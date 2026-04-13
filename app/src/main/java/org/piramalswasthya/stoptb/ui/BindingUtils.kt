@@ -1,0 +1,487 @@
+package org.piramalswasthya.stoptb.ui
+
+import android.content.Context
+import android.net.Uri
+import android.os.Build
+import android.provider.OpenableColumns
+import android.text.Html
+import android.text.InputType
+import android.view.View
+import android.view.ViewGroup
+import android.view.animation.Animation
+import android.view.animation.LinearInterpolator
+import android.view.animation.RotateAnimation
+import android.widget.*
+import android.widget.RadioGroup.LayoutParams
+import androidx.annotation.RequiresApi
+import androidx.annotation.StringRes
+import androidx.cardview.widget.CardView
+import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.databinding.BindingAdapter
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.signature.ObjectKey
+import com.google.android.material.color.MaterialColors
+import com.google.android.material.divider.MaterialDivider
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
+import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.configuration.IconDataset
+import org.piramalswasthya.stoptb.database.room.SyncState
+import org.piramalswasthya.stoptb.helpers.Konstants
+import org.piramalswasthya.stoptb.model.BenBasicDomain
+import org.piramalswasthya.stoptb.model.FormInputOld
+import org.piramalswasthya.stoptb.model.Gender
+import timber.log.Timber
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+
+fun IconDataset.Disease.getTitle(context: Context): String {
+    return context.getString(getTitleRes())
+}
+@StringRes
+fun IconDataset.Disease.getTitleRes(): Int {
+    return when (this) {
+        IconDataset.Disease.MALARIA   -> R.string.icon_title_maleria
+        IconDataset.Disease.KALA_AZAR -> R.string.icon_title_ka
+        IconDataset.Disease.AES_JE    -> R.string.icon_title_aes
+        IconDataset.Disease.FILARIA  -> R.string.icon_title_filaria
+        IconDataset.Disease.LEPROSY  -> R.string.icon_title_leprosy
+        IconDataset.Disease.DEWARMING -> R.string.deworming_title
+    }
+}
+
+
+@BindingAdapter("formattedDate")
+fun setFormattedDate(view: TextView, timestamp: Long?) {
+    timestamp?.let {
+        val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
+        view.text = sdf.format(Date(it))
+    }
+}
+
+
+@BindingAdapter("formattedDatewitheMonth")
+fun setFormattedDateWithMonth(view: TextView, timestamp: Long?) {
+    timestamp?.let {
+        val sdf = SimpleDateFormat("dd-MM-yyyy , MMM", Locale.ENGLISH)
+        view.text = sdf.format(Date(it))
+    }
+}
+
+
+@BindingAdapter("scope", "recordCount")
+fun TextView.setRecordCount(scope: CoroutineScope, count: Flow<Int>?) {
+    count?.let { flow ->
+        scope.launch {
+            try {
+                flow.collect {
+                    text = it.toString()
+                }
+            } catch (e: Exception) {
+                Timber.d("Exception at record count : $e collected")
+            }
+
+        }
+    } ?: run {
+        text = null
+    }
+}
+
+@BindingAdapter("allowRedBorder", "scope", "recordCount")
+fun CardView.setRedBorder(allowRedBorder: Boolean, scope: CoroutineScope, count: Flow<Int>?) {
+    count?.let {
+        scope.launch {
+            it.collect {
+                if (it > 0 && allowRedBorder) {
+                    setBackgroundResource(R.drawable.red_border)
+                }
+            }
+        }
+    }
+}
+
+@BindingAdapter("benIdText")
+fun TextView.setBenIdText(benId: Long?) {
+    benId?.let {
+        if (benId < 0L) {
+            text = "Pending Sync"
+            setTextColor(resources.getColor(android.R.color.holo_orange_light))
+        } else {
+            text = benId.toString()
+            setTextColor(
+                MaterialColors.getColor(
+                    this,
+                    com.google.android.material.R.attr.colorOnPrimary
+                )
+            )
+
+        }
+    }
+
+}
+
+
+@BindingAdapter("showBasedOnNumMembers")
+fun TextView.showBasedOnNumMembers(numMembers: Int?) {
+    numMembers?.let {
+        visibility = if (it > 0) View.VISIBLE else View.GONE
+    }
+}
+
+@BindingAdapter("backgroundTintBasedOnNumMembers")
+fun CardView.setBackgroundTintBasedOnNumMembers(numMembers: Int?) {
+    numMembers?.let {
+        val color = MaterialColors.getColor(
+            this,
+            if (it > 0) androidx.appcompat.R.attr.colorPrimary else android.R.attr.colorEdgeEffect
+        )
+        setCardBackgroundColor(color)
+    }
+}
+
+@BindingAdapter("rchId")
+fun LinearLayout.showRchIdOrNot(ben: BenBasicDomain?) {
+    ben?.let {
+        val gender = ben.gender
+        visibility =
+            if (gender == Gender.FEMALE.name || (gender == Gender.MALE.name && ben.ageInt < Konstants.minAgeForGenBen))
+                View.VISIBLE
+            else
+                View.INVISIBLE
+    }
+}
+
+@BindingAdapter("textBasedOnNumMembers")
+fun TextView.textBasedOnNumMembers(numMembers: Int?) {
+    numMembers?.let {
+        text = if (it > 0) resources.getString(R.string.str_add_member)  else resources.getString(R.string.add_family_member)
+    }
+}
+
+
+@BindingAdapter("listItems")
+fun AutoCompleteTextView.setSpinnerItems(list: Array<String>?) {
+    list?.let {
+        this.setAdapter(ArrayAdapter(context, android.R.layout.simple_spinner_dropdown_item, it))
+    }
+}
+
+@BindingAdapter("allCaps")
+fun TextInputEditText.setAllAlphabetCaps(allCaps: Boolean) {
+    if (allCaps) {
+        isAllCaps = true
+        inputType = InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+    }
+}
+
+@BindingAdapter("showLayout")
+fun Button.setVisibilityOfLayout(show: Boolean?) {
+    show?.let {
+        visibility = if (it) View.VISIBLE else View.GONE
+    }
+}
+
+@BindingAdapter("showLayout")
+fun ImageView.setVisibilityOfLayout(show: Boolean?) {
+    show?.let {
+        visibility = if (it) View.VISIBLE else View.GONE
+    }
+}
+
+@BindingAdapter("showLayout")
+fun ViewGroup.setVisibilityOfLayout(show: Boolean?) {
+    show?.let {
+        visibility = if (it) View.VISIBLE else View.GONE
+    }
+}
+
+@BindingAdapter("radioForm")
+fun ConstraintLayout.setItems(form: FormInputOld?) {
+}
+
+@BindingAdapter("checkBoxesForm")
+fun ConstraintLayout.setItemsCheckBox(form: FormInputOld?) {
+    val ll = this.findViewById<LinearLayout>(R.id.ll_checks)
+    ll.removeAllViews()
+    ll.apply {
+        form?.entries?.let { items ->
+            orientation = form.orientation ?: LinearLayout.VERTICAL
+            weightSum = items.size.toFloat()
+            items.forEach {
+                val cbx = CheckBox(this.context)
+                cbx.layoutParams =
+                    LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, 1.0F)
+                cbx.id = View.generateViewId()
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) cbx.setTextAppearance(
+                    context, android.R.style.TextAppearance_Material_Medium
+                )
+                else cbx.setTextAppearance(android.R.style.TextAppearance_Material_Subhead)
+                cbx.text = it
+                addView(cbx)
+                if (form.value.value?.contains(it) == true) cbx.isChecked = true
+                cbx.setOnCheckedChangeListener { _, b ->
+                    if (b) {
+                        if (form.value.value != null) form.value.value = form.value.value + it
+                        else form.value.value = it
+                    } else {
+                        if (form.value.value?.contains(it) == true) {
+                            form.value.value = form.value.value?.replace(it, "")
+                        }
+                    }
+                    if (form.value.value.isNullOrBlank()) {
+                        form.value.value = null
+                    } else {
+                        Timber.d("Called here!")
+                        form.errorText = null
+                        this@setItemsCheckBox.setBackgroundResource(0)
+                    }
+                    Timber.d("Checkbox values : ${form.value.value}")
+                }
+            }
+        }
+    }
+}
+
+@BindingAdapter("required")
+fun TextView.setRequired(required: Boolean?) {
+    required?.let {
+        visibility = if (it) View.VISIBLE else View.GONE
+    }
+}
+
+@BindingAdapter("imgRequired")
+fun ImageView.setRequired(required: Boolean?) {
+    required?.let {
+        visibility = if (it) View.VISIBLE else View.GONE
+    }
+}
+
+@BindingAdapter("required2")
+fun TextView.setRequired2(required2: Boolean?) {
+    required2?.let {
+        visibility = if (it) View.VISIBLE else View.GONE
+    }
+}
+
+@BindingAdapter("headingLine")
+fun MaterialDivider.setHeadingLine(required: Boolean?) {
+    required?.let {
+        visibility = if (it) View.VISIBLE else View.GONE
+    }
+}
+
+
+private val rotate = RotateAnimation(
+    360F, 0F, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f
+).apply {
+    duration = 1000
+    interpolator = LinearInterpolator()
+    repeatCount = Animation.INFINITE
+}
+
+
+@BindingAdapter("syncState")
+fun ImageView.setSyncState(syncState: SyncState?) {
+    syncState?.let {
+        visibility = View.VISIBLE
+        val drawable = when (it) {
+            SyncState.UNSYNCED -> R.drawable.ic_unsynced
+            SyncState.SYNCING -> R.drawable.ic_syncing
+            SyncState.SYNCED -> R.drawable.ic_synced
+        }
+        setImageResource(drawable)
+        isClickable = it == SyncState.UNSYNCED
+        if (it == SyncState.SYNCING) startAnimation(rotate)
+    } ?: run {
+        visibility = View.INVISIBLE
+    }
+}
+
+@BindingAdapter("syncStateForBen")
+fun ImageView.setSyncStateForBen(syncState: SyncState?) {
+    syncState?.let {
+
+        val drawable = when (it) {
+            SyncState.UNSYNCED -> R.drawable.ic_unsynced
+            SyncState.SYNCING -> R.drawable.ic_syncing
+            SyncState.SYNCED -> R.drawable.ic_synced
+        }
+        setImageResource(drawable)
+        isClickable = it == SyncState.UNSYNCED
+        if (it == SyncState.SYNCING) startAnimation(rotate)
+    } ?: run {
+        visibility = View.INVISIBLE
+    }
+}
+
+
+
+@BindingAdapter("benImage")
+fun ImageView.setBenImage(uriString: String?) {
+    if (uriString == null) setImageResource(R.drawable.ic_person)
+    else {
+        Glide.with(this).load(Uri.parse(uriString))
+            .signature(ObjectKey(System.currentTimeMillis() / 1000))
+            .skipMemoryCache(true)
+            .diskCacheStrategy(DiskCacheStrategy.NONE)
+            .placeholder(R.drawable.ic_person).circleCrop()
+            .into(this)
+    }
+}
+
+
+@BindingAdapter("list_avail")
+fun Button.setCbacListAvail(list: List<Any>?) {
+    list?.let {
+        if (list.isEmpty())
+            visibility = View.INVISIBLE
+        else
+            visibility = View.VISIBLE
+    }
+}
+
+
+@BindingAdapter("cbac_name", "asteriskColor")
+fun TextView.setAsteriskText(fieldName: String?, numAsterisk: Int?) {
+
+    fieldName?.let {
+        numAsterisk?.let {
+            text = if (numAsterisk == 1) {
+                Html.fromHtml(
+                    resources.getString(R.string.radio_title_cbac, fieldName),
+                    Html.FROM_HTML_MODE_LEGACY
+                )
+            } else if (numAsterisk == 2) {
+                Html.fromHtml(
+                    resources.getString(R.string.radio_title_cbac_ds, fieldName),
+                    Html.FROM_HTML_MODE_LEGACY
+                )
+            } else {
+                fieldName
+            }
+        }
+    }
+}
+
+@RequiresApi(Build.VERSION_CODES.N)
+@BindingAdapter("asteriskRequired", "hintText")
+fun TextInputLayout.setAsteriskFormText(required: Boolean?, title: String?) {
+
+    required?.let {
+        title?.let {
+            hint = if (required) {
+                Html.fromHtml(
+                    resources.getString(R.string.radio_title_cbac, title),
+                    Html.FROM_HTML_MODE_LEGACY
+                )
+            } else {
+                title
+            }
+        }
+    }
+}
+fun checkFileSize(uri: Uri,context: Context) : Boolean {
+    val size = getFileSize(uri, context)
+    return size > 5 * 1024 * 1024
+
+}
+fun getFileSize(uri: Uri,context: Context): Long {
+    val cursor = context.contentResolver.query(uri, null, null, null, null)
+    return cursor?.use {
+        val sizeIndex = it.getColumnIndex(android.provider.OpenableColumns.SIZE)
+        if (sizeIndex != -1 && it.moveToFirst()) {
+            it.getLong(sizeIndex)
+        } else {
+            0L
+        }
+    } ?: 0L
+}
+
+fun getByteArrayFromUri(uri: Uri,context: Context): ByteArray {
+    val inputStream = context.contentResolver.openInputStream(uri)
+    return inputStream?.readBytes() ?: byteArrayOf()
+}
+fun getFileName(uri: Uri,context: Context): String {
+    val cursor = context.contentResolver.query(uri, null, null, null, null)
+    cursor?.use {
+        val index = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        if (it.moveToFirst()) return it.getString(index)
+    }
+    return "file_${System.currentTimeMillis()}"
+}
+@RequiresApi(Build.VERSION_CODES.N)
+@BindingAdapter("asteriskRequired", "hintText")
+fun TextView.setAsteriskTextView(required: Boolean?, title: String?) {
+
+    required?.let {
+        title?.let {
+            text = if (required) {
+                Html.fromHtml(
+                    resources.getString(R.string.radio_title_cbac, title),
+                    Html.FROM_HTML_MODE_LEGACY
+                )
+            } else {
+                title
+            }
+        }
+    }
+
+}
+
+
+@BindingAdapter(value = ["formattedSessionDate"], requireAll = false)
+fun setFormattedSessionDate(textView: TextView, timestamp: Long?) {
+    if (timestamp == null) {
+        textView.text =textView.context.getString(R.string.session_date_n_a)
+        return
+    }
+
+    val date = Date(timestamp)
+    val formatType = textView.tag as? String ?: "default"
+
+    val format = SimpleDateFormat("dd MMM yyyy", Locale.ENGLISH)
+    val formattedDate = format.format(date)
+
+    textView.text = when (formatType) {
+        "default" -> textView.context.getString(R.string.session_date_format, formattedDate)
+        "monthYear" -> {
+            val monthFormat = SimpleDateFormat("MMMM - yyyy", Locale.ENGLISH)
+            val monthYear = monthFormat.format(date)
+            textView.context.getString(R.string.uwin_session_format, monthYear)
+        }
+        else -> textView.context.getString(R.string.session_date_format, formattedDate)
+    }
+}
+
+@BindingAdapter(value = ["visibleIfAgeAbove30AndAliveAge", "isDeath"], requireAll = true)
+fun Button.visibleIfAgeAbove30AndAlive(age: Int?, isDeath: String?) {
+    val shouldShow = (age ?: 0) >= 30 && isDeath.equals("false", ignoreCase = true)
+    visibility = if (shouldShow) View.VISIBLE else View.GONE
+}
+
+@BindingAdapter(value = ["visibleIfEligibleFemale", "isDeath", "reproductiveStatusId", "gender"], requireAll = true)
+fun Button.visibleIfEligibleFemale(age: Int?, isDeath: String?, reproductiveStatusId: Int?, gender: String?) {
+
+    val shouldShow =
+        (gender.equals("female", ignoreCase = true)) &&
+                ((age ?: 0) in 20..49) &&
+                (reproductiveStatusId == 1 || reproductiveStatusId == 2) &&
+                isDeath.equals("false", ignoreCase = true)
+
+    visibility = if (shouldShow) View.VISIBLE else View.GONE
+}
+
+@BindingAdapter("dynamicBackground")
+fun setDynamicBackground(view: View, isEligible: Boolean) {
+    if (isEligible) {
+        view.setBackgroundResource(R.color.md_theme_light_error)
+    } else {
+        view.background = null
+    }
+}

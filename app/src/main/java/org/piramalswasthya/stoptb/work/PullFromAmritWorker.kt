@@ -1,0 +1,146 @@
+package org.piramalswasthya.stoptb.work
+
+import android.content.pm.ServiceInfo
+import android.os.Build
+import android.content.Context
+import android.database.sqlite.SQLiteConstraintException
+import androidx.core.app.NotificationCompat
+import androidx.hilt.work.HiltWorker
+import androidx.work.CoroutineWorker
+import androidx.work.ForegroundInfo
+import androidx.work.WorkerParameters
+import androidx.work.workDataOf
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.withContext
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.Konstants
+import org.piramalswasthya.stoptb.repositories.BenRepo
+import timber.log.Timber
+import java.lang.Integer.min
+import java.util.concurrent.TimeUnit
+
+@HiltWorker
+class PullFromAmritWorker @AssistedInject constructor(
+    @Assisted private val appContext: Context,
+    @Assisted params: WorkerParameters,
+    private val benRepo: BenRepo,
+    private val preferenceDao: PreferenceDao,
+) : CoroutineWorker(appContext, params) {
+
+    companion object {
+        const val name = "PullFromAmritWorker"
+        const val Progress = "Progress"
+        const val NumPages = "Total Pages"
+        const val n = 4 // Number of threads!
+    }
+
+    private var page1: Int = 0
+    private var page2: Int = 0
+    private var page3: Int = 0
+    private var page4: Int = 0
+
+
+    override suspend fun getForegroundInfo(): ForegroundInfo = createForegroundInfo("Syncing data...")
+
+    override suspend fun doWork(): Result {
+        return try {            withContext(Dispatchers.IO) {
+                val startTime = System.currentTimeMillis()
+                var numPages: Int
+                val startPage =
+                    if (preferenceDao.getLastSyncedTimeStamp() == Konstants.defaultTimeStamp)
+                        preferenceDao.getFirstSyncLastSyncedPage()
+                    else 0
+
+                try {
+                    do {
+                        numPages = benRepo.getBeneficiariesFromServerForWorker(startPage)
+                    } while (numPages == -2)
+                    if (numPages == 0)
+                        return@withContext Result.success()
+                    val result1 =
+                        awaitAll(
+                            async { getBenForPage(numPages, 0, startPage) },
+                            async { getBenForPage(numPages, 1, startPage) },
+                            async { getBenForPage(numPages, 2, startPage) },
+                            async { getBenForPage(numPages, 3, startPage) },
+                        )
+                    val endTime = System.currentTimeMillis()
+                    val timeTaken = TimeUnit.MILLISECONDS.toSeconds(endTime - startTime)
+                    Timber.d("Full load took $timeTaken seconds for $numPages pages  $result1")
+
+                    if (result1.all { it }) {
+                        return@withContext Result.success()
+                    }
+                    return@withContext Result.failure(workDataOf("worker_name" to "PullFromAmritWorker", "error" to "Pull operation returned incomplete results"))
+                } catch (e: SQLiteConstraintException) {
+                    Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
+                    return@withContext Result.failure(workDataOf("worker_name" to "PullFromAmritWorker", "error" to "SQLite constraint: ${e.message}"))
+                }
+
+            }
+
+        } catch (e: java.lang.Exception) {
+            Timber.e("Error occurred in PullFromAmritFullLoadWorker $e ${e.stackTrace}")
+
+            Result.failure(workDataOf("worker_name" to "PullFromAmritWorker", "error" to (e.message ?: "Unknown error")))
+        }
+    }
+
+    private fun createForegroundInfo(progress: String): ForegroundInfo {
+
+        val notification = NotificationCompat.Builder(
+            appContext,
+            appContext.getString(org.piramalswasthya.stoptb.R.string.notification_sync_channel_id)
+        )
+            .setContentTitle("Syncing Data")
+            .setContentText(progress)
+            .setSmallIcon(org.piramalswasthya.stoptb.R.drawable.ic_launcher_foreground)
+            .setProgress(100, 0, true)
+            .setOngoing(true)
+            .build()
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            ForegroundInfo(1003, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            ForegroundInfo(1003, notification)
+        }
+    }
+
+
+    private suspend fun getBenForPage(numPages: Int, rem: Int, startPage: Int): Boolean {
+        return withContext(Dispatchers.IO) {
+            var page: Int = startPage + rem
+
+            try {
+                while (page <= numPages) {
+                    val ret = benRepo.getBeneficiariesFromServerForWorker(page)
+
+                    if (ret == -1)
+                        throw IllegalStateException("benRepo.getBeneficiariesFromServerForWorker(page) returned -1 ")
+                    if (ret != -2) {
+                        val finalPage = (page1 + page2 + page3 + page4) / 4
+                        val minPageSynced = min(min(page1, page2), min(page3, page4))
+                        preferenceDao.setFirstSyncLastSyncedPage(minPageSynced)
+                        setProgressAsync(workDataOf(Progress to finalPage, NumPages to numPages))
+                        page += n
+                    }
+                    when (rem) {
+                        0 -> page1 = page
+                        1 -> page2 = page
+                        2 -> page3 = page
+                        3 -> page4 = page
+                    }
+
+                }
+            } catch (e: SQLiteConstraintException) {
+                Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
+            }
+            true
+        }
+    }
+
+}

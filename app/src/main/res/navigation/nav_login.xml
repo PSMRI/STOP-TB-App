@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_login"
+    app:startDestination="@id/signInFragment">
+
+    <fragment
+        android:id="@+id/signInFragment"
+        android:name="org.piramalswasthya.stoptb.ui.login_activity.sign_in.SignInFragment"
+        android:label="@string/sign_in"
+        tools:layout="@layout/fragment_sign_in" >
+        <action
+            android:id="@+id/action_signInFragment_to_homeActivity"
+            app:destination="@id/homeActivity" />
+        <action
+            android:id="@+id/action_signInFragment_to_serviceLocationActivity"
+            app:destination="@id/serviceLocationActivity" />
+    </fragment>
+    <activity
+        android:id="@+id/homeActivity"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.HomeActivity"
+        android:label="@string/home"
+        tools:layout="@layout/activity_home_content" />
+    <activity
+        android:id="@+id/serviceLocationActivity"
+        android:name="org.piramalswasthya.stoptb.ui.service_location_activity.ServiceLocationActivity"
+        android:label="activity_service_location"
+        tools:layout="@layout/activity_service_location" />
+</navigation>

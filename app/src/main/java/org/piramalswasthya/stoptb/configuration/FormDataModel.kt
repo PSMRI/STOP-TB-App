@@ -1,0 +1,3 @@
+package org.piramalswasthya.stoptb.configuration
+
+interface FormDataModel

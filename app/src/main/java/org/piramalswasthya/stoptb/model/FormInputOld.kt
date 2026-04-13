@@ -1,0 +1,30 @@
+package org.piramalswasthya.stoptb.model
+
+import android.text.InputType.TYPE_CLASS_TEXT
+import androidx.annotation.DrawableRes
+import kotlinx.coroutines.flow.MutableStateFlow
+import java.io.File
+
+data class FormInputOld(
+    val inputType: InputType,
+    var title: String,
+    val subtitle: String? = null,
+    var entries: Array<String>? = null,
+    var required: Boolean,
+    val regex: String? = null,
+    val allCaps: Boolean = false,
+    val etInputType: Int = TYPE_CLASS_TEXT,
+    val isMobileNumber: Boolean = false,
+    val etMaxLength: Int = 50,
+    var errorText: String? = null,
+    var max: Long? = null,
+    var min: Long? = null,
+    var minDecimal: Double? = null,
+    var maxDecimal: Double? = null,
+    val orientation: Int? = null,
+    var imageFile: File? = null,
+    @DrawableRes val iconDrawableRes: Int? = null,
+) {
+
+    var value: MutableStateFlow<String?> = MutableStateFlow(null)
+}

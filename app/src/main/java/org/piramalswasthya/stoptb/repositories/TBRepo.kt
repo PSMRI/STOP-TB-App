@@ -1,0 +1,627 @@
+package org.piramalswasthya.stoptb.repositories
+
+import com.google.gson.Gson
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import org.piramalswasthya.stoptb.database.room.SyncState
+import org.piramalswasthya.stoptb.database.room.dao.BenDao
+import org.piramalswasthya.stoptb.database.room.dao.TBDao
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.Konstants
+import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
+import org.piramalswasthya.stoptb.model.TBScreeningCache
+import org.piramalswasthya.stoptb.model.TBSuspectedCache
+import org.piramalswasthya.stoptb.network.AmritApiService
+import org.piramalswasthya.stoptb.network.GetDataPaginatedRequest
+import org.piramalswasthya.stoptb.network.TBConfirmedRequestDTO
+import org.piramalswasthya.stoptb.network.TBScreeningRequestDTO
+import org.piramalswasthya.stoptb.network.TBSuspectedRequestDTO
+import timber.log.Timber
+import java.net.SocketTimeoutException
+import java.text.SimpleDateFormat
+import java.util.Locale
+import javax.inject.Inject
+
+class TBRepo @Inject constructor(
+    private val tbDao: TBDao,
+    private val benDao: BenDao,
+    private val preferenceDao: PreferenceDao,
+    private val userRepo: UserRepo,
+    private val tmcNetworkApiService: AmritApiService
+) {
+
+    suspend fun getTBScreening(benId: Long): TBScreeningCache? {
+        return withContext(Dispatchers.IO) {
+            tbDao.getTbScreening(benId)
+        }
+    }
+
+    suspend fun saveTBScreening(tbScreeningCache: TBScreeningCache) {
+        withContext(Dispatchers.IO) {
+            tbDao.saveTbScreening(tbScreeningCache)
+        }
+    }
+
+    suspend fun getTBSuspected(benId: Long): TBSuspectedCache? {
+        return withContext(Dispatchers.IO) {
+            tbDao.getTbSuspected(benId)
+        }
+    }
+
+    suspend fun saveTBSuspected(tbSuspectedCache: TBSuspectedCache) {
+        withContext(Dispatchers.IO) {
+            tbDao.saveTbSuspected(tbSuspectedCache)
+        }
+    }
+
+    suspend fun getTBConfirmed(benId: Long): TBConfirmedTreatmentCache? {
+        return withContext(Dispatchers.IO) {
+            tbDao.getTbConfirmed(benId)
+        }
+    }
+
+    suspend fun saveTBConfirmed(tbConfirmedTreatmentCache: TBConfirmedTreatmentCache) {
+        withContext(Dispatchers.IO)
+        {
+            tbDao.saveTbConfirmed(tbConfirmedTreatmentCache)
+        }
+    }
+
+    suspend fun getAllFollowUpsForBeneficiary(benId: Long): List<TBConfirmedTreatmentCache> {
+        return withContext(Dispatchers.IO) {
+            tbDao.getAllFollowUpsForBeneficiary(benId)
+        }
+    }
+
+    suspend fun getTBScreeningDetailsFromServer(): Int {
+        return withContext(Dispatchers.IO) {
+            val user =
+                preferenceDao.getLoggedInUser()
+                    ?: throw IllegalStateException("No user logged in!!")
+            val lastTimeStamp = preferenceDao.getLastSyncedTimeStamp()
+            try {
+                val response = tmcNetworkApiService.getTBScreeningData(
+                    GetDataPaginatedRequest(
+                        ashaId = user.userId,
+                        pageNo = 0,
+                        fromDate = BenRepo.getCurrentDate(Konstants.defaultTimeStamp),
+                        toDate = getCurrentDate()
+                    )
+                )
+                val statusCode = response.code()
+                if (statusCode == 200) {
+                    val responseString = response.body()?.string()
+                    if (responseString != null) {
+                        val jsonObj = JSONObject(responseString)
+
+                        val errorMessage = jsonObj.getString("errorMessage")
+                        val responseStatusCode = jsonObj.getInt("statusCode")
+                        Timber.d("Pull from amrit tb screening data : $responseStatusCode")
+                        when (responseStatusCode) {
+                            200 -> {
+                                try {
+                                    val dataObj = jsonObj.getString("data")
+                                    saveTBScreeningCacheFromResponse(dataObj)
+                                } catch (e: Exception) {
+                                    Timber.d("TB Screening entries not synced $e")
+                                    return@withContext 0
+                                }
+
+                                return@withContext 1
+                            }
+
+                            401,5002 -> {
+                                if (userRepo.refreshTokenTmc(
+                                        user.userName, user.password
+                                    )
+                                ) throw SocketTimeoutException("Refreshed Token!")
+                                else throw IllegalStateException("User Logged out!!")
+                            }
+
+                            5000 -> {
+                                if (errorMessage == "No record found") return@withContext 0
+                            }
+
+                            else -> {
+                                throw IllegalStateException("$responseStatusCode received, dont know what todo!?")
+                            }
+                        }
+                    }
+                }
+
+            } catch (e: SocketTimeoutException) {
+                Timber.e("get_tb error : $e")
+                return@withContext -2
+
+            } catch (e: java.lang.IllegalStateException) {
+                Timber.e("get_tb error : $e")
+                return@withContext -1
+            }
+            -1
+        }
+    }
+
+    private suspend fun saveTBScreeningCacheFromResponse(dataObj: String): MutableList<TBScreeningCache> {
+        val tbScreeningList = mutableListOf<TBScreeningCache>()
+        var requestDTO = Gson().fromJson(dataObj, TBScreeningRequestDTO::class.java)
+        requestDTO?.tbScreeningList?.forEach { tbScreeningDTO ->
+            tbScreeningDTO.visitDate?.let {
+                var tbScreeningCache: TBScreeningCache? =
+                    tbDao.getTbScreening(
+                        tbScreeningDTO.benId,
+                        getLongFromDate(tbScreeningDTO.visitDate),
+                        getLongFromDate(tbScreeningDTO.visitDate) - 19_800_000
+                    )
+                if (tbScreeningCache == null) {
+                    benDao.getBen(tbScreeningDTO.benId)?.let {
+                        tbDao.saveTbScreening(tbScreeningDTO.toCache())
+                    }
+                }
+            }
+        }
+        return tbScreeningList
+    }
+
+    suspend fun getTbSuspectedDetailsFromServer(): Int {
+        return withContext(Dispatchers.IO) {
+            val user =
+                preferenceDao.getLoggedInUser()
+                    ?: throw IllegalStateException("No user logged in!!")
+            val lastTimeStamp = preferenceDao.getLastSyncedTimeStamp()
+            try {
+                val response = tmcNetworkApiService.getTBSuspectedData(
+                    GetDataPaginatedRequest(
+                        ashaId = user.userId,
+                        pageNo = 0,
+                        fromDate = BenRepo.getCurrentDate(Konstants.defaultTimeStamp),
+                        toDate = getCurrentDate()
+                    )
+                )
+                val statusCode = response.code()
+                if (statusCode == 200) {
+                    val responseString = response.body()?.string()
+                    if (responseString != null) {
+                        val jsonObj = JSONObject(responseString)
+
+                        val errorMessage = jsonObj.getString("errorMessage")
+                        val responseStatusCode = jsonObj.getInt("statusCode")
+                        Timber.d("Pull from amrit tb suspected data : $responseStatusCode")
+                        when (responseStatusCode) {
+                            200 -> {
+                                try {
+                                    val dataObj = jsonObj.getString("data")
+                                    saveTBSuspectedCacheFromResponse(dataObj)
+                                } catch (e: Exception) {
+                                    Timber.d("TB Suspected entries not synced $e")
+                                    return@withContext 0
+                                }
+
+                                return@withContext 1
+                            }
+
+                            401,5002 -> {
+                                if (userRepo.refreshTokenTmc(
+                                        user.userName, user.password
+                                    )
+                                ) throw SocketTimeoutException("Refreshed Token!")
+                                else throw IllegalStateException("User Logged out!!")
+                            }
+
+                            5000 -> {
+                                if (errorMessage == "No record found") return@withContext 0
+                            }
+
+                            else -> {
+                                throw IllegalStateException("$responseStatusCode received, don't know what todo!?")
+                            }
+                        }
+                    }
+                }
+
+            } catch (e: SocketTimeoutException) {
+                Timber.e("get_tb error : $e")
+                return@withContext -2
+
+            } catch (e: java.lang.IllegalStateException) {
+                Timber.e("get_tb error : $e")
+                return@withContext -1
+            }
+            -1
+        }
+    }
+
+    private suspend fun saveTBSuspectedCacheFromResponse(dataObj: String): MutableList<TBSuspectedCache> {
+        val tbSuspectedList = mutableListOf<TBSuspectedCache>()
+        val requestDTO = Gson().fromJson(dataObj, TBSuspectedRequestDTO::class.java)
+        requestDTO?.tbSuspectedList?.forEach { tbSuspectedDTO ->
+            tbSuspectedDTO.visitDate?.let {
+                val tbSuspectedCache: TBSuspectedCache? =
+                    tbDao.getTbSuspected(
+                        tbSuspectedDTO.benId,
+                        getLongFromDate(tbSuspectedDTO.visitDate),
+                        getLongFromDate(tbSuspectedDTO.visitDate) - 19_800_000
+                    )
+                if (tbSuspectedCache == null) {
+                    benDao.getBen(tbSuspectedDTO.benId)?.let {
+                        tbDao.saveTbSuspected(tbSuspectedDTO.toCache())
+                    }
+                }
+            }
+        }
+        return tbSuspectedList
+    }
+
+
+    suspend fun getTbConfirmedDetailsFromServer(): Int {
+        return withContext(Dispatchers.IO) {
+
+            try {
+
+                val user =
+                    preferenceDao.getLoggedInUser()
+                        ?: throw IllegalStateException("No user logged in!!")
+
+
+                val response = tmcNetworkApiService.getTBConfirmedData()
+                val statusCode = response.code()
+
+                if (statusCode == 200) {
+                    val responseString = response.body()?.string()
+
+                    if (responseString != null) {
+                        val jsonObj = JSONObject(responseString)
+
+                        val errorMessage = jsonObj.getString("errorMessage")
+                        val responseStatusCode = jsonObj.getInt("statusCode")
+
+
+                        when (responseStatusCode) {
+                            200 -> {
+                                try {
+                                    val dataObj = jsonObj.getString("data")
+
+                                    saveTBConfirmedCacheFromResponse(dataObj)
+
+                                } catch (e: Exception) {
+                                    Timber.e(e, "TBConfirmed: Error while saving data")
+                                    return@withContext 0
+                                }
+
+                                return@withContext 1
+                            }
+
+                            5002 -> {
+                                if (userRepo.refreshTokenTmc(user.userName, user.password))
+                                    throw SocketTimeoutException("Refreshed Token!")
+                                else
+                                    throw IllegalStateException("User Logged out!!")
+                            }
+
+                            5000 -> {
+                                if (errorMessage == "No record found") {
+                                    return@withContext 0
+                                }
+                            }
+
+                            else -> {
+                                throw IllegalStateException("$responseStatusCode received, don't know what todo!?")
+                            }
+                        }
+                    }
+                }
+
+            } catch (e: SocketTimeoutException) {
+                return@withContext -2
+
+            } catch (e: IllegalStateException) {
+                return@withContext -1
+            } catch (e: Exception) {
+                return@withContext -1
+            }
+
+            -1
+        }
+    }
+
+
+    private suspend fun saveTBConfirmedCacheFromResponse(dataObj: String): MutableList<TBConfirmedTreatmentCache> {
+
+
+        val tbConfirmedList = mutableListOf<TBConfirmedTreatmentCache>()
+
+        try {
+            val requestDTO = Gson().fromJson(dataObj, TBConfirmedRequestDTO::class.java)
+
+
+            requestDTO?.tbConfirmedList?.forEachIndexed { index, tbConfirmedDTO ->
+
+
+                try {
+                    val cache = tbConfirmedDTO.toCache()
+
+                    tbDao.saveTbConfirmed(cache)
+
+
+                    tbConfirmedList.add(cache)
+
+                } catch (e: Exception) {
+                }
+            }
+
+        } catch (e: Exception) {
+            Timber.e(e, "TBConfirmed: Error parsing or saving JSON")
+        }
+
+        return tbConfirmedList
+    }
+
+
+    // RECORD-LEVEL ISOLATION: Coordinator always returns true so the
+    // WorkManager worker succeeds. Each sub-method handles its own failures
+    // independently — failed records stay UNSYNCED and retry on next sync cycle.
+    // Previously, if any sub-method failed, the coordinator returned false which
+    // could cause the worker to be marked as failed.
+    suspend fun pushUnSyncedRecords(): Boolean {
+        val screeningResult = pushUnSyncedRecordsTBScreening()
+        val suspectedResult = pushUnSyncedRecordsTBSuspected()
+        val confirmedResult = pushUnSyncedRecordsTBConfirmed()
+        Timber.d("TB push results: screening=$screeningResult, suspected=$suspectedResult, confirmed=$confirmedResult")
+        // Worker succeeds — failed records stay UNSYNCED for next cycle
+        return true
+    }
+
+    // RECORD-LEVEL ISOLATION: TB Screening records are now sent in
+    // chunks of 20 instead of one giant batch. Previously, if ANY record in
+    // the batch was malformed, the ENTIRE batch failed and ALL records stayed
+    // UNSYNCED. Now each chunk is independent — one bad chunk doesn't affect
+    // the others. Failed chunks' records stay UNSYNCED for the next sync cycle.
+    // Also removed dangerous recursive retry on SocketTimeoutException that
+    // could cause infinite recursion and stack overflow.
+    private suspend fun pushUnSyncedRecordsTBScreening(): Int {
+
+        return withContext(Dispatchers.IO) {
+            val user =
+                preferenceDao.getLoggedInUser()
+                    ?: throw IllegalStateException("No user logged in!!")
+
+            val tbsnList: List<TBScreeningCache> = tbDao.getTBScreening(SyncState.UNSYNCED)
+
+            if (tbsnList.isEmpty()) return@withContext 1
+
+            // Chunk records to prevent all-or-nothing batch failure
+            val CHUNK_SIZE = 20
+            val chunks = tbsnList.chunked(CHUNK_SIZE)
+            var successCount = 0
+            var failCount = 0
+
+            for (chunk in chunks) {
+                try {
+                    val chunkDtos = chunk.map { it.toDTO() }
+
+                    val response = tmcNetworkApiService.saveTBScreeningData(
+                        TBScreeningRequestDTO(
+                            userId = user.userId,
+                            tbScreeningList = chunkDtos
+                        )
+                    )
+                    val statusCode = response.code()
+                    if (statusCode == 200) {
+                        val responseString = response.body()?.string()
+                        if (responseString != null) {
+                            val jsonObj = JSONObject(responseString)
+                            val responseStatusCode = jsonObj.getInt("statusCode")
+                            Timber.d("Push to Amrit TB Screening chunk: $responseStatusCode")
+                            when (responseStatusCode) {
+                                200 -> {
+                                    updateSyncStatusScreening(chunk)
+                                    successCount += chunk.size
+                                }
+
+                                401, 5002 -> {
+                                    // Token expired — try refreshing for subsequent chunks
+                                    if (userRepo.refreshTokenTmc(user.userName, user.password)) {
+                                        Timber.d("Token refreshed, TB Screening chunk will retry next cycle")
+                                    }
+                                    failCount += chunk.size
+                                }
+
+                                else -> {
+                                    Timber.e("TB Screening chunk failed with statusCode: $responseStatusCode")
+                                    failCount += chunk.size
+                                }
+                            }
+                        }
+                    } else {
+                        Timber.e("TB Screening chunk HTTP error: $statusCode")
+                        failCount += chunk.size
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "TB Screening chunk push failed: ${chunk.size} records")
+                    failCount += chunk.size
+                }
+            }
+
+            Timber.d("TB Screening push complete: $successCount succeeded, $failCount failed out of ${tbsnList.size}")
+            // Worker succeeds — failed records stay UNSYNCED for next cycle
+            return@withContext 1
+        }
+    }
+
+    // RECORD-LEVEL ISOLATION: Same chunking pattern as TB Screening.
+    // Records sent in chunks of 20 with per-chunk error isolation.
+    private suspend fun pushUnSyncedRecordsTBSuspected(): Int {
+        return withContext(Dispatchers.IO) {
+            val user =
+                preferenceDao.getLoggedInUser()
+                    ?: throw IllegalStateException("No user logged in!!")
+
+            val tbspList: List<TBSuspectedCache> = tbDao.getTbSuspected(SyncState.UNSYNCED)
+
+            if (tbspList.isEmpty()) return@withContext 1
+
+            val CHUNK_SIZE = 20
+            val chunks = tbspList.chunked(CHUNK_SIZE)
+            var successCount = 0
+            var failCount = 0
+
+            for (chunk in chunks) {
+                try {
+                    val chunkDtos = chunk.map { it.toDTO() }
+
+                    val response = tmcNetworkApiService.saveTBSuspectedData(
+                        TBSuspectedRequestDTO(
+                            userId = user.userId,
+                            tbSuspectedList = chunkDtos
+                        )
+                    )
+                    val statusCode = response.code()
+                    if (statusCode == 200) {
+                        val responseString = response.body()?.string()
+                        if (responseString != null) {
+                            val jsonObj = JSONObject(responseString)
+                            val responseStatusCode = jsonObj.getInt("statusCode")
+                            Timber.d("Push to Amrit TB Suspected chunk: $responseStatusCode")
+                            when (responseStatusCode) {
+                                200 -> {
+                                    updateSyncStatusSuspected(chunk)
+                                    successCount += chunk.size
+                                }
+
+                                401, 5002 -> {
+                                    if (userRepo.refreshTokenTmc(user.userName, user.password)) {
+                                        Timber.d("Token refreshed, TB Suspected chunk will retry next cycle")
+                                    }
+                                    failCount += chunk.size
+                                }
+
+                                else -> {
+                                    Timber.e("TB Suspected chunk failed with statusCode: $responseStatusCode")
+                                    failCount += chunk.size
+                                }
+                            }
+                        }
+                    } else {
+                        Timber.e("TB Suspected chunk HTTP error: $statusCode")
+                        failCount += chunk.size
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "TB Suspected chunk push failed: ${chunk.size} records")
+                    failCount += chunk.size
+                }
+            }
+
+            Timber.d("TB Suspected push complete: $successCount succeeded, $failCount failed out of ${tbspList.size}")
+            return@withContext 1
+        }
+    }
+
+    // RECORD-LEVEL ISOLATION: Same chunking pattern as TB Screening.
+    // Records sent in chunks of 20 with per-chunk error isolation.
+    private suspend fun pushUnSyncedRecordsTBConfirmed(): Int {
+        return withContext(Dispatchers.IO) {
+            val user =
+                preferenceDao.getLoggedInUser()
+                    ?: throw IllegalStateException("No user logged in!!")
+
+            val tbspList: List<TBConfirmedTreatmentCache> = tbDao.getTbConfirmed(SyncState.UNSYNCED)
+
+            if (tbspList.isEmpty()) return@withContext 1
+
+            val CHUNK_SIZE = 20
+            val chunks = tbspList.chunked(CHUNK_SIZE)
+            var successCount = 0
+            var failCount = 0
+
+            for (chunk in chunks) {
+                try {
+                    val chunkDtos = chunk.map { it.toDTO() }
+
+                    val response = tmcNetworkApiService.saveTBConfirmedData(
+                        TBConfirmedRequestDTO(
+                            userId = user.userId,
+                            tbConfirmedList = chunkDtos
+                        )
+                    )
+                    val statusCode = response.code()
+                    if (statusCode == 200) {
+                        val responseString = response.body()?.string()
+                        if (responseString != null) {
+                            val jsonObj = JSONObject(responseString)
+                            val responseStatusCode = jsonObj.getInt("statusCode")
+                            Timber.d("Push to Amrit TB Confirmed chunk: $responseStatusCode")
+                            when (responseStatusCode) {
+                                200 -> {
+                                    updateSyncStatusConfirmed(chunk)
+                                    successCount += chunk.size
+                                }
+
+                                401, 5002 -> {
+                                    if (userRepo.refreshTokenTmc(user.userName, user.password)) {
+                                        Timber.d("Token refreshed, TB Confirmed chunk will retry next cycle")
+                                    }
+                                    failCount += chunk.size
+                                }
+
+                                else -> {
+                                    Timber.e("TB Confirmed chunk failed with statusCode: $responseStatusCode")
+                                    failCount += chunk.size
+                                }
+                            }
+                        }
+                    } else {
+                        Timber.e("TB Confirmed chunk HTTP error: $statusCode")
+                        failCount += chunk.size
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "TB Confirmed chunk push failed: ${chunk.size} records")
+                    failCount += chunk.size
+                }
+            }
+
+            Timber.d("TB Confirmed push complete: $successCount succeeded, $failCount failed out of ${tbspList.size}")
+            return@withContext 1
+        }
+    }
+
+
+    private suspend fun updateSyncStatusScreening(tbsnList: List<TBScreeningCache>) {
+        tbsnList.forEach {
+            it.syncState = SyncState.SYNCED
+            tbDao.saveTbScreening(it)
+        }
+    }
+
+    private suspend fun updateSyncStatusSuspected(tbspList: List<TBSuspectedCache>) {
+        tbspList.forEach {
+            it.syncState = SyncState.SYNCED
+            tbDao.saveTbSuspected(it)
+        }
+    }
+
+    private suspend fun updateSyncStatusConfirmed(tbspList: List<TBConfirmedTreatmentCache>) {
+        tbspList.forEach {
+            it.syncState = SyncState.SYNCED
+            tbDao.saveTbConfirmed(it)
+        }
+    }
+
+    companion object {
+        private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
+        private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.ENGLISH)
+        private fun getCurrentDate(millis: Long = System.currentTimeMillis()): String {
+            val dateString = dateFormat.format(millis)
+            val timeString = timeFormat.format(millis)
+            return "${dateString}T${timeString}.000Z"
+        }
+
+        private fun getLongFromDate(dateString: String): Long {
+            //Jul 22, 2023 8:17:23 AM"
+            val f = SimpleDateFormat("MMM d, yyyy h:mm:ss a", Locale.ENGLISH)
+            val date = f.parse(dateString)
+            return date?.time ?: throw IllegalStateException("Invalid date for dateReg")
+        }
+    }
+
+
+}

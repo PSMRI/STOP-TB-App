@@ -1,0 +1,124 @@
+package org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.ncd_eligible_list
+
+import android.content.Context
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.combineTransform
+import kotlinx.coroutines.launch
+import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.filterBenList
+import org.piramalswasthya.stoptb.model.User
+import org.piramalswasthya.stoptb.repositories.RecordsRepo
+import org.piramalswasthya.stoptb.utils.HelperUtil.getLocalizedResources
+import javax.inject.Inject
+
+@HiltViewModel
+class NcdEligibleListViewModel @Inject constructor(
+    recordsRepo: RecordsRepo,
+    private val preferenceDao: PreferenceDao,
+    @ApplicationContext private val context: Context
+) : ViewModel(
+
+) {
+
+    private lateinit var asha: User
+    var clickedPosition = 0
+
+    private val resources get() = getLocalizedResources(context, preferenceDao.getCurrentLanguage())
+
+    private val selectedCategory = MutableStateFlow(resources.getString(R.string.all))
+
+    private val allBenList = recordsRepo.getNcdEligibleList
+    private val filter = MutableStateFlow("")
+    private val selectedBenId = MutableStateFlow(0L)
+
+    val benList = combine(allBenList, filter, selectedCategory) { cacheList, filterText, selectedCat ->
+        val list = cacheList.map { it.asDomainModel() }
+        val benBasicDomainList = list.map { it.ben }
+        val filteredBenBasicDomainList = filterBenList(benBasicDomainList, filterText)
+
+        val filteredIds = filteredBenBasicDomainList.map { it.benId }.toSet()
+
+        when (selectedCat) {
+            resources.getString(R.string.screened) -> list.filter { it.savedCbacRecords.isNotEmpty() && (it.ben.benId in filteredIds) }
+            resources.getString(R.string.not_screened) -> list.filter { it.savedCbacRecords.isEmpty() && (it.ben.benId in filteredIds) }
+            else -> list.filter { it.ben.benId in filteredIds }
+        }
+    }
+
+    fun setSelectedCategory(cat: String) {
+        viewModelScope.launch {
+            selectedCategory.emit(cat)
+        }
+    }
+
+
+    val ncdDetails = allBenList.combineTransform(selectedBenId) { list, benId ->
+        if (benId != 0L) {
+            val emitList =
+                list.firstOrNull { it.ben.benId == benId }?.savedCbacRecords?.map { it.asDomainModel(resources) }
+            if (!emitList.isNullOrEmpty()) emit(emitList.reversed())
+        }
+    }
+
+    init {
+        viewModelScope.launch {
+            asha = preferenceDao.getLoggedInUser()!!
+        }
+    }
+
+    fun filterText(text: String) {
+        viewModelScope.launch {
+            filter.emit(text)
+        }
+
+    }
+
+    fun setSelectedBenId(benId: Long) {
+        viewModelScope.launch {
+            selectedBenId.emit(benId)
+        }
+    }
+
+    fun getSelectedBenId(): Long = selectedBenId.value
+    fun getAshaId(): Int = asha.userId
+
+
+    private val catList = ArrayList<String>()
+
+    fun categoryData() : ArrayList<String> {
+
+        catList.clear()
+        catList.add(resources.getString(R.string.all))
+        catList.add(resources.getString(R.string.screened))
+        catList.add(resources.getString(R.string.not_screened))
+        return catList
+
+    }
+
+    private val yearsData = ArrayList<String>()
+
+    fun yearsList() : ArrayList<String> {
+
+        yearsData.clear()
+        yearsData.add("Select Years")
+        yearsData.add("35 YEARS")
+        yearsData.add("40 YEARS")
+        yearsData.add("45 YEARS")
+        yearsData.add("50 YEARS")
+        yearsData.add("55 YEARS")
+        yearsData.add("60 YEARS")
+        yearsData.add("65 YEARS")
+        yearsData.add("70 YEARS")
+        yearsData.add("75 YEARS")
+        yearsData.add("80 YEARS")
+        return yearsData
+
+    }
+
+}

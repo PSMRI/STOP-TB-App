@@ -1,0 +1,456 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--  PregnantWoman ANC  -->
+    <string-array name="anc_abortion_type_array">
+        <item>जानबूझकर</item>
+        <item>स्वतः</item>
+        <item>अधूरा</item>
+    </string-array>
+    <string-array name="place_of_anc_array">
+        <item>उप केंद्र</item>
+        <item>वीएचएनडी / वीएचएसएनडी</item>
+        <item>पी.एच.सी</item>
+        <item>पीएमएसएमए का दौरा</item>
+        <item>सी.एच.सी</item>
+        <item>जिला अस्पताल</item>
+        <item>मेडिकल कॉलेज अस्पताल</item>
+    </string-array>
+    <string-array name="abortion_place_array">
+        <item>घर</item>
+        <item>उपकेन्द्र</item>
+        <item>पी.एच.सी</item>
+        <item>सी.एच.सी</item>
+        <item>जिला अस्पताल</item>
+        <item>मेडिकल कॉलेज अस्पताल</item>
+        <item>निजी अस्पताल</item>
+        <item>मार्ग में / रास्ते में</item>
+        <item>गर्भपात का अन्य स्थान</item>
+    </string-array>
+    <string-array name="anc_abortion_facility_array">
+        <item>सरकारी अस्पताल</item>
+        <item>निजी अस्पताल</item>
+    </string-array>
+    <string-array name="anc_urine_albumin_array">
+        <item>अनुपस्थित</item>
+        <item>उपस्थित</item>
+    </string-array>
+    <string-array name="anc_random_blood_sugar_test_array">
+        <item>नहीं किया</item>
+        <item>किया</item>
+    </string-array>
+    <string-array name="anc_high_risk_array">
+        <item>कोई नहीं</item>
+        <item>उच्च बीपी (सिस्टोलिक>=140 और/या डायस्टोलिक>=90mmHg)</item>
+        <item>मिर्च लगना</item>
+        <item>योनि से रक्तस्राव</item>
+        <item>बदबूदार डिस्चार्ज</item>
+        <item>गंभीर रक्त की कमी (हीमोग्लोबिन 7 gm/dl से कम)</item>
+        <item>मधुमेह (डायबिटीज)</item>
+        <item>जुड़वां</item>
+        <item>अन्य</item>
+    </string-array>
+    <string-array name="anc_referral_facility_array">
+        <item>प्राथमिक स्वास्थ्य केंद्र</item>
+        <item>समुदाय स्वास्थ्य केंद्र</item>
+        <item>जिला अस्पताल</item>
+        <item>अन्य निजी अस्पताल</item>
+    </string-array>
+    <string-array name="anc_confirmed_by_array">
+        <item>एएनएम (सहायक नर्स दाई)</item>
+        <item>सीएचओ (सामुदायिक स्वास्थ्य अधिकारी)</item>
+        <item>पीएचसी – चिकित्सा अधिकारी</item>
+        <item>उच्च सुविधा में विशेषज्ञ</item>
+    </string-array>
+    <string-array name="anc_death_cause_array">
+        <item>एक्लैम्प्सिया</item>
+        <item>हेमोरेज (रक्तस्राव)</item>
+        <item>उच्च बुखार</item>
+        <item>गर्भपात</item>
+        <item>दुर्घटना</item>
+        <item>अन्य</item>
+    </string-array>
+    <string-array name="anc_termination_done_by">
+        <item>डॉक्टर</item>
+        <item>नर्स</item>
+    </string-array>
+    <string-array name="anc_method_of_termination">
+        <item>एमवीए</item>
+        <item>ईवीए</item>
+        <item>एमएमए</item>
+        <item>अन्य</item>
+    </string-array>
+    <string-array name="anc_confirmation_array">
+        <item>हाँ</item>
+        <item>नहीं</item>
+    </string-array>
+
+    <string-array name="abortion_isplaning_array">
+        <item>क्या PAIUCD (कॉपर-T) डाला गया है?\n अथवा</item>
+        <item>क्या महिला ने स्थायी नसबंदी (ट्यूबेक्टॉमी) चुनी है?</item>
+    </string-array>
+    <string-array name="anc_confirmation_array1">
+        <item>नहीं</item>
+        <item>हाँ</item>
+    </string-array>
+
+    <string-array name="maternal_health_past_illness">
+    <item>कोई नहीं</item>
+    <item>टीबी (क्षय रोग)</item>
+    <item>मधुमेह</item>
+    <item>उच्च रक्तचाप</item>
+    <item>हृदय रोग</item>
+    <item>मिर्गी</item>
+    <item>यौन संचारित संक्रमण / प्रजनन तंत्र संक्रमण</item>
+    <item>हेपेटाइटिस-बी</item>
+    <item>दमा</item>
+    <item>अन्य कोई भी</item>
+    </string-array>
+
+    <string-array name="select_high_risk_condition">
+        <item>उच्च बीपी (सिस्टोलिक>=140 और/या डायस्टोलिक>=90mmHg)</item>
+        <item>दौरे</item>
+        <item>योनि से रक्तस्राव</item>
+        <item>बदबूदार डिस्चार्ज</item>
+        <item>गंभीर रक्त की कमी (हीमोग्लोबिन 7 gm/dl से कम)</item>
+        <item>मधुमेह (डायबिटीज)</item>
+        <item>जुड़वां</item>
+        <item>अन्य</item>
+    </string-array>
+
+    <string-array name="method_of_contraception_for_zero_child">
+        <item>स्वयं</item>
+        <item>अंतरा इंजेक्शन</item>
+        <item>कॉपर टी (आईयूसीडी)</item>
+        <item>कंडोम</item>
+        <item>माला एन</item>
+        <item>छाया</item>
+        <item>आपातकालीन गर्भनिरोधक गोली (ईसीपी)</item>
+        <item>कोई अन्य विधि</item>
+    </string-array>
+
+    <string-array name="method_of_contraception">
+        <item>स्वयं</item>
+        <item>अंतरा इंजेक्शन</item>
+        <item>कॉपर टी (आईयूसीडी)</item>
+        <item>कंडोम</item>
+        <item>माला एन</item>
+        <item>छाया</item>
+        <item>आपातकालीन गर्भनिरोधक गोली (ईसीपी)</item>
+        <item>पुरुष नसबंदी</item>
+        <item>महिला नसबंदी</item>
+      <!--  <item>मिनीलैप</item>-->
+        <item>कोई अन्य विधि</item>
+    </string-array>
+
+    <!-- PMSMA Strings -->
+    <string name="pmsma_mcts_rch_number">MCTS नंबर / RCH नंबर</string>
+    <string name="pmsma_have_mcp_card">क्या लाभार्थी के पास एक एमसीपी कार्ड है</string>
+    <string name="pmsma_given_mcp_card">एमसीपी कार्ड दिया गया है</string>
+    <string name="pmsma_husband_name">पति का नाम</string>
+    <string name="pmsma_address">पता</string>
+    <string name="pmsma_mobile_number">मोबाइल नंबर</string>
+    <string name="pmsma_num_anc">प्रसव से पहले किए गए एएनसी की संख्या</string>
+    <string name="pmsma_mother_status">माता की स्थिति</string>
+    <string name="pmsma_weight">वजन (किलोग्राम में)</string>
+    <string name="pmsma_sys_bp">सिस्टॉलिक रक्तचाप</string>
+    <string name="pmsma_dia_bp">डायस्टोलिक रक्तचाप</string>
+    <string name="pmsma_abdominal_check_up">पेट की जांच</string>
+    <string name="pmsma_fetal_status">भ्रूण की स्थिति</string>
+    <string name="pmsma_fetal_hrpm">भ्रूण के दिल की धड़कन प्रति मिनट</string>
+    <string name="pmsma_twin_pregnancy">जुड़वा गर्भावस्था</string>
+    <string name="pmsma_investigation">जांच</string>
+    <string name="pmsma_urine_albumin">मूत्र में एल्ब्यूमिन</string>
+    <string name="pmsma_haemoglobin_and_blood_group">हीमोग्लोबिन और रक्त समूह</string>
+    <string name="pmsma_hiv">एचआईवी</string>
+    <string name="pmsma_vdrl">वीडीआरएल</string>
+    <string name="pmsma_hbsc">एचबीएससी (हेपेटाइटिस बी)</string>
+    <string name="pmsma_malaria">मलेरिया</string>
+    <string name="pmsma_hiv_test_during_anc">क्या एएनसी जांच के दौरान एचआईवी परीक्षण किया गया था?</string>
+    <string name="pmsma_swollen_condition">सूजन वाली स्थिति</string>
+    <string name="pmsma_blood_sugar_test">रक्त शर्करा परीक्षण</string>
+    <string name="pmsma_ultrasound">उल्ट्रासाउंड</string>
+    <string name="pmsma_intervention_details">हस्तक्षेप विवरण</string>
+    <string name="pmsma_iron_folic_acid">लोहा और फोलिक एसिड</string>
+    <string name="pmsma_calcium_supplementation">कैल्शियम सप्लीमेंटेशन</string>
+    <string name="pmsma_tetanus_toxoid">टीटेनस टॉक्सॉयड</string>
+    <string name="pmsma_lmp">अंतिम माहवारी (LMP) की तिथि</string>
+    <string name="pmsma_last_mestrual_period">अंतिम माहवारी की तिथि</string>
+    <string name="pmsma_expected_delivery_date">प्रसव की अपेक्षित तिथि</string>
+    <string name="pmsma_high_risk_factors">उच्च जोखिम के कारकों की पहचान</string>
+    <string name="pmsma_high_risk_symbols">उच्च जोखिम प्रतीकों की पहचान</string>
+    <string name="pmsma_high_risk_reason">हां, नीचे दिए गए कारण का चयन करें और लिखें</string>
+    <string name="pmsma_high_risk_pregnant">उच्च जोखिम श्रेणी में गर्भवती</string>
+    <string name="pmsma_high_risk_pregnancy_referred">उच्च जोखिम श्रेणी में गर्भवती को संदर्भित किया गया था</string>
+    <string name="pmsma_advice">सलाह</string>
+    <string name="pmsma_birth_complications_and_planning">प्रसव की तैयारी और कठिनाइयों, पोषण और परिवार नियोजन</string>
+    <string name="pmsma_medical_officer_sign">अधिशासी चिकित्साधिकारी की हस्ताक्षर</string>
+    <string-array name="pmsma_tetanus_toxoid_array">
+        <item>पहली</item>
+        <item>दूसरी</item>
+        <item>बूस्टर</item>
+    </string-array>
+    <string-array name="pmsma_confirmation_array">
+        <item>हाँ</item>
+        <item>नहीं</item>
+    </string-array>
+    <string-array name="pmsma_malaria_array">
+        <item>नेगेटिव</item>
+        <item>पॉजिटिव</item>
+        <item>परीक्षण नहीं किया गया</item>
+    </string-array>
+
+    <!-- Delivery Outcome Strings -->
+    <string name="do_delivery_date">प्रसव की तिथि</string>
+    <string name="do_delivery_time">प्रसव का समय</string>
+    <string name="do_delivery_place">प्रसव स्थल</string>
+    <string name="do_delivery_type">प्रसव के प्रकार</string>
+    <string name="do_had_complication">प्रसव के दौरान कोई कठिनाई हुई?</string>
+    <string name="do_delivery_complication">प्रसव समस्या</string>
+    <string name="do_death_cause">मौत के संभावित कारण</string>
+    <string name="do_other_death_cause">अन्य मौत के कारण</string>
+    <string name="do_other_delivery_complication">अन्य प्रसव समस्या</string>
+    <string name="do_delivery_outcome">कुल जन्म (जन्मे शिशुओं की कुल संख्या)</string>
+    <string name="do_live_birth">जीवित जन्मों की संख्या</string>
+    <string name="do_still_birth">मृत जन्मों की संख्या</string>
+    <string name="do_discharge_date">छुट्टी की तारीख</string>
+    <string name="do_discharge_time">निष्कर्षण का समय</string>
+    <string name="do_is_jsy_beneficiary">क्या गर्भवती महिला जेएसवाई लाभार्थी है?</string>
+    <string-array name="do_place_of_delivery_array">
+        <item>जिला अस्पताल</item>
+        <item>समुदाय स्वास्थ्य केंद्र</item>
+        <item>प्राथमिक स्वास्थ्य केंद्र</item>
+        <item>उप केंद्र</item>
+        <item>अन्य सार्वजनिक सुविधा</item>
+        <item>मान्यता प्राप्त निजी अस्पताल</item>
+        <item>अन्य निजी अस्पताल</item>
+        <item>घर</item>
+        <item>उप जिला अस्पताल</item>
+        <item>मेडिकल कॉलेज अस्पताल</item>
+        <item>परिवहन में</item>
+    </string-array>
+    <string-array name="do_type_of_delivery_array">
+        <item>सामान्य</item>
+        <item>सिजेरियन</item>
+    </string-array>
+    <string-array name="do_had_complications_array">
+        <item>हाँ</item>
+        <item>नहीं</item>
+    </string-array>
+    <string-array name="do_complications_array">
+        <item>पीपीएच (पोस्ट पार्टम हेमरेज)</item>
+        <item>रिटेन्ड प्लेसेंटा</item>
+        <item>बाधित प्रसव</item>
+        <item>प्रोलैप्स्ड कॉर्ड</item>
+        <item>जुड़वा गर्भावस्था</item>
+        <item>दौरे</item>
+        <item>मौत</item>
+        <item>कोई अन्य (विशिष्ट करें)</item>
+        <item>मालूम नहीं</item>
+    </string-array>
+    <string-array name="maternal_health_past_del_complications">
+        <item>कोई नहीं</item>
+        <item>दौरे</item>
+        <item>एपीएच (गर्भावस्था के दौरान रक्तस्राव)</item>
+        <item>गर्भावस्था जनित उच्च रक्तचाप (पीआईएच)</item>
+        <item>बार-बार गर्भपात</item>
+        <item>मृत जन्म</item>
+        <item>जन्मजात विकृति</item>
+        <item>सिजेरियन प्रसव</item>
+        <item>रक्त चढ़ाना</item>
+        <item>जुड़वां</item>
+        <item>अवरुद्ध प्रसव</item>
+        <item>पीपीएच (प्रसवोत्तर रक्तस्राव)</item>
+        <item>अन्य</item>
+    </string-array>
+    <string-array name="do_cause_of_death_array">
+        <item>एक्लैम्प्सिया</item>
+        <item>रक्तवर्धन</item>
+        <item>बाधित प्रसव</item>
+        <item>दीर्घकालिक प्रसव</item>
+        <item>अन्य</item>
+        <item>उच्च बुखार</item>
+    </string-array>
+    <string-array name="do_is_jsy_beneficiary_array">
+        <item>हाँ</item>
+        <item>नहीं</item>
+    </string-array>
+
+    <!--  Post Natal Care Strings -->
+    <string name="pnc_period">PNC अवधि</string>
+    <string name="pnc_visit_date">PNC दौरे की तारीख</string>
+    <string name="pnc_ifa_tabs_given">दी गई आयरन-फोलिक एसिड (आईएफए) गोलियों की संख्या</string>
+    <string name="pnc_contraception_method">गर्भनिरोध का तरीका</string>
+    <string name="pnc_any_contraception_method">क्या प्रसव के बाद दंपति ने कोई परिवार नियोजन विधि अपनाई है? \n कोई भी गर्भनिरोध का तरीका</string>
+    <string name="pnc_other_ppc_method">अन्य PPC तरीका</string>
+    <string name="pnc_mother_danger_sign">माँ को खतरे के संकेत</string>
+    <string name="pnc_other_danger_sign">अन्य खतरनाक संकेत</string>
+    <string name="pnc_referral_facility">रेफरल सुविधा / संदर्भित स्वास्थ्य केंद्र</string>
+    <string name="pnc_mother_death">मां की मौके पर मौत</string>
+    <string name="pnc_death_date">मृत्यु की तिथि</string>
+    <string name="pnc_death_cause">मां की मौत का संभावित कारण</string>
+    <string name="pnc_other_death_cause">अन्य मौत का कारण</string>
+    <string name="pnc_death_place">मृत्यु का स्थान</string>
+    <string name="pnc_remarks">टिप्पणी</string>
+    <string-array name="pnc_period_array">
+        <item>पहला दिन</item>
+        <item>तीसरा दिन</item>
+        <item>सातवां दिन</item>
+        <item>चौबीसवां दिन</item>
+        <item>इकत्तीसवां दिन</item>
+        <item>अड़तालीसवां दिन</item>
+        <item>बाइसवां दिन</item>
+    </string-array>
+    <string-array name="pnc_confirmation_array">
+        <item>हाँ</item>
+        <item>नहीं</item>
+    </string-array>
+    <string-array name="pnc_contraception_method_array">
+        <item>पोस्ट पार्टम IUCD (PPIUCD) प्रसव के 48 घंटों के भीतर</item>
+        <item>कंडोम</item>
+        <item>पुरुष निषेकरण</item>
+        <item>महिला निषेकरण</item>
+        <item>पोस्ट पार्टम स्टेरिलाइजेशन (PPS प्रसव के 7 दिनों के भीतर)</item>
+        <item>MiniLap</item>
+        <item>कोई अन्य (स्पष्ट करें)</item>
+    </string-array>
+
+    <string-array name="pnc_mother_danger_sign_array">
+        <item>पीपीएच – अत्यधिक रक्तस्राव</item>
+        <item>बुखार</item>
+        <item>सेप्सिस (गंभीर संक्रमण)</item>
+        <item>पेट में तेज दर्द</item>
+        <item>तेज सिरदर्द या धुंधला दिखाई देना </item>
+        <item>सांस लेने में कठिनाई</item>
+        <item>पेशाब, त्वचा या आँखों का पीलापन</item>
+        <item>त्वचा या आँखों का पीला पड़ना </item>
+        <item>चेहरे, हाथों और पैरों में सूजन </item>
+        <item>असामान्य व्यवहार </item>
+        <item>कोई अन्य</item>
+    </string-array>
+    <string-array name="pnc_referral_facility_array">
+        <item>प्राथमिक स्वास्थ्य केंद्र</item>
+        <item>समुदाय स्वास्थ्य केंद्र</item>
+        <item>जिला अस्पताल</item>
+        <item>अन्य निजी अस्पताल</item>
+    </string-array>
+    <string-array name="pnc_death_cause_array">
+        <item>एक्लैम्प्सिया</item>
+        <item>हेमोरेज (PPH)</item>
+        <item>एनीमिया</item>
+        <item>उच्च बुखार</item>
+        <item>संक्रमण</item>
+        <item>दुर्घटना</item>
+        <item>कोई अन्य</item>
+    </string-array>
+    <string-array name="pnc_death_place_array">
+        <item>घर</item>
+        <item>अस्पताल</item>
+        <item>परिवहन में</item>
+    </string-array>
+
+    <!--  Infant Registration  -->
+    <string name="ir_baby_name">शिशु का नाम</string>
+    <string name="ir_infant_term">शिशु की गर्भावधि</string>
+    <string name="ir_corticosteroid_given">क्या कॉर्टिकोस्टेरॉइड इंजेक्शन दिया गया था?</string>
+    <string name="ir_gender">शिशु का लिंग</string>
+    <string name="ir_baby_cried_at_birth">शिशु प्रसव के समय तुरंत रोता था</string>
+    <string name="ir_resuscitation">यदि नहीं, तो क्या पुनर्जीवन (रेससिटेशन) किया गया?</string>
+    <string name="ir_referred">उच्च सुविधा के लिए और प्रबंधन के लिए संदर्भित किया गया?</string>
+    <string name="ir_had_birth_defect">प्रसव के समय क्या कोई जन्म दोष दिखा?</string>
+    <string name="ir_birth_defect">प्रसव के समय दोष दिखा</string>
+    <string name="ir_other_defect">प्रसव के समय अन्य दोष दिखा</string>
+    <string name="ir_weight">जन्म पर वजन (किलोग्राम में)</string>
+    <string name="ir_breast_feeding_started">शिशु का दूध पीना प्रसव के एक घंटे के भीतर शुरू हुआ</string>
+    <string name="ir_opv0_dose">OPV0 डोज</string>
+    <string name="ir_bcg_dose">BCG डोज</string>
+    <string name="ir_hepb_dose">HEP B-0 डोज</string>
+    <string name="ir_vitk_dose">VITK डोज</string>
+    <string-array name="ir_infant_term">
+        <item>पूरी अवधि</item>
+        <item>पूर्व अवधि</item>
+    </string-array>
+    <string-array name="ir_confirmation_array1">
+        <item>हाँ</item>
+        <item>नहीं</item>
+    </string-array>
+    <string-array name="ir_confirmation_array2">
+        <item>हाँ</item>
+        <item>नहीं</item>
+        <item>नहीं लागू</item>
+    </string-array>
+    <string-array name="ir_confirmation_array3">
+        <item>हाँ</item>
+        <item>नहीं</item>
+        <item>मालूम नहीं</item>
+    </string-array>
+    <string-array name="ir_birth_defect_array">
+        <item>क्लेफ्ट लिप / क्लेफ्ट पैलेट</item>
+        <item>क्लब पैर</item>
+        <item>डाउन सिंड्रोम</item>
+        <item>हाइड्रोसेफालस</item>
+        <item>अंक नलिका दोष (स्पाइनल बिफिडा)</item>
+        <item>अन्य</item>
+    </string-array>
+
+    <string-array name="maternal_health_reg_hrp_confirm_by">
+        <item>एएनएम (सहायक नर्स दाई)</item>
+        <item>सीएचओ (सामुदायिक स्वास्थ्य अधिकारी)</item>
+        <item>पीएचसी – चिकित्सा अधिकारी</item>
+        <item>उच्च स्वास्थ्य संस्थान में विशेषज्ञ डॉक्टर</item>
+    </string-array>
+
+    <string name="anc_visit_number">एएनसी (ANC) विज़िट %1d</string>
+    <string name="pnc_visit_number">पीएनसी (PNC) विज़िट – दिन %1d</string>
+    <string name="register">पंजीकरण</string>
+    <string name="tracking_form_filled_successfully">ट्रैकिंग फॉर्म सफलतापूर्वक भरा गया</string>
+    <string name="pmsma_form">पीएमएसएमए (PMSMA) फॉर्म</string>
+    <string name="general_op">सामान्य बाह्य रोगी</string>
+    <string name="saving_pmsma_to_database_failed">पीएमएसएमए (PMSMA) डेटा सेव करने में विफल</string>
+    <string name="hrp_case_please_visit_the_nearest_hwc_or_call_104">उच्च जोखिम गर्भावस्था – नजदीकी एचडब्ल्यूसी जाएं या 104 पर कॉल करें</string>
+
+    <string name="str_anc_period">एएनसी अवधि</string>
+    <string name="str_abortion_if_any">गर्भपात, यदि कोई हो</string>
+    <string name="str_abortion_type">गर्भपात का प्रकार</string>
+    <string name="str_facility">स्वास्थ्य केंद्र</string>
+    <string name="str_abortion_date">गर्भपात की तिथि</string>
+    <string name="str_weight_pw">पंजीकरण के समय गर्भवती महिला का वजन (किग्रा)</string>
+    <string name="str_bp_of_pw">गर्भवती महिला का रक्तचाप (BP) - सिस्टोलिक/डायस्टोलिक (मिमी एचजी)</string>
+    <string name="str_pulse_rate">नाड़ी दर</string>
+    <string name="str_hb">हीमोग्लोबिन (ग्राम/डीएल)</string>
+    <string name="str_fundal_height">गर्भाशय की मूल ऊँचाई/आकार (सप्ताह)</string>
+    <string name="str_urine_albumin">मूत्र एल्बुमिन</string>
+    <string name="str_random_blood_sugar">रैंडम ब्लड शुगर टेस्ट</string>
+    <string name="str_date_of_tt_first_dose">टीडी/टीटी (पहली खुराक) की तिथि</string>
+    <string name="str_date_of_tt_second_dose">टीडी टीटी (दूसरी खुराक) की तिथि</string>
+    <string name="str_date_of_tt_booster_dose">टीडी/टीटी (बूस्टर खुराक) की तिथि</string>
+    <string name="str_no_of_acid_tab">दी गई फोलिक एसिड गोलियों की संख्या</string>
+    <string name="str_no_of_ifa_tab">दी गई आईएफए गोलियों की संख्या</string>
+    <string name="str_any_high_risk_cond">कोई उच्च जोखिम वाली स्थितियाँ</string>
+    <string name="str_high_risk_cond">उच्च जोखिम वाली स्थितियाँ</string>
+    <string name="str_any_other_high_risk_cond">कोई अन्य उच्च जोखिम वाली स्थितियाँ</string>
+    <string name="str_referral_facility">रेफरल सुविधा / संदर्भित स्वास्थ्य केंद्र</string>
+    <string name="str_hrp_confirmed">क्या उच्च जोखिम गर्भावस्था (एचआरपी) की पुष्टि हुई है?</string>
+    <string name="str_identified_as_hrp">एचआरपी (उच्च जोखिम वाली गर्भावस्था) के रूप में पहचानने वाला व्यक्ति</string>
+    <string name="str_maternal_death">मातृ मृत्यु</string>
+    <string name="str_cause_of_death">मृत्यु का संभावित कारण</string>
+    <string name="str_other_cause_of_death">मृत्यु का अन्य कारण</string>
+    <string name="str_death_date">मृत्यु तिथि</string>
+    <string name="str_has_pregnant_women_delivered">क्या गर्भवती महिला ने प्रसव किया है?</string>
+    <string name="sr_no">क्रमांक: %1d</string>
+    <string name="date_no">दिनांक: %1$s</string>
+    <string name="round_no">राउंड: %1d</string>
+    <string name="pmsma_edd">संभावित प्रसव</string>
+    <string name="string_edd">प्रसव की अनुमानित तिथि (EDD)</string>
+
+    <string name="anc_form_submitted">फॉर्म सफलतापूर्वक सबमिट किया गया</string>
+    <string name="something_went_wrong_try_again">कुछ गलत हो गया। कृपया पुनः प्रयास करें।</string>
+    <string name="continue_anc_visit">एएनसी भ्रमण जारी रखें</string>
+    <string name="continue_anc_visit_message">क्या आप एएनसी भ्रमण जारी रखना चाहते हैं?</string>
+    <string name="next_anc_visit_due">अगली एएनसी भ्रमण देय है</string>
+    <string name="visit_date_required">भ्रमण तिथि आवश्यक है</string>
+    <string name="invalid_visit_date_format">अमान्य भ्रमण तिथि प्रारूप</string>
+    <string name="fill_required_fields">कृपया सभी आवश्यक फ़ील्ड सही से भरें</string>
+    <string name="danger_signs_identified">खतरे के संकेत पहचाने गए!</string>
+
+</resources>

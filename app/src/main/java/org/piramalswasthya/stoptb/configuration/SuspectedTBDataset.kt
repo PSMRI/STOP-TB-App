@@ -1,0 +1,399 @@
+package org.piramalswasthya.stoptb.configuration
+
+import android.content.Context
+import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.helpers.Languages
+import org.piramalswasthya.stoptb.model.BenRegCache
+import org.piramalswasthya.stoptb.model.FormElement
+import org.piramalswasthya.stoptb.model.InputType
+import org.piramalswasthya.stoptb.model.TBSuspectedCache
+
+class SuspectedTBDataset(
+    context: Context, currentLanguage: Languages
+) : Dataset(context, currentLanguage) {
+
+    private val dateOfVisit = FormElement(
+        id = 1,
+        inputType = InputType.DATE_PICKER,
+        title = resources.getString(R.string.tracking_date),
+        arrayId = -1,
+        required = true,
+        max = System.currentTimeMillis(),
+        hasDependants = true
+
+    )
+    private val visitLabel = FormElement(
+        id = 2,
+        inputType = InputType.TEXT_VIEW,
+        title = resources.getString(R.string.visits),
+        arrayId = -1,
+        required = false,
+        hasDependants = false
+    )
+
+    private val typeOfTBCase = FormElement(
+        id = 3,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.type_of_tb_case),
+        arrayId = R.array.type_of_tb_case,
+        entries = resources.getStringArray(R.array.type_of_tb_case),
+        required = true,
+        hasDependants = true
+    )
+
+    private val reasonForSuspicion = FormElement(
+        id = 4,
+        inputType = InputType.DROPDOWN,
+        title = resources.getString(R.string.reason_for_suspicion),
+        arrayId = R.array.reason_for_suspicion,
+        entries = resources.getStringArray(R.array.reason_for_suspicion),
+        required = true,
+        hasDependants = true
+    )
+
+    private val hasSymptoms = FormElement(
+        id = 5,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.has_symptoms),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = true,
+        hasDependants = true
+    )
+    private val isChestXRayDone = FormElement(
+        id = 6,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.is_chest_xray_done),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = false,
+        hasDependants = true
+    )
+
+    private val chestXRayResult = FormElement(
+        id = 7,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.chest_xray_result),
+        arrayId = R.array.chest_xray_result,
+        entries = resources.getStringArray(R.array.chest_xray_result),
+        required = false,
+        hasDependants = false
+    )
+
+    private val isSputumCollected = FormElement(
+        id = 8,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.is_sputum_sample_collected),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = true,
+        hasDependants = true
+    )
+
+
+    private val sputumSubmittedAt = FormElement(
+        id = 9,
+        inputType = InputType.DROPDOWN,
+        title = resources.getString(R.string.sputum_sample_submitted_at),
+        arrayId = R.array.tb_sputum_sample_submitted_at,
+        entries = resources.getStringArray(R.array.tb_sputum_sample_submitted_at),
+        required = false,
+        hasDependants = false
+    )
+
+
+    private val nikshayId = FormElement(
+        id = 10,
+        inputType = InputType.EDIT_TEXT,
+        title = resources.getString(R.string.nikshay_id),
+        required = false,
+        hasDependants = false
+    )
+
+    private val sputumTestResult = FormElement(
+        id = 11,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.sputum_test_result),
+        arrayId = R.array.tb_test_result,
+        entries = resources.getStringArray(R.array.tb_test_result),
+        required = false,
+        hasDependants = false
+    )
+
+
+
+    private val referralFacility = FormElement(
+        id = 12,
+        inputType = InputType.DROPDOWN,
+        title = resources.getString(R.string.referral_facility),
+        arrayId = R.array.referral_facility,
+        entries = resources.getStringArray(R.array.referral_facility),
+        required = true,
+        hasDependants = false
+    )
+
+    private val isTBConfirmed = FormElement(
+        id = 13,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.is_tb_confirmed),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = true,
+        hasDependants = true
+    )
+    private val isDRTBConfirmed = FormElement(
+        id = 14,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.is_drtb_confirmed),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = true,
+        hasDependants = false
+    )
+
+    private var followUps = FormElement(
+        id = 15,
+        inputType = InputType.EDIT_TEXT,
+        title = resources.getString(R.string.facility_referral_follow_ups),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = false,
+        hasDependants = false
+    )
+
+    suspend fun setUpPage(ben: BenRegCache?, saved: TBSuspectedCache?) {
+        visitLabel.value = resources.getString(R.string.visit_format, 1)
+        var list =  mutableListOf<FormElement>()
+
+        if (saved == null) {
+            dateOfVisit.value = getDateFromLong(System.currentTimeMillis())
+            typeOfTBCase.value = null
+            hasSymptoms.value = resources.getStringArray(R.array.yes_no)[0]
+
+            list.addAll(listOf(
+                dateOfVisit,
+                visitLabel,
+                typeOfTBCase,
+
+            ))
+
+            if (hasSymptoms.value == resources.getStringArray(R.array.yes_no)[0]) {
+                isSputumCollected.value = resources.getStringArray(R.array.yes_no)[1]
+                list.add(isSputumCollected)
+            } else {
+                isChestXRayDone.value = resources.getStringArray(R.array.yes_no)[1]
+                list.add(isChestXRayDone)
+            }
+
+            list.addAll(listOf(
+                referralFacility,
+            ))
+        }
+        else {
+            dateOfVisit.value = getDateFromLong(saved.visitDate)
+            visitLabel.value =  resources.getString(R.string.visit_format, 1)
+            typeOfTBCase.value = getLocalValueInArray(R.array.type_of_tb_case, saved.typeOfTBCase)
+            hasSymptoms.value = saved.hasSymptoms?.let {
+                if (it) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(R.array.yes_no)[1]
+            }
+            isSputumCollected.value = saved.isSputumCollected?.let {
+                if (it) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(R.array.yes_no)[1]
+            }
+
+            list.addAll(listOf(
+                dateOfVisit,
+                visitLabel,
+                typeOfTBCase
+            ))
+
+            if (typeOfTBCase.value in listOf(
+                    resources.getStringArray(R.array.type_of_tb_case)[1],
+                    resources.getStringArray(R.array.type_of_tb_case)[2]
+                )) {
+                reasonForSuspicion.value = getLocalValueInArray(R.array.reason_for_suspicion, saved.reasonForSuspicion)
+                list.add(reasonForSuspicion)
+            }
+
+            //list.add(hasSymptoms)
+            list.add(isSputumCollected)
+
+            if (saved.isSputumCollected == true) {
+                sputumSubmittedAt.value = getLocalValueInArray(R.array.tb_sputum_sample_submitted_at, saved.sputumSubmittedAt)
+                nikshayId.value = saved.nikshayId
+                sputumTestResult.value = getLocalValueInArray(R.array.tb_test_result, saved.sputumTestResult)
+
+                list.addAll(listOf(
+                    sputumSubmittedAt,
+                    nikshayId,
+                    sputumTestResult
+                ))
+            }
+
+
+            referralFacility.value = getLocalValueInArray(R.array.referral_facility, saved.referralFacility)
+
+            if (typeOfTBCase.value == typeOfTBCase.entries!![0]) {
+                isTBConfirmed.value = saved.isTBConfirmed?.let {
+                    if (it) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(R.array.yes_no)[1]
+                }
+                list.add(isTBConfirmed)
+            } else if (typeOfTBCase.value in listOf(
+                    typeOfTBCase.entries!![1],
+                    typeOfTBCase.entries!![2]
+                )) {
+                isDRTBConfirmed.value = saved.isDRTBConfirmed?.let {
+                    if (it) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(R.array.yes_no)[1]
+                }
+                list.add(isDRTBConfirmed)
+            }
+
+            list.addAll(listOf(
+                referralFacility,
+
+            ))
+        }
+
+       
+
+
+
+        ben?.let {
+            dateOfVisit.min = it.regDate
+        }
+        setUpPage(list)
+
+    }
+
+    override suspend fun handleListOnValueChanged(formId: Int, index: Int): Int {
+        return when (formId) {
+/*
+            typeOfTBCase.id ->{
+                if (typeOfTBCase.value != resources.getStringArray(R.array.type_of_tb_case)[0])
+                {
+                    triggerDependants(
+                        source = typeOfTBCase,
+                        addItems = listOf(reasonForSuspicion),
+                        removeItems = listOf(),
+                    )
+                    triggerDependants(source = referralFacility,
+                        addItems = listOf(isTBConfirmed), removeItems = listOf(), position = -2)
+                }
+                else
+                {
+                    triggerDependants(
+                        source = typeOfTBCase,
+                        addItems = listOf(),
+                        removeItems = listOf(reasonForSuspicion),
+                    )
+                    triggerDependants(source = referralFacility,
+                        addItems = listOf(), removeItems = listOf(isTBConfirmed), position = 12)
+                }
+            }*/
+            typeOfTBCase.id -> {
+                val currentValue = typeOfTBCase.value
+
+                if (currentValue == typeOfTBCase.entries!![0]) {
+                    triggerDependants(
+                        source = typeOfTBCase,
+                        addItems = listOf(),
+                        removeItems = listOf(reasonForSuspicion, isDRTBConfirmed),
+                    )
+
+                    return triggerDependants(
+                        source = typeOfTBCase,
+                        addItems = listOf(isTBConfirmed),
+                        removeItems = listOf(),
+                        position = -2
+                    )
+                } else if (currentValue == typeOfTBCase.entries!![1] || currentValue == typeOfTBCase.entries!![2]) {
+                    val result1 = triggerDependants(
+                        source = typeOfTBCase,
+                        addItems = listOf(reasonForSuspicion),
+                        removeItems = listOf(),
+                    )
+
+                    triggerDependants(
+                        source = typeOfTBCase,
+                        addItems = listOf(isDRTBConfirmed),
+                        removeItems = listOf(),
+                        position = -2
+                    )
+
+                    triggerDependants(
+                        source = typeOfTBCase,
+                        addItems = listOf(),
+                        removeItems = listOf(isTBConfirmed),
+                    )
+
+                    return result1
+                } else {
+                    triggerDependants(
+                        source = typeOfTBCase,
+                        addItems = listOf(),
+                        removeItems = listOf(reasonForSuspicion, isTBConfirmed, isDRTBConfirmed),
+                    )
+                    return -1
+                }
+            }
+
+            isSputumCollected.id -> {
+                triggerDependants(
+                    source = isSputumCollected,
+                    passedIndex = index,
+                    triggerIndex = 0,
+                    target = sputumTestResult
+                )
+                triggerDependants(
+                    source = isSputumCollected,
+                    passedIndex = index,
+                    triggerIndex = 0,
+                    target = nikshayId
+                )
+                triggerDependants(
+                    source = isSputumCollected,
+                    passedIndex = index,
+                    triggerIndex = 0,
+                    target = sputumSubmittedAt
+                )
+            }
+
+
+
+            else -> -1
+        }
+    }
+
+    override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
+        (cacheModel as TBSuspectedCache).let { form ->
+            form.visitDate = getLongFromDate(dateOfVisit.value)
+            form.visitLabel = visitLabel.value
+            form.typeOfTBCase = getEnglishValueInArray(R.array.type_of_tb_case, typeOfTBCase.value)
+            form.reasonForSuspicion = getEnglishValueInArray(R.array.reason_for_suspicion, reasonForSuspicion.value)
+            form.isChestXRayDone = isChestXRayDone.value?.let {
+                it == isChestXRayDone.entries!![0]
+            }
+            form.chestXRayResult = getEnglishValueInArray(R.array.chest_xray_result, chestXRayResult.value)
+
+            form.isSputumCollected = isSputumCollected.value?.let {
+                it == isSputumCollected.entries!![0]
+            }
+            form.sputumSubmittedAt = getEnglishValueInArray(R.array.tb_sputum_sample_submitted_at, sputumSubmittedAt.value)
+            form.nikshayId = nikshayId.value
+            form.sputumTestResult = getEnglishValueInArray(R.array.tb_test_result, sputumTestResult.value)
+
+            form.referralFacility = getEnglishValueInArray(R.array.referral_facility, referralFacility.value)
+            form.isTBConfirmed = isTBConfirmed.value?.let {
+                it == isTBConfirmed.entries!![0]
+            }
+            form.isDRTBConfirmed = isDRTBConfirmed.value?.let {
+                it == isDRTBConfirmed.entries!![0]
+            }
+
+
+            if (form.isTBConfirmed == true || form.isDRTBConfirmed == true) {
+                form.isConfirmed = true
+            }
+        }
+    }
+
+
+    fun isTestPositive(): String? {
+        return if (sputumTestResult.value == resources.getStringArray(R.array.tb_test_result)[0])
+            resources.getString(R.string.tb_suspected_alert_positive) else null
+    }
+
+}

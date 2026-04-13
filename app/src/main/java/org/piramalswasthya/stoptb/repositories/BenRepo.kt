@@ -1,0 +1,1718 @@
+package org.piramalswasthya.stoptb.repositories
+
+import android.app.Application
+import android.net.Uri
+import android.widget.Toast
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONException
+import org.json.JSONObject
+import org.piramalswasthya.stoptb.database.room.BeneficiaryIdsAvail
+import org.piramalswasthya.stoptb.database.room.SyncState
+import org.piramalswasthya.stoptb.database.room.dao.BenDao
+import org.piramalswasthya.stoptb.database.room.dao.BeneficiaryIdsAvailDao
+import org.piramalswasthya.stoptb.database.room.dao.HouseholdDao
+import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.FormResponseJsonDao
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.ImageUtils
+import org.piramalswasthya.stoptb.helpers.Konstants
+import org.piramalswasthya.stoptb.model.*
+import org.piramalswasthya.stoptb.network.*
+import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel
+import org.piramalswasthya.stoptb.work.WorkerUtils
+import timber.log.Timber
+import java.io.File
+import java.lang.Long.min
+import java.net.SocketTimeoutException
+import java.text.SimpleDateFormat
+import java.util.Locale
+import javax.inject.Inject
+
+class BenRepo @Inject constructor(
+    private val context: Application,
+    private val benDao: BenDao,
+    private val householdDao: HouseholdDao,
+    private val benIdGenDao: BeneficiaryIdsAvailDao,
+    private val preferenceDao: PreferenceDao,
+    private val userRepo: UserRepo,
+    private val tmcNetworkApiService: AmritApiService,
+    private val formResponseJsonDao: FormResponseJsonDao,
+) {
+
+    private val processNewBenMutex = Mutex()
+
+    companion object {
+        private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
+        private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.ENGLISH)
+        fun getCurrentDate(millis: Long = System.currentTimeMillis()): String {
+            val dateString = dateFormat.format(millis)
+            val timeString = timeFormat.format(millis)
+            return "${dateString}T${timeString}.000Z"
+        }
+
+        fun getLongFromDateStr(dateString: String): Long {
+            val f = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ENGLISH)
+            val date = f.parse(dateString)
+            return date?.time ?: throw IllegalStateException("Invalid date for dateReg")
+        }
+    }
+
+    suspend fun updateBenToSync(householdId: Long, unsynced: SyncState) {
+        withContext(Dispatchers.IO) {
+            benDao.updateBenToSync(householdId = householdId,unsynced,"U",2)
+        }
+    }
+
+    suspend fun updateHousehold(householdId: Long, unsynced: SyncState) {
+        withContext(Dispatchers.IO) {
+            benDao.updateHofSpouseAdded(householdId = householdId,unsynced,"U",2)
+        }
+    }
+    suspend fun updateBeneficiarySpouseAdded(householdId: Long,benID: Long,unsynced: SyncState) {
+        withContext(Dispatchers.IO) {
+            benDao.updateBeneficiarySpouseAdded(householdId = householdId, benId = benID,unsynced,"U",2)
+        }
+    }
+
+    suspend fun updateFatherInChildren(benName: String, householdId: Long, parentName: String, unsynced: SyncState) {
+        withContext(Dispatchers.IO) {
+            benDao.updateFatherInChildren(benName = benName, householdId = householdId, parentName = parentName, unsynced, "U", 2)
+        }
+    }
+
+    suspend fun updateMotherInChildren(benName: String, householdId: Long, parentName: String, unsynced: SyncState) {
+        withContext(Dispatchers.IO) {
+            benDao.updateMotherInChildren(benName = benName, householdId = householdId, parentName = parentName, unsynced, "U", 2)
+        }
+    }
+
+    suspend fun updateSpouseOfHoF(benName: String, householdId: Long, spouseName: String, unsynced: SyncState) {
+        withContext(Dispatchers.IO) {
+            benDao.updateSpouseOfHoF(benName = benName, householdId = householdId, spouseName = spouseName, unsynced, "U", 2)
+        }
+    }
+
+    suspend fun updateFather(benName: String, householdId: Long, parentName: String, unsynced: SyncState) {
+        withContext(Dispatchers.IO) {
+            benDao.updateFather(benName = benName, householdId = householdId, parentName = parentName, unsynced, "U", 2)
+        }
+    }
+
+    suspend fun updateMother(benName: String, householdId: Long, parentName: String, unsynced: SyncState) {
+        withContext(Dispatchers.IO) {
+            benDao.updateMother(benName = benName, householdId = householdId, parentName = parentName, unsynced, "U", 2)
+        }
+    }
+
+    suspend fun updateMarriageAgeOfWife(marriageDate: Long, ageAtMarriage: Int, householdId: Long, spouseName: String, unsynced: SyncState) {
+        withContext(Dispatchers.IO) {
+            benDao.updateMarriageAgeOfWife(marriageDate = marriageDate, ageAtMarriage = ageAtMarriage, householdId = householdId, spouseName = spouseName, unsynced, "U", 2)
+        }
+    }
+
+    suspend fun updateMarriageAgeOfHusband(marriageDate: Long, ageAtMarriage: Int, householdId: Long, spouseName: String, unsynced: SyncState) {
+        withContext(Dispatchers.IO) {
+            benDao.updateMarriageAgeOfHusband(marriageDate = marriageDate, ageAtMarriage = ageAtMarriage, householdId = householdId, spouseName = spouseName, unsynced, "U", 2)
+        }
+    }
+
+    suspend fun updateBabyName(babyName: String, householdId: Long, parentName: String, unsynced: SyncState) {
+        withContext(Dispatchers.IO) {
+            benDao.updateBabyName(babyName = babyName, householdId = householdId, parentName = parentName, unsynced, "U", 2)
+        }
+    }
+
+    suspend fun updateSpouse(benName: String, householdId: Long, spouseName: String, unsynced: SyncState) {
+        withContext(Dispatchers.IO) {
+            benDao.updateSpouse(benName = benName, householdId = householdId, spouseName = spouseName, unsynced, "U", 2)
+        }
+    }
+
+    suspend fun updateChildrenLastName(lastName: String, householdId: Long, parentName: String, unsynced: SyncState) {
+        withContext(Dispatchers.IO) {
+            benDao.updateChildrenLastName(lastName = lastName, householdId = householdId, parentName = parentName, unsynced, "U", 2)
+        }
+    }
+
+    suspend fun updateSpouseLastName(lastName: String, householdId: Long, spouseName: String, unsynced: SyncState) {
+        withContext(Dispatchers.IO) {
+            benDao.updateSpouseLastName(lastName = lastName, householdId = householdId, spouseName = spouseName, unsynced, "U", 2)
+        }
+    }
+
+    suspend fun updateBeneficiaryChildrenAdded(
+        householdId: Long,
+        benID: Long,
+        unsynced: SyncState
+
+    ) {
+        withContext(Dispatchers.IO) {
+            benDao.updateBeneficiaryChildrenAdded(householdId = householdId, benId = benID,unsynced,"U",2)
+        }
+    }
+    fun getBenBasicListFromHousehold(hhId: Long): Flow<List<BenBasicDomain>> {
+        return benDao.getAllBasicBenForHousehold(hhId).map { it.map { it.asBasicDomainModel() } }
+
+    }
+
+    suspend fun getBenListFromHousehold(hhId: Long): List<BenRegCache> {
+        return benDao.getAllBenForHousehold(hhId)
+
+    }
+
+    suspend fun getChildCountForBen(benId: Long): Int {
+        return benDao.getChildCountForBen(benId)
+    }
+
+    suspend fun getChildBenListFromHousehold(
+        hhId: Long,
+        selectedbenIdFromArgs: Long,
+        firstName: String?
+    ): List<BenRegCache> {
+        return benDao.getChildBenForHousehold(hhId,selectedbenIdFromArgs,firstName)
+
+    }
+
+    suspend fun getChildBelow15(
+        hhId: Long,
+        selectedbenIdFromArgs: Long,
+        firstName: String?
+    ): Int {
+        return benDao.getBelow15Count(hhId,selectedbenIdFromArgs,firstName)
+
+    }
+
+    suspend fun getChildAbove15(
+        hhId: Long,
+        selectedbenIdFromArgs: Long,
+        firstName: String?
+    ): Int {
+        return benDao.get15aboveCount(hhId,selectedbenIdFromArgs,firstName)
+
+    }
+
+    suspend fun isBenDead(benId: Long): Boolean {
+        return benDao.isBenDead(benId)
+    }
+
+    suspend fun getBenFromId(benId: Long): BenRegCache? {
+        return withContext(Dispatchers.IO) {
+            benDao.getBen(benId)
+        }
+    }
+
+    suspend fun substituteBenIdForDraft(ben: BenRegCache) {
+        val extract = extractBenId()
+        ben.beneficiaryId = extract.benId
+        ben.isDraft = false
+    }
+
+    suspend fun persistRecord(ben: BenRegCache) {
+        withContext(Dispatchers.IO) {
+
+            val originalImagePath = ben.userImage
+            val finalImagePath = originalImagePath?.let { imagePath ->
+                val uri = Uri.parse(imagePath)
+                val filePath = uri.path
+                    ?: throw IllegalStateException("Invalid image URI: $imagePath")
+
+                val file = File(filePath)
+
+                when {
+                    file.absolutePath.startsWith(context.cacheDir.absolutePath) -> {
+                        val savedPath = ImageUtils.saveBenImageFromCameraToStorage(
+                            context = context,
+                            uriString = imagePath,
+                            benId = ben.beneficiaryId
+                        )
+
+                        if (savedPath.isNullOrBlank()) {
+                            Timber.e("Image compression/save failed for beneficiaryId=${ben.beneficiaryId}")
+
+                            // Cleanup orphaned cache file
+                            runCatching { file.delete() }
+                                .onFailure { Timber.w(it, "Failed to delete orphaned cache image") }
+
+                            throw IllegalStateException("Failed to save beneficiary image")
+                        }
+
+                        savedPath
+                    }
+
+                    file.absolutePath.startsWith(context.filesDir.absolutePath) -> {
+                        imagePath
+                    }
+
+                    else -> {
+                        Timber.w("Unknown image path source: $imagePath")
+                        imagePath
+                    }
+                }
+            }
+            ben.userImage = finalImagePath
+            benDao.upsert(ben)
+        }
+    }
+
+
+    suspend fun updateRecord(ben: BenRegCache) {
+        withContext(Dispatchers.IO) {
+            benDao.updateBen(ben)
+        }
+    }
+
+    suspend fun getHousehold(hhId: Long): HouseholdCache? {
+        return withContext(Dispatchers.IO) {
+            householdDao.getHousehold(hhId)
+        }
+
+    }
+
+    suspend fun getBeneficiaryRecord(benId: Long, hhId: Long): BenRegCache? {
+        return withContext(Dispatchers.IO) {
+            if (benId == 0L)
+                return@withContext null
+            benDao.getBen(hhId, benId)
+        }
+
+    }
+
+    private suspend fun extractBenId(): BeneficiaryIdsAvail {
+        return withContext(Dispatchers.IO) {
+            val user =
+                preferenceDao.getLoggedInUser()
+                    ?: throw IllegalStateException("No user logged in!!")
+
+            val benIdObj = benIdGenDao.getEntry(user.userId)
+            benIdGenDao.delete(benIdObj)
+            benIdObj
+        }
+
+    }
+
+    suspend fun getBenIdsGeneratedFromServer(maxCount: Int = Konstants.benIdCapacity) {
+        val user =
+            preferenceDao.getLoggedInUser() ?: throw IllegalStateException("No user logged in!!")
+        val benIdCount = benIdGenDao.count()
+        if (benIdCount > Konstants.benIdWorkerTriggerLimit) return
+        val count = maxCount - benIdCount
+        getBenIdsFromLocal(count, user.userId)
+//        getBenIdsFromServer(count, user)
+
+
+    }
+
+    private suspend fun getBenIdsFromLocal(count: Int, userId: Int) {
+        val minBenId = min(benDao.getMinBenId() ?: -1L, -1L)
+        val benIdList = mutableListOf<BeneficiaryIdsAvail>()
+        for (benId in minBenId - count until minBenId) {
+            benIdList.add(
+                BeneficiaryIdsAvail(
+                    userId = userId, benId = benId, benRegId = 0
+                )
+            )
+        }
+        benIdGenDao.insert(*benIdList.toTypedArray())
+    }
+
+    private suspend fun createBenIdAtServerByBeneficiarySending(
+        ben: BenRegCache, user: User, locationRecord: LocationRecord
+    ): Boolean {
+
+        val sendingData = ben.asNetworkSendingModel(user, locationRecord, context)
+        Timber.d("Amrit push beneficiary registration: benId=${ben.beneficiaryId}, hhId=${ben.householdId}")
+        try {
+            val response = tmcNetworkApiService.getBenIdFromBeneficiarySending(sendingData)
+            val statusCode = response.code()
+            val responseString = response.body()?.string()
+            Timber.d("Amrit push beneficiary registration response: httpStatus=$statusCode, benId=${ben.beneficiaryId}")
+            if (responseString != null) {
+                val jsonObj = JSONObject(responseString)
+                val errorMessage = jsonObj.optString("errorMessage", "")
+                val responseStatusCode: Int = jsonObj.getInt("statusCode")
+                if (responseStatusCode == 200) {
+                    val jsonObjectData: JSONObject = jsonObj.getJSONObject("data")
+                    val newBenId = jsonObjectData.getString("benGenId").toLong()
+                    val newBenRegId = jsonObjectData.getString("benRegId").toLong()
+                    Timber.d("Amrit push beneficiary registration success: oldBenId=${ben.beneficiaryId}, newBenId=$newBenId, benRegId=$newBenRegId")
+                    val photoUri = ImageUtils.renameImage(context, ben.beneficiaryId, newBenId)
+                    benDao.updateToFinalBenId(
+                        hhId = ben.householdId,
+                        oldId = ben.beneficiaryId,
+                        newBenRegId = newBenRegId,
+                        newId = newBenId,
+                        imageUri = photoUri
+                    )
+                    formResponseJsonDao.updateVisitBenId(
+                        oldBenId = ben.beneficiaryId,
+                        newBenId = newBenId
+                    )
+                    householdDao.getHousehold(ben.householdId)
+                        ?.takeIf { it.benId == ben.beneficiaryId }?.let {
+                            it.benId = newBenId
+                            householdDao.update(it)
+                        }
+                    ben.beneficiaryId = newBenId
+                    return true
+                }
+                Timber.e("Amrit push beneficiary registration failed: statusCode=$responseStatusCode, error=$errorMessage, benId=${ben.beneficiaryId}")
+                if (responseStatusCode == 5002 || responseStatusCode == 401) {
+                    if (userRepo.refreshTokenTmc(
+                            user.userName, user.password
+                        )
+                    ) throw SocketTimeoutException("Refreshed Token")
+                }
+            } else {
+                Timber.e("Amrit push beneficiary registration failed: response body is null, httpStatus=$statusCode, benId=${ben.beneficiaryId}")
+            }
+            throw IllegalStateException("Response undesired!")
+        } catch (se: SocketTimeoutException) {
+            if (se.message == "Refreshed Token") {
+                return createBenIdAtServerByBeneficiarySending(ben, user, locationRecord)
+            }
+            Timber.e("Amrit push beneficiary registration timeout: benId=${ben.beneficiaryId}, error=$se")
+            return false
+        } catch (e: java.lang.Exception) {
+            benDao.setSyncState(ben.householdId, ben.beneficiaryId, SyncState.UNSYNCED)
+            Timber.e("Amrit push beneficiary registration error: benId=${ben.beneficiaryId}, error=$e")
+            return false
+        }
+    }
+    suspend fun processNewBen(): Boolean = processNewBenMutex.withLock {
+        withContext(Dispatchers.IO) {
+            val user =
+                preferenceDao.getLoggedInUser()
+                    ?: throw IllegalStateException("No user logged in!!")
+
+            val benList = benDao.getAllUnprocessedBen()
+            Timber.d("YTR 419 $benList")
+
+            val benNetworkPostList = mutableSetOf<BenPost>()
+
+            benList.forEach {
+                createBenIdAtServerByBeneficiarySending(it, user, it.locationRecord)
+                Timber.d("YTR 429 $it")
+            }
+
+            val updateBenList = benDao.getAllBenForSyncWithServer()
+            updateBenList.forEach {
+                benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.SYNCING)
+                benNetworkPostList.add(it.asNetworkPostModel(context, user))
+            }
+
+            val uploadDone = postDataToAmritServer(benNetworkPostList)
+            if (!uploadDone) {
+                benNetworkPostList.takeIf { it.isNotEmpty() }?.map { it.benId }?.let {
+                    benDao.benSyncWithServerFailed(*it.toLongArray())
+                }
+                Timber.e("Beneficiary batch push FAILED: ${benNetworkPostList.size} ben records")
+            } else {
+                Timber.d("Beneficiary batch push succeeded: ${benNetworkPostList.size} ben records")
+            }
+            return@withContext true
+        }
+    }
+
+    private suspend fun postDataToAmritServer(
+        benNetworkPostSet: MutableSet<BenPost>,
+        retryCount: Int = 3,
+    ): Boolean {
+        if (benNetworkPostSet.isEmpty()) return true
+        val benIds = benNetworkPostSet.map { it.benId }
+        Timber.d("Amrit push syncDataToAmrit: sending ${benNetworkPostSet.size} ben(s) $benIds")
+        val rmnchData = SendingRMNCHData(
+            houseHoldRegistrationData = null,
+            benficieryRegistrationData = benNetworkPostSet.toList(),
+            cbacData = null,
+            birthDetails = null
+        )
+        try {
+            val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
+            val statusCode = response.code()
+            Timber.d("Amrit push syncDataToAmrit response: httpStatus=$statusCode")
+
+            if (statusCode == 200) {
+
+                val responseString: String? = response.body()?.string()
+                if (responseString != null) {
+                    val jsonObj = JSONObject(responseString)
+                    val responseStatusCode = jsonObj.getInt("statusCode")
+                    val errorMessage = jsonObj.optString("errorMessage", "")
+                    if (responseStatusCode == 200) {
+                        Timber.d("Amrit push syncDataToAmrit success: $jsonObj")
+                        val benToUpdateList =
+                            benNetworkPostSet.takeIf { it.isNotEmpty() }?.map { it.benId }
+                                ?.toTypedArray()?.toLongArray()
+                        Timber.d("Amrit push syncDataToAmrit marking synced: benIds=${benToUpdateList?.toList()}")
+                        benToUpdateList?.let {
+                            benDao.benSyncedWithServer(*it)
+                            Timber.d("Amrit push syncDataToAmrit DB updated: benIds=${it.toList()}")
+                        }
+                        return true
+                    } else if (responseStatusCode == 5002 || responseStatusCode ==401)  {
+                        val user = preferenceDao.getLoggedInUser()
+                            ?: throw IllegalStateException("User not logged in according to db")
+                        if (userRepo.refreshTokenTmc(
+                                user.userName, user.password
+                            )
+                        ) throw SocketTimeoutException("Refreshed Token!")
+                        else throw IllegalStateException("User seems to be logged out and refresh token not working!!!!")
+                    }
+                    Timber.e("Amrit push syncDataToAmrit failed: statusCode=$responseStatusCode, error=$errorMessage")
+                } else {
+                    Timber.e("Amrit push syncDataToAmrit failed: response body is null, httpStatus=$statusCode")
+                }
+            }
+            Timber.w("Amrit push syncDataToAmrit bad response: httpStatus=$statusCode, benIds=$benIds")
+            return false
+        } catch (e: SocketTimeoutException) {
+            Timber.e("Amrit push syncDataToAmrit timeout: benIds=$benIds, error=$e")
+            if (retryCount > 0) return postDataToAmritServer(
+                benNetworkPostSet, retryCount - 1
+            )
+            Timber.e("Amrit push syncDataToAmrit: max retries exhausted")
+            return false
+        } catch (e: JSONException) {
+            Timber.e("Amrit push syncDataToAmrit JSON error: benIds=$benIds, error=$e")
+            return false
+        } catch (e: java.lang.Exception) {
+            Timber.e("Amrit push syncDataToAmrit error: benIds=$benIds, error=$e")
+            return false
+        }
+    }
+
+
+    suspend fun deactivateHouseHold(
+        benNetworkPostSet: List<BenRegCache>,
+        householdNetworkPostSet: HouseholdNetwork,
+        retryCount: Int = 3,
+    ): Boolean {
+        val user = preferenceDao.getLoggedInUser() ?: throw IllegalStateException("No user logged in!!")
+        val benNetworkPostList: List<BenPost> =
+            benNetworkPostSet.map {
+                it.asNetworkPostModel(context, user)
+            }
+
+
+        val rmnchData = SendingRMNCHData(
+            listOf(householdNetworkPostSet),
+            benNetworkPostList
+        )
+        try {
+            val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
+            val statusCode = response.code()
+
+            if (statusCode == 200) {
+
+                val responseString: String? = response.body()?.string()
+                if (responseString != null) {
+                    val jsonObj = JSONObject(responseString)
+                    val responseStatusCode = jsonObj.getInt("statusCode")
+                    val errorMessage = jsonObj.optString("errorMessage", "")
+                    if (responseStatusCode == 200) {
+                        Timber.d("response : $jsonObj")
+                        WorkerUtils.triggerAmritPullWorker(context)
+                        return true
+                    } else if (responseStatusCode == 5002) {
+                        val user = preferenceDao.getLoggedInUser()
+                            ?: throw IllegalStateException("User not logged in according to db")
+                        if (userRepo.refreshTokenTmc(
+                                user.userName, user.password
+                            )
+                        ) throw SocketTimeoutException("Refreshed Token!")
+                        else throw IllegalStateException("User seems to be logged out and refresh token not working!!!!")
+                    }
+                }
+            }
+            Timber.w("Bad Response from server, need to check $householdNetworkPostSet")
+            return false
+        } catch (e: SocketTimeoutException) {
+            Timber.e("Caught exception $e here")
+            if (retryCount > 0) return deactivateHouseHold(
+                benNetworkPostSet, householdNetworkPostSet, retryCount - 1
+            )
+            Timber.e("deactivateHouseHold: max retries exhausted")
+            return false
+        } catch (e: JSONException) {
+            Timber.e("Caught exception $e here")
+            return false
+        } catch (e: java.lang.Exception) {
+            Timber.e("Caught exception $e here")
+            return false
+        }
+    }
+
+    suspend fun deactivateBeneficiary(
+        benNetworkPostSet: List<BenRegCache>,
+        retryCount: Int = 3,
+    ): Boolean {
+        val user = preferenceDao.getLoggedInUser() ?: throw IllegalStateException("No user logged in!!")
+        val benNetworkPostList: List<BenPost> =
+            benNetworkPostSet.map {
+                it.asNetworkPostModel(context, user)
+            }
+
+
+        val rmnchData = SendingRMNCHData(
+            //   listOf(householdNetworkPostSet),
+            benficieryRegistrationData= benNetworkPostList
+        )
+        try {
+            val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
+            val statusCode = response.code()
+
+            if (statusCode == 200) {
+
+                val responseString: String? = response.body()?.string()
+                if (responseString != null) {
+                    val jsonObj = JSONObject(responseString)
+                    val responseStatusCode = jsonObj.getInt("statusCode")
+                    val errorMessage = jsonObj.optString("errorMessage", "")
+                    if (responseStatusCode == 200) {
+                        Timber.d("response : $jsonObj")
+                        WorkerUtils.triggerAmritPullWorker(context)
+                        return true
+                    } else if (responseStatusCode == 5002) {
+                        val user = preferenceDao.getLoggedInUser()
+                            ?: throw IllegalStateException("User not logged in according to db")
+                        if (userRepo.refreshTokenTmc(
+                                user.userName, user.password
+                            )
+                        ) throw SocketTimeoutException("Refreshed Token!")
+                        else throw IllegalStateException("User seems to be logged out and refresh token not working!!!!")
+                    }
+                }
+            }
+            Timber.w("Bad Response from server, need to check $benNetworkPostList")
+            return false
+        } catch (e: SocketTimeoutException) {
+            Timber.e("Caught exception $e here")
+            if (retryCount > 0) return deactivateBeneficiary(
+                benNetworkPostSet, retryCount - 1
+            )
+            Timber.e("deactivateBeneficiary: max retries exhausted")
+            return false
+        } catch (e: JSONException) {
+            Timber.e("Caught exception $e here")
+            return false
+        } catch (e: java.lang.Exception) {
+            Timber.e("Caught exception $e here")
+            return false
+        }
+    }
+
+    suspend fun getBeneficiariesFromServerForWorker(pageNumber: Int): Int {
+        Timber.d("=====1234:getBeneficiariesFromServerForWorker : $pageNumber")
+        return withContext(Dispatchers.IO) {
+            val user =
+                preferenceDao.getLoggedInUser()
+                    ?: throw IllegalStateException("No user logged in!!")
+            val lastTimeStamp = preferenceDao.getLastSyncedTimeStamp()
+            try {
+                val response = tmcNetworkApiService.getBeneficiaries(
+                    GetDataPaginatedRequest(
+                        user.userId,
+                        pageNumber,
+                        getCurrentDate(lastTimeStamp),
+                        getCurrentDate()
+                    )
+                )
+                val statusCode = response.code()
+                if (statusCode == 200) {
+                    val responseString = response.body()?.string()
+                    if (responseString != null) {
+                        val jsonObj = JSONObject(responseString)
+
+                        val errorMessage = jsonObj.optString("errorMessage", "")
+                        val responseStatusCode = jsonObj.getInt("statusCode")
+                        Timber.d("Pull from amrit page $pageNumber response status : $responseStatusCode")
+                        when (responseStatusCode) {
+                            200 -> {
+
+                                val dataObj = jsonObj.getJSONObject("data")
+                                val pageSize = dataObj.getInt("totalPage")
+
+//                                HelperUtil.allPagesContent.append("Page $pageNumber:\n")
+//                                HelperUtil.allPagesContent.append(responseString)
+//                                HelperUtil.allPagesContent.append("\n")
+
+                                try {
+                                    householdDao.upsert(
+                                        *getHouseholdCacheFromServerResponse(
+                                            responseString
+                                        ).toTypedArray()
+                                    )
+                                } catch (e: Exception) {
+                                    Timber.d("HouseHold entries not synced $e")
+                                    // StopTB: HH save fail should not stop ben saving
+                                }
+                                val benCacheList = getBenCacheFromServerResponse(responseString)
+
+                                benDao.upsert(*benCacheList.toTypedArray())
+//                                val cbacCacheList = getCbacCacheFromServerResponse(responseString)
+//                                cbacDao.upsert(*cbacCacheList.toTypedArray())
+
+                                Timber.d("GeTBenDataList: $pageSize")
+                                return@withContext pageSize
+                            }
+
+                            401,5002 -> {
+                                if (pageNumber == 0 && userRepo.refreshTokenTmc(
+                                        user.userName, user.password
+                                    )
+                                ) throw SocketTimeoutException("Refreshed Token!")
+                                else throw IllegalStateException("User Logged out!!")
+                            }
+
+                            5000 -> {
+                                // HelperUtil.saveApiResponseToDownloads(context, "9864880049_getBeneficiaryData_response.txt", HelperUtil.allPagesContent.toString())
+
+                                if (errorMessage == "No record found") return@withContext 0
+                            }
+
+                            else -> {
+                                throw IllegalStateException("$responseStatusCode received, dont know what todo!?")
+                            }
+                        }
+                    }
+                }
+
+            } catch (e: SocketTimeoutException) {
+                Timber.e("get_ben error : $e")
+                return@withContext -2
+
+            } catch (e: java.lang.IllegalStateException) {
+                Timber.e("get_ben error : $e")
+                return@withContext -1
+            }
+            -1
+        }
+    }
+
+
+    suspend fun getBeneficiariesFromServer(pageNumber: Int): Pair<Int, MutableList<BenBasicDomain>> {
+        return withContext(Dispatchers.IO) {
+            val benDataList = mutableListOf<BenBasicDomain>()
+            val user =
+                preferenceDao.getLoggedInUser()
+                    ?: throw IllegalStateException("No user logged in!!")
+            try {
+                val response = tmcNetworkApiService.getBeneficiaries(
+                    GetDataPaginatedRequest(
+                        user.userId,
+                        pageNumber,
+                        "2020-10-20T15:50:45.000Z",
+                        getCurrentDate()
+                    )
+                )
+                val statusCode = response.code()
+                if (statusCode == 200) {
+                    val responseString = response.body()?.string()
+                    if (responseString != null) {
+                        val jsonObj = JSONObject(responseString)
+
+                        val errorMessage = jsonObj.optString("errorMessage", "")
+                        val responseStatusCode = jsonObj.getInt("statusCode")
+                        if (responseStatusCode == 200) {
+                            val dataObj = jsonObj.getJSONObject("data")
+                            val jsonArray = dataObj.getJSONArray("data")
+                            val pageSize = dataObj.getInt("totalPage")
+
+                            if (jsonArray.length() != 0) {
+
+                                for (i in 0 until jsonArray.length()) {
+                                    val jsonObject = jsonArray.getJSONObject(i)
+                                    val houseDataObj = jsonObject.getJSONObject("householdDetails")
+                                    val benDataObj = jsonObject.getJSONObject("beneficiaryDetails")
+
+                                    val benId =
+                                        if (jsonObject.has("benficieryid")) jsonObject.getLong("benficieryid") else -1L
+                                    val hhId =
+                                        if (jsonObject.has("houseoldId")) jsonObject.getLong("houseoldId") else -1L
+                                    if (hhId == -1L || benId == -1L) {
+                                        continue
+                                    }
+                                    val benExists = benDao.getBen(hhId, benId) != null
+
+                                    benDataList.add(
+                                        BenBasicDomain(
+                                            benId = jsonObject.getLong("benficieryid"),
+                                            hhId = jsonObject.getLong("houseoldId"),
+
+//                                            isDeath = if (jsonObject.has("isDeath")) jsonObject.optBoolean("isDeath") else false,
+//                                            isDeathValue = jsonObject.optString("isDeath", null),
+//                                            dateOfDeath = jsonObject.optString("dateOfDeath", null),
+//                                            timeOfDeath = jsonObject.optString("timeOfDeath", null),
+//                                            reasonOfDeath = jsonObject.optString("reasonOfDeath", null),
+//                                            reasonOfDeathId = if (jsonObject.has("reasonOfDeathId")) jsonObject.optInt("reasonOfDeathId") else -1,
+//                                            placeOfDeath = jsonObject.optString("placeOfDeath", null),
+//                                            placeOfDeathId = if (jsonObject.has("placeOfDeathId")) jsonObject.optInt("placeOfDeathId") else -1,
+//                                            otherPlaceOfDeath = jsonObject.optString("otherPlaceOfDeath", null),
+
+                                            isDeath = if (jsonObject.has("isDeath")) jsonObject.optBoolean(
+                                                "isDeath"
+                                            ) else false,
+
+                                            isDeathValue = jsonObject.optString("isDeath", null)
+                                                .takeIf { !it.isNullOrEmpty() },
+
+                                            dateOfDeath = jsonObject.optString("dateOfDeath", null)
+                                                .takeIf { !it.isNullOrEmpty() },
+
+                                            timeOfDeath = jsonObject.optString("timeOfDeath", null)
+                                                .takeIf { !it.isNullOrEmpty() },
+
+                                            reasonOfDeath = jsonObject.optString(
+                                                "reasonOfDeath",
+                                                null
+                                            ).takeIf { !it.isNullOrEmpty() },
+
+                                            reasonOfDeathId = if (jsonObject.has("reasonOfDeathId")) {
+                                                jsonObject.optInt("reasonOfDeathId")
+                                                    .takeIf { it != 0 } ?: -1
+                                            } else -1,
+
+                                            placeOfDeath = jsonObject.optString(
+                                                "placeOfDeath",
+                                                null
+                                            ).takeIf { !it.isNullOrEmpty() },
+
+                                            placeOfDeathId = if (jsonObject.has("placeOfDeathId")) {
+                                                jsonObject.optInt("placeOfDeathId")
+                                                    .takeIf { it != 0 } ?: -1
+                                            } else -1,
+
+                                            otherPlaceOfDeath = jsonObject.optString(
+                                                "otherPlaceOfDeath",
+                                                null
+                                            ).takeIf { !it.isNullOrEmpty() },
+
+
+                                            regDate = benDataObj.getString("registrationDate"),
+                                            benName = benDataObj.getString("firstName"),
+                                            benSurname = benDataObj.getString("lastName"),
+                                            gender = benDataObj.getString("gender"),
+                                            age = benDataObj.getInt("age").toString(),
+                                            mobileNo = benDataObj.getString("contact_number"),
+                                            fatherName = benDataObj.getString("fatherName"),
+                                            familyHeadName = houseDataObj.getString("familyHeadName"),
+                                            rchId = benDataObj.getString("rchid"),
+                                            hrpStatus = benDataObj.getBoolean("hrpStatus"),
+//                                            typeOfList = benDataObj.getString("registrationType"),
+                                            syncState = if (benExists) SyncState.SYNCED else SyncState.SYNCING,
+                                            dob = 0L,
+                                            relToHeadId = 0,
+                                            isConsent = false,
+                                            isSpouseAdded = false,
+                                            isChildrenAdded = false,
+                                            isMarried = false,
+                                            reproductiveStatusId =  benDataObj.getInt("reproductiveStatusId"),
+                                        )
+                                    )
+                                }
+                                try {
+                                    householdDao.upsert(
+                                        *getHouseholdCacheFromServerResponse(
+                                            responseString
+                                        ).toTypedArray()
+                                    )
+                                } catch (e: Exception) {
+                                    Timber.d("HouseHold entries not synced $e")
+                                    return@withContext Pair(0, benDataList)
+                                }
+                                val benCacheList = getBenCacheFromServerResponse(responseString)
+                                benDao.upsert(*benCacheList.toTypedArray())
+
+                                Timber.d("GeTBenDataList: $pageSize $benDataList")
+                                return@withContext Pair(pageSize, benDataList)
+                            }
+                            throw IllegalStateException("Response code !-100")
+                        } else {
+                            Timber.e("getBenData() returned error message : $errorMessage")
+                            throw IllegalStateException("Response code !-100")
+                        }
+                    }
+                }
+
+            } catch (e: Exception) {
+                Timber.e("get_ben error : $e")
+            }
+            Timber.d("get_ben data : $benDataList")
+            Pair(0, benDataList)
+        }
+    }
+
+    private fun getLongFromDate(date: String): Long {
+        val formatter = SimpleDateFormat("MMM dd, yyyy HH:mm:ss a", Locale.ENGLISH)
+        val localDateTime = formatter.parse(date)
+        return localDateTime?.time ?: 0
+    }
+
+    var count = 0
+    private suspend fun getBenCacheFromServerResponse(response: String): MutableList<BenRegCache> {
+        val jsonObj = JSONObject(response)
+        val result = mutableListOf<BenRegCache>()
+
+        val responseStatusCode = jsonObj.getInt("statusCode")
+        if (responseStatusCode == 200) {
+            val dataObj = jsonObj.getJSONObject("data")
+            val jsonArray = dataObj.getJSONArray("data")
+
+            if (jsonArray.length() != 0) {
+                for (i in 0 until jsonArray.length()) {
+                    val jsonObject = jsonArray.getJSONObject(i)
+                    val benDataObj = jsonObject.getJSONObject("beneficiaryDetails")
+                    val abhaHealthDetailsObj = jsonObject.getJSONObject("abhaHealthDetails")
+
+//                    val houseDataObj = jsonObject.getJSONObject("householdDetails")
+//                    val cbacDataObj = jsonObject.getJSONObject("cbacDetails")
+                    val childDataObj = jsonObject.getJSONObject("bornbirthDeatils")
+                    val benId =
+                        if (jsonObject.has("benficieryid")) jsonObject.getLong("benficieryid") else -1L
+                    val hhId =
+                        if (jsonObject.has("houseoldId")) jsonObject.getLong("houseoldId") else -1L
+
+                    if(benId == 700623622919L){
+                        Timber.d("====5224::BenPull benId=$benId | benExists=${benDao.getBen(hhId, benId) != null} | has doYouHavechildren=${jsonObject.has("doYouHavechildren")} val=${jsonObject.optBoolean("doYouHavechildren")} | has isMarried=${jsonObject.has("isMarried")} val=${jsonObject.optBoolean("isMarried")} | has isSpouseAdded=${jsonObject.has("isSpouseAdded")} val=${jsonObject.optBoolean("isSpouseAdded")} | has isChildrenAdded=${jsonObject.has("isChildrenAdded")} val=${jsonObject.optBoolean("isChildrenAdded")} | has noOfchildren=${jsonObject.has("noOfchildren")} val=${jsonObject.optInt("noOfchildren")}")
+                    }
+
+                    if (benId == -1L || hhId == -1L) continue
+                    val benExists = benDao.getBen(hhId, benId) != null
+
+                    if (benExists) {
+                        continue
+                    }
+                    // StopTB: No household check needed
+
+                    try {
+                        result.add(
+                            BenRegCache(
+                                householdId = jsonObject.getLong("houseoldId"),
+                                beneficiaryId = jsonObject.getLong("benficieryid"),
+                                isDeath = if (jsonObject.has("isDeath")) jsonObject.optBoolean("isDeath") else false,
+                                isDeathValue = jsonObject.optString("isDeath", null)
+                                    .takeIf { !it.isNullOrEmpty() },
+                                dateOfDeath = jsonObject.optString("dateOfDeath", null)
+                                    .takeIf { !it.isNullOrEmpty() },
+                                timeOfDeath = jsonObject.optString("timeOfDeath", null)
+                                    .takeIf { !it.isNullOrEmpty() },
+                                reasonOfDeath = jsonObject.optString("reasonOfDeath", null)
+                                    .takeIf { !it.isNullOrEmpty() },
+                                reasonOfDeathId = if (jsonObject.has("reasonOfDeathId")) {
+                                    jsonObject.optInt("reasonOfDeathId").takeIf { it != 0 } ?: -1
+                                } else -1,
+
+                                placeOfDeath = jsonObject.optString("placeOfDeath", null)
+                                    .takeIf { !it.isNullOrEmpty() },
+
+                                placeOfDeathId = if (jsonObject.has("placeOfDeathId")) {
+                                    jsonObject.optInt("placeOfDeathId").takeIf { it != 0 } ?: -1
+                                } else -1,
+
+                                otherPlaceOfDeath = jsonObject.optString("otherPlaceOfDeath", null)
+                                    .takeIf { !it.isNullOrEmpty() },
+
+
+                                ashaId = jsonObject.getInt("ashaId"),
+                                benRegId = jsonObject.getLong("BenRegId"),
+                                isNewAbha = if (abhaHealthDetailsObj.has("isNewAbha")) abhaHealthDetailsObj.getBoolean(
+                                    "isNewAbha"
+                                ) else false,
+                                age = benDataObj.getInt("age"),
+                                isDeactivate = if (benDataObj.has("isDeactivate")) benDataObj.getBoolean("isDeactivate") else false,
+                                ageUnit = if (benDataObj.has("gender")) {
+                                    when (benDataObj.getString("age_unit")) {
+                                        "Years" -> AgeUnit.YEARS
+                                        "Months" -> AgeUnit.MONTHS
+                                        "Days" -> AgeUnit.DAYS
+                                        else -> AgeUnit.YEARS
+                                    }
+                                } else null,
+                                ageUnitId = when (benDataObj.getString("age_unit")) {
+                                    "Years" -> 3
+                                    "Months" -> 2
+                                    "Days" -> 1
+                                    else -> 3
+                                },
+                                isKid = !(benDataObj.getString("age_unit") == "Years" && benDataObj.getInt(
+                                    "age"
+                                ) > 14),
+                                isAdult = (benDataObj.getString("age_unit") == "Years" && benDataObj.getInt(
+                                    "age"
+                                ) > 14),
+//                                userImageBlob = getCompressedByteArray(benId, benDataObj),
+                                regDate = if (benDataObj.has("registrationDate")) getLongFromDate(
+                                    benDataObj.getString("registrationDate")
+                                ) else 0,
+                                firstName = if (benDataObj.has("firstName")) benDataObj.getString("firstName") else null,
+                                lastName = if (benDataObj.has("lastName")) benDataObj.getString("lastName") else null,
+                                genderId = benDataObj.getInt("genderId"),
+                                gender = if (benDataObj.has("gender")) {
+                                    when (benDataObj.getInt("genderId")) {
+                                        1 -> Gender.MALE
+                                        2 -> Gender.FEMALE
+                                        3 -> Gender.TRANSGENDER
+                                        else -> Gender.MALE
+                                    }
+                                } else null,
+                                dob = getLongFromDate(benDataObj.getString("dob")),
+
+                                fatherName = if (benDataObj.has("fatherName")) benDataObj.getString(
+                                    "fatherName"
+                                ) else null,
+                                motherName = if (benDataObj.has("motherName")) benDataObj.getString(
+                                    "motherName"
+                                ) else null,
+                                familyHeadRelation = if (benDataObj.has("familyHeadRelation")) benDataObj.getString(
+                                    "familyHeadRelation"
+                                ) else null,
+                                familyHeadRelationPosition = benDataObj.getInt("familyHeadRelationPosition"),
+//                            familyHeadRelationOther = benDataObj.getString("familyHeadRelationOther"),
+                                mobileNoOfRelation = if (benDataObj.has("mobilenoofRelation")) benDataObj.getString(
+                                    "mobilenoofRelation"
+                                ) else null,
+                                mobileNoOfRelationId = if (benDataObj.has("mobilenoofRelationId")) benDataObj.getInt(
+                                    "mobilenoofRelationId"
+                                ) else 0,
+                                mobileOthers = if (benDataObj.has("mobileOthers") && benDataObj.getString(
+                                        "mobileOthers"
+                                    ).isNotEmpty()
+                                ) benDataObj.getString(
+                                    "mobileOthers"
+                                ) else null,
+                                contactNumber = if (benDataObj.has("contact_number")) benDataObj.getString(
+                                    "contact_number"
+                                ).toLong() else 0,
+//                            literacy = literacy,
+                                literacyId = if (benDataObj.has("literacyId")) benDataObj.getInt("literacyId") else 0,
+                                communityId = if (benDataObj.has("communityId")) benDataObj.getInt("communityId") else 0,
+                                community = if (benDataObj.has("community")) benDataObj.getString("community") else null,
+                                religion = if (benDataObj.has("religion")) benDataObj.getString("religion") else null,
+                                religionId = if (benDataObj.has("religionID")) benDataObj.getInt("religionID") else 0,
+                                religionOthers = if (benDataObj.has("religionOthers") && benDataObj.getString(
+                                        "religionOthers"
+                                    ).isNotEmpty()
+                                ) benDataObj.getString(
+                                    "religionOthers"
+                                ) else null,
+                                rchId = if (benDataObj.has("rchid")) benDataObj.getString("rchid") else null,
+//                            registrationType = if (benDataObj.has("registrationType")) {
+//                                when (benDataObj.getString("registrationType")) {
+//                                    "NewBorn" -> {
+//                                        if (benDataObj.getString("age_unit") != "Years" || benDataObj.getInt(
+//                                                "age"
+//                                            ) < 2
+//                                        ) TypeOfList.INFANT
+//                                        else if (benDataObj.getInt("age") < 6) TypeOfList.CHILD
+//                                        else TypeOfList.ADOLESCENT
+//                                    }
+//                                    "General Beneficiary", "सामान्य लाभार्थी" -> if (benDataObj.has(
+//                                            "reproductiveStatus"
+//                                        )
+//                                    ) {
+//                                        with(benDataObj.getString("reproductiveStatus")) {
+//                                            when {
+//                                                contains("Eligible Couple") || contains("पात्र युगल") -> TypeOfList.ELIGIBLE_COUPLE
+//                                                contains("Antenatal Mother") -> TypeOfList.ANTENATAL_MOTHER
+//                                                contains("Delivery Stage") -> TypeOfList.DELIVERY_STAGE
+//                                                contains("Postnatal Mother") -> TypeOfList.POSTNATAL_MOTHER
+//                                                contains("Menopause Stage") -> TypeOfList.MENOPAUSE
+//                                                contains("Teenager") || contains("किशोरी") -> TypeOfList.TEENAGER
+//                                                else -> TypeOfList.GENERAL
+//                                            }
+//                                        }
+//                                    } else TypeOfList.GENERAL
+//                                    else -> TypeOfList.GENERAL
+//                                }
+//                            } else TypeOfList.OTHER,
+                                latitude = benDataObj.getDouble("latitude"),
+                                longitude = benDataObj.getDouble("longitude"),
+                                aadharNum = if (benDataObj.has("aadhaNo")) benDataObj.getString("aadhaNo") else null,
+                                aadharNumId = benDataObj.getInt("aadha_noId"),
+                                hasAadhar = if (benDataObj.has("aadhaNo")) benDataObj.getString("aadhaNo") != "" else false,
+                                hasAadharId = if (benDataObj.getInt("aadha_noId") == 1) 1 else 0,
+//                            bankAccountId = benDataObj.getString("bank_accountId"),
+                                bankAccount = if (benDataObj.has("bankAccount")) benDataObj.getString(
+                                    "bankAccount"
+                                ) else null,
+                                nameOfBank = if (benDataObj.has("nameOfBank")) benDataObj.getString(
+                                    "nameOfBank"
+                                ) else null,
+//                            nameOfBranch = benDataObj.getString("nameOfBranch"),
+                                ifscCode = if (benDataObj.has("ifscCode")) benDataObj.getString("ifscCode") else null,
+//                            needOpCare = benDataObj.getString("need_opcare"),
+                                needOpCareId = if (benDataObj.has("need_opcareId")) benDataObj.getInt(
+                                    "need_opcareId"
+                                ) else 0,
+                                ncdPriority = if (benDataObj.has("ncd_priority")) benDataObj.getInt(
+                                    "ncd_priority"
+                                ) else 0,
+//                            cbacAvailable = cbacDataObj.length() != 0,
+                                guidelineId = if (benDataObj.has("guidelineId")) benDataObj.getString(
+                                    "guidelineId"
+                                ) else null,
+                                isHrpStatus = if (benDataObj.has("hrpStatus")) benDataObj.getBoolean(
+                                    "hrpStatus"
+                                ) else false,
+//                            hrpIdentificationDate = hrp_identification_date,
+//                            hrpLastVisitDate = hrp_last_vist_date,
+//                            nishchayPregnancyStatus = nishchayPregnancyStatus,
+//                            nishchayPregnancyStatusPosition = nishchayPregnancyStatusPosition,
+//                            nishchayDeliveryStatus = nishchayDeliveryStatus,
+//                            nishchayDeliveryStatusPosition = nishchayDeliveryStatusPosition,
+//                            nayiPahalDeliveryStatus = nayiPahalDeliveryStatus,
+//                            nayiPahalDeliveryStatusPosition = nayiPahalDeliveryStatusPosition,
+//                            suspectedNcd = if (cbacDataObj.has("suspected_ncd")) cbacDataObj.getString(
+//                                "suspected_ncd"
+//                            ) else null,
+//                            suspectedNcdDiseases = if (cbacDataObj.has("suspected_ncd_diseases")) cbacDataObj.getString(
+//                                "suspected_ncd_diseases"
+//                            ) else null,
+//                            suspectedTb = if (cbacDataObj.has("suspected_tb")) cbacDataObj.getString(
+//                                "suspected_tb"
+//                            ) else null,
+//                            confirmed_Ncd = if (cbacDataObj.has("confirmed_ncd")) cbacDataObj.getString(
+//                                "confirmed_ncd"
+//                            ) else null,
+//                            confirmedHrp = if (cbacDataObj.has("confirmed_hrp")) cbacDataObj.getString(
+//                                "confirmed_hrp"
+//                            ) else null,
+//                            confirmedTb = if (cbacDataObj.has("confirmed_tb")) cbacDataObj.getString(
+//                                "confirmed_tb"
+//                            ) else null,
+//                            confirmedNcdDiseases = if (cbacDataObj.has("confirmed_ncd_diseases")) cbacDataObj.getString(
+//                                "confirmed_ncd_diseases"
+//                            ) else null,
+//                            diagnosisStatus = if (cbacDataObj.has("diagnosis_status")) cbacDataObj.getString(
+//                                "diagnosis_status"
+//                            ) else null,
+                                locationRecord = LocationRecord(
+                                    country = preferenceDao.getLocationRecord()?.country ?: LocationEntity(1, "India"),
+                                    state = LocationEntity(
+                                        benDataObj.getInt("stateId"),
+                                        benDataObj.getString("stateName"),
+                                    ),
+                                    district = LocationEntity(
+                                        benDataObj.getInt("districtid"),
+                                        benDataObj.getString("districtname"),
+                                    ),
+                                    block = LocationEntity(
+                                        benDataObj.getInt("blockId"),
+                                        benDataObj.getString("blockName"),
+                                    ),
+                                    village = LocationEntity(
+                                        benDataObj.getInt("villageId"),
+                                        benDataObj.getString("villageName"),
+                                    ),
+                                ),
+                                processed = "P",
+                                serverUpdatedStatus = 1,
+                                createdBy = benDataObj.getString("createdBy"),
+                                updatedBy = if (benDataObj.has("updatedBy")) benDataObj.getString("updatedBy") else benDataObj.getString(
+                                    "createdBy"
+                                ),
+                                createdDate = getLongFromDate(benDataObj.getString("createdDate")),
+                                updatedDate = getLongFromDate(
+                                    if (benDataObj.has("updatedDate")) benDataObj.getString("updatedDate") else benDataObj.getString(
+                                        "createdDate"
+                                    )
+                                ),
+                                userImage = if (benDataObj.has("user_image"))
+                                    ImageUtils.saveBenImageFromServerToStorage(
+                                        context,
+                                        benDataObj.getString("user_image"),
+                                        benId
+                                    ) else null,
+                                kidDetails = if (childDataObj.length() == 0) null else BenRegKid(
+                                    childRegisteredAWCId = if (benDataObj.has("childRegisteredAWCID")) benDataObj.getInt(
+                                        "childRegisteredAWCID"
+                                    ) else 0,
+                                    childRegisteredSchoolId = if (benDataObj.has("childRegisteredSchoolID")) benDataObj.getInt(
+                                        "childRegisteredSchoolID"
+                                    ) else 0,
+                                    typeOfSchoolId = if (benDataObj.has("typeofSchoolID")) benDataObj.getInt(
+                                        "typeofSchoolID"
+                                    ) else 0,
+                                    birthPlace = if (childDataObj.has("birthPlace")) childDataObj.getString(
+                                        "birthPlace"
+                                    ) else null,
+                                    birthPlaceId = if (childDataObj.has("birthPlaceid")) childDataObj.getInt(
+                                        "birthPlaceid"
+                                    ) else 0,
+                                    facilityName = if (childDataObj.has("facilityName")) childDataObj.getString(
+                                        "facilityName"
+                                    ) else null,
+                                    facilityId = if (childDataObj.has("facilityid")) childDataObj.getInt(
+                                        "facilityid"
+                                    ) else 0,
+                                    facilityOther = if (childDataObj.has("facilityOther")) childDataObj.getString(
+                                        "facilityOther"
+                                    ) else null,
+                                    placeName = if (childDataObj.has("placeName")) childDataObj.getString(
+                                        "placeName"
+                                    ) else null,
+                                    conductedDelivery = if (childDataObj.has("conductedDelivery")) childDataObj.getString(
+                                        "conductedDelivery"
+                                    ) else null,
+                                    conductedDeliveryId = if (childDataObj.has("conductedDeliveryid")) childDataObj.getInt(
+                                        "conductedDeliveryid"
+                                    ) else 0,
+                                    conductedDeliveryOther = if (childDataObj.has("conductedDeliveryOther")) childDataObj.getString(
+                                        "conductedDeliveryOther"
+                                    ) else null,
+                                    deliveryType = if (childDataObj.has("deliveryType")) childDataObj.getString(
+                                        "deliveryType"
+                                    ) else null,
+                                    deliveryTypeId = if (childDataObj.has("deliveryTypeid")) childDataObj.getInt(
+                                        "deliveryTypeid"
+                                    ) else 0,
+                                    complications = if (childDataObj.has("complecations")) childDataObj.getString(
+                                        "complecations"
+                                    ) else null,
+                                    complicationsId = if (childDataObj.has("complecationsid")) childDataObj.getInt(
+                                        "complecationsid"
+                                    ) else 0,
+                                    complicationsOther = if (childDataObj.has("complicationsOther")) childDataObj.getString(
+                                        "complicationsOther"
+                                    ) else null,
+                                    term = if (childDataObj.has("term")) childDataObj.getString("term") else null,
+                                    termId = if (childDataObj.has("termid")) childDataObj.getInt("termid") else 0,
+//                                    gestationalAge  = if(childDataObj.has("gestationalAge")) childDataObj.getString("gestationalAge") else null,
+                                    gestationalAgeId = if (childDataObj.has("gestationalAgeid")) childDataObj.getInt(
+                                        "gestationalAgeid"
+                                    ) else 0,
+//                                    corticosteroidGivenMother  = if(childDataObj.has("corticosteroidGivenMother")) childDataObj.getString("corticosteroidGivenMother") else null,
+                                    corticosteroidGivenMotherId = if (childDataObj.has("corticosteroidGivenMotherid")) childDataObj.getInt(
+                                        "corticosteroidGivenMotherid"
+                                    ) else 0,
+                                    criedImmediately = if (childDataObj.has("criedImmediately")) childDataObj.getString(
+                                        "criedImmediately"
+                                    ) else null,
+                                    criedImmediatelyId = if (childDataObj.has("criedImmediatelyid")) childDataObj.getInt(
+                                        "criedImmediatelyid"
+                                    ) else 0,
+                                    birthDefects = if (childDataObj.has("birthDefects")) childDataObj.getString(
+                                        "birthDefects"
+                                    ) else null,
+                                    birthDefectsId = if (childDataObj.has("birthDefectsid")) childDataObj.getInt(
+                                        "birthDefectsid"
+                                    ) else 0,
+                                    birthDefectsOthers = if (childDataObj.has("birthDefectsOthers")) childDataObj.getString(
+                                        "birthDefectsOthers"
+                                    ) else null,
+                                    heightAtBirth = if (childDataObj.has("heightAtBirth")) childDataObj.getDouble(
+                                        "heightAtBirth"
+                                    ) else 0.0,
+                                    weightAtBirth = if (childDataObj.has("weightAtBirth")) childDataObj.getDouble(
+                                        "weightAtBirth"
+                                    ) else 0.0,
+                                    feedingStarted = if (childDataObj.has("feedingStarted")) childDataObj.getString(
+                                        "feedingStarted"
+                                    ) else null,
+                                    feedingStartedId = if (childDataObj.has("feedingStartedid")) childDataObj.getInt(
+                                        "feedingStartedid"
+                                    ) else 0,
+                                    birthDosage = if (childDataObj.has("birthDosage")) childDataObj.getString(
+                                        "birthDosage"
+                                    ) else null,
+                                    birthDosageId = if (childDataObj.has("birthDosageid")) childDataObj.getInt(
+                                        "birthDosageid"
+                                    ) else 0,
+                                    opvBatchNo = if (childDataObj.has("opvBatchNo")) childDataObj.getString(
+                                        "opvBatchNo"
+                                    ) else null,
+//                                opvGivenDueDate  = childDataObj.getString("opvGivenDueDate"),
+//                                opvDate  = childDataObj.getString("opvDate"),
+                                    bcdBatchNo = if (childDataObj.has("bcdBatchNo")) childDataObj.getString(
+                                        "bcdBatchNo"
+                                    ) else null,
+//                                bcgGivenDueDate  = childDataObj.getString("bcgGivenDueDate"),
+//                                bcgDate  = childDataObj.getString("bcgDate"),
+                                    hptBatchNo = if (childDataObj.has("hptdBatchNo")) childDataObj.getString(
+                                        "hptdBatchNo"
+                                    ) else null,
+//                                hptGivenDueDate  = childDataObj.getString("hptGivenDueDate"),
+//                                hptDate  = childDataObj.getString("hptDate"),
+                                    vitaminKBatchNo = if (childDataObj.has("vitaminkBatchNo")) childDataObj.getString(
+                                        "vitaminkBatchNo"
+                                    ) else null,
+//                                vitaminKGivenDueDate  =  childDataObj.getString("vitaminKGivenDueDate"),
+//                                vitaminKDate =  childDataObj.getString("vitaminKDate"),
+                                    deliveryTypeOther = if (childDataObj.has("deliveryTypeOther")) childDataObj.getString(
+                                        "deliveryTypeOther"
+                                    ) else null,
+
+//                                motherBenId =  childDataObj.getString("conductedDeliveryOther"),
+//                                childMotherName =  childDataObj.getString("conductedDeliveryOther"),
+//                                motherPosition =  childDataObj.getString("conductedDeliveryOther"),
+                                    birthBCG = if (childDataObj.has("birthBCG")) childDataObj.getBoolean(
+                                        "birthBCG"
+                                    ) else false,
+                                    birthHepB = if (childDataObj.has("birthHepB")) childDataObj.getBoolean(
+                                        "birthHepB"
+                                    ) else false,
+                                    birthOPV = if (childDataObj.has("birthOPV")) childDataObj.getBoolean(
+                                        "birthOPV"
+                                    ) else false,
+                                    birthCertificateFileBackView = if (childDataObj.has("birthOPV")) childDataObj.getString(
+                                        "birthOPV"
+                                    ) else "",
+                                    birthCertificateFileFrontView = if (childDataObj.has("birthOPV")) childDataObj.getString(
+                                        "birthOPV"
+                                    ) else ""
+                                ),
+                                genDetails = if (childDataObj.length() != 0) null else BenRegGen(
+                                    maritalStatus = if (benDataObj.has("maritalstatus")) benDataObj.getString(
+                                        "maritalstatus"
+                                    ) else null,
+                                    maritalStatusId = if (benDataObj.has("maritalstatusId")) benDataObj.getInt(
+                                        "maritalstatusId"
+                                    ) else 0,
+                                    spouseName = if (benDataObj.has("spousename")) benDataObj.getString(
+                                        "spousename"
+                                    ) else null,
+                                    ageAtMarriage = if (benDataObj.has("ageAtMarriage")) benDataObj.getInt(
+                                        "ageAtMarriage"
+                                    ) else 0,
+//                                dateOfMarriage = getLongFromDate(dateMarriage),
+                                    marriageDate = if (benDataObj.has("marriageDate")) getLongFromDate(
+                                        benDataObj.getString("marriageDate")
+                                    ) else null,
+//                                menstrualStatus = menstrualStatus,
+//                                menstrualStatusId = if (benDataObj.has("menstrualStatusId")) benDataObj.getInt(
+//                                    "menstrualStatusId"
+//                                ) else null,
+//                                regularityOfMenstrualCycle = regularityofMenstrualCycle,
+//                                regularityOfMenstrualCycleId = if (benDataObj.has("regularityofMenstrualCycleId")) benDataObj.getInt(
+//                                    "regularityofMenstrualCycleId"
+//                                ) else 0,
+//                                lengthOfMenstrualCycle = lengthofMenstrualCycle,
+//                                lengthOfMenstrualCycleId = if (benDataObj.has("lengthofMenstrualCycleId")) benDataObj.getInt(
+//                                    "lengthofMenstrualCycleId"
+//                                ) else 0,
+//                                menstrualBFD = menstrualBFD,
+//                                menstrualBFDId = if (benDataObj.has("menstrualBFDId")) benDataObj.getInt(
+//                                    "menstrualBFDId"
+//                                ) else 0,
+//                                menstrualProblem = menstrualProblem,
+//                                menstrualProblemId = if (benDataObj.has("menstrualProblemId")) benDataObj.getInt(
+//                                    "menstrualProblemId"
+//                                ) else 0,
+//                                lastMenstrualPeriod = lastMenstrualPeriod,
+                                    /**
+                                     * part of reproductive status id mapping on @since Aug 7
+                                     */
+                                    reproductiveStatus = if (benDataObj.has("reproductiveStatus")) benDataObj.getString(
+                                        "reproductiveStatus"
+                                    ) else null,
+                                    reproductiveStatusId = if (benDataObj.has("reproductiveStatusId")) {
+                                        val idFromServer = benDataObj.getInt(
+                                            "reproductiveStatusId"
+                                        )
+                                        when (idFromServer) {
+                                            0 -> 0
+                                            1 -> 1
+                                            2, 3 -> 2
+                                            4 -> 3
+                                            5 -> 4
+                                            6 -> 5
+                                            else -> 5
+                                        }
+                                    } else 0,
+//                                lastDeliveryConducted = lastDeliveryConducted,
+//                                lastDeliveryConductedId = if (benDataObj.has("lastDeliveryConductedID")) benDataObj.getInt(
+//                                    "lastDeliveryConductedID"
+//                                ) else 0,
+//                                facilityName = facilitySelection,
+//                                whoConductedDelivery = whoConductedDelivery,
+//                                whoConductedDeliveryId = if (benDataObj.has("whoConductedDeliveryID")) benDataObj.getInt(
+//                                    "whoConductedDeliveryID"
+//                                ) else 0,
+//                                deliveryDate = deliveryDate,
+//                                expectedDateOfDelivery = if (benDataObj.has("expectedDateOfDelivery")) getLongFromDate(
+//                                    benDataObj.getString("expectedDateOfDelivery")
+//                                ) else null,
+//                                noOfDaysForDelivery = noOfDaysForDelivery,
+                                ),
+                                healthIdDetails = if (abhaHealthDetailsObj != null && abhaHealthDetailsObj.length() > 0) {
+                                    BenHealthIdDetails(
+                                        healthIdNumber = abhaHealthDetailsObj.getString("HealthIdNumber"),
+                                        isNewAbha = if (abhaHealthDetailsObj.has("isNewAbha")) abhaHealthDetailsObj.getBoolean(
+                                            "isNewAbha"
+                                        ) else false,
+                                        healthId = abhaHealthDetailsObj.getString("HealthID")
+                                    )
+
+                                } else null,
+                                syncState = SyncState.SYNCED,
+                                isDraft = false,
+                                isConsent = false,
+                                isSpouseAdded = if (jsonObject.has("isSpouseAdded")) jsonObject.optBoolean("isSpouseAdded") else false,
+                                isChildrenAdded = if (jsonObject.has("isChildrenAdded")) jsonObject.optBoolean("isChildrenAdded") else false,
+                                isMarried = if (jsonObject.has("isMarried")) jsonObject.optBoolean("isMarried") else false,
+                                doYouHavechildren = if (jsonObject.has("doYouHavechildren")) jsonObject.optBoolean("doYouHavechildren") else false,
+                                noOfAliveChildren = if (jsonObject.has("noofAlivechildren")) jsonObject.optInt("noofAlivechildren") else 0,
+                                noOfChildren = if (jsonObject.has("noOfchildren")) jsonObject.optInt("noOfchildren") else 0,
+                            )
+                        )
+
+
+                        /*val registrationType = if (benDataObj.has("registrationType")) {
+                            when (benDataObj.getString("registrationType")) {
+                                "NewBorn" -> {
+                                    if (benDataObj.getString("age_unit") != "Years" || benDataObj.getInt(
+                                            "age"
+                                        ) < 2
+                                    ) TypeOfList.INFANT
+                                    else if (benDataObj.getInt("age") < 6) TypeOfList.CHILD
+                                    else TypeOfList.ADOLESCENT
+                                }
+                                "General Beneficiary", "सामान्य लाभार्थी" -> if (benDataObj.has(
+                                        "reproductiveStatus"
+                                    )
+                                ) {
+                                    when (benDataObj.getString("reproductiveStatus")) {
+                                        "Eligible Couple" -> TypeOfList.ELIGIBLE_COUPLE
+                                        "Antenatal Mother" -> TypeOfList.ANTENATAL_MOTHER
+                                        "Delivery Stage" -> TypeOfList.DELIVERY_STAGE
+                                        "Postnatal Mother" -> TypeOfList.POSTNATAL_MOTHER
+                                        "Menopause" -> TypeOfList.MENOPAUSE
+                                        "Teenager" -> TypeOfList.TEENAGER
+                                        else -> TypeOfList.OTHER
+                                    }
+                                } else TypeOfList.GENERAL
+                                else -> TypeOfList.GENERAL
+                            }
+                        } else TypeOfList.OTHER
+                        Timber.d(
+                            "Custom Validation: $registrationType, ${benDataObj.getString("age_unit")}, " + "${
+                                benDataObj.getInt(
+                                    "age"
+                                )
+                            }, ${benDataObj.getString("reproductiveStatus")}"
+                        )*/
+
+//                        if (benDataObj.has("benficieryid")){
+//                            count++
+//                            Timber.d("====050224,::$count")
+//                        }
+                    } catch (e: JSONException) {
+                        Timber.e("Beneficiary skipped: ${jsonObject.getLong("benficieryid")} with error $e")
+                    } catch (e: NumberFormatException) {
+                        Timber.e("Beneficiary skipped: ${jsonObject.getLong("benficieryid")} with error $e")
+                    }
+                }
+            }
+        }
+        return result
+    }
+
+    private suspend fun getHouseholdCacheFromServerResponse(response: String): MutableList<HouseholdCache> {
+        val jsonObj = JSONObject(response)
+        val result = mutableListOf<HouseholdCache>()
+
+        val responseStatusCode = jsonObj.getInt("statusCode")
+        if (responseStatusCode == 200) {
+            val dataObj = jsonObj.getJSONObject("data")
+            val jsonArray = dataObj.getJSONArray("data")
+
+            if (jsonArray.length() != 0) {
+                for (i in 0 until jsonArray.length()) {
+                    val jsonObject = jsonArray.getJSONObject(i)
+                    val benId =
+                        if (jsonObject.has("benficieryid")) jsonObject.getLong("benficieryid") else -1L
+                    val hhId =
+                        if (jsonObject.has("houseoldId")) jsonObject.getLong("houseoldId") else -1L
+                    if (benId == -1L || hhId == -1L) continue
+                    val houseDataObj = jsonObject.getJSONObject("householdDetails")
+                    val benDataObj = jsonObject.getJSONObject("beneficiaryDetails")
+
+                    val hhExists =
+                        householdDao.getHousehold(hhId) != null || result.map { it.householdId }
+                            .contains(hhId)
+
+                    if (hhExists) {
+                        continue
+                    }
+                    Timber.d("HouseHoldList $result")
+                    try {
+                        result.add(
+                            HouseholdCache(
+                                householdId = jsonObject.getLong("houseoldId"),
+                                ashaId = jsonObject.getInt("ashaId"),
+                                benId = jsonObject.getLong("benficieryid"),
+                                family = HouseholdFamily(
+                                    familyHeadName = houseDataObj.getString("familyHeadName"),
+                                    familyName = if (houseDataObj.has("familyName")) houseDataObj.getString(
+                                        "familyName"
+                                    ) else null,
+                                    familyHeadPhoneNo = houseDataObj.getString("familyHeadPhoneNo")
+                                        .toLongOrNull() ?: 0L,
+                                    houseNo = if (houseDataObj.has("houseno")) houseDataObj.getString(
+                                        "houseno"
+                                    )
+                                        .let { if (it == "null") null else it } else null,
+                                    wardNo = if (houseDataObj.has("wardNo")) houseDataObj.getString(
+                                        "wardNo"
+                                    )
+                                        .let { if (it == "null") null else it } else null,
+                                    wardName = if (houseDataObj.has("wardName")) houseDataObj.getString(
+                                        "wardName"
+                                    )
+                                        .let { if (it == "null") null else it } else null,
+                                    mohallaName = if (houseDataObj.has("mohallaName")) houseDataObj.getString(
+                                        "mohallaName"
+                                    )
+                                        .let { if (it == "null") null else it } else null,
+//                                rationCardDetails = houseDataObj.getString("rationCardDetails"),
+                                    povertyLine = houseDataObj.getString("type_bpl_apl"),
+                                    povertyLineId = houseDataObj.getInt("bpl_aplId"),
+                                ),
+                                details = HouseholdDetails(
+                                    residentialArea = houseDataObj.getString("residentialArea")
+                                        .let { if (it == "null") null else it },
+                                    residentialAreaId = houseDataObj.getInt("residentialAreaId"),
+                                    otherResidentialArea = houseDataObj.getString("other_residentialArea"),
+                                    houseType = houseDataObj.getString("houseType"),
+                                    houseTypeId = houseDataObj.getInt("houseTypeId"),
+                                    otherHouseType = houseDataObj.getString("other_houseType"),
+                                    isHouseOwned = houseDataObj.getString("houseOwnerShip"),
+                                    isHouseOwnedId = houseDataObj.getInt("houseOwnerShipId"),
+//                                isLandOwned = houseDataObj.getString("landOwned") == "Yes",
+//                                isLandIrrigated = houseDataObj.has("landIrregated") && houseDataObj.getString("landIrregated") == "Yes",
+//                                isLivestockOwned = houseDataObj.getString("liveStockOwnerShip") == "Yes",
+//                                street = houseDataObj.getString("street"),
+//                                colony = houseDataObj.getString("colony"),
+//                                pincode = houseDataObj.getInt("pincode"),
+                                ),
+                                amenities = HouseholdAmenities(
+                                    separateKitchen = houseDataObj.getString("seperateKitchen"),
+                                    separateKitchenId = houseDataObj.getInt("seperateKitchenId"),
+                                    fuelUsed = houseDataObj.getString("fuelUsed"),
+                                    fuelUsedId = houseDataObj.getInt("fuelUsedId"),
+                                    otherFuelUsed = houseDataObj.getString("other_fuelUsed"),
+                                    sourceOfDrinkingWater = houseDataObj.getString("sourceofDrinkingWater"),
+                                    sourceOfDrinkingWaterId = houseDataObj.getInt("sourceofDrinkingWaterId"),
+                                    otherSourceOfDrinkingWater = houseDataObj.getString("other_sourceofDrinkingWater"),
+                                    availabilityOfElectricity = houseDataObj.getString("avalabilityofElectricity"),
+                                    availabilityOfElectricityId = houseDataObj.getInt("avalabilityofElectricityId"),
+                                    otherAvailabilityOfElectricity = houseDataObj.getString("other_avalabilityofElectricity"),
+                                    availabilityOfToilet = houseDataObj.getString("availabilityofToilet"),
+                                    availabilityOfToiletId = houseDataObj.getInt("availabilityofToiletId"),
+                                    otherAvailabilityOfToilet = houseDataObj.getString("other_availabilityofToilet"),
+                                ),
+//                                motorizedVehicle = houseDataObj.getString("motarizedVehicle"),
+//                                otherMotorizedVehicle = houseDataObj.getString("other_motarizedVehicle"),
+                                registrationType = if (houseDataObj.has("registrationType")) houseDataObj.getString(
+                                    "registrationType"
+                                ) else null,
+                                locationRecord = LocationRecord(
+                                    country = preferenceDao.getLocationRecord()?.country ?: LocationEntity(1, "India"),
+                                    state = LocationEntity(
+                                        benDataObj.getInt("stateId"),
+                                        benDataObj.getString("stateName"),
+                                    ),
+                                    district = LocationEntity(
+                                        benDataObj.getInt("districtid"),
+                                        benDataObj.getString("districtname"),
+                                    ),
+                                    block = LocationEntity(
+                                        benDataObj.getInt("blockId"),
+                                        benDataObj.getString("blockName"),
+                                    ),
+                                    village = LocationEntity(
+                                        benDataObj.getInt("villageId"),
+                                        benDataObj.getString("villageName"),
+                                    ),
+                                ),
+                                serverUpdatedStatus = houseDataObj.getInt("serverUpdatedStatus"),
+                                createdBy = houseDataObj.getString("createdBy"),
+                                createdTimeStamp = getLongFromDate(houseDataObj.getString("createdDate")),
+//                            updatedBy = houseDataObj.getString("other_houseType"),
+//                            updatedTimeStamp = houseDataObj.getString("other_houseType"),
+                                processed = "P",
+                                isDraft = false,
+                                isDeactivate =  if (houseDataObj.has("isDeactivate")) houseDataObj.getBoolean(
+                                    "isDeactivate"
+                                ) else false
+                            )
+                        )
+                    } catch (e: JSONException) {
+                        Timber.e("Household skipped: ${jsonObject.getLong("houseoldId")} with error $e")
+                    }
+                }
+            }
+        }
+        return result
+    }
+
+
+    suspend fun getBeneficiaryWithId(benRegId: Long): BenHealthDetails? {
+        try {
+            val response = tmcNetworkApiService
+                .getBenHealthID(GetBenHealthIdRequest(benRegId, null))
+            if (response.isSuccessful) {
+                val responseBody = response.body()?.string()
+
+                when (responseBody?.let { JSONObject(it).getInt("statusCode") }) {
+                    200 -> {
+                        val jsonObj = JSONObject(responseBody)
+                        val data = jsonObj.getJSONObject("data").getJSONArray("BenHealthDetails")
+                            .toString()
+                        val bens = Gson().fromJson(data, Array<BenHealthDetails>::class.java)
+                        return if (bens.isNotEmpty()) {
+                            bens.last()
+                        } else {
+                            null
+                        }
+                    }
+
+                    401,5000, 5002 -> {
+                        if (JSONObject(responseBody).getString("errorMessage")
+                                .contentEquals("Invalid login key or session is expired")
+                        ) {
+                            val user = preferenceDao.getLoggedInUser()!!
+                            userRepo.refreshTokenTmc(user.userName, user.password)
+                            return getBeneficiaryWithId(benRegId)
+                        } else {
+                            NetworkResult.Error(
+                                0,
+                                JSONObject(responseBody).getString("errorMessage")
+                            )
+                        }
+                    }
+
+                    else -> {
+                        NetworkResult.Error(0, responseBody.toString())
+                    }
+                }
+            }
+        } catch (_: java.lang.Exception) {
+        }
+        return null
+    }
+
+
+    suspend fun sendOtp(mobileNo: String): SendOtpResponse? {
+        try {
+            var sendOtp = sendOtpRequest(mobileNo)
+            val response = tmcNetworkApiService.sendOtp(sendOtp)
+            if (response.isSuccessful) {
+                val responseBody = response.body()?.string()
+                when (responseBody?.let { JSONObject(it).getInt("statusCode") }) {
+                    200 -> {
+                        val jsonObj = JSONObject(responseBody)
+                        val data = jsonObj.getJSONObject("data").toString()
+                        val response = Gson().fromJson(data, SendOtpResponse::class.java)
+                        Toast.makeText(context,"Otp sent successfully",Toast.LENGTH_SHORT).show()
+                        return response
+                    }
+
+                    5000, 5002 -> {
+                        if (JSONObject(responseBody).getString("errorMessage")
+                                .contentEquals("Invalid login key or session is expired")
+                        ) {
+                            val user = preferenceDao.getLoggedInUser()!!
+                            userRepo.refreshTokenTmc(user.userName, user.password)
+
+                        } else {
+                            NetworkResult.Error(
+                                0,
+                                JSONObject(responseBody).getString("errorMessage")
+                            )
+                        }
+                    }
+
+                    else -> {
+                        NetworkResult.Error(0, responseBody.toString())
+                    }
+                }
+            }
+        } catch (_: java.lang.Exception) {
+        }
+        return null
+    }
+    suspend fun resendOtp(mobileNo: String): SendOtpResponse? {
+        try {
+            var sendOtp = sendOtpRequest(mobileNo)
+            val response = tmcNetworkApiService.resendOtp(sendOtp)
+            if (response.isSuccessful) {
+                val responseBody = response.body()?.string()
+                when (responseBody?.let { JSONObject(it).getInt("statusCode") }) {
+                    200 -> {
+                        val jsonObj = JSONObject(responseBody)
+                        val data = jsonObj.getJSONObject("data").toString()
+                        val response = Gson().fromJson(data, SendOtpResponse::class.java)
+                        Toast.makeText(context,"Otp sent successfully",Toast.LENGTH_SHORT).show()
+                        return response
+                    }
+
+                    5000, 5002 -> {
+                        if (JSONObject(responseBody).getString("errorMessage")
+                                .contentEquals("Invalid login key or session is expired")
+                        ) {
+                            val user = preferenceDao.getLoggedInUser()!!
+                            userRepo.refreshTokenTmc(user.userName, user.password)
+
+                        } else {
+                            NetworkResult.Error(
+                                0,
+                                JSONObject(responseBody).getString("errorMessage")
+                            )
+                        }
+                    }
+
+                    else -> {
+                        NetworkResult.Error(0, responseBody.toString())
+                    }
+                }
+            }
+        } catch (_: java.lang.Exception) {
+        }
+        return null
+    }
+
+    suspend fun verifyOtp(mobileNo: String,otp:Int): ValidateOtpResponse? {
+
+        var validateOtp = ValidateOtpRequest(otp,mobileNo)
+        val response = tmcNetworkApiService.validateOtp(validateOtp)
+        if (response.isSuccessful) {
+            val responseBody = response.body()?.string()
+            when (responseBody?.let { JSONObject(it).getInt("statusCode") }) {
+                200 -> {
+                    val jsonObj = JSONObject(responseBody)
+                    val data = jsonObj.getJSONObject("data").toString()
+                    val myresponse = Gson().fromJson(responseBody, ValidateOtpResponse::class.java)
+                    NewBenRegViewModel.isOtpVerified = true
+                    return myresponse
+                }
+
+                5000, 5002 -> {
+                    Toast.makeText(context,"Please enter valid OTP.",Toast.LENGTH_SHORT).show()
+
+                }
+
+                else -> {
+                    NetworkResult.Error(0, responseBody.toString())
+                }
+            }
+        }
+
+        return null
+    }
+
+
+
+    suspend fun getMinBenId(): Long {
+        return withContext(Dispatchers.IO) {
+            benDao.getMinBenId() ?: 0L
+        }
+    }
+}

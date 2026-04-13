@@ -1,0 +1,386 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="marital_status">वैवाहिक स्थिति</string>
+    <string name="relation_with_family_head">परिवार के मुखिया के साथ संबंध</string>
+    <string name="other_enter_relation_to_head">अन्य - संबंध दर्ज करें</string>
+    <string name="community">समुदाय</string>
+    <string name="religion">धर्म</string>
+    <string name="other_enter_religion">अन्य - धर्म दर्ज करें</string>
+    <string name="has_aadhaar_number">आधार नंबर है</string>
+    <string name="enter_aadhaar_number_ben">आधार नंबर दर्ज करें</string>
+    <string name="reproductive_status">जननांग स्थिति</string>
+    <string name="birth_certificate_number">Birth Certificate No.</string>
+    <string name="beneficiary_details">लाभार्थी विवरण</string>
+    <string name="wife_s_name">पत्नी का नाम</string>
+    <string name="spouse_s_name">पति / पत्नी का नाम</string>
+    <string name="age_at_marriage">विवाह की आयु</string>
+    <string name="date_of_marriage">विवाह की तिथि</string>
+    <string name="father_s_name">पिता का नाम</string>
+    <string name="mother_s_name">मां का नाम</string>
+    <string name="mobile_number_of">किसका मोबाइल नंबर</string>
+    <string name="other_mobile_number_of">अन्य - मोबाइल नंबर किसका</string>
+    <string name="form_name">फ़ॉर्म का नाम</string>
+    <string name="rch_id_ben">RCH आईडी</string>
+    <string name="nbr_age">आयु</string>
+    <string name="nbr_dob">जन्म की तारीख</string>
+    <string name="nbr_gender">लिंग</string>
+    <string name="nbr_image">फ़ोटो</string>
+    <string name="nbr_image_sub">कैमरा का उपयोग करने के लिए टैप करें</string>
+    <string name="nbr_dor">पंजीकरण की तारीख</string>
+    <string name="nbr_nb_first_name">पहला नाम</string>
+    <string name="nbr_nb_last_name">अंतिम नाम / उपनाम</string>
+    <string name="title_new_ben_reg_hof">मुखिया का पंजीकरण</string>
+    <string name="title_new_ben_reg_non_hof">परिवार सदस्य पंजीकरण</string>
+    <string name="icon_title_abortion">गर्भपात सूची</string>
+    <string name="icon_title_pmsma">ई-पीएमएसएमए सूची</string>
+    <string name="mother_rch_id">मां की RCH आईडी</string>
+    <string-array name="anc_paiucd_done_by">
+        <item>डॉक्टर</item>
+        <item>नर्स</item>
+    </string-array>
+
+    <string-array name="nbr_gender_array">
+        <item name="nbr_gender_1">पुरुष</item>
+        <item name="nbr_gender_2">महिला</item>
+        <item name="nbr_gender_3">ट्रांसजेंडर</item>
+    </string-array>
+
+    <string-array name="nbr_reproductive_status_array1">
+        <item>किशोरी लड़की</item>
+    </string-array>
+
+    <string-array name="nbr_reproductive_status_array2">
+        <item>लक्ष्य दम्पति</item>
+        <item>गर्भवती महिला</item>
+        <item>प्रसवोत्तर माता</item>
+        <item>स्थायी नसबंदीकृत महिला</item>
+    </string-array>
+
+    <string-array name="nbr_reproductive_status_array3">
+        <item>लागू नहीं</item>
+    </string-array>
+
+    <string-array name="nbr_reproductive_status_array4">
+        <item>लक्ष्य दम्पति</item>
+        <item>गर्भवती महिला</item>
+        <item>प्रसवोत्तर माता</item>
+        <item>स्थायी नसबंदीकृत महिला</item>
+    </string-array>
+
+    <string-array name="nbr_reproductive_status_array5">
+        <item>वृद्धा महिला</item>
+    </string-array>
+
+    <string name="dd_ec">लक्ष्य दम्पति</string>
+    <string name="dd_pw">गर्भवती महिला</string>
+    <string name="dd_pm">प्रसवोत्तर माता</string>
+    <string name="dd_ew">वृद्धा महिला</string>
+    <string name="dd_ag">किशोरी लड़की</string>
+    <string name="dd_ps">स्थायी नसबंदीकृत महिला</string>
+
+    <string-array name="nbr_marital_status_male_array">
+        <item>अविवाहित</item>
+        <item>विवाहित</item>
+        <item>तलाकशुदा</item>
+        <item>अलग</item>
+        <item>विधुर</item>
+    </string-array>
+
+    <string-array name="place_of_vhsnc">
+        <item>आंगनवाड़ी केंद्र</item>
+        <item>एचडब्ल्यूसी</item>
+        <item>स्कूल</item>
+        <item>सामुदायिक केंद्र</item>
+    </string-array>
+
+    <string-array name="nbr_marital_status_female_array">
+        <item>अविवाहित</item>
+        <item>विवाहित</item>
+        <item>तलाकशुदा</item>
+        <item>अलग</item>
+        <item>विधवा</item>
+    </string-array>
+
+    <string-array name="nbr_mobile_no_relation_array">
+        <item>स्वयं</item>
+        <item>पति</item>
+        <item>मां</item>
+        <item>पिता</item>
+        <item>परिवार के मुखिया</item>
+        <item>अन्य</item>
+    </string-array>
+
+    <string-array name="nbr_relationship_to_head">
+        <item>मां</item>
+        <item>पिता</item>
+        <item>भाई</item>
+        <item>बहन</item>
+        <item>पत्नी</item>
+        <item>पति</item>
+        <item>भतीजा</item>
+        <item>भतीजी</item>
+        <item>बेटा</item>
+        <item>बेटी</item>
+        <item>दादा</item>
+        <item>दादी</item>
+        <item>ससुर</item>
+        <item>सास</item>
+        <item>पोता</item>
+        <item>पोती</item>
+        <item>दामाद</item>
+        <item>नातनी</item>
+        <item>अन्य</item>
+    </string-array>
+    <string-array name="nbr_relationship_to_head_src">
+        <item>मां</item>
+        <item>पिता</item>
+        <item>भाई</item>
+        <item>बहन</item>
+        <item>पत्नी</item>
+        <item>पति</item>
+        <item>भतीजा</item>
+        <item>भतीजी</item>
+        <item>बेटा</item>
+        <item>बेटी</item>
+        <item>दादा</item>
+        <item>दादी</item>
+        <item>ससुर</item>
+        <item>सास</item>
+        <item>पोता</item>
+        <item>पोती</item>
+        <item>दामाद</item>
+        <item>नातनी</item>
+        <item>स्वयं</item>
+        <item>अन्य</item>
+    </string-array>
+
+    <string-array name="nbr_relationship_to_head_male">
+        <item>पिता</item>
+        <item>भाई</item>
+        <item>पति</item>
+        <item>भतीजा</item>
+        <item>बेटा</item>
+        <item>दादा</item>
+        <item>ससुर</item>
+        <item>पोता</item>
+        <item>दामाद</item>
+        <item>अन्य</item>
+    </string-array>
+
+    <string-array name="nbr_relationship_to_head_female">
+        <item>मां</item>
+        <item>बहन</item>
+        <item>पत्नी</item>
+        <item>भतीजी</item>
+        <item>बेटी</item>
+        <item>दादी</item>
+        <item>सास</item>
+        <item>पोती/नातनी</item>
+        <item>बहू</item>
+        <item>भाभी/नन्द/साली</item>
+        <item>अन्य</item>
+    </string-array>
+
+    <string-array name="community_array">
+        <item>सामान्य (GEN)</item>
+        <item>अनुसूचित जाति (SC)</item>
+        <item>अनुसूचित जनजाति (ST)</item>
+        <item>पिछड़ा वर्ग (BC)</item>
+        <item>अन्य पिछड़ा वर्ग (OBC)</item>
+        <item>अन्य वर्ग (OC)</item>
+        <item>विशेष रूप से कमजोर जनजातीय समूह (PVTG)</item>
+        <item>नहीं दिया गया (NA)</item>
+    </string-array>
+
+    <string-array name="religion_array">
+        <item>हिन्दू</item>
+        <item>मुस्लिम</item>
+        <item>ईसाई</item>
+        <item>सिख</item>
+        <item>बौद्ध</item>
+        <item>जैन</item>
+        <item>पारसी</item>
+        <item>अन्य</item>
+        <item>अप्रकटित</item>
+    </string-array>
+
+    <string-array name="death_place_array">
+        <item>घर</item>
+        <item>उप-केंद्र</item>
+        <item>पीएचसी</item>
+        <item>सीएचसी</item>
+        <item>जिला अस्पताल</item>
+        <item>चिकित्सा महाविद्यालय अस्पताल</item>
+        <item>निजी अस्पताल</item>
+        <item>यात्रा के दौरान</item>
+        <item>अन्य मृत्यु स्थान</item>
+    </string-array>
+
+    <string-array name="yes_no_donno">
+        <item>हाँ</item>
+        <item>नहीं</item>
+        <item>मालूम नहीं</item>
+    </string-array>
+    <string-array name="yes_no">
+        <item>हाँ</item>
+        <item>नहीं</item>
+    </string-array>
+
+    <string-array name="yes">
+        <item>हाँ</item>
+    </string-array>
+
+    <string name="beneficiary_details_ben">लाभार्थी का विवरण</string>
+    <string name="id_details">पहचान का विवरण</string>
+    <string name="reproductive_status_ben">महिला की स्थिति</string>
+    <string name="enable_gps">जीपीएस सक्षम करें</string>
+    <string name="gps_is_not_enabled_do_you_want_to_go_to_settings_menu">जीपीएस सक्षम नहीं है। क्या आप सेटिंग मेनू पर जाना चाहते हैं?</string>
+    <string name="settings">सेटिंग्स</string>
+    <string name="cancel">रद्द करें</string>
+    <string name="please_tick_the_checkbox">कृपया चेकबॉक्स पर टिक करें</string>
+    <string name="incomplete_form_found">अधूरा फॉर्म मिला</string>
+    <string name="do_you_want_to_continue_with_previous_form_or_create_a_new_form_and_discard_the_previous_form">क्या आप पिछला फॉर्म जारी रखना चाहते हैं या नया फॉर्म बनाकर पुराना हटा देना चाहते हैं?</string>
+    <string name="open_draft">ड्राफ्ट खोलें</string>
+    <string name="create_new">नया बनाएं</string>
+    <string name="warning_id_running_low_connect_to_internet_at_the_earliest">चेतावनी: इंटरनेट कनेक्शन धीमा है</string>
+    <string name="error_no_more_ben_ids_available_connect_to_internet_to_get_some">त्रुटि: लाभार्थी आईडी पाने के लिए इंटरनेट कनेक्शन जांचें</string>
+    <string name="please_select_type_of_beneficiary">कृपया लाभार्थी का प्रकार चुनें</string>
+    <string name="disagree">असहमत</string>
+    <string name="agree">सहमत</string>
+    <string name="name_ben">नाम</string>
+    <string name="age_ben">उम्र</string>
+    <string name="year">वर्ष</string>
+    <string name="years">वर्ष</string>
+    <string name="month">महीना</string>
+    <string name="months">महीने</string>
+    <string name="day">दिन</string>
+    <string name="days">दिन</string>
+
+    <string-array name="diet_plane">
+        <item>क्या खाएं, क्या न खाएं, आहार विविधता का महत्व।</item>
+
+    </string-array>
+    <string-array name="care_pregnancy">
+        <item>एनीमिया, कमज़ोरी से बचाव, आराम और पोषण का महत्व।</item>
+
+    </string-array>
+    <string-array name="select_all">
+        <item>Select All</item>
+    </string-array>
+
+
+    <string-array name="import_brestfeeding">
+        <item>जन्म के बाद जल्दी स्तनपान शुरू करना, 6 महीने तक केवल स्तनपान।</item>
+    </string-array>
+
+    <string-array name="complementary_feeding">
+        <item>6 महीने के बाद स्तनपान के साथ घर का पौष्टिक अनुपूरक आहार शुरू करना।</item>
+
+    </string-array>
+    <string-array name="hygiene_senetigation">
+        <item>खाना बनाते और खिलाते समय स्वच्छता बनाए रखना।</item>
+
+    </string-array>
+    <string-array name="family_planning_health">
+        <item>छोटे परिवार का महत्व और नियमित स्वास्थ्य जांच।</item>
+
+    </string-array>
+
+    <string-array name="positive_negative">
+        <item>पॉजिटिव</item>
+        <item>नेगेटिव</item>
+        <item>नहीं किया गया</item>
+    </string-array>
+
+
+    <string-array name="pf_pv">
+        <item>पीएफ</item>
+        <item>पीवी</item>
+    </string-array>
+
+    <string-array name="maa_breastfeeding">
+        <item>सभी चुनें</item>
+        <item>शिशु को जन्म के पहले घंटे में तुरंत स्तनपान कराना चाहिए</item>
+        <item>पहले 6 महीने शिशु को केवल मां का दूध देना चाहिए</item>
+        <item>6 महीने के बाद मां के दूध के साथ पौष्टिक अनुपूरक आहार दिया जाना चाहिए</item>
+        <item>स्तनपान 2 साल या उससे अधिक समय तक जारी रहना चाहिए</item>
+        <item>परिवार को मां का समर्थन और प्रोत्साहन देना चाहिए</item>
+        <item>पहले 6 महीने शिशु को शहद, पानी या घुट्टी (हर्बल मिश्रण) नहीं देना चाहिए</item>
+        <item>स्तनपान शिशु को कई रोगों से बचाता है</item>
+        <item>मां का दूध शिशु के संपूर्ण विकास के लिए सर्वोत्तम है</item>
+        <item>केएमसी (कंगारू मदर केयर) के बारे में जानकारी दी गई</item>
+    </string-array>
+
+    <string name="age_at_marriagee">विवाह के समय आपकी आयु</string>
+    <string name="nbr_abortion_image">गर्भपात डिस्चार्ज</string>
+    <string name="nbr_image_cam_gal">कैमरा/गैलरी उपयोग करने के लिए टैप करें</string>
+    <string name="vhnd_date">वीएचएनडी तिथि</string>
+    <string name="vhnc_date">वीएचएसएनसी बैठक की तिथि</string>
+    <string name="phc_review_meeting_date">बैठक की तिथि</string>
+    <string name="nbr_child_first_name">बच्चे का नाम</string>
+    <string name="frag_new_ben_type_kid_text">नवजात / शिशु / बच्चा / किशोर\n( 0 - 15 वर्ष से कम आयु )</string>
+    <string name="frag_new_ben_type_adult_text">सामान्य पंजीकरण \n( 15 वर्ष और उससे अधिक )</string>
+    <string name="frag_new_ben_type_select_text">लाभार्थी प्रकार चुनें</string>
+    <string name="frag_new_ben_reg_type_title">पंजीकरण के लिए लाभार्थी प्रकार</string>
+    <string name="consent_text">सहमति:\nमुझे वॉलंटियर द्वारा समझाया गया है कि मेरे से जो जानकारी और माप एकत्र की जा रही है उसका उद्देश्य क्या है, एक ऐसी भाषा में जो मैं समझती/समझता हूँ और मैं अपनी व्यक्तिगत स्वास्थ्य प्रोफाइल पर जानकारी और माप एकत्र करने के लिए अपनी सहमति देती/देता हूँ।</string>
+    <string name="other_place_of_death">मृत्यु का अन्य स्थान</string>
+    <string name="deworming_done">कृमि मुक्ति चक्र पूरा हुआ?</string>
+    <string name="deworming_date">कृमि मुक्ति की तारीख</string>
+    <string name="deworming_location">कृमि मुक्ति का स्थान</string>
+    <string name="age_group">आयु वर्ग</string>
+    <string name="deworming_title">राष्ट्रीय कृमि मुक्ति दिवस फॉर्म</string>
+    <string name="deworming_list_title">राष्ट्रीय कृमि मुक्ति दिवस फॉर्म सूची</string>
+    <string name="ndd_list_title">NDD फॉर्म</string>
+
+    <string-array name="mitanin_array">
+        <item>मितानिन</item>
+        <item>MT</item>
+        <item>ANM/ RHO</item>
+    </string-array>
+
+    <string-array name="activity_checklist">
+        <item>सभी चुनें</item>
+        <item>स्वास्थ्य विभाग द्वारा जारी नई योजनाओं या दिशानिर्देशों की जानकारी साझा की गई।</item>
+        <item>डेटा रजिस्टर और रिकॉर्ड जांचे गए।</item>
+        <item>प्रशिक्षण और क्षमता निर्माण पर चर्चा की गई।</item>
+        <item>दवा पेटी (मेडिसिन किट) की समीक्षा।</item>
+        <item>सामग्री वितरण और संबंधित गतिविधियाँ की गईं।</item>
+        <item>गर्भवती और स्तनपान कराने वाली माताओं की प्रगति पर चर्चा की गई।</item>
+        <item>विशेष मामलों (गंभीर मरीजों) के रेफरल पर चर्चा की गई।</item>
+        <item>बच्चों के टीकाकरण पर अपडेट दी गई।</item>
+    </string-array>
+
+    <string-array name="ahd_health_status_array">
+        <item>स्वस्थ</item>
+        <item>रक्ताल्पता (एनीमिया)</item>
+        <item>कुपोषित</item>
+    </string-array>
+
+    <string-array name="ahd_place_array">
+        <item>घर</item>
+        <item>सामुदायिक केंद्र</item>
+        <item>स्कूल</item>
+        <item>उप-स्वास्थ्य केंद्र</item>
+    </string-array>
+
+    <string-array name="ahd_counseling_type_array">
+        <item>व्यक्तिगत</item>
+        <item>समूह</item>
+    </string-array>
+
+    <string-array name="ahd_referral_status_array">
+        <item>लंबित</item>
+        <item>पूर्ण</item>
+    </string-array>
+
+    <string-array name="temp_mobile_no_relation_array">
+        <item>परिवार के मुखिया</item>
+        <item>स्वयं</item>
+        <item>पति / पत्नी</item>
+        <item>माँ</item>
+        <item>पिता</item>
+        <item>पड़ोसी</item>
+        <item>मित्र / रिश्तेदार</item>
+    </string-array>
+
+</resources>

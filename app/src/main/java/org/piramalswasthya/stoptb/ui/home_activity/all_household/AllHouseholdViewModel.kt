@@ -1,0 +1,156 @@
+package org.piramalswasthya.stoptb.ui.home_activity.all_household
+
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.piramalswasthya.stoptb.database.room.SyncState
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.model.BenRegCache
+import org.piramalswasthya.stoptb.model.HouseHoldBasicDomain
+import org.piramalswasthya.stoptb.model.HouseholdCache
+import org.piramalswasthya.stoptb.repositories.BenRepo
+import org.piramalswasthya.stoptb.repositories.HouseholdRepo
+import org.piramalswasthya.stoptb.repositories.RecordsRepo
+import timber.log.Timber
+import javax.inject.Inject
+
+@HiltViewModel
+class AllHouseholdViewModel @Inject constructor(
+    private val householdRepo: HouseholdRepo, recordsRepo: RecordsRepo, private val benRepo: BenRepo,
+    private val preferenceDao: PreferenceDao,
+
+    ) : ViewModel() {
+
+    private val _hasDraft = MutableLiveData(false)
+    val hasDraft: LiveData<Boolean>
+        get() = _hasDraft
+
+    private val filter = MutableStateFlow("")
+
+    private val _navigateToNewHouseholdRegistration = MutableLiveData(false)
+    val navigateToNewHouseholdRegistration: LiveData<Boolean>
+        get() = _navigateToNewHouseholdRegistration
+
+    val householdList = recordsRepo.hhList.combine(filter) { list, filter ->
+        filterHH(list, filter)
+    }
+    private var _selectedHouseholdId: Long = 0
+
+    private val _householdBenList = mutableListOf<BenRegCache>()
+    val householdBenList: List<BenRegCache>
+        get() = _householdBenList
+
+    val selectedHouseholdId: Long
+        get() = _selectedHouseholdId
+
+    private var _selectedHousehold: HouseholdCache? = null
+    val selectedHousehold: HouseholdCache?
+        get() = _selectedHousehold
+
+
+    fun checkDraft() {
+        viewModelScope.launch {
+            _hasDraft.value = householdRepo.getDraftRecord() != null
+        }
+    }
+
+    fun navigateToNewHouseholdRegistration(delete: Boolean) {
+
+        viewModelScope.launch {
+            if (delete) householdRepo.deleteHouseholdDraft()
+            _navigateToNewHouseholdRegistration.value = true
+        }
+    }
+
+    fun navigateToNewHouseholdRegistrationCompleted() {
+        _navigateToNewHouseholdRegistration.value = false
+    }
+
+    fun filterText(text: String) {
+        viewModelScope.launch {
+            filter.emit(text)
+        }
+
+    }
+
+    private fun filterHH(
+        list: List<HouseHoldBasicDomain>,
+        filter: String
+    ): List<HouseHoldBasicDomain> {
+
+        val filteredList = if (filter.isBlank()) {
+            list
+        } else {
+            val filterText = filter.lowercase()
+            list.filter {
+                it.hhId.toString().contains(filterText) ||
+                        it.headFullName.lowercase().contains(filterText) ||
+                        it.contactNumber.contains(filterText)
+            }
+        }
+
+        return filteredList.sortedWith(
+            compareBy<HouseHoldBasicDomain> { it.isDeactivate }
+                .thenByDescending { it.createdTimeStamp }
+        )
+    }
+
+
+    fun resetSelectedHouseholdId() {
+        _selectedHouseholdId = 0
+        _householdBenList.clear()
+    }
+
+    fun setSelectedHouseholdId(id: Long) {
+        _selectedHouseholdId = id
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                _selectedHousehold = householdRepo.getRecord(id)
+            }
+            _householdBenList.clear()
+            _householdBenList.addAll(householdRepo.getAllBenOfHousehold(id))
+        }
+    }
+
+
+    fun deActivateHouseHold(houseHoldBasicDomain: HouseHoldBasicDomain) {
+        viewModelScope.launch {
+            val user = preferenceDao.getLoggedInUser() ?: run {
+                return@launch
+            }
+            val houseHoldCache = householdRepo.getRecord(houseHoldBasicDomain.hhId) ?: run {
+                return@launch
+            }
+            houseHoldBasicDomain.apply {
+                isDeactivate = !isDeactivate
+            }.also {
+                houseHoldCache.isDeactivate = houseHoldBasicDomain.isDeactivate
+                houseHoldCache.processed = "U"
+                houseHoldCache.serverUpdatedStatus = 2
+            }
+            householdRepo.persistRecord(houseHoldCache)
+            val benList = benRepo.getBenListFromHousehold(houseHoldBasicDomain.hhId)
+            benList.forEach {
+                it?.isDeactivate =  houseHoldBasicDomain.isDeactivate
+                if (it?.processed != "N"){
+                    it?.processed = "U"
+                    it?.syncState = SyncState.UNSYNCED
+                    it?.serverUpdatedStatus = 2
+                }
+                benRepo.updateRecord(it)
+            }
+            try {
+                benRepo.deactivateHouseHold(benList, houseHoldCache.asNetworkModel(user))
+            } catch (e: Exception) {
+                Timber.d("error : $e")
+            }
+        }
+    }
+}
