@@ -101,13 +101,12 @@ class TBSuspectedListFragment : Fragment() {
     override fun onStart() {
         super.onStart()
         activity?.let {
-            if (it is VolunteerActivity) {
-                it.updateActionBar(
+            when (it) {
+                is HomeActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.tb_suspected_list)
                 )
-            } else {
-                (it as HomeActivity).updateActionBar(
+                is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.tb_suspected_list)
                 )

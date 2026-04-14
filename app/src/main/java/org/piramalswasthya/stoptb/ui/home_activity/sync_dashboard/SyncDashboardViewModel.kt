@@ -34,7 +34,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SyncDashboardViewModel @Inject constructor(
-    syncDao: SyncDao,
+    private val syncDao: SyncDao,
     private val preferenceDao: PreferenceDao,
     private val syncLogManager: SyncLogManager,
     private val syncLogExporter: SyncLogExporter,
@@ -42,7 +42,8 @@ class SyncDashboardViewModel @Inject constructor(
 ) : AndroidViewModel(application) {
 
     // Tab 1: Status
-    val syncStatus: Flow<List<SyncStatusCache>> = syncDao.getSyncStatus()
+    private val selectedVillage get() = preferenceDao.getLocationRecord()?.village?.id ?: 0
+    val syncStatus: Flow<List<SyncStatusCache>> get() = syncDao.getSyncStatus(selectedVillage)
 
     val overallProgress: Flow<Pair<Int, Int>> = syncStatus.map { list ->
         val synced = list.filter { it.syncState == org.piramalswasthya.stoptb.database.room.SyncState.SYNCED }

@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="nbr_village">गाँव / बस्ती</string>
+    <string name="nbr_occupation">व्यवसाय</string>
+    <string name="nbr_occupation_default">अज्ञात</string>
     <string name="marital_status">वैवाहिक स्थिति</string>
     <string name="relation_with_family_head">परिवार के मुखिया के साथ संबंध</string>
     <string name="other_enter_relation_to_head">अन्य - संबंध दर्ज करें</string>
@@ -321,7 +324,7 @@
     <string name="frag_new_ben_type_kid_text">नवजात / शिशु / बच्चा / किशोर\n( 0 - 15 वर्ष से कम आयु )</string>
     <string name="frag_new_ben_type_adult_text">सामान्य पंजीकरण \n( 15 वर्ष और उससे अधिक )</string>
     <string name="frag_new_ben_type_select_text">लाभार्थी प्रकार चुनें</string>
-    <string name="frag_new_ben_reg_type_title">पंजीकरण के लिए लाभार्थी प्रकार</string>
+    <string name="frag_new_ben_reg_type_title">लाभार्थी पंजीकरण</string>
     <string name="consent_text">सहमति:\nमुझे वॉलंटियर द्वारा समझाया गया है कि मेरे से जो जानकारी और माप एकत्र की जा रही है उसका उद्देश्य क्या है, एक ऐसी भाषा में जो मैं समझती/समझता हूँ और मैं अपनी व्यक्तिगत स्वास्थ्य प्रोफाइल पर जानकारी और माप एकत्र करने के लिए अपनी सहमति देती/देता हूँ।</string>
     <string name="other_place_of_death">मृत्यु का अन्य स्थान</string>
     <string name="deworming_done">कृमि मुक्ति चक्र पूरा हुआ?</string>

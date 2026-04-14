@@ -20,6 +20,7 @@ import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.Gender.FEMALE
 import org.piramalswasthya.stoptb.model.Gender.MALE
 import org.piramalswasthya.stoptb.model.Gender.TRANSGENDER
+import org.piramalswasthya.stoptb.model.Gender.PREFER_NOT_TO_SAY
 import org.piramalswasthya.stoptb.model.HouseholdCache
 import org.piramalswasthya.stoptb.model.InputType.DATE_PICKER
 import org.piramalswasthya.stoptb.model.InputType.DROPDOWN
@@ -114,7 +115,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     private val lastName = FormElement(
         id = 4, inputType = EDIT_TEXT,
         title = resources.getString(R.string.nbr_nb_last_name),
-        arrayId = -1, required = true, allCaps = true, hasSpeechToText = true,
+        arrayId = -1, required = false, allCaps = true, hasSpeechToText = true,
         etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
     )
 
@@ -125,12 +126,14 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         subtitle = resources.getString(R.string.nbr_dob),
         arrayId = -1, required = true, allCaps = true, hasSpeechToText = true,
         hasDependants = true,
-        etInputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL
+        etInputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL,
+        max = System.currentTimeMillis(),
+        min = getMinDobMillis()
     )
 
     // 7. Gender
     val gender = FormElement(
-        id = 9, inputType = RADIO,
+        id = 9, inputType = DROPDOWN,
         title = resources.getString(R.string.nbr_gender),
         arrayId = -1,
         entries = resources.getStringArray(R.array.nbr_gender_array),
@@ -143,7 +146,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         title = resources.getString(R.string.nbr_mobile_number_of),
         arrayId = R.array.nbr_mobile_no_relation_array,
         entries = resources.getStringArray(R.array.nbr_mobile_no_relation_array),
-        required = true, hasDependants = true
+        required = false, hasDependants = true
     )
     private val otherMobileNoOfRelation = FormElement(
         id = 13, inputType = EDIT_TEXT,
@@ -153,7 +156,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     private val contactNumber = FormElement(
         id = 14, inputType = EDIT_TEXT,
         title = resources.getString(R.string.nrb_contact_number),
-        arrayId = -1, required = true,
+        arrayId = -1, required = false,
         etInputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL,
         isMobileNumber = true, etMaxLength = 10,
         max = 9999999999, min = 6000000000
@@ -166,7 +169,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         id = 1008, inputType = DROPDOWN,
         title = resources.getString(R.string.marital_status),
         arrayId = R.array.nbr_marital_status_male_array,
-        entries = maritalStatusMale, required = true, hasDependants = true
+        entries = maritalStatusMale, required = false, hasDependants = true
     )
     private val husbandName = FormElement(
         id = 1009, inputType = EDIT_TEXT,
@@ -263,7 +266,22 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         arrayId = -1, required = true, etMaxLength = 100
     )
 
-    // 16. RCH ID
+    // 16. Village/Hamlet (read-only, auto-filled from location)
+    private val villageHamlet = FormElement(
+        id = 1040, inputType = TEXT_VIEW,
+        title = resources.getString(R.string.nbr_village),
+        arrayId = -1, required = false
+    )
+
+    // 17. Occupation (free text, default "unknown")
+    private val occupation = FormElement(
+        id = 1041, inputType = EDIT_TEXT,
+        title = resources.getString(R.string.nbr_occupation),
+        arrayId = -1, required = false,
+        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+    )
+
+    // 18. RCH ID
     val rchId = FormElement(
         id = 23, inputType = EDIT_TEXT,
         title = resources.getString(R.string.nbr_rch_id),
@@ -287,7 +305,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     /**
      * Setup page for NEW beneficiary registration
      */
-    suspend fun setUpPage(ben: BenRegCache?, familyHeadPhoneNo: Long?) {
+    suspend fun setUpPage(ben: BenRegCache?, familyHeadPhoneNo: Long?, villageName: String? = null) {
         val list = mutableListOf(
             pic,
             dateOfReg,
@@ -295,15 +313,16 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             lastName,
             agePopup,
             gender,
+            villageHamlet,
             maritalStatus,
             fatherName,
             motherName,
-            mobileNoOfRelation,
             contactNumber,
             community,
             religion,
             economicStatus,
             residentialAreaType,
+            occupation,
             rchId,
         )
 
@@ -311,6 +330,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
         if (dateOfReg.value == null) dateOfReg.value = getCurrentDateString()
         contactNumber.value = familyHeadPhoneNo?.toString()
+        villageHamlet.value = villageName ?: ""
+        if (occupation.value == null) occupation.value = resources.getString(R.string.nbr_occupation_default)
 
         ben?.takeIf { !it.isDraft }?.let { saved ->
             // Beneficiary Status (death)
@@ -443,12 +464,12 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     }
 
     // Keep setFirstPageToRead as alias for backward compat with ViewModel
-    suspend fun setFirstPageToRead(ben: BenRegCache?, familyHeadPhoneNo: Long?) =
-        setUpPage(ben, familyHeadPhoneNo)
+    suspend fun setFirstPageToRead(ben: BenRegCache?, familyHeadPhoneNo: Long?, villageName: String? = null) =
+        setUpPage(ben, familyHeadPhoneNo, villageName)
 
     // Keep setPageForHof as alias — StopTB has no HoF concept, uses same form
-    suspend fun setPageForHof(ben: BenRegCache?, household: HouseholdCache) =
-        setUpPage(ben, household.family?.familyHeadPhoneNo)
+    suspend fun setPageForHof(ben: BenRegCache?, household: HouseholdCache, villageName: String? = null) =
+        setUpPage(ben, household.family?.familyHeadPhoneNo, villageName)
 
     // Keep setPageForFamilyMember as alias — StopTB registers each ben independently
     suspend fun setPageForFamilyMember(
@@ -513,14 +534,32 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             }
 
             agePopup.id -> {
-                maritalStatus.entries = when (index) {
-                    1 -> maritalStatusFemale
-                    else -> maritalStatusMale
+                val age = try { getAgeFromDob(getLongFromDate(agePopup.value)) } catch (_: Exception) { 0 }
+
+                // Hide marital status + dependants for age < 15 (PRD: Not Applicable for age 0-14)
+                val maritalFields = listOf(maritalStatus, husbandName, wifeName, spouseName, ageAtMarriage, dateOfMarriage)
+                if (age < Konstants.minAgeForGenBen) {
+                    triggerDependants(
+                        source = villageHamlet,
+                        removeItems = maritalFields,
+                        addItems = emptyList()
+                    )
+                } else {
+                    triggerDependants(
+                        source = villageHamlet,
+                        removeItems = maritalFields,
+                        addItems = listOf(maritalStatus)
+                    )
+                    maritalStatus.entries = when (index) {
+                        1 -> maritalStatusFemale
+                        else -> maritalStatusMale
+                    }
+                    maritalStatus.arrayId = when (index) {
+                        1 -> R.array.nbr_marital_status_female_array
+                        else -> R.array.nbr_marital_status_male_array
+                    }
                 }
-                maritalStatus.arrayId = when (index) {
-                    1 -> R.array.nbr_marital_status_female_array
-                    else -> R.array.nbr_marital_status_male_array
-                }
+
                 try { return updateReproductiveOptionsBasedOnAgeGender(formId = agePopup.id) }
                 catch (e: Exception) { e.printStackTrace(); return 1 }
             }
@@ -697,10 +736,11 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                 gender.entries!![0] -> 1
                 gender.entries!![1] -> 2
                 gender.entries!![2] -> 3
+                gender.entries!![3] -> 4
                 else -> 0
             }
             ben.gender = when (ben.genderId) {
-                1 -> MALE; 2 -> FEMALE; 3 -> TRANSGENDER; else -> null
+                1 -> MALE; 2 -> FEMALE; 3 -> TRANSGENDER; 4 -> PREFER_NOT_TO_SAY; else -> null
             }
 
             ben.fatherName = fatherName.value
@@ -715,8 +755,11 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             ben.mobileNoOfRelationId = mobileNoOfRelation.getPosition()
             ben.mobileNoOfRelation   = mobileNoOfRelation.getEnglishStringFromPosition(ben.mobileNoOfRelationId)
             ben.mobileOthers         = otherMobileNoOfRelation.value
-            ben.contactNumber        = if (ben.mobileNoOfRelationId == 5)
-                familyHeadPhoneNo!!.toLong() else contactNumber.value!!.toLong()
+            ben.contactNumber        = when {
+                ben.mobileNoOfRelationId == 5 -> familyHeadPhoneNo?.toLongOrNull() ?: 0L
+                contactNumber.value.isNullOrEmpty() -> 0L
+                else -> contactNumber.value!!.toLong()
+            }
             ben.tempMobileNoOfRelationId = 0
 
             // Community & Religion
@@ -732,6 +775,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             ben.residentialAreaId  = residentialAreaType.getPosition()
             ben.residentialArea    = residentialAreaType.getEnglishStringFromPosition(ben.residentialAreaId ?: 0)
             ben.otherResidentialArea = otherResidentialAreaType.value
+
+            // Occupation
+            val defaultOccupation = resources.getString(R.string.nbr_occupation_default)
+            ben.occupation = occupation.value?.ifEmpty { defaultOccupation } ?: defaultOccupation
 
             // RCH ID
             ben.rchId = rchId.value

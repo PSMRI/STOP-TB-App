@@ -12,6 +12,7 @@ import org.piramalswasthya.stoptb.database.room.dao.HouseholdDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.utils.HelperUtil
+import timber.log.Timber
 import javax.inject.Inject
 
 @ActivityRetainedScoped
@@ -24,19 +25,23 @@ class RecordsRepo @Inject constructor(
 //    private val selectedVillage = preferenceDao.getLocationRecord()?.village?.id ?: 0
     private val selectedVillage get() = preferenceDao.getLocationRecord()?.village?.id ?: 0
 
+    init {
+        Timber.d("RecordsRepo INIT: selectedVillage = $selectedVillage, locationRecord = ${preferenceDao.getLocationRecord()}")
+    }
+
     private val localizedResources = HelperUtil.getLocalizedResources(context, preferenceDao.getCurrentLanguage())
 
-    val hhList = householdDao.getAllHouseholdWithNumMembers(selectedVillage)
+    val hhList get() = householdDao.getAllHouseholdWithNumMembers(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }
-    val hhListCount = householdDao.getAllHouseholdsCount(selectedVillage)
+    val hhListCount get() = householdDao.getAllHouseholdsCount(selectedVillage)
 
-    val hhListforAsha = householdDao.getAllHouseholdForAshaFamilyMembers(selectedVillage)
-        .map { list -> list.map { it.asBasicDomainModel() } }
-
-    val allBenList = benDao.getAllBen(selectedVillage)
+    val hhListforAsha get() = householdDao.getAllHouseholdForAshaFamilyMembers(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }
 
-    val childCountsByBen: Flow<Map<Long, Int>> =
+    val allBenList get() = benDao.getAllBen(selectedVillage)
+        .map { list -> list.map { it.asBasicDomainModel() } }
+
+    val childCountsByBen: Flow<Map<Long, Int>> get() =
         benDao.getChildCountsForAllBen(selectedVillage)
             .map { list -> list.associate { it.benId to it.childCount } }
 
@@ -51,23 +56,23 @@ class RecordsRepo @Inject constructor(
         benDao.searchBenOnce(selectedVillage, source, filterType, query)
             .map { it.asBasicDomainModel() }
 
-    val allBenListCount = benDao.getAllBenCount(selectedVillage)
-    val allBenWithoutAbhaList = benDao.getAllBenWithoutAbha(selectedVillage)
+    val allBenListCount get() = benDao.getAllBenCount(selectedVillage)
+    val allBenWithoutAbhaList get() = benDao.getAllBenWithoutAbha(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }
-    val allBenWithAbhaList = benDao.getAllBenWithAbha(selectedVillage)
+    val allBenWithAbhaList get() = benDao.getAllBenWithAbha(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }
 
-    val benWithAbhaListCount = benDao.getAllBenWithAbhaCount(selectedVillage)
-    val benWithOldAbhaListCount = benDao.getAllBenWithOldAbhaCount(selectedVillage)
-    val benWithNewAbhaListCount = benDao.getAllBenWithNewAbhaCount(selectedVillage)
+    val benWithAbhaListCount get() = benDao.getAllBenWithAbhaCount(selectedVillage)
+    val benWithOldAbhaListCount get() = benDao.getAllBenWithOldAbhaCount(selectedVillage)
+    val benWithNewAbhaListCount get() = benDao.getAllBenWithNewAbhaCount(selectedVillage)
 
-    val allBenWithRchList = benDao.getAllBenWithRch(selectedVillage)
+    val allBenWithRchList get() = benDao.getAllBenWithRch(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }
-    val benWithRchListCount = benDao.getAllBenWithRchCount(selectedVillage)
+    val benWithRchListCount get() = benDao.getAllBenWithRchCount(selectedVillage)
 
-    val allBenAboveThirtyList = benDao.getAllBenAboveThirty(selectedVillage)
+    val allBenAboveThirtyList get() = benDao.getAllBenAboveThirty(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }
-    val allBenWARAList = benDao.getAllBenWARA(selectedVillage)
+    val allBenWARAList get() = benDao.getAllBenWARA(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }
 
     fun getBenList() = benDao.getAllBen(selectedVillage)
@@ -78,26 +83,26 @@ class RecordsRepo @Inject constructor(
 
     fun getBenListCount() = benDao.getAllBenGenderCount(selectedVillage, "FEMALE")
 
-    val ncdList = allBenList
-    val ncdListCount = allBenListCount
+    val ncdList get() = allBenList
+    val ncdListCount get() = allBenListCount
 
-    val getNcdEligibleList = benDao.getBenWithCbac(selectedVillage)
-    val getNcdrefferedList = benDao.getBenWithReferredCbac(selectedVillage)
-    val getHwcRefferedList = benDao.getReferredHWCBenList(selectedVillage)
+    val getNcdEligibleList get() = benDao.getBenWithCbac(selectedVillage)
+    val getNcdrefferedList get() = benDao.getBenWithReferredCbac(selectedVillage)
+    val getHwcRefferedList get() = benDao.getReferredHWCBenList(selectedVillage)
 
-    val getNcdEligibleListCount = benDao.getBenWithCbacCount(selectedVillage)
-    val getNcdrefferedListCount = benDao.getReferredBenCount(selectedVillage)
-    val getHwcReferedListCount = benDao.getReferredHWCBenCount(selectedVillage)
+    val getNcdEligibleListCount get() = benDao.getBenWithCbacCount(selectedVillage)
+    val getNcdrefferedListCount get() = benDao.getReferredBenCount(selectedVillage)
+    val getHwcReferedListCount get() = benDao.getReferredHWCBenCount(selectedVillage)
 
-    val getNcdPriorityList = getNcdEligibleList.map {
+    val getNcdPriorityList get() = getNcdEligibleList.map {
         it.filter { it.savedCbacRecords.isNotEmpty() && it.savedCbacRecords.maxBy { it.createdDate }.total_score > 4 }
     }
-    val getNcdPriorityListCount = getNcdPriorityList.map { it.count() }
+    val getNcdPriorityListCount get() = getNcdPriorityList.map { it.count() }
 
-    val getNcdNonEligibleList = getNcdEligibleList.map {
+    val getNcdNonEligibleList get() = getNcdEligibleList.map {
         it.filter { it.savedCbacRecords.isNotEmpty() && it.savedCbacRecords.maxBy { it.createdDate }.total_score <= 4 }
     }
-    val getNcdNonEligibleListCount = getNcdNonEligibleList.map { it.count() }
+    val getNcdNonEligibleListCount get() = getNcdNonEligibleList.map { it.count() }
 
     fun malariaScreeningList(hhId: Long) = benDao.getAllMalariaScreeningBen(selectedVillage, hhId = hhId)
         .map { list -> list.map { it.asMalariaScreeningDomainModel() } }
@@ -121,23 +126,23 @@ class RecordsRepo @Inject constructor(
     fun filariaScreeningList(hhId: Long) = benDao.getAllFilariaScreeningBen(selectedVillage, hhId = hhId)
         .map { list -> list.map { it.asFilariaScreeningDomainModel() } }
 
-    val tbScreeningList = benDao.getAllTbScreeningBen(selectedVillage)
+    val tbScreeningList get() = benDao.getAllTbScreeningBen(selectedVillage)
         .map { list -> list.map { it.asTbScreeningDomainModel() } }
-    val tbScreeningListCount = tbScreeningList.map { it.size }
+    val tbScreeningListCount get() = tbScreeningList.map { it.size }
 
-    val tbSuspectedList = benDao.getTbScreeningList(selectedVillage)
+    val tbSuspectedList get() = benDao.getTbScreeningList(selectedVillage)
         .map { list -> list.map { it.asTbSuspectedDomainModel() } }
-    val tbSuspectedListCount = tbSuspectedList.map { it.size }
+    val tbSuspectedListCount get() = tbSuspectedList.map { it.size }
 
-    val tbConfirmedList = benDao.getTbConfirmedList(selectedVillage)
+    val tbConfirmedList get() = benDao.getTbConfirmedList(selectedVillage)
         .map { list -> list.map { it.asTbSuspectedDomainModel() } }
-    val tbConfirmedListCount = tbConfirmedList.map { it.size }
+    val tbConfirmedListCount get() = tbConfirmedList.map { it.size }
 
-    val leprosySuspectedListCount = benDao.getLeprosyScreeningBenCountBySymptoms(selectedVillage, 0)
-    val leprosyConfirmedCasesListCount = benDao.getConfirmedLeprosyCaseCount(selectedVillage = selectedVillage)
+    val leprosySuspectedListCount get() = benDao.getLeprosyScreeningBenCountBySymptoms(selectedVillage, 0)
+    val leprosyConfirmedCasesListCount get() = benDao.getConfirmedLeprosyCaseCount(selectedVillage = selectedVillage)
 
 
-    val benWithAbhaCount = benWithAbhaListCount
+    val benWithAbhaCount get() = benWithAbhaListCount
 
     suspend fun getBenById(benId: Long): BenBasicDomain? {
         return benDao.getBenById(benId)?.asBasicDomainModel()

@@ -28,6 +28,7 @@ import org.piramalswasthya.stoptb.model.CbacCache
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.ReferalCache
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
+import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.ncd_referred.form.NCDReferDialogViewModel
 import org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.tb_screening.form.TBScreeningFormViewModel
 import org.piramalswasthya.stoptb.utils.HelperUtil
@@ -1281,10 +1282,16 @@ class CbacFragment : Fragment() {
     override fun onStart() {
         super.onStart()
         activity?.let {
-            (it as HomeActivity).updateActionBar(
-                R.drawable.ic__ncd_eligibility,
-                getString(R.string.cbac)
-            )
+            when (it) {
+                is HomeActivity -> it.updateActionBar(
+                    R.drawable.ic__ncd_eligibility,
+                    getString(R.string.cbac)
+                )
+                is VolunteerActivity -> it.updateActionBar(
+                    R.drawable.ic__ncd_eligibility,
+                    getString(R.string.cbac)
+                )
+            }
         }
     }
 

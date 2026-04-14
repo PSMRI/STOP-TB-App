@@ -168,11 +168,10 @@ class AllHouseholdFragment : Fragment() {
     override fun onStart() {
         super.onStart()
         activity?.let {
-            if (it is VolunteerActivity) {
-                it.updateActionBar(R.drawable.ic__hh,
+            when (it) {
+                is HomeActivity -> it.updateActionBar(R.drawable.ic__hh,
                     getString(R.string.icon_title_household))
-            } else {
-                (it as HomeActivity).updateActionBar(R.drawable.ic__hh,
+                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__hh,
                     getString(R.string.icon_title_household))
             }
         }

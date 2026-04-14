@@ -1,11 +1,18 @@
 package org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.Context
+import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
 import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -72,6 +79,9 @@ class NewBenRegFragment : Fragment() {
     // ─── onViewCreated ───────────────────────────────────────────────────
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // Capture geolocation silently
+        captureGeolocation()
 
         binding.cvPatientInformation.visibility = View.GONE
 
@@ -172,11 +182,11 @@ class NewBenRegFragment : Fragment() {
             when (it) {
                 is HomeActivity -> it.updateActionBar(
                     R.drawable.ic__ben,
-                    getString(R.string.title_new_ben_reg_hof)
+                    getString(R.string.frag_new_ben_reg_type_title)
                 )
                 is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic__ben,
-                    getString(R.string.title_new_ben_reg_hof)
+                    getString(R.string.frag_new_ben_reg_type_title)
                 )
             }
         }
@@ -307,6 +317,35 @@ class NewBenRegFragment : Fragment() {
             .into(viewImageBinding.viewImage)
         viewImageBinding.btnClose.setOnClickListener { alertDialog.dismiss() }
         alertDialog.show()
+    }
+
+    // ─── Geolocation ────────────────────────────────────────────────────
+    private val requestLocationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) fetchLocation()
+        }
+
+    private fun captureGeolocation() {
+        if (ActivityCompat.checkSelfPermission(
+                requireContext(), Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            fetchLocation()
+        } else {
+            requestLocationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun fetchLocation() {
+        val locationManager = requireContext().getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+        location?.let {
+            viewModel.capturedLatitude = it.latitude
+            viewModel.capturedLongitude = it.longitude
+            Timber.d("Geolocation captured: lat=${it.latitude}, lng=${it.longitude}")
+        }
     }
 
     override fun onDestroy() {

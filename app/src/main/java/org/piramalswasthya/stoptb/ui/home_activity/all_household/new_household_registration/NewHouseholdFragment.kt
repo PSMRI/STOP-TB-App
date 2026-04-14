@@ -28,6 +28,7 @@ import org.piramalswasthya.stoptb.databinding.AlertConsentBinding
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
+import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.ui.home_activity.all_household.new_household_registration.NewHouseholdViewModel.State
 import timber.log.Timber
 
@@ -262,10 +263,16 @@ class NewHouseholdFragment : Fragment() {
     override fun onStart() {
         super.onStart()
         activity?.let {
-            (it as HomeActivity).updateActionBar(
-                R.drawable.ic__hh,
-                getString(R.string.frag_nhhr_title)
-            )
+            when (it) {
+                is HomeActivity -> it.updateActionBar(
+                    R.drawable.ic__hh,
+                    getString(R.string.frag_nhhr_title)
+                )
+                is VolunteerActivity -> it.updateActionBar(
+                    R.drawable.ic__hh,
+                    getString(R.string.frag_nhhr_title)
+                )
+            }
         }
         viewModel.readRecord.observe(viewLifecycleOwner) {
             if (!it && !viewModel.getIsConsentAgreed()) consentAlert.show()

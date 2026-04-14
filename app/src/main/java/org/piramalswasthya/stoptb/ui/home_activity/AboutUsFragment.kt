@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 
 
 class AboutUsFragment : Fragment() {
@@ -21,7 +22,10 @@ class AboutUsFragment : Fragment() {
     override fun onStart() {
         super.onStart()
         activity?.let {
-            (it as HomeActivity).updateActionBar(R.drawable.ic_info, getString(R.string.about))
+            when (it) {
+                is HomeActivity -> it.updateActionBar(R.drawable.ic_info, getString(R.string.about))
+                is VolunteerActivity -> it.updateActionBar(R.drawable.ic_info, getString(R.string.about))
+            }
         }
     }
 }

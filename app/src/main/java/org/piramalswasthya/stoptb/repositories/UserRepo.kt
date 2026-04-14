@@ -11,6 +11,8 @@ import org.piramalswasthya.stoptb.database.room.dao.SyncDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.SyncStatusCache
+import org.piramalswasthya.stoptb.model.LocationEntity
+import org.piramalswasthya.stoptb.model.LocationRecord
 import org.piramalswasthya.stoptb.model.User
 import org.piramalswasthya.stoptb.network.AmritApiService
 import org.piramalswasthya.stoptb.network.TmcAuthUserRequest
@@ -32,7 +34,8 @@ class UserRepo @Inject constructor(
     private val amritApiService: AmritApiService
 ) {
 
-    val unProcessedRecordCount: Flow<List<SyncStatusCache>> = syncDao.getSyncStatus()
+    private val selectedVillage get() = preferenceDao.getLocationRecord()?.village?.id ?: 0
+    val unProcessedRecordCount: Flow<List<SyncStatusCache>> get() = syncDao.getSyncStatus(selectedVillage)
 
 
 
@@ -92,6 +95,18 @@ class UserRepo @Inject constructor(
         val response = amritApiService.getUserDetailsById(userId = userId)
         val user = response.data.toUser(password)
         preferenceDao.registerUser(user)
+        // Auto-set location if user has exactly one village (common for ASHA workers)
+        if (user.villages.size == 1) {
+            val locationRecord = LocationRecord(
+                country = LocationEntity(1, "India"),
+                state = user.state,
+                district = user.district,
+                block = user.block,
+                village = user.villages.first()
+            )
+            preferenceDao.saveLocationRecord(locationRecord)
+            Timber.d("UserRepo: Auto-set location to village ${user.villages.first().id} (${user.villages.first().name})")
+        }
         return user
     }
 

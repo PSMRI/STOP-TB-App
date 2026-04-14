@@ -18,6 +18,7 @@ import org.piramalswasthya.stoptb.databinding.ActivityServiceTypeBinding
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
 import org.piramalswasthya.stoptb.helpers.TapjackingProtectionHelper
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
+import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import timber.log.Timber
 
 @AndroidEntryPoint
@@ -39,8 +40,9 @@ class ServiceLocationActivity : AppCompatActivity() {
             override fun handleOnBackPressed() {
                 if (viewModel.isLocationSet()) {
                     finish()
-                    val goToHome = Intent(this@ServiceLocationActivity, HomeActivity::class.java)
-                    startActivity(goToHome)
+                    val targetClass = if (intent.getBooleanExtra("fromVolunteer", false))
+                        VolunteerActivity::class.java else HomeActivity::class.java
+                    startActivity(Intent(this@ServiceLocationActivity, targetClass))
                 } else
                     if (!exitAlert.isShowing)
                         exitAlert.show()
@@ -110,8 +112,9 @@ class ServiceLocationActivity : AppCompatActivity() {
             if (dataValid()) {
                 viewModel.saveCurrentLocation()
                 finish()
-                val goToHome = Intent(this@ServiceLocationActivity, HomeActivity::class.java)
-                startActivity(goToHome)
+                val targetClass = if (intent.getBooleanExtra("fromVolunteer", false))
+                    VolunteerActivity::class.java else HomeActivity::class.java
+                startActivity(Intent(this@ServiceLocationActivity, targetClass))
             } else
                 incompleteLocationAlert.show()
         }

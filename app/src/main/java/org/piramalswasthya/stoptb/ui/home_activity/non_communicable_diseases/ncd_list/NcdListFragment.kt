@@ -177,10 +177,9 @@ class NcdListFragment : Fragment() {
     override fun onStart() {
         super.onStart()
         activity?.let {
-            if (it is VolunteerActivity) {
-                it.updateActionBar(R.drawable.ic__ben, getString(R.string.ncd_list))
-            } else {
-                (it as HomeActivity).updateActionBar(R.drawable.ic__ben, getString(R.string.ncd_list))
+            when (it) {
+                is HomeActivity -> it.updateActionBar(R.drawable.ic__ben, getString(R.string.ncd_list))
+                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ben, getString(R.string.ncd_list))
             }
         }
     }

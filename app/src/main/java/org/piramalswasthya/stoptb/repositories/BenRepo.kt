@@ -275,11 +275,11 @@ class BenRepo @Inject constructor(
 
     }
 
-    suspend fun getBeneficiaryRecord(benId: Long, hhId: Long): BenRegCache? {
+    suspend fun getBeneficiaryRecord(benId: Long, hhId: Long = 0L): BenRegCache? {
         return withContext(Dispatchers.IO) {
             if (benId == 0L)
                 return@withContext null
-            benDao.getBen(hhId, benId)
+            benDao.getBen(benId)
         }
 
     }
@@ -736,15 +736,15 @@ class BenRepo @Inject constructor(
                                         if (jsonObject.has("benficieryid")) jsonObject.getLong("benficieryid") else -1L
                                     val hhId =
                                         if (jsonObject.has("houseoldId")) jsonObject.getLong("houseoldId") else -1L
-                                    if (hhId == -1L || benId == -1L) {
+                                    if (benId == -1L) {
                                         continue
                                     }
-                                    val benExists = benDao.getBen(hhId, benId) != null
+                                    val benExists = benDao.getBen(benId) != null
 
                                     benDataList.add(
                                         BenBasicDomain(
                                             benId = jsonObject.getLong("benficieryid"),
-                                            hhId = jsonObject.getLong("houseoldId"),
+                                            hhId = if (jsonObject.has("houseoldId")) jsonObject.getLong("houseoldId") else -1L,
 
 //                                            isDeath = if (jsonObject.has("isDeath")) jsonObject.optBoolean("isDeath") else false,
 //                                            isDeathValue = jsonObject.optString("isDeath", null),
@@ -880,21 +880,21 @@ class BenRepo @Inject constructor(
                         if (jsonObject.has("houseoldId")) jsonObject.getLong("houseoldId") else -1L
 
                     if(benId == 700623622919L){
-                        Timber.d("====5224::BenPull benId=$benId | benExists=${benDao.getBen(hhId, benId) != null} | has doYouHavechildren=${jsonObject.has("doYouHavechildren")} val=${jsonObject.optBoolean("doYouHavechildren")} | has isMarried=${jsonObject.has("isMarried")} val=${jsonObject.optBoolean("isMarried")} | has isSpouseAdded=${jsonObject.has("isSpouseAdded")} val=${jsonObject.optBoolean("isSpouseAdded")} | has isChildrenAdded=${jsonObject.has("isChildrenAdded")} val=${jsonObject.optBoolean("isChildrenAdded")} | has noOfchildren=${jsonObject.has("noOfchildren")} val=${jsonObject.optInt("noOfchildren")}")
+                        Timber.d("====5224::BenPull benId=$benId | benExists=${benDao.getBen(benId) != null} | has doYouHavechildren=${jsonObject.has("doYouHavechildren")} val=${jsonObject.optBoolean("doYouHavechildren")} | has isMarried=${jsonObject.has("isMarried")} val=${jsonObject.optBoolean("isMarried")} | has isSpouseAdded=${jsonObject.has("isSpouseAdded")} val=${jsonObject.optBoolean("isSpouseAdded")} | has isChildrenAdded=${jsonObject.has("isChildrenAdded")} val=${jsonObject.optBoolean("isChildrenAdded")} | has noOfchildren=${jsonObject.has("noOfchildren")} val=${jsonObject.optInt("noOfchildren")}")
                     }
 
-                    if (benId == -1L || hhId == -1L) continue
-                    val benExists = benDao.getBen(hhId, benId) != null
+                    if (benId == -1L) continue
+                    val benExists = benDao.getBen(benId) != null
 
                     if (benExists) {
                         continue
                     }
-                    // StopTB: No household check needed
+                    // StopTB: No household check needed - hhId can be -1 for direct beneficiaries
 
                     try {
                         result.add(
                             BenRegCache(
-                                householdId = jsonObject.getLong("houseoldId"),
+                                householdId = if (jsonObject.has("houseoldId")) jsonObject.getLong("houseoldId") else -1L,
                                 beneficiaryId = jsonObject.getLong("benficieryid"),
                                 isDeath = if (jsonObject.has("isDeath")) jsonObject.optBoolean("isDeath") else false,
                                 isDeathValue = jsonObject.optString("isDeath", null)
@@ -959,6 +959,7 @@ class BenRepo @Inject constructor(
                                         1 -> Gender.MALE
                                         2 -> Gender.FEMALE
                                         3 -> Gender.TRANSGENDER
+                                        4 -> Gender.PREFER_NOT_TO_SAY
                                         else -> Gender.MALE
                                     }
                                 } else null,
@@ -973,7 +974,7 @@ class BenRepo @Inject constructor(
                                 familyHeadRelation = if (benDataObj.has("familyHeadRelation")) benDataObj.getString(
                                     "familyHeadRelation"
                                 ) else null,
-                                familyHeadRelationPosition = benDataObj.getInt("familyHeadRelationPosition"),
+                                familyHeadRelationPosition = if (benDataObj.has("familyHeadRelationPosition")) benDataObj.getInt("familyHeadRelationPosition") else 0,
 //                            familyHeadRelationOther = benDataObj.getString("familyHeadRelationOther"),
                                 mobileNoOfRelation = if (benDataObj.has("mobilenoofRelation")) benDataObj.getString(
                                     "mobilenoofRelation"

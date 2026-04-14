@@ -27,6 +27,7 @@ import org.piramalswasthya.stoptb.databinding.AlertConsentBinding
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
+import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
 
@@ -356,10 +357,16 @@ class NewChildAsBenRegistrationFragment : Fragment() {
     override fun onStart() {
         super.onStart()
         activity?.let {
-            (it as HomeActivity).updateActionBar(
-                R.drawable.ic__child,
-                getString( R.string.child_reg)
-            )
+            when (it) {
+                is HomeActivity -> it.updateActionBar(
+                    R.drawable.ic__child,
+                    getString( R.string.child_reg)
+                )
+                is VolunteerActivity -> it.updateActionBar(
+                    R.drawable.ic__child,
+                    getString( R.string.child_reg)
+                )
+            }
         }
 
         viewModel.recordExists.observe(viewLifecycleOwner) {

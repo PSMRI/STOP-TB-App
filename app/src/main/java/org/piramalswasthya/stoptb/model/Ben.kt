@@ -47,7 +47,8 @@ enum class AgeUnit {
 enum class Gender {
     MALE,
     FEMALE,
-    TRANSGENDER
+    TRANSGENDER,
+    PREFER_NOT_TO_SAY
 }
 
 enum class BenStatus {
@@ -1220,6 +1221,8 @@ data class BenRegCache(
 
     var rchId: String? = null,
 
+    var occupation: String? = "unknown",
+
 //    var registrationType: TypeOfList? = null,
 
     var latitude: Double = 0.0,
@@ -2069,6 +2072,7 @@ fun asCacheModel(benRegNetwork: BenRegNetwork, newBornRegNetwork: NewBornRegNetw
                "Male" -> Gender.MALE
                "Female" -> Gender.FEMALE
                "Transgender" -> Gender.TRANSGENDER
+               "Prefer not to say" -> Gender.PREFER_NOT_TO_SAY
                else -> Gender.MALE
            },
            genderId = genderId,

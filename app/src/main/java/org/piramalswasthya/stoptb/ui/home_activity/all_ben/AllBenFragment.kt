@@ -278,10 +278,9 @@ class AllBenFragment : Fragment() {
                 getString(R.string.icon_title_ben)
             }
 
-            if (it is VolunteerActivity) {
-                it.updateActionBar(R.drawable.ic__ben, title)
-            } else {
-                (it as HomeActivity).updateActionBar(R.drawable.ic__ben, title)
+            when (it) {
+                is HomeActivity -> it.updateActionBar(R.drawable.ic__ben, title)
+                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ben, title)
             }
         }
     }

@@ -93,13 +93,13 @@ class VolunteerActivity : AppCompatActivity() {
                 arrayOf(
                     resources.getString(R.string.english),
                     resources.getString(R.string.hindi),
-                    resources.getString(R.string.assamese)
+//                    resources.getString(R.string.assamese)
                 ), currentLanguageIndex
             ) { di, checkedItemIndex ->
                 val checkedLanguage = when (checkedItemIndex) {
                     0 -> Languages.ENGLISH
                     1 -> Languages.HINDI
-                    2 -> Languages.ASSAMESE
+//                    2 -> Languages.ASSAMESE
                     else -> throw IllegalStateException("Unknown language index $checkedItemIndex")
                 }
                 if (checkedItemIndex == currentLanguageIndex) {
@@ -159,6 +159,20 @@ class VolunteerActivity : AppCompatActivity() {
                 viewModel.navigateToLoginPageComplete()
                 finish()
             }
+        }
+
+        // Redirect to ServiceLocationActivity if location not set (multi-village users)
+        if (pref.getLocationRecord() == null) {
+            val intent = Intent(this, org.piramalswasthya.stoptb.ui.service_location_activity.ServiceLocationActivity::class.java)
+            intent.putExtra("fromVolunteer", true)
+            startActivity(intent)
+            finish()
+            return
+        }
+
+        // Auto-trigger sync on first launch (when full pull hasn't completed yet)
+        if (!pref.isFullPullComplete) {
+            WorkerUtils.triggerAmritPullWorker(this)
         }
     }
 

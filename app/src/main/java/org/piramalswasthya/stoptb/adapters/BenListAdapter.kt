@@ -326,6 +326,13 @@ class BenListAdapter(
 
 
             binding.executePendingBindings()
+
+            // Hide all action buttons except ABHA
+            binding.btnAbove30.visibility = View.GONE
+            binding.llBenDetails4.visibility = View.GONE
+            binding.btnAddSpouse.visibility = View.GONE
+            binding.btnAddChildren.visibility = View.GONE
+            binding.llAddSpouseBtn.visibility = View.GONE
         }
     }
 

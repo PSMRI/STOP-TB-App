@@ -8,6 +8,7 @@ import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.model.Gender.FEMALE
 import org.piramalswasthya.stoptb.model.Gender.MALE
 import org.piramalswasthya.stoptb.model.Gender.TRANSGENDER
+import org.piramalswasthya.stoptb.model.Gender.PREFER_NOT_TO_SAY
 
 @JsonClass(generateAdapter = true)
 data class BeneficiaryDataSending(
@@ -294,6 +295,7 @@ fun BenRegCache.asNetworkSendingModel(
             MALE -> "Male"
             FEMALE -> "Female"
             TRANSGENDER -> "Transgender"
+            PREFER_NOT_TO_SAY -> "Prefer not to say"
             null -> "NA"
         },
         maritalStatusID = if (isKid) null else genDetails?.maritalStatusId?.toString() ?: "",

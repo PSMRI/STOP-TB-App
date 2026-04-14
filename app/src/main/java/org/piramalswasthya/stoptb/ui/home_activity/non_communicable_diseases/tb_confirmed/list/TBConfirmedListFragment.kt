@@ -106,10 +106,9 @@ class TBConfirmedListFragment : Fragment() {
     override fun onStart() {
         super.onStart()
         activity?.let {
-            if (it is VolunteerActivity) {
-                it.updateActionBar(R.drawable.ic__ncd, getString(R.string.tb_confirmed_list))
-            } else {
-                (it as HomeActivity).updateActionBar(R.drawable.ic__ncd, getString(R.string.tb_confirmed_list))
+            when (it) {
+                is HomeActivity -> it.updateActionBar(R.drawable.ic__ncd, getString(R.string.tb_confirmed_list))
+                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ncd, getString(R.string.tb_confirmed_list))
             }
         }
     }

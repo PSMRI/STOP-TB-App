@@ -25,8 +25,8 @@
         app:layout_constraintVertical_chainStyle="spread_inside">
         <ImageView
             android:id="@+id/iv_nhm_logo"
-            android:layout_width="100dp"
-            android:layout_height="100dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:layout_marginTop="40dp"
             android:contentDescription="@string/cd_assam_nhm_logo"
             android:src="@drawable/logo_circle"
@@ -106,11 +106,12 @@
                     <com.google.android.material.radiobutton.MaterialRadioButton
                         android:id="@+id/rb_hindi"
                         style="@style/radio_item_lang"
-                        android:visibility="gone"
+                        android:visibility="visible"
                         android:text="@string/text_hindi" />
 
                     <com.google.android.material.radiobutton.MaterialRadioButton
                         android:id="@+id/rb_assamese"
+                        android:visibility="gone"
                         style="@style/radio_item_lang"
                         android:text="@string/text_assamese" />
 
@@ -218,6 +219,7 @@
                     android:id="@+id/tvDeleteAccount"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:visibility="gone"
                     android:text="@string/delete_my_account"
                     android:textColor="@color/md_theme_light_shadow"
                     android:fontFamily="@font/roboto_regular"

@@ -29,6 +29,7 @@
     import org.piramalswasthya.stoptb.configuration.dynamicDataSet.FormField
     import org.piramalswasthya.stoptb.databinding.FragmentNcdReferalFollowUpFormBinding
     import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
+    import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
     import org.piramalswasthya.stoptb.utils.Log
     import kotlin.collections.map
 
@@ -274,10 +275,16 @@ private fun handleFormSubmission() {
         override fun onStart() {
             super.onStart()
             activity?.let {
-                (it as HomeActivity).updateActionBar(
-                    R.drawable.ic__ncd_priority,
-                    getString(R.string.ncd_folloup_form)
-                )
+                when (it) {
+                    is HomeActivity -> it.updateActionBar(
+                        R.drawable.ic__ncd_priority,
+                        getString(R.string.ncd_folloup_form)
+                    )
+                    is VolunteerActivity -> it.updateActionBar(
+                        R.drawable.ic__ncd_priority,
+                        getString(R.string.ncd_folloup_form)
+                    )
+                }
             }
         }
         override fun onDestroyView() {

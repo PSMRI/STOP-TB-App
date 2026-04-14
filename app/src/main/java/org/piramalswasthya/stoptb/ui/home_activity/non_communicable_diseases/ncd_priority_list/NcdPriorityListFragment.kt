@@ -112,13 +112,12 @@ class NcdPriorityListFragment : Fragment() {
     override fun onStart() {
         super.onStart()
         activity?.let {
-            if (it is VolunteerActivity) {
-                it.updateActionBar(
+            when (it) {
+                is HomeActivity -> it.updateActionBar(
                     R.drawable.ic__ncd_priority,
                     getString(R.string.ncd_priority_list)
                 )
-            } else {
-                (it as HomeActivity).updateActionBar(
+                is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic__ncd_priority,
                     getString(R.string.ncd_priority_list)
                 )

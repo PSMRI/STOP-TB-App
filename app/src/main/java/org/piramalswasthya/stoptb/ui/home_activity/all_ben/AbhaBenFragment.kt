@@ -26,6 +26,7 @@ import org.piramalswasthya.stoptb.databinding.AlertFilterBinding
 import org.piramalswasthya.stoptb.databinding.FragmentAbhaBenBinding
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
+import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.ui.home_activity.home.HomeViewModel
 import timber.log.Timber
 import javax.inject.Inject
@@ -345,7 +346,10 @@ class AbhaBenFragment : Fragment() {
             } else {
                 getString(R.string.icon_title_ben)
             }
-            (it as HomeActivity).updateActionBar(R.drawable.ic__ben, title)
+            when (it) {
+                is HomeActivity -> it.updateActionBar(R.drawable.ic__ben, title)
+                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ben, title)
+            }
         }
     }
 

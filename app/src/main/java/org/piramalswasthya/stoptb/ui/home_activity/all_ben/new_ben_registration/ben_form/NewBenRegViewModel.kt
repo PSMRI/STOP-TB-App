@@ -73,6 +73,10 @@ class NewBenRegViewModel @Inject constructor(
     fun setConsentAgreed()    { isConsentAgreed = true }
     fun getIsConsentAgreed()  = isConsentAgreed
 
+    // Geolocation
+    var capturedLatitude: Double = 0.0
+    var capturedLongitude: Double = 0.0
+
     // ─── Data ────────────────────────────────────────────────────────────
     private lateinit var user:           User
     private lateinit var household:      HouseholdCache
@@ -130,11 +134,12 @@ class NewBenRegViewModel @Inject constructor(
                     // View mode — show existing data read-only
                     dataset.setFirstPageToRead(
                         ben,
-                        familyHeadPhoneNo = household.family?.familyHeadPhoneNo
+                        familyHeadPhoneNo = household.family?.familyHeadPhoneNo,
+                        villageName = locationRecord.village.name
                     )
                 } else {
                     // New registration
-                    dataset.setUpPage(null, household.family?.familyHeadPhoneNo)
+                    dataset.setUpPage(null, household.family?.familyHeadPhoneNo, locationRecord.village.name)
                 }
             }
         }
@@ -161,7 +166,7 @@ class NewBenRegViewModel @Inject constructor(
                             placeOfDeath   = "",
                             placeOfDeathId = -1,
                             otherPlaceOfDeath = "",
-                            householdId    = hhId,
+                            householdId    = 0L,
                             isAdult        = false,
                             isKid          = false,
                             isDraft        = true,
@@ -174,6 +179,10 @@ class NewBenRegViewModel @Inject constructor(
                     }
 
                     dataset.mapValues(ben, 1)
+
+                    // Set captured geolocation
+                    ben.latitude = capturedLatitude
+                    ben.longitude = capturedLongitude
 
                     ben.apply {
                         serverUpdatedStatus = if (beneficiaryId < 0L) 1 else 2

@@ -12,11 +12,12 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SyncViewModel @Inject constructor(
-    syncDao: SyncDao,
-    preferenceDao: PreferenceDao
+    private val syncDao: SyncDao,
+    private val preferenceDao: PreferenceDao
 ) : ViewModel() {
 
-    val syncStatus = syncDao.getSyncStatus()
+    private val selectedVillage get() = preferenceDao.getLocationRecord()?.village?.id ?: 0
+    val syncStatus get() = syncDao.getSyncStatus(selectedVillage)
 
     val lang = preferenceDao.getCurrentLanguage()
     fun getLocalNames(context: Context): Array<String> {

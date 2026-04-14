@@ -77,14 +77,13 @@ android {
     productFlavors {
 
         stoptb {
-            applicationId "org.piramalswasthya.stoptb"
-            resValue "string", "app_native_name", "StopTB"
+            applicationId "org.piramalswasthya.stoptb.prod"
+            resValue "string", "app_native_name", "NikshayMitra"
         }
 
         stoptbUat {
-            applicationId "org.piramalswasthya.stoptb"
-            applicationIdSuffix ".uat"
-            resValue "string", "app_native_name", "StopTB-UAT"
+            applicationId "org.piramalswasthya.stoptb.uat"
+            resValue "string", "app_native_name", "NikshayMitra-UAT"
         }
 
     }

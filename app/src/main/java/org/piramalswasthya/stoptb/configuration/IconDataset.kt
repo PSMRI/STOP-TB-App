@@ -25,7 +25,7 @@ class IconDataset @Inject constructor(
         Icon(
             R.drawable.ic__ben,
             resources.getString(R.string.icon_title_ben),
-            null,
+            recordsRepo.allBenListCount,
             VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment()
         ),
         Icon(
@@ -43,7 +43,7 @@ class IconDataset @Inject constructor(
         Icon(
             R.drawable.ic_ncd_noneligible,
             resources.getString(R.string.ncd_refer_list),
-            null,
+            recordsRepo.getNcdrefferedListCount,
             VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToNcdReferredListFragment()
         )
     ).apply {
@@ -71,12 +71,12 @@ class IconDataset @Inject constructor(
             recordsRepo.getNcdNonEligibleListCount,
             NcdFragmentDirections.actionNcdFragmentToNcdNonEligibleListFragment()
         ),
-        Icon(
-            R.drawable.ic_ncd_noneligible,
-            resources.getString(R.string.ncd_refer_list),
-            recordsRepo.getNcdrefferedListCount,
-            NcdFragmentDirections.actionNcdFragmentToNcdReferredListFragment()
-        )
+//        Icon(
+//            R.drawable.ic_ncd_noneligible,
+//            resources.getString(R.string.ncd_refer_list),
+//            recordsRepo.getNcdrefferedListCount,
+//            NcdFragmentDirections.actionNcdFragmentToNcdReferredListFragment()
+//        )
     ).apply {
         forEachIndexed { index, icon ->
             icon.colorPrimary = index % 2 == 0

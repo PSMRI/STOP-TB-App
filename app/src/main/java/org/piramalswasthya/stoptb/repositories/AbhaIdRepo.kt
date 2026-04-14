@@ -10,6 +10,7 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import org.piramalswasthya.stoptb.BuildConfig
+import org.piramalswasthya.stoptb.utils.KeyUtils
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.ABHAModel
 import org.piramalswasthya.stoptb.model.BenRegCache
@@ -72,7 +73,8 @@ class AbhaIdRepo @Inject constructor(
 
                 val response = abhaApiService.getToken(
                     id = if (BuildConfig.FLAVOR.contains("stag", true) ||
-                        BuildConfig.FLAVOR.contains("uat", true)
+                        BuildConfig.FLAVOR.contains("uat", true) ||
+                        KeyUtils.abhaTokenUrl().contains("dev.abdm", true)
                     ) {
                         "sbx"
                     } else {
