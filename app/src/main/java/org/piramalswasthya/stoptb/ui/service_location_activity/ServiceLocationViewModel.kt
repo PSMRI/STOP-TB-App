@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Languages
+
 import org.piramalswasthya.stoptb.helpers.Languages.ASSAMESE
 import org.piramalswasthya.stoptb.helpers.Languages.ENGLISH
 import org.piramalswasthya.stoptb.model.LocationEntity
@@ -103,7 +104,8 @@ class ServiceTypeViewModel @Inject constructor(
                             user.block.let { it.nameAssamese ?: it.name }
                         villageDropdownEntries =
                             user.villages.map { it.nameAssamese ?: it.name }.toTypedArray()
-                   }
+                    }
+
                 }
 
             }

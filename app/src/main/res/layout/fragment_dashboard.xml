@@ -1,13 +1,388 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
     tools:context=".ui.home_activity.dashboard.DashboardFragment">
 
-    <TextView
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:text="@string/hello" />
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
 
-</FrameLayout>
+        <!-- Header -->
+        <TextView
+            android:id="@+id/tvDashboardTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/dashboard"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="?attr/colorOnSurface"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Filters Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <!-- Time Period Filter -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/tilTimePeriod"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:hint="Time Period">
+
+                <AutoCompleteTextView
+                    android:id="@+id/actvTimePeriod"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="none"
+                    android:text="Today"
+                    android:textSize="13sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Village Filter -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/tilVillage"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:hint="Village / Hamlet">
+
+                <AutoCompleteTextView
+                    android:id="@+id/actvVillage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="none"
+                    android:text="All Villages"
+                    android:textSize="13sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+
+        <!-- Card 1: Total TB Screenings -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardElevation="2dp"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="#FFF9C4">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Total TB Screenings"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="#5D4037" />
+
+                <TextView
+                    android:id="@+id/tvTbScreeningTotal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="32sp"
+                    android:textStyle="bold"
+                    android:textColor="#4E342E"
+                    android:layout_marginTop="4dp"
+                    tools:text="45" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
+
+                    <TextView
+                        android:id="@+id/tvTbScreeningMale"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textSize="12sp"
+                        android:textColor="#5D4037"
+                        tools:text="Male: 20" />
+
+                    <TextView
+                        android:id="@+id/tvTbScreeningFemale"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textSize="12sp"
+                        android:textColor="#5D4037"
+                        tools:text="Female: 15" />
+
+                    <TextView
+                        android:id="@+id/tvTbScreeningChildren"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textSize="12sp"
+                        android:textColor="#5D4037"
+                        tools:text="Children: 5" />
+
+                    <TextView
+                        android:id="@+id/tvTbScreeningOthers"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textSize="12sp"
+                        android:textColor="#5D4037"
+                        tools:text="Others: 5" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Card 2: Total TB Suspected -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardElevation="2dp"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="#FFF9C4">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Total TB Suspected Cases"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="#5D4037" />
+
+                <TextView
+                    android:id="@+id/tvTbSuspectedTotal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="32sp"
+                    android:textStyle="bold"
+                    android:textColor="#4E342E"
+                    android:layout_marginTop="4dp"
+                    tools:text="12" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
+
+                    <TextView
+                        android:id="@+id/tvTbSuspectedMale"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textSize="12sp"
+                        android:textColor="#5D4037"
+                        tools:text="Male: 6" />
+
+                    <TextView
+                        android:id="@+id/tvTbSuspectedFemale"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textSize="12sp"
+                        android:textColor="#5D4037"
+                        tools:text="Female: 4" />
+
+                    <TextView
+                        android:id="@+id/tvTbSuspectedChildren"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textSize="12sp"
+                        android:textColor="#5D4037"
+                        tools:text="Children: 1" />
+
+                    <TextView
+                        android:id="@+id/tvTbSuspectedOthers"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textSize="12sp"
+                        android:textColor="#5D4037"
+                        tools:text="Others: 1" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Card 3: Total TB Confirmed -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardElevation="2dp"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="#FFF9C4">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Total TB Confirmed Cases"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="#5D4037" />
+
+                <TextView
+                    android:id="@+id/tvTbConfirmedTotal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="32sp"
+                    android:textStyle="bold"
+                    android:textColor="#4E342E"
+                    android:layout_marginTop="4dp"
+                    tools:text="3" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
+
+                    <TextView
+                        android:id="@+id/tvTbConfirmedMale"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textSize="12sp"
+                        android:textColor="#5D4037"
+                        tools:text="Male: 2" />
+
+                    <TextView
+                        android:id="@+id/tvTbConfirmedFemale"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textSize="12sp"
+                        android:textColor="#5D4037"
+                        tools:text="Female: 1" />
+
+                    <TextView
+                        android:id="@+id/tvTbConfirmedChildren"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textSize="12sp"
+                        android:textColor="#5D4037"
+                        tools:text="Children: 0" />
+
+                    <TextView
+                        android:id="@+id/tvTbConfirmedOthers"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textSize="12sp"
+                        android:textColor="#5D4037"
+                        tools:text="Others: 0" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Row: NIKSHAY IDs + ABHA IDs -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="12dp">
+
+            <!-- Card 4: NIKSHAY IDs -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                app:cardElevation="2dp"
+                app:cardCornerRadius="12dp"
+                app:cardBackgroundColor="#FFF9C4">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="NIKSHAY IDs"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="#5D4037" />
+
+                    <TextView
+                        android:id="@+id/tvNikshayCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="32sp"
+                        android:textStyle="bold"
+                        android:textColor="#4E342E"
+                        android:layout_marginTop="4dp"
+                        tools:text="8" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Card 5: ABHA IDs -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                app:cardElevation="2dp"
+                app:cardCornerRadius="12dp"
+                app:cardBackgroundColor="#FFF9C4">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="ABHA IDs"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="#5D4037" />
+
+                    <TextView
+                        android:id="@+id/tvAbhaCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="32sp"
+                        android:textStyle="bold"
+                        android:textColor="#4E342E"
+                        android:layout_marginTop="4dp"
+                        tools:text="25" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

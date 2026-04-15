@@ -72,7 +72,7 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.NCDReferalFormResponseJson
         TBConfirmedTreatmentCache::class
     ],
     views = [BenBasicCache::class],
-    version = 1, exportSchema = false
+    version = 2, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,

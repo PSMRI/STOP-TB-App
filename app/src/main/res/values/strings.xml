@@ -250,6 +250,8 @@
     <string name="delivery_outcome_list">Delivery Outcome List</string>
     <string name="communicable_diseases">Communicable Diseases</string>
     <string name="dashboard">Dashboard</string>
+    <string name="abha_ids">ABHA IDs</string>
+    <string name="pending_sync">Pending Sync</string>
     <string name="sign_in">Sign In</string>
     <string name="email">Email</string>
 

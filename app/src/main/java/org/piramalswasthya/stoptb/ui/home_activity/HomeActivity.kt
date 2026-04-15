@@ -134,16 +134,15 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
     private val langChooseAlert by lazy {
         val currentLanguageIndex = when (pref.getCurrentLanguage()) {
             Languages.ENGLISH -> 0
-            Languages.ASSAMESE -> 2
             Languages.HINDI -> 1
-
+            Languages.ASSAMESE -> 2
         }
         MaterialAlertDialogBuilder(this).setTitle(resources.getString(R.string.choose_application_language))
             .setSingleChoiceItems(
                 arrayOf(
                     resources.getString(R.string.english),
                     resources.getString(R.string.hindi),
-                    resources.getString(R.string.assamese)
+//                    resources.getString(R.string.assamese),
                 ), currentLanguageIndex
             ) { di, checkedItemIndex ->
                 val checkedLanguage = when (checkedItemIndex) {
@@ -705,6 +704,12 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
 
         binding.navView.menu.findItem(R.id.syncDashboardFragment).setOnMenuItemClickListener {
             navController.navigate(R.id.syncDashboardFragment)
+            binding.drawerLayout.close()
+            true
+        }
+
+        binding.navView.menu.findItem(R.id.dashboardFragment).setOnMenuItemClickListener {
+            navController.navigate(R.id.dashboardFragment)
             binding.drawerLayout.close()
             true
         }

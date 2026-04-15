@@ -3,10 +3,9 @@ package org.piramalswasthya.stoptb.configuration
 import android.content.Context
 import android.net.Uri
 import android.text.InputType
-import android.util.Log
 import org.piramalswasthya.stoptb.R
-import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.helpers.Konstants
+import org.piramalswasthya.stoptb.model.LocationEntity
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.setToStartOfTheDay
 import org.piramalswasthya.stoptb.model.AgeUnit
@@ -21,7 +20,6 @@ import org.piramalswasthya.stoptb.model.Gender.FEMALE
 import org.piramalswasthya.stoptb.model.Gender.MALE
 import org.piramalswasthya.stoptb.model.Gender.TRANSGENDER
 import org.piramalswasthya.stoptb.model.Gender.PREFER_NOT_TO_SAY
-import org.piramalswasthya.stoptb.model.HouseholdCache
 import org.piramalswasthya.stoptb.model.InputType.DATE_PICKER
 import org.piramalswasthya.stoptb.model.InputType.DROPDOWN
 import org.piramalswasthya.stoptb.model.InputType.EDIT_TEXT
@@ -266,11 +264,11 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         arrayId = -1, required = true, etMaxLength = 100
     )
 
-    // 16. Village/Hamlet (read-only, auto-filled from location)
+    // 16. Village/Hamlet (dropdown, populated from user's assigned villages)
     private val villageHamlet = FormElement(
-        id = 1040, inputType = TEXT_VIEW,
+        id = 1040, inputType = DROPDOWN,
         title = resources.getString(R.string.nbr_village),
-        arrayId = -1, required = false
+        arrayId = -1, required = true, hasDependants = false
     )
 
     // 17. Occupation (free text, default "unknown")
@@ -305,7 +303,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     /**
      * Setup page for NEW beneficiary registration
      */
-    suspend fun setUpPage(ben: BenRegCache?, familyHeadPhoneNo: Long?, villageName: String? = null) {
+    suspend fun setUpPage(ben: BenRegCache?, familyHeadPhoneNo: Long?, villageName: String? = null, villageNames: Array<String>? = null, villageEntityList: List<LocationEntity> = emptyList()) {
         val list = mutableListOf(
             pic,
             dateOfReg,
@@ -330,7 +328,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
         if (dateOfReg.value == null) dateOfReg.value = getCurrentDateString()
         contactNumber.value = familyHeadPhoneNo?.toString()
-        villageHamlet.value = villageName ?: ""
+        villageNames?.let { villageHamlet.entries = it }
+        villageHamlet.value = villageName ?: villageNames?.firstOrNull() ?: ""
+        this.villageEntities = villageEntityList
         if (occupation.value == null) occupation.value = resources.getString(R.string.nbr_occupation_default)
 
         ben?.takeIf { !it.isDraft }?.let { saved ->
@@ -399,7 +399,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
             mobileNoOfRelation.value = mobileNoOfRelation.getStringFromPosition(saved.mobileNoOfRelationId)
             otherMobileNoOfRelation.value = saved.mobileOthers
-            contactNumber.value = saved.contactNumber.toString()
+            contactNumber.value = saved.contactNumber?.toString()
 
             community.value  = community.getStringFromPosition(saved.communityId)
             religion.value   = religion.getStringFromPosition(saved.religionId)
@@ -464,33 +464,18 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     }
 
     // Keep setFirstPageToRead as alias for backward compat with ViewModel
-    suspend fun setFirstPageToRead(ben: BenRegCache?, familyHeadPhoneNo: Long?, villageName: String? = null) =
-        setUpPage(ben, familyHeadPhoneNo, villageName)
+    suspend fun setFirstPageToRead(ben: BenRegCache?, familyHeadPhoneNo: Long?, villageName: String? = null, villageNames: Array<String>? = null, villageEntityList: List<LocationEntity> = emptyList()) =
+        setUpPage(ben, familyHeadPhoneNo, villageName, villageNames, villageEntityList)
 
-    // Keep setPageForHof as alias — StopTB has no HoF concept, uses same form
-    suspend fun setPageForHof(ben: BenRegCache?, household: HouseholdCache, villageName: String? = null) =
-        setUpPage(ben, household.family?.familyHeadPhoneNo, villageName)
-
-    // Keep setPageForFamilyMember as alias — StopTB registers each ben independently
-    suspend fun setPageForFamilyMember(
-        ben: BenRegCache?,
-        household: HouseholdCache,
-        hoF: BenRegCache?,
-        benGender: Gender,
-        relationToHeadId: Int,
-        hoFSpouse: List<BenRegCache> = emptyList(),
-        selectedben: BenRegCache?,
-        isAddspouse: Int,
-    ) = setUpPage(ben, household.family?.familyHeadPhoneNo)
 
     private var familyHeadPhoneNo: String? = null
+    private var villageEntities: List<LocationEntity> = emptyList()
 
     fun hasThirdPage(): Boolean {
         return (getAgeFromDob(getLongFromDate(agePopup.value)) >= Konstants.minAgeForGenBen
                 && gender.value == gender.entries!![1])
     }
 
-    fun isKid(): Boolean = false // StopTB has no kid concept
 
     // ─────────────────────────── VALUE CHANGED ───────────────────────────
 
@@ -756,8 +741,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             ben.mobileNoOfRelation   = mobileNoOfRelation.getEnglishStringFromPosition(ben.mobileNoOfRelationId)
             ben.mobileOthers         = otherMobileNoOfRelation.value
             ben.contactNumber        = when {
-                ben.mobileNoOfRelationId == 5 -> familyHeadPhoneNo?.toLongOrNull() ?: 0L
-                contactNumber.value.isNullOrEmpty() -> 0L
+                ben.mobileNoOfRelationId == 5 -> familyHeadPhoneNo?.toLongOrNull()
+                contactNumber.value.isNullOrEmpty() -> null
                 else -> contactNumber.value!!.toLong()
             }
             ben.tempMobileNoOfRelationId = 0
@@ -775,6 +760,13 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             ben.residentialAreaId  = residentialAreaType.getPosition()
             ben.residentialArea    = residentialAreaType.getEnglishStringFromPosition(ben.residentialAreaId ?: 0)
             ben.otherResidentialArea = otherResidentialAreaType.value
+
+            // Village — update locationRecord if user changed village
+            villageHamlet.value?.let { selectedName ->
+                villageEntities.find { it.name == selectedName }?.let { selectedVillage ->
+                    ben.locationRecord = ben.locationRecord.copy(village = selectedVillage)
+                }
+            }
 
             // Occupation
             val defaultOccupation = resources.getString(R.string.nbr_occupation_default)
@@ -828,26 +820,6 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     fun setImageUriToFormElement(lastImageFormId: Int, dpUri: Uri) {
         pic.value = dpUri.toString()
         pic.errorText = null
-    }
-
-    fun updateHouseholdWithHoFDetails(household: HouseholdCache, ben: BenRegCache) {
-        household.family?.familyHeadName = ben.firstName
-        household.family?.familyName     = ben.lastName
-    }
-
-    fun mapValueToBen(ben: BenRegCache?): Boolean {
-        var isUpdated = false
-        rchId.value?.takeIf { it.isNotEmpty() }?.toLong()?.let {
-            if (it != ben?.rchId?.takeIf { r -> r.isNotEmpty() }?.toLong()) {
-                ben?.rchId = it.toString()
-                isUpdated = true
-            }
-        }
-        if (isUpdated) {
-            if (ben?.processed != "N") ben?.processed = "U"
-            ben?.syncState = SyncState.UNSYNCED
-        }
-        return isUpdated
     }
 
     private fun calculateMarriageDate(marriageAge: Int, dob: Long): Long {

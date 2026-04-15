@@ -97,242 +97,86 @@ class BenListAdapter(
                 binding.root.context.getString(R.string.add_eye_surgery)
             }
 
-            binding.executePendingBindings()
-
-            var gender = item.gender.toString()
-
-            if (item.relToHeadId == 19) {
-                binding.HOF.visibility = View.VISIBLE
-            } else {
-                binding.HOF.visibility = View.GONE
-            }
-
-            if (item.dob != null) {
-                val type = getPatientTypeByAge(getDateFromLong(item.dob))
-                when (type) {
-
-                    "new_born_baby" -> {
-                        binding.ivHhLogo.setImageResource(R.drawable.ic_icon_baby)
-                    }
-
-                    "infant" -> {
-                        binding.ivHhLogo.setImageResource(R.drawable.ic_infant)
-                    }
-
-                    "child", "adolescence" -> {
-                        when (gender) {
-                            Gender.MALE.name -> {
-                                binding.ivHhLogo.setImageResource(R.drawable.ic_icon_boy_ben)
-                            }
-
-                            Gender.FEMALE.name -> {
-                                binding.ivHhLogo.setImageResource(R.drawable.ic_girl)
-                            }
-
-                            else -> {
-                                // Intentionally left blank (no icon change)
-                            }
-                        }
-                    }
-
-                    "adult" -> {
-                        when (gender) {
-                            Gender.MALE.name -> {
-                                binding.ivHhLogo.setImageResource(R.drawable.ic_males)
-                            }
-
-                            Gender.FEMALE.name -> {
-                                binding.ivHhLogo.setImageResource(R.drawable.ic_icon_female_2)
-                            }
-
-                            else -> {
-                                binding.ivHhLogo.setImageResource(R.drawable.ic_unisex)
-                            }
-                        }
-                    }
-                }
-
-            }
-
-            val effectiveChildCount = childCountMap[item.benId] ?: item.noOfChildren
-
-            when {
-                item.gender == "MALE" && !item.isSpouseAdded && item.isMarried -> {
-                    binding.btnAddSpouse.visibility = View.VISIBLE
-                    binding.btnAddChildren.visibility = View.INVISIBLE
-                    binding.llAddSpouseBtn.visibility = View.VISIBLE
-                    binding.btnAddSpouse.text = context.getString(R.string.add_wife)
-                    binding.btnAddSpouse.setOnClickListener {
-                        clickListener?.onClickedWifeBen(item)
-                    }
-                }
-
-                // FEMALE + married + no spouse: show Add Husband only
-                item.gender == "FEMALE" && !item.isSpouseAdded && item.isMarried -> {
-                    binding.btnAddSpouse.visibility = View.VISIBLE
-                    binding.btnAddChildren.visibility = View.INVISIBLE
-                    binding.llAddSpouseBtn.visibility = View.VISIBLE
-                    binding.btnAddSpouse.text = context.getString(R.string.add_husband)
-                    binding.btnAddSpouse.setOnClickListener {
-                        clickListener?.onClickedHusbandBen(item)
-                    }
-                }
-
-                // FEMALE + married + spouse added + 0 children + doYouHavechildren: Register Children
-                item.gender == "FEMALE" &&
-                        item.isMarried &&
-                        item.isSpouseAdded &&
-                        item.doYouHavechildren &&
-                        effectiveChildCount == 0 -> {
-
-                    binding.btnAddChildren.visibility = View.VISIBLE
-                    binding.btnAddChildren.text = context.getString(R.string.add_children)
-                    binding.btnAddSpouse.visibility = View.GONE
-                    binding.llAddSpouseBtn.visibility = View.VISIBLE
-                    binding.btnAddChildren.setOnClickListener {
-                        clickListener?.onClickChildBen(item)
-                    }
-                }
-
-                // FEMALE + married + spouse added + >0 children: View Children
-                item.gender == "FEMALE" &&
-                        item.isMarried &&
-                        item.isSpouseAdded &&
-                        effectiveChildCount > 0 -> {
-
-                    binding.btnAddChildren.visibility = View.VISIBLE
-                    binding.btnAddChildren.text = context.getString(R.string.view_children)
-                    binding.btnAddSpouse.visibility = View.GONE
-                    binding.llAddSpouseBtn.visibility = View.VISIBLE
-                    binding.btnAddChildren.setOnClickListener {
-                        clickListener?.onClickChildBen(item)
-                    }
-                }
-
-                else -> {
-                    binding.btnAddSpouse.visibility = View.GONE
-                    binding.btnAddChildren.visibility = View.INVISIBLE
-                    binding.llAddSpouseBtn.visibility = View.GONE
-                }
-            }
-
-            if (!showActionButtons) {
-                binding.btnAbove30.visibility = View.GONE
-                binding.btnAddSpouse.visibility = View.GONE
-                binding.btnAddChildren.visibility = View.GONE
-                binding.llAddSpouseBtn.visibility = View.GONE
-            }
-
-            if (showBeneficiaries) {
-                if (item.spouseName == "Not Available" && item.fatherName == "Not Available") {
-                    binding.father = true
-                    binding.husband = false
-                    binding.spouse = false
-                } else {
-                    if (item.gender == "MALE") {
-                        binding.father = true
-                        binding.husband = false
-                        binding.spouse = false
-                    } else if (item.gender == "FEMALE") {
-                        if (item.ageInt > 15) {
-                            binding.father =
-                                item.fatherName != "Not Available" && item.spouseName == "Not Available"
-                            binding.husband = item.spouseName != "Not Available"
-                            binding.spouse = false
-                        } else {
-                            binding.father = true
-                            binding.husband = false
-                            binding.spouse = false
-                        }
-                    } else {
-                        binding.father =
-                            item.fatherName != "Not Available" && item.spouseName == "Not Available"
-                        binding.spouse = item.spouseName != "Not Available"
-                        binding.husband = false
-                    }
-                }
-            } else {
-                binding.father = false
-                binding.husband = false
-                binding.spouse = false
-            }
-            if (item.isDeath) {
-                binding.contentLayout.setBackgroundColor(
-                    ContextCompat.getColor(
-                        binding.contentLayout.context,
-                        R.color.md_theme_dark_outline
-                    )
-                )
-                binding.ivCall.visibility = View.GONE
-                binding.ivSyncState.visibility = View.GONE
-                binding.llAddSpouseBtn.visibility = View.GONE
-                binding.btnAbha.visibility = View.GONE
-                binding.ivSoftDelete.visibility = View.GONE
-            } else {
-                binding.contentLayout.setBackgroundColor(
-                    ContextCompat.getColor(
-                        binding.contentLayout.context,
-                        R.color.md_theme_light_primary
-                    )
-                )
-            }
-
-            if (isSoftDeleteEnabled) {
-                binding.ivSoftDelete.visibility = View.VISIBLE
-
-                if (item.isDeactivate) {
-                    binding.contentLayout.setBackgroundColor(
-                        ContextCompat.getColor(
-                            binding.contentLayout.context,
-                            R.color.Quartenary
-                        )
-                    )
-                    binding.ivSoftDelete.visibility = View.GONE
-
-                    binding.btnAbha.visibility = View.INVISIBLE
-                    binding.tvTitleDuplicaterecord.visibility = View.VISIBLE
-                    binding.ivCall.visibility = View.INVISIBLE
-                    binding.ivSyncState.visibility = View.INVISIBLE
-                    binding.llBenDetails4.visibility = View.GONE
-                    binding.llAddSpouseBtn.visibility = View.GONE
-
-
-                } else {
-
-                    if (!item.isDeath) {
-                        binding.contentLayout.setBackgroundColor(
-                            ContextCompat.getColor(
-                                binding.contentLayout.context,
-                                R.color.md_theme_light_primary
-                            )
-                        )
-
-                        binding.btnAbha.visibility = View.VISIBLE
-                        binding.tvTitleDuplicaterecord.visibility = View.GONE
-                        binding.llBenDetails4.visibility = View.VISIBLE
-                        binding.ivCall.visibility = View.VISIBLE
-                        binding.ivSyncState.visibility = View.VISIBLE
-                        binding.llAddSpouseBtn.visibility = View.VISIBLE
-
-                    } else {
-                        binding.ivSoftDelete.visibility = View.GONE
-
-                    }
-                }
-
-            } else {
-                binding.ivSoftDelete.visibility = View.GONE
-            }
-
-
-            binding.executePendingBindings()
-
-            // Hide all action buttons except ABHA
+            // Hide unused UI elements upfront (no spouse/children/eye surgery buttons in StopTB)
+            binding.HOF.visibility = View.GONE
             binding.btnAbove30.visibility = View.GONE
             binding.llBenDetails4.visibility = View.GONE
             binding.btnAddSpouse.visibility = View.GONE
             binding.btnAddChildren.visibility = View.GONE
             binding.llAddSpouseBtn.visibility = View.GONE
+            binding.ivSoftDelete.visibility = View.GONE
+            binding.tvTitleDuplicaterecord.visibility = View.GONE
+
+            // Set gender-based avatar icon
+            if (item.dob != null) {
+                val type = getPatientTypeByAge(getDateFromLong(item.dob))
+                val gender = item.gender.toString()
+                val iconRes = when (type) {
+                    "new_born_baby" -> R.drawable.ic_icon_baby
+                    "infant" -> R.drawable.ic_infant
+                    "child", "adolescence" -> when (gender) {
+                        Gender.MALE.name -> R.drawable.ic_icon_boy_ben
+                        Gender.FEMALE.name -> R.drawable.ic_girl
+                        else -> null
+                    }
+                    "adult" -> when (gender) {
+                        Gender.MALE.name -> R.drawable.ic_males
+                        Gender.FEMALE.name -> R.drawable.ic_icon_female_2
+                        else -> R.drawable.ic_unisex
+                    }
+                    else -> null
+                }
+                iconRes?.let { binding.ivHhLogo.setImageResource(it) }
+            }
+
+            // Father/Husband/Spouse name display
+            if (showBeneficiaries) {
+                when {
+                    item.spouseName == "Not Available" && item.fatherName == "Not Available" -> {
+                        binding.father = true; binding.husband = false; binding.spouse = false
+                    }
+                    item.gender == "MALE" -> {
+                        binding.father = true; binding.husband = false; binding.spouse = false
+                    }
+                    item.gender == "FEMALE" && item.ageInt > 15 -> {
+                        binding.father = item.fatherName != "Not Available" && item.spouseName == "Not Available"
+                        binding.husband = item.spouseName != "Not Available"
+                        binding.spouse = false
+                    }
+                    item.gender == "FEMALE" -> {
+                        binding.father = true; binding.husband = false; binding.spouse = false
+                    }
+                    else -> {
+                        binding.father = item.fatherName != "Not Available" && item.spouseName == "Not Available"
+                        binding.spouse = item.spouseName != "Not Available"
+                        binding.husband = false
+                    }
+                }
+            } else {
+                binding.father = false; binding.husband = false; binding.spouse = false
+            }
+
+            // Death/Deactivate background
+            when {
+                item.isDeath -> {
+                    binding.contentLayout.setBackgroundColor(ContextCompat.getColor(binding.contentLayout.context, R.color.md_theme_dark_outline))
+                    binding.ivCall.visibility = View.GONE
+                    binding.ivSyncState.visibility = View.GONE
+                    binding.btnAbha.visibility = View.GONE
+                }
+                item.isDeactivate -> {
+                    binding.contentLayout.setBackgroundColor(ContextCompat.getColor(binding.contentLayout.context, R.color.Quartenary))
+                    binding.btnAbha.visibility = View.INVISIBLE
+                    binding.tvTitleDuplicaterecord.visibility = View.VISIBLE
+                    binding.ivCall.visibility = View.INVISIBLE
+                    binding.ivSyncState.visibility = View.INVISIBLE
+                }
+                else -> {
+                    binding.contentLayout.setBackgroundColor(ContextCompat.getColor(binding.contentLayout.context, R.color.md_theme_light_primary))
+                }
+            }
+
+            binding.executePendingBindings()
         }
     }
 

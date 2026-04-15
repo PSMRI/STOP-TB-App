@@ -31,10 +31,13 @@
             android:title="@string/sync_records" />
     </group>
 
-    <!--        <item-->
-    <!--            android:id="@+id/dashboardFragment"-->
-    <!--            android:icon="@drawable/ic_dashboard"-->
-    <!--            android:title="Dashboard" />-->
+    <group>
+        <item
+            android:id="@+id/dashboardFragment"
+            android:checkable="false"
+            android:icon="@drawable/ic_dashboard"
+            android:title="@string/dashboard" />
+    </group>
 <!--    <group>-->
 <!--        <item-->
 <!--            android:id="@+id/abha_id_activity"-->

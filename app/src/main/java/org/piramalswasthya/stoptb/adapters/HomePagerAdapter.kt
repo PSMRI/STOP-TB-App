@@ -2,7 +2,7 @@ package org.piramalswasthya.stoptb.adapters
 
 import androidx.fragment.app.Fragment
 import androidx.viewpager2.adapter.FragmentStateAdapter
-import org.piramalswasthya.stoptb.ui.home_activity.home.HomeIconsFragment
+import org.piramalswasthya.stoptb.ui.home_activity.dashboard.DashboardFragment
 import org.piramalswasthya.stoptb.ui.home_activity.home.SchedulerFragment
 import timber.log.Timber
 
@@ -12,7 +12,7 @@ class HomePagerAdapter(fragment: Fragment) : FragmentStateAdapter(fragment) {
 
     override fun createFragment(position: Int): Fragment {
         val fragment = when (position) {
-            1 -> HomeIconsFragment()
+            1 -> DashboardFragment()
             0 -> SchedulerFragment()
             else -> throw IllegalStateException("Index >1 called!")
 

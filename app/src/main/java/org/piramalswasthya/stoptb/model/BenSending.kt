@@ -141,6 +141,30 @@ data class BeneficiaryDataSending(
     @Json(name = "beneficiaryConsent")
     val beneficiaryConsent: Boolean = false,
 
+    @Json(name = "occupation")
+    val occupation: String? = null,
+
+    @Json(name = "latitude")
+    val latitude: Double? = null,
+
+    @Json(name = "longitude")
+    val longitude: Double? = null,
+
+    @Json(name = "economicStatus")
+    val economicStatus: String? = null,
+
+    @Json(name = "economicStatusId")
+    val economicStatusId: Int? = null,
+
+    @Json(name = "residentialArea")
+    val residentialArea: String? = null,
+
+    @Json(name = "residentialAreaId")
+    val residentialAreaId: Int? = null,
+
+    @Json(name = "otherResidentialArea")
+    val otherResidentialArea: String? = null,
+
     )
 
 data class BenDemographics(
@@ -329,7 +353,7 @@ fun BenRegCache.asNetworkSendingModel(
         ),
         benPhoneMaps = arrayOf(
             BenPhoneMaps(
-                phoneNo = contactNumber.toString(),
+                phoneNo = contactNumber?.toString() ?: "0",
                 createdBy = user.userName,
             )
         ),
@@ -346,8 +370,15 @@ fun BenRegCache.asNetworkSendingModel(
 //        vanID = user.vanId,
 //        parkingPlaceID = user.parkingPlaceId,
         createdBy = user.userName,
-        beneficiaryConsent = isConsent
-
+        beneficiaryConsent = isConsent,
+        occupation = occupation ?: "unknown",
+        latitude = latitude,
+        longitude = longitude,
+        economicStatus = economicStatus,
+        economicStatusId = economicStatusId,
+        residentialArea = residentialArea,
+        residentialAreaId = residentialAreaId,
+        otherResidentialArea = otherResidentialArea,
 
     )
 }

@@ -21,9 +21,7 @@ import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
@@ -95,9 +93,43 @@ class NewBenRegFragment : Fragment() {
             showCancelConfirmation()
         }
 
-        // Death badge visibility
+        // Death badge visibility — only show fab if record exists AND not dead
         viewModel.isDeath.observe(viewLifecycleOwner) { isDeath ->
-            binding.fabEdit.visibility = if (isDeath) View.GONE else View.VISIBLE
+            val recordExists = viewModel.recordExists.value ?: false
+            binding.fabEdit.visibility = if (isDeath || !recordExists) View.GONE else View.VISIBLE
+        }
+
+        // Set up adapter once
+        val adapter = FormInputAdapter(
+            imageClickListener = FormInputAdapter.ImageClickListener {
+                viewModel.setCurrentImageFormId(it)
+                takeImage()
+            },
+            formValueListener = FormInputAdapter.FormValueListener { formId, index ->
+                when (index) {
+                    Konstants.micClickIndex -> {
+                        micClickedElementId = formId
+                        sttContract.launch(Unit)
+                    }
+                    else -> {
+                        viewModel.updateListOnValueChanged(formId, index)
+                        hardCodedListUpdate(formId)
+                    }
+                }
+            },
+            // OTP not used in StopTB — empty listener kept for adapter compat
+            sendOtpClickListener = FormInputAdapter.SendOtpClickListener { _, _, _, _, _, _, _ -> },
+            selectImageClickListener = FormInputAdapter.SelectUploadImageClickListener { },
+            viewDocumentListner = FormInputAdapter.ViewDocumentOnClick { },
+            isEnabled = true,
+        )
+        binding.form.rvInputForm.adapter = adapter
+
+        // Collect form list once
+        lifecycleScope.launch {
+            viewModel.formList.collect {
+                if (it.isNotEmpty()) adapter.submitList(it)
+            }
         }
 
         // Record exists observer — drives view/edit mode
@@ -105,42 +137,8 @@ class NewBenRegFragment : Fragment() {
             binding.fabEdit.visibility  = if (recordExists) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (recordExists) View.GONE else View.VISIBLE
             binding.btnCancel.visibility = if (recordExists) View.GONE else View.VISIBLE
-
-            val adapter = FormInputAdapter(
-                imageClickListener = FormInputAdapter.ImageClickListener {
-                    viewModel.setCurrentImageFormId(it)
-                    takeImage()
-                },
-                formValueListener = FormInputAdapter.FormValueListener { formId, index ->
-                    when (index) {
-                        Konstants.micClickIndex -> {
-                            micClickedElementId = formId
-                            sttContract.launch(Unit)
-                        }
-                        else -> {
-                            viewModel.updateListOnValueChanged(formId, index)
-                            hardCodedListUpdate(formId)
-                        }
-                    }
-                },
-                // OTP not used in StopTB — empty listener kept for adapter compat
-                sendOtpClickListener = FormInputAdapter.SendOtpClickListener { _, _, _, _, _, _, _ -> },
-                selectImageClickListener = FormInputAdapter.SelectUploadImageClickListener { },
-                viewDocumentListner = FormInputAdapter.ViewDocumentOnClick { },
-                isEnabled = !recordExists,
-            )
-
-            binding.form.rvInputForm.adapter = adapter
-
-            lifecycleScope.launch {
-                viewModel.formList.collect {
-                    if (it.isNotEmpty()) adapter.submitList(it)
-                }
-            }
-
-            lifecycleScope.launch {
-                withContext(Dispatchers.IO) { viewModel.setUpPage() }
-            }
+            adapter.isEnabled = !recordExists
+            adapter.notifyDataSetChanged()
         }
 
         // State observer
@@ -172,6 +170,9 @@ class NewBenRegFragment : Fragment() {
         // Edit FAB
         binding.fabEdit.setOnClickListener {
             viewModel.setRecordExist(false)
+            binding.fabEdit.visibility = View.GONE
+            binding.btnSubmit.visibility = View.VISIBLE
+            binding.btnCancel.visibility = View.VISIBLE
         }
     }
 

@@ -1130,7 +1130,13 @@ data class BenRegGen(
 //        )
 //    ],
 //    indices = [Index(name = "ind_ben", value = ["beneficiaryId"/*, "householdId"*/])]
-    indices = [Index(name = "ind_ben", value = ["beneficiaryId"])]
+    indices = [
+        Index(name = "ind_ben", value = ["beneficiaryId"]),
+        Index(name = "ind_ben_village", value = ["loc_village_id"]),
+        Index(name = "ind_ben_sync", value = ["syncState"]),
+        Index(name = "ind_ben_draft_deactivate", value = ["isDraft", "isDeactivate"]),
+        Index(name = "ind_ben_village_deactivate", value = ["loc_village_id", "isDeactivate", "isDraft"])
+    ]
 
 )
 
@@ -1203,7 +1209,7 @@ data class BenRegCache(
 
     var mobileOthers: String? = null,
 
-    var contactNumber: Long = 0,
+    var contactNumber: Long? = null,
 
     var literacy: String? = null,
 
@@ -1511,7 +1517,7 @@ data class BenRegCache(
             ),
             benPhoneMaps = arrayOf(
                 BenPhoneMaps(
-                    phoneNo = contactNumber.toString(),
+                    phoneNo = contactNumber?.toString() ?: "0",
                     createdBy = user.userName,
                 )
             ),
@@ -2086,7 +2092,7 @@ fun asCacheModel(benRegNetwork: BenRegNetwork, newBornRegNetwork: NewBornRegNetw
            mobileNoOfRelation = mobileNoOfRelation,
            mobileNoOfRelationId = mobileNoOfRelationId,
            mobileOthers = mobileOthers,
-           contactNumber = contact_number?.toLong() ?:0L,
+           contactNumber = contact_number?.toLongOrNull(),
            literacy = literacy,
            literacyId = literacyId,
            community = community,

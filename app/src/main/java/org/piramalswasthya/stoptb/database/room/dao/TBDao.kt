@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import kotlinx.coroutines.flow.Flow
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
@@ -73,4 +74,52 @@ interface TBDao {
 
     @Query("UPDATE TB_CONFIRMED_TREATMENT SET syncState = 0 WHERE syncState = 1")
     suspend fun resetConfirmedSyncingToUnsynced()
+
+    // Dashboard queries - TB Screening count by gender with time + village filter
+    @Query("""
+        SELECT COUNT(*) FROM TB_SCREENING ts
+        INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
+        WHERE (:villageId = 0 OR b.loc_village_id = :villageId)
+        AND (:startTime = 0 OR ts.visitDate >= :startTime)
+        AND (:endTime = 0 OR ts.visitDate <= :endTime)
+        AND (:gender = '' OR b.gender = :gender)
+        AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+    """)
+    fun getDashboardTbScreeningCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>
+
+    // Dashboard queries - TB Suspected count by gender with time + village filter
+    @Query("""
+        SELECT COUNT(*) FROM TB_SUSPECTED ts
+        INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
+        WHERE (:villageId = 0 OR b.loc_village_id = :villageId)
+        AND (:startTime = 0 OR ts.visitDate >= :startTime)
+        AND (:endTime = 0 OR ts.visitDate <= :endTime)
+        AND (:gender = '' OR b.gender = :gender)
+        AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+    """)
+    fun getDashboardTbSuspectedCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>
+
+    // Dashboard queries - TB Confirmed count by gender with time + village filter
+    @Query("""
+        SELECT COUNT(*) FROM TB_SUSPECTED ts
+        INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
+        WHERE ts.isConfirmed = 1
+        AND (:villageId = 0 OR b.loc_village_id = :villageId)
+        AND (:startTime = 0 OR ts.visitDate >= :startTime)
+        AND (:endTime = 0 OR ts.visitDate <= :endTime)
+        AND (:gender = '' OR b.gender = :gender)
+        AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+    """)
+    fun getDashboardTbConfirmedCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>
+
+    // NIKSHAY IDs count with time + village filter
+    @Query("""
+        SELECT COUNT(*) FROM TB_SUSPECTED ts
+        INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
+        WHERE ts.nikshayId IS NOT NULL AND ts.nikshayId != ''
+        AND (:villageId = 0 OR b.loc_village_id = :villageId)
+        AND (:startTime = 0 OR ts.visitDate >= :startTime)
+        AND (:endTime = 0 OR ts.visitDate <= :endTime)
+    """)
+    fun getDashboardNikshayCount(villageId: Int, startTime: Long, endTime: Long): Flow<Int>
 }

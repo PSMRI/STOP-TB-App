@@ -86,7 +86,7 @@ class FormInputAdapter(
     private val ageClickListener: AgeClickListener? = null,
     private val sendOtpClickListener: SendOtpClickListener? = null,
     private val formValueListener: FormValueListener? = null,
-    private val isEnabled: Boolean = true,
+    var isEnabled: Boolean = true,
     private val selectImageClickListener: SelectUploadImageClickListener? = null,
     private val viewDocumentListner: ViewDocumentOnClick? = null,
     var  fileList: MutableList<Uri>? = null,

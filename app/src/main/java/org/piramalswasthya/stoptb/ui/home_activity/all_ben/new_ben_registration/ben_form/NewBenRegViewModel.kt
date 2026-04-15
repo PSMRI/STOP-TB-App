@@ -96,52 +96,57 @@ class NewBenRegViewModel @Inject constructor(
     fun getIndexOfBirthCertificateBack()  = -1
 
     // ─── Init ────────────────────────────────────────────────────────────
+    private var isPageSetUp = false
+
     init {
-        viewModelScope.launch { withContext(Dispatchers.IO) { setUpPage() } }
+        viewModelScope.launch(Dispatchers.IO) { setUpPage() }
     }
 
     suspend fun setUpPage() {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                user = preferenceDao.getLoggedInUser()!!
+        if (isPageSetUp) return
+        isPageSetUp = true
 
-                household = benRepo.getHousehold(hhId) ?: HouseholdCache(
-                    householdId = 0,
-                    ashaId      = user.userId,
-                    processed   = "N",
-                    isDraft     = false,
-                    locationRecord = LocationRecord(
-                        country  = LocationEntity(1, "India"),
-                        state    = LocationEntity(0, ""),
-                        district = LocationEntity(0, ""),
-                        block    = LocationEntity(0, ""),
-                        village  = LocationEntity(0, "")
-                    )
-                )
+        user = preferenceDao.getLoggedInUser()!!
 
-                locationRecord = preferenceDao.getLocationRecord() ?: LocationRecord(
-                    country  = LocationEntity(1, "India"),
-                    state    = LocationEntity(0, ""),
-                    district = LocationEntity(0, ""),
-                    block    = LocationEntity(0, ""),
-                    village  = LocationEntity(0, "")
-                )
+        household = benRepo.getHousehold(hhId) ?: HouseholdCache(
+            householdId = 0,
+            ashaId      = user.userId,
+            processed   = "N",
+            isDraft     = false,
+            locationRecord = LocationRecord(
+                country  = LocationEntity(1, "India"),
+                state    = LocationEntity(0, ""),
+                district = LocationEntity(0, ""),
+                block    = LocationEntity(0, ""),
+                village  = LocationEntity(0, "")
+            )
+        )
 
-                if (benIdFromArgs != 0L) {
-                    ben = benRepo.getBeneficiaryRecord(benIdFromArgs, hhId)!!
-                    _isDeath.postValue(ben.isDeath ?: false)
-                    isOtpVerified = ben.isConsent
-                    // View mode — show existing data read-only
-                    dataset.setFirstPageToRead(
-                        ben,
-                        familyHeadPhoneNo = household.family?.familyHeadPhoneNo,
-                        villageName = locationRecord.village.name
-                    )
-                } else {
-                    // New registration
-                    dataset.setUpPage(null, household.family?.familyHeadPhoneNo, locationRecord.village.name)
-                }
-            }
+        locationRecord = preferenceDao.getLocationRecord() ?: LocationRecord(
+            country  = LocationEntity(1, "India"),
+            state    = LocationEntity(0, ""),
+            district = LocationEntity(0, ""),
+            block    = LocationEntity(0, ""),
+            village  = LocationEntity(0, "")
+        )
+
+        if (benIdFromArgs != 0L) {
+            ben = benRepo.getBeneficiaryRecord(benIdFromArgs, hhId)!!
+            _isDeath.postValue(ben.isDeath ?: false)
+            isOtpVerified = ben.isConsent
+            val villageNames = user.villages.map { it.name }.toTypedArray()
+            // View mode — show existing data read-only
+            dataset.setFirstPageToRead(
+                ben,
+                familyHeadPhoneNo = household.family?.familyHeadPhoneNo,
+                villageName = locationRecord.village.name,
+                villageNames = villageNames,
+                villageEntityList = user.villages
+            )
+        } else {
+            val villageNames = user.villages.map { it.name }.toTypedArray()
+            // New registration
+            dataset.setUpPage(null, household.family?.familyHeadPhoneNo, locationRecord.village.name, villageNames, user.villages)
         }
     }
 

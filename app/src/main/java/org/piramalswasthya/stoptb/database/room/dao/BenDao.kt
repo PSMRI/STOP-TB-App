@@ -426,6 +426,16 @@ interface BenDao {
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage AND isDeactivate=0 AND abhaId IS NOT NULL AND isNewAbha = 1")
     fun getAllBenWithNewAbhaCount(selectedVillage: Int): Flow<Int>
 
+    // Dashboard ABHA count with time + village filter
+    @Query("""
+        SELECT COUNT(*) FROM BEN_BASIC_CACHE
+        WHERE isDeactivate = 0 AND abhaId IS NOT NULL
+        AND (:villageId = 0 OR villageId = :villageId)
+        AND (:startTime = 0 OR regDate >= :startTime)
+        AND (:endTime = 0 OR regDate <= :endTime)
+    """)
+    fun getDashboardAbhaCount(villageId: Int, startTime: Long, endTime: Long): Flow<Int>
+
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage AND isDeactivate=0 AND rchId IS NOT NULL AND rchId != ''")
     fun getAllBenWithRchCount(selectedVillage: Int): Flow<Int>
 

@@ -990,7 +990,7 @@ class BenRepo @Inject constructor(
                                 ) else null,
                                 contactNumber = if (benDataObj.has("contact_number")) benDataObj.getString(
                                     "contact_number"
-                                ).toLong() else 0,
+                                ).toLongOrNull() else null,
 //                            literacy = literacy,
                                 literacyId = if (benDataObj.has("literacyId")) benDataObj.getInt("literacyId") else 0,
                                 communityId = if (benDataObj.has("communityId")) benDataObj.getInt("communityId") else 0,
