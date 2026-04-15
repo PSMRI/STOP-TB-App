@@ -26,6 +26,16 @@ jobs:
       - name: Create local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > local.properties
 
+      - name: Create google-services.json (UAT)
+        run: |
+          mkdir -p app/src/stoptbUat
+          echo '${{ secrets.GOOGLE_SERVICES_JSON_UAT }}' > app/src/stoptbUat/google-services.json
+
+      - name: Create google-services.json (Prod)
+        run: |
+          mkdir -p app/src/stoptb
+          echo '${{ secrets.GOOGLE_SERVICES_JSON_PROD }}' > app/src/stoptb/google-services.json
+
       - name: Accept SDK licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
 
