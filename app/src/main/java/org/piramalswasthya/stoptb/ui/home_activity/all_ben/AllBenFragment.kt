@@ -12,6 +12,7 @@ import android.widget.EditText
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import androidx.paging.LoadState
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -151,18 +152,33 @@ class AllBenFragment : Fragment() {
             binding.ibDownload.visibility = View.VISIBLE
         }
 
+        var lastClickTime = 0L
         benAdapter = BenPagingAdapter(
             clickListener = BenListAdapter.BenClickListener(
                 { item, hhId, benId, relToHeadId ->
-                    findNavController().navigate(
-                        AllBenFragmentDirections.actionAllBenFragmentToNewBenRegFragment(
-                            hhId = hhId,
-                            benId = benId,
-                            relToHeadId = relToHeadId,
-                            isAddSpouse = 0,
-                            gender = 0
+                    val now = System.currentTimeMillis()
+                    timber.log.Timber.d("BEN_CLICK: clicked benId=$benId, hhId=$hhId, time=$now")
+                    if (now - lastClickTime > 1000) {
+                        lastClickTime = now
+                        timber.log.Timber.d("BEN_CLICK: navigating to form for benId=$benId")
+                        val navOptions = NavOptions.Builder()
+                            .setEnterAnim(0)
+                            .setExitAnim(0)
+                            .setPopEnterAnim(0)
+                            .setPopExitAnim(0)
+                            .setLaunchSingleTop(true)
+                            .build()
+                        findNavController().navigate(
+                            AllBenFragmentDirections.actionAllBenFragmentToNewBenRegFragment(
+                                hhId = hhId,
+                                benId = benId,
+                                relToHeadId = relToHeadId,
+                                isAddSpouse = 0,
+                                gender = 0
+                            ),
+                            navOptions
                         )
-                    )
+                    }
                 },
                 clickedWifeBen = { item, hhId, benId, relToHeadId -> },
                 clickedHusbandBen = { item, hhId, benId, relToHeadId -> },

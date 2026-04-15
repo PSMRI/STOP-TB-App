@@ -1227,7 +1227,7 @@ data class BenRegCache(
 
     var rchId: String? = null,
 
-    var occupation: String? = "unknown",
+    var occupation: String? = null,
 
 //    var registrationType: TypeOfList? = null,
 
@@ -1514,6 +1514,7 @@ data class BenRegCache(
                 addressLine1 = "D.No 3-160E",
                 addressLine2 = "ARS Road",
                 addressLine3 = "Neggipudi",
+                occupation = occupation ?: "unknown",
             ),
             benPhoneMaps = arrayOf(
                 BenPhoneMaps(
@@ -1548,7 +1549,6 @@ data class BenRegCache(
             residentialArea = residentialArea,
             residentialAreaId = residentialAreaId ?: 0,
             otherResidentialArea = otherResidentialArea ?: "",
-
 
         )
     }

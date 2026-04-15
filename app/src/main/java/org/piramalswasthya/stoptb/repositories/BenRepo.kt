@@ -1004,6 +1004,15 @@ class BenRepo @Inject constructor(
                                     "religionOthers"
                                 ) else null,
                                 rchId = if (benDataObj.has("rchid")) benDataObj.getString("rchid") else null,
+                                occupation = if (benDataObj.has("occupation")) benDataObj.getString("occupation") else null,
+                                economicStatus = if (benDataObj.has("economicStatus")) benDataObj.getString("economicStatus")
+                                    else if (benDataObj.has("type_bpl_apl")) benDataObj.getString("type_bpl_apl") else null,
+                                economicStatusId = if (benDataObj.has("economicStatusId")) benDataObj.getInt("economicStatusId")
+                                    else if (benDataObj.has("bpl_aplId")) benDataObj.getInt("bpl_aplId") else null,
+                                residentialArea = if (benDataObj.has("residentialArea")) benDataObj.getString("residentialArea") else null,
+                                residentialAreaId = if (benDataObj.has("residentialAreaId")) benDataObj.getInt("residentialAreaId") else null,
+                                otherResidentialArea = if (benDataObj.has("otherResidentialArea")) benDataObj.getString("otherResidentialArea")
+                                    else if (benDataObj.has("other_residentialArea")) benDataObj.getString("other_residentialArea") else null,
 //                            registrationType = if (benDataObj.has("registrationType")) {
 //                                when (benDataObj.getString("registrationType")) {
 //                                    "NewBorn" -> {

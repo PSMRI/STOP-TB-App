@@ -70,13 +70,35 @@ class NewBenRegFragment : Fragment() {
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
+        timber.log.Timber.d("BEN_FORM: onCreateView called, benId=${viewModel.benIdFromArgs}")
         _binding = FragmentNewFormBinding.inflate(layoutInflater, container, false)
         return binding.root
+    }
+
+
+    override fun onResume() {
+        super.onResume()
+        timber.log.Timber.d("BEN_FORM: onResume called")
     }
 
     // ─── onViewCreated ───────────────────────────────────────────────────
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        timber.log.Timber.d("BEN_FORM: onViewCreated called")
+
+        // Set action bar title once
+        activity?.let {
+            when (it) {
+                is HomeActivity -> it.updateActionBar(
+                    R.drawable.ic__ben,
+                    getString(R.string.frag_new_ben_reg_type_title)
+                )
+                is VolunteerActivity -> it.updateActionBar(
+                    R.drawable.ic__ben,
+                    getString(R.string.frag_new_ben_reg_type_title)
+                )
+            }
+        }
 
         // Capture geolocation silently
         captureGeolocation()
@@ -124,21 +146,39 @@ class NewBenRegFragment : Fragment() {
             isEnabled = true,
         )
         binding.form.rvInputForm.adapter = adapter
+        binding.form.rvInputForm.itemAnimator = null
 
-        // Collect form list once
+        // Collect form list — show loading until ready
+        var formShown = false
         lifecycleScope.launch {
             viewModel.formList.collect {
-                if (it.isNotEmpty()) adapter.submitList(it)
+                timber.log.Timber.d("BEN_FORM: formList collected, size=${it.size}")
+                if (it.isNotEmpty()) {
+                    adapter.submitList(it) {
+                        if (!formShown) {
+                            formShown = true
+                            // Wait for RecyclerView to fully layout before showing
+                            binding.form.rvInputForm.post {
+                                binding.form.rvInputForm.post {
+                                    binding.llLoading.visibility = View.GONE
+                                    binding.llContent.visibility = View.VISIBLE
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        // Record exists observer — drives view/edit mode
+        // Record exists observer — drives view/edit mode + consent
         viewModel.recordExists.observe(viewLifecycleOwner) { recordExists ->
+            timber.log.Timber.d("BEN_FORM: recordExists=$recordExists")
             binding.fabEdit.visibility  = if (recordExists) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (recordExists) View.GONE else View.VISIBLE
             binding.btnCancel.visibility = if (recordExists) View.GONE else View.VISIBLE
             adapter.isEnabled = !recordExists
-            adapter.notifyDataSetChanged()
+            // Show consent popup for new registrations
+            if (!recordExists && !viewModel.getIsConsentAgreed()) consentAlert.show()
         }
 
         // State observer
@@ -176,25 +216,9 @@ class NewBenRegFragment : Fragment() {
         }
     }
 
-    // ─── onStart — Consent popup + ActionBar title ───────────────────────
+    // ─── onStart ───────────────────────────────────────────────────────────
     override fun onStart() {
         super.onStart()
-        activity?.let {
-            when (it) {
-                is HomeActivity -> it.updateActionBar(
-                    R.drawable.ic__ben,
-                    getString(R.string.frag_new_ben_reg_type_title)
-                )
-                is VolunteerActivity -> it.updateActionBar(
-                    R.drawable.ic__ben,
-                    getString(R.string.frag_new_ben_reg_type_title)
-                )
-            }
-        }
-        // Show consent popup for new registrations
-        viewModel.recordExists.observe(viewLifecycleOwner) {
-            if (!it && !viewModel.getIsConsentAgreed()) consentAlert.show()
-        }
     }
 
     // ─── Consent popup ───────────────────────────────────────────────────

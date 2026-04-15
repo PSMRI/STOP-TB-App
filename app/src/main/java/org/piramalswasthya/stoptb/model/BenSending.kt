@@ -141,30 +141,6 @@ data class BeneficiaryDataSending(
     @Json(name = "beneficiaryConsent")
     val beneficiaryConsent: Boolean = false,
 
-    @Json(name = "occupation")
-    val occupation: String? = null,
-
-    @Json(name = "latitude")
-    val latitude: Double? = null,
-
-    @Json(name = "longitude")
-    val longitude: Double? = null,
-
-    @Json(name = "economicStatus")
-    val economicStatus: String? = null,
-
-    @Json(name = "economicStatusId")
-    val economicStatusId: Int? = null,
-
-    @Json(name = "residentialArea")
-    val residentialArea: String? = null,
-
-    @Json(name = "residentialAreaId")
-    val residentialAreaId: Int? = null,
-
-    @Json(name = "otherResidentialArea")
-    val otherResidentialArea: String? = null,
-
     )
 
 data class BenDemographics(
@@ -244,6 +220,29 @@ data class BenDemographics(
     @Json(name = "pinCode")
     var pinCode: String? = null,
 
+    @Json(name = "occupation")
+    var occupation: String? = null,
+
+    @Json(name = "economicStatus")
+    var economicStatus: String? = null,
+
+    @Json(name = "economicStatusId")
+    var economicStatusId: Int? = null,
+
+    @Json(name = "residentialArea")
+    var residentialArea: String? = null,
+
+    @Json(name = "residentialAreaId")
+    var residentialAreaId: Int? = null,
+
+    @Json(name = "otherResidentialArea")
+    var otherResidentialArea: String? = null,
+
+    @Json(name = "latitude")
+    var latitude: Double? = null,
+
+    @Json(name = "longitude")
+    var longitude: Double? = null,
 
     )
 
@@ -350,6 +349,14 @@ fun BenRegCache.asNetworkSendingModel(
             addressLine1 = "D.No 3-160E",
             addressLine2 = "ARS Road",
             addressLine3 = "Neggipudi",
+            occupation = occupation ?: "unknown",
+            economicStatus = economicStatus,
+            economicStatusId = economicStatusId,
+            residentialArea = residentialArea,
+            residentialAreaId = residentialAreaId,
+            otherResidentialArea = otherResidentialArea,
+            latitude = latitude,
+            longitude = longitude,
         ),
         benPhoneMaps = arrayOf(
             BenPhoneMaps(
@@ -371,14 +378,6 @@ fun BenRegCache.asNetworkSendingModel(
 //        parkingPlaceID = user.parkingPlaceId,
         createdBy = user.userName,
         beneficiaryConsent = isConsent,
-        occupation = occupation ?: "unknown",
-        latitude = latitude,
-        longitude = longitude,
-        economicStatus = economicStatus,
-        economicStatusId = economicStatusId,
-        residentialArea = residentialArea,
-        residentialAreaId = residentialAreaId,
-        otherResidentialArea = otherResidentialArea,
 
     )
 }

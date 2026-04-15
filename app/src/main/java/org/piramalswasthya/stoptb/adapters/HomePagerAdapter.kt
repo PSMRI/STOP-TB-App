@@ -12,8 +12,8 @@ class HomePagerAdapter(fragment: Fragment) : FragmentStateAdapter(fragment) {
 
     override fun createFragment(position: Int): Fragment {
         val fragment = when (position) {
-            1 -> DashboardFragment()
-            0 -> SchedulerFragment()
+            0 -> DashboardFragment()
+            1 -> SchedulerFragment()
             else -> throw IllegalStateException("Index >1 called!")
 
         }

@@ -409,6 +409,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             residentialAreaType.value = residentialAreaType.getStringFromPosition(saved.residentialAreaId ?: 0)
             otherResidentialAreaType.value = saved.otherResidentialArea
 
+            if (!saved.occupation.isNullOrEmpty() && saved.occupation != "unknown") occupation.value = saved.occupation
+
             rchId.value = saved.rchId
             reproductiveStatus.value = saved.genDetails?.reproductiveStatus
         }
@@ -454,8 +456,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             list.add(residentialIndex + 1, otherResidentialAreaType)
         }
 
-        // Reproductive status for eligible females
-        if (hasThirdPage()) list.add(reproductiveStatus)
+        // Reproductive status removed from form
+        // if (hasThirdPage()) list.add(reproductiveStatus)
 
         // Remove rchId if not needed
         if (!hasThirdPage()) list.remove(rchId)
@@ -587,9 +589,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
                 val listChanged = if (hasThirdPage()) {
                     updateReproductiveOptionsBasedOnAgeGender(formId = gender.id)
-                    triggerDependants(source = rchId, addItems = listOf(reproductiveStatus), removeItems = emptyList(), position = -2)
+                    // reproductiveStatus removed from form
+                    -1
                 } else {
-                    triggerDependants(source = rchId, removeItems = listOf(reproductiveStatus), addItems = emptyList())
+                    -1
                 } != -1
 
                 if (listChanged) 1 else -1
@@ -865,12 +868,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         reproductiveStatus.value = null
         if (reproductiveStatus.entries?.size == 1) reproductiveStatus.value = reproductiveStatus.entries?.get(0)
 
-        val listChanged = if (hasThirdPage())
-            triggerDependants(source = rchId, addItems = listOf(reproductiveStatus), removeItems = emptyList(), position = -2)
-        else
-            triggerDependants(source = rchId, removeItems = listOf(reproductiveStatus), addItems = emptyList())
-
-        return if (listChanged != -1) 1 else -1
+        // reproductiveStatus removed from form UI
+        return -1
     }
 
     private fun shouldShowMaternalDeath(gender: String?, dob: String?): Boolean {
