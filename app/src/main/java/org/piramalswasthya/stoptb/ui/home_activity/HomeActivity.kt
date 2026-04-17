@@ -661,23 +661,13 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
 
         val appBarConfiguration = AppBarConfiguration.Builder(
             setOf(
-                R.id.homeFragment, R.id.allHouseholdFragment, R.id.allBenFragment
+                R.id.homeFragment, R.id.allBenFragment
             )
         ).setOpenableLayout(binding.drawerLayout).build()
 
         NavigationUI.setupWithNavController(binding.toolbar, navController, appBarConfiguration)
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration)
 
-
-//        binding.navView.menu.findItem(R.id.incentivesFragment)?.let { incentivesMenuItem ->
-//            val titleRes =
-//                if (BuildConfig.FLAVOR.contains("mitanin", ignoreCase = true)) {
-//                    R.string.monthly_claim_summary
-//                } else {
-//                    R.string.incentive_fragment_title
-//                }
-//            incentivesMenuItem.title = getString(titleRes)
-//        }
 
         binding.navView.menu.findItem(R.id.homeFragment).setOnMenuItemClickListener {
             navController.popBackStack(R.id.homeFragment, false)

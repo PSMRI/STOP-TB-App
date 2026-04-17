@@ -86,6 +86,48 @@ class NewBenRegFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         timber.log.Timber.d("BEN_FORM: onViewCreated called")
 
+        // Show loading, hide content until form is ready
+        binding.llLoading.visibility = View.VISIBLE
+        binding.llContent.visibility = View.GONE
+
+        // Back press — show discard dialog in edit mode
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner,
+            object : androidx.activity.OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    val isEditMode = viewModel.recordExists.value == false
+                    if (isEditMode) {
+                        showDiscardDialog()
+                    } else {
+                        isEnabled = false
+                        requireActivity().onBackPressedDispatcher.onBackPressed()
+                    }
+                }
+            }
+        )
+
+        // Toolbar back arrow — same discard logic as back press
+        activity?.let { act ->
+            val toolbar = when (act) {
+                is HomeActivity -> act.findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+                is VolunteerActivity -> act.findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+                else -> null
+            }
+            toolbar?.setNavigationOnClickListener {
+                if (!isAdded) return@setNavigationOnClickListener
+                val isEditMode = viewModel.recordExists.value == false
+                if (isEditMode) {
+                    showDiscardDialog()
+                } else {
+                    try {
+                        findNavController().popBackStack()
+                    } catch (e: Exception) {
+                        Timber.e(e)
+                        requireActivity().onBackPressedDispatcher.onBackPressed()
+                    }
+                }
+            }
+        }
+
         // Set action bar title once
         activity?.let {
             when (it) {
@@ -110,10 +152,7 @@ class NewBenRegFragment : Fragment() {
             if (validateCurrentPage()) showPreview()
         }
 
-        // Cancel button — BRD: "Are you Sure?" popup
-        binding.btnCancel.setOnClickListener {
-            showCancelConfirmation()
-        }
+        // Cancel button hidden — discard handled by back press
 
         // Death badge visibility — only show fab if record exists AND not dead
         viewModel.isDeath.observe(viewLifecycleOwner) { isDeath ->
@@ -175,7 +214,7 @@ class NewBenRegFragment : Fragment() {
             timber.log.Timber.d("BEN_FORM: recordExists=$recordExists")
             binding.fabEdit.visibility  = if (recordExists) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (recordExists) View.GONE else View.VISIBLE
-            binding.btnCancel.visibility = if (recordExists) View.GONE else View.VISIBLE
+            // btnCancel hidden — discard via back press
             adapter.isEnabled = !recordExists
             // Show consent popup for new registrations
             if (!recordExists && !viewModel.getIsConsentAgreed()) consentAlert.show()
@@ -210,9 +249,12 @@ class NewBenRegFragment : Fragment() {
         // Edit FAB
         binding.fabEdit.setOnClickListener {
             viewModel.setRecordExist(false)
+            viewModel.enableEditMode()
             binding.fabEdit.visibility = View.GONE
             binding.btnSubmit.visibility = View.VISIBLE
-            binding.btnCancel.visibility = View.VISIBLE
+            // btnCancel hidden
+            adapter.isEnabled = true
+            adapter.notifyDataSetChanged()
         }
     }
 
@@ -252,16 +294,16 @@ class NewBenRegFragment : Fragment() {
     }
 
     // ─── Cancel confirmation ─────────────────────────────────────────────
-    private fun showCancelConfirmation() {
+    private fun showDiscardDialog() {
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle(getString(R.string.cancel))
-            .setMessage(getString(R.string.are_you_sure))
+            .setTitle(getString(R.string.discard_changes_title))
+            .setMessage(getString(R.string.discard_changes_message))
             .setCancelable(false)
-            .setPositiveButton(getString(R.string.yes)) { dialog, _ ->
+            .setPositiveButton(getString(R.string.discard)) { dialog, _ ->
                 dialog.dismiss()
                 try { findNavController().navigateUp() } catch (e: Exception) { Timber.e(e) }
             }
-            .setNegativeButton(getString(R.string.no)) { dialog, _ ->
+            .setNegativeButton(getString(R.string.stay)) { dialog, _ ->
                 dialog.dismiss()
             }
             .show()
@@ -370,6 +412,19 @@ class NewBenRegFragment : Fragment() {
             viewModel.capturedLatitude = it.latitude
             viewModel.capturedLongitude = it.longitude
             Timber.d("Geolocation captured: lat=${it.latitude}, lng=${it.longitude}")
+        }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        // Clear toolbar listener to prevent crash on other fragments
+        activity?.let { act ->
+            val toolbar = when (act) {
+                is HomeActivity -> act.findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+                is VolunteerActivity -> act.findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+                else -> null
+            }
+            toolbar?.setNavigationOnClickListener(null)
         }
     }
 

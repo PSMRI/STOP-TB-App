@@ -100,5 +100,5 @@ data class FieldValidationDto(
 
 data class OptionItem(
     val label: String = "",
-    val value: Any? = null
+    val value: String =  ""
 )

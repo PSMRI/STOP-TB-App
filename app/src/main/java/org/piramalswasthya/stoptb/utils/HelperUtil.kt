@@ -494,23 +494,19 @@ object HelperUtil {
         onCameraClick: () -> Unit,
         onGalleryClick: () -> Unit
     ) {
-        if (!BuildConfig.FLAVOR.contains("mitanin", ignoreCase = true)) {
-            val binding = LayoutMediaOptionsBinding.inflate(LayoutInflater.from(this))
-            binding.btnPdf.visibility = View.GONE
+        val binding = LayoutMediaOptionsBinding.inflate(LayoutInflater.from(this))
+        binding.btnPdf.visibility = View.GONE
 
-            val dialog = MaterialAlertDialogBuilder(this)
-                .setView(binding.root)
-                .setCancelable(true)
-                .create()
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setView(binding.root)
+            .setCancelable(true)
+            .create()
 
-            binding.btnCamera.setOnClickListener { dialog.dismiss(); onCameraClick() }
-            binding.btnGallery.setOnClickListener { dialog.dismiss(); onGalleryClick() }
-            binding.btnCancel.setOnClickListener { dialog.dismiss() }
+        binding.btnCamera.setOnClickListener { dialog.dismiss(); onCameraClick() }
+        binding.btnGallery.setOnClickListener { dialog.dismiss(); onGalleryClick() }
+        binding.btnCancel.setOnClickListener { dialog.dismiss() }
 
-            dialog.show()
-
-        }
-
+        dialog.show()
     }
 
     fun Context.showUploadReminderDialog(

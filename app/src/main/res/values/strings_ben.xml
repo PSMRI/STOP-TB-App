@@ -377,12 +377,6 @@
         <item>What to eat, what to avoid, importance of dietary diversity.</item>
 
     </string-array>
-    <string-array name="mitanin_array">
-        <item>Mitanins</item>
-        <item>MT</item>
-        <item>ANM/ RHO</item>
-
-    </string-array>
     <string-array name="activity_checklist">
         <item>Select All</item>
         <item>Information was shared about new schemes or guidelines issued by the Health Department.</item>

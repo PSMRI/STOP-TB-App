@@ -24,7 +24,6 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchRvButtonBinding
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
-import org.piramalswasthya.stoptb.ui.home_activity.all_household.AllHouseholdFragmentDirections
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import javax.inject.Inject
 
@@ -125,9 +124,7 @@ class NcdListFragment : Fragment() {
             }
         }
 
-        binding.btnNextPage.setOnClickListener {
-            findNavController().navigate(AllHouseholdFragmentDirections.actionAllHouseholdFragmentToNewHouseholdFragment())
-        }
+        binding.btnNextPage.visibility = View.GONE
 
         binding.ibSearch.setOnClickListener { sttContract.launch(Unit) }
 

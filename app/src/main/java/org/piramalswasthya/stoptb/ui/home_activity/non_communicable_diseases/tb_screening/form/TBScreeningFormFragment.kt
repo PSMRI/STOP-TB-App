@@ -47,6 +47,7 @@ class TBScreeningFormFragment : Fragment() {
             .setTitle(resources.getString(R.string.tb_screening))
             .setMessage("it")
             .setPositiveButton(resources.getString(R.string.yes)) {dialog, _ ->
+//                viewModel.saveForm()
              findNavController().navigate(TBScreeningFormFragmentDirections.actionTBScreeningFormFragmentToNcdReferForm(viewModel.benId, referral = binding.root.resources.getString(R.string.tb_screening_form), referralType = referType))
             }
             .setNegativeButton(resources.getString(R.string.no)) { dialog, _ -> dialog.dismiss() }

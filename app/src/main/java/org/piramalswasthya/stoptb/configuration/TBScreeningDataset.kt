@@ -115,7 +115,7 @@ class TBScreeningDataset(
         inputType = InputType.RADIO,
         title = resources.getString(R.string.tb_rise_of_fever),
         entries = resources.getStringArray(R.array.yes_no),
-        doubleStar = true,
+        doubleStar = false,
         required = true,
         hasDependants = false
     )
@@ -126,7 +126,7 @@ class TBScreeningDataset(
         inputType = InputType.RADIO,
         title = resources.getString(R.string.tb_loss_of_appetite),
         entries = resources.getStringArray(R.array.yes_no),
-        doubleStar = true,
+        doubleStar = false,
         required = true,
         hasDependants = false
     )
@@ -147,7 +147,7 @@ class TBScreeningDataset(
         inputType = InputType.RADIO,
         title = resources.getString(R.string.tb_age_more_than_60),
         entries = resources.getStringArray(R.array.yes_no),
-        doubleStar = true,
+        doubleStar = false,
         required = true,
         hasDependants = false
     )
@@ -156,7 +156,7 @@ class TBScreeningDataset(
         inputType = InputType.RADIO,
         title = resources.getString(R.string.tb_diabetic),
         entries = resources.getStringArray(R.array.yes_no),
-        doubleStar = true,
+        doubleStar = false,
         required = true,
         hasDependants = false
     )
@@ -165,7 +165,7 @@ class TBScreeningDataset(
         inputType = InputType.RADIO,
         title = resources.getString(R.string.tb_tobacco_user),
         entries = resources.getStringArray(R.array.yes_no),
-        doubleStar = true,
+        doubleStar = false,
         required = true,
         hasDependants = false
     )
@@ -174,7 +174,7 @@ class TBScreeningDataset(
         inputType = InputType.RADIO,
         title = resources.getString(R.string.tb_bmi_less_than_18_5),
         entries = resources.getStringArray(R.array.yes_no),
-        doubleStar = true,
+        doubleStar = false,
         required = true,
         hasDependants = false
     )
@@ -183,7 +183,7 @@ class TBScreeningDataset(
         inputType = InputType.RADIO,
         title = resources.getString(R.string.tb_contact_with_patient_on_treatment),
         entries = resources.getStringArray(R.array.yes_no),
-        doubleStar = true,
+        doubleStar = false,
         required = true,
         hasDependants = false
     )
@@ -192,7 +192,7 @@ class TBScreeningDataset(
         inputType = InputType.RADIO,
         title = resources.getString(R.string.tb_history_last_5_years),
         entries = resources.getStringArray(R.array.yes_no),
-        doubleStar = true,
+        doubleStar = false,
         required = true,
         hasDependants = false
     )
@@ -380,6 +380,7 @@ class TBScreeningDataset(
             contactWithTBPatient.value == resources.getStringArray(R.array.yes_no)[0] ||
             historyOfTBInLastFiveYrs.value == resources.getStringArray(R.array.yes_no)[0]
         )
+//            "Refer to Chest X-ray" else null
             resources.getString(R.string.refer_to_hwc_facility_alert) else null
 
     }

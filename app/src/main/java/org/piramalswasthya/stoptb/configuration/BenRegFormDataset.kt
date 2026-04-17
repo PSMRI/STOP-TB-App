@@ -393,9 +393,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             dateOfMarriage.value = getDateFromLong(saved.genDetails?.marriageDate ?: 0)
 
             fatherName.value = saved.fatherName
-            saved.fatherName?.takeIf { it.isNotEmpty() }?.let { fatherName.inputType = TEXT_VIEW }
             motherName.value = saved.motherName
-            saved.motherName?.takeIf { it.isNotEmpty() }?.let { motherName.inputType = TEXT_VIEW }
 
             mobileNoOfRelation.value = mobileNoOfRelation.getStringFromPosition(saved.mobileNoOfRelationId)
             otherMobileNoOfRelation.value = saved.mobileOthers
@@ -816,6 +814,11 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     fun getIndexOfAgeAtMarriage()  = getIndexOfElement(ageAtMarriage)
     fun getIndexOfContactNumber()  = getIndexOfElement(contactNumber)
     fun getIndexOfMaritalStatus()  = getIndexOfElement(maritalStatus)
+
+    fun enableEditMode() {
+        if (fatherName.inputType == TEXT_VIEW) fatherName.inputType = EDIT_TEXT
+        if (motherName.inputType == TEXT_VIEW) motherName.inputType = EDIT_TEXT
+    }
     fun getTempMobileNoStatus()    = getIndexOfElement(contactNumber) // no temp contact in StopTB
     fun getIndexOfBirthCertificateFrontPath() = -1 // not used in StopTB
     fun getIndexOfBirthCertificateBackPath()  = -1 // not used in StopTB

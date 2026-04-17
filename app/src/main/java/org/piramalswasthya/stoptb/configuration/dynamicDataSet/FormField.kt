@@ -1,12 +1,15 @@
 package org.piramalswasthya.stoptb.configuration.dynamicDataSet
 
+import org.piramalswasthya.stoptb.model.dynamicEntity.OptionItem
+
+
 data class FormField(
     val fieldId: String,
     val label: String,
     val type: String,
     var defaultValue: String? = null,
     val isRequired: Boolean,
-    val options: List<String>? = null,
+    val options: List<OptionItem>? = null,
     var value: Any? = null,
     var visible: Boolean = true,
     val conditional: ConditionalLogic? = null,
@@ -38,5 +41,4 @@ data class FieldValidation(
     val afterField: String? = null,
     val beforeField: String? = null
 )
-
 

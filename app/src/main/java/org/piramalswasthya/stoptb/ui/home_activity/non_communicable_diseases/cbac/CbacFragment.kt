@@ -1325,6 +1325,8 @@ class CbacFragment : Fragment() {
         dialog.setContentView(binding.root)
         dialog.setCancelable(true)
 
+        // Content already visible from XML, no need to toggle
+
 
         referViewModel.initFromArgs(
             benId = benId,

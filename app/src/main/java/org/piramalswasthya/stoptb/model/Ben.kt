@@ -1398,8 +1398,6 @@ data class BenRegCache(
                 TypeOfList.TEENAGER -> "General Beneficiary"
                 else -> "Other"
             }*/
-            latitude = latitude,
-            longitude = longitude,
             needOpCare = needOpCare ?: "null",
             needOpCareId = needOpCareId,
 //            menstrualStatusId = 0,
@@ -1515,6 +1513,13 @@ data class BenRegCache(
                 addressLine2 = "ARS Road",
                 addressLine3 = "Neggipudi",
                 occupation = occupation ?: "unknown",
+                economicStatus = economicStatus,
+                economicStatusId = economicStatusId,
+                residentialArea = residentialArea,
+                residentialAreaId = residentialAreaId,
+                otherResidentialArea = otherResidentialArea,
+                latitude = latitude,
+                longitude = longitude,
             ),
             benPhoneMaps = arrayOf(
                 BenPhoneMaps(
@@ -1543,12 +1548,6 @@ data class BenRegCache(
             doYouHavechildren = doYouHavechildren,
             isSpouseAdded = isSpouseAdded,
             isDeactivate = isDeactivate,
-
-            povertyLine = economicStatus,
-            povertyLineId = economicStatusId ?: 0,
-            residentialArea = residentialArea,
-            residentialAreaId = residentialAreaId ?: 0,
-            otherResidentialArea = otherResidentialArea ?: "",
 
         )
     }

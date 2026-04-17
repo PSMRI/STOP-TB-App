@@ -24,7 +24,6 @@ import org.piramalswasthya.stoptb.model.LocationRecord
 import org.piramalswasthya.stoptb.model.PreviewItem
 import org.piramalswasthya.stoptb.model.User
 import org.piramalswasthya.stoptb.repositories.BenRepo
-import org.piramalswasthya.stoptb.repositories.HouseholdRepo
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -34,7 +33,6 @@ class NewBenRegViewModel @Inject constructor(
     private val preferenceDao: PreferenceDao,
     @ApplicationContext context: Context,
     private val benRepo: BenRepo,
-    private val householdRepo: HouseholdRepo,
 ) : ViewModel() {
 
     enum class State { IDLE, SAVING, SAVE_SUCCESS, SAVE_FAILED }
@@ -243,6 +241,7 @@ class NewBenRegViewModel @Inject constructor(
     fun getIndexofTempraryNumber()  = dataset.getTempMobileNoStatus()
 
     fun setRecordExist(b: Boolean) { _recordExists.value = b }
+    fun enableEditMode() { dataset.enableEditMode() }
 
     // ─── Preview ─────────────────────────────────────────────────────────
     suspend fun getFormPreviewData(): List<PreviewItem> = withContext(Dispatchers.Default) {

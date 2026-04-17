@@ -97,8 +97,6 @@
     <string name="icon_cluster_phc_list">Cluster Meeting Forms List</string>
     <string name="icon_cluster_phc">Cluster Meeting Forms</string>
     <string name="place_of_meeting">Place of meeting</string>
-    <string name="mitanin">Mitanins</string>
-    <string name="mt">Mitanin Activity check list</string>
     <string name="anmrho">ANM/ RHO</string>
     <string name="participants_attended">Participants Attended</string>
     <string name="leprosy_title">Check if the person has any of these symptoms</string>
@@ -130,5 +128,35 @@
     <string name="com_feeding_title">পৰিপূৰক আহাৰ</string>
     <string name="imp_brestfeeding_title">স্তন্যপানৰ গুৰুত্ব</string>
     <string name="cluster_review">ক্লাষ্টাৰ সভা</string>
+    <string name="label_male">পুৰুষ: %d</string>
+    <string name="label_female">মহিলা: %d</string>
+    <string name="label_children">শিশু(&lt;15বছৰ): %d</string>
+    <string name="label_others">অন্যান্য: %d</string>
+    <string name="filter_time_period">সময়সীমা</string>
+    <string name="filter_village">গাওঁ / বস্তি</string>
+    <string name="filter_all_villages">সকলো গাওঁ</string>
+    <string name="filter_today">আজি</string>
+    <string name="total_tb_screenings">মুঠ টিবি পৰীক্ষণ</string>
+    <string name="total_tb_suspected">মুঠ সন্দেহজনক টিবি ৰোগী</string>
+    <string name="total_tb_confirmed">মুঠ নিশ্চিত টিবি ৰোগী</string>
+    <string name="nikshay_ids">নিক্ষয় আইডি</string>
+    <string name="abha_ids">আভা আইডি</string>
+    <string name="loading_form">ফৰ্ম লোড হৈ আছে...</string>
+    <string name="month_january">জানুৱাৰী</string>
+    <string name="month_february">ফেব্ৰুৱাৰী</string>
+    <string name="month_march">মাৰ্চ</string>
+    <string name="month_april">এপ্ৰিল</string>
+    <string name="month_may">মে</string>
+    <string name="month_june">জুন</string>
+    <string name="month_july">জুলাই</string>
+    <string name="month_august">আগষ্ট</string>
+    <string name="month_september">ছেপ্টেম্বৰ</string>
+    <string name="month_october">অক্টোবৰ</string>
+    <string name="month_november">নৱেম্বৰ</string>
+    <string name="month_december">ডিচেম্বৰ</string>
+    <string name="discard_changes_title">পৰিবৰ্তন বাতিল কৰিবনে?</string>
+    <string name="discard_changes_message">আপুনি উভতি যাব বিচাৰেনে? পৰিবৰ্তনসমূহ হেৰাই যাব।</string>
+    <string name="discard">বাতিল</string>
+    <string name="stay">থাকক</string>
 
 </resources>

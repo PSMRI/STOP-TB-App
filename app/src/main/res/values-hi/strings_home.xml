@@ -112,8 +112,6 @@
     <string name="icon_cluster_phc_list">क्लस्टर बैठकें फॉर्म सूची</string>
     <string name="icon_cluster_phc">क्लस्टर बैठकें फॉर्म</string>
     <string name="place_of_meeting">बैठक का स्थान</string>
-    <string name="mitanin">Mitanins</string>
-    <string name="mt">मितानिन गतिविधि जांच सूची</string>
     <string name="anmrho">ANM/ RHO</string>
     <string name="participants_attended">उपस्थित प्रतिभागी</string>
     <string name="leprosy_title">जांचें कि व्यक्ति में इनमें से कोई लक्षण है या नहीं</string>
@@ -143,7 +141,7 @@
     <string name="abha_ids">आभा आईडी</string>
     <string name="label_male">पुरुष: %d</string>
     <string name="label_female">महिला: %d</string>
-    <string name="label_children">बच्चे: %d</string>
+    <string name="label_children">बच्चे(&lt;15वर्ष): %d</string>
     <string name="label_others">अन्य: %d</string>
     <string name="loading_form">फॉर्म लोड हो रहा है...</string>
     <string name="month_january">जनवरी</string>
@@ -158,5 +156,9 @@
     <string name="month_october">अक्टूबर</string>
     <string name="month_november">नवंबर</string>
     <string name="month_december">दिसंबर</string>
+    <string name="discard_changes_title">बदलाव छोड़ें?</string>
+    <string name="discard_changes_message">क्या आप वापस जाना चाहते हैं? बदलाव खो जाएंगे।</string>
+    <string name="discard">छोड़ें</string>
+    <string name="stay">रुकें</string>
 
 </resources>

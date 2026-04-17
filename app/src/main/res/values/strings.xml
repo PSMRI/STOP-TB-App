@@ -263,7 +263,7 @@
     <string name="nikshay_ids">NIKSHAY IDs</string>
     <string name="label_male">Male: %d</string>
     <string name="label_female">Female: %d</string>
-    <string name="label_children">Children: %d</string>
+    <string name="label_children">Children(&lt;15y): %d</string>
     <string name="label_others">Others: %d</string>
     <string name="month_january">January</string>
     <string name="month_february">February</string>
@@ -848,6 +848,26 @@
     <string name="weight_min_500">Weight must be at least 500 grams</string>
     <string name="weight_max_7000">Weight should not be greater than 7000 grams</string>
     <string name="are_you_sure">Are you Sure?</string>
+
+    <string name="follow_up_date_required_or_invalid">Follow-up date is required or invalid</string>
+    <string name="invalid_treatment_date_in_db">Invalid treatment date in DB</string>
+    <string name="follow_up_must_be_after_treatment">Follow-up must be after treatment start date (%s)</string>
+    <string name="follow_up_must_be_next_month">Follow-up must be in the immediate next month after last follow-up of current visit</string>
+    <string name="follow_up_cannot_be_future_month">Follow-up cannot be in a future month</string>
+    <string name="dynamic_form_select">Select %s</string>
+    <string name="field_is_invalid">%s is invalid</string>
+    <string name="field_must_be_number">%s must be a number</string>
+    <string name="field_min_value">%1$s should be at least %2$s</string>
+    <string name="field_max_value">%1$s should be at most %2$s</string>
+    <string name="field_date_invalid">%s date is invalid</string>
+    <string name="field_date_before">%1$s cannot be before %2$s</string>
+    <string name="field_date_after">%1$s cannot be after %2$s</string>
+    <string name="field_is_required">%s is required</string>
+    <string name="main_visit_not_found">Main visit not found</string>
+    <string name="discard_changes_title">Discard Changes?</string>
+    <string name="discard_changes_message">Are you sure you want to go back? Changes will be lost.</string>
+    <string name="discard">Discard</string>
+    <string name="stay">Stay</string>
 
 </resources>
 

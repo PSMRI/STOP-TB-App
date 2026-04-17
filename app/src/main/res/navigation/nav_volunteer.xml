@@ -67,6 +67,9 @@
         android:name="org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.tb_screening.form.TBScreeningFormFragment"
         android:label="TB Screening Form">
         <argument android:name="benId" app:argType="long" />
+        <action
+            android:id="@+id/action_TBScreeningFormFragment_to_ncdReferForm"
+            app:destination="@id/NCDReferalForm" />
     </fragment>
 
     <fragment

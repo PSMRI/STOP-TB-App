@@ -97,10 +97,6 @@ data class BenPost(
     @Json(name = "lastMenstrualPeriod")
     val lastMenstrualPeriod: String? = null,
     val lastName: String,
-    @Json(name = "latitude")
-    val latitude: Double,
-    @Json(name = "longitude")
-    val longitude: Double,
     @Json(name = "marriageDate")
     val marriageDate: String?,
     @Json(name = "mobileOthers")
@@ -288,19 +284,5 @@ data class BenPost(
     @Json(name = "isDeactivate")
     val isDeactivate: Boolean = false,
 
-    @Json(name = "type_bpl_apl")
-    val povertyLine: String? = null,
-
-    @Json(name = "bpl_aplId")
-    val povertyLineId: Int = 0,
-
-    @Json(name = "residentialArea")
-    val residentialArea: String? = null,
-
-    @Json(name = "residentialAreaId")
-    val residentialAreaId: Int = 0,
-
-    @Json(name = "other_residentialArea")
-    val otherResidentialArea: String? = null,
 
     )

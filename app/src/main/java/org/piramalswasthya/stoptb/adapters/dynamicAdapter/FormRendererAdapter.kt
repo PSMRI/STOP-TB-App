@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.adapters.dynamicAdapter
 import android.app.AlertDialog
 import android.app.DatePickerDialog
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.Color
@@ -12,6 +13,7 @@ import android.text.*
 import android.text.style.ForegroundColorSpan
 import android.view.*
 import android.util.Base64
+import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
@@ -282,7 +284,7 @@ class FormRendererAdapter(
                         ).apply { setMargins(0, 8, 0, 8) }
                     }
 
-                    val selectedOptions: MutableSet<String> = when (val v = field.value) {
+                    val selectedValues: MutableSet<String> = when (val v = field.value) {
                         is Set<*> -> v.filterIsInstance<String>().toMutableSet()
                         is List<*> -> v.filterIsInstance<String>().toMutableSet()
                         is String -> v.split(",").map { it.trim() }.toMutableSet()
@@ -290,8 +292,8 @@ class FormRendererAdapter(
                     }
                     field.options?.forEach { option ->
                         val checkBox = CheckBox(context).apply {
-                            text = option
-                            isChecked = selectedOptions.contains(option)
+                            text = option.label
+                            isChecked = selectedValues.contains(option.value)
                             isEnabled = !isViewOnly && field.isEditable
                             layoutParams = LinearLayout.LayoutParams(
                                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -302,12 +304,12 @@ class FormRendererAdapter(
                         if (!isViewOnly && field.isEditable) {
                             checkBox.setOnCheckedChangeListener { _, isChecked ->
                                 if (isChecked) {
-                                    selectedOptions.add(option)
+                                    selectedValues.add(option.value)
                                 } else {
-                                    selectedOptions.remove(option)
+                                    selectedValues.remove(option.value)
                                 }
-                                field.value = selectedOptions
-                                onValueChanged(field, selectedOptions)
+                                field.value = selectedValues
+                                onValueChanged(field, selectedValues)
                             }
                         }
 
@@ -316,6 +318,7 @@ class FormRendererAdapter(
 
                     // Error TextView
                     val errorTextView = TextView(context).apply {
+                        tag = "field_error_tv"
                         setTextColor(Color.RED)
                         textSize = 12f
                         text = field.errorMessage ?: ""
@@ -327,7 +330,6 @@ class FormRendererAdapter(
                     inputContainer.removeAllViews()
                     inputContainer.addView(container)
                 }
-
 
                 "text" -> {
                     val context = itemView.context
@@ -535,7 +537,7 @@ class FormRendererAdapter(
                         ).apply {
                             setMargins(0, 16, 0, 8)
                         }
-                        hint = field.placeholder ?: "Select ${field.label}"
+                        hint = field.placeholder ?: context.getString(R.string.dynamic_form_select, field.label)
                         boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
                         boxStrokeColor = ContextCompat.getColor(context, R.color.md_theme_light_primary)
                         boxStrokeWidthFocused = 2
@@ -550,7 +552,9 @@ class FormRendererAdapter(
                         isFocusable = false
                         isClickable = isEditableField
                         isEnabled = isEditableField
-                        setText(field.value?.toString() ?: "")
+                        val displayText = field.options?.find { it.value == field.value?.toString() }?.label
+                            ?: field.value?.toString() ?: ""
+                        setText(displayText)
                         background = null
                         setTextColor(ContextCompat.getColor(context, android.R.color.black))
                         setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyLarge)
@@ -572,14 +576,14 @@ class FormRendererAdapter(
                     if (isEditableField) {
                         editText.setOnClickListener {
                             val options = field.options ?: emptyList()
+                            val labels = options.map { it.label }.toTypedArray()
                             val builder = AlertDialog.Builder(context)
-                            builder.setTitle("Select ${field.label}")
-                            builder.setItems(options.toTypedArray()) { _, which ->
+                            builder.setTitle(context.getString(R.string.dynamic_form_select, field.label))
+                            builder.setItems(labels) { _, which ->
                                 val selected = options[which]
-                                editText.setText(selected)
-                                field.value = selected
-                                onValueChanged(field, selected)
-
+                                editText.setText(selected.label)
+                                field.value = selected.value
+                                onValueChanged(field, selected.value)
                             }
                             builder.show()
                         }
@@ -817,7 +821,8 @@ class FormRendererAdapter(
                     addWithError(textInputLayout, field)
                 }
 
-                "radio" -> {
+                "radio" ->
+                {
                     val context = itemView.context
 
                     val radioGroup = RadioGroup(context).apply {
@@ -828,43 +833,69 @@ class FormRendererAdapter(
                         ).apply { setMargins(0, 8, 0, 8) }
                     }
 
-                    val isFieldDisabled = field.fieldId == "discharged_from_sncu" &&
+                    val isSNCUDisabled = field.fieldId == "discharged_from_sncu" &&
                             fields.find { it.fieldId == "is_baby_alive" }?.value == "Yes" &&
                             isSNCU
 
-                    if (isFieldDisabled && field.value != "Yes") {
+                    if (isSNCUDisabled && field.value != "Yes") {
                         field.value = "Yes"
                         onValueChanged(field, "Yes")
                         notifyItemChanged(adapterPosition)
                     }
 
+                    val preSelectedValue = if (!field.isEditable) field.value?.toString() else null
+
                     field.options?.forEachIndexed { index, option ->
                         val radioButton = RadioButton(context).apply {
-                            text = option
-                            isChecked = field.value == option
-                            isEnabled = !isViewOnly && !isFieldDisabled
+                            id = View.generateViewId()
+                            text = option.label
+                            isChecked = field.value?.toString().equals(option.value, ignoreCase = true)
+                            isEnabled = when {
+                                isViewOnly -> false
+                                isSNCUDisabled -> false
+                                !field.isEditable -> option.value.equals(preSelectedValue, ignoreCase = true) // CASE-INSENSITIVE
+                                else -> true
+                            }
+
                             layoutParams = LinearLayout.LayoutParams(
                                 LinearLayout.LayoutParams.WRAP_CONTENT,
                                 LinearLayout.LayoutParams.WRAP_CONTENT
                             ).apply { setMargins(0, 0, if (index != field.options!!.lastIndex) 24 else 0, 0) }
                         }
+                        radioGroup.addView(radioButton)
+                    }
 
-                        radioButton.setOnCheckedChangeListener(null)
+                    // Set checked state AFTER all buttons are added to the group
+                    field.options?.forEachIndexed { index, option ->
+                        val rb = radioGroup.getChildAt(index) as RadioButton
+                        if (field.value?.toString() == option.value) {
+                            radioGroup.check(rb.id)
+                        }
+                    }
 
-                        if (!isViewOnly && !isFieldDisabled) {
-                            radioButton.setOnCheckedChangeListener { _, isChecked ->
-                                if (isChecked && field.value != option) {
-                                    field.value = option
-                                    onValueChanged(field, option)
-                                    for (i in 0 until radioGroup.childCount) {
-                                        val child = radioGroup.getChildAt(i) as RadioButton
-                                        if (child.text != option) child.isChecked = false
-                                    }
-                                }
+                    if (!isViewOnly && !isSNCUDisabled && field.isEditable) {
+                        radioGroup.setOnCheckedChangeListener { group, checkedId ->
+                            // Clear focus from any previously focused EditText to prevent auto-scroll
+                            itemView.rootView.findFocus()?.clearFocus()
+                            val imm = itemView.context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                            imm.hideSoftInputFromWindow(itemView.windowToken, 0)
+                            val checkedIndex = (0 until group.childCount).firstOrNull { (group.getChildAt(it) as RadioButton).id == checkedId } ?: return@setOnCheckedChangeListener
+                            val selectedOption = field.options?.getOrNull(checkedIndex) ?: return@setOnCheckedChangeListener
+                            if (field.value?.toString() != selectedOption.value) {
+                                field.value = selectedOption.value
+                                onValueChanged(field, selectedOption.value)
                             }
                         }
-
-                        radioGroup.addView(radioButton)
+//                            radioButton.setOnCheckedChangeListener { _, isChecked ->
+//                                if (isChecked && field.value != option) {
+//                                    field.value = option
+//                                    onValueChanged(field, option)
+//                                    for (i in 0 until radioGroup.childCount) {
+//                                        val child = radioGroup.getChildAt(i) as RadioButton
+//                                        if (child.text != option) child.isChecked = false
+//                                    }
+//                                }
+//                            }
                     }
 
                     val wrapper = LinearLayout(itemView.context).apply {
@@ -877,6 +908,7 @@ class FormRendererAdapter(
                     wrapper.addView(radioGroup)
 
                     val errorTextView = TextView(itemView.context).apply {
+                        tag = "field_error_tv"
                         setTextColor(Color.RED)
                         textSize = 12f
                         text = field.errorMessage ?: ""

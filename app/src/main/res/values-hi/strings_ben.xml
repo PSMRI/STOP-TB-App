@@ -335,12 +335,6 @@
     <string name="deworming_list_title">राष्ट्रीय कृमि मुक्ति दिवस फॉर्म सूची</string>
     <string name="ndd_list_title">NDD फॉर्म</string>
 
-    <string-array name="mitanin_array">
-        <item>मितानिन</item>
-        <item>MT</item>
-        <item>ANM/ RHO</item>
-    </string-array>
-
     <string-array name="activity_checklist">
         <item>सभी चुनें</item>
         <item>स्वास्थ्य विभाग द्वारा जारी नई योजनाओं या दिशानिर्देशों की जानकारी साझा की गई।</item>

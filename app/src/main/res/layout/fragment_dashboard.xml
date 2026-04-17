@@ -103,7 +103,8 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:textSize="12sp"
+                        android:maxLines="1"
+                        android:textSize="11sp"
                         android:textColor="#5D4037"
                         tools:text="Male: 20" />
 
@@ -112,7 +113,8 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:textSize="12sp"
+                        android:maxLines="1"
+                        android:textSize="11sp"
                         android:textColor="#5D4037"
                         tools:text="Female: 15" />
 
@@ -120,18 +122,21 @@
                         android:id="@+id/tvTbScreeningChildren"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:textSize="12sp"
+                        android:layout_weight="1.3"
+                        android:maxLines="1"
+                        android:textSize="11sp"
                         android:textColor="#5D4037"
-                        tools:text="Children: 5" />
+                        tools:text="Children(&lt;15y): 5" />
 
                     <TextView
                         android:id="@+id/tvTbScreeningOthers"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:textSize="12sp"
+                        android:maxLines="1"
+                        android:textSize="11sp"
                         android:textColor="#5D4037"
+                        android:gravity="end"
                         tools:text="Others: 5" />
                 </LinearLayout>
             </LinearLayout>
@@ -181,7 +186,8 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:textSize="12sp"
+                        android:maxLines="1"
+                        android:textSize="11sp"
                         android:textColor="#5D4037"
                         tools:text="Male: 6" />
 
@@ -190,7 +196,8 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:textSize="12sp"
+                        android:maxLines="1"
+                        android:textSize="11sp"
                         android:textColor="#5D4037"
                         tools:text="Female: 4" />
 
@@ -198,18 +205,21 @@
                         android:id="@+id/tvTbSuspectedChildren"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:textSize="12sp"
+                        android:layout_weight="1.3"
+                        android:maxLines="1"
+                        android:textSize="11sp"
                         android:textColor="#5D4037"
-                        tools:text="Children: 1" />
+                        tools:text="Children(&lt;15y): 1" />
 
                     <TextView
                         android:id="@+id/tvTbSuspectedOthers"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:textSize="12sp"
+                        android:maxLines="1"
+                        android:textSize="11sp"
                         android:textColor="#5D4037"
+                        android:gravity="end"
                         tools:text="Others: 1" />
                 </LinearLayout>
             </LinearLayout>
@@ -259,7 +269,8 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:textSize="12sp"
+                        android:maxLines="1"
+                        android:textSize="11sp"
                         android:textColor="#5D4037"
                         tools:text="Male: 2" />
 
@@ -268,7 +279,8 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:textSize="12sp"
+                        android:maxLines="1"
+                        android:textSize="11sp"
                         android:textColor="#5D4037"
                         tools:text="Female: 1" />
 
@@ -276,18 +288,21 @@
                         android:id="@+id/tvTbConfirmedChildren"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:textSize="12sp"
+                        android:layout_weight="1.3"
+                        android:maxLines="1"
+                        android:textSize="11sp"
                         android:textColor="#5D4037"
-                        tools:text="Children: 0" />
+                        tools:text="Children(&lt;15y): 0" />
 
                     <TextView
                         android:id="@+id/tvTbConfirmedOthers"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:textSize="12sp"
+                        android:maxLines="1"
+                        android:textSize="11sp"
                         android:textColor="#5D4037"
+                        android:gravity="end"
                         tools:text="Others: 0" />
                 </LinearLayout>
             </LinearLayout>

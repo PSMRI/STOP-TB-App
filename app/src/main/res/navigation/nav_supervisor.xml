@@ -12,9 +12,6 @@
         android:label="@string/menu_supervisor"
         tools:layout="@layout/fragment_supervisor">
         <action
-            android:id="@+id/action_nav_supervisor_to_allHouseholdFragments"
-            app:destination="@id/allHouseholdFragments" />
-        <action
             android:id="@+id/action_nav_supervisor_to_allBenFragments"
             app:destination="@id/allBenFragments" />
         <action
@@ -44,23 +41,6 @@
         <action
             android:id="@+id/action_nav_supervisor_to_TBSuspectedListFragments"
             app:destination="@id/TBSuspectedListFragments" />
-    </fragment>
-
-    <fragment
-        android:id="@+id/allHouseholdFragments"
-        android:name="org.piramalswasthya.stoptb.ui.home_activity.all_household.AllHouseholdFragment"
-        android:label="@string/icon_title_household"
-        tools:layout="@layout/fragment_display_search_rv_button">
-    </fragment>
-
-    <fragment
-        android:id="@+id/householdMembersFragments"
-        android:name="org.piramalswasthya.stoptb.ui.home_activity.all_household.household_members.HouseholdMembersFragment"
-        android:label="@string/household_members"
-        tools:layout="@layout/fragment_display_search_rv_button">
-        <argument
-            android:name="hhId"
-            app:argType="long" />
     </fragment>
 
     <fragment

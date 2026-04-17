@@ -23,7 +23,6 @@ import org.piramalswasthya.stoptb.model.HouseholdCache
 import org.piramalswasthya.stoptb.model.LocationRecord
 import org.piramalswasthya.stoptb.model.User
 import org.piramalswasthya.stoptb.repositories.BenRepo
-import org.piramalswasthya.stoptb.repositories.HouseholdRepo
 import org.piramalswasthya.stoptb.repositories.UserRepo
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegFragmentArgs
 import org.piramalswasthya.stoptb.utils.Log
@@ -36,7 +35,6 @@ class NewChildBenViewModel @Inject constructor(
     private val preferenceDao: PreferenceDao,
     @ApplicationContext context: Context,
     private val benRepo: BenRepo,
-    private val householdRepo: HouseholdRepo,
     userRepo: UserRepo
 ) : ViewModel() {
 
