@@ -11,7 +11,7 @@
     <string name="other_enter_religion">अन्य - धर्म दर्ज करें</string>
     <string name="has_aadhaar_number">आधार नंबर है</string>
     <string name="enter_aadhaar_number_ben">आधार नंबर दर्ज करें</string>
-    <string name="reproductive_status">जननांग स्थिति</string>
+    <string name="reproductive_status">क्या आप गर्भवती हैं</string>
     <string name="birth_certificate_number">Birth Certificate No.</string>
     <string name="beneficiary_details">लाभार्थी विवरण</string>
     <string name="wife_s_name">पत्नी का नाम</string>
@@ -72,6 +72,11 @@
 
     <string-array name="nbr_reproductive_status_array5">
         <item>वृद्धा महिला</item>
+    </string-array>
+
+    <string-array name="nbr_reproductive_status_married_women_array">
+        <item>हाँ</item>
+        <item>नहीं</item>
     </string-array>
 
     <string name="dd_ec">लक्ष्य दम्पति</string>
@@ -380,4 +385,5 @@
         <item>मित्र / रिश्तेदार</item>
     </string-array>
 
+    <string name="whose_mobile_number">किसका मोबाइल नंबर</string>
 </resources>

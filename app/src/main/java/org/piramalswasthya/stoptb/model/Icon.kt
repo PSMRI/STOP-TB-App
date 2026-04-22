@@ -7,6 +7,7 @@ import org.piramalswasthya.stoptb.database.room.SyncState
 data class Icon(
     val icon: Int,
     val title: String,
+    val subtitle: String? = null,
     val count: Flow<Int>?,
     val navAction: NavDirections,
     var colorPrimary: Boolean = true,

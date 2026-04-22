@@ -10,7 +10,8 @@
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:background="@color/md_theme_light_background">
 
 <!--        <com.google.android.material.textfield.TextInputLayout-->
 <!--            android:id="@+id/til_select_village"-->
@@ -44,8 +45,26 @@
                 android:id="@+id/tl_home_viewpager"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="16dp"
+                android:layout_marginEnd="16dp"
+                android:background="@drawable/bg_tab_strip"
+                android:padding="6dp"
+                app:tabIndicator="@drawable/bg_tab_indicator"
+                app:tabIndicatorFullWidth="false"
+                app:tabIndicatorHeight="0dp"
                 app:tabGravity="fill"
-                app:tabMaxWidth="0dp" />
+                app:tabMaxWidth="0dp"
+                app:tabRippleColor="@color/md_theme_light_primaryContainer"
+                app:tabSelectedTextColor="@color/md_theme_light_primary"
+                app:tabTextAppearance="@style/TextAppearance.Material3.TitleMedium"
+                app:tabTextColor="@color/sakhi_tab_unselected"
+                app:tabInlineLabel="true"
+                app:tabMode="fixed"
+                app:tabPaddingStart="20dp"
+                app:tabPaddingEnd="20dp"
+                app:tabPaddingTop="14dp"
+                app:tabPaddingBottom="14dp" />
 
             <androidx.viewpager2.widget.ViewPager2
                 android:id="@+id/vp2_home"
@@ -69,6 +88,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:padding="@dimen/padding_small"
+                android:textColor="@color/md_theme_light_onSurfaceVariant"
                 android:text="@string/home_fragment_percent_download_text"
                 android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                 tools:visibility="visible" />

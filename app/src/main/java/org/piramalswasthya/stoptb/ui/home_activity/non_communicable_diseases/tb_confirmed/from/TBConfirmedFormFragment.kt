@@ -33,7 +33,6 @@ class TBConfirmedFormFragment : Fragment() {
     private val viewModel: TBConfirmedViewModel by viewModels()
     private lateinit var followUpAdapter: TBFollowUpDatesAdapter
 
-
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
@@ -135,16 +134,6 @@ class TBConfirmedFormFragment : Fragment() {
             addItemDecoration(DividerItemDecoration(requireContext(), LinearLayoutManager.VERTICAL))
         }
     }
-
-    private fun showAlerts() {
-       /* val alert = viewModel.getAlerts()
-        alert?.let {
-            tbSuspectedAlert.setMessage(it)
-            tbSuspectedAlert.show()
-        }*/
-    }
-
-
 
     override fun onStart() {
         super.onStart()

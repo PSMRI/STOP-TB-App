@@ -11,17 +11,25 @@
     <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="@color/md_theme_light_background"
         tools:context=".ui.volunteer.VolunteerActivity">
 
         <com.google.android.material.appbar.AppBarLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="@drawable/bg_toolbar_surface"
+            android:elevation="0dp"
             android:theme="@style/Theme.Sakhi.ActionBar">
 
             <androidx.appcompat.widget.Toolbar
                 android:id="@+id/toolbar"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content">
+                android:layout_height="wrap_content"
+                android:background="@android:color/transparent"
+                android:paddingStart="12dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="10dp">
 
                 <LinearLayout
                     android:layout_width="wrap_content"
@@ -32,8 +40,8 @@
 
                     <ImageView
                         android:id="@+id/iv_toolbar"
-                        android:layout_width="60dp"
-                        android:layout_height="60dp"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
                         android:padding="@dimen/padding_normal"/>
 
                     <TextView
@@ -41,6 +49,8 @@
                         android:layout_width="0dp"
                         android:layout_weight="1"
                         android:layout_height="wrap_content"
+                        android:fontFamily="@font/opensans_semibold"
+                        android:textColor="@color/md_theme_light_onPrimary"
                         android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                         tools:text="Volunteer"/>
 
@@ -66,6 +76,7 @@
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:layout_gravity="start"
+        android:fitsSystemWindows="true"
         app:headerLayout="@layout/nav_header_home"
         app:menu="@menu/activity_volunteer_drawer">
 
@@ -76,6 +87,7 @@
             android:layout_gravity="bottom|center_horizontal"
             android:layout_margin="@dimen/margin_normal"
             android:padding="@dimen/padding_normal"
+            android:textColor="@color/md_theme_light_onSurfaceVariant"
             tools:text="v2.0.0"/>
 
     </com.google.android.material.navigation.NavigationView>

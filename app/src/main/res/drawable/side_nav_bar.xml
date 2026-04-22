@@ -2,7 +2,9 @@
     android:shape="rectangle">
     <gradient
         android:angle="135"
-        android:endColor="@color/seed"
-        android:startColor="@color/md_theme_dark_primary"
+        android:endColor="@color/sakhi_nav_header_end"
+        android:startColor="@color/sakhi_nav_header_start"
         android:type="linear" />
+    <corners
+        android:bottomRightRadius="28dp" />
 </shape>

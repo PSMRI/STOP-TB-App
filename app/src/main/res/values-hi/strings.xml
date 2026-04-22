@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="title_activity_home" translatable="false">HomeActivity</string>
     <string name="nav_header_desc" translatable="false">Navigation header</string>
@@ -11,48 +11,48 @@
     <string name="notification_sync_channel_description">Upload beneficiaries to Server</string>
     <string name="notification_sync_channel_id">sakhi-sync0</string>
 <string name="long_to_string">%d</string>
-    <string name="preview_title">पूर्वावलोकन</string>
+    <string name="preview_title">à¤ªà¥‚à¤°à¥à¤µà¤¾à¤µà¤²à¥‹à¤•à¤¨</string>
 
-    <string name="tv_reg_date_ph">पंजीकरण तिथि</string>
-    <string name="reg_date">पंजी. तिथि</string>
-    <string name="tv_ben_name_ph">लाभार्थी का नाम</string>
-    <string name="tv_type_of_list">सूची का प्रकार</string>
+    <string name="tv_reg_date_ph">à¤ªà¤‚à¤œà¥€à¤•à¤°à¤£ à¤¤à¤¿à¤¥à¤¿</string>
+    <string name="reg_date">à¤ªà¤‚à¤œà¥€. à¤¤à¤¿à¤¥à¤¿</string>
+    <string name="tv_ben_name_ph">à¤²à¤¾à¤­à¤¾à¤°à¥à¤¥à¥€ à¤•à¤¾ à¤¨à¤¾à¤®</string>
+    <string name="tv_type_of_list">à¤¸à¥‚à¤šà¥€ à¤•à¤¾ à¤ªà¥à¤°à¤•à¤¾à¤°</string>
     <string name="tv_rch_id">RCH ID</string>
-    <string name="tv_ben_surname">लाभार्थी का उपनाम</string>
-    <string name="tv_gender_ph">लिंग</string>
-    <string name="tv_father_name_ph">पिता का नाम</string>
-    <string name="tv_family_head_name_ph">परिवार के मुखिया का नाम</string>
-    <string name="tv_ben_id_ph">लाभार्थी ID</string>
-    <string name="tv_mob_no_ph">फोन नंबर</string>
-    <string name="tv_age_ph">आयु</string>
-    <string name="tv_suspected_hrp_ph">संभावित HRP</string>
+    <string name="tv_ben_surname">à¤²à¤¾à¤­à¤¾à¤°à¥à¤¥à¥€ à¤•à¤¾ à¤‰à¤ªà¤¨à¤¾à¤®</string>
+    <string name="tv_gender_ph">à¤²à¤¿à¤‚à¤—</string>
+    <string name="tv_father_name_ph">à¤ªà¤¿à¤¤à¤¾ à¤•à¤¾ à¤¨à¤¾à¤®</string>
+    <string name="tv_family_head_name_ph">à¤ªà¤°à¤¿à¤µà¤¾à¤° à¤•à¥‡ à¤®à¥à¤–à¤¿à¤¯à¤¾ à¤•à¤¾ à¤¨à¤¾à¤®</string>
+    <string name="tv_ben_id_ph">à¤²à¤¾à¤­à¤¾à¤°à¥à¤¥à¥€ ID</string>
+    <string name="tv_mob_no_ph">à¤«à¥‹à¤¨ à¤¨à¤‚à¤¬à¤°</string>
+    <string name="tv_age_ph">à¤†à¤¯à¥</string>
+    <string name="tv_suspected_hrp_ph">à¤¸à¤‚à¤­à¤¾à¤µà¤¿à¤¤ HRP</string>
     <string name="iv_sync_state_tv">SYNC STATE</string>
-    <string name="form_input_empty_error">आवश्यक फ़ील्ड खाली नहीं हो सकता !</string>
-    <string name="form_input_upper_case_error">केवल बड़े अक्षरों में अंग्रेजी वर्णमाला की अनुमति है!</string>
-    <string name="form_input_min_limit_error">%1$s %2$d से अधिक या उसके बराबर होना चाहिए</string>
-    <string name="antra_injection_details">अंतरा इंजेक्शन विवरण</string>
-    <string name="dose">खुराक</string>
-    <string name="next_due_date">अगली देय तारीख</string>
-    <string name="yes_dialog">हाँ</string>
-    <string name="no_dialog">नहीं</string>
+    <string name="form_input_empty_error">à¤†à¤µà¤¶à¥à¤¯à¤• à¤«à¤¼à¥€à¤²à¥à¤¡ à¤–à¤¾à¤²à¥€ à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤¸à¤•à¤¤à¤¾ !</string>
+    <string name="form_input_upper_case_error">à¤•à¥‡à¤µà¤² à¤¬à¤¡à¤¼à¥‡ à¤…à¤•à¥à¤·à¤°à¥‹à¤‚ à¤®à¥‡à¤‚ à¤…à¤‚à¤—à¥à¤°à¥‡à¤œà¥€ à¤µà¤°à¥à¤£à¤®à¤¾à¤²à¤¾ à¤•à¥€ à¤…à¤¨à¥à¤®à¤¤à¤¿ à¤¹à¥ˆ!</string>
+    <string name="form_input_min_limit_error">%1$s %2$d à¤¸à¥‡ à¤…à¤§à¤¿à¤• à¤¯à¤¾ à¤‰à¤¸à¤•à¥‡ à¤¬à¤°à¤¾à¤¬à¤° à¤¹à¥‹à¤¨à¤¾ à¤šà¤¾à¤¹à¤¿à¤</string>
+    <string name="antra_injection_details">à¤…à¤‚à¤¤à¤°à¤¾ à¤‡à¤‚à¤œà¥‡à¤•à¥à¤¶à¤¨ à¤µà¤¿à¤µà¤°à¤£</string>
+    <string name="dose">à¤–à¥à¤°à¤¾à¤•</string>
+    <string name="next_due_date">à¤…à¤—à¤²à¥€ à¤¦à¥‡à¤¯ à¤¤à¤¾à¤°à¥€à¤–</string>
+    <string name="yes_dialog">à¤¹à¤¾à¤</string>
+    <string name="no_dialog">à¤¨à¤¹à¥€à¤‚</string>
     <string name="optional">(Optional)</string>
     <string name="optional_">Optional</string>
-     <string name="mandatory">अनिवार्य<font color='#FF0000'>*</font></string>
-    <string name="higher_healthcare_center">उच्च स्वास्थ्य सेवा केंद्र</string>
-    <string name="additional_services">अतिरिक्त सेवाएं</string>
-    <string name="refer_date">रेफर तिथि</string>
+     <string name="mandatory">à¤…à¤¨à¤¿à¤µà¤¾à¤°à¥à¤¯<font color='#FF0000'>*</font></string>
+    <string name="higher_healthcare_center">à¤‰à¤šà¥à¤š à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤¸à¥‡à¤µà¤¾ à¤•à¥‡à¤‚à¤¦à¥à¤°</string>
+    <string name="additional_services">à¤…à¤¤à¤¿à¤°à¤¿à¤•à¥à¤¤ à¤¸à¥‡à¤µà¤¾à¤à¤‚</string>
+    <string name="refer_date">à¤°à¥‡à¤«à¤° à¤¤à¤¿à¤¥à¤¿</string>
     <string-array name="referal_health_center_array">
-        <item>अपोलो</item>
-        <item>सीएचसी</item>
-        <item>जिला अस्पताल</item>
-        <item>पीएचसी</item>
+        <item>à¤…à¤ªà¥‹à¤²à¥‹</item>
+        <item>à¤¸à¥€à¤à¤šà¤¸à¥€</item>
+        <item>à¤œà¤¿à¤²à¤¾ à¤…à¤¸à¥à¤ªà¤¤à¤¾à¤²</item>
+        <item>à¤ªà¥€à¤à¤šà¤¸à¥€</item>
     </string-array>
 
     <string-array name="deworming_location_options">
-        <item>स्कूल</item>
-        <item>आंगनबाडी केंद्र</item>
-        <item>सामुदायिक केंद्र</item>
-        <item>गृह भ्रमण</item>
+        <item>à¤¸à¥à¤•à¥‚à¤²</item>
+        <item>à¤†à¤‚à¤—à¤¨à¤¬à¤¾à¤¡à¥€ à¤•à¥‡à¤‚à¤¦à¥à¤°</item>
+        <item>à¤¸à¤¾à¤®à¥à¤¦à¤¾à¤¯à¤¿à¤• à¤•à¥‡à¤‚à¤¦à¥à¤°</item>
+        <item>à¤—à¥ƒà¤¹ à¤­à¥à¤°à¤®à¤£</item>
     </string-array>
 
     <string-array name="temp_array">
@@ -64,161 +64,162 @@
         <item>Item 6</item>
     </string-array>
 
-    <string name="tracking_date">भेंट की तिथि</string>
-    <string name="btn_submit">सबमिट करें</string>
-    <string name="tv_husband_name_ph">पति का नाम</string>
-    <string name="tv_spouse_name_ph">पति/पत्नी का नाम</string>
-    <string name="chat_error">आपके चैट बॉट को लोड करने में कुछ त्रुटि हुई है</string>
-    <string name="help_and_support">सहायता और समर्थन</string>
+    <string name="tracking_date">à¤­à¥‡à¤‚à¤Ÿ à¤•à¥€ à¤¤à¤¿à¤¥à¤¿</string>
+    <string name="btn_submit">à¤¸à¤¬à¤®à¤¿à¤Ÿ à¤•à¤°à¥‡à¤‚</string>
+    <string name="btn_skip">छोड़ें</string>
+    <string name="tv_husband_name_ph">à¤ªà¤¤à¤¿ à¤•à¤¾ à¤¨à¤¾à¤®</string>
+    <string name="tv_spouse_name_ph">à¤ªà¤¤à¤¿/à¤ªà¤¤à¥à¤¨à¥€ à¤•à¤¾ à¤¨à¤¾à¤®</string>
+    <string name="chat_error">à¤†à¤ªà¤•à¥‡ à¤šà¥ˆà¤Ÿ à¤¬à¥‰à¤Ÿ à¤•à¥‹ à¤²à¥‹à¤¡ à¤•à¤°à¤¨à¥‡ à¤®à¥‡à¤‚ à¤•à¥à¤› à¤¤à¥à¤°à¥à¤Ÿà¤¿ à¤¹à¥à¤ˆ à¤¹à¥ˆ</string>
+    <string name="help_and_support">à¤¸à¤¹à¤¾à¤¯à¤¤à¤¾ à¤”à¤° à¤¸à¤®à¤°à¥à¤¥à¤¨</string>
     <string name="immunization_dosage_count">%1$d/%2$d</string>
-    <string name="form_input_missing_entry_error">फ़ील्ड में %1$d अंक होने चाहिए</string>
-    <string name="form_input_alphabet_space_only_error">केवल अक्षर और खाली जगह मान्य</string>
-    <string name="form_input_alphabet_special_only_error">केवल अक्षर और विशेष चिन्ह मान्य</string>
-    <string name="form_input_alph_numeric_space_only_error">केवल अक्षर और अंक मान्य</string>
-    <string name="form_input__no_alpha_space_error">अक्षर या खाली जगह मान्य नहीं</string>
-    <string name="form_input_digit_only_error">केवल अंक मान्य</string>
-    <string name="form_input_min_limit_error_decimal">%1$s %2$.1f से अधिक या बराबर होना चाहिए</string>
-    <string name="form_input_max_limit_error">%1$s %2$d से कम या बराबर होना चाहिए</string>
-    <string name="form_input_max_limit_error_decimal">%1$s %2$.1f से कम या बराबर होना चाहिए</string>
-    <string name="form_input_error_invalid_mobile">अमान्य मोबाइल संख्या!</string>
-    <string name="form_input_error_invalid_rch">अमान्य RCH ID!</string>
-    <string name="form_input_error_invalid_mcp">अमान्य MCP संख्या!</string>
-    <string name="form_input_error_invalid_aadhar">अमान्य आधार संख्या!</string>
-<string name="version_2_0_0">APK वर्जन 2.0.0</string>
-    <string name="full_name">पूरा नाम</string>
-    <string name="male">पुरुष</string>
-    <string name="female">महिला</string>
-    <string name="transgender">ट्रांसजेंडर</string>
-    <string name="other">अन्य</string>
-    <string name="district">जिला</string>
-    <string name="view_household_information">परिवार की जानकारी देखें</string>
-    <string name="hello">नमस्ते</string>
-    <string name="select_immunization_category">टीकाकरण श्रेणी चुनें</string>
-    <string name="children">बच्चे</string>
-    <string name="mother">माँ</string>
-    <string name="patient_information">रोगी की जानकारी</string>
-    <string name="mother_name">माँ का नाम</string>
-    <string name="previous_vaccine_details">पिछला टीकाकरण विवरण</string>
-    <string name="due_serial">देय क्रम</string>
-    <string name="saving_form">फॉर्म सेव हो रहा है…</string>
-    <string name="previous">पिछला</string>
-    <string name="next">अगला</string>
-    <string name="edit">संपादित करें</string>
-    <string name="to_do_list">कार्य सूची</string>
-    <string name="beneficiaries_due_for_anc">एएनसी के लिए लाभार्थी बकाया</string>
-    <string name="beneficiaries_due_for_immunization">टीकाकरण के लिए देय लाभार्थी</string>
-    <string name="high_risk_cases">उच्च जोखिम वाले मामले</string>
-    <string name="high_risk_pregnant_women">उच्च जोखिम वाली गर्भवती महिलाएं</string>
-    <string name="high_risk_non_pregnant_women">उच्च जोखिम वाली गैर-गर्भवती महिलाएं</string>
-    <string name="high_risk_babies">उच्च जोखिम वाले शिशु</string>
-    <string name="low_birth_weight_babies">कम वजन वाले शिशु</string>
-    <string name="registration_date">पंजीकरण तिथि</string>
-    <string name="beneficiary_id">लाभार्थी आईडी</string>
-    <string name="rch_id">आरसीएच आईडी</string>
-    <string name="sync_to_local">स्थानीय से सिंक करें</string>
-    <string name="husband_s_name">पति का नाम</string>
-    <string name="pregnancy_weeks">गर्भावस्था के सप्ताह</string>
-    <string name="add_visit">भरमण जोड़</string>
-    <string name="household_id">परिवार आईडी</string>
-    <string name="contact_number">संपर्क संख्या</string>
-    <string name="add_cbac">सीबीएसी जोड़ें</string>
-    <string name="view_cbac">सीबीएसी देखें</string>
-    <string name="view">देखें</string>
-    <string name="home">घर</string>
-    <string name="sync_records">रिकॉर्ड सिंक करें</string>
-    <string name="about">हमारे बारे में</string>
-    <string name="help">सहायता</string>
-    <string name="logout">लॉगआउट करें</string>
-    <string name="delete_my_account">मेरा खाता हटाने का अनुरोध</string>
-    <string name="monthly_claim_summary">मासिक दावा सारांश</string>
-    <string name="support">सहायता</string>
-    <string name="go_to_home">होम पर जाएँ</string>
-    <string name="change_language">भाषा बदलें</string>
-    <string name="adult_registration">वयस्क पंजीकरण</string>
-    <string name="ncd_eligible_list">गैर संक्रामक रोग पात्र सूची</string>
-    <string name="ncd_list">गैर संक्रामक रोग सूची</string>
-    <string name="ncd_non_eligible_list">गैर संक्रामक रोग गैर-प्राथमिकता सूची</string>
-    <string name="ncd_priority_list">गैर संक्रामक रोग प्राथमिकता सूची</string>
-    <string name="household_members">परिवार के सदस्य</string>
-    <string name="hbnc">एचबीएनसी</string>
-    <string name="hbyc">एचबीवाईसी</string>
-    <string name="eligible_couple_registration">पात्र दंपत्ति पंजीकरण</string>
-    <string name="eligible_couple_tracking_list">पात्र दंपत्ति ट्रैकिंग सूची</string>
-    <string name="tb_screening_list">टीबी स्क्रीनिंग सूची</string>
-    <string name="tb_suspected_list">संदेहास्पद टीबी मामले</string>
-    <string name="tb_screening_form">टीबी स्क्रीनिंग फॉर्म</string>
-    <string name="tb_suspected_form">संदिग्ध टीबी मामला</string>
-    <string name="delivery_outcome_list">प्रसव परिणाम सूची</string>
-    <string name="communicable_diseases">संचारी (संक्रामक) रोग</string>
-    <string name="dashboard">डैशबोर्ड</string>
-    <string name="sign_in">साइन इन</string>
-    <string name="save_successful">सफलतापूर्वक सहेजें</string>
-    <string name="something_wend_wong_contact_testing">कुछ गड़बड़ है! संपर्क परीक्षण!</string>
-    <string name="error_input">त्रुटि इनपुट</string>
-    <string name="exit_application">एप्लिकेशन से बाहर निकलें</string>
-    <string name="do_you_want_to_exit_application">क्या आप एप्लिकेशन से बाहर निकलना चाहते हैं?</string>
-    <string name="downloading">डाउनलोड हो रहा है…</string>
-    <string name="choose_application_language">एप्लिकेशन की भाषा चुनें</string>
-    <string name="english">अंग्रेज़ी</string>
-    <string name="hindi">हिन्दी</string>
-    <string name="sync">सिंक</string>
-    <string name="tap_to_change">बदलने के लिए टैप करें</string>
-    <string name="validate">मान्य करें</string>
-    <string name="child_immunization">बाल टीकाकरण</string>
-    <string name="relation_with_hof">"मुखिया" से सम्बन्ध</string>
-    <string name="add_family_member">परिवार के सदस्य जोड़ें</string>
-    <string name="non_pregnant_women_eligible_couple_section">गैर-गर्भवती महिलाएं (पात्र दंपत्ति) अनुभाग</string>
-    <string name="about_us">पिरामल स्वास्थ्य सभी के लिए सार्वभौमिक स्वास्थ्य देखभाल को पूरा करने के लिए भारत सरकार के दृष्टिकोण को पूरक और संपूरित करके सार्वजनिक स्वास्थ्य सेवा के अंतराल को पाटने पर ध्यान केंद्रित कर रहा है। पिरामल स्वास्थ्य भारत में प्राथमिक सार्वजनिक स्वास्थ्य देखभाल क्षेत्र में मातृ स्वास्थ्य, बाल और किशोर स्वास्थ्य, गैर-संचारी रोगों पर ध्यान केंद्रित करने वाले सबसे बड़े गैर-लाभकारी संगठनों में से एक है। पिरामल स्वास्थ्य के पास कई स्वास्थ्य सेवा नवाचारों को बड़े पैमाने पर संचालित करने का एक दशक से अधिक का अनुभव है, जो पूरे भारत में सबसे कम सेवा प्राप्त और हाशिए पर रहने वाली आबादी की प्राथमिक स्वास्थ्य देखभाल जरूरतों को पूरा कर रहा है। पिरामल स्वास्थ्य भारत के 20 राज्यों में 35 नवीन सार्वजनिक स्वास्थ्य देखभाल वितरण कार्यक्रमों के माध्यम से कार्यरत है और अब तक 10.7 करोड़ से अधिक लाभार्थियों को सेवा प्रदान कर चुका है| पिरामल स्वास्थ्य में 250 चिकित्सकों सहित 2260 कर्मचारी कार्यरत हैं जो परिणामोन्मुखी दृष्टिकोण के माध्यम से सेवा भाव (लाभार्थी-केंद्रित) के मूल मूल्य पर काम करते हैं। पिछले बारह वर्षों में, फोकस निम्नलिखित पर रहा है, बड़े पैमाने पर स्थायी प्रभाव के लिए प्लेटफॉर्म का निर्माण, एक यात्रा के रूप में पैमाने पर नवाचार, नीति आयोग के ज्ञान और कार्यान्वयन भागीदार के रूप में नीतियों, शासन और सार्वजनिक स्वास्थ्य देखभाल प्रणाली की जवाबदेही को प्रभावित करना। हस्तक्षेप डिजाइन, मॉडलिंग, पायलटिंग और उन पायलटों को बढ़ाने के रूप में नवाचार पिरामल स्वास्थ्य में एक दृष्टिकोण रहा है। पिरामल स्वास्थ्य प्राथमिक स्वास्थ्य सेवा को न केवल सस्ती, सुलभ और सभी के लिए उपलब्ध बनाने के लिए प्रतिबद्ध है, बल्कि यह भी सुनिश्चित करता है कि यह पूर्ण, निरंतर और व्यापक हो।</string>
+    <string name="form_input_missing_entry_error">à¤«à¤¼à¥€à¤²à¥à¤¡ à¤®à¥‡à¤‚ %1$d à¤…à¤‚à¤• à¤¹à¥‹à¤¨à¥‡ à¤šà¤¾à¤¹à¤¿à¤</string>
+    <string name="form_input_alphabet_space_only_error">à¤•à¥‡à¤µà¤² à¤…à¤•à¥à¤·à¤° à¤”à¤° à¤–à¤¾à¤²à¥€ à¤œà¤—à¤¹ à¤®à¤¾à¤¨à¥à¤¯</string>
+    <string name="form_input_alphabet_special_only_error">à¤•à¥‡à¤µà¤² à¤…à¤•à¥à¤·à¤° à¤”à¤° à¤µà¤¿à¤¶à¥‡à¤· à¤šà¤¿à¤¨à¥à¤¹ à¤®à¤¾à¤¨à¥à¤¯</string>
+    <string name="form_input_alph_numeric_space_only_error">à¤•à¥‡à¤µà¤² à¤…à¤•à¥à¤·à¤° à¤”à¤° à¤…à¤‚à¤• à¤®à¤¾à¤¨à¥à¤¯</string>
+    <string name="form_input__no_alpha_space_error">à¤…à¤•à¥à¤·à¤° à¤¯à¤¾ à¤–à¤¾à¤²à¥€ à¤œà¤—à¤¹ à¤®à¤¾à¤¨à¥à¤¯ à¤¨à¤¹à¥€à¤‚</string>
+    <string name="form_input_digit_only_error">à¤•à¥‡à¤µà¤² à¤…à¤‚à¤• à¤®à¤¾à¤¨à¥à¤¯</string>
+    <string name="form_input_min_limit_error_decimal">%1$s %2$.1f à¤¸à¥‡ à¤…à¤§à¤¿à¤• à¤¯à¤¾ à¤¬à¤°à¤¾à¤¬à¤° à¤¹à¥‹à¤¨à¤¾ à¤šà¤¾à¤¹à¤¿à¤</string>
+    <string name="form_input_max_limit_error">%1$s %2$d à¤¸à¥‡ à¤•à¤® à¤¯à¤¾ à¤¬à¤°à¤¾à¤¬à¤° à¤¹à¥‹à¤¨à¤¾ à¤šà¤¾à¤¹à¤¿à¤</string>
+    <string name="form_input_max_limit_error_decimal">%1$s %2$.1f à¤¸à¥‡ à¤•à¤® à¤¯à¤¾ à¤¬à¤°à¤¾à¤¬à¤° à¤¹à¥‹à¤¨à¤¾ à¤šà¤¾à¤¹à¤¿à¤</string>
+    <string name="form_input_error_invalid_mobile">à¤…à¤®à¤¾à¤¨à¥à¤¯ à¤®à¥‹à¤¬à¤¾à¤‡à¤² à¤¸à¤‚à¤–à¥à¤¯à¤¾!</string>
+    <string name="form_input_error_invalid_rch">à¤…à¤®à¤¾à¤¨à¥à¤¯ RCH ID!</string>
+    <string name="form_input_error_invalid_mcp">à¤…à¤®à¤¾à¤¨à¥à¤¯ MCP à¤¸à¤‚à¤–à¥à¤¯à¤¾!</string>
+    <string name="form_input_error_invalid_aadhar">à¤…à¤®à¤¾à¤¨à¥à¤¯ à¤†à¤§à¤¾à¤° à¤¸à¤‚à¤–à¥à¤¯à¤¾!</string>
+<string name="version_2_0_0">APK à¤µà¤°à¥à¤œà¤¨ 2.0.0</string>
+    <string name="full_name">à¤ªà¥‚à¤°à¤¾ à¤¨à¤¾à¤®</string>
+    <string name="male">à¤ªà¥à¤°à¥à¤·</string>
+    <string name="female">à¤®à¤¹à¤¿à¤²à¤¾</string>
+    <string name="transgender">à¤Ÿà¥à¤°à¤¾à¤‚à¤¸à¤œà¥‡à¤‚à¤¡à¤°</string>
+    <string name="other">à¤…à¤¨à¥à¤¯</string>
+    <string name="district">à¤œà¤¿à¤²à¤¾</string>
+    <string name="view_household_information">à¤ªà¤°à¤¿à¤µà¤¾à¤° à¤•à¥€ à¤œà¤¾à¤¨à¤•à¤¾à¤°à¥€ à¤¦à¥‡à¤–à¥‡à¤‚</string>
+    <string name="hello">à¤¨à¤®à¤¸à¥à¤¤à¥‡</string>
+    <string name="select_immunization_category">à¤Ÿà¥€à¤•à¤¾à¤•à¤°à¤£ à¤¶à¥à¤°à¥‡à¤£à¥€ à¤šà¥à¤¨à¥‡à¤‚</string>
+    <string name="children">à¤¬à¤šà¥à¤šà¥‡</string>
+    <string name="mother">à¤®à¤¾à¤</string>
+    <string name="patient_information">à¤°à¥‹à¤—à¥€ à¤•à¥€ à¤œà¤¾à¤¨à¤•à¤¾à¤°à¥€</string>
+    <string name="mother_name">à¤®à¤¾à¤ à¤•à¤¾ à¤¨à¤¾à¤®</string>
+    <string name="previous_vaccine_details">à¤ªà¤¿à¤›à¤²à¤¾ à¤Ÿà¥€à¤•à¤¾à¤•à¤°à¤£ à¤µà¤¿à¤µà¤°à¤£</string>
+    <string name="due_serial">à¤¦à¥‡à¤¯ à¤•à¥à¤°à¤®</string>
+    <string name="saving_form">à¤«à¥‰à¤°à¥à¤® à¤¸à¥‡à¤µ à¤¹à¥‹ à¤°à¤¹à¤¾ à¤¹à¥ˆâ€¦</string>
+    <string name="previous">à¤ªà¤¿à¤›à¤²à¤¾</string>
+    <string name="next">à¤…à¤—à¤²à¤¾</string>
+    <string name="edit">à¤¸à¤‚à¤ªà¤¾à¤¦à¤¿à¤¤ à¤•à¤°à¥‡à¤‚</string>
+    <string name="to_do_list">à¤•à¤¾à¤°à¥à¤¯ à¤¸à¥‚à¤šà¥€</string>
+    <string name="beneficiaries_due_for_anc">à¤à¤à¤¨à¤¸à¥€ à¤•à¥‡ à¤²à¤¿à¤ à¤²à¤¾à¤­à¤¾à¤°à¥à¤¥à¥€ à¤¬à¤•à¤¾à¤¯à¤¾</string>
+    <string name="beneficiaries_due_for_immunization">à¤Ÿà¥€à¤•à¤¾à¤•à¤°à¤£ à¤•à¥‡ à¤²à¤¿à¤ à¤¦à¥‡à¤¯ à¤²à¤¾à¤­à¤¾à¤°à¥à¤¥à¥€</string>
+    <string name="high_risk_cases">à¤‰à¤šà¥à¤š à¤œà¥‹à¤–à¤¿à¤® à¤µà¤¾à¤²à¥‡ à¤®à¤¾à¤®à¤²à¥‡</string>
+    <string name="high_risk_pregnant_women">à¤‰à¤šà¥à¤š à¤œà¥‹à¤–à¤¿à¤® à¤µà¤¾à¤²à¥€ à¤—à¤°à¥à¤­à¤µà¤¤à¥€ à¤®à¤¹à¤¿à¤²à¤¾à¤à¤‚</string>
+    <string name="high_risk_non_pregnant_women">à¤‰à¤šà¥à¤š à¤œà¥‹à¤–à¤¿à¤® à¤µà¤¾à¤²à¥€ à¤—à¥ˆà¤°-à¤—à¤°à¥à¤­à¤µà¤¤à¥€ à¤®à¤¹à¤¿à¤²à¤¾à¤à¤‚</string>
+    <string name="high_risk_babies">à¤‰à¤šà¥à¤š à¤œà¥‹à¤–à¤¿à¤® à¤µà¤¾à¤²à¥‡ à¤¶à¤¿à¤¶à¥</string>
+    <string name="low_birth_weight_babies">à¤•à¤® à¤µà¤œà¤¨ à¤µà¤¾à¤²à¥‡ à¤¶à¤¿à¤¶à¥</string>
+    <string name="registration_date">à¤ªà¤‚à¤œà¥€à¤•à¤°à¤£ à¤¤à¤¿à¤¥à¤¿</string>
+    <string name="beneficiary_id">à¤²à¤¾à¤­à¤¾à¤°à¥à¤¥à¥€ à¤†à¤ˆà¤¡à¥€</string>
+    <string name="rch_id">à¤†à¤°à¤¸à¥€à¤à¤š à¤†à¤ˆà¤¡à¥€</string>
+    <string name="sync_to_local">à¤¸à¥à¤¥à¤¾à¤¨à¥€à¤¯ à¤¸à¥‡ à¤¸à¤¿à¤‚à¤• à¤•à¤°à¥‡à¤‚</string>
+    <string name="husband_s_name">à¤ªà¤¤à¤¿ à¤•à¤¾ à¤¨à¤¾à¤®</string>
+    <string name="pregnancy_weeks">à¤—à¤°à¥à¤­à¤¾à¤µà¤¸à¥à¤¥à¤¾ à¤•à¥‡ à¤¸à¤ªà¥à¤¤à¤¾à¤¹</string>
+    <string name="add_visit">à¤­à¤°à¤®à¤£ à¤œà¥‹à¤¡à¤¼</string>
+    <string name="household_id">à¤ªà¤°à¤¿à¤µà¤¾à¤° à¤†à¤ˆà¤¡à¥€</string>
+    <string name="contact_number">à¤¸à¤‚à¤ªà¤°à¥à¤• à¤¸à¤‚à¤–à¥à¤¯à¤¾</string>
+    <string name="add_cbac">à¤¸à¥€à¤¬à¥€à¤à¤¸à¥€ à¤œà¥‹à¤¡à¤¼à¥‡à¤‚</string>
+    <string name="view_cbac">à¤¸à¥€à¤¬à¥€à¤à¤¸à¥€ à¤¦à¥‡à¤–à¥‡à¤‚</string>
+    <string name="view">à¤¦à¥‡à¤–à¥‡à¤‚</string>
+    <string name="home">à¤˜à¤°</string>
+    <string name="sync_records">à¤°à¤¿à¤•à¥‰à¤°à¥à¤¡ à¤¸à¤¿à¤‚à¤• à¤•à¤°à¥‡à¤‚</string>
+    <string name="about">à¤¹à¤®à¤¾à¤°à¥‡ à¤¬à¤¾à¤°à¥‡ à¤®à¥‡à¤‚</string>
+    <string name="help">à¤¸à¤¹à¤¾à¤¯à¤¤à¤¾</string>
+    <string name="logout">à¤²à¥‰à¤—à¤†à¤‰à¤Ÿ à¤•à¤°à¥‡à¤‚</string>
+    <string name="delete_my_account">à¤®à¥‡à¤°à¤¾ à¤–à¤¾à¤¤à¤¾ à¤¹à¤Ÿà¤¾à¤¨à¥‡ à¤•à¤¾ à¤…à¤¨à¥à¤°à¥‹à¤§</string>
+    <string name="monthly_claim_summary">à¤®à¤¾à¤¸à¤¿à¤• à¤¦à¤¾à¤µà¤¾ à¤¸à¤¾à¤°à¤¾à¤‚à¤¶</string>
+    <string name="support">à¤¸à¤¹à¤¾à¤¯à¤¤à¤¾</string>
+    <string name="go_to_home">à¤¹à¥‹à¤® à¤ªà¤° à¤œà¤¾à¤à¤</string>
+    <string name="change_language">à¤­à¤¾à¤·à¤¾ à¤¬à¤¦à¤²à¥‡à¤‚</string>
+    <string name="adult_registration">à¤µà¤¯à¤¸à¥à¤• à¤ªà¤‚à¤œà¥€à¤•à¤°à¤£</string>
+    <string name="ncd_eligible_list">à¤—à¥ˆà¤° à¤¸à¤‚à¤•à¥à¤°à¤¾à¤®à¤• à¤°à¥‹à¤— à¤ªà¤¾à¤¤à¥à¤° à¤¸à¥‚à¤šà¥€</string>
+    <string name="ncd_list">à¤—à¥ˆà¤° à¤¸à¤‚à¤•à¥à¤°à¤¾à¤®à¤• à¤°à¥‹à¤— à¤¸à¥‚à¤šà¥€</string>
+    <string name="ncd_non_eligible_list">à¤—à¥ˆà¤° à¤¸à¤‚à¤•à¥à¤°à¤¾à¤®à¤• à¤°à¥‹à¤— à¤—à¥ˆà¤°-à¤ªà¥à¤°à¤¾à¤¥à¤®à¤¿à¤•à¤¤à¤¾ à¤¸à¥‚à¤šà¥€</string>
+    <string name="ncd_priority_list">à¤—à¥ˆà¤° à¤¸à¤‚à¤•à¥à¤°à¤¾à¤®à¤• à¤°à¥‹à¤— à¤ªà¥à¤°à¤¾à¤¥à¤®à¤¿à¤•à¤¤à¤¾ à¤¸à¥‚à¤šà¥€</string>
+    <string name="household_members">à¤ªà¤°à¤¿à¤µà¤¾à¤° à¤•à¥‡ à¤¸à¤¦à¤¸à¥à¤¯</string>
+    <string name="hbnc">à¤à¤šà¤¬à¥€à¤à¤¨à¤¸à¥€</string>
+    <string name="hbyc">à¤à¤šà¤¬à¥€à¤µà¤¾à¤ˆà¤¸à¥€</string>
+    <string name="eligible_couple_registration">à¤ªà¤¾à¤¤à¥à¤° à¤¦à¤‚à¤ªà¤¤à¥à¤¤à¤¿ à¤ªà¤‚à¤œà¥€à¤•à¤°à¤£</string>
+    <string name="eligible_couple_tracking_list">à¤ªà¤¾à¤¤à¥à¤° à¤¦à¤‚à¤ªà¤¤à¥à¤¤à¤¿ à¤Ÿà¥à¤°à¥ˆà¤•à¤¿à¤‚à¤— à¤¸à¥‚à¤šà¥€</string>
+    <string name="tb_screening_list">à¤Ÿà¥€à¤¬à¥€ à¤¸à¥à¤•à¥à¤°à¥€à¤¨à¤¿à¤‚à¤— à¤¸à¥‚à¤šà¥€</string>
+    <string name="tb_suspected_list">à¤¸à¤‚à¤¦à¥‡à¤¹à¤¾à¤¸à¥à¤ªà¤¦ à¤Ÿà¥€à¤¬à¥€ à¤®à¤¾à¤®à¤²à¥‡</string>
+    <string name="tb_screening_form">à¤Ÿà¥€à¤¬à¥€ à¤¸à¥à¤•à¥à¤°à¥€à¤¨à¤¿à¤‚à¤— à¤«à¥‰à¤°à¥à¤®</string>
+    <string name="tb_suspected_form">à¤¸à¤‚à¤¦à¤¿à¤—à¥à¤§ à¤Ÿà¥€à¤¬à¥€ à¤®à¤¾à¤®à¤²à¤¾</string>
+    <string name="delivery_outcome_list">à¤ªà¥à¤°à¤¸à¤µ à¤ªà¤°à¤¿à¤£à¤¾à¤® à¤¸à¥‚à¤šà¥€</string>
+    <string name="communicable_diseases">à¤¸à¤‚à¤šà¤¾à¤°à¥€ (à¤¸à¤‚à¤•à¥à¤°à¤¾à¤®à¤•) à¤°à¥‹à¤—</string>
+    <string name="dashboard">à¤¡à¥ˆà¤¶à¤¬à¥‹à¤°à¥à¤¡</string>
+    <string name="sign_in">à¤¸à¤¾à¤‡à¤¨ à¤‡à¤¨</string>
+    <string name="save_successful">à¤¸à¤«à¤²à¤¤à¤¾à¤ªà¥‚à¤°à¥à¤µà¤• à¤¸à¤¹à¥‡à¤œà¥‡à¤‚</string>
+    <string name="something_wend_wong_contact_testing">à¤•à¥à¤› à¤—à¤¡à¤¼à¤¬à¤¡à¤¼ à¤¹à¥ˆ! à¤¸à¤‚à¤ªà¤°à¥à¤• à¤ªà¤°à¥€à¤•à¥à¤·à¤£!</string>
+    <string name="error_input">à¤¤à¥à¤°à¥à¤Ÿà¤¿ à¤‡à¤¨à¤ªà¥à¤Ÿ</string>
+    <string name="exit_application">à¤à¤ªà¥à¤²à¤¿à¤•à¥‡à¤¶à¤¨ à¤¸à¥‡ à¤¬à¤¾à¤¹à¤° à¤¨à¤¿à¤•à¤²à¥‡à¤‚</string>
+    <string name="do_you_want_to_exit_application">à¤•à¥à¤¯à¤¾ à¤†à¤ª à¤à¤ªà¥à¤²à¤¿à¤•à¥‡à¤¶à¤¨ à¤¸à¥‡ à¤¬à¤¾à¤¹à¤° à¤¨à¤¿à¤•à¤²à¤¨à¤¾ à¤šà¤¾à¤¹à¤¤à¥‡ à¤¹à¥ˆà¤‚?</string>
+    <string name="downloading">à¤¡à¤¾à¤‰à¤¨à¤²à¥‹à¤¡ à¤¹à¥‹ à¤°à¤¹à¤¾ à¤¹à¥ˆâ€¦</string>
+    <string name="choose_application_language">à¤à¤ªà¥à¤²à¤¿à¤•à¥‡à¤¶à¤¨ à¤•à¥€ à¤­à¤¾à¤·à¤¾ à¤šà¥à¤¨à¥‡à¤‚</string>
+    <string name="english">à¤…à¤‚à¤—à¥à¤°à¥‡à¤œà¤¼à¥€</string>
+    <string name="hindi">à¤¹à¤¿à¤¨à¥à¤¦à¥€</string>
+    <string name="sync">à¤¸à¤¿à¤‚à¤•</string>
+    <string name="tap_to_change">à¤¬à¤¦à¤²à¤¨à¥‡ à¤•à¥‡ à¤²à¤¿à¤ à¤Ÿà¥ˆà¤ª à¤•à¤°à¥‡à¤‚</string>
+    <string name="validate">à¤®à¤¾à¤¨à¥à¤¯ à¤•à¤°à¥‡à¤‚</string>
+    <string name="child_immunization">à¤¬à¤¾à¤² à¤Ÿà¥€à¤•à¤¾à¤•à¤°à¤£</string>
+    <string name="relation_with_hof">"à¤®à¥à¤–à¤¿à¤¯à¤¾" à¤¸à¥‡ à¤¸à¤®à¥à¤¬à¤¨à¥à¤§</string>
+    <string name="add_family_member">à¤ªà¤°à¤¿à¤µà¤¾à¤° à¤•à¥‡ à¤¸à¤¦à¤¸à¥à¤¯ à¤œà¥‹à¤¡à¤¼à¥‡à¤‚</string>
+    <string name="non_pregnant_women_eligible_couple_section">à¤—à¥ˆà¤°-à¤—à¤°à¥à¤­à¤µà¤¤à¥€ à¤®à¤¹à¤¿à¤²à¤¾à¤à¤‚ (à¤ªà¤¾à¤¤à¥à¤° à¤¦à¤‚à¤ªà¤¤à¥à¤¤à¤¿) à¤…à¤¨à¥à¤­à¤¾à¤—</string>
+    <string name="about_us">à¤ªà¤¿à¤°à¤¾à¤®à¤² à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤¸à¤­à¥€ à¤•à¥‡ à¤²à¤¿à¤ à¤¸à¤¾à¤°à¥à¤µà¤­à¥Œà¤®à¤¿à¤• à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤¦à¥‡à¤–à¤­à¤¾à¤² à¤•à¥‹ à¤ªà¥‚à¤°à¤¾ à¤•à¤°à¤¨à¥‡ à¤•à¥‡ à¤²à¤¿à¤ à¤­à¤¾à¤°à¤¤ à¤¸à¤°à¤•à¤¾à¤° à¤•à¥‡ à¤¦à¥ƒà¤·à¥à¤Ÿà¤¿à¤•à¥‹à¤£ à¤•à¥‹ à¤ªà¥‚à¤°à¤• à¤”à¤° à¤¸à¤‚à¤ªà¥‚à¤°à¤¿à¤¤ à¤•à¤°à¤•à¥‡ à¤¸à¤¾à¤°à¥à¤µà¤œà¤¨à¤¿à¤• à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤¸à¥‡à¤µà¤¾ à¤•à¥‡ à¤…à¤‚à¤¤à¤°à¤¾à¤² à¤•à¥‹ à¤ªà¤¾à¤Ÿà¤¨à¥‡ à¤ªà¤° à¤§à¥à¤¯à¤¾à¤¨ à¤•à¥‡à¤‚à¤¦à¥à¤°à¤¿à¤¤ à¤•à¤° à¤°à¤¹à¤¾ à¤¹à¥ˆà¥¤ à¤ªà¤¿à¤°à¤¾à¤®à¤² à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤­à¤¾à¤°à¤¤ à¤®à¥‡à¤‚ à¤ªà¥à¤°à¤¾à¤¥à¤®à¤¿à¤• à¤¸à¤¾à¤°à¥à¤µà¤œà¤¨à¤¿à¤• à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤¦à¥‡à¤–à¤­à¤¾à¤² à¤•à¥à¤·à¥‡à¤¤à¥à¤° à¤®à¥‡à¤‚ à¤®à¤¾à¤¤à¥ƒ à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯, à¤¬à¤¾à¤² à¤”à¤° à¤•à¤¿à¤¶à¥‹à¤° à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯, à¤—à¥ˆà¤°-à¤¸à¤‚à¤šà¤¾à¤°à¥€ à¤°à¥‹à¤—à¥‹à¤‚ à¤ªà¤° à¤§à¥à¤¯à¤¾à¤¨ à¤•à¥‡à¤‚à¤¦à¥à¤°à¤¿à¤¤ à¤•à¤°à¤¨à¥‡ à¤µà¤¾à¤²à¥‡ à¤¸à¤¬à¤¸à¥‡ à¤¬à¤¡à¤¼à¥‡ à¤—à¥ˆà¤°-à¤²à¤¾à¤­à¤•à¤¾à¤°à¥€ à¤¸à¤‚à¤—à¤ à¤¨à¥‹à¤‚ à¤®à¥‡à¤‚ à¤¸à¥‡ à¤à¤• à¤¹à¥ˆà¥¤ à¤ªà¤¿à¤°à¤¾à¤®à¤² à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤•à¥‡ à¤ªà¤¾à¤¸ à¤•à¤ˆ à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤¸à¥‡à¤µà¤¾ à¤¨à¤µà¤¾à¤šà¤¾à¤°à¥‹à¤‚ à¤•à¥‹ à¤¬à¤¡à¤¼à¥‡ à¤ªà¥ˆà¤®à¤¾à¤¨à¥‡ à¤ªà¤° à¤¸à¤‚à¤šà¤¾à¤²à¤¿à¤¤ à¤•à¤°à¤¨à¥‡ à¤•à¤¾ à¤à¤• à¤¦à¤¶à¤• à¤¸à¥‡ à¤…à¤§à¤¿à¤• à¤•à¤¾ à¤…à¤¨à¥à¤­à¤µ à¤¹à¥ˆ, à¤œà¥‹ à¤ªà¥‚à¤°à¥‡ à¤­à¤¾à¤°à¤¤ à¤®à¥‡à¤‚ à¤¸à¤¬à¤¸à¥‡ à¤•à¤® à¤¸à¥‡à¤µà¤¾ à¤ªà¥à¤°à¤¾à¤ªà¥à¤¤ à¤”à¤° à¤¹à¤¾à¤¶à¤¿à¤ à¤ªà¤° à¤°à¤¹à¤¨à¥‡ à¤µà¤¾à¤²à¥€ à¤†à¤¬à¤¾à¤¦à¥€ à¤•à¥€ à¤ªà¥à¤°à¤¾à¤¥à¤®à¤¿à¤• à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤¦à¥‡à¤–à¤­à¤¾à¤² à¤œà¤°à¥‚à¤°à¤¤à¥‹à¤‚ à¤•à¥‹ à¤ªà¥‚à¤°à¤¾ à¤•à¤° à¤°à¤¹à¤¾ à¤¹à¥ˆà¥¤ à¤ªà¤¿à¤°à¤¾à¤®à¤² à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤­à¤¾à¤°à¤¤ à¤•à¥‡ 20 à¤°à¤¾à¤œà¥à¤¯à¥‹à¤‚ à¤®à¥‡à¤‚ 35 à¤¨à¤µà¥€à¤¨ à¤¸à¤¾à¤°à¥à¤µà¤œà¤¨à¤¿à¤• à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤¦à¥‡à¤–à¤­à¤¾à¤² à¤µà¤¿à¤¤à¤°à¤£ à¤•à¤¾à¤°à¥à¤¯à¤•à¥à¤°à¤®à¥‹à¤‚ à¤•à¥‡ à¤®à¤¾à¤§à¥à¤¯à¤® à¤¸à¥‡ à¤•à¤¾à¤°à¥à¤¯à¤°à¤¤ à¤¹à¥ˆ à¤”à¤° à¤…à¤¬ à¤¤à¤• 10.7 à¤•à¤°à¥‹à¤¡à¤¼ à¤¸à¥‡ à¤…à¤§à¤¿à¤• à¤²à¤¾à¤­à¤¾à¤°à¥à¤¥à¤¿à¤¯à¥‹à¤‚ à¤•à¥‹ à¤¸à¥‡à¤µà¤¾ à¤ªà¥à¤°à¤¦à¤¾à¤¨ à¤•à¤° à¤šà¥à¤•à¤¾ à¤¹à¥ˆ| à¤ªà¤¿à¤°à¤¾à¤®à¤² à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤®à¥‡à¤‚ 250 à¤šà¤¿à¤•à¤¿à¤¤à¥à¤¸à¤•à¥‹à¤‚ à¤¸à¤¹à¤¿à¤¤ 2260 à¤•à¤°à¥à¤®à¤šà¤¾à¤°à¥€ à¤•à¤¾à¤°à¥à¤¯à¤°à¤¤ à¤¹à¥ˆà¤‚ à¤œà¥‹ à¤ªà¤°à¤¿à¤£à¤¾à¤®à¥‹à¤¨à¥à¤®à¥à¤–à¥€ à¤¦à¥ƒà¤·à¥à¤Ÿà¤¿à¤•à¥‹à¤£ à¤•à¥‡ à¤®à¤¾à¤§à¥à¤¯à¤® à¤¸à¥‡ à¤¸à¥‡à¤µà¤¾ à¤­à¤¾à¤µ (à¤²à¤¾à¤­à¤¾à¤°à¥à¤¥à¥€-à¤•à¥‡à¤‚à¤¦à¥à¤°à¤¿à¤¤) à¤•à¥‡ à¤®à¥‚à¤² à¤®à¥‚à¤²à¥à¤¯ à¤ªà¤° à¤•à¤¾à¤® à¤•à¤°à¤¤à¥‡ à¤¹à¥ˆà¤‚à¥¤ à¤ªà¤¿à¤›à¤²à¥‡ à¤¬à¤¾à¤°à¤¹ à¤µà¤°à¥à¤·à¥‹à¤‚ à¤®à¥‡à¤‚, à¤«à¥‹à¤•à¤¸ à¤¨à¤¿à¤®à¥à¤¨à¤²à¤¿à¤–à¤¿à¤¤ à¤ªà¤° à¤°à¤¹à¤¾ à¤¹à¥ˆ, à¤¬à¤¡à¤¼à¥‡ à¤ªà¥ˆà¤®à¤¾à¤¨à¥‡ à¤ªà¤° à¤¸à¥à¤¥à¤¾à¤¯à¥€ à¤ªà¥à¤°à¤­à¤¾à¤µ à¤•à¥‡ à¤²à¤¿à¤ à¤ªà¥à¤²à¥‡à¤Ÿà¤«à¥‰à¤°à¥à¤® à¤•à¤¾ à¤¨à¤¿à¤°à¥à¤®à¤¾à¤£, à¤à¤• à¤¯à¤¾à¤¤à¥à¤°à¤¾ à¤•à¥‡ à¤°à¥‚à¤ª à¤®à¥‡à¤‚ à¤ªà¥ˆà¤®à¤¾à¤¨à¥‡ à¤ªà¤° à¤¨à¤µà¤¾à¤šà¤¾à¤°, à¤¨à¥€à¤¤à¤¿ à¤†à¤¯à¥‹à¤— à¤•à¥‡ à¤œà¥à¤žà¤¾à¤¨ à¤”à¤° à¤•à¤¾à¤°à¥à¤¯à¤¾à¤¨à¥à¤µà¤¯à¤¨ à¤­à¤¾à¤—à¥€à¤¦à¤¾à¤° à¤•à¥‡ à¤°à¥‚à¤ª à¤®à¥‡à¤‚ à¤¨à¥€à¤¤à¤¿à¤¯à¥‹à¤‚, à¤¶à¤¾à¤¸à¤¨ à¤”à¤° à¤¸à¤¾à¤°à¥à¤µà¤œà¤¨à¤¿à¤• à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤¦à¥‡à¤–à¤­à¤¾à¤² à¤ªà¥à¤°à¤£à¤¾à¤²à¥€ à¤•à¥€ à¤œà¤µà¤¾à¤¬à¤¦à¥‡à¤¹à¥€ à¤•à¥‹ à¤ªà¥à¤°à¤­à¤¾à¤µà¤¿à¤¤ à¤•à¤°à¤¨à¤¾à¥¤ à¤¹à¤¸à¥à¤¤à¤•à¥à¤·à¥‡à¤ª à¤¡à¤¿à¤œà¤¾à¤‡à¤¨, à¤®à¥‰à¤¡à¤²à¤¿à¤‚à¤—, à¤ªà¤¾à¤¯à¤²à¤Ÿà¤¿à¤‚à¤— à¤”à¤° à¤‰à¤¨ à¤ªà¤¾à¤¯à¤²à¤Ÿà¥‹à¤‚ à¤•à¥‹ à¤¬à¤¢à¤¼à¤¾à¤¨à¥‡ à¤•à¥‡ à¤°à¥‚à¤ª à¤®à¥‡à¤‚ à¤¨à¤µà¤¾à¤šà¤¾à¤° à¤ªà¤¿à¤°à¤¾à¤®à¤² à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤®à¥‡à¤‚ à¤à¤• à¤¦à¥ƒà¤·à¥à¤Ÿà¤¿à¤•à¥‹à¤£ à¤°à¤¹à¤¾ à¤¹à¥ˆà¥¤ à¤ªà¤¿à¤°à¤¾à¤®à¤² à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤ªà¥à¤°à¤¾à¤¥à¤®à¤¿à¤• à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤¸à¥‡à¤µà¤¾ à¤•à¥‹ à¤¨ à¤•à¥‡à¤µà¤² à¤¸à¤¸à¥à¤¤à¥€, à¤¸à¥à¤²à¤­ à¤”à¤° à¤¸à¤­à¥€ à¤•à¥‡ à¤²à¤¿à¤ à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¬à¤¨à¤¾à¤¨à¥‡ à¤•à¥‡ à¤²à¤¿à¤ à¤ªà¥à¤°à¤¤à¤¿à¤¬à¤¦à¥à¤§ à¤¹à¥ˆ, à¤¬à¤²à¥à¤•à¤¿ à¤¯à¤¹ à¤­à¥€ à¤¸à¥à¤¨à¤¿à¤¶à¥à¤šà¤¿à¤¤ à¤•à¤°à¤¤à¤¾ à¤¹à¥ˆ à¤•à¤¿ à¤¯à¤¹ à¤ªà¥‚à¤°à¥à¤£, à¤¨à¤¿à¤°à¤‚à¤¤à¤° à¤”à¤° à¤µà¥à¤¯à¤¾à¤ªà¤• à¤¹à¥‹à¥¤</string>
 
-    <string name="phone_no">फोन नंबर</string>
-    <string name="name_of_pregnant_woman">गर्भवती महिला का नाम</string>
-    <string name="husband_name">पति का नाम</string>
-    <string name="last_home_visit_date">अंतिम गृह भ्रमण की तिथि</string>
-    <string name="mda_form_campagain_title">लिम्फैटिक फाइलेरियासिस (LF) सामूहिक औषधि वितरण (MDA) अभियान</string>
-    <string name="screening">जांच</string>
-    <string name="suspected">संदिग्ध</string>
-    <string name="malaria_confirmed">पुष्टि हुई</string>
-    <string name="malaria_not_confirmed">पुष्टि नहीं हुई</string>
-    <string name="malaria_treatment_started">उपचार शुरू हुआ</string>
-    <string name="visits">भ्रमण</string>
-    <string name="treatment_start_date">चिकित्सा आरंभ तिथि</string>
-    <string name="expected_treatment_completion_date">उपचार समाप्ति की अपेक्षित तिथि </string>
-    <string name="actual_treatment_completion_date">वास्तविक उपचार समाप्ति तिथि</string>
-    <string name="treatment_status">उपचार की स्थिति</string>
-    <string name="follow_up_date">फॉलो-अप तिथि</string>
-    <string name="follow_up_history">फॉलो-अप रिकॉर्ड </string>
+    <string name="phone_no">à¤«à¥‹à¤¨ à¤¨à¤‚à¤¬à¤°</string>
+    <string name="name_of_pregnant_woman">à¤—à¤°à¥à¤­à¤µà¤¤à¥€ à¤®à¤¹à¤¿à¤²à¤¾ à¤•à¤¾ à¤¨à¤¾à¤®</string>
+    <string name="husband_name">à¤ªà¤¤à¤¿ à¤•à¤¾ à¤¨à¤¾à¤®</string>
+    <string name="last_home_visit_date">à¤…à¤‚à¤¤à¤¿à¤® à¤—à¥ƒà¤¹ à¤­à¥à¤°à¤®à¤£ à¤•à¥€ à¤¤à¤¿à¤¥à¤¿</string>
+    <string name="mda_form_campagain_title">à¤²à¤¿à¤®à¥à¤«à¥ˆà¤Ÿà¤¿à¤• à¤«à¤¾à¤‡à¤²à¥‡à¤°à¤¿à¤¯à¤¾à¤¸à¤¿à¤¸ (LF) à¤¸à¤¾à¤®à¥‚à¤¹à¤¿à¤• à¤”à¤·à¤§à¤¿ à¤µà¤¿à¤¤à¤°à¤£ (MDA) à¤…à¤­à¤¿à¤¯à¤¾à¤¨</string>
+    <string name="screening">à¤œà¤¾à¤‚à¤š</string>
+    <string name="suspected">à¤¸à¤‚à¤¦à¤¿à¤—à¥à¤§</string>
+    <string name="malaria_confirmed">à¤ªà¥à¤·à¥à¤Ÿà¤¿ à¤¹à¥à¤ˆ</string>
+    <string name="malaria_not_confirmed">à¤ªà¥à¤·à¥à¤Ÿà¤¿ à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤ˆ</string>
+    <string name="malaria_treatment_started">à¤‰à¤ªà¤šà¤¾à¤° à¤¶à¥à¤°à¥‚ à¤¹à¥à¤†</string>
+    <string name="visits">à¤­à¥à¤°à¤®à¤£</string>
+    <string name="treatment_start_date">à¤šà¤¿à¤•à¤¿à¤¤à¥à¤¸à¤¾ à¤†à¤°à¤‚à¤­ à¤¤à¤¿à¤¥à¤¿</string>
+    <string name="expected_treatment_completion_date">à¤‰à¤ªà¤šà¤¾à¤° à¤¸à¤®à¤¾à¤ªà¥à¤¤à¤¿ à¤•à¥€ à¤…à¤ªà¥‡à¤•à¥à¤·à¤¿à¤¤ à¤¤à¤¿à¤¥à¤¿ </string>
+    <string name="actual_treatment_completion_date">à¤µà¤¾à¤¸à¥à¤¤à¤µà¤¿à¤• à¤‰à¤ªà¤šà¤¾à¤° à¤¸à¤®à¤¾à¤ªà¥à¤¤à¤¿ à¤¤à¤¿à¤¥à¤¿</string>
+    <string name="treatment_status">à¤‰à¤ªà¤šà¤¾à¤° à¤•à¥€ à¤¸à¥à¤¥à¤¿à¤¤à¤¿</string>
+    <string name="follow_up_date">à¤«à¥‰à¤²à¥‹-à¤…à¤ª à¤¤à¤¿à¤¥à¤¿</string>
+    <string name="follow_up_history">à¤«à¥‰à¤²à¥‹-à¤…à¤ª à¤°à¤¿à¤•à¥‰à¤°à¥à¤¡ </string>
 
-    <string name="pending">बाकी है</string>
+    <string name="pending">à¤¬à¤¾à¤•à¥€ à¤¹à¥ˆ</string>
 
     <string-array name="leprosy_status">
-        <item>जांच</item>
-        <item>अस्वीकृत</item>
-        <item>स्क्रीनिंग नहीं हुई</item>
-        <item>संदिग्ध</item>
-        <item>पुष्ट</item>
-        <item>पुष्ट नहीं</item>
+        <item>à¤œà¤¾à¤‚à¤š</item>
+        <item>à¤…à¤¸à¥à¤µà¥€à¤•à¥ƒà¤¤</item>
+        <item>à¤¸à¥à¤•à¥à¤°à¥€à¤¨à¤¿à¤‚à¤— à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤ˆ</item>
+        <item>à¤¸à¤‚à¤¦à¤¿à¤—à¥à¤§</item>
+        <item>à¤ªà¥à¤·à¥à¤Ÿ</item>
+        <item>à¤ªà¥à¤·à¥à¤Ÿ à¤¨à¤¹à¥€à¤‚</item>
     </string-array>
 
     <string-array name="type_of_leprocy">
-        <item name="mb">एमबी (मल्टीबैसिलरी)</item>
-        <item name="pb">पीबी (पॉसिबैसिलरी)</item>
+        <item name="mb">à¤à¤®à¤¬à¥€ (à¤®à¤²à¥à¤Ÿà¥€à¤¬à¥ˆà¤¸à¤¿à¤²à¤°à¥€)</item>
+        <item name="pb">à¤ªà¥€à¤¬à¥€ (à¤ªà¥‰à¤¸à¤¿à¤¬à¥ˆà¤¸à¤¿à¤²à¤°à¥€)</item>
     </string-array>
 
     <string-array name="leprosy_treatment_status">
-        <item>स्वस्थ हो रहा है</item>
-        <item>ठीक हो गया</item>
-        <item>लक्षणों की पुनरावृत्ति</item>
-        <item>नियमित रूप से दवा लेना</item>
-        <item>नियमित रूप से दवा नहीं लेना</item>
-        <item>उपचार पूर्ण हो गया</item>
+        <item>à¤¸à¥à¤µà¤¸à¥à¤¥ à¤¹à¥‹ à¤°à¤¹à¤¾ à¤¹à¥ˆ</item>
+        <item>à¤ à¥€à¤• à¤¹à¥‹ à¤—à¤¯à¤¾</item>
+        <item>à¤²à¤•à¥à¤·à¤£à¥‹à¤‚ à¤•à¥€ à¤ªà¥à¤¨à¤°à¤¾à¤µà¥ƒà¤¤à¥à¤¤à¤¿</item>
+        <item>à¤¨à¤¿à¤¯à¤®à¤¿à¤¤ à¤°à¥‚à¤ª à¤¸à¥‡ à¤¦à¤µà¤¾ à¤²à¥‡à¤¨à¤¾</item>
+        <item>à¤¨à¤¿à¤¯à¤®à¤¿à¤¤ à¤°à¥‚à¤ª à¤¸à¥‡ à¤¦à¤µà¤¾ à¤¨à¤¹à¥€à¤‚ à¤²à¥‡à¤¨à¤¾</item>
+        <item>à¤‰à¤ªà¤šà¤¾à¤° à¤ªà¥‚à¤°à¥à¤£ à¤¹à¥‹ à¤—à¤¯à¤¾</item>
     </string-array>
 
     <string-array name="leprosy_treatment_status_before_time">
-        <item>स्वस्थ हो रहा है</item>
-        <item>ठीक हो गया</item>
-        <item>लक्षणों की पुनरावृत्ति</item>
-        <item>नियमित रूप से दवा लेना</item>
-        <item>नियमित रूप से दवा नहीं लेना</item>
+        <item>à¤¸à¥à¤µà¤¸à¥à¤¥ à¤¹à¥‹ à¤°à¤¹à¤¾ à¤¹à¥ˆ</item>
+        <item>à¤ à¥€à¤• à¤¹à¥‹ à¤—à¤¯à¤¾</item>
+        <item>à¤²à¤•à¥à¤·à¤£à¥‹à¤‚ à¤•à¥€ à¤ªà¥à¤¨à¤°à¤¾à¤µà¥ƒà¤¤à¥à¤¤à¤¿</item>
+        <item>à¤¨à¤¿à¤¯à¤®à¤¿à¤¤ à¤°à¥‚à¤ª à¤¸à¥‡ à¤¦à¤µà¤¾ à¤²à¥‡à¤¨à¤¾</item>
+        <item>à¤¨à¤¿à¤¯à¤®à¤¿à¤¤ à¤°à¥‚à¤ª à¤¸à¥‡ à¤¦à¤µà¤¾ à¤¨à¤¹à¥€à¤‚ à¤²à¥‡à¤¨à¤¾</item>
     </string-array>
 
     <string name="PREF_NAME">Sakhi-pref-1</string>
@@ -238,338 +239,417 @@
     <string name="_0">0</string>
     <string name="radio_title">%s<span> *</span></string>
     <string name="radio_title_ds">%s<span> **</span></string>
-    <string name="str_add_member">सदस्य जोड़ें</string>
-    <string name="death_date">मृत्यु की तिथि</string>
-    <string name="visit_date">भ्रमण की तिथि</string>
-    <string name="aes_case_status_date">एईएस / जेएस केस स्थिति तारीख</string>
-    <string name="place_of_Death">मृत्यु का स्थान</string>
-    <string name="reason_of_Death">मृत्यु का कारण</string>
-    <string name="beneficiary_status">लाभार्थी स्थिति</string>
-    <string name="refer_to">रेफर किया गया</string>
-    <string name="ncd_refer_alert">क्या आप एचडब्ल्यूसी सुविधा में रेफर करना चाहते हैं?</string>
-    <string name="cbac_screening_submitted">सीबीएसी स्क्रीनिंग जमा की गई</string>
-    <string name="mosquito_net_off">मच्छरदानी बंद</string>
-    <string name="btn_apply">लागू करें</string>
-    <string name="iv_death_indicator">मृत्यु</string>
-    <string name="iv_case_status_tv">केस स्थिति</string>
-    <string name="visit_format">विजिट-%d</string>
-    <string name="type_of_tb_case">टीबी केस का प्रकार?</string>
-    <string name="reason_for_suspicion">संदेह का कारण</string>
-    <string name="has_symptoms">क्या रोगी में लक्षण हैं?</string>
-    <string name="is_chest_xray_done">क्या टीबी छाती एक्स-रे जांच की गई है?</string>
-    <string name="chest_xray_result">छाती एक्स-रे जांच का परिणाम</string>
-    <string name="referral_facility">रेफरल सुविधा / संदर्भित स्वास्थ्य केंद्र</string>
-    <string name="is_tb_confirmed">क्या टीबी का निदान पुष्टि किया गया है?</string>
-    <string name="is_drtb_confirmed">क्या डीआर-टीबी का निदान पुष्टि किया गया है?</string>
-    <string name="about_us_powered">द्वारा संचालित</string>
-    <string name="form_input_alphabet_special__digit_only_error">केवल अक्षर, विशेष अक्षर और अंक अनुमत हैं!</string>
-    <string name="abha_number_digit">ABHA नंबर 14 अंकों का होना चाहिए</string>
-    <string name="ifsc">4 अक्षर और उसके बाद 7 अंक (उदा., ABCD1234567)!</string>
-    <string name="other_place">मृत्यु का अन्य स्थान</string>
-    <string name="other_reason">मृत्यु का अन्य कारण</string>
-    <string name="no_of_elderly_children">वयस्क बच्चों की संख्या (15 वर्ष से ऊपर)</string>
-    <string name="visit_no">विजिट संख्या</string>
-    <string name="add">जोड़ें</string>
-    <string name="asha_profile">प्रोफाइल</string>
-    <string name="sync_status">सिंक स्थिति</string>
-    <string name="ncd_refer_form">एनसीडी रेफर फॉर्म</string>
-    <string name="ncd_refer_list">रेफरल</string>
-    <string name="hwc_refer_form">एचडब्ल्यूसी रेफर फॉर्म</string>
+    <string name="str_add_member">à¤¸à¤¦à¤¸à¥à¤¯ à¤œà¥‹à¤¡à¤¼à¥‡à¤‚</string>
+    <string name="death_date">à¤®à¥ƒà¤¤à¥à¤¯à¥ à¤•à¥€ à¤¤à¤¿à¤¥à¤¿</string>
+    <string name="visit_date">à¤­à¥à¤°à¤®à¤£ à¤•à¥€ à¤¤à¤¿à¤¥à¤¿</string>
+    <string name="aes_case_status_date">à¤à¤ˆà¤à¤¸ / à¤œà¥‡à¤à¤¸ à¤•à¥‡à¤¸ à¤¸à¥à¤¥à¤¿à¤¤à¤¿ à¤¤à¤¾à¤°à¥€à¤–</string>
+    <string name="place_of_Death">à¤®à¥ƒà¤¤à¥à¤¯à¥ à¤•à¤¾ à¤¸à¥à¤¥à¤¾à¤¨</string>
+    <string name="reason_of_Death">à¤®à¥ƒà¤¤à¥à¤¯à¥ à¤•à¤¾ à¤•à¤¾à¤°à¤£</string>
+    <string name="beneficiary_status">à¤²à¤¾à¤­à¤¾à¤°à¥à¤¥à¥€ à¤¸à¥à¤¥à¤¿à¤¤à¤¿</string>
+    <string name="refer_to">à¤°à¥‡à¤«à¤° à¤•à¤¿à¤¯à¤¾ à¤—à¤¯à¤¾</string>
+    <string name="ncd_refer_alert">à¤•à¥à¤¯à¤¾ à¤†à¤ª à¤à¤šà¤¡à¤¬à¥à¤²à¥à¤¯à¥‚à¤¸à¥€ à¤¸à¥à¤µà¤¿à¤§à¤¾ à¤®à¥‡à¤‚ à¤°à¥‡à¤«à¤° à¤•à¤°à¤¨à¤¾ à¤šà¤¾à¤¹à¤¤à¥‡ à¤¹à¥ˆà¤‚?</string>
+    <string name="cbac_screening_submitted">à¤¸à¥€à¤¬à¥€à¤à¤¸à¥€ à¤¸à¥à¤•à¥à¤°à¥€à¤¨à¤¿à¤‚à¤— à¤œà¤®à¤¾ à¤•à¥€ à¤—à¤ˆ</string>
+    <string name="mosquito_net_off">à¤®à¤šà¥à¤›à¤°à¤¦à¤¾à¤¨à¥€ à¤¬à¤‚à¤¦</string>
+    <string name="btn_apply">à¤²à¤¾à¤—à¥‚ à¤•à¤°à¥‡à¤‚</string>
+    <string name="iv_death_indicator">à¤®à¥ƒà¤¤à¥à¤¯à¥</string>
+    <string name="iv_case_status_tv">à¤•à¥‡à¤¸ à¤¸à¥à¤¥à¤¿à¤¤à¤¿</string>
+    <string name="visit_format">à¤µà¤¿à¤œà¤¿à¤Ÿ-%d</string>
+    <string name="type_of_tb_case">à¤Ÿà¥€à¤¬à¥€ à¤•à¥‡à¤¸ à¤•à¤¾ à¤ªà¥à¤°à¤•à¤¾à¤°?</string>
+    <string name="reason_for_suspicion">à¤¸à¤‚à¤¦à¥‡à¤¹ à¤•à¤¾ à¤•à¤¾à¤°à¤£</string>
+    <string name="has_symptoms">à¤•à¥à¤¯à¤¾ à¤°à¥‹à¤—à¥€ à¤®à¥‡à¤‚ à¤²à¤•à¥à¤·à¤£ à¤¹à¥ˆà¤‚?</string>
+    <string name="is_chest_xray_done">à¤•à¥à¤¯à¤¾ à¤Ÿà¥€à¤¬à¥€ à¤›à¤¾à¤¤à¥€ à¤à¤•à¥à¤¸-à¤°à¥‡ à¤œà¤¾à¤‚à¤š à¤•à¥€ à¤—à¤ˆ à¤¹à¥ˆ?</string>
+    <string name="chest_xray_result">à¤›à¤¾à¤¤à¥€ à¤à¤•à¥à¤¸-à¤°à¥‡ à¤œà¤¾à¤‚à¤š à¤•à¤¾ à¤ªà¤°à¤¿à¤£à¤¾à¤®</string>
+    <string name="referral_facility">à¤°à¥‡à¤«à¤°à¤² à¤¸à¥à¤µà¤¿à¤§à¤¾ / à¤¸à¤‚à¤¦à¤°à¥à¤­à¤¿à¤¤ à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤•à¥‡à¤‚à¤¦à¥à¤°</string>
+    <string name="is_tb_confirmed">à¤•à¥à¤¯à¤¾ à¤Ÿà¥€à¤¬à¥€ à¤•à¤¾ à¤¨à¤¿à¤¦à¤¾à¤¨ à¤ªà¥à¤·à¥à¤Ÿà¤¿ à¤•à¤¿à¤¯à¤¾ à¤—à¤¯à¤¾ à¤¹à¥ˆ?</string>
+    <string name="is_drtb_confirmed">à¤•à¥à¤¯à¤¾ à¤¡à¥€à¤†à¤°-à¤Ÿà¥€à¤¬à¥€ à¤•à¤¾ à¤¨à¤¿à¤¦à¤¾à¤¨ à¤ªà¥à¤·à¥à¤Ÿà¤¿ à¤•à¤¿à¤¯à¤¾ à¤—à¤¯à¤¾ à¤¹à¥ˆ?</string>
+    <string name="about_us_powered">à¤¦à¥à¤µà¤¾à¤°à¤¾ à¤¸à¤‚à¤šà¤¾à¤²à¤¿à¤¤</string>
+    <string name="form_input_alphabet_special__digit_only_error">à¤•à¥‡à¤µà¤² à¤…à¤•à¥à¤·à¤°, à¤µà¤¿à¤¶à¥‡à¤· à¤…à¤•à¥à¤·à¤° à¤”à¤° à¤…à¤‚à¤• à¤…à¤¨à¥à¤®à¤¤ à¤¹à¥ˆà¤‚!</string>
+    <string name="abha_number_digit">ABHA à¤¨à¤‚à¤¬à¤° 14 à¤…à¤‚à¤•à¥‹à¤‚ à¤•à¤¾ à¤¹à¥‹à¤¨à¤¾ à¤šà¤¾à¤¹à¤¿à¤</string>
+    <string name="ifsc">4 à¤…à¤•à¥à¤·à¤° à¤”à¤° à¤‰à¤¸à¤•à¥‡ à¤¬à¤¾à¤¦ 7 à¤…à¤‚à¤• (à¤‰à¤¦à¤¾., ABCD1234567)!</string>
+    <string name="other_place">à¤®à¥ƒà¤¤à¥à¤¯à¥ à¤•à¤¾ à¤…à¤¨à¥à¤¯ à¤¸à¥à¤¥à¤¾à¤¨</string>
+    <string name="other_reason">à¤®à¥ƒà¤¤à¥à¤¯à¥ à¤•à¤¾ à¤…à¤¨à¥à¤¯ à¤•à¤¾à¤°à¤£</string>
+    <string name="no_of_elderly_children">à¤µà¤¯à¤¸à¥à¤• à¤¬à¤šà¥à¤šà¥‹à¤‚ à¤•à¥€ à¤¸à¤‚à¤–à¥à¤¯à¤¾ (15 à¤µà¤°à¥à¤· à¤¸à¥‡ à¤Šà¤ªà¤°)</string>
+    <string name="visit_no">à¤µà¤¿à¤œà¤¿à¤Ÿ à¤¸à¤‚à¤–à¥à¤¯à¤¾</string>
+    <string name="add">à¤œà¥‹à¤¡à¤¼à¥‡à¤‚</string>
+    <string name="asha_profile">à¤ªà¥à¤°à¥‹à¤«à¤¾à¤‡à¤²</string>
+    <string name="sync_status">à¤¸à¤¿à¤‚à¤• à¤¸à¥à¤¥à¤¿à¤¤à¤¿</string>
+    <string name="ncd_refer_form">à¤à¤¨à¤¸à¥€à¤¡à¥€ à¤°à¥‡à¤«à¤° à¤«à¥‰à¤°à¥à¤®</string>
+    <string name="ncd_refer_list">à¤°à¥‡à¤«à¤°à¤²</string>
+    <string name="hwc_refer_form">à¤à¤šà¤¡à¤¬à¥à¤²à¥à¤¯à¥‚à¤¸à¥€ à¤°à¥‡à¤«à¤° à¤«à¥‰à¤°à¥à¤®</string>
     <string name="ec">EC</string>
-    <string name="tb_confirmed_list">पुष्टि टीबी सूची</string>
-    <string name="tb_confirmed_form">पुष्टि टीबी फॉर्म</string>
-    <string name="otp_resent">OTP पुनः भेजा गया</string>
-    <string name="assamese">অসমীয়া</string>
-    <string name="app_native_name">निक्षय मित्र</string>
-    <string name="time_of_death">मृत्यु का समय</string>
-    <string name="reason_for_death">मृत्यु का कारण</string>
-    <string name="add_file">फ़ाइल जोड़ें</string>
-    <string name="text_kpis">प्रमुख प्रदर्शन संकेतक (KPIs)</string>
-    <string name="all">सभी</string>
-    <string name="with_abha">ABHA के साथ</string>
-    <string name="without_abha">ABHA के बिना</string>
-    <string name="age_above_30_years">30 वर्ष से अधिक आयु</string>
-    <string name="filter_list">फ़िल्टर</string>
-    <string name="ben_with_rch_id">RCH आईडी वाले लाभार्थी</string>
-    <string name="heading">इतिहास</string>
-    <string name="new_abha">नया ABHA</string>
-    <string name="existing_abha">मौजूदा ABHA</string>
-    <string name="referred_date">रेफरल तारीख</string>
-    <string name="referred_from">रेफर किया गया</string>
-    <string name="referral_reason">रेफरल कारण</string>
-    <string name="add_new">नया जोड़ें</string>
-    <string name="ifa_distribution">आईएफए वितरण</string>
-    <string name="ifa_quantity">आईएफए मात्रा</string>
-    <string name="date_of_provision">प्रदान करने की तारीख</string>
-    <string name="bottle_number">बोतल नंबर</string>
-    <string name="s_no">क्रम संख्या</string>
-    <string name="last_follow_up_date">अंतिम फॉलो अप तारीख</string>
-    <string name="bottle_distribution">बोतल वितरण</string>
-    <string name="reminder">अनुस्मारक!!</string>
-    <string name="session_date_n_a">सत्र तारीख: N/A</string>
-    <string name="session_date_format">सत्र तारीख: %s</string>
-    <string name="uwin_session_format">UWIN सत्र %s</string>
-    <string name="add_wife">पत्नी पंजीकरण</string>
-    <string name="add_husband">पति पंजीकरण</string>
-    <string name="hof">एचओएफ</string>
-    <string name="select_visit">विजिट चुनें</string>
-    <string name="no_previous_visits_available">कोई पिछली विजिट उपलब्ध नहीं</string>
-    <string name="add_children">बच्चों का पंजीकरण करें</string>
-    <string name="view_children">बच्चों को देखें</string>
-    <string name="newAbha">नया</string>
-    <string name="oldAbha">पुराना</string>
-    <string name="regimen_type">उपचार रेजीमेन का प्रकार</string>
-    <string name="monthly_follow_up_done">मासिक फॉलो-अप किया गया</string>
-    <string name="adherence_to_medicines">दवाओं का नियमित सेवन</string>
-    <string name="any_discomfort">कोई असुविधा</string>
-    <string name="treatment_completed">क्या मरीज ने उपचार का पूरा कोर्स पूरा किया?</string>
-    <string name="treatment_outcome">टीबी उपचार परिणाम</string>
-    <string name="reason_for_not_completing">उपचार पूरा न करने का कारण</string>
-    <string name="tuberculosis">क्षय रोग</string>
-    <string name="month_format">माह-%d</string>
-    <string name="gallery">गैलरी</string>
-    <string name="documents">दस्तावेज़</string>
-    <string name="choose_pdf_or_doc">Pdf या Doc चुनें</string>
-    <string name="camera">कैमरा</string>
-    <string name="upload_files">फ़ाइलें अपलोड करें</string>
-    <string name="choose_upload_source">अपलोड स्रोत चुनें</string>
-    <string name="sync_dashboard">सिंक डैशबोर्ड</string>
-    <string name="sync_dashboard_tab_status">स्थिति</string>
-    <string name="sync_dashboard_tab_logs">लॉग</string>
-    <string name="sync_dashboard_records_synced">%1$d / %2$d रिकॉर्ड सिंक किए गए</string>
-    <string name="sync_dashboard_worker_running">सिंक चल रहा है (%1$d / %2$d वर्कर)</string>
-    <string name="sync_dashboard_worker_idle">निष्क्रिय</string>
-    <string name="sync_dashboard_worker_complete">पूर्ण</string>
-    <string name="sync_dashboard_worker_failed">विफल: %1$d वर्कर - विवरण देखने के लिए टैप करें</string>
-    <string name="sync_dashboard_no_logs">अभी तक कोई सिंक लॉग नहीं। गतिविधि देखने के लिए सिंक ट्रिगर करें।</string>
-    <string name="sync_dashboard_clear_logs">लॉग साफ़ करें</string>
-    <string name="sync_dashboard_export_logs">लॉग निर्यात करें</string>
-    <string name="sync_dashboard_no_log_files">निर्यात करने के लिए कोई लॉग फ़ाइल नहीं</string>
-    <string name="check_if_the_person_has_any_of_these_symptoms">जांचें कि व्यक्ति में इनमें से कोई लक्षण है या नहीं</string>
-    <string name="symptomatic_tb_screening">टीबी के लक्षणों की जांच</string>
-    <string name="tb_asymptomatic_symptoms">बिना लक्षण वाले लोगों की टीबी जांच</string>
-    <string name="tb_rise_of_fever">रोजाना शाम को तेज बुखार आता है?</string>
-    <string name="tb_loss_of_appetite">भूख कम लगना</string>
-    <string name="tb_age_more_than_60">उम्र 60 वर्ष से अधिक</string>
-    <string name="tb_diabetic">मधुमेह रोगी</string>
-    <string name="tb_tobacco_user">तंबाकू सेवन करने वाला</string>
-    <string name="tb_bmi_less_than_18_5">बीएमआई 18.5 से कम</string>
-    <string name="tb_contact_with_patient_on_treatment">क्या आप टीबी मरीज के संपर्क में आए हैं?</string>
-    <string name="tb_history_last_5_years">क्या पिछले 5 साल में आपको कभी टीबी (TB) हुई थी?</string>
-    <string name="value_cannot_be_empty">मान खाली नहीं हो सकता</string>
-    <string name="enter_a_valid_number">एक मान्य संख्या दर्ज करें</string>
-    <string name="allowed_range">अनुमत सीमा: %1$d से %2$d</string>
-    <string name="minimum_allowed_value">न्यूनतम अनुमत मान: %1$d</string>
+    <string name="tb_confirmed_list">à¤ªà¥à¤·à¥à¤Ÿà¤¿ à¤Ÿà¥€à¤¬à¥€ à¤¸à¥‚à¤šà¥€</string>
+    <string name="tb_confirmed_form">à¤ªà¥à¤·à¥à¤Ÿà¤¿ à¤Ÿà¥€à¤¬à¥€ à¤«à¥‰à¤°à¥à¤®</string>
+    <string name="otp_resent">OTP à¤ªà¥à¤¨à¤ƒ à¤­à¥‡à¤œà¤¾ à¤—à¤¯à¤¾</string>
+    <string name="assamese">à¦…à¦¸à¦®à§€à¦¯à¦¼à¦¾</string>
+    <string name="app_native_name">STOP TB</string>
+    <string name="time_of_death">à¤®à¥ƒà¤¤à¥à¤¯à¥ à¤•à¤¾ à¤¸à¤®à¤¯</string>
+    <string name="reason_for_death">à¤®à¥ƒà¤¤à¥à¤¯à¥ à¤•à¤¾ à¤•à¤¾à¤°à¤£</string>
+    <string name="add_file">à¤«à¤¼à¤¾à¤‡à¤² à¤œà¥‹à¤¡à¤¼à¥‡à¤‚</string>
+    <string name="text_kpis">à¤ªà¥à¤°à¤®à¥à¤– à¤ªà¥à¤°à¤¦à¤°à¥à¤¶à¤¨ à¤¸à¤‚à¤•à¥‡à¤¤à¤• (KPIs)</string>
+    <string name="all">à¤¸à¤­à¥€</string>
+    <string name="with_abha">ABHA à¤•à¥‡ à¤¸à¤¾à¤¥</string>
+    <string name="without_abha">ABHA à¤•à¥‡ à¤¬à¤¿à¤¨à¤¾</string>
+    <string name="age_above_30_years">30 à¤µà¤°à¥à¤· à¤¸à¥‡ à¤…à¤§à¤¿à¤• à¤†à¤¯à¥</string>
+    <string name="filter_list">à¤«à¤¼à¤¿à¤²à¥à¤Ÿà¤°</string>
+    <string name="ben_with_rch_id">RCH à¤†à¤ˆà¤¡à¥€ à¤µà¤¾à¤²à¥‡ à¤²à¤¾à¤­à¤¾à¤°à¥à¤¥à¥€</string>
+    <string name="heading">à¤‡à¤¤à¤¿à¤¹à¤¾à¤¸</string>
+    <string name="new_abha">à¤¨à¤¯à¤¾ ABHA</string>
+    <string name="existing_abha">à¤®à¥Œà¤œà¥‚à¤¦à¤¾ ABHA</string>
+    <string name="referred_date">à¤°à¥‡à¤«à¤°à¤² à¤¤à¤¾à¤°à¥€à¤–</string>
+    <string name="referred_from">à¤°à¥‡à¤«à¤° à¤•à¤¿à¤¯à¤¾ à¤—à¤¯à¤¾</string>
+    <string name="referral_reason">à¤°à¥‡à¤«à¤°à¤² à¤•à¤¾à¤°à¤£</string>
+    <string name="add_new">à¤¨à¤¯à¤¾ à¤œà¥‹à¤¡à¤¼à¥‡à¤‚</string>
+    <string name="ifa_distribution">à¤†à¤ˆà¤à¤«à¤ à¤µà¤¿à¤¤à¤°à¤£</string>
+    <string name="ifa_quantity">à¤†à¤ˆà¤à¤«à¤ à¤®à¤¾à¤¤à¥à¤°à¤¾</string>
+    <string name="date_of_provision">à¤ªà¥à¤°à¤¦à¤¾à¤¨ à¤•à¤°à¤¨à¥‡ à¤•à¥€ à¤¤à¤¾à¤°à¥€à¤–</string>
+    <string name="bottle_number">à¤¬à¥‹à¤¤à¤² à¤¨à¤‚à¤¬à¤°</string>
+    <string name="s_no">à¤•à¥à¤°à¤® à¤¸à¤‚à¤–à¥à¤¯à¤¾</string>
+    <string name="last_follow_up_date">à¤…à¤‚à¤¤à¤¿à¤® à¤«à¥‰à¤²à¥‹ à¤…à¤ª à¤¤à¤¾à¤°à¥€à¤–</string>
+    <string name="bottle_distribution">à¤¬à¥‹à¤¤à¤² à¤µà¤¿à¤¤à¤°à¤£</string>
+    <string name="reminder">à¤…à¤¨à¥à¤¸à¥à¤®à¤¾à¤°à¤•!!</string>
+    <string name="session_date_n_a">à¤¸à¤¤à¥à¤° à¤¤à¤¾à¤°à¥€à¤–: N/A</string>
+    <string name="session_date_format">à¤¸à¤¤à¥à¤° à¤¤à¤¾à¤°à¥€à¤–: %s</string>
+    <string name="uwin_session_format">UWIN à¤¸à¤¤à¥à¤° %s</string>
+    <string name="add_wife">à¤ªà¤¤à¥à¤¨à¥€ à¤ªà¤‚à¤œà¥€à¤•à¤°à¤£</string>
+    <string name="add_husband">à¤ªà¤¤à¤¿ à¤ªà¤‚à¤œà¥€à¤•à¤°à¤£</string>
+    <string name="hof">à¤à¤šà¤“à¤à¤«</string>
+    <string name="select_visit">à¤µà¤¿à¤œà¤¿à¤Ÿ à¤šà¥à¤¨à¥‡à¤‚</string>
+    <string name="no_previous_visits_available">à¤•à¥‹à¤ˆ à¤ªà¤¿à¤›à¤²à¥€ à¤µà¤¿à¤œà¤¿à¤Ÿ à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚</string>
+    <string name="add_children">à¤¬à¤šà¥à¤šà¥‹à¤‚ à¤•à¤¾ à¤ªà¤‚à¤œà¥€à¤•à¤°à¤£ à¤•à¤°à¥‡à¤‚</string>
+    <string name="view_children">à¤¬à¤šà¥à¤šà¥‹à¤‚ à¤•à¥‹ à¤¦à¥‡à¤–à¥‡à¤‚</string>
+    <string name="newAbha">à¤¨à¤¯à¤¾</string>
+    <string name="oldAbha">à¤ªà¥à¤°à¤¾à¤¨à¤¾</string>
+    <string name="regimen_type">à¤‰à¤ªà¤šà¤¾à¤° à¤°à¥‡à¤œà¥€à¤®à¥‡à¤¨ à¤•à¤¾ à¤ªà¥à¤°à¤•à¤¾à¤°</string>
+    <string name="monthly_follow_up_done">à¤®à¤¾à¤¸à¤¿à¤• à¤«à¥‰à¤²à¥‹-à¤…à¤ª à¤•à¤¿à¤¯à¤¾ à¤—à¤¯à¤¾</string>
+    <string name="adherence_to_medicines">à¤¦à¤µà¤¾à¤“à¤‚ à¤•à¤¾ à¤¨à¤¿à¤¯à¤®à¤¿à¤¤ à¤¸à¥‡à¤µà¤¨</string>
+    <string name="any_discomfort">à¤•à¥‹à¤ˆ à¤…à¤¸à¥à¤µà¤¿à¤§à¤¾</string>
+    <string name="treatment_completed">à¤•à¥à¤¯à¤¾ à¤®à¤°à¥€à¤œ à¤¨à¥‡ à¤‰à¤ªà¤šà¤¾à¤° à¤•à¤¾ à¤ªà¥‚à¤°à¤¾ à¤•à¥‹à¤°à¥à¤¸ à¤ªà¥‚à¤°à¤¾ à¤•à¤¿à¤¯à¤¾?</string>
+    <string name="treatment_outcome">à¤Ÿà¥€à¤¬à¥€ à¤‰à¤ªà¤šà¤¾à¤° à¤ªà¤°à¤¿à¤£à¤¾à¤®</string>
+    <string name="reason_for_not_completing">à¤‰à¤ªà¤šà¤¾à¤° à¤ªà¥‚à¤°à¤¾ à¤¨ à¤•à¤°à¤¨à¥‡ à¤•à¤¾ à¤•à¤¾à¤°à¤£</string>
+    <string name="tuberculosis">à¤•à¥à¤·à¤¯ à¤°à¥‹à¤—</string>
+    <string name="month_format">à¤®à¤¾à¤¹-%d</string>
+    <string name="gallery">à¤—à¥ˆà¤²à¤°à¥€</string>
+    <string name="documents">à¤¦à¤¸à¥à¤¤à¤¾à¤µà¥‡à¤œà¤¼</string>
+    <string name="choose_pdf_or_doc">Pdf à¤¯à¤¾ Doc à¤šà¥à¤¨à¥‡à¤‚</string>
+    <string name="camera">à¤•à¥ˆà¤®à¤°à¤¾</string>
+    <string name="upload_files">à¤«à¤¼à¤¾à¤‡à¤²à¥‡à¤‚ à¤…à¤ªà¤²à¥‹à¤¡ à¤•à¤°à¥‡à¤‚</string>
+    <string name="choose_upload_source">à¤…à¤ªà¤²à¥‹à¤¡ à¤¸à¥à¤°à¥‹à¤¤ à¤šà¥à¤¨à¥‡à¤‚</string>
+    <string name="sync_dashboard">à¤¸à¤¿à¤‚à¤• à¤¡à¥ˆà¤¶à¤¬à¥‹à¤°à¥à¤¡</string>
+    <string name="sync_dashboard_tab_status">à¤¸à¥à¤¥à¤¿à¤¤à¤¿</string>
+    <string name="sync_dashboard_tab_logs">à¤²à¥‰à¤—</string>
+    <string name="sync_dashboard_records_synced">%1$d / %2$d à¤°à¤¿à¤•à¥‰à¤°à¥à¤¡ à¤¸à¤¿à¤‚à¤• à¤•à¤¿à¤ à¤—à¤</string>
+    <string name="sync_dashboard_worker_running">à¤¸à¤¿à¤‚à¤• à¤šà¤² à¤°à¤¹à¤¾ à¤¹à¥ˆ (%1$d / %2$d à¤µà¤°à¥à¤•à¤°)</string>
+    <string name="sync_dashboard_worker_idle">à¤¨à¤¿à¤·à¥à¤•à¥à¤°à¤¿à¤¯</string>
+    <string name="sync_dashboard_worker_complete">à¤ªà¥‚à¤°à¥à¤£</string>
+    <string name="sync_dashboard_worker_failed">à¤µà¤¿à¤«à¤²: %1$d à¤µà¤°à¥à¤•à¤° - à¤µà¤¿à¤µà¤°à¤£ à¤¦à¥‡à¤–à¤¨à¥‡ à¤•à¥‡ à¤²à¤¿à¤ à¤Ÿà¥ˆà¤ª à¤•à¤°à¥‡à¤‚</string>
+    <string name="sync_dashboard_no_logs">à¤…à¤­à¥€ à¤¤à¤• à¤•à¥‹à¤ˆ à¤¸à¤¿à¤‚à¤• à¤²à¥‰à¤— à¤¨à¤¹à¥€à¤‚à¥¤ à¤—à¤¤à¤¿à¤µà¤¿à¤§à¤¿ à¤¦à¥‡à¤–à¤¨à¥‡ à¤•à¥‡ à¤²à¤¿à¤ à¤¸à¤¿à¤‚à¤• à¤Ÿà¥à¤°à¤¿à¤—à¤° à¤•à¤°à¥‡à¤‚à¥¤</string>
+    <string name="sync_dashboard_clear_logs">à¤²à¥‰à¤— à¤¸à¤¾à¤«à¤¼ à¤•à¤°à¥‡à¤‚</string>
+    <string name="sync_dashboard_export_logs">à¤²à¥‰à¤— à¤¨à¤¿à¤°à¥à¤¯à¤¾à¤¤ à¤•à¤°à¥‡à¤‚</string>
+    <string name="sync_dashboard_no_log_files">à¤¨à¤¿à¤°à¥à¤¯à¤¾à¤¤ à¤•à¤°à¤¨à¥‡ à¤•à¥‡ à¤²à¤¿à¤ à¤•à¥‹à¤ˆ à¤²à¥‰à¤— à¤«à¤¼à¤¾à¤‡à¤² à¤¨à¤¹à¥€à¤‚</string>
+    <string name="check_if_the_person_has_any_of_these_symptoms">à¤œà¤¾à¤‚à¤šà¥‡à¤‚ à¤•à¤¿ à¤µà¥à¤¯à¤•à¥à¤¤à¤¿ à¤®à¥‡à¤‚ à¤‡à¤¨à¤®à¥‡à¤‚ à¤¸à¥‡ à¤•à¥‹à¤ˆ à¤²à¤•à¥à¤·à¤£ à¤¹à¥ˆ à¤¯à¤¾ à¤¨à¤¹à¥€à¤‚</string>
+    <string name="symptomatic_tb_screening">à¤Ÿà¥€à¤¬à¥€ à¤•à¥‡ à¤²à¤•à¥à¤·à¤£à¥‹à¤‚ à¤•à¥€ à¤œà¤¾à¤‚à¤š</string>
+    <string name="tb_asymptomatic_symptoms">à¤¬à¤¿à¤¨à¤¾ à¤²à¤•à¥à¤·à¤£ à¤µà¤¾à¤²à¥‡ à¤²à¥‹à¤—à¥‹à¤‚ à¤•à¥€ à¤Ÿà¥€à¤¬à¥€ à¤œà¤¾à¤‚à¤š</string>
+    <string name="tb_rise_of_fever">à¤°à¥‹à¤œà¤¾à¤¨à¤¾ à¤¶à¤¾à¤® à¤•à¥‹ à¤¤à¥‡à¤œ à¤¬à¥à¤–à¤¾à¤° à¤†à¤¤à¤¾ à¤¹à¥ˆ?</string>
+    <string name="tb_loss_of_appetite">à¤­à¥‚à¤– à¤•à¤® à¤²à¤—à¤¨à¤¾</string>
+    <string name="tb_age_more_than_60">à¤‰à¤®à¥à¤° 60 à¤µà¤°à¥à¤· à¤¸à¥‡ à¤…à¤§à¤¿à¤•</string>
+    <string name="tb_diabetic">à¤®à¤§à¥à¤®à¥‡à¤¹ à¤°à¥‹à¤—à¥€</string>
+    <string name="tb_tobacco_user">à¤¤à¤‚à¤¬à¤¾à¤•à¥‚ à¤¸à¥‡à¤µà¤¨ à¤•à¤°à¤¨à¥‡ à¤µà¤¾à¤²à¤¾</string>
+    <string name="tb_bmi_less_than_18_5">à¤¬à¥€à¤à¤®à¤†à¤ˆ 18.5 à¤¸à¥‡ à¤•à¤®</string>
+    <string name="tb_contact_with_patient_on_treatment">à¤•à¥à¤¯à¤¾ à¤†à¤ª à¤Ÿà¥€à¤¬à¥€ à¤®à¤°à¥€à¤œ à¤•à¥‡ à¤¸à¤‚à¤ªà¤°à¥à¤• à¤®à¥‡à¤‚ à¤†à¤ à¤¹à¥ˆà¤‚?</string>
+    <string name="tb_history_last_5_years">à¤•à¥à¤¯à¤¾ à¤ªà¤¿à¤›à¤²à¥‡ 5 à¤¸à¤¾à¤² à¤®à¥‡à¤‚ à¤†à¤ªà¤•à¥‹ à¤•à¤­à¥€ à¤Ÿà¥€à¤¬à¥€ (TB) à¤¹à¥à¤ˆ à¤¥à¥€?</string>
+    <string name="value_cannot_be_empty">à¤®à¤¾à¤¨ à¤–à¤¾à¤²à¥€ à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤¸à¤•à¤¤à¤¾</string>
+    <string name="enter_a_valid_number">à¤à¤• à¤®à¤¾à¤¨à¥à¤¯ à¤¸à¤‚à¤–à¥à¤¯à¤¾ à¤¦à¤°à¥à¤œ à¤•à¤°à¥‡à¤‚</string>
+    <string name="allowed_range">à¤…à¤¨à¥à¤®à¤¤ à¤¸à¥€à¤®à¤¾: %1$d à¤¸à¥‡ %2$d</string>
+    <string name="minimum_allowed_value">à¤¨à¥à¤¯à¥‚à¤¨à¤¤à¤® à¤…à¤¨à¥à¤®à¤¤ à¤®à¤¾à¤¨: %1$d</string>
 
     <string-array name="type_of_tb_case">
-        <item>टीबी का नया मामला</item>
-        <item>पहले से इलाज कराए गए टीबी का मामला</item>
-        <item>ड्रग-रेजिस्टेंट टीबी (DR-TB) का मामला</item>
+        <item>à¤Ÿà¥€à¤¬à¥€ à¤•à¤¾ à¤¨à¤¯à¤¾ à¤®à¤¾à¤®à¤²à¤¾</item>
+        <item>à¤ªà¤¹à¤²à¥‡ à¤¸à¥‡ à¤‡à¤²à¤¾à¤œ à¤•à¤°à¤¾à¤ à¤—à¤ à¤Ÿà¥€à¤¬à¥€ à¤•à¤¾ à¤®à¤¾à¤®à¤²à¤¾</item>
+        <item>à¤¡à¥à¤°à¤—-à¤°à¥‡à¤œà¤¿à¤¸à¥à¤Ÿà¥‡à¤‚à¤Ÿ à¤Ÿà¥€à¤¬à¥€ (DR-TB) à¤•à¤¾ à¤®à¤¾à¤®à¤²à¤¾</item>
     </string-array>
 
     <string-array name="ecr_gender_array">
-        <item name="nbr_gender_1">पुरुष</item>
-        <item name="nbr_gender_2">महिला</item>
+        <item name="nbr_gender_1">à¤ªà¥à¤°à¥à¤·</item>
+        <item name="nbr_gender_2">à¤®à¤¹à¤¿à¤²à¤¾</item>
     </string-array>
 
     <string-array name="referral_facility">
-        <item>जिला टीबी केंद्र (DTC)</item>
-        <item>एचडब्ल्यूसी</item>
-        <item>प्राथमिक स्वास्थ्य केंद्र</item>
-        <item>सामुदायिक स्वास्थ्य केंद्र</item>
-        <item>जिला अस्पताल</item>
-        <item>सरकारी मेडिकल कॉलेज</item>
+        <item>à¤œà¤¿à¤²à¤¾ à¤Ÿà¥€à¤¬à¥€ à¤•à¥‡à¤‚à¤¦à¥à¤° (DTC)</item>
+        <item>à¤à¤šà¤¡à¤¬à¥à¤²à¥à¤¯à¥‚à¤¸à¥€</item>
+        <item>à¤ªà¥à¤°à¤¾à¤¥à¤®à¤¿à¤• à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤•à¥‡à¤‚à¤¦à¥à¤°</item>
+        <item>à¤¸à¤¾à¤®à¥à¤¦à¤¾à¤¯à¤¿à¤• à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤•à¥‡à¤‚à¤¦à¥à¤°</item>
+        <item>à¤œà¤¿à¤²à¤¾ à¤…à¤¸à¥à¤ªà¤¤à¤¾à¤²</item>
+        <item>à¤¸à¤°à¤•à¤¾à¤°à¥€ à¤®à¥‡à¤¡à¤¿à¤•à¤² à¤•à¥‰à¤²à¥‡à¤œ</item>
     </string-array>
 
     <string-array name="tb_submitted_yet_suspected">
-        <item>एचडब्ल्यूसी</item>
-        <item>प्राथमिक स्वास्थ्य केंद्र</item>
-        <item>सामुदायिक स्वास्थ्य केंद्र</item>
-        <item>जिला अस्पताल</item>
-        <item>सरकारी मेडिकल कॉलेज</item>
+        <item>à¤à¤šà¤¡à¤¬à¥à¤²à¥à¤¯à¥‚à¤¸à¥€</item>
+        <item>à¤ªà¥à¤°à¤¾à¤¥à¤®à¤¿à¤• à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤•à¥‡à¤‚à¤¦à¥à¤°</item>
+        <item>à¤¸à¤¾à¤®à¥à¤¦à¤¾à¤¯à¤¿à¤• à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤•à¥‡à¤‚à¤¦à¥à¤°</item>
+        <item>à¤œà¤¿à¤²à¤¾ à¤…à¤¸à¥à¤ªà¤¤à¤¾à¤²</item>
+        <item>à¤¸à¤°à¤•à¤¾à¤°à¥€ à¤®à¥‡à¤¡à¤¿à¤•à¤² à¤•à¥‰à¤²à¥‡à¤œ</item>
     </string-array>
 
     <string-array name="adherence_options">
-        <item>नियमित</item>
-        <item>अनियमित</item>
+        <item>à¤¨à¤¿à¤¯à¤®à¤¿à¤¤</item>
+        <item>à¤…à¤¨à¤¿à¤¯à¤®à¤¿à¤¤</item>
     </string-array>
 
     <string-array name="dc_case_status">
-        <item name="dc_suspected">संदिग्ध</item>
-        <item name="dc_confirmed">पुष्टि हुई</item>
-        <item name="dc_not_confirmed">पुष्टि नहीं हुई</item>
-        <item name="dc_treatment">उपचार शुरू हुआ</item>
+        <item name="dc_suspected">à¤¸à¤‚à¤¦à¤¿à¤—à¥à¤§</item>
+        <item name="dc_confirmed">à¤ªà¥à¤·à¥à¤Ÿà¤¿ à¤¹à¥à¤ˆ</item>
+        <item name="dc_not_confirmed">à¤ªà¥à¤·à¥à¤Ÿà¤¿ à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤ˆ</item>
+        <item name="dc_treatment">à¤‰à¤ªà¤šà¤¾à¤° à¤¶à¥à¤°à¥‚ à¤¹à¥à¤†</item>
     </string-array>
 
     <string-array name="benificary_case_status_kalaazar">
-        <item name="dc_not_app">लागू नहीं</item>
-        <item name="dc_recovering">ठीक हो रहे हैं</item>
-        <item name="dc_cured">ठीक हो गए</item>
-        <item name="dc_death">मृत्यु</item>
-        <item name="dc_symp">लक्षण फिर से आए</item>
+        <item name="dc_not_app">à¤²à¤¾à¤—à¥‚ à¤¨à¤¹à¥€à¤‚</item>
+        <item name="dc_recovering">à¤ à¥€à¤• à¤¹à¥‹ à¤°à¤¹à¥‡ à¤¹à¥ˆà¤‚</item>
+        <item name="dc_cured">à¤ à¥€à¤• à¤¹à¥‹ à¤—à¤</item>
+        <item name="dc_death">à¤®à¥ƒà¤¤à¥à¤¯à¥</item>
+        <item name="dc_symp">à¤²à¤•à¥à¤·à¤£ à¤«à¤¿à¤° à¤¸à¥‡ à¤†à¤</item>
     </string-array>
 
     <string-array name="death_place">
-        <item name="home">घर</item>
-        <item name="facility">स्वास्थ्य सुविधा</item>
-        <item name="other">अन्य</item>
+        <item name="home">à¤˜à¤°</item>
+        <item name="facility">à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤¸à¥à¤µà¤¿à¤§à¤¾</item>
+        <item name="other">à¤…à¤¨à¥à¤¯</item>
     </string-array>
 
     <string-array name="reason_death">
-        <item name="fever">बुखार</item>
-        <item name="other_disease">अन्य बीमारी</item>
-        <item name="other">अन्य</item>
+        <item name="fever">à¤¬à¥à¤–à¤¾à¤°</item>
+        <item name="other_disease">à¤…à¤¨à¥à¤¯ à¤¬à¥€à¤®à¤¾à¤°à¥€</item>
+        <item name="other">à¤…à¤¨à¥à¤¯</item>
     </string-array>
 
     <string-array name="benificary_case_status">
-        <item name="dc_not">जांच</item>
-        <item name="dc_death">मृत्यु</item>
+        <item name="dc_not">à¤œà¤¾à¤‚à¤š</item>
+        <item name="dc_death">à¤®à¥ƒà¤¤à¥à¤¯à¥</item>
     </string-array>
 
     <string-array name="dc_refer">
-        <item>प्राथमिक स्वास्थ्य केंद्र</item>
-        <item>सामुदायिक स्वास्थ्य केंद्र</item>
-        <item>जिला अस्पताल</item>
-        <item>मेडिकल कॉलेज और अस्पताल</item>
-        <item>रेफरल अस्पताल</item>
-        <item>अन्य निजी अस्पताल</item>
-        <item>अन्य</item>
+        <item>à¤ªà¥à¤°à¤¾à¤¥à¤®à¤¿à¤• à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤•à¥‡à¤‚à¤¦à¥à¤°</item>
+        <item>à¤¸à¤¾à¤®à¥à¤¦à¤¾à¤¯à¤¿à¤• à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤•à¥‡à¤‚à¤¦à¥à¤°</item>
+        <item>à¤œà¤¿à¤²à¤¾ à¤…à¤¸à¥à¤ªà¤¤à¤¾à¤²</item>
+        <item>à¤®à¥‡à¤¡à¤¿à¤•à¤² à¤•à¥‰à¤²à¥‡à¤œ à¤”à¤° à¤…à¤¸à¥à¤ªà¤¤à¤¾à¤²</item>
+        <item>à¤°à¥‡à¤«à¤°à¤² à¤…à¤¸à¥à¤ªà¤¤à¤¾à¤²</item>
+        <item>à¤…à¤¨à¥à¤¯ à¤¨à¤¿à¤œà¥€ à¤…à¤¸à¥à¤ªà¤¤à¤¾à¤²</item>
+        <item>à¤…à¤¨à¥à¤¯</item>
     </string-array>
 
     <string-array name="dc_refer_malaria">
-        <item>प्राथमिक स्वास्थ्य केंद्र</item>
-        <item>सामुदायिक स्वास्थ्य केंद्र</item>
-        <item>जिला अस्पताल</item>
-        <item>मेडिकल कॉलेज और अस्पताल</item>
-        <item>रेफरल अस्पताल</item>
-        <item>अन्य निजी अस्पताल</item>
-        <item>अन्य</item>
-        <item>कोई नहीं</item>
+        <item>à¤ªà¥à¤°à¤¾à¤¥à¤®à¤¿à¤• à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤•à¥‡à¤‚à¤¦à¥à¤°</item>
+        <item>à¤¸à¤¾à¤®à¥à¤¦à¤¾à¤¯à¤¿à¤• à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤•à¥‡à¤‚à¤¦à¥à¤°</item>
+        <item>à¤œà¤¿à¤²à¤¾ à¤…à¤¸à¥à¤ªà¤¤à¤¾à¤²</item>
+        <item>à¤®à¥‡à¤¡à¤¿à¤•à¤² à¤•à¥‰à¤²à¥‡à¤œ à¤”à¤° à¤…à¤¸à¥à¤ªà¤¤à¤¾à¤²</item>
+        <item>à¤°à¥‡à¤«à¤°à¤² à¤…à¤¸à¥à¤ªà¤¤à¤¾à¤²</item>
+        <item>à¤…à¤¨à¥à¤¯ à¤¨à¤¿à¤œà¥€ à¤…à¤¸à¥à¤ªà¤¤à¤¾à¤²</item>
+        <item>à¤…à¤¨à¥à¤¯</item>
+        <item>à¤•à¥‹à¤ˆ à¤¨à¤¹à¥€à¤‚</item>
     </string-array>
 
     <string-array name="daysPv">
-        <item>दिन 1</item>
-        <item>दिन 2</item>
-        <item>दिन 3</item>
-        <item>दिन 4</item>
+        <item>à¤¦à¤¿à¤¨ 1</item>
+        <item>à¤¦à¤¿à¤¨ 2</item>
+        <item>à¤¦à¤¿à¤¨ 3</item>
+        <item>à¤¦à¤¿à¤¨ 4</item>
 
     </string-array>
 
     <string-array name="daysPf">
-        <item>दिन 1</item>
-        <item>दिन 2</item>
-        <item>दिन 3</item>
+        <item>à¤¦à¤¿à¤¨ 1</item>
+        <item>à¤¦à¤¿à¤¨ 2</item>
+        <item>à¤¦à¤¿à¤¨ 3</item>
     </string-array>
 
     <string-array name="hbyc_month_array">
-        <item name="hbyc_month_3">3 महीने</item>
-        <item name="hbyc_month_4">4 महीने</item>
-        <item name="hbyc_month_5">5 महीने</item>
-        <item name="hbyc_month_6">6 महीने</item>
-        <item name="hbyc_month_7">7 महीने</item>
-        <item name="hbyc_month_8">8 महीने</item>
-        <item name="hbyc_month_9">9 महीने</item>
-        <item name="hbyc_month_10">10 महीने</item>
-        <item name="hbyc_month_11">11 महीने</item>
-        <item name="hbyc_month_12">12 महीने</item>
-        <item name="hbyc_month_13">13 महीने</item>
-        <item name="hbyc_month_14">14 महीने</item>
-        <item name="hbyc_month_15">15 महीने</item>
+        <item name="hbyc_month_3">3 à¤®à¤¹à¥€à¤¨à¥‡</item>
+        <item name="hbyc_month_4">4 à¤®à¤¹à¥€à¤¨à¥‡</item>
+        <item name="hbyc_month_5">5 à¤®à¤¹à¥€à¤¨à¥‡</item>
+        <item name="hbyc_month_6">6 à¤®à¤¹à¥€à¤¨à¥‡</item>
+        <item name="hbyc_month_7">7 à¤®à¤¹à¥€à¤¨à¥‡</item>
+        <item name="hbyc_month_8">8 à¤®à¤¹à¥€à¤¨à¥‡</item>
+        <item name="hbyc_month_9">9 à¤®à¤¹à¥€à¤¨à¥‡</item>
+        <item name="hbyc_month_10">10 à¤®à¤¹à¥€à¤¨à¥‡</item>
+        <item name="hbyc_month_11">11 à¤®à¤¹à¥€à¤¨à¥‡</item>
+        <item name="hbyc_month_12">12 à¤®à¤¹à¥€à¤¨à¥‡</item>
+        <item name="hbyc_month_13">13 à¤®à¤¹à¥€à¤¨à¥‡</item>
+        <item name="hbyc_month_14">14 à¤®à¤¹à¥€à¤¨à¥‡</item>
+        <item name="hbyc_month_15">15 à¤®à¤¹à¥€à¤¨à¥‡</item>
     </string-array>
 
     <string-array name="hbnc_place_of_delivery_array">
-        <item name="hbnc_place_of_delivery_1">घर</item>
-        <item name="hbnc_place_of_delivery_2">स्वास्थ्य केंद्र</item>
-        <item name="hbnc_place_of_delivery_3">सामुदायिक स्वास्थ्य केंद्र</item>
-        <item name="hbnc_place_of_delivery_4">प्राथमिक स्वास्थ्य केंद्र</item>
+        <item name="hbnc_place_of_delivery_1">à¤˜à¤°</item>
+        <item name="hbnc_place_of_delivery_2">à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤•à¥‡à¤‚à¤¦à¥à¤°</item>
+        <item name="hbnc_place_of_delivery_3">à¤¸à¤¾à¤®à¥à¤¦à¤¾à¤¯à¤¿à¤• à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤•à¥‡à¤‚à¤¦à¥à¤°</item>
+        <item name="hbnc_place_of_delivery_4">à¤ªà¥à¤°à¤¾à¤¥à¤®à¤¿à¤• à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤•à¥‡à¤‚à¤¦à¥à¤°</item>
     </string-array>
 
     <string-array name="hbnc_visit_days">
-        <item>पहला दिन</item>
-        <item>तीसरा दिन</item>
-        <item>सातवां दिन</item>
-        <item>चौदहवां दिन</item>
-        <item>इक्कीसवां दिन</item>
-        <item>अट्ठाईसवां दिन</item>
-        <item>बयालीसवां दिन</item>
+        <item>à¤ªà¤¹à¤²à¤¾ à¤¦à¤¿à¤¨</item>
+        <item>à¤¤à¥€à¤¸à¤°à¤¾ à¤¦à¤¿à¤¨</item>
+        <item>à¤¸à¤¾à¤¤à¤µà¤¾à¤‚ à¤¦à¤¿à¤¨</item>
+        <item>à¤šà¥Œà¤¦à¤¹à¤µà¤¾à¤‚ à¤¦à¤¿à¤¨</item>
+        <item>à¤‡à¤•à¥à¤•à¥€à¤¸à¤µà¤¾à¤‚ à¤¦à¤¿à¤¨</item>
+        <item>à¤…à¤Ÿà¥à¤ à¤¾à¤ˆà¤¸à¤µà¤¾à¤‚ à¤¦à¤¿à¤¨</item>
+        <item>à¤¬à¤¯à¤¾à¤²à¥€à¤¸à¤µà¤¾à¤‚ à¤¦à¤¿à¤¨</item>
     </string-array>
 
     <string-array name="body_part_male">
-        <item>दाएं हाथ</item>
-        <item>बाएं हाथ</item>
-        <item>दाएं पैर</item>
-        <item>बाएं पैर</item>
-        <item>हाइड्रोसील</item>
-        <item>अन्य</item>
+        <item>à¤¦à¤¾à¤à¤‚ à¤¹à¤¾à¤¥</item>
+        <item>à¤¬à¤¾à¤à¤‚ à¤¹à¤¾à¤¥</item>
+        <item>à¤¦à¤¾à¤à¤‚ à¤ªà¥ˆà¤°</item>
+        <item>à¤¬à¤¾à¤à¤‚ à¤ªà¥ˆà¤°</item>
+        <item>à¤¹à¤¾à¤‡à¤¡à¥à¤°à¥‹à¤¸à¥€à¤²</item>
+        <item>à¤…à¤¨à¥à¤¯</item>
     </string-array>
 
     <string-array name="body_part_female">
-        <item>दाएं हाथ</item>
-        <item>बाएं हाथ</item>
-        <item>दाएं पैर</item>
-        <item>बाएं पैर</item>
-        <item>दाईं ओर स्तन</item>
-        <item>बाईं ओर स्तन</item>
-        <item>अन्य</item>
+        <item>à¤¦à¤¾à¤à¤‚ à¤¹à¤¾à¤¥</item>
+        <item>à¤¬à¤¾à¤à¤‚ à¤¹à¤¾à¤¥</item>
+        <item>à¤¦à¤¾à¤à¤‚ à¤ªà¥ˆà¤°</item>
+        <item>à¤¬à¤¾à¤à¤‚ à¤ªà¥ˆà¤°</item>
+        <item>à¤¦à¤¾à¤ˆà¤‚ à¤“à¤° à¤¸à¥à¤¤à¤¨</item>
+        <item>à¤¬à¤¾à¤ˆà¤‚ à¤“à¤° à¤¸à¥à¤¤à¤¨</item>
+        <item>à¤…à¤¨à¥à¤¯</item>
     </string-array>
 
     <string-array name="side_effect_of_medicine">
-        <item>F (बुखार)</item>
-        <item>H (सिरदर्द)</item>
-        <item>B (शरीर में दर्द)</item>
-        <item>V (उल्टी)</item>
-        <item>N (नजला)</item>
-        <item>O (अन्य)</item>
-        <item>कोई नहीं</item>
+        <item>F (à¤¬à¥à¤–à¤¾à¤°)</item>
+        <item>H (à¤¸à¤¿à¤°à¤¦à¤°à¥à¤¦)</item>
+        <item>B (à¤¶à¤°à¥€à¤° à¤®à¥‡à¤‚ à¤¦à¤°à¥à¤¦)</item>
+        <item>V (à¤‰à¤²à¥à¤Ÿà¥€)</item>
+        <item>N (à¤¨à¤œà¤²à¤¾)</item>
+        <item>O (à¤…à¤¨à¥à¤¯)</item>
+        <item>à¤•à¥‹à¤ˆ à¤¨à¤¹à¥€à¤‚</item>
     </string-array>
 
     <string-array name="mdsr_cause_of_death_type">
-        <item>संदिग्ध मातृ मृत्यु</item>
-        <item>गैर-मातृ मृत्यु</item>
+        <item>à¤¸à¤‚à¤¦à¤¿à¤—à¥à¤§ à¤®à¤¾à¤¤à¥ƒ à¤®à¥ƒà¤¤à¥à¤¯à¥</item>
+        <item>à¤—à¥ˆà¤°-à¤®à¤¾à¤¤à¥ƒ à¤®à¥ƒà¤¤à¥à¤¯à¥</item>
     </string-array>
 
     <string-array name="tb_regimen_types">
-        <item>डीएस-टीबी (6 महीने)</item>
-        <item>छोटा रेजिमेन (9–12 महीने)</item>
-        <item>लंबा रेजिमेन (18–24 महीने)</item>
-        <item>बीपीएएल रेजिमेन (6 महीने)</item>
-        <item>आईएनएच मोनो (6 महीने)</item>
+        <item>à¤¡à¥€à¤à¤¸-à¤Ÿà¥€à¤¬à¥€ (6 à¤®à¤¹à¥€à¤¨à¥‡)</item>
+        <item>à¤›à¥‹à¤Ÿà¤¾ à¤°à¥‡à¤œà¤¿à¤®à¥‡à¤¨ (9â€“12 à¤®à¤¹à¥€à¤¨à¥‡)</item>
+        <item>à¤²à¤‚à¤¬à¤¾ à¤°à¥‡à¤œà¤¿à¤®à¥‡à¤¨ (18â€“24 à¤®à¤¹à¥€à¤¨à¥‡)</item>
+        <item>à¤¬à¥€à¤ªà¥€à¤à¤à¤² à¤°à¥‡à¤œà¤¿à¤®à¥‡à¤¨ (6 à¤®à¤¹à¥€à¤¨à¥‡)</item>
+        <item>à¤†à¤ˆà¤à¤¨à¤à¤š à¤®à¥‹à¤¨à¥‹ (6 à¤®à¤¹à¥€à¤¨à¥‡)</item>
     </string-array>
 
-    <string name="btn_cancel">रद्द करें</string>
-    <string name="filter_sort_by">क्रमबद्ध करें</string>
-    <string name="filter_newest_first">नवीनतम पहले</string>
-    <string name="filter_oldest_first">सबसे पुराना पहले</string>
-    <string name="filter_age_wise">उम्र के अनुसार</string>
-    <string name="filter_syncing_first">सिंकिंग डेटा पहले</string>
-    <string name="filter_unsynced_first">असिंक्ड पहले</string>
-    <string name="bp_invalid_format">अमान्य प्रारूप। जैसे 123/56 होना चाहिए</string>
-    <string name="bp_systole_less_than">सिस्टोल %d से कम नहीं होना चाहिए</string>
-    <string name="bp_systole_greater_than">सिस्टोल %d से अधिक नहीं होना चाहिए</string>
-    <string name="bp_diastole_less_than">डायस्टोल %d से कम नहीं होना चाहिए</string>
-    <string name="bp_diastole_greater_than">डायस्टोल %d से अधिक नहीं होना चाहिए</string>
-    <string name="bp_diastole_greater_than_systole">डायस्टोल सिस्टोल से अधिक नहीं हो सकता</string>
-    <string name="weight_enter_in_grams">कृपया वजन ग्राम में दर्ज करें</string>
-    <string name="weight_cannot_be_zero">वजन 0 नहीं हो सकता</string>
-    <string name="weight_enter_in_grams_example">कृपया वजन ग्राम में दर्ज करें (जैसे 2500)</string>
-    <string name="weight_min_500">वजन कम से कम 500 ग्राम होना चाहिए</string>
-    <string name="weight_max_7000">वजन 7000 ग्राम से अधिक नहीं होना चाहिए</string>
+    <string name="btn_cancel">à¤°à¤¦à¥à¤¦ à¤•à¤°à¥‡à¤‚</string>
+    <string name="filter_sort_by">à¤•à¥à¤°à¤®à¤¬à¤¦à¥à¤§ à¤•à¤°à¥‡à¤‚</string>
+    <string name="filter_newest_first">à¤¨à¤µà¥€à¤¨à¤¤à¤® à¤ªà¤¹à¤²à¥‡</string>
+    <string name="filter_oldest_first">à¤¸à¤¬à¤¸à¥‡ à¤ªà¥à¤°à¤¾à¤¨à¤¾ à¤ªà¤¹à¤²à¥‡</string>
+    <string name="filter_age_wise">à¤‰à¤®à¥à¤° à¤•à¥‡ à¤…à¤¨à¥à¤¸à¤¾à¤°</string>
+    <string name="filter_syncing_first">à¤¸à¤¿à¤‚à¤•à¤¿à¤‚à¤— à¤¡à¥‡à¤Ÿà¤¾ à¤ªà¤¹à¤²à¥‡</string>
+    <string name="filter_unsynced_first">à¤…à¤¸à¤¿à¤‚à¤•à¥à¤¡ à¤ªà¤¹à¤²à¥‡</string>
+    <string name="bp_invalid_format">à¤…à¤®à¤¾à¤¨à¥à¤¯ à¤ªà¥à¤°à¤¾à¤°à¥‚à¤ªà¥¤ à¤œà¥ˆà¤¸à¥‡ 123/56 à¤¹à¥‹à¤¨à¤¾ à¤šà¤¾à¤¹à¤¿à¤</string>
+    <string name="bp_systole_less_than">à¤¸à¤¿à¤¸à¥à¤Ÿà¥‹à¤² %d à¤¸à¥‡ à¤•à¤® à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹à¤¨à¤¾ à¤šà¤¾à¤¹à¤¿à¤</string>
+    <string name="bp_systole_greater_than">à¤¸à¤¿à¤¸à¥à¤Ÿà¥‹à¤² %d à¤¸à¥‡ à¤…à¤§à¤¿à¤• à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹à¤¨à¤¾ à¤šà¤¾à¤¹à¤¿à¤</string>
+    <string name="bp_diastole_less_than">à¤¡à¤¾à¤¯à¤¸à¥à¤Ÿà¥‹à¤² %d à¤¸à¥‡ à¤•à¤® à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹à¤¨à¤¾ à¤šà¤¾à¤¹à¤¿à¤</string>
+    <string name="bp_diastole_greater_than">à¤¡à¤¾à¤¯à¤¸à¥à¤Ÿà¥‹à¤² %d à¤¸à¥‡ à¤…à¤§à¤¿à¤• à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹à¤¨à¤¾ à¤šà¤¾à¤¹à¤¿à¤</string>
+    <string name="bp_diastole_greater_than_systole">à¤¡à¤¾à¤¯à¤¸à¥à¤Ÿà¥‹à¤² à¤¸à¤¿à¤¸à¥à¤Ÿà¥‹à¤² à¤¸à¥‡ à¤…à¤§à¤¿à¤• à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤¸à¤•à¤¤à¤¾</string>
+    <string name="weight_enter_in_grams">à¤•à¥ƒà¤ªà¤¯à¤¾ à¤µà¤œà¤¨ à¤—à¥à¤°à¤¾à¤® à¤®à¥‡à¤‚ à¤¦à¤°à¥à¤œ à¤•à¤°à¥‡à¤‚</string>
+    <string name="weight_cannot_be_zero">à¤µà¤œà¤¨ 0 à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤¸à¤•à¤¤à¤¾</string>
+    <string name="weight_enter_in_grams_example">à¤•à¥ƒà¤ªà¤¯à¤¾ à¤µà¤œà¤¨ à¤—à¥à¤°à¤¾à¤® à¤®à¥‡à¤‚ à¤¦à¤°à¥à¤œ à¤•à¤°à¥‡à¤‚ (à¤œà¥ˆà¤¸à¥‡ 2500)</string>
+    <string name="weight_min_500">à¤µà¤œà¤¨ à¤•à¤® à¤¸à¥‡ à¤•à¤® 500 à¤—à¥à¤°à¤¾à¤® à¤¹à¥‹à¤¨à¤¾ à¤šà¤¾à¤¹à¤¿à¤</string>
+    <string name="weight_max_7000">à¤µà¤œà¤¨ 7000 à¤—à¥à¤°à¤¾à¤® à¤¸à¥‡ à¤…à¤§à¤¿à¤• à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹à¤¨à¤¾ à¤šà¤¾à¤¹à¤¿à¤</string>
     <string name="are_you_sure">Are you Sure?</string>
 
-    <string name="follow_up_date_required_or_invalid">फॉलो-अप तारीख आवश्यक या अमान्य है</string>
-    <string name="main_visit_not_found">मुख्य विजिट नहीं मिली</string>
-    <string name="invalid_treatment_date_in_db">डेटाबेस में उपचार तारीख अमान्य है</string>
-    <string name="follow_up_must_be_after_treatment">फॉलो-अप उपचार शुरू होने की तारीख (%s) के बाद होना चाहिए</string>
-    <string name="follow_up_must_be_next_month">फॉलो-अप वर्तमान विजिट के अंतिम फॉलो-अप के तुरंत अगले महीने में होना चाहिए</string>
-    <string name="follow_up_cannot_be_future_month">फॉलो-अप भविष्य के महीने में नहीं हो सकता</string>
-    <string name="dynamic_form_select">%s चुनें</string>
-    <string name="field_is_invalid">%s अमान्य है</string>
-    <string name="field_must_be_number">%s एक संख्या होनी चाहिए</string>
+    <string name="follow_up_date_required_or_invalid">à¤«à¥‰à¤²à¥‹-à¤…à¤ª à¤¤à¤¾à¤°à¥€à¤– à¤†à¤µà¤¶à¥à¤¯à¤• à¤¯à¤¾ à¤…à¤®à¤¾à¤¨à¥à¤¯ à¤¹à¥ˆ</string>
+    <string name="main_visit_not_found">à¤®à¥à¤–à¥à¤¯ à¤µà¤¿à¤œà¤¿à¤Ÿ à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¥€</string>
+    <string name="invalid_treatment_date_in_db">à¤¡à¥‡à¤Ÿà¤¾à¤¬à¥‡à¤¸ à¤®à¥‡à¤‚ à¤‰à¤ªà¤šà¤¾à¤° à¤¤à¤¾à¤°à¥€à¤– à¤…à¤®à¤¾à¤¨à¥à¤¯ à¤¹à¥ˆ</string>
+    <string name="follow_up_must_be_after_treatment">à¤«à¥‰à¤²à¥‹-à¤…à¤ª à¤‰à¤ªà¤šà¤¾à¤° à¤¶à¥à¤°à¥‚ à¤¹à¥‹à¤¨à¥‡ à¤•à¥€ à¤¤à¤¾à¤°à¥€à¤– (%s) à¤•à¥‡ à¤¬à¤¾à¤¦ à¤¹à¥‹à¤¨à¤¾ à¤šà¤¾à¤¹à¤¿à¤</string>
+    <string name="follow_up_must_be_next_month">à¤«à¥‰à¤²à¥‹-à¤…à¤ª à¤µà¤°à¥à¤¤à¤®à¤¾à¤¨ à¤µà¤¿à¤œà¤¿à¤Ÿ à¤•à¥‡ à¤…à¤‚à¤¤à¤¿à¤® à¤«à¥‰à¤²à¥‹-à¤…à¤ª à¤•à¥‡ à¤¤à¥à¤°à¤‚à¤¤ à¤…à¤—à¤²à¥‡ à¤®à¤¹à¥€à¤¨à¥‡ à¤®à¥‡à¤‚ à¤¹à¥‹à¤¨à¤¾ à¤šà¤¾à¤¹à¤¿à¤</string>
+    <string name="follow_up_cannot_be_future_month">à¤«à¥‰à¤²à¥‹-à¤…à¤ª à¤­à¤µà¤¿à¤·à¥à¤¯ à¤•à¥‡ à¤®à¤¹à¥€à¤¨à¥‡ à¤®à¥‡à¤‚ à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤¸à¤•à¤¤à¤¾</string>
+    <string name="dynamic_form_select">%s à¤šà¥à¤¨à¥‡à¤‚</string>
+    <string name="field_is_invalid">%s à¤…à¤®à¤¾à¤¨à¥à¤¯ à¤¹à¥ˆ</string>
+    <string name="field_must_be_number">%s à¤à¤• à¤¸à¤‚à¤–à¥à¤¯à¤¾ à¤¹à¥‹à¤¨à¥€ à¤šà¤¾à¤¹à¤¿à¤</string>
 
-    <string name="field_min_value">%1$s कम से कम %2$s होना चाहिए</string>
-    <string name="field_max_value">%1$s अधिकतम %2$s होना चाहिए</string>
-    <string name="field_date_invalid">%s तारीख अमान्य है</string>
-    <string name="field_date_before">%1$s %2$s से पहले नहीं हो सकता</string>
-    <string name="field_date_after">%1$s %2$s के बाद नहीं हो सकता</string>
-    <string name="field_is_required">%s आवश्यक है</string>
+    <string name="field_min_value">%1$s à¤•à¤® à¤¸à¥‡ à¤•à¤® %2$s à¤¹à¥‹à¤¨à¤¾ à¤šà¤¾à¤¹à¤¿à¤</string>
+    <string name="field_max_value">%1$s à¤…à¤§à¤¿à¤•à¤¤à¤® %2$s à¤¹à¥‹à¤¨à¤¾ à¤šà¤¾à¤¹à¤¿à¤</string>
+    <string name="field_date_invalid">%s à¤¤à¤¾à¤°à¥€à¤– à¤…à¤®à¤¾à¤¨à¥à¤¯ à¤¹à¥ˆ</string>
+    <string name="field_date_before">%1$s %2$s à¤¸à¥‡ à¤ªà¤¹à¤²à¥‡ à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤¸à¤•à¤¤à¤¾</string>
+    <string name="field_date_after">%1$s %2$s à¤•à¥‡ à¤¬à¤¾à¤¦ à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤¸à¤•à¤¤à¤¾</string>
+    <string name="field_is_required">%s à¤†à¤µà¤¶à¥à¤¯à¤• à¤¹à¥ˆ</string>
+    <string name="dashboard_greeting_subtitle">à¤†à¤œ à¤…à¤¸à¤° à¤¬à¤¨à¤¾à¤¨à¥‡ à¤•à¤¾ à¤¦à¤¿à¤¨ à¤¹à¥ˆ</string>
+    <string name="dashboard_stay_safe">à¤¸à¥à¤°à¤•à¥à¤·à¤¿à¤¤ à¤°à¤¹à¥‡à¤‚</string>
+    <string name="home_greeting_subtitle">à¤†à¤ªà¤•à¥‡ à¤°à¥‹à¤œà¤¼ à¤•à¥‡ à¤•à¤¾à¤®à¥‹à¤‚ à¤•à¤¾ à¤¤à¥à¤µà¤°à¤¿à¤¤ à¤à¤•à¥à¤¸à¥‡à¤¸</string>
+    <string name="home_quick_actions">à¤¤à¥à¤µà¤°à¤¿à¤¤ à¤•à¤¾à¤°à¥à¤¯</string>
+    <string name="home_card_all_ben_subtitle">à¤¸à¤­à¥€ à¤²à¤¾à¤­à¤¾à¤°à¥à¤¥à¤¿à¤¯à¥‹à¤‚ à¤•à¥‹ à¤¦à¥‡à¤–à¥‡à¤‚ à¤”à¤° à¤ªà¥à¤°à¤¬à¤‚à¤§à¤¿à¤¤ à¤•à¤°à¥‡à¤‚</string>
+    <string name="home_card_tb_subtitle">à¤Ÿà¥€à¤¬à¥€ à¤¸à¥à¤•à¥à¤°à¥€à¤¨à¤¿à¤‚à¤— à¤”à¤° à¤¸à¤¹à¤¾à¤¯à¤¤à¤¾ à¤•à¥‹ à¤Ÿà¥à¤°à¥ˆà¤• à¤•à¤°à¥‡à¤‚</string>
+    <string name="home_card_ncd_subtitle">à¤à¤¨à¤¸à¥€à¤¡à¥€ à¤•à¤¾à¤°à¥à¤¯à¤ªà¥à¤°à¤µà¤¾à¤¹ à¤ªà¥à¤°à¤¬à¤‚à¤§à¤¿à¤¤ à¤•à¤°à¥‡à¤‚</string>
+    <string name="home_card_referral_subtitle">à¤°à¥‡à¤«à¤° à¤•à¤¿à¤ à¤—à¤ à¤®à¤¾à¤®à¤²à¥‹à¤‚ à¤ªà¤° à¤«à¥‰à¤²à¥‹-à¤…à¤ª à¤•à¤°à¥‡à¤‚</string>
+    <string name="home_card_rch_subtitle">RCH ID à¤¸à¥‡ à¤œà¥à¤¡à¤¼à¥‡ à¤²à¤¾à¤­à¤¾à¤°à¥à¤¥à¥€</string>
+    <string name="home_card_ncd_eligible_subtitle">à¤ªà¤¾à¤¤à¥à¤° à¤²à¤¾à¤­à¤¾à¤°à¥à¤¥à¤¿à¤¯à¥‹à¤‚ à¤•à¥€ à¤¸à¥à¤•à¥à¤°à¥€à¤¨à¤¿à¤‚à¤— à¤”à¤° à¤ªà¥à¤°à¤¬à¤‚à¤§à¤¨ à¤•à¤°à¥‡à¤‚</string>
+    <string name="home_card_ncd_priority_subtitle">à¤‰à¤šà¥à¤š à¤ªà¥à¤°à¤¾à¤¥à¤®à¤¿à¤•à¤¤à¤¾ NCD à¤«à¥‰à¤²à¥‹-à¤…à¤ª à¤Ÿà¥à¤°à¥ˆà¤• à¤•à¤°à¥‡à¤‚</string>
+    <string name="home_card_ncd_non_priority_subtitle">à¤•à¤® à¤œà¥‹à¤–à¤¿à¤® à¤µà¤¾à¤²à¥‡ à¤¸à¥à¤•à¥à¤°à¥€à¤¨ à¤•à¤¿à¤ à¤²à¤¾à¤­à¤¾à¤°à¥à¤¥à¤¿à¤¯à¥‹à¤‚ à¤•à¥‹ à¤ªà¥à¤°à¤¬à¤‚à¤§à¤¿à¤¤ à¤•à¤°à¥‡à¤‚</string>
+    <string name="home_card_tb_screening_subtitle">à¤Ÿà¥€à¤¬à¥€ à¤¸à¥à¤•à¥à¤°à¥€à¤¨à¤¿à¤‚à¤— à¤¶à¥à¤°à¥‚ à¤•à¤°à¥‡à¤‚ à¤”à¤° à¤¸à¤®à¥€à¤•à¥à¤·à¤¾ à¤•à¤°à¥‡à¤‚</string>
+    <string name="home_card_tb_suspected_short_subtitle">à¤¸à¤‚à¤¦à¤¿à¤—à¥à¤§ à¤Ÿà¥€à¤¬à¥€ à¤®à¤¾à¤®à¤²à¥‹à¤‚ à¤ªà¤° à¤«à¥‰à¤²à¥‹-à¤…à¤ª à¤•à¤°à¥‡à¤‚</string>
+    <string name="home_card_tb_confirmed_short_subtitle">à¤ªà¥à¤·à¥à¤Ÿà¤¿ à¤•à¤¿à¤ à¤—à¤ à¤Ÿà¥€à¤¬à¥€ à¤°à¥‹à¤—à¤¿à¤¯à¥‹à¤‚ à¤•à¥‹ à¤Ÿà¥à¤°à¥ˆà¤• à¤•à¤°à¥‡à¤‚</string>
+    <string name="view_details">à¤µà¤¿à¤µà¤°à¤£ à¤¦à¥‡à¤–à¥‡à¤‚</string>
+    <string name="dashboard_tb_screening_subtitle">à¤ªà¤¹à¥à¤‚à¤š à¤”à¤° à¤¸à¥à¤•à¥à¤°à¥€à¤¨à¤¿à¤‚à¤— à¤•à¥€ à¤®à¤¾à¤¤à¥à¤°à¤¾ à¤Ÿà¥à¤°à¥ˆà¤• à¤•à¤°à¥‡à¤‚</string>
+    <string name="dashboard_tb_suspected_subtitle">à¤‰à¤šà¥à¤š à¤œà¥‹à¤–à¤¿à¤® à¤µà¤¾à¤²à¥‡ à¤¸à¤‚à¤¦à¤¿à¤—à¥à¤§ à¤®à¤¾à¤®à¤²à¥‹à¤‚ à¤ªà¤° à¤«à¥‰à¤²à¥‹-à¤…à¤ª à¤•à¤°à¥‡à¤‚</string>
+    <string name="dashboard_tb_confirmed_subtitle">à¤ªà¥à¤·à¥à¤Ÿà¤¿ à¤°à¥‹à¤—à¤¿à¤¯à¥‹à¤‚ à¤•à¥€ à¤¨à¤¿à¤—à¤°à¤¾à¤¨à¥€ à¤”à¤° à¤¸à¤¹à¤¾à¤¯à¤¤à¤¾ à¤•à¤°à¥‡à¤‚</string>
+    <string name="dashboard_nikshay_subtitle">à¤²à¤¿à¤‚à¤• à¤•à¤¿à¤ à¤—à¤ à¤²à¤¾à¤­à¤¾à¤°à¥à¤¥à¥€ à¤‰à¤ªà¤šà¤¾à¤° ID</string>
+    <string name="dashboard_abha_subtitle">à¤¡à¤¿à¤œà¤¿à¤Ÿà¤² à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ ID à¤µà¤¾à¤²à¥‡ à¤²à¤¾à¤­à¤¾à¤°à¥à¤¥à¥€</string>
+    <string name="tb_asymptomatic_screening">लक्षणरहित स्क्रीनिंग</string>
+    <string name="tb_referral_required">रेफरल आवश्यक</string>
+    <string name="tb_referral_for">किसके लिए रेफरल</string>
+    <string name="tb_family_contact_screening_alert">कृपया इस लाभार्थी के सभी परिवार सदस्यों और नज़दीकी संपर्कों की टीबी स्क्रीनिंग करें।</string>
+    <string name="tb_screening_referral_reason">टीबी स्क्रीनिंग रेफरल</string>
+
+    <string-array name="tb_referral_tests">
+        <item>एआई कफ असेसमेंट</item>
+        <item>डिजिटल चेस्ट एक्स-रे</item>
+        <item>स्पुटम कलेक्शन</item>
+        <item>True NAT</item>
+    </string-array>
+    <string name="tb_is_digital_chest_xray_conducted">à¤•à¥à¤¯à¤¾ à¤¡à¤¿à¤œà¤¿à¤Ÿà¤² à¤šà¥‡à¤¸à¥à¤Ÿ à¤à¤•à¥à¤¸-à¤°à¥‡ à¤•à¤¿à¤¯à¤¾ à¤—à¤¯à¤¾?</string>
+    <string name="tb_digital_chest_xray_result">à¤¡à¤¿à¤œà¤¿à¤Ÿà¤² à¤šà¥‡à¤¸à¥à¤Ÿ à¤à¤•à¥à¤¸-à¤°à¥‡ à¤œà¤¾à¤‚à¤š à¤•à¤¾ à¤ªà¤°à¤¿à¤£à¤¾à¤®</string>
+    <string name="tb_ai_cough_assessment_conducted">à¤•à¥à¤¯à¤¾ à¤à¤†à¤ˆ à¤•à¤« à¤…à¤¸à¥‡à¤¸à¤®à¥‡à¤‚à¤Ÿ à¤•à¤¿à¤¯à¤¾ à¤—à¤¯à¤¾?</string>
+    <string name="tb_ai_cough_assessment_result">à¤à¤†à¤ˆ à¤•à¤« à¤…à¤¸à¥‡à¤¸à¤®à¥‡à¤‚à¤Ÿ à¤•à¤¾ à¤ªà¤°à¤¿à¤£à¤¾à¤®</string>
+    <string name="tb_naat_conducted">à¤•à¥à¤¯à¤¾ True NAT à¤•à¤¿à¤¯à¤¾ à¤—à¤¯à¤¾?</string>
+    <string name="tb_naat_result">True NAT à¤•à¤¾ à¤ªà¤°à¤¿à¤£à¤¾à¤®</string>
+    <string name="tb_suspected_alert_confirmed">à¤¯à¤¹ à¤²à¤¾à¤­à¤¾à¤°à¥à¤¥à¥€ à¤…à¤¬ à¤ªà¥à¤·à¥à¤Ÿ à¤Ÿà¥€à¤¬à¥€ à¤®à¤¾à¤®à¤²à¥‹à¤‚ à¤®à¥‡à¤‚ à¤œà¤¾à¤à¤—à¤¾à¥¤</string>
+
+    <string-array name="tb_suspected_sample_submitted_at">
+        <item>DMC</item>
+        <item>DH</item>
+        <item>à¤¸à¥€à¤à¤šà¤¸à¥€</item>
+        <item>à¤ªà¥€à¤à¤šà¤¸à¥€</item>
+        <item>SC</item>
+    </string-array>
+    <string name="vital_screen">वाइटल स्क्रीन</string>
+    <string name="vital_screen_placeholder">लाभार्थी आईडी %1$d के लिए वाइटल स्क्रीन</string>
+    <string name="vital_details">वाइटल विवरण</string>
+    <string name="temperature">तापमान</string>
+    <string name="pulse_rate">नाड़ी दर</string>
+    <string name="bp_systolic">सिस्टोलिक बीपी</string>
+    <string name="bp_diastolic">डायस्टोलिक बीपी</string>
+    <string name="respiratory_rate">श्वसन दर</string>
+    <string name="spo2_label">एसपीओ2</string>
+    <string name="rbs">आरबीएस</string>
+    <string name="height">लंबाई</string>
+    <string name="weight">वज़न</string>
+    <string name="bmi">बीएमआई</string>
+    <string name="anthropometry">मानवमिति</string>
+    <string name="invalid_height_weight">कृपया सही लंबाई और वज़न दर्ज करें</string>
+    <string name="vitals_saved_successfully">वाइटल सफलतापूर्वक सहेजे गए।</string>
+    <string name="vitals_save_failed">वाइटल सहेजे नहीं जा सके।</string>
+    <string name="tb_digital_chest_xray_conducted">क्या डिजिटल चेस्ट एक्स-रे किया गया?</string>
+    <string name="tb_sputum_sample_collected">क्या थूक का सैंपल एकत्र किया गया?</string>
+    <string name="tb_suspected_quick_title">डायग्नॉस्टिक्स</string>
+    <string name="tb_suspected_quick_info">इस लाभार्थी के लिए किए गए टेस्ट चुनें।</string>
+    <string name="tb_suspected_quick_save_failed">टीबी संदिग्ध विवरण सहेजे नहीं जा सके।</string>
+    <string name="referral_digital_chest_xray">डिजिटल चेस्ट एक्स-रे</string>
+    <string name="referral_true_nat">ट्रू नॉट</string>
+    <string name="referral_hwc">हेल्थ एंड वेलनेस सेंटर</string>
+    <string name="referral_liquid_culture">लिक्विड कल्चर</string>
+    <string name="tb_liquid_culture_conducted">क्या लिक्विड कल्चर किया गया?</string>
+    <string name="tb_liquid_culture_result">लिक्विड कल्चर का परिणाम</string>
+    <string name="result">परिणाम</string>
 </resources>
+
+

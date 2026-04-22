@@ -98,8 +98,12 @@ class FormInputAdapter(
             oldItem.id == newItem.id
 
         override fun areContentsTheSame(oldItem: FormElement, newItem: FormElement): Boolean {
-            Timber.d("${oldItem.id}   ${oldItem.errorText} ${newItem.errorText}")
-            return oldItem.errorText == newItem.errorText
+            Timber.d("${oldItem.id} error:${oldItem.errorText} value:${oldItem.value}")
+            return oldItem.errorText == newItem.errorText &&
+                oldItem.value == newItem.value &&
+                oldItem.isEnabled == newItem.isEnabled &&
+                oldItem.required == newItem.required &&
+                oldItem.title == newItem.title
         }
     }
 
@@ -426,7 +430,8 @@ class FormInputAdapter(
         fun bind(
             item: FormElement, isEnabled: Boolean, formValueListener: FormValueListener?
         ) {
-            if (!isEnabled) {
+            val effectiveEnabled = isEnabled && item.isEnabled
+            if (!effectiveEnabled) {
                 binding.rg.isClickable = false
                 binding.rg.isFocusable = false
             }
@@ -482,7 +487,7 @@ class FormInputAdapter(
                             )
                         }
 
-                        if (!isEnabled) rdBtn.buttonTintList = colorStateList
+                        if (!effectiveEnabled) rdBtn.buttonTintList = colorStateList
                         rdBtn.text = it
                         addView(rdBtn)
                         if (item.value == it) rdBtn.isChecked = true
@@ -520,7 +525,7 @@ class FormInputAdapter(
                 }
             }
 
-            if (!isEnabled) {
+            if (!effectiveEnabled) {
                 binding.rg.children.forEach {
                     it.isClickable = false
                 }
@@ -579,6 +584,7 @@ class FormInputAdapter(
         ) {
             binding.form = item
             binding.llChecks.removeAllViews()
+            val effectiveEnabled = isEnabled && item.isEnabled
 
             val selectedIndexes = item.value
                 ?.split("|")
@@ -590,7 +596,7 @@ class FormInputAdapter(
 
                 val cbx = CheckBox(binding.root.context)
                 cbx.text = text
-                cbx.isEnabled = isEnabled
+                cbx.isEnabled = effectiveEnabled
                 cbx.isChecked = selectedIndexes.contains(index)
                 cbx.setOnCheckedChangeListener { _, isChecked ->
 
@@ -940,8 +946,18 @@ class FormInputAdapter(
                 )
                 item.errorText = null
                 binding.tilEditTextDate.error = null
-                item.min?.let { datePickerDialog.datePicker.minDate = it }
-                item.max?.let { datePickerDialog.datePicker.maxDate = it }
+                val effectiveMin = item.min
+                val effectiveMax = item.max
+                when {
+                    effectiveMin != null && effectiveMax != null && effectiveMin > effectiveMax -> {
+                        datePickerDialog.datePicker.minDate = effectiveMax
+                        datePickerDialog.datePicker.maxDate = effectiveMax
+                    }
+                    else -> {
+                        effectiveMin?.let { datePickerDialog.datePicker.minDate = it }
+                        effectiveMax?.let { datePickerDialog.datePicker.maxDate = it }
+                    }
+                }
                 if (item.showYearFirstInDatePicker)
                     datePickerDialog.datePicker.touchables[0].performClick()
                 datePickerDialog.show()

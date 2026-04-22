@@ -5,7 +5,10 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/side_nav_bar"
-    android:padding="@dimen/padding_normal"
+    android:paddingStart="20dp"
+    android:paddingTop="24dp"
+    android:paddingEnd="20dp"
+    android:paddingBottom="24dp"
     android:theme="@style/ThemeOverlay.AppCompat.Dark">
 
     <ImageView
@@ -14,7 +17,7 @@
         android:layout_height="72dp"
         android:layout_alignParentStart="true"
         android:layout_centerVertical="true"
-        android:background="@drawable/bg_circular"
+        android:background="@drawable/bg_dashboard_chip"
         android:padding="@dimen/padding_tiny"
         android:contentDescription="@string/nav_header_desc"
         app:srcCompat="@drawable/ic_person" />
@@ -22,7 +25,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginTop="15dp"
+        android:layout_marginTop="8dp"
         android:layout_toEndOf="@id/iv_profile_pic"
         android:gravity="center_vertical"
         android:orientation="vertical"
@@ -32,15 +35,20 @@
         <TextView
             android:id="@+id/tv_nav_name"
             style="@style/nav_header_item_tv"
-            />
+            android:textColor="@color/md_theme_light_onPrimary"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tv_nav_role"
-            style="@style/nav_header_item_tv" />
+            style="@style/nav_header_item_tv"
+            android:alpha="0.92"
+            android:textColor="@color/md_theme_light_onPrimary" />
 
         <TextView
             android:id="@+id/tv_nav_id"
-            style="@style/nav_header_item_tv" />
+            style="@style/nav_header_item_tv"
+            android:alpha="0.82"
+            android:textColor="@color/md_theme_light_onPrimary" />
 
     </LinearLayout>
 </RelativeLayout>

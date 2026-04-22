@@ -55,6 +55,14 @@ class TBSuspectedViewModel @Inject constructor(
     val formList = dataset.listFlow
 
     private lateinit var tbSuspected: TBSuspectedCache
+    var capturedLatitude: Double? = null
+    var capturedLongitude: Double? = null
+    var capturedAddress: String? = preferenceDao.getLocationRecord()?.let {
+        listOf(it.village.name, it.block.name, it.district.name, it.state.name)
+            .filter { name -> name.isNotBlank() }
+            .distinct()
+            .joinToString(", ")
+    }
 
     init {
         viewModelScope.launch {
@@ -66,17 +74,19 @@ class TBSuspectedViewModel @Inject constructor(
                     benId = ben.beneficiaryId,
                 )
             }
+            val tbScreening = tbRepo.getTBScreening(benId)
 
             tbRepo.getTBSuspected(benId)?.let {
                 tbSuspected = it
-                _recordExists.value = true
+                _recordExists.value = isFullFormSubmitted(it)
             } ?: run {
                 _recordExists.value = false
             }
 
             dataset.setUpPage(
                 ben,
-                if (recordExists.value == true) tbSuspected else null
+                tbScreening,
+                if (::tbSuspected.isInitialized) tbSuspected else null
             )
 
         }
@@ -95,6 +105,9 @@ class TBSuspectedViewModel @Inject constructor(
                 try {
                     _state.postValue(State.SAVING)
                     dataset.mapValues(tbSuspected, 1)
+                    tbSuspected.latitude = capturedLatitude
+                    tbSuspected.longitude = capturedLongitude
+                    tbSuspected.address = capturedAddress
                     tbRepo.saveTBSuspected(tbSuspected)
                     _state.postValue(State.SAVE_SUCCESS)
                 } catch (e: Exception) {
@@ -110,7 +123,11 @@ class TBSuspectedViewModel @Inject constructor(
     }
 
     fun getAlerts(): String? {
-        return dataset.isTestPositive()
+        return dataset.getAlerts()
+    }
+
+    private fun isFullFormSubmitted(cache: TBSuspectedCache): Boolean {
+        return !cache.visitLabel.isNullOrBlank()
     }
 
 }

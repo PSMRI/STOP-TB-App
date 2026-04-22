@@ -8,13 +8,17 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Locale
 import javax.inject.Inject
 
 @HiltViewModel
 class SchedulerViewModel @Inject constructor(
-    recordsRepo: RecordsRepo
+    recordsRepo: RecordsRepo,
+    preferenceDao: PreferenceDao
 ) : ViewModel() {
 
     enum class State { LOADING, LOADED }
@@ -26,6 +30,17 @@ class SchedulerViewModel @Inject constructor(
     val abhaOldGeneratedCount: Flow<Int> = recordsRepo.benWithOldAbhaListCount
     val abhaNewGeneratedCount: Flow<Int> = recordsRepo.benWithNewAbhaListCount
     val rchIdCount: Flow<Int> = recordsRepo.benWithRchListCount
+    val allBenCount: Flow<Int> = recordsRepo.allBenListCount
+    val tbCount: Flow<Int> = recordsRepo.tbScreeningListCount
+    val ncdCount: Flow<Int> = recordsRepo.getNcdEligibleListCount
+    val referralCount: Flow<Int> = recordsRepo.getNcdrefferedListCount
+
+    private val firstName = preferenceDao.getLoggedInUser()
+        ?.name
+        ?.trim()
+        ?.substringBefore(" ")
+        ?.takeIf { it.isNotEmpty() }
+        ?: "User"
 
     private val _date = MutableLiveData(
         Calendar.getInstance().apply {
@@ -35,6 +50,11 @@ class SchedulerViewModel @Inject constructor(
         }.timeInMillis
     )
     val date: LiveData<Long> get() = _date
+
+    fun getFirstName(): String = firstName
+
+    val formattedDate: String
+        get() = SimpleDateFormat("dd MMM", Locale.ENGLISH).format(_date.value ?: System.currentTimeMillis())
 
     fun setDate(dateLong: Long) {
         _date.value = dateLong

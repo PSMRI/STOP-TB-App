@@ -45,12 +45,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             clickListener: ClickListener?,
             pref: PreferenceDao?
         ) {
-
-            if (pref?.getLoggedInUser()?.role.equals("asha", true)) {
-                binding.btnFormTb.visibility = View.VISIBLE
-            } else {
-                binding.btnFormTb.visibility = View.INVISIBLE
-            }
+            binding.btnFormTb.visibility = View.VISIBLE
 
             binding.benWithTb = item
 

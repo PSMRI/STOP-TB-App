@@ -2,8 +2,8 @@
 <resources>
 
     <string name="menu_home">ঘৰ</string>
-    <string name="menu_home_home">ঘৰ</string>
-    <string name="menu_home_scheduler">সূচীকাৰক</string>
+    <string name="menu_home_home">হোম</string>
+    <string name="menu_home_scheduler">ডেশবৰ্ড</string>
     <string name="icon_title_household">সমস্ত পাৰিবাৰিক তালিকা</string>
     <string name="icon_title_ben">সমস্ত হিতাধিকাৰীৰ তালিকা</string>
     <string name="icon_title_ec">উপযুক্ত দম্পতিৰ তালিকা</string>

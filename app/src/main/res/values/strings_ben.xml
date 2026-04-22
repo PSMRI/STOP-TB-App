@@ -10,7 +10,7 @@
     <string name="other_enter_religion">Other - Enter Religion</string>
     <string name="has_aadhaar_number">Has Aadhaar Number</string>
     <string name="enter_aadhaar_number_ben">Enter Aadhaar Number</string>
-    <string name="reproductive_status">Status Of Women</string>
+    <string name="reproductive_status">Are you pregnant</string>
     <string name="birth_certificate_number">Birth Certificate No.</string>
     <string name="beneficiary_details">Beneficiary Details</string>
     <string name="wife_s_name">Wife\'s Name</string>
@@ -21,6 +21,7 @@
     <string name="father_s_name">Father\'s Name</string>
     <string name="mother_s_name">Mother\'s Name</string>
     <string name="mobile_number_of">Mobile Number Of</string>
+    <string name="whose_mobile_number">Whose mobile number</string>
     <string name="other_mobile_number_of">Other - Mobile Number of</string>
     <string name="rch_id_ben">RCH ID</string>
     <string name="nbr_age">Age</string>
@@ -39,7 +40,7 @@
     <string name="nbr_nb_last_name">Last Name / Surname</string>
     <string name="beneficiary_details_ben">Beneficiary Details</string>
     <string name="id_details">ID Details</string>
-    <string name="reproductive_status_ben">Status Of Women</string>
+    <string name="reproductive_status_ben">Are you pregnant</string>
     <string name="enable_gps">Enable GPS</string>
     <string name="gps_is_not_enabled_do_you_want_to_go_to_settings_menu">GPS is not enabled. Do you want to go to settings menu?</string>
     <string name="settings">Settings</string>
@@ -107,6 +108,11 @@
 
     <string-array name="nbr_reproductive_status_array5">
         <item>Elderly Woman</item>
+    </string-array>
+
+    <string-array name="nbr_reproductive_status_married_women_array">
+        <item>Yes</item>
+        <item>No</item>
     </string-array>
 
     <string name="dd_ec">Eligible Couple</string>

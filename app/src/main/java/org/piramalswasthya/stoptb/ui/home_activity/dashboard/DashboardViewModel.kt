@@ -139,6 +139,10 @@ class DashboardViewModel @Inject constructor(
         val (startTime, endTime) = getTimeRange()
         val village = selectedVillageId
 
+        _tbScreening.value = TbGenderBreakdown()
+        _tbSuspected.value = TbGenderBreakdown()
+        _tbConfirmed.value = TbGenderBreakdown()
+
         // TB Screening breakdown
         collectJobs += viewModelScope.launch {
             tbDao.getDashboardTbScreeningCount(village, startTime, endTime, "", 0).collect { total ->
@@ -162,6 +166,12 @@ class DashboardViewModel @Inject constructor(
             tbDao.getDashboardTbScreeningCount(village, startTime, endTime, "", 1).collect { children ->
                 val current = _tbScreening.value ?: TbGenderBreakdown()
                 _tbScreening.value = current.copy(children = children)
+            }
+        }
+        collectJobs += viewModelScope.launch {
+            tbDao.getDashboardTbScreeningCount(village, startTime, endTime, "TRANSGENDER", 0).collect { others ->
+                val current = _tbScreening.value ?: TbGenderBreakdown()
+                _tbScreening.value = current.copy(others = others)
             }
         }
 
@@ -190,6 +200,12 @@ class DashboardViewModel @Inject constructor(
                 _tbSuspected.value = current.copy(children = children)
             }
         }
+        collectJobs += viewModelScope.launch {
+            tbDao.getDashboardTbSuspectedCount(village, startTime, endTime, "TRANSGENDER", 0).collect { others ->
+                val current = _tbSuspected.value ?: TbGenderBreakdown()
+                _tbSuspected.value = current.copy(others = others)
+            }
+        }
 
         // TB Confirmed breakdown
         collectJobs += viewModelScope.launch {
@@ -216,6 +232,12 @@ class DashboardViewModel @Inject constructor(
                 _tbConfirmed.value = current.copy(children = children)
             }
         }
+        collectJobs += viewModelScope.launch {
+            tbDao.getDashboardTbConfirmedCount(village, startTime, endTime, "TRANSGENDER", 0).collect { others ->
+                val current = _tbConfirmed.value ?: TbGenderBreakdown()
+                _tbConfirmed.value = current.copy(others = others)
+            }
+        }
 
         // NIKSHAY count
         collectJobs += viewModelScope.launch {
@@ -232,9 +254,4 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    // Calculate "Others" = total - male - female - children
-    fun getOthersCount(breakdown: TbGenderBreakdown): Int {
-        val others = breakdown.total - breakdown.male - breakdown.female - breakdown.children
-        return if (others > 0) others else 0
-    }
 }

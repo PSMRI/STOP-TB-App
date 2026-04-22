@@ -118,6 +118,7 @@ class VolunteerActivity : AppCompatActivity() {
             .findFragmentById(R.id.nav_host_fragment_volunteer) as NavHostFragment
         navHostFragment.navController
     }
+    private lateinit var appBarConfiguration: AppBarConfiguration
 
     override fun attachBaseContext(newBase: Context) {
         val pref = EntryPointAccessors.fromApplication(
@@ -225,7 +226,7 @@ class VolunteerActivity : AppCompatActivity() {
         setSupportActionBar(binding.toolbar)
         binding.navView.setupWithNavController(navController)
 
-        val appBarConfiguration = AppBarConfiguration.Builder(
+        appBarConfiguration = AppBarConfiguration.Builder(
             setOf(R.id.volunteerHomeFragment)
         ).setOpenableLayout(binding.drawerLayout).build()
 
@@ -280,6 +281,12 @@ class VolunteerActivity : AppCompatActivity() {
         binding.ivToolbar.setImageResource(icon)
         binding.toolbar.title = null
         binding.tvToolbar.text = title
+    }
+
+    fun restoreToolbarNavigation() {
+        if (!::appBarConfiguration.isInitialized) return
+        NavigationUI.setupWithNavController(binding.toolbar, navController, appBarConfiguration)
+        NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration)
     }
 
     override fun onPause() {

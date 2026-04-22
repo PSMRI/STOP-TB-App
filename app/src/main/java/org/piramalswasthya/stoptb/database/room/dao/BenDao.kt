@@ -211,6 +211,30 @@ interface BenDao {
             OR (:source = 4 AND gender = 'Female' AND isDeath = 0
                 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
                 AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
+            OR (:source = 5 AND isDeath = 0 AND tbsnFilled = 1 AND benId IN (
+                SELECT v.benId FROM BEN_VITALS v
+                WHERE IFNULL(v.temperature, 0) >= 100
+                   OR IFNULL(v.pulseRate, 0) < 60
+                   OR IFNULL(v.pulseRate, 0) > 90
+                   OR IFNULL(v.bpSystolic, 0) < 90
+                   OR IFNULL(v.bpSystolic, 0) > 140
+                   OR IFNULL(v.bpDiastolic, 0) < 60
+                   OR IFNULL(v.bpDiastolic, 0) > 90
+                   OR IFNULL(v.rbs, 0) < 60
+                   OR IFNULL(v.rbs, 0) > 90
+            ))
+            OR (:source = 6 AND isDeath = 0 AND benId IN (
+                SELECT ts.benId FROM TB_SUSPECTED ts
+                WHERE ts.isChestXRayDone IS NOT NULL
+            ))
+            OR (:source = 7 AND isDeath = 0 AND benId IN (
+                SELECT ts.benId FROM TB_SUSPECTED ts
+                WHERE ts.isNaatConducted IS NOT NULL
+            ))
+            OR (:source = 8 AND isDeath = 0 AND benId IN (
+                SELECT ts.benId FROM TB_SUSPECTED ts
+                WHERE ts.isLiquidCultureConducted IS NOT NULL
+            ))
         )
         AND (:filterType = 0
             OR (:filterType = 1 AND abhaId IS NOT NULL)
@@ -246,6 +270,30 @@ interface BenDao {
             OR (:source = 4 AND gender = 'Female' AND isDeath = 0
                 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
                 AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
+            OR (:source = 5 AND isDeath = 0 AND tbsnFilled = 1 AND benId IN (
+                SELECT v.benId FROM BEN_VITALS v
+                WHERE IFNULL(v.temperature, 0) >= 100
+                   OR IFNULL(v.pulseRate, 0) < 60
+                   OR IFNULL(v.pulseRate, 0) > 90
+                   OR IFNULL(v.bpSystolic, 0) < 90
+                   OR IFNULL(v.bpSystolic, 0) > 140
+                   OR IFNULL(v.bpDiastolic, 0) < 60
+                   OR IFNULL(v.bpDiastolic, 0) > 90
+                   OR IFNULL(v.rbs, 0) < 60
+                   OR IFNULL(v.rbs, 0) > 90
+            ))
+            OR (:source = 6 AND isDeath = 0 AND benId IN (
+                SELECT ts.benId FROM TB_SUSPECTED ts
+                WHERE ts.isChestXRayDone IS NOT NULL
+            ))
+            OR (:source = 7 AND isDeath = 0 AND benId IN (
+                SELECT ts.benId FROM TB_SUSPECTED ts
+                WHERE ts.isNaatConducted IS NOT NULL
+            ))
+            OR (:source = 8 AND isDeath = 0 AND benId IN (
+                SELECT ts.benId FROM TB_SUSPECTED ts
+                WHERE ts.isLiquidCultureConducted IS NOT NULL
+            ))
         )
         AND (:filterType = 0
             OR (:filterType = 1 AND abhaId IS NOT NULL)
@@ -286,6 +334,30 @@ interface BenDao {
             OR (:source = 4 AND gender = 'Female' AND isDeath = 0
                 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
                 AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
+            OR (:source = 5 AND isDeath = 0 AND tbsnFilled = 1 AND benId IN (
+                SELECT v.benId FROM BEN_VITALS v
+                WHERE IFNULL(v.temperature, 0) >= 100
+                   OR IFNULL(v.pulseRate, 0) < 60
+                   OR IFNULL(v.pulseRate, 0) > 90
+                   OR IFNULL(v.bpSystolic, 0) < 90
+                   OR IFNULL(v.bpSystolic, 0) > 140
+                   OR IFNULL(v.bpDiastolic, 0) < 60
+                   OR IFNULL(v.bpDiastolic, 0) > 90
+                   OR IFNULL(v.rbs, 0) < 60
+                   OR IFNULL(v.rbs, 0) > 90
+            ))
+            OR (:source = 6 AND isDeath = 0 AND benId IN (
+                SELECT ts.benId FROM TB_SUSPECTED ts
+                WHERE ts.isChestXRayDone IS NOT NULL
+            ))
+            OR (:source = 7 AND isDeath = 0 AND benId IN (
+                SELECT ts.benId FROM TB_SUSPECTED ts
+                WHERE ts.isNaatConducted IS NOT NULL
+            ))
+            OR (:source = 8 AND isDeath = 0 AND benId IN (
+                SELECT ts.benId FROM TB_SUSPECTED ts
+                WHERE ts.isLiquidCultureConducted IS NOT NULL
+            ))
         )
         AND (:filterType = 0
             OR (:filterType = 1 AND abhaId IS NOT NULL)
@@ -340,6 +412,13 @@ interface BenDao {
     @Transaction
     @Query("SELECT * FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0")
     fun getAllTbScreeningBen(selectedVillage: Int): Flow<List<BenWithTbScreeningCache>>
+
+    @Transaction
+    @Query("SELECT * FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0 and tbsnFilled = 0")
+    fun getPendingTbScreeningBen(selectedVillage: Int): Flow<List<BenWithTbScreeningCache>>
+
+    @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0 and tbsnFilled = 0")
+    fun getPendingTbScreeningCount(selectedVillage: Int): Flow<Int>
 
     @Transaction
     @Query("SELECT * FROM BEN_BASIC_CACHE where villageId = :selectedVillage and hhId = :hhId  and isDeactivate=0")
@@ -573,6 +652,72 @@ interface BenDao {
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE WHERE reproductiveStatusId = 2 and isDeactivate=0 and villageId=:selectedVillage")
     fun getAllPregnancyWomenListCount(selectedVillage: Int): Flow<Int>
 
+    @Query("""
+        SELECT COUNT(*) FROM BEN_BASIC_CACHE
+        WHERE villageId = :selectedVillage
+          AND isDeactivate = 0
+          AND isDeath = 0
+          AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) < 5
+    """)
+    fun getUnderFiveChildrenCount(selectedVillage: Int): Flow<Int>
+
+    @Query("""
+        SELECT COUNT(*) FROM BEN_BASIC_CACHE
+        WHERE villageId = :selectedVillage
+          AND isDeactivate = 0
+          AND isDeath = 0
+          AND tbsnFilled = 1
+          AND benId IN (
+            SELECT v.benId FROM BEN_VITALS v
+            WHERE IFNULL(v.temperature, 0) >= 100
+               OR IFNULL(v.pulseRate, 0) < 60
+               OR IFNULL(v.pulseRate, 0) > 90
+               OR IFNULL(v.bpSystolic, 0) < 90
+               OR IFNULL(v.bpSystolic, 0) > 140
+               OR IFNULL(v.bpDiastolic, 0) < 60
+               OR IFNULL(v.bpDiastolic, 0) > 90
+               OR IFNULL(v.rbs, 0) < 60
+               OR IFNULL(v.rbs, 0) > 90
+          )
+    """)
+    fun getHwcBenDataCount(selectedVillage: Int): Flow<Int>
+
+    @Query("""
+        SELECT COUNT(*) FROM BEN_BASIC_CACHE
+        WHERE villageId = :selectedVillage
+          AND isDeactivate = 0
+          AND isDeath = 0
+          AND benId IN (
+            SELECT ts.benId FROM TB_SUSPECTED ts
+            WHERE ts.isChestXRayDone IS NOT NULL
+          )
+    """)
+    fun getDigitalChestXRayBenCount(selectedVillage: Int): Flow<Int>
+
+    @Query("""
+        SELECT COUNT(*) FROM BEN_BASIC_CACHE
+        WHERE villageId = :selectedVillage
+          AND isDeactivate = 0
+          AND isDeath = 0
+          AND benId IN (
+            SELECT ts.benId FROM TB_SUSPECTED ts
+            WHERE ts.isNaatConducted IS NOT NULL
+          )
+    """)
+    fun getTrueNatBenCount(selectedVillage: Int): Flow<Int>
+
+    @Query("""
+        SELECT COUNT(*) FROM BEN_BASIC_CACHE
+        WHERE villageId = :selectedVillage
+          AND isDeactivate = 0
+          AND isDeath = 0
+          AND benId IN (
+            SELECT ts.benId FROM TB_SUSPECTED ts
+            WHERE ts.isLiquidCultureConducted IS NOT NULL
+          )
+    """)
+    fun getLiquidCultureBenCount(selectedVillage: Int): Flow<Int>
+
 
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE WHERE reproductiveStatusId = 1 and gender = 'FEMALE' and isDeactivate=0 and villageId=:selectedVillage")
     fun getAllNonPregnancyWomenListCount(selectedVillage: Int): Flow<Int>
@@ -697,7 +842,19 @@ interface BenDao {
     fun getScreeningList(villageId: Int): Flow<List<BenBasicCache>>
 
     @Transaction
-    @Query("select b.* from BEN_BASIC_CACHE b inner join tb_screening t on  b.benId = t.benId LEFT JOIN TB_SUSPECTED ts ON b.benId = ts.benId  where villageId = :villageId and isDeactivate=0 and tbsnFilled = 1 and (t.bloodInSputum =1 or t.coughMoreThan2Weeks = 1 or feverMoreThan2Weeks = 1 or nightSweats = 1 or lossOfWeight = 1 or historyOfTb = 1)AND (\n" +
+    @Query("select b.* from BEN_BASIC_CACHE b inner join tb_screening t on b.benId = t.benId LEFT JOIN TB_SUSPECTED ts ON b.benId = ts.benId where villageId = :villageId and isDeactivate=0 and tbsnFilled = 1 and (\n" +
+            "            t.bloodInSputum = 1\n" +
+            "            OR t.coughMoreThan2Weeks = 1\n" +
+            "            OR t.feverMoreThan2Weeks = 1\n" +
+            "            OR t.riseOfFever = 1\n" +
+            "            OR t.lossOfAppetite = 1\n" +
+            "            OR t.lossOfWeight = 1\n" +
+            "            OR t.nightSweats = 1\n" +
+            "            OR t.historyOfTb = 1\n" +
+            "            OR t.takingAntiTBDrugs = 1\n" +
+            "            OR CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) <= 5\n" +
+            "            OR b.reproductiveStatusId = 1\n" +
+            "        ) AND (\n" +
             "            ts.benId IS NULL\n" +
             "            OR ts.isConfirmed = 0\n" +
             "        )")
@@ -720,10 +877,15 @@ interface BenDao {
     SELECT  r.*, b.*
    FROM BEN_BASIC_CACHE b
    INNER JOIN NCD_REFER r ON b.benId = r.benId
-   WHERE CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= :min
-     AND b.reproductiveStatusId != 2
-     AND b.villageId = :selectedVillage
+   WHERE b.villageId = :selectedVillage
      AND b.isDeactivate = 0
+     AND (
+       r.type = "TB"
+       OR (
+         CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= :min
+         AND b.reproductiveStatusId != 2
+       )
+     )
    ORDER BY b.regDate DESC
 """)
     fun getBenWithReferredCbac(
@@ -736,10 +898,15 @@ interface BenDao {
   SELECT COUNT(b.benId)
     FROM BEN_BASIC_CACHE b
     INNER JOIN NCD_REFER r ON b.benId = r.benId
-      AND CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= :min
-      AND b.reproductiveStatusId != 2
       AND b.villageId = :selectedVillage
       AND b.isDeactivate=0
+      AND (
+        r.type = "TB"
+        OR (
+          CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= :min
+          AND b.reproductiveStatusId != 2
+        )
+      )
 """)
     fun getReferredBenCount(
         selectedVillage: Int,
@@ -770,6 +937,34 @@ interface BenDao {
     fun getReferredHWCBenList(
         selectedVillage: Int,
     ):  Flow<List<BenWithCbacAndReferalCache>>
+
+    @Query("""
+        SELECT COUNT(b.benId)
+        FROM BEN_BASIC_CACHE b
+        INNER JOIN NCD_REFER r ON b.benId = r.benId
+        WHERE b.villageId = :selectedVillage
+          AND b.isDeactivate = 0
+          AND r.type = "TB"
+          AND r.refrredToAdditionalServiceList IS NOT NULL
+          AND r.refrredToAdditionalServiceList LIKE '%' || :serviceName || '%'
+    """)
+    fun getTbReferralServiceCount(
+        selectedVillage: Int,
+        serviceName: String
+    ): Flow<Int>
+
+    @Query("""
+        SELECT COUNT(b.benId)
+        FROM BEN_BASIC_CACHE b
+        INNER JOIN NCD_REFER r ON b.benId = r.benId
+        WHERE b.villageId = :selectedVillage
+          AND b.isDeactivate = 0
+          AND r.referredToInstituteName = :instituteName
+    """)
+    fun getReferralInstituteCount(
+        selectedVillage: Int,
+        instituteName: String
+    ): Flow<Int>
 
 
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE b where CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER)  >= :min and b.reproductiveStatusId!=2 and isDeactivate=0 and b.villageId=:selectedVillage")

@@ -207,6 +207,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
             supportFragmentManager.findFragmentById(R.id.nav_host_fragment_home) as NavHostFragment
         navHostFragment.navController
     }
+    private lateinit var appBarConfiguration: AppBarConfiguration
 
     var showMenuHome: Boolean = false
 
@@ -659,7 +660,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
 
         binding.navView.setupWithNavController(navController)
 
-        val appBarConfiguration = AppBarConfiguration.Builder(
+        appBarConfiguration = AppBarConfiguration.Builder(
             setOf(
                 R.id.homeFragment, R.id.allBenFragment
             )
@@ -775,6 +776,12 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
             binding.toolbar.title = null
             binding.tvToolbar.text = it
         }
+    }
+
+    fun restoreToolbarNavigation() {
+        if (!::appBarConfiguration.isInitialized) return
+        NavigationUI.setupWithNavController(binding.toolbar, navController, appBarConfiguration)
+        NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration)
     }
 
     @Deprecated("Deprecated in Java")

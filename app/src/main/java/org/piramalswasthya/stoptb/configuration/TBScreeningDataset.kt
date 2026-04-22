@@ -3,441 +3,303 @@ package org.piramalswasthya.stoptb.configuration
 import android.content.Context
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.helpers.Languages
+import org.piramalswasthya.stoptb.model.BenBasicCache
 import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.FormElement
 import org.piramalswasthya.stoptb.model.InputType
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 
 class TBScreeningDataset(
-    context: Context, currentLanguage: Languages
+    context: Context,
+    currentLanguage: Languages
 ) : Dataset(context, currentLanguage) {
 
+    private var benAgeYears: Int = 0
+
+    private val yesValue get() = resources.getStringArray(R.array.yes_no)[0]
+    private val noValue get() = resources.getStringArray(R.array.yes_no)[1]
+
     private val symptomaticLabel = FormElement(
-        id = 14,
+        id = 100,
         inputType = InputType.HEADLINE,
         title = resources.getString(R.string.symptomatic_tb_screening),
         required = false
     )
 
     private val checkSymptomsLabel = FormElement(
-        id = 14,
+        id = 101,
         inputType = InputType.HEADLINE,
         title = resources.getString(R.string.check_if_the_person_has_any_of_these_symptoms),
         required = false
     )
+
     private val dateOfVisit = FormElement(
         id = 1,
         inputType = InputType.DATE_PICKER,
         title = resources.getString(R.string.tracking_date),
-        arrayId = -1,
         required = true,
         max = System.currentTimeMillis(),
         hasDependants = true
-
     )
 
     private val isCoughing = FormElement(
-        id = 4,
+        id = 2,
         inputType = InputType.RADIO,
         title = resources.getString(R.string.cbac_coughing),
         entries = resources.getStringArray(R.array.yes_no),
         required = true,
-        hasDependants = false
+        hasDependants = true
     )
 
-    private var bloodInSputum = FormElement(
-        id = 5,
+    private val bloodInSputum = FormElement(
+        id = 3,
         inputType = InputType.RADIO,
         title = resources.getString(R.string.cbac_blsputum),
         entries = resources.getStringArray(R.array.yes_no),
         required = true,
-        hasDependants = false
+        hasDependants = true
     )
 
-    private var isFever = FormElement(
-        id = 6,
+    private val isFever = FormElement(
+        id = 4,
         inputType = InputType.RADIO,
         title = resources.getString(R.string.cbac_feverwks),
         entries = resources.getStringArray(R.array.yes_no),
         required = true,
-        hasDependants = false
+        hasDependants = true
     )
 
-    private var lossOfWeight = FormElement(
+    private val riseOfFever = FormElement(
+        id = 5,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.tb_rise_of_fever),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = true,
+        hasDependants = true
+    )
+
+    private val lossOfAppetite = FormElement(
+        id = 6,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.tb_loss_of_appetite),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = true,
+        hasDependants = true
+    )
+
+    private val lossOfWeight = FormElement(
         id = 7,
         inputType = InputType.RADIO,
         title = resources.getString(R.string.cbac_lsweight),
         entries = resources.getStringArray(R.array.yes_no),
         required = true,
-        hasDependants = false
+        hasDependants = true
     )
 
-    private var nightSweats = FormElement(
-        id = 7,
+    private val nightSweats = FormElement(
+        id = 8,
         inputType = InputType.RADIO,
         title = resources.getString(R.string.cbac_ntswets),
         entries = resources.getStringArray(R.array.yes_no),
         required = true,
-        hasDependants = false
+        hasDependants = true
     )
 
-    private var historyOfTB = FormElement(
-        id = 7,
+    private val historyOfTB = FormElement(
+        id = 9,
         inputType = InputType.RADIO,
         title = resources.getString(R.string.cbac_histb),
         entries = resources.getStringArray(R.array.yes_no),
         required = true,
-        hasDependants = false
+        hasDependants = true
     )
 
-    private var currentlyTakingDrugs = FormElement(
-        id = 7,
+    private val currentlyTakingDrugs = FormElement(
+        id = 10,
         inputType = InputType.RADIO,
         title = resources.getString(R.string.cbac_taking_tb_drug),
         entries = resources.getStringArray(R.array.yes_no),
         required = true,
         doubleStar = true,
-        hasDependants = false
+        hasDependants = true
     )
 
-    private var familyHistoryTB = FormElement(
-        id = 7,
+    private val familyHistoryTB = FormElement(
+        id = 11,
         inputType = InputType.RADIO,
         title = resources.getString(R.string.cbac_fh_tb),
         entries = resources.getStringArray(R.array.yes_no),
+        required = true,
         doubleStar = true,
-        required = true,
-        hasDependants = false
+        hasDependants = true
     )
 
-    private var riseOfFever = FormElement(
-        id = 7,
-        inputType = InputType.RADIO,
-        title = resources.getString(R.string.tb_rise_of_fever),
-        entries = resources.getStringArray(R.array.yes_no),
-        doubleStar = false,
-        required = true,
-        hasDependants = false
-    )
-
-
-    private var lossOfAppetite = FormElement(
-        id = 7,
-        inputType = InputType.RADIO,
-        title = resources.getString(R.string.tb_loss_of_appetite),
-        entries = resources.getStringArray(R.array.yes_no),
-        doubleStar = false,
-        required = true,
-        hasDependants = false
-    )
-    private val aSymptomaticLabel = FormElement(
-        id = 14,
+    private val asymptomaticLabel = FormElement(
+        id = 102,
         inputType = InputType.HEADLINE,
-        title = resources.getString(R.string.tb_asymptomatic_symptoms),
+        title = resources.getString(R.string.tb_asymptomatic_screening),
         required = false
     )
+
     private val checkSymptomsLabel1 = FormElement(
-        id = 14,
+        id = 103,
         inputType = InputType.HEADLINE,
         title = resources.getString(R.string.check_if_the_person_has_any_of_these_symptoms),
         required = false
     )
-    private var age = FormElement(
-        id = 7,
+
+    private val age = FormElement(
+        id = 12,
         inputType = InputType.RADIO,
         title = resources.getString(R.string.tb_age_more_than_60),
         entries = resources.getStringArray(R.array.yes_no),
-        doubleStar = false,
         required = true,
-        hasDependants = false
+        isEnabled = false
     )
-    private var diabetic = FormElement(
-        id = 7,
+
+    private val diabetic = FormElement(
+        id = 13,
         inputType = InputType.RADIO,
         title = resources.getString(R.string.tb_diabetic),
         entries = resources.getStringArray(R.array.yes_no),
-        doubleStar = false,
-        required = true,
-        hasDependants = false
+        required = true
     )
-    private var tobaccoUser = FormElement(
-        id = 7,
+
+    private val tobaccoUser = FormElement(
+        id = 14,
         inputType = InputType.RADIO,
         title = resources.getString(R.string.tb_tobacco_user),
         entries = resources.getStringArray(R.array.yes_no),
-        doubleStar = false,
-        required = true,
-        hasDependants = false
+        required = true
     )
-    private var bmi = FormElement(
-        id = 7,
-        inputType = InputType.RADIO,
-        title = resources.getString(R.string.tb_bmi_less_than_18_5),
-        entries = resources.getStringArray(R.array.yes_no),
-        doubleStar = false,
-        required = true,
-        hasDependants = false
-    )
-    private var contactWithTBPatient = FormElement(
-        id = 7,
+
+    private val contactWithTBPatient = FormElement(
+        id = 15,
         inputType = InputType.RADIO,
         title = resources.getString(R.string.tb_contact_with_patient_on_treatment),
         entries = resources.getStringArray(R.array.yes_no),
-        doubleStar = false,
-        required = true,
-        hasDependants = false
-    )
-    private var historyOfTBInLastFiveYrs = FormElement(
-        id = 7,
-        inputType = InputType.RADIO,
-        title = resources.getString(R.string.tb_history_last_5_years),
-        entries = resources.getStringArray(R.array.yes_no),
-        doubleStar = false,
-        required = true,
-        hasDependants = false
+        required = true
     )
 
+    private val referralRequired = FormElement(
+        id = 16,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.tb_referral_required),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = true,
+        hasDependants = true
+    )
+
+    private val referralFor = FormElement(
+        id = 17,
+        inputType = InputType.CHECKBOXES,
+        title = resources.getString(R.string.tb_referral_for),
+        entries = resources.getStringArray(R.array.tb_referral_tests),
+        required = false
+    )
 
     suspend fun setUpPage(ben: BenRegCache?, saved: TBScreeningCache?) {
-        val list = mutableListOf(
-            symptomaticLabel,
-            checkSymptomsLabel,
-            dateOfVisit,
-            isCoughing,
-            bloodInSputum,
-            isFever,
-            lossOfWeight,
-            nightSweats,
-            historyOfTB,
-            currentlyTakingDrugs,
-            familyHistoryTB,
-            riseOfFever,
-            lossOfAppetite,
-            aSymptomaticLabel,
-            checkSymptomsLabel1,
-            age,
-            diabetic,
-            tobaccoUser,
-            bmi,
-            contactWithTBPatient,
-            historyOfTBInLastFiveYrs
-        )
+        ben?.let {
+            dateOfVisit.min = it.regDate
+            benAgeYears = when {
+                it.dob > 0L -> BenBasicCache.getAgeFromDob(it.dob)
+                else -> it.age
+            }
+        }
+
         if (saved == null) {
             dateOfVisit.value = getDateFromLong(System.currentTimeMillis())
         } else {
             dateOfVisit.value = getDateFromLong(saved.visitDate)
-            isCoughing.value =
-                if (saved.coughMoreThan2Weeks == true) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(
-                    R.array.yes_no
-                )[1]
-            bloodInSputum.value =
-                if (saved.bloodInSputum == true) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(
-                    R.array.yes_no
-                )[1]
-            isFever.value =
-                if (saved.feverMoreThan2Weeks == true) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(
-                    R.array.yes_no
-                )[1]
-            lossOfWeight.value =
-                if (saved.lossOfWeight == true) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(
-                    R.array.yes_no
-                )[1]
-            nightSweats.value =
-                if (saved.nightSweats == true) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(
-                    R.array.yes_no
-                )[1]
-            historyOfTB.value =
-                if (saved.historyOfTb == true) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(
-                    R.array.yes_no
-                )[1]
-            currentlyTakingDrugs.value =
-                if (saved.takingAntiTBDrugs == true) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(
-                    R.array.yes_no
-                )[1]
-            familyHistoryTB.value =
-                if (saved.familySufferingFromTB == true) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(
-                    R.array.yes_no
-                )[1]
-
-            riseOfFever.value =
-                if (saved.riseOfFever == true) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(
-                    R.array.yes_no
-                )[1]
-
-            lossOfAppetite.value =
-                if (saved.lossOfAppetite == true) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(
-                    R.array.yes_no
-                )[1]
-            age.value =
-                if (saved.age == true) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(
-                    R.array.yes_no
-                )[1]
-            diabetic.value =
-                if (saved.diabetic == true) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(
-                    R.array.yes_no
-                )[1]
-            tobaccoUser.value =
-                if (saved.tobaccoUser == true) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(
-                    R.array.yes_no
-                )[1]
-            bmi.value =
-                if (saved.bmi == true) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(
-                    R.array.yes_no
-                )[1]
-            contactWithTBPatient.value =
-                if (saved.contactWithTBPatient == true) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(
-                    R.array.yes_no
-                )[1]
-
-            historyOfTBInLastFiveYrs.value =
-                if (saved.historyOfTBInLastFiveYrs == true) resources.getStringArray(R.array.yes_no)[0] else resources.getStringArray(
-                    R.array.yes_no
-                )[1]
+            isCoughing.value = boolToYesNo(saved.coughMoreThan2Weeks)
+            bloodInSputum.value = boolToYesNo(saved.bloodInSputum)
+            isFever.value = boolToYesNo(saved.feverMoreThan2Weeks)
+            riseOfFever.value = boolToYesNo(saved.riseOfFever)
+            lossOfAppetite.value = boolToYesNo(saved.lossOfAppetite)
+            lossOfWeight.value = boolToYesNo(saved.lossOfWeight)
+            nightSweats.value = boolToYesNo(saved.nightSweats)
+            historyOfTB.value = boolToYesNo(saved.historyOfTb)
+            currentlyTakingDrugs.value = boolToYesNo(saved.takingAntiTBDrugs)
+            familyHistoryTB.value = boolToYesNo(saved.familySufferingFromTB)
         }
 
-
-        ben?.let {
-            dateOfVisit.min = it.regDate
-        }
-        setUpPage(list)
-
+        setUpPage(buildFormList())
     }
 
     override suspend fun handleListOnValueChanged(formId: Int, index: Int): Int {
-        return -1
-//        return when (formId) {
-//        }
+        return getIndexOfElement(dateOfVisit)
     }
 
     override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
         (cacheModel as TBScreeningCache).let { form ->
             form.visitDate = getLongFromDate(dateOfVisit.value)
-            form.coughMoreThan2Weeks =
-                isCoughing.value == resources.getStringArray(R.array.yes_no)[0]
-            form.bloodInSputum = bloodInSputum.value == resources.getStringArray(R.array.yes_no)[0]
-            form.feverMoreThan2Weeks = isFever.value == resources.getStringArray(R.array.yes_no)[0]
-            form.nightSweats = nightSweats.value == resources.getStringArray(R.array.yes_no)[0]
-            form.lossOfWeight = lossOfWeight.value == resources.getStringArray(R.array.yes_no)[0]
-            form.historyOfTb = historyOfTB.value == resources.getStringArray(R.array.yes_no)[0]
-            form.takingAntiTBDrugs =
-                currentlyTakingDrugs.value == resources.getStringArray(R.array.yes_no)[0]
-            form.familySufferingFromTB =
-                familyHistoryTB.value == resources.getStringArray(R.array.yes_no)[0]
-            form.riseOfFever = riseOfFever.value == resources.getStringArray(R.array.yes_no)[0]
-            form.lossOfAppetite =
-                lossOfAppetite.value == resources.getStringArray(R.array.yes_no)[0]
-            form.age =
-                age.value == resources.getStringArray(R.array.yes_no)[0]
-            form.diabetic =
-                diabetic.value == resources.getStringArray(R.array.yes_no)[0]
-            form.tobaccoUser =
-                tobaccoUser.value == resources.getStringArray(R.array.yes_no)[0]
-            form.bmi =
-                bmi.value == resources.getStringArray(R.array.yes_no)[0]
-            form.contactWithTBPatient =
-                contactWithTBPatient.value == resources.getStringArray(R.array.yes_no)[0]
-            form.historyOfTBInLastFiveYrs =
-                historyOfTBInLastFiveYrs.value == resources.getStringArray(R.array.yes_no)[0]
-            form.sympotomatic = isSymptomatic()
-            form.asymptomatic = isAsymptomatic()
-
-            if (isSymptomatic()=="Yes" && isAsymptomatic() =="No"){
-                form.recommandateTest = "Sputum Test"
-            }else if(isSymptomatic() == "No"&& isAsymptomatic() =="Yes"){
-                form.recommandateTest = "Chest X-Ray"
-            }else if(isSymptomatic() == "Yes"&& isAsymptomatic() =="Yes"){
-                form.recommandateTest = "Both"
-            }else{
-                form.recommandateTest = "None"
-            }
+            form.coughMoreThan2Weeks = isYes(isCoughing)
+            form.bloodInSputum = isYes(bloodInSputum)
+            form.feverMoreThan2Weeks = isYes(isFever)
+            form.riseOfFever = isYes(riseOfFever)
+            form.lossOfAppetite = isYes(lossOfAppetite)
+            form.lossOfWeight = isYes(lossOfWeight)
+            form.nightSweats = isYes(nightSweats)
+            form.historyOfTb = isYes(historyOfTB)
+            form.takingAntiTBDrugs = isYes(currentlyTakingDrugs)
+            form.familySufferingFromTB = isYes(familyHistoryTB)
+            form.age = null
+            form.diabetic = null
+            form.tobaccoUser = null
+            form.contactWithTBPatient = null
+            form.bmi = null
+            form.historyOfTBInLastFiveYrs = null
+            form.referralRequired = null
+            form.referralFor = null
+            form.familyContactScreeningRequired = requiresFamilyContactScreening()
+            form.sympotomatic = null
+            form.asymptomatic = null
+            form.recommandateTest = null
         }
     }
 
+    fun requiresFamilyContactScreening(): Boolean =
+        isYes(currentlyTakingDrugs) || isYes(familyHistoryTB)
 
-    fun updateBen(benRegCache: BenRegCache) {
-        benRegCache.genDetails?.let {
-            it.reproductiveStatus =
-                englishResources.getStringArray(R.array.nbr_reproductive_status_array2)[1]
-            it.reproductiveStatusId = 2
-        }
-        if (benRegCache.processed != "N") benRegCache.processed = "U"
-    }
+    fun getFamilyContactAlert(): String? =
+        if (requiresFamilyContactScreening()) resources.getString(R.string.tb_family_contact_screening_alert) else null
 
-    fun referHwcFacility():String?{
-        return if (isCoughing.value == resources.getStringArray(R.array.yes_no)[0] ||
-            bloodInSputum.value == resources.getStringArray(R.array.yes_no)[0] ||
-            isFever.value == resources.getStringArray(R.array.yes_no)[0] ||
-            nightSweats.value == resources.getStringArray(R.array.yes_no)[0] ||
-            lossOfWeight.value == resources.getStringArray(R.array.yes_no)[0] ||
-            historyOfTB.value == resources.getStringArray(R.array.yes_no)[0]||
+    fun getIndexOfDate(): Int = listFlow.value.indexOf(dateOfVisit)
 
-            riseOfFever.value == resources.getStringArray(R.array.yes_no)[0] ||
-            lossOfAppetite.value == resources.getStringArray(R.array.yes_no)[0] ||
-            age.value == resources.getStringArray(R.array.yes_no)[0] ||
-            diabetic.value == resources.getStringArray(R.array.yes_no)[0] ||
-            tobaccoUser.value == resources.getStringArray(R.array.yes_no)[0] ||
-            bmi.value == resources.getStringArray(R.array.yes_no)[0] ||
-            contactWithTBPatient.value == resources.getStringArray(R.array.yes_no)[0] ||
-            historyOfTBInLastFiveYrs.value == resources.getStringArray(R.array.yes_no)[0]
+    private fun buildFormList(): MutableList<FormElement> {
+        return mutableListOf(
+            dateOfVisit,
+            isCoughing,
+            bloodInSputum,
+            isFever,
+            riseOfFever,
+            lossOfAppetite,
+            lossOfWeight,
+            nightSweats,
+            historyOfTB,
+            currentlyTakingDrugs,
+            familyHistoryTB,
         )
-//            "Refer to Chest X-ray" else null
-            resources.getString(R.string.refer_to_hwc_facility_alert) else null
-
     }
 
-    fun isSymptomatic():String{
-        return if (isCoughing.value == resources.getStringArray(R.array.yes_no)[0] ||
-            bloodInSputum.value == resources.getStringArray(R.array.yes_no)[0] ||
-            isFever.value == resources.getStringArray(R.array.yes_no)[0] ||
-            nightSweats.value == resources.getStringArray(R.array.yes_no)[0] ||
-            lossOfWeight.value == resources.getStringArray(R.array.yes_no)[0] ||
-            historyOfTB.value == resources.getStringArray(R.array.yes_no)[0]||
-            riseOfFever.value == resources.getStringArray(R.array.yes_no)[0] ||
-            lossOfAppetite.value == resources.getStringArray(R.array.yes_no)[0]
-        )
-            "Yes" else "No"
-    }
-    fun isAsymptomatic():String{
-        return if (
-            age.value == resources.getStringArray(R.array.yes_no)[0] ||
-            diabetic.value == resources.getStringArray(R.array.yes_no)[0] ||
-            tobaccoUser.value == resources.getStringArray(R.array.yes_no)[0] ||
-            bmi.value == resources.getStringArray(R.array.yes_no)[0] ||
-            contactWithTBPatient.value == resources.getStringArray(R.array.yes_no)[0] ||
-            historyOfTBInLastFiveYrs.value == resources.getStringArray(R.array.yes_no)[0]
-        )
-            "Yes" else "No"
+    private fun getSelectedEnglishValues(formElement: FormElement, arrayId: Int): List<String> {
+        val selectedIndexes = formElement.value
+            ?.split("|")
+            ?.mapNotNull { it.toIntOrNull() }
+            .orEmpty()
+
+        val englishEntries = englishResources.getStringArray(arrayId)
+        return selectedIndexes.mapNotNull { idx -> englishEntries.getOrNull(idx) }
     }
 
-    fun isTbSuspected(): String? {
-        return if (isCoughing.value == resources.getStringArray(R.array.yes_no)[0] ||
-            bloodInSputum.value == resources.getStringArray(R.array.yes_no)[0] ||
-            isFever.value == resources.getStringArray(R.array.yes_no)[0] ||
-            nightSweats.value == resources.getStringArray(R.array.yes_no)[0] ||
-            lossOfWeight.value == resources.getStringArray(R.array.yes_no)[0] ||
-            historyOfTB.value == resources.getStringArray(R.array.yes_no)[0]||
-
-            riseOfFever.value == resources.getStringArray(R.array.yes_no)[0] ||
-            lossOfAppetite.value == resources.getStringArray(R.array.yes_no)[0] ||
-            age.value == resources.getStringArray(R.array.yes_no)[0] ||
-            diabetic.value == resources.getStringArray(R.array.yes_no)[0] ||
-            tobaccoUser.value == resources.getStringArray(R.array.yes_no)[0] ||
-            bmi.value == resources.getStringArray(R.array.yes_no)[0] ||
-            contactWithTBPatient.value == resources.getStringArray(R.array.yes_no)[0] ||
-            historyOfTBInLastFiveYrs.value == resources.getStringArray(R.array.yes_no)[0]
-        )
-            resources.getString(R.string.tb_suspected_alert) else null
+    private fun englishValuesToSelectionIndexes(values: List<String>?, arrayId: Int): String? {
+        if (values.isNullOrEmpty()) return null
+        val englishEntries = englishResources.getStringArray(arrayId)
+        val selectedIndexes = values.mapNotNull { value -> englishEntries.indexOf(value).takeIf { it >= 0 } }
+        return selectedIndexes.takeIf { it.isNotEmpty() }?.joinToString("|")
     }
 
-    fun isTbSuspectedFamily(): String? {
-        return if (currentlyTakingDrugs.value == resources.getStringArray(R.array.yes_no)[0] || familyHistoryTB.value == resources.getStringArray(
-                R.array.yes_no
-            )[0]
-        )
-            resources.getString(R.string.tb_suspected_family_alert) else null
-    }
+    private fun boolToYesNo(value: Boolean?): String = if (value == true) yesValue else noValue
 
-    fun getIndexOfDate(): Int {
-        return getIndexById(dateOfVisit.id)
-    }
+    private fun isYes(formElement: FormElement): Boolean = formElement.value == yesValue
 }

@@ -1,14 +1,35 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp"
-    android:height="24dp"
-    android:viewportWidth="24.0"
-    android:viewportHeight="24.0">
-    <path
-        android:fillColor="?attr/colorOnPrimary"
-        android:pathData="H24V24H-24Z" />
-    <path
-        android:fillColor="@color/seed"
-        android:pathData="M0,12 Q 12,15 24,12 v12 h-24 v-12 " />
-
-
-</vector>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/md_theme_light_background" />
+        </shape>
+    </item>
+    <item android:gravity="top">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:endColor="@android:color/transparent"
+                android:startColor="@color/sakhi_login_glow"
+                android:type="linear" />
+            <size android:height="220dp" />
+        </shape>
+    </item>
+    <item android:gravity="bottom">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/sakhi_login_wave" />
+            <corners
+                android:topLeftRadius="56dp"
+                android:topRightRadius="56dp" />
+            <size android:height="160dp" />
+        </shape>
+    </item>
+    <item android:gravity="bottom">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/sakhi_login_wave_deep" />
+            <corners
+                android:topLeftRadius="88dp"
+                android:topRightRadius="88dp" />
+            <size android:height="92dp" />
+        </shape>
+    </item>
+</layer-list>

@@ -35,7 +35,7 @@
 
     <!--    HBNC-->
 
-    <string name="title_activity_home" translatable="false">HomeActivity</string>
+    <string name="title_activity_home" translatable="false">STOP TB</string>
     <string name="nav_header_desc" translatable="false">Navigation header</string>
 
     <string name="cd_icon_grid_icon">icon</string>
@@ -47,6 +47,7 @@
     <string name="notification_sync_channel_description">Upload beneficiaries to Server</string>
     <string name="notification_sync_channel_id">sakhi-sync0</string>
     <string name="btn_submit">Submit</string>
+    <string name="btn_skip">Skip</string>
     <string name="mosquito_net_off">Mosquito Net OFF</string>
     <string name="btn_apply">Apply</string>
     <string name="long_to_string">%d</string>
@@ -84,6 +85,21 @@
     <string name="referral_facility">Referral Facility</string>
     <string name="is_tb_confirmed">Has the diagnosis of TB been confirmed?</string>
     <string name="is_drtb_confirmed">Has the diagnosis of DR-TB been confirmed?</string>
+    <string name="tb_is_digital_chest_xray_conducted">Is Digital Chest X-ray conducted?</string>
+    <string name="tb_digital_chest_xray_conducted">Is Digital chest x-ray conducted?</string>
+    <string name="tb_digital_chest_xray_result">Digital Chest X-Ray Test Result</string>
+    <string name="tb_sputum_sample_collected">Is Sputum sample collected?</string>
+    <string name="tb_ai_cough_assessment_conducted">AI Cough Assessment conducted?</string>
+    <string name="tb_ai_cough_assessment_result">AI Cough Assessment result</string>
+    <string name="tb_naat_conducted">True NAT conducted?</string>
+    <string name="tb_naat_result">True NAT result</string>
+    <string name="tb_liquid_culture_conducted">Is Liquid culture conducted?</string>
+    <string name="tb_liquid_culture_result">Liquid Culture result</string>
+    <string name="tb_suspected_quick_title">Diagnostics</string>
+    <string name="tb_suspected_quick_info">Select the conducted tests for this beneficiary.</string>
+    <string name="result">Result</string>
+    <string name="tb_suspected_quick_save_failed">Unable to save TB suspected details.</string>
+    <string name="tb_suspected_alert_confirmed">This beneficiary now qualifies for Confirmed TB cases.</string>
 
     <string-array name="type_of_tb_case">
         <item>New case of TB</item>
@@ -113,12 +129,27 @@
         <item>Govt. Medical College</item>
     </string-array>
 
+    <string-array name="tb_referral_tests">
+        <item>AI Cough Assessment</item>
+        <item>Digital Chest X-ray</item>
+        <item>Sputum Collection</item>
+        <item>True NAT</item>
+    </string-array>
+
     <string-array name="tb_submitted_yet_suspected">
         <item>HWC</item>
         <item>PHC</item>
         <item>CHC</item>
         <item>District Hospital</item>
         <item>Govt. Medical College</item>
+    </string-array>
+
+    <string-array name="tb_suspected_sample_submitted_at">
+        <item>DMC</item>
+        <item>DH</item>
+        <item>CHC</item>
+        <item>PHC</item>
+        <item>SC</item>
     </string-array>
 
     <string-array name="yes_no_options">
@@ -257,6 +288,33 @@
     <string name="filter_village">Village / Hamlet</string>
     <string name="filter_all_villages">All Villages</string>
     <string name="filter_today">Today</string>
+    <string name="label_greeting_name">%1$s, %2$s</string>
+    <string name="dashboard_greeting_subtitle">Let\'s make impact today</string>
+    <string name="dashboard_stay_safe">Stay Safe</string>
+    <string name="home_greeting_subtitle">Quick access to your day-to-day work</string>
+    <string name="home_quick_actions">Quick Actions</string>
+    <string name="home_health_id_section">Health IDs</string>
+    <string name="home_card_all_ben_subtitle">View and manage all beneficiaries</string>
+    <string name="home_card_tb_subtitle">Track screening and support TB cases</string>
+    <string name="home_card_ncd_subtitle">Manage non-communicable disease workflows</string>
+    <string name="home_card_referral_subtitle">Follow up on referred cases</string>
+    <string name="home_card_rch_subtitle">Beneficiaries linked with RCH IDs</string>
+    <string name="home_card_ncd_eligible_subtitle">Screen and manage eligible beneficiaries</string>
+    <string name="home_card_ncd_priority_subtitle">Track high priority NCD follow-up cases</string>
+    <string name="home_card_ncd_non_priority_subtitle">Manage lower risk screened beneficiaries</string>
+    <string name="home_card_tb_screening_subtitle">Start and review TB screening activity</string>
+    <string name="home_card_tb_suspected_short_subtitle">Follow up suspected TB cases</string>
+    <string name="home_card_tb_confirmed_short_subtitle">Track confirmed TB patients</string>
+    <string name="view_details">View Details</string>
+    <string name="referral_digital_chest_xray">Digital Chest X-ray</string>
+    <string name="referral_true_nat">True NAT</string>
+    <string name="referral_hwc">Health and Wellness Centre</string>
+    <string name="referral_liquid_culture">Liquid Culture</string>
+    <string name="dashboard_tb_screening_subtitle">Track outreach and screening volume</string>
+    <string name="dashboard_tb_suspected_subtitle">Follow up high-risk suspected cases</string>
+    <string name="dashboard_tb_confirmed_subtitle">Monitor confirmed patients and support</string>
+    <string name="dashboard_nikshay_subtitle">Linked beneficiary treatment IDs</string>
+    <string name="dashboard_abha_subtitle">Beneficiaries with digital health IDs</string>
     <string name="total_tb_screenings">Total TB Screenings</string>
     <string name="total_tb_suspected">Total TB Suspected Cases</string>
     <string name="total_tb_confirmed">Total TB Confirmed Cases</string>
@@ -299,7 +357,7 @@
     <string name="child_immunization">Child Immunization</string>
     <string name="relation_with_hof">Relation with HOF</string>
     <string name="add_family_member">Add HoF Member</string>
-    <string name="app_native_name">উৎপ্ৰেৰণা</string>
+    <string name="app_native_name">STOP TB</string>
     <string name="non_pregnant_women_eligible_couple_section">Non-Pregnant Women (Eligible Couple) section</string>
     <string name="time_of_death">Time of Death</string>
     <string name="reason_for_death">Reason for Death</string>
@@ -815,7 +873,7 @@
     <string name="pending">Pending</string>
     <string name="symptomatic_tb_screening">Symptomatic TB Screening</string>
     <string name="check_if_the_person_has_any_of_these_symptoms">Check if the person has any of these Symptoms:</string>
-    <string name="tb_asymptomatic_symptoms">Asymptomatic Symptoms</string>
+    <string name="tb_asymptomatic_screening">Asymptomatic Screening</string>
     <string name="tb_rise_of_fever">Rise of fever in evening</string>
     <string name="tb_loss_of_appetite">Loss of Appetite</string>
     <string name="tb_age_more_than_60">Age more than 60 years</string>
@@ -824,6 +882,10 @@
     <string name="tb_bmi_less_than_18_5">BMI &lt; 18.5</string>
     <string name="tb_contact_with_patient_on_treatment">Contact with TB patient on treatment</string>
     <string name="tb_history_last_5_years">Last 5 years history of TB</string>
+    <string name="tb_referral_required">Referral Required</string>
+    <string name="tb_referral_for">Referral For</string>
+    <string name="tb_family_contact_screening_alert">Please screen all family members and close contacts of this beneficiary for TB.</string>
+    <string name="tb_screening_referral_reason">TB Screening Referral</string>
 
     <string name="filter_sort_by">Sort By</string>
     <string name="filter_newest_first">Newest First</string>
@@ -869,5 +931,52 @@
     <string name="discard">Discard</string>
     <string name="stay">Stay</string>
 
+    <string name="vital_screen">Vital Screen</string>
+    <string name="vital_screen_placeholder">Vital Screen for beneficiary ID: %1$d</string>
+    <string name="vital_details">Vital Details</string>
+    <string name="temperature">Temperature</string>
+    <string name="pulse_rate">Pulse Rate</string>
+    <string name="bp_systolic">BP Systolic</string>
+    <string name="bp_diastolic">BP Diastolic</string>
+    <string name="respiratory_rate">Respiratory Rate</string>
+    <string name="spo2_label">SpO2</string>
+    <string name="rbs">RBS</string>
+    <string name="height">Height</string>
+    <string name="weight">Weight</string>
+    <string name="bmi">BMI</string>
+    <string name="anthropometry">Anthropometry</string>
+    <string name="invalid_height_weight">Enter valid height and weight</string>
+    <string name="vitals_saved_successfully">Vitals saved successfully.</string>
+    <string name="vitals_save_failed">Unable to save vitals.</string>
+    <string name="weight_kgs">Weight (Kgs)</string>
+    <string name="height_cms">Height (cms)</string>
+    <string name="temperature_degree_fahrenheit">Temperature (Degree Fahrenheit)</string>
+    <string name="pulse_rate_bpm">Pulse Rate (beats per minute)</string>
+    <string name="systolic_bp_mmhg">Systolic Blood Pressure (mm Hg)</string>
+    <string name="diastolic_bp_mmhg">Diastolic Blood Pressure (mm Hg)</string>
+    <string name="random_blood_sugar">Random Blood Sugar</string>
+    <string name="referred_for">Referred for</string>
+    <string name="refer_to_hwc_alert">Refer to Health and Wellness Centre</string>
+    <string name="vital_referral_reason">Vital Screening Referral</string>
+    <string name="temperature_option_97_5">97.5</string>
+    <string name="temperature_option_98_5">98.5</string>
+    <string name="temperature_option_99_5">99.5</string>
+    <string name="temperature_option_100_or_more">&gt;= 100</string>
+    <string name="pulse_option_below_60">Less than 60</string>
+    <string name="pulse_option_60_70">60-70</string>
+    <string name="pulse_option_70_80">70-80</string>
+    <string name="pulse_option_above_90">More than 90</string>
+    <string-array name="vital_temperature_options">
+        <item>@string/temperature_option_97_5</item>
+        <item>@string/temperature_option_98_5</item>
+        <item>@string/temperature_option_99_5</item>
+        <item>@string/temperature_option_100_or_more</item>
+    </string-array>
+    <string-array name="vital_pulse_rate_options">
+        <item>@string/pulse_option_below_60</item>
+        <item>@string/pulse_option_60_70</item>
+        <item>@string/pulse_option_70_80</item>
+        <item>@string/pulse_option_above_90</item>
+    </string-array>
 </resources>
 

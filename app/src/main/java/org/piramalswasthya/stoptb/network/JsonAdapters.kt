@@ -368,6 +368,9 @@ data class TBScreeningDTO(
     var age: Boolean? = null, var diabetic: Boolean? = null,
     var tobaccoUser: Boolean? = null, var bmi: Boolean? = null,
     var contactWithTBPatient: Boolean? = null, var historyOfTBInLastFiveYrs: Boolean? = null,
+    var referralRequired: Boolean? = null, var referralFor: List<String>? = null,
+    var latitude: Double? = null, var longitude: Double? = null, var address: String? = null,
+    var familyContactScreeningRequired: Boolean? = null,
     var sympotomatic: String? = null, var asymptomatic: String? = null, var recommandateTest: String? = null,
 ) {
     fun toCache(): TBScreeningCache = TBScreeningCache(
@@ -379,6 +382,9 @@ data class TBScreeningDTO(
         riseOfFever = riseOfFever, lossOfAppetite = lossOfAppetite, age = age,
         diabetic = diabetic, tobaccoUser = tobaccoUser, bmi = bmi,
         contactWithTBPatient = contactWithTBPatient, historyOfTBInLastFiveYrs = historyOfTBInLastFiveYrs,
+        referralRequired = referralRequired, referralFor = referralFor,
+        latitude = latitude, longitude = longitude, address = address,
+        familyContactScreeningRequired = familyContactScreeningRequired,
         sympotomatic = sympotomatic, asymptomatic = asymptomatic, recommandateTest = recommandateTest,
         syncState = SyncState.SYNCED
     )
@@ -391,8 +397,13 @@ data class TBSuspectedDTO(
     val followUps: String?, var visitLabel: String?, var typeOfTBCase: String? = null,
     var reasonForSuspicion: String? = null, var hasSymptoms: Boolean? = null,
     var isChestXRayDone: Boolean? = null, var chestXRayResult: String? = null,
+    var isAICoughAssessmentDone: Boolean? = null, var aiCoughAssessmentResult: String? = null,
+    var isNaatConducted: Boolean? = null, var naatResult: String? = null,
+    var isLiquidCultureConducted: Boolean? = null, var liquidCultureResult: String? = null,
     var referralFacility: String? = null, var isTBConfirmed: Boolean? = null,
     var isDRTBConfirmed: Boolean? = null, var isConfirmed: Boolean = false,
+    var otherReasonForSuspicion: String? = null,
+    var latitude: Double? = null, var longitude: Double? = null, var address: String? = null,
 ) {
     fun toCache(): TBSuspectedCache = TBSuspectedCache(
         benId = benId, visitDate = getLongFromDate(visitDate),
@@ -401,9 +412,21 @@ data class TBSuspectedDTO(
         referred = referred, followUps = followUps, visitLabel = visitLabel,
         typeOfTBCase = typeOfTBCase, reasonForSuspicion = reasonForSuspicion,
         hasSymptoms = hasSymptoms ?: false, isChestXRayDone = isChestXRayDone,
-        chestXRayResult = chestXRayResult, referralFacility = referralFacility,
+        chestXRayResult = chestXRayResult,
+        isAICoughAssessmentDone = isAICoughAssessmentDone,
+        aiCoughAssessmentResult = aiCoughAssessmentResult,
+        isNaatConducted = isNaatConducted,
+        naatResult = naatResult,
+        isLiquidCultureConducted = isLiquidCultureConducted,
+        liquidCultureResult = liquidCultureResult,
+        referralFacility = referralFacility,
         isTBConfirmed = isTBConfirmed, isDRTBConfirmed = isDRTBConfirmed,
-        isConfirmed = isConfirmed, syncState = SyncState.SYNCED
+        otherReasonForSuspicion = otherReasonForSuspicion,
+        isConfirmed = isConfirmed,
+        latitude = latitude,
+        longitude = longitude,
+        address = address,
+        syncState = SyncState.SYNCED
     )
 }
 
@@ -426,7 +449,8 @@ data class TBConfirmedTreatmentDTO(
         actualTreatmentCompletionDate = getLongFromDateMultipleSupport(actualTreatmentCompletionDate),
         treatmentOutcome = treatmentOutcome, dateOfDeath = getLongFromDateMultipleSupport(dateOfDeath),
         placeOfDeath = placeOfDeath, reasonForDeath = reasonForDeath ?: "Tuberculosis",
-        reasonForNotCompleting = reasonForNotCompleting, syncState = SyncState.SYNCED
+        reasonForNotCompleting = reasonForNotCompleting,
+        syncState = SyncState.SYNCED
     )
 }
 

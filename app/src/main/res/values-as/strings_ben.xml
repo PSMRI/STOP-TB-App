@@ -11,7 +11,7 @@
     <string name="other_enter_religion">অন্য - ধৰ্ম লিখক</string>
     <string name="has_aadhaar_number">আধাৰ নম্বৰ আছে</string>
     <string name="enter_aadhaar_number_ben">আধাৰ নম্বৰ লিখক</string>
-    <string name="reproductive_status">প্ৰজনন স্থিতি</string>
+    <string name="reproductive_status">আপুনি গৰ্ভৱতী নেকি</string>
     <string name="birth_certificate_number">Birth Certificate No.</string>
     <string name="beneficiary_details">সুবিধা প্ৰাপ্তবোৰ বিৱৰণ</string>
     <string name="wife_s_name">বাইৰ নাম</string>
@@ -34,7 +34,7 @@
     <string name="nbr_nb_last_name">শেষ নাম / উপনাম</string>
     <string name="beneficiary_details_ben">সুবিধানুগত তথ্য</string>
     <string name="id_details">আইডি বিবরণী</string>
-    <string name="reproductive_status_ben">প্রজনন স্থিতি</string>
+    <string name="reproductive_status_ben">আপুনি গৰ্ভৱতী নেকি</string>
     <string name="enable_gps">জিপিএস সক্ষম করুন</string>
     <string name="gps_is_not_enabled_do_you_want_to_go_to_settings_menu">জিপিএস সক্ষম নেই। আপনি কি সেটিংস মেনুতে যেতে চান?</string>
     <string name="settings">সেটিংস</string>
@@ -90,6 +90,11 @@
 
     <string-array name="nbr_reproductive_status_array5">
         <item>Elderly Woman</item>
+    </string-array>
+
+    <string-array name="nbr_reproductive_status_married_women_array">
+        <item>হয়</item>
+        <item>নহয়</item>
     </string-array>
 
     <string-array name="nbr_marital_status_male_array">
@@ -337,4 +342,5 @@
         <item>Completed</item>
     </string-array>
 
+    <string name="whose_mobile_number">কাৰ মোবাইল নম্বৰ</string>
 </resources>

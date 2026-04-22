@@ -82,7 +82,7 @@ interface TBDao {
         WHERE (:villageId = 0 OR b.loc_village_id = :villageId)
         AND (:startTime = 0 OR ts.visitDate >= :startTime)
         AND (:endTime = 0 OR ts.visitDate <= :endTime)
-        AND (:gender = '' OR b.gender = :gender)
+        AND (:gender = '' OR UPPER(COALESCE(b.gender, '')) = UPPER(:gender))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
     """)
     fun getDashboardTbScreeningCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>
@@ -94,7 +94,7 @@ interface TBDao {
         WHERE (:villageId = 0 OR b.loc_village_id = :villageId)
         AND (:startTime = 0 OR ts.visitDate >= :startTime)
         AND (:endTime = 0 OR ts.visitDate <= :endTime)
-        AND (:gender = '' OR b.gender = :gender)
+        AND (:gender = '' OR UPPER(COALESCE(b.gender, '')) = UPPER(:gender))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
     """)
     fun getDashboardTbSuspectedCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>
@@ -107,7 +107,7 @@ interface TBDao {
         AND (:villageId = 0 OR b.loc_village_id = :villageId)
         AND (:startTime = 0 OR ts.visitDate >= :startTime)
         AND (:endTime = 0 OR ts.visitDate <= :endTime)
-        AND (:gender = '' OR b.gender = :gender)
+        AND (:gender = '' OR UPPER(COALESCE(b.gender, '')) = UPPER(:gender))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
     """)
     fun getDashboardTbConfirmedCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>

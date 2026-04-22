@@ -94,7 +94,7 @@ class DashboardFragment : Fragment() {
             binding.tvTbScreeningMale.text = getString(R.string.label_male, data.male)
             binding.tvTbScreeningFemale.text = getString(R.string.label_female, data.female)
             binding.tvTbScreeningChildren.text = getString(R.string.label_children, data.children)
-            binding.tvTbScreeningOthers.text = getString(R.string.label_others, viewModel.getOthersCount(data))
+            binding.tvTbScreeningOthers.text = getString(R.string.label_others, data.others)
         }
 
         // TB Suspected card
@@ -103,7 +103,7 @@ class DashboardFragment : Fragment() {
             binding.tvTbSuspectedMale.text = getString(R.string.label_male, data.male)
             binding.tvTbSuspectedFemale.text = getString(R.string.label_female, data.female)
             binding.tvTbSuspectedChildren.text = getString(R.string.label_children, data.children)
-            binding.tvTbSuspectedOthers.text = getString(R.string.label_others, viewModel.getOthersCount(data))
+            binding.tvTbSuspectedOthers.text = getString(R.string.label_others, data.others)
         }
 
         // TB Confirmed card
@@ -112,7 +112,7 @@ class DashboardFragment : Fragment() {
             binding.tvTbConfirmedMale.text = getString(R.string.label_male, data.male)
             binding.tvTbConfirmedFemale.text = getString(R.string.label_female, data.female)
             binding.tvTbConfirmedChildren.text = getString(R.string.label_children, data.children)
-            binding.tvTbConfirmedOthers.text = getString(R.string.label_others, viewModel.getOthersCount(data))
+            binding.tvTbConfirmedOthers.text = getString(R.string.label_others, data.others)
         }
 
         // NIKSHAY count

@@ -1,6 +1,7 @@
 package org.piramalswasthya.stoptb.ui.home_activity.home
 
 import android.os.Bundle
+import java.util.Calendar
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,10 +11,10 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.databinding.FragmentSchedulerBinding
 import org.piramalswasthya.stoptb.ui.home_activity.home.SchedulerViewModel.State.LOADED
 import org.piramalswasthya.stoptb.ui.home_activity.home.SchedulerViewModel.State.LOADING
-import java.util.Calendar
 
 @AndroidEntryPoint
 class SchedulerFragment : Fragment() {
@@ -35,6 +36,8 @@ class SchedulerFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        setupHeader()
+
         viewModel.state.observe(viewLifecycleOwner) {
             when (it) {
                 LOADING -> {
@@ -49,10 +52,9 @@ class SchedulerFragment : Fragment() {
         }
 
         viewModel.date.observe(viewLifecycleOwner) {
-            binding.calendarView.date = it
+            binding.tvSelectedDate.text = viewModel.formattedDate
         }
 
-        // ABHA counts
         lifecycleScope.launch {
             viewModel.abhaNewGeneratedCount.collect {
                 binding.tvAbhaNewCount.text = it.toString()
@@ -71,36 +73,52 @@ class SchedulerFragment : Fragment() {
             }
         }
 
-        // ABHA card click -> AllBen with ABHA filter
+        lifecycleScope.launch {
+            viewModel.allBenCount.collect {
+                binding.tvAllBenCount.text = it.toString()
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.tbCount.collect {
+                binding.tvTbCount.text = it.toString()
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.ncdCount.collect {
+                binding.tvNcdCount.text = it.toString()
+            }
+        }
+        binding.cvAllBen.setOnClickListener {
+            findNavController().navigate(HomeFragmentDirections.actionNavHomeToAllBenFragment(0))
+        }
+        binding.cvTb.setOnClickListener {
+            findNavController().navigate(HomeFragmentDirections.actionHomeFragmentToCdFragment())
+        }
+        binding.cvNcd.setOnClickListener {
+            findNavController().navigate(HomeFragmentDirections.actionNavHomeToNcdFragment())
+        }
+        binding.cvReferrals.setOnClickListener {
+            findNavController().navigate(HomeFragmentDirections.actionHomeFragmentToReferralIconsFragment())
+        }
+
         binding.cvAbha.setOnClickListener {
             findNavController().navigate(HomeFragmentDirections.actionNavHomeToAllBenFragment(1))
         }
 
-        // RCH card click -> AllBen with RCH filter
         binding.cvRch.setOnClickListener {
             findNavController().navigate(HomeFragmentDirections.actionNavHomeToAllBenFragment(2))
         }
+    }
 
-        // Hide cards that depend on deleted features
-        binding.cvAnc.visibility = View.GONE
-        binding.cvImm.visibility = View.GONE
-        binding.cvHrp.visibility = View.GONE
-        binding.cvNonHrp.visibility = View.GONE
-        binding.cvHrb.visibility = View.GONE
-        binding.cvLwb.visibility = View.GONE
-        binding.cvNon.visibility = View.GONE
-        binding.cvMiss.visibility = View.GONE
-        binding.cvRcha.visibility = View.GONE
-        binding.cvNona.visibility = View.GONE
-
-        binding.calendarView.setOnDateChangeListener { _, year, month, day ->
-            val calLong = Calendar.getInstance().apply {
-                set(Calendar.YEAR, year)
-                set(Calendar.MONTH, month)
-                set(Calendar.DAY_OF_MONTH, day)
-            }.timeInMillis
-            viewModel.setDate(calLong)
+    private fun setupHeader() {
+        val greeting = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
+            in 0..11 -> "Good Morning"
+            in 12..16 -> "Good Afternoon"
+            in 17..20 -> "Good Evening"
+            else -> "Good Night"
         }
+        binding.tvHomeGreeting.text = getString(R.string.label_greeting_name, greeting, viewModel.getFirstName())
+        binding.tvSelectedDate.text = viewModel.formattedDate
     }
 
     override fun onDestroy() {

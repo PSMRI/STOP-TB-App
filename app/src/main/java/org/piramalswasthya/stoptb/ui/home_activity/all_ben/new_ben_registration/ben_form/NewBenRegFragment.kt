@@ -11,6 +11,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.os.bundleOf
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.content.FileProvider
@@ -235,7 +236,19 @@ class NewBenRegFragment : Fragment() {
                     binding.pbForm.visibility    = View.GONE
                     Toast.makeText(context, resources.getString(R.string.save_successful), Toast.LENGTH_LONG).show()
                     WorkerUtils.triggerAmritPushWorker(requireContext())
-                    try { findNavController().navigateUp() } catch (e: Exception) { Timber.e(e) }
+                    try {
+                        if (viewModel.benIdFromArgs == 0L) {
+                            findNavController().navigate(
+                                R.id.TBScreeningFormFragment,
+                                bundleOf(
+                                    "benId" to viewModel.getCurrentBenId(),
+                                    "autoFlow" to true
+                                )
+                            )
+                        } else {
+                            findNavController().navigateUp()
+                        }
+                    } catch (e: Exception) { Timber.e(e) }
                 }
 
                 State.SAVE_FAILED -> {
@@ -417,14 +430,11 @@ class NewBenRegFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        // Clear toolbar listener to prevent crash on other fragments
         activity?.let { act ->
-            val toolbar = when (act) {
-                is HomeActivity -> act.findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
-                is VolunteerActivity -> act.findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
-                else -> null
+            when (act) {
+                is HomeActivity -> act.restoreToolbarNavigation()
+                is VolunteerActivity -> act.restoreToolbarNavigation()
             }
-            toolbar?.setNavigationOnClickListener(null)
         }
     }
 

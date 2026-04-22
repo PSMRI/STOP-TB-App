@@ -1,22 +1,29 @@
 package org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.tb_screening.form
 
+import android.Manifest
 import android.app.AlertDialog
+import android.content.Context
+import android.content.pm.PackageManager
+import android.location.LocationManager
+import android.os.Build
 import android.os.Bundle
+import android.annotation.SuppressLint
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
+import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
-import com.google.gson.Gson
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
-import org.piramalswasthya.stoptb.model.ReferalCache
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.work.WorkerUtils
@@ -31,36 +38,21 @@ class TBScreeningFormFragment : Fragment() {
 
     private val viewModel: TBScreeningFormViewModel by viewModels()
 
-    var referralForReason = "Suspected TB case"
-    var referType = "TB"
-
-    private val tbSuspectedAlert by lazy {
+    private val familyContactAlert by lazy {
         AlertDialog.Builder(requireContext())
             .setTitle(resources.getString(R.string.tb_screening))
             .setMessage("it")
-            .setPositiveButton(resources.getString(R.string.ok)) { dialog, _ -> dialog.dismiss() }
-            .create()
-    }
-
-    private val referToHwcFacilityAlert by lazy {
-        AlertDialog.Builder(requireContext())
-            .setTitle(resources.getString(R.string.tb_screening))
-            .setMessage("it")
-            .setPositiveButton(resources.getString(R.string.yes)) {dialog, _ ->
-//                viewModel.saveForm()
-             findNavController().navigate(TBScreeningFormFragmentDirections.actionTBScreeningFormFragmentToNcdReferForm(viewModel.benId, referral = binding.root.resources.getString(R.string.tb_screening_form), referralType = referType))
+            .setPositiveButton(resources.getString(R.string.ok)) { dialog, _ ->
+                dialog.dismiss()
+                viewModel.saveForm()
             }
-            .setNegativeButton(resources.getString(R.string.no)) { dialog, _ -> dialog.dismiss() }
             .create()
     }
 
-    private val tbSuspectedFamilyAlert by lazy {
-        AlertDialog.Builder(requireContext())
-            .setTitle(resources.getString(R.string.tb_screening))
-            .setMessage("it")
-            .setPositiveButton(resources.getString(R.string.ok)) { dialog, _ -> dialog.dismiss() }
-            .create()
-    }
+    private val requestLocationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) fetchLocation()
+        }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -97,6 +89,7 @@ class TBScreeningFormFragment : Fragment() {
         viewModel.benAgeGender.observe(viewLifecycleOwner) {
             binding.tvAgeGender.text = it
         }
+        captureGeolocation()
         binding.btnSubmit.setOnClickListener {
             submitTBScreeningForm()
         }
@@ -109,64 +102,34 @@ class TBScreeningFormFragment : Fragment() {
                         resources.getString(R.string.tb_screening_submitted), Toast.LENGTH_SHORT
                     ).show()
                     WorkerUtils.triggerAmritPushWorker(requireContext())
-                    findNavController().navigateUp()
+                    if (viewModel.autoFlow) {
+                        findNavController().navigate(
+                            R.id.vitalScreenFragment,
+                            bundleOf(
+                                "benId" to viewModel.benId,
+                                "autoFlow" to true
+                            )
+                        )
+                    } else {
+                        findNavController().navigateUp()
+                    }
                 }
 
                 else -> {}
             }
         }
-
-        findNavController()
-            .currentBackStackEntry
-            ?.savedStateHandle
-            ?.getLiveData<String>("REFERRAL_DONE")
-            ?.observe(viewLifecycleOwner) { typeName ->
-                if (typeName.isNullOrBlank()) return@observe
-                val type = TBScreeningFormViewModel.ReferralType.valueOf(typeName)
-                viewModel.markReferralCompleted(type)
-                viewModel.saveForm()
-                findNavController().currentBackStackEntry?.savedStateHandle?.set("REFERRAL_DONE",null)
-            }
-
-        findNavController().currentBackStackEntry
-            ?.savedStateHandle
-            ?.getLiveData<String>("REFERRAL_RESULT")
-            ?.observe(viewLifecycleOwner) { json ->
-                if (json.isNullOrBlank()) return@observe
-                val referral = Gson().fromJson(json, ReferalCache::class.java)
-                viewModel.addReferral(referral)
-                findNavController().currentBackStackEntry?.savedStateHandle?.set("REFERRAL_RESULT",null)
-
-            }
     }
 
     private fun submitTBScreeningForm() {
         if (validateCurrentPage()) {
-            viewModel.getAlerts()
-            if (viewModel.referToHwcFacility.isNullOrBlank()){
+            val alertMessage = viewModel.getFamilyContactAlert()
+            if (alertMessage.isNullOrBlank()) {
                 viewModel.saveForm()
-            }else{
-                showAlerts()
+            } else {
+                familyContactAlert.setMessage(alertMessage)
+                familyContactAlert.show()
             }
         }
-    }
-
-    private fun showAlerts() {
-        viewModel.getAlerts()
-        viewModel.suspectedTB?.let {
-            tbSuspectedAlert.setMessage(it)
-            tbSuspectedAlert.show()
-        }
-
-        viewModel.suspectedTBFamily?.let {
-            tbSuspectedFamilyAlert.setMessage(it)
-            tbSuspectedFamilyAlert.show()
-        }
-        viewModel.referToHwcFacility?.let {
-            referToHwcFacilityAlert.setMessage(it)
-            referToHwcFacilityAlert.show()
-        }
-
     }
 
     private fun validateCurrentPage(): Boolean {
@@ -182,6 +145,36 @@ class TBScreeningFormFragment : Fragment() {
             false
         }
     }
+
+    private fun captureGeolocation() {
+        if (ActivityCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            fetchLocation()
+        } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || shouldShowRequestPermissionRationale(
+                Manifest.permission.ACCESS_FINE_LOCATION
+            )
+        ) {
+            requestLocationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        } else {
+            requestLocationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun fetchLocation() {
+        val locationManager =
+            requireContext().getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+        location?.let {
+            viewModel.capturedLatitude = it.latitude
+            viewModel.capturedLongitude = it.longitude
+        }
+    }
+
     override fun onStart() {
         super.onStart()
         activity?.let {

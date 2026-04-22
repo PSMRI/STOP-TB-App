@@ -11,8 +11,8 @@
     <string name="btn_continue_text">जारी रखें</string>
 
     <string name="menu_home">घर</string>
-    <string name="menu_home_home">घर</string>
-    <string name="menu_home_scheduler">अनुसूचक</string>
+    <string name="menu_home_home">होम</string>
+    <string name="menu_home_scheduler">डैशबोर्ड</string>
     <string name="til_hint_selected_village">Selected Village</string>
 
     <string name="icon_title_household">सभी घरेलू सूची</string>

@@ -201,6 +201,24 @@ fun ViewGroup.setVisibilityOfLayout(show: Boolean?) {
     }
 }
 
+@BindingAdapter("boundMinHeight")
+fun View.setBoundMinHeight(minHeight: Float?) {
+    minHeight?.let {
+        minimumHeight = it.toInt()
+    }
+}
+
+@BindingAdapter("boundMarginTop")
+fun View.setBoundMarginTop(marginTop: Float?) {
+    marginTop?.let {
+        val params = layoutParams
+        if (params is ViewGroup.MarginLayoutParams) {
+            params.topMargin = it.toInt()
+            layoutParams = params
+        }
+    }
+}
+
 @BindingAdapter("radioForm")
 fun ConstraintLayout.setItems(form: FormInputOld?) {
 }
@@ -484,4 +502,9 @@ fun setDynamicBackground(view: View, isEligible: Boolean) {
     } else {
         view.background = null
     }
+}
+
+@BindingAdapter("visibleOrGone")
+fun View.setVisibleOrGone(show: Boolean?) {
+    visibility = if (show == true) View.VISIBLE else View.GONE
 }

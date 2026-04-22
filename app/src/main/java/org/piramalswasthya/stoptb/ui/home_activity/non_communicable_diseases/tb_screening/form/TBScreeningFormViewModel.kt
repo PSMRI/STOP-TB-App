@@ -14,11 +14,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.configuration.TBScreeningDataset
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
-import org.piramalswasthya.stoptb.database.shared_preferences.ReferralStatusManager
-import org.piramalswasthya.stoptb.model.ReferalCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.repositories.BenRepo
-import org.piramalswasthya.stoptb.repositories.NcdReferalRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import timber.log.Timber
 import javax.inject.Inject
@@ -26,25 +23,15 @@ import javax.inject.Inject
 @HiltViewModel
 class TBScreeningFormViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    preferenceDao: PreferenceDao,
+    private val preferenceDao: PreferenceDao,
     @ApplicationContext context: Context,
     private val tbRepo: TBRepo,
-    private val benRepo: BenRepo,
-    private val referralStatusManager: ReferralStatusManager,
-    private val referalRepo: NcdReferalRepo
+    private val benRepo: BenRepo
 ) : ViewModel() {
     val benId =
         TBScreeningFormFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
-
-    enum class ReferralType {
-        NCD,
-        TB,
-        LEPROSY,
-        GERIATRIC,
-        COPD,
-        DEPRESSION,
-        HRP
-    }
+    val autoFlow =
+        TBScreeningFormFragmentArgs.fromSavedStateHandle(savedStateHandle).autoFlow
 
     enum class State {
         IDLE, SAVING, SAVE_SUCCESS, SAVE_FAILED
@@ -70,12 +57,15 @@ class TBScreeningFormViewModel @Inject constructor(
         TBScreeningDataset(context, preferenceDao.getCurrentLanguage())
     val formList = dataset.listFlow
 
-    var suspectedTB: String? = null
-    var referToHwcFacility: String? = null
-
-    var suspectedTBFamily: String? = null
-
     private lateinit var tbScreeningCache: TBScreeningCache
+    var capturedLatitude: Double? = null
+    var capturedLongitude: Double? = null
+    var capturedAddress: String? = preferenceDao.getLocationRecord()?.let {
+        listOf(it.village.name, it.block.name, it.district.name, it.state.name)
+            .filter { name -> name.isNotBlank() }
+            .distinct()
+            .joinToString(", ")
+    }
 
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.IO
 
@@ -101,34 +91,6 @@ class TBScreeningFormViewModel @Inject constructor(
                 ben,
                 if (recordExists.value == true) tbScreeningCache else null
             )
-
-        }
-    }
-    private val _completedReferrals = MutableLiveData<MutableSet<ReferralType>>(mutableSetOf())
-    fun markReferralCompleted(type: ReferralType) {
-        val set = _completedReferrals.value ?: mutableSetOf()
-        set.add(type)
-        _completedReferrals.value = set
-        referralStatusManager.markAsReferred(benId, type.name)
-    }
-
-    fun isReferralAlreadyDone(type: ReferralType): Boolean {
-        return _completedReferrals.value?.contains(type) == true
-    }
-    private val _referralList = MutableLiveData<MutableList<ReferalCache>>(mutableListOf())
-    val referralList: LiveData<MutableList<ReferalCache>> = _referralList
-    var referralCache: ReferalCache? = null
-    fun addReferral(referral: ReferalCache) {
-        val list = _referralList.value ?: mutableListOf()
-        val alreadyExists = list.any {
-            it.referralReason == referral.referralReason
-        }
-
-        if (!alreadyExists) {
-            list.add(referral)
-            _referralList.value = list
-            referralCache = referral
-            referralStatusManager.markAsReferred(benId, ReferralType.TB.name)
         }
     }
 
@@ -139,12 +101,7 @@ class TBScreeningFormViewModel @Inject constructor(
 
     }
 
-
-    fun getAlerts() {
- //       suspectedTB = dataset.isTbSuspected()
-//        suspectedTBFamily = dataset.isTbSuspectedFamily()
-        referToHwcFacility = dataset.referHwcFacility()
-    }
+    fun getFamilyContactAlert(): String? = dataset.getFamilyContactAlert()
 
     fun saveForm() {
         viewModelScope.launch {
@@ -152,14 +109,13 @@ class TBScreeningFormViewModel @Inject constructor(
                 try {
                     _state.postValue(State.SAVING)
                     dataset.mapValues(tbScreeningCache, 1)
+                    tbScreeningCache.latitude = capturedLatitude
+                    tbScreeningCache.longitude = capturedLongitude
+                    tbScreeningCache.address = capturedAddress
                     tbRepo.saveTBScreening(tbScreeningCache)
-                    referralList.value?.forEach {
-                        referalRepo.saveReferedNCD(it)
-
-                    }
                     _state.postValue(State.SAVE_SUCCESS)
                 } catch (e: Exception) {
-                    Timber.d("saving tb screening data failed!!")
+                    Timber.d(e, "saving tb screening data failed!!")
                     _state.postValue(State.SAVE_FAILED)
                 }
             }
@@ -201,6 +157,5 @@ class TBScreeningFormViewModel @Inject constructor(
     fun getIndexOfDate(): Int {
         return dataset.getIndexOfDate()
     }
-
 }
 

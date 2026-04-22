@@ -9,7 +9,9 @@
     tools:context=".ui.login_activity.sign_in.SignInFragment">
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
 
     <LinearLayout
         android:id="@+id/ll_logo"
@@ -25,30 +27,34 @@
         app:layout_constraintVertical_chainStyle="spread_inside">
         <ImageView
             android:id="@+id/iv_nhm_logo"
-            android:layout_width="match_parent"
+            android:layout_width="120dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="40dp"
+            android:layout_marginTop="48dp"
             android:contentDescription="@string/cd_assam_nhm_logo"
-            android:src="@drawable/logo_circle"
-            />
+            android:src="@drawable/logo_circle" />
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
-            android:text="@string/app_native_name"/>
+            android:layout_marginTop="12dp"
+            android:fontFamily="@font/opensans_semibold"
+            android:text="@string/app_native_name"
+            android:textAppearance="@style/TextAppearance.Material3.HeadlineSmall"
+            android:textColor="@color/md_theme_light_onBackground" />
 
     </LinearLayout>
 
 
-    <androidx.cardview.widget.CardView
+    <com.google.android.material.card.MaterialCardView
         android:id="@+id/cv_login_item_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="@dimen/margin_huge"
-        android:elevation="@dimen/padding_normal"
-        app:cardBackgroundColor="?attr/colorOnPrimary"
-        app:cardCornerRadius="@dimen/padding_wide"
-        app:cardElevation="@dimen/padding_wide"
+        android:layout_marginTop="28dp"
+        android:layout_marginBottom="20dp"
+        app:cardBackgroundColor="@color/sakhi_card_surface"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="0dp"
+        app:strokeColor="@color/md_theme_light_outlineVariant"
+        app:strokeWidth="1dp"
         app:layout_constraintBottom_toTopOf="@+id/textView12"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -71,6 +77,8 @@
                     android:paddingTop="@dimen/padding_normal"
                     android:paddingBottom="@dimen/padding_normal"
                     android:text="@string/tv_text_sign_in"
+                    android:textColor="@color/md_theme_light_onSurface"
+                    android:fontFamily="@font/opensans_semibold"
                     android:textAppearance="@style/TextAppearance.Material3.HeadlineMedium"
                     android:textStyle="normal"
                     android:gravity="center"
@@ -80,9 +88,11 @@
                     android:id="@+id/tv_lang"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
                     android:gravity="center"
                     android:padding="@dimen/padding_normal"
                     android:text="@string/tv_text_select_language"
+                    android:textColor="@color/md_theme_light_onSurfaceVariant"
                     android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
                     app:layout_constraintTop_toBottomOf="@id/tv_sign_in" />
 
@@ -93,6 +103,7 @@
                     android:checkedButton="@id/rb_eng"
                     android:gravity="center"
                     android:orientation="horizontal"
+                    android:paddingTop="4dp"
                     android:paddingStart="@dimen/padding_wide"
                     android:paddingEnd="@dimen/padding_wide"
                     android:weightSum="3"
@@ -145,14 +156,13 @@
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/til_username"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    style="@style/Widget.Sakhi.TextInputLayout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="@string/til_username_hint_text"
                     android:paddingTop="@dimen/padding_normal"
-
                     android:paddingBottom="@dimen/padding_normal"
-                    app:endIconTint="?attr/colorOnPrimary"
+                    app:endIconTint="@color/md_theme_light_onSurfaceVariant"
 
                     app:layout_constraintTop_toBottomOf="@id/rg_lang_select"
                     tools:layout_editor_absoluteX="16dp">
@@ -171,7 +181,7 @@
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/til_password"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    style="@style/Widget.Sakhi.TextInputLayout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:longClickable="false"
@@ -211,6 +221,7 @@
                     android:id="@+id/cb_remember"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
                     android:text="@string/cb_login_remember_me_text"
                     android:checked="true"
                     app:layout_constraintTop_toBottomOf="@id/tv_error" />
@@ -246,9 +257,11 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center_horizontal"
-                    android:layout_margin="@dimen/padding_normal"
+                    android:layout_marginTop="@dimen/padding_normal"
+                    android:layout_marginBottom="@dimen/padding_small"
                     android:padding="@dimen/padding_normal"
                     android:text="@string/btn_login_text"
+                    android:fontFamily="@font/opensans_semibold"
                     android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
                     app:layout_constraintTop_toBottomOf="@id/tv_forgot_password" />
 
@@ -264,7 +277,7 @@
                 android:visibility="gone" />
         </FrameLayout>
 
-    </androidx.cardview.widget.CardView>
+    </com.google.android.material.card.MaterialCardView>
 
     <TextView
         android:id="@+id/textView12"
@@ -274,8 +287,9 @@
         android:text="@string/pwr_by_text"
         android:lineSpacingMultiplier="1.5"
         android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
-        android:textColor="?attr/colorOnPrimary"
+        android:textColor="@color/md_theme_light_onSurfaceVariant"
         android:gravity="center"
+        android:layout_marginBottom="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
