@@ -35,6 +35,10 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class AllBenFragment : Fragment() {
 
+    private companion object {
+        val READ_ONLY_REFERRAL_SOURCES = setOf(5, 6, 7, 8)
+    }
+
     @Inject
     lateinit var prefDao: PreferenceDao
 
@@ -123,17 +127,23 @@ class AllBenFragment : Fragment() {
 //        val isVolunteer = prefDao.getLoggedInUser()?.role
 //            .equals(RoleConstants.ROLE_VOLUNTEER, true)
         val isVolunteer = true
+        val isReadOnlyReferralList = args.source in READ_ONLY_REFERRAL_SOURCES
+        val showResultButton = args.source == 6 || args.source == 7 || args.source == 8
         if (isVolunteer) {
-            binding.btnNextPage.visibility = View.VISIBLE
-            binding.btnNextPage.text = getString(R.string.add_beneficiary)
-            binding.btnNextPage.setOnClickListener {
-                findNavController().navigate(
-                    AllBenFragmentDirections.actionAllBenFragmentToNewBenRegFragment(
-                        hhId = 0L,
-                        relToHeadId = 18,
-                        gender = 0
+            if (isReadOnlyReferralList) {
+                binding.btnNextPage.visibility = View.GONE
+            } else {
+                binding.btnNextPage.visibility = View.VISIBLE
+                binding.btnNextPage.text = getString(R.string.add_beneficiary)
+                binding.btnNextPage.setOnClickListener {
+                    findNavController().navigate(
+                        AllBenFragmentDirections.actionAllBenFragmentToNewBenRegFragment(
+                            hhId = 0L,
+                            relToHeadId = 18,
+                            gender = 0
+                        )
                     )
-                )
+                }
             }
         } else {
             binding.btnNextPage.visibility = View.GONE
@@ -147,7 +157,7 @@ class AllBenFragment : Fragment() {
             viewModel.downloadCsv(requireContext())
         }
 
-        if (args.source == 1 || args.source == 2 || args.source == 3 || args.source == 4) {
+        if (args.source == 1 || args.source == 2 || args.source == 3 || args.source == 4 || args.source == 5 || args.source == 6 || args.source == 7 || args.source == 8) {
             binding.ibFilter.visibility = View.GONE
             binding.ibDownload.visibility = View.VISIBLE
         }
@@ -156,6 +166,7 @@ class AllBenFragment : Fragment() {
         benAdapter = BenPagingAdapter(
             clickListener = BenListAdapter.BenClickListener(
                 { item, hhId, benId, relToHeadId ->
+                    if (isReadOnlyReferralList) return@BenClickListener
                     val now = System.currentTimeMillis()
                     timber.log.Timber.d("BEN_CLICK: clicked benId=$benId, hhId=$hhId, time=$now")
                     if (now - lastClickTime > 1000) {
@@ -189,15 +200,32 @@ class AllBenFragment : Fragment() {
                 },
                 { item, benId, hhId, isViewMode, isIFA -> },
                 { },
-                { }
+                { },
+                { item, benId, hhId ->
+                    if (isReadOnlyReferralList) return@BenClickListener
+                    findNavController().navigate(
+                        AllBenFragmentDirections.actionAllBenFragmentToVitalScreenFragment(benId)
+                    )
+                },
+                { item, benId, hhId ->
+                    if (!showResultButton) return@BenClickListener
+                    findNavController().navigate(
+                        AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                            benId = benId,
+                            viewOnly = true
+                        )
+                    )
+                }
             ),
             showBeneficiaries = true,
             showRegistrationDate = true,
             showSyncIcon = true,
-            showAbha = true,
-            showCall = true,
+            showAbha = !isReadOnlyReferralList,
+            showCall = !isReadOnlyReferralList,
             pref = prefDao,
-            context = requireActivity()
+            context = requireActivity(),
+            showActionButtons = !isReadOnlyReferralList,
+            showResultButton = showResultButton
         )
 
         binding.rvAny.adapter = benAdapter
@@ -218,8 +246,8 @@ class AllBenFragment : Fragment() {
                 val isEmpty = loadStates.refresh is LoadState.NotLoading
                         && benAdapter.itemCount == 0
                 binding.flEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
-                // Volunteer ke liye button hamesha visible rahega
-                if (isVolunteer) {
+                // Volunteer ke liye button hamesha visible rahega except read-only referral lists
+                if (isVolunteer && !isReadOnlyReferralList) {
                     binding.btnNextPage.visibility = View.VISIBLE
                 }
             }
@@ -228,6 +256,12 @@ class AllBenFragment : Fragment() {
         lifecycleScope.launch {
             viewModel.childCounts.collectLatest { countMap ->
                 benAdapter.submitChildCounts(countMap)
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.vitalBenIds.collectLatest { benIds ->
+                benAdapter.submitBenIds(benIds)
             }
         }
 
@@ -290,6 +324,14 @@ class AllBenFragment : Fragment() {
                 getString(R.string.icon_title_abhas)
             } else if (args.source == 2) {
                 getString(R.string.icon_title_rchs)
+            } else if (args.source == 5) {
+                getString(R.string.referral_hwc)
+            } else if (args.source == 6) {
+                getString(R.string.referral_digital_chest_xray)
+            } else if (args.source == 7) {
+                getString(R.string.referral_true_nat)
+            } else if (args.source == 8) {
+                getString(R.string.referral_liquid_culture)
             } else {
                 getString(R.string.icon_title_ben)
             }

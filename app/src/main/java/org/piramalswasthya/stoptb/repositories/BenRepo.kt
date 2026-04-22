@@ -1115,7 +1115,14 @@ class BenRepo @Inject constructor(
                                     ),
                                     block = LocationEntity(
                                         benDataObj.getInt("blockId"),
-                                        benDataObj.getString("blockName"),
+                                        if (benDataObj.has("facilitySelection") &&
+                                            !benDataObj.isNull("facilitySelection") &&
+                                            benDataObj.getString("facilitySelection").isNotBlank()
+                                        ) {
+                                            benDataObj.getString("facilitySelection")
+                                        } else {
+                                            benDataObj.getString("blockName")
+                                        },
                                     ),
                                     village = LocationEntity(
                                         benDataObj.getInt("villageId"),

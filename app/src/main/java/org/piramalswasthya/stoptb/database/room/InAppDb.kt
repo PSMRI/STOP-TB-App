@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.database.room
 import android.content.Context
 import android.util.Log
 import androidx.room.Database
+import androidx.room.migration.Migration
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
@@ -23,6 +24,7 @@ import org.piramalswasthya.stoptb.database.room.dao.LeprosyDao
 import org.piramalswasthya.stoptb.database.room.dao.MalariaDao
 import org.piramalswasthya.stoptb.database.room.dao.SyncDao
 import org.piramalswasthya.stoptb.database.room.dao.TBDao
+import org.piramalswasthya.stoptb.database.room.dao.VitalDao
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.FormResponseDao
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.FormResponseJsonDao
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.FormSchemaDao
@@ -45,6 +47,7 @@ import org.piramalswasthya.stoptb.model.ReferalCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
+import org.piramalswasthya.stoptb.model.VitalCache
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormResponseJsonEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormSchemaEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.NCDReferalFormResponseJsonEntity
@@ -69,10 +72,11 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.NCDReferalFormResponseJson
         FormResponseJsonEntity::class,
         NCDReferalFormResponseJsonEntity::class,
         ReferalCache::class,
-        TBConfirmedTreatmentCache::class
+        TBConfirmedTreatmentCache::class,
+        VitalCache::class
     ],
     views = [BenBasicCache::class],
-    version = 2, exportSchema = false
+    version = 4, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -98,6 +102,7 @@ abstract class InAppDb : RoomDatabase() {
     abstract fun NCDReferalFormResponseJsonDao(): NCDReferalFormResponseJsonDao
     abstract fun formResponseJsonDao(): FormResponseJsonDao
     abstract val syncDao: SyncDao
+    abstract val vitalDao: VitalDao
 
     companion object {
         @Volatile
@@ -127,6 +132,50 @@ abstract class InAppDb : RoomDatabase() {
             }
             cursor.close()
             return false
+        }
+
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `BEN_VITALS` (
+                        `benId` INTEGER NOT NULL,
+                        `capturedAt` INTEGER NOT NULL,
+                        `temperature` REAL,
+                        `pulseRate` INTEGER,
+                        `bpSystolic` INTEGER,
+                        `bpDiastolic` INTEGER,
+                        `respiratoryRate` INTEGER,
+                        `spo2` INTEGER,
+                        `height` REAL,
+                        `weight` REAL,
+                        `bmi` REAL,
+                        `rbs` REAL,
+                        `syncState` INTEGER NOT NULL,
+                        PRIMARY KEY(`benId`),
+                        FOREIGN KEY(`benId`) REFERENCES `beneficiary`(`beneficiaryId`) ON UPDATE CASCADE ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `ind_vitals_ben` ON `BEN_VITALS` (`benId`)"
+                )
+            }
+        }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "TB_SUSPECTED", "isLiquidCultureConducted")) {
+                    database.execSQL(
+                        "ALTER TABLE TB_SUSPECTED ADD COLUMN isLiquidCultureConducted INTEGER DEFAULT NULL"
+                    )
+                }
+                if (!columnExists(database, "TB_SUSPECTED", "liquidCultureResult")) {
+                    database.execSQL(
+                        "ALTER TABLE TB_SUSPECTED ADD COLUMN liquidCultureResult TEXT DEFAULT NULL"
+                    )
+                }
+            }
         }
 
         fun getInstance(appContext: Context): InAppDb {
@@ -173,7 +222,8 @@ abstract class InAppDb : RoomDatabase() {
                     }
 
                     instance = builder
-                        .fallbackToDestructiveMigration()
+                        .addMigrations(MIGRATION_2_3)
+                        .addMigrations(MIGRATION_3_4)
                         .build()
 
                     INSTANCE = instance

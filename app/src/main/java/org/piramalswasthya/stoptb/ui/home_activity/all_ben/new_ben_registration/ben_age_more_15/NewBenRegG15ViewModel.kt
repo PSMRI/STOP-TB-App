@@ -106,9 +106,17 @@ class NewBenRegG15ViewModel @Inject constructor(
                 )
                 currentPage.collect {
                     when (it) {
-                        1 -> dataset.setFirstPageToRead(ben, household.family?.familyHeadPhoneNo)
+                        1 -> dataset.setFirstPageToRead(
+                            ben,
+                            household.family?.familyHeadPhoneNo,
+                            subCentreName = user.subCentre
+                        )
 //                        2 -> dataset.setSecondPage(ben)
-                        3 -> dataset.setFirstPageToRead(ben, household.family?.familyHeadPhoneNo)
+                        3 -> dataset.setFirstPageToRead(
+                            ben,
+                            household.family?.familyHeadPhoneNo,
+                            subCentreName = user.subCentre
+                        )
                     }
                 }
             }

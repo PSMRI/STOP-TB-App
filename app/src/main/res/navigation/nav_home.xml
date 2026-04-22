@@ -22,6 +22,22 @@
         <action
             android:id="@+id/action_homeFragment_to_cdFragment"
             app:destination="@id/cdFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_referralIconsFragment"
+            app:destination="@id/referralIconsFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/referralIconsFragment"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.home.ReferralIconsFragment"
+        android:label="@string/ncd_refer_list"
+        tools:layout="@layout/rv_icon_grid">
+        <action
+            android:id="@+id/action_referralIconsFragment_to_ncdRefferedList"
+            app:destination="@id/ncdRefferedList" />
+        <action
+            android:id="@+id/action_referralIconsFragment_to_allBenFragment"
+            app:destination="@id/allBenFragment" />
     </fragment>
 
     <fragment
@@ -35,10 +51,47 @@
         <action
             android:id="@+id/action_allBenFragment_to_newChildAsBenRegistrationFragment"
             app:destination="@id/newChildAsBenRegistrationFragment" />
+        <action
+            android:id="@+id/action_allBenFragment_to_vitalScreenFragment"
+            app:destination="@id/vitalScreenFragment" />
+        <action
+            android:id="@+id/action_allBenFragment_to_TBSuspectedQuickFragment"
+            app:destination="@id/TBSuspectedQuickFragment" />
         <argument
             android:name="source"
             android:defaultValue="0"
             app:argType="integer" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/vitalScreenFragment"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.vital_screen.VitalScreenFragment"
+        android:label="@string/vital_screen"
+        tools:layout="@layout/fragment_vital_screen">
+        <argument
+            android:name="benId"
+            app:argType="long" />
+        <argument
+            android:name="autoFlow"
+            android:defaultValue="false"
+            app:argType="boolean" />
+        <action
+            android:id="@+id/action_vitalScreenFragment_to_TBSuspectedQuickFragment"
+            app:destination="@id/TBSuspectedQuickFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/TBSuspectedQuickFragment"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.tb_suspected.quick.TBSuspectedQuickFragment"
+        android:label="@string/tb_suspected_quick_title"
+        tools:layout="@layout/fragment_tb_suspected_quick">
+        <argument
+            android:name="benId"
+            app:argType="long" />
+        <argument
+            android:name="viewOnly"
+            android:defaultValue="false"
+            app:argType="boolean" />
     </fragment>
 
     <fragment
@@ -297,6 +350,10 @@
         <argument
             android:name="benId"
             app:argType="long" />
+        <argument
+            android:name="autoFlow"
+            android:defaultValue="false"
+            app:argType="boolean" />
         <action
             android:id="@+id/action_TBScreeningFormFragment_to_ncdReferForm"
             app:destination="@id/NCDReferalForm" />

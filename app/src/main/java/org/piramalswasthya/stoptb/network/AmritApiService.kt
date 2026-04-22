@@ -108,6 +108,9 @@ interface AmritApiService {
     @POST("flw-api/tb/confirmed/save")
     suspend fun saveTBConfirmedData(@Body tbConfirmedRequestDTO: TBConfirmedRequestDTO): Response<ResponseBody>
 
+    @POST("/hwc-api/sync/generalOPDNurseFormDataToServer")
+    suspend fun saveVitalNurseData(@Body patientVisitInfo: VitalNurseDataRequest): Response<ResponseBody>
+
     @POST("flw-api/follow-up/save")
     suspend fun saveMalariaConfirmedData(@Body malariaConfirmedRequestDTO: MalariaConfirmedRequestDTO): Response<ResponseBody>
 

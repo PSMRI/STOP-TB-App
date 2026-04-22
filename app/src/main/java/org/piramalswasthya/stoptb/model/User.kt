@@ -262,7 +262,8 @@ data class User(
     val state: LocationEntity,
     val district: LocationEntity,
     val block: LocationEntity,
-    val villages: List<LocationEntity>
+    val villages: List<LocationEntity>,
+    val subCentre: String? = null
 )
 
 
@@ -291,7 +292,7 @@ data class UserDetailsInResponse(
     val villageId: String,
     val villageName: String
 ) {
-    fun toUser(password: String): User {
+    fun toUser(password: String, subCentre: String? = null): User {
         return User(
             userId = userId,
             name = name,
@@ -303,6 +304,7 @@ data class UserDetailsInResponse(
             district = LocationEntity(id = 1, name = workingDistrictName.toString()),
             block = LocationEntity(id = blockId, name = blockName),
             villages = getLocationEntityListForVillage(villageId, villageName),
+            subCentre = subCentre
         )
     }
 

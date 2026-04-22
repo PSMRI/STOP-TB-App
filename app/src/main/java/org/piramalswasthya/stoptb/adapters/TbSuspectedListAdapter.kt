@@ -45,12 +45,13 @@ class TbSuspectedListAdapter(
             clickListener: ClickListener?,
             pref: PreferenceDao?
         ) {
+            val isFullFormSubmitted = !item.tbSuspected?.visitLabel.isNullOrBlank()
 
             binding.btnFormTb.visibility = View.VISIBLE
 
             binding.benWithTb = item
 
-            binding.ivSyncState.visibility = if (item.tbSuspected == null) View.INVISIBLE else View.VISIBLE
+            binding.ivSyncState.visibility = if (isFullFormSubmitted) View.VISIBLE else View.INVISIBLE
 
             if (item.ben.spouseName == "Not Available" && item.ben.fatherName == "Not Available") {
                 binding.father = true
@@ -80,8 +81,12 @@ class TbSuspectedListAdapter(
                 }
             }
 
-            binding.btnFormTb.text = if (item.tbSuspected == null) binding.root.resources.getString(R.string.track) else binding.root.resources.getString(R.string.view)
-            binding.btnFormTb.setBackgroundColor(binding.root.resources.getColor(if (item.tbSuspected == null) android.R.color.holo_red_dark else android.R.color.holo_green_dark))
+            binding.btnFormTb.text = if (isFullFormSubmitted) binding.root.resources.getString(R.string.view) else binding.root.resources.getString(R.string.track)
+            binding.btnFormTb.setBackgroundColor(
+                binding.root.resources.getColor(
+                    if (isFullFormSubmitted) android.R.color.holo_green_dark else android.R.color.holo_red_dark
+                )
+            )
             binding.clickListener = clickListener
 
             binding.executePendingBindings()

@@ -127,6 +127,9 @@ data class BeneficiaryDataSending(
     @Json(name = "motherName")
     val motherName: String,
 
+    @Json(name = "facilitySelection")
+    val facilitySelection: String? = null,
+
     @Json(name = "branchName")
     val branchName: String? = null,
 
@@ -301,6 +304,7 @@ fun BenRegCache.asNetworkSendingModel(
         dob = getDateTimeStringFromLong(dob) ?: "",
         fatherName = fatherName ?: "",
         motherName = motherName ?: "",
+        facilitySelection = locationRecord.block.name.takeIf { it.isNotBlank() },
         spouseName = genDetails?.spouseName ?: "",
         govtIdentityNo = null,
         govtIdentityTypeID = null,

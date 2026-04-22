@@ -139,12 +139,20 @@ class NewBenRegViewModel @Inject constructor(
                 familyHeadPhoneNo = household.family?.familyHeadPhoneNo,
                 villageName = locationRecord.village.name,
                 villageNames = villageNames,
-                villageEntityList = user.villages
+                villageEntityList = user.villages,
+                subCentreName = user.subCentre
             )
         } else {
             val villageNames = user.villages.map { it.name }.toTypedArray()
             // New registration
-            dataset.setUpPage(null, household.family?.familyHeadPhoneNo, locationRecord.village.name, villageNames, user.villages)
+            dataset.setUpPage(
+                null,
+                household.family?.familyHeadPhoneNo,
+                locationRecord.village.name,
+                villageNames,
+                user.villages,
+                user.subCentre
+            )
         }
     }
 
@@ -239,6 +247,7 @@ class NewBenRegViewModel @Inject constructor(
     fun getIndexOfMaritalStatus()   = dataset.getIndexOfMaritalStatus()
     fun getIndexOfContactNumber()   = dataset.getIndexOfContactNumber()
     fun getIndexofTempraryNumber()  = dataset.getTempMobileNoStatus()
+    fun getCurrentBenId(): Long = if (this::ben.isInitialized) ben.beneficiaryId else benIdFromArgs
 
     fun setRecordExist(b: Boolean) { _recordExists.value = b }
     fun enableEditMode() { dataset.enableEditMode() }

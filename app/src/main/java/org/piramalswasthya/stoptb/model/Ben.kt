@@ -1455,8 +1455,7 @@ data class BenRegCache(
             spouseName = genDetails?.spouseName ?: "",
 //            whoConductedDelivery = genDetails?.whoConductedDelivery,
 //            lastDeliveryConducted = genDetails?.lastDeliveryConducted,
-
-//            facilitySelection = genDetails?.facilityName ?: "",
+            facilitySelection = locationRecord.block.name.takeIf { it.isNotBlank() } ?: "",
             serverUpdatedStatus = serverUpdatedStatus,
             createdBy = createdBy!!,
             createdDate = getDateTimeStringFromLong(createdDate!!)!!,

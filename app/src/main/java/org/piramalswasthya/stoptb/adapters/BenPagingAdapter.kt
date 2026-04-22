@@ -17,7 +17,8 @@ class BenPagingAdapter(
     private val pref: PreferenceDao? = null,
     var context: FragmentActivity,
     private val isSoftDeleteEnabled: Boolean = false,
-    private val showActionButtons: Boolean = true,
+    private val showActionButtons: Boolean = false,
+    private val showResultButton: Boolean = false,
 ) :
     PagingDataAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenListAdapter.BenDiffUtilCallBack) {
 
@@ -44,7 +45,8 @@ class BenPagingAdapter(
             context,
             benIds,
             childCountMap,
-            showActionButtons = showActionButtons
+            showActionButtons = showActionButtons,
+            showResultButton = showResultButton
         )
     }
 

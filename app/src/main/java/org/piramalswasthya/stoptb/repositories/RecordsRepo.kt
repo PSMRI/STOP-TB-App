@@ -93,6 +93,10 @@ class RecordsRepo @Inject constructor(
     val getNcdEligibleListCount get() = benDao.getBenWithCbacCount(selectedVillage)
     val getNcdrefferedListCount get() = benDao.getReferredBenCount(selectedVillage)
     val getHwcReferedListCount get() = benDao.getReferredHWCBenCount(selectedVillage)
+    val digitalChestXrayReferralCount get() = benDao.getDigitalChestXRayBenCount(selectedVillage)
+    val trueNatReferralCount get() = benDao.getTrueNatBenCount(selectedVillage)
+    val liquidCultureReferralCount get() = benDao.getLiquidCultureBenCount(selectedVillage)
+    val hwcReferralCount get() = benDao.getHwcBenDataCount(selectedVillage)
 
     val getNcdPriorityList get() = getNcdEligibleList.map {
         it.filter { it.savedCbacRecords.isNotEmpty() && it.savedCbacRecords.maxBy { it.createdDate }.total_score > 4 }
@@ -126,9 +130,9 @@ class RecordsRepo @Inject constructor(
     fun filariaScreeningList(hhId: Long) = benDao.getAllFilariaScreeningBen(selectedVillage, hhId = hhId)
         .map { list -> list.map { it.asFilariaScreeningDomainModel() } }
 
-    val tbScreeningList get() = benDao.getAllTbScreeningBen(selectedVillage)
+    val tbScreeningList get() = benDao.getPendingTbScreeningBen(selectedVillage)
         .map { list -> list.map { it.asTbScreeningDomainModel() } }
-    val tbScreeningListCount get() = tbScreeningList.map { it.size }
+    val tbScreeningListCount get() = benDao.getPendingTbScreeningCount(selectedVillage)
 
     val tbSuspectedList get() = benDao.getTbScreeningList(selectedVillage)
         .map { list -> list.map { it.asTbSuspectedDomainModel() } }

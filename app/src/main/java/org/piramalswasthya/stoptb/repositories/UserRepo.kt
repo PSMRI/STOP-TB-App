@@ -42,8 +42,8 @@ class UserRepo @Inject constructor(
     suspend fun authenticateUser(userName: String, password: String): NetworkResponse<User?> {
         return withContext(Dispatchers.IO) {
             try {
-                val userId = getTokenAmrit(userName, password)
-                val user = setUserRole(userId, password)
+                val authData = getTokenAmrit(userName, password)
+                val user = setUserRole(authData.userId, password, authData.subCentre)
                 return@withContext NetworkResponse.Success(user)
             } catch (se: SocketTimeoutException) {
                 return@withContext NetworkResponse.Error(message = "Server timed out !")
@@ -70,8 +70,8 @@ class UserRepo @Inject constructor(
     suspend fun saveToken(userName: String, password: String): NetworkResponse<User?> {
         return withContext(Dispatchers.IO) {
             try {
-                val userId = getTokenAmrit(userName, password)
-                val user = setUserRole(userId, password)
+                val authData = getTokenAmrit(userName, password)
+                val user = setUserRole(authData.userId, password, authData.subCentre)
                 return@withContext NetworkResponse.Success(user)
             } catch (se: SocketTimeoutException) {
                 return@withContext NetworkResponse.Error(message = "Server timed out !")
@@ -91,9 +91,9 @@ class UserRepo @Inject constructor(
         }
     }
 
-    private suspend fun setUserRole(userId: Int, password: String): User {
+    private suspend fun setUserRole(userId: Int, password: String, subCentre: String?): User {
         val response = amritApiService.getUserDetailsById(userId = userId)
-        val user = response.data.toUser(password)
+        val user = response.data.toUser(password, subCentre)
         preferenceDao.registerUser(user)
         // Auto-set location if user has exactly one village (common for ASHA workers)
         if (user.villages.size == 1) {
@@ -178,7 +178,12 @@ class UserRepo @Inject constructor(
         }
     }
 
-    private suspend fun getTokenAmrit(userName: String, password: String): Int {
+    private data class AuthUserData(
+        val userId: Int,
+        val subCentre: String?
+    )
+
+    private suspend fun getTokenAmrit(userName: String, password: String): AuthUserData {
         return withContext(Dispatchers.IO) {
             val encryptedPassword = encrypt(password)
             val response =
@@ -201,6 +206,12 @@ class UserRepo @Inject constructor(
             val data = responseBody.getJSONObject("data")
             val token = data.getString("key")
             val userId = data.getInt("userID")
+            val subCentre = data.optJSONObject("facilityData")
+                ?.optJSONArray("facilities")
+                ?.takeIf { it.length() > 0 }
+                ?.optJSONObject(0)
+                ?.optString("facilityName")
+                ?.takeIf { !it.isNullOrBlank() }
             val refreshToken = data.getString("refreshToken")
             //  db.clearAllTables()
             TokenInsertTmcInterceptor.setJwt(data.getString("jwtToken"))
@@ -209,7 +220,7 @@ class UserRepo @Inject constructor(
             TokenInsertTmcInterceptor.setToken(token)
             preferenceDao.registerAmritToken(token)
             preferenceDao.lastAmritTokenFetchTimestamp = System.currentTimeMillis()
-            return@withContext userId
+            return@withContext AuthUserData(userId, subCentre)
         }
     }
 

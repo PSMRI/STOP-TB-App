@@ -28,7 +28,8 @@ class BenListAdapter(
     private val pref: PreferenceDao? = null,
     var context: FragmentActivity,
     private val isSoftDeleteEnabled: Boolean = false,
-    private val showActionButtons: Boolean = true,
+    private val showActionButtons: Boolean = false,
+    private val showResultButton: Boolean = false,
 ) :
     ListAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenDiffUtilCallBack) {
 
@@ -66,7 +67,8 @@ class BenListAdapter(
             context: FragmentActivity,
             benIdList: List<Long>,
             childCountMap: Map<Long, Int> = emptyMap(),
-            showActionButtons: Boolean = true
+            showActionButtons: Boolean = true,
+            showResultButton: Boolean = false
         ) {
 
             binding.btnAbha.visibility = View.VISIBLE
@@ -74,6 +76,7 @@ class BenListAdapter(
             binding.ben = item
             binding.clickListener = clickListener
             binding.showAbha = showAbha
+            binding.showActionButtons = showActionButtons
             binding.showRegistrationDate = showRegistrationDate
             binding.registrationDate.visibility =
                 if (showRegistrationDate) View.VISIBLE else View.INVISIBLE
@@ -100,6 +103,37 @@ class BenListAdapter(
             // Hide unused UI elements upfront (no spouse/children/eye surgery buttons in StopTB)
             binding.HOF.visibility = View.GONE
             binding.btnAbove30.visibility = View.GONE
+            binding.btnVitalScreen.visibility = when {
+                showResultButton && !item.isDeath && !item.isDeactivate -> View.VISIBLE
+                showActionButtons && !item.isDeath && !item.isDeactivate -> View.VISIBLE
+                else -> View.GONE
+            }
+            if (binding.btnVitalScreen.visibility == View.VISIBLE) {
+                if (showResultButton) {
+                    binding.btnVitalScreen.text = binding.root.context.getString(R.string.result)
+                    binding.btnVitalScreen.setBackgroundTintList(
+                        ContextCompat.getColorStateList(
+                            binding.root.context,
+                            android.R.color.holo_green_dark
+                        )
+                    )
+                    binding.btnVitalScreen.setTextColor(
+                        ContextCompat.getColor(binding.root.context, android.R.color.white)
+                    )
+                } else {
+                    binding.btnVitalScreen.text = binding.root.context.getString(R.string.vital_screen)
+                    val hasVitals = benIdList.contains(item.benId)
+                    binding.btnVitalScreen.setBackgroundTintList(
+                        ContextCompat.getColorStateList(
+                            binding.root.context,
+                            if (hasVitals) android.R.color.holo_green_dark else android.R.color.holo_red_dark
+                        )
+                    )
+                    binding.btnVitalScreen.setTextColor(
+                        ContextCompat.getColor(binding.root.context, android.R.color.white)
+                    )
+                }
+            }
             binding.llBenDetails4.visibility = View.GONE
             binding.btnAddSpouse.visibility = View.GONE
             binding.btnAddChildren.visibility = View.GONE
@@ -200,7 +234,8 @@ class BenListAdapter(
             pref,
             context,
             benIds,
-            showActionButtons = showActionButtons
+            showActionButtons = showActionButtons,
+            showResultButton = showResultButton
         )
     }
 
@@ -229,7 +264,9 @@ class BenListAdapter(
         private val clickedABHA: (item: BenBasicDomain, benId: Long, hhId: Long) -> Unit,
         private val clickedAddAllBenBtn: (item: BenBasicDomain, benId: Long, hhId: Long, isViewMode: Boolean, isIFA: Boolean) -> Unit,
         private val callBen: (ben: BenBasicDomain) -> Unit,
-        private val softDeleteBen: (ben: BenBasicDomain) -> Unit
+        private val softDeleteBen: (ben: BenBasicDomain) -> Unit,
+        private val clickedVitalScreen: (item: BenBasicDomain, benId: Long, hhId: Long) -> Unit = { _, _, _ -> },
+        private val clickedResult: (item: BenBasicDomain, benId: Long, hhId: Long) -> Unit = { _, _, _ -> }
     ) {
         fun onClickedBen(item: BenBasicDomain) = clickedBen(
             item,
@@ -265,6 +302,10 @@ class BenListAdapter(
         fun onClickABHA(item: BenBasicDomain) = clickedABHA(item, item.benId, item.hhId)
         fun clickedAddAllBenBtn(item: BenBasicDomain, isMatched: Boolean, isIFA: Boolean) =
             clickedAddAllBenBtn(item, item.benId, item.hhId, isMatched, isIFA)
+        fun onClickVitalScreen(item: BenBasicDomain) =
+            clickedVitalScreen(item, item.benId, item.hhId)
+        fun onClickResult(item: BenBasicDomain) =
+            clickedResult(item, item.benId, item.hhId)
 
         fun onClickedForCall(item: BenBasicDomain) = callBen(item)
         fun onClickSoftDeleteBen(item: BenBasicDomain) = softDeleteBen(item)

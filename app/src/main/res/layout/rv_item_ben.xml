@@ -44,6 +44,9 @@
         <variable
             name="isMatched"
             type="Boolean" />
+        <variable
+            name="showActionButtons"
+            type="Boolean" />
 
 
     </data>
@@ -446,28 +449,28 @@
                     app:layout_constraintTop_toBottomOf="@id/ll_ben_details_2">
 
                         <LinearLayout
+                            android:id="@+id/ll_vital_action"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            rchId="@{ben}"
-                            android:orientation="vertical"
-                            android:padding="@dimen/padding_small">
+                            android:orientation="vertical">
 
-                            <TextView
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btn_vital_screen"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="@string/rch_id_ben"
-                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                                android:textColor="?attr/colorOnPrimary" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@{ben.rchId}"
+                                android:backgroundTint="@android:color/holo_green_dark"
+                                android:onClick="@{()-> showActionButtons ? clickListener.onClickVitalScreen(ben) : clickListener.onClickResult(ben)}"
+                                android:text="@string/vital_screen"
                                 android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
                                 android:textColor="?attr/colorOnPrimary"
-                                tools:text="0123456789" />
+                                android:visibility="gone"
+                                app:cornerRadius="@dimen/padding_normal"
+                                app:strokeColor="?attr/colorPrimary"
+                                app:strokeWidth="1dp" />
                         </LinearLayout>
+
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
@@ -577,10 +580,11 @@
                 android:id="@+id/ll_ben_details_4"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:gravity="end"
                 android:orientation="horizontal"
-                android:weightSum="3"
                 android:layout_marginHorizontal="@dimen/padding_normal"
                 android:layout_marginBottom="0dp"
+                android:visibility="gone"
                 app:layout_constraintTop_toBottomOf="@id/ll_ben_details_3">
 
                         <Button
@@ -588,15 +592,9 @@
                             android:id="@+id/btn_above_30"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="@dimen/margin_small"
-                            android:backgroundTint="@android:color/holo_green_dark"
+                            android:visibility="gone"
                             android:onClick="@{()-> clickListener.clickedAddAllBenBtn(ben,isMatched,false)}"
                             android:text="@string/add_eye_surgery"
-                            app:cornerRadius="@dimen/padding_normal"
-                            app:visibleIfAgeAbove30AndAliveAge="@{ben.ageInt}"
-                            app:isDeath="@{ben.isDeathValue}"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                            android:textColor="?attr/colorOnPrimary"
                             tools:ignore="NestedWeights"/>
 
                     </LinearLayout>

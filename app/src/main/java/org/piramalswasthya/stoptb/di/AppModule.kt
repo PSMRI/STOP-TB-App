@@ -24,6 +24,7 @@ import org.piramalswasthya.stoptb.database.room.dao.LeprosyDao
 import org.piramalswasthya.stoptb.database.room.dao.MalariaDao
 import org.piramalswasthya.stoptb.database.room.dao.SyncDao
 import org.piramalswasthya.stoptb.database.room.dao.TBDao
+import org.piramalswasthya.stoptb.database.room.dao.VitalDao
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.FormResponseJsonDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.AnalyticsHelper
@@ -278,6 +279,10 @@ object AppModule {
     @Singleton
     @Provides
     fun provideSyncDao(database: InAppDb): SyncDao = database.syncDao
+
+    @Singleton
+    @Provides
+    fun provideVitalDao(database: InAppDb): VitalDao = database.vitalDao
 
     @Singleton
     @Provides
