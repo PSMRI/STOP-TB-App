@@ -37,6 +37,7 @@ import org.piramalswasthya.stoptb.helpers.TapjackingProtectionHelper
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.sync.SyncBottomSheetFragment
 import org.piramalswasthya.stoptb.ui.login_activity.LoginActivity
+import org.piramalswasthya.stoptb.ui.service_location_activity.ServiceLocationActivity
 import org.piramalswasthya.stoptb.ui.volunteer.fragment.VolunteerViewModel
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import java.util.Locale
@@ -65,6 +66,9 @@ class VolunteerActivity : AppCompatActivity() {
     }
 
     var lastClickTime: Long = 0L
+    private val onClickTitleBar = android.view.View.OnClickListener {
+        finishAndStartServiceLocationActivity()
+    }
 
     private val logoutAlert by lazy {
         MaterialAlertDialogBuilder(this)
@@ -281,6 +285,21 @@ class VolunteerActivity : AppCompatActivity() {
         binding.ivToolbar.setImageResource(icon)
         binding.toolbar.title = null
         binding.tvToolbar.text = title
+    }
+
+    fun addClickListenerToHomepageActionBarTitle() {
+        binding.toolbar.setOnClickListener(onClickTitleBar)
+    }
+
+    fun removeClickListenerToHomepageActionBarTitle() {
+        binding.toolbar.setOnClickListener(null)
+        binding.toolbar.subtitle = null
+    }
+
+    private fun finishAndStartServiceLocationActivity() {
+        val serviceLocationActivity = Intent(this, ServiceLocationActivity::class.java)
+        finish()
+        startActivity(serviceLocationActivity)
     }
 
     fun restoreToolbarNavigation() {

@@ -318,6 +318,11 @@
     <string name="total_tb_screenings">Total TB Screenings</string>
     <string name="total_tb_suspected">Total TB Suspected Cases</string>
     <string name="total_tb_confirmed">Total TB Confirmed Cases</string>
+    <string name="total_digital_chest_xrays">Total Digital Chest X-Rays conducted</string>
+    <string name="total_sputum_collection">Total Sputum collection conducted</string>
+    <string name="total_true_nat_tests">Total Truenat tests conducted</string>
+    <string name="total_liquid_culture_samples">Total sputum samples sent for liquid culture</string>
+    <string name="total_hwc_referrals">Total cases referred to Health and Wellness Centres</string>
     <string name="nikshay_ids">NIKSHAY IDs</string>
     <string name="label_male">Male: %d</string>
     <string name="label_female">Female: %d</string>
@@ -357,7 +362,7 @@
     <string name="child_immunization">Child Immunization</string>
     <string name="relation_with_hof">Relation with HOF</string>
     <string name="add_family_member">Add HoF Member</string>
-    <string name="app_native_name">STOP TB</string>
+    <string name="app_native_name">StopTB</string>
     <string name="non_pregnant_women_eligible_couple_section">Non-Pregnant Women (Eligible Couple) section</string>
     <string name="time_of_death">Time of Death</string>
     <string name="reason_for_death">Reason for Death</string>

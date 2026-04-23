@@ -85,6 +85,10 @@
         android:label="TB Screening Form">
         <argument android:name="benId" app:argType="long" />
         <argument
+            android:name="viewOnly"
+            android:defaultValue="false"
+            app:argType="boolean" />
+        <argument
             android:name="autoFlow"
             android:defaultValue="false"
             app:argType="boolean" />
@@ -232,6 +236,9 @@
         tools:layout="@layout/fragment_vital_screen">
         <argument
             android:name="benId"
+            app:argType="long" />
+        <argument
+            android:name="benRegId"
             app:argType="long" />
         <argument
             android:name="autoFlow"

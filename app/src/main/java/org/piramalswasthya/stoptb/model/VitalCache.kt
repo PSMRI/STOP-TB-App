@@ -22,6 +22,7 @@ import org.piramalswasthya.stoptb.database.room.SyncState
 data class VitalCache(
     @PrimaryKey
     val benId: Long,
+    val benRegId: Long,
     var capturedAt: Long = System.currentTimeMillis(),
     var temperature: Double? = null,
     var pulseRate: Int? = null,

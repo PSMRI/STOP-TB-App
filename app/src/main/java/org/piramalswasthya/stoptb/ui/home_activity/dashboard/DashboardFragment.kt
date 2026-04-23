@@ -115,6 +115,46 @@ class DashboardFragment : Fragment() {
             binding.tvTbConfirmedOthers.text = getString(R.string.label_others, data.others)
         }
 
+        viewModel.digitalChestXray.observe(viewLifecycleOwner) { data ->
+            binding.tvDigitalXrayTotal.text = data.total.toString()
+            binding.tvDigitalXrayMale.text = getString(R.string.label_male, data.male)
+            binding.tvDigitalXrayFemale.text = getString(R.string.label_female, data.female)
+            binding.tvDigitalXrayChildren.text = getString(R.string.label_children, data.children)
+            binding.tvDigitalXrayOthers.text = getString(R.string.label_others, data.others)
+        }
+
+        viewModel.sputumCollection.observe(viewLifecycleOwner) { data ->
+            binding.tvSputumTotal.text = data.total.toString()
+            binding.tvSputumMale.text = getString(R.string.label_male, data.male)
+            binding.tvSputumFemale.text = getString(R.string.label_female, data.female)
+            binding.tvSputumChildren.text = getString(R.string.label_children, data.children)
+            binding.tvSputumOthers.text = getString(R.string.label_others, data.others)
+        }
+
+        viewModel.trueNat.observe(viewLifecycleOwner) { data ->
+            binding.tvTrueNatTotal.text = data.total.toString()
+            binding.tvTrueNatMale.text = getString(R.string.label_male, data.male)
+            binding.tvTrueNatFemale.text = getString(R.string.label_female, data.female)
+            binding.tvTrueNatChildren.text = getString(R.string.label_children, data.children)
+            binding.tvTrueNatOthers.text = getString(R.string.label_others, data.others)
+        }
+
+        viewModel.liquidCulture.observe(viewLifecycleOwner) { data ->
+            binding.tvLiquidCultureTotal.text = data.total.toString()
+            binding.tvLiquidCultureMale.text = getString(R.string.label_male, data.male)
+            binding.tvLiquidCultureFemale.text = getString(R.string.label_female, data.female)
+            binding.tvLiquidCultureChildren.text = getString(R.string.label_children, data.children)
+            binding.tvLiquidCultureOthers.text = getString(R.string.label_others, data.others)
+        }
+
+        viewModel.hwcReferral.observe(viewLifecycleOwner) { data ->
+            binding.tvHwcReferralTotal.text = data.total.toString()
+            binding.tvHwcReferralMale.text = getString(R.string.label_male, data.male)
+            binding.tvHwcReferralFemale.text = getString(R.string.label_female, data.female)
+            binding.tvHwcReferralChildren.text = getString(R.string.label_children, data.children)
+            binding.tvHwcReferralOthers.text = getString(R.string.label_others, data.others)
+        }
+
         // NIKSHAY count
         viewModel.nikshayCount.observe(viewLifecycleOwner) {
             binding.tvNikshayCount.text = it.toString()

@@ -21,6 +21,11 @@ class TBSuspectedQuickDataset(
 
     private var benCache: BenRegCache? = null
     private var screeningCache: TBScreeningCache? = null
+    private var referralMode = false
+
+    private var lockDigitalChestXray = false
+    private var lockTrueNat = false
+    private var lockLiquidCulture = false
 
     private val digitalChestXrayConducted = FormElement(
         id = 1,
@@ -29,15 +34,6 @@ class TBSuspectedQuickDataset(
         entries = yesNoEntries,
         required = true,
         hasDependants = true
-    )
-
-    private val digitalChestXrayResult = FormElement(
-        id = 5,
-        inputType = InputType.RADIO,
-        title = resources.getString(R.string.tb_digital_chest_xray_result),
-        arrayId = R.array.tb_test_result,
-        entries = resources.getStringArray(R.array.tb_test_result),
-        required = true
     )
 
     private val sputumCollected = FormElement(
@@ -53,6 +49,25 @@ class TBSuspectedQuickDataset(
         inputType = InputType.RADIO,
         title = resources.getString(R.string.tb_naat_conducted),
         entries = yesNoEntries,
+        required = true,
+        hasDependants = true
+    )
+
+    private val liquidCultureConducted = FormElement(
+        id = 4,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.tb_liquid_culture_conducted),
+        entries = yesNoEntries,
+        required = true,
+        hasDependants = true
+    )
+
+    private val digitalChestXrayResult = FormElement(
+        id = 5,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.tb_digital_chest_xray_result),
+        arrayId = R.array.tb_test_result,
+        entries = resources.getStringArray(R.array.tb_test_result),
         required = true
     )
 
@@ -62,14 +77,6 @@ class TBSuspectedQuickDataset(
         title = resources.getString(R.string.tb_naat_result),
         arrayId = R.array.tb_test_result,
         entries = resources.getStringArray(R.array.tb_test_result),
-        required = true
-    )
-
-    private val liquidCultureConducted = FormElement(
-        id = 4,
-        inputType = InputType.RADIO,
-        title = resources.getString(R.string.tb_liquid_culture_conducted),
-        entries = yesNoEntries,
         required = true
     )
 
@@ -85,49 +92,121 @@ class TBSuspectedQuickDataset(
     suspend fun setUpPage(
         ben: BenRegCache?,
         screening: TBScreeningCache?,
-        saved: TBSuspectedCache?
+        saved: TBSuspectedCache?,
+        referralMode: Boolean = false
     ) {
         benCache = ben
         screeningCache = screening
+        this.referralMode = referralMode
 
+        digitalChestXrayConducted.value =
+            boolToYesNo(saved?.isChestXRayDone.takeIf { shouldShowDigitalChestXray() })
+        digitalChestXrayResult.value =
+            getLocalValueInArray(R.array.tb_test_result, saved?.chestXRayResult)
+        sputumCollected.value =
+            boolToYesNo(saved?.isSputumCollected.takeIf { shouldShowSputumCollected() })
+        trueNatConducted.value =
+            boolToYesNo(saved?.isNaatConducted.takeIf { shouldShowTrueNatConducted() })
+        trueNatResult.value =
+            getLocalValueInArray(R.array.tb_test_result, saved?.naatResult)
+        liquidCultureConducted.value =
+            boolToYesNo(saved?.isLiquidCultureConducted.takeIf { shouldShowLiquidCultureConducted() })
+        liquidCultureResult.value =
+            getLocalValueInArray(R.array.tb_test_result, saved?.liquidCultureResult)
+
+        configureReferralLocks(saved)
         syncFieldStates()
-
-        digitalChestXrayConducted.value = boolToYesNo(saved?.isChestXRayDone.takeIf { shouldShowDigitalChestXray() })
-        digitalChestXrayResult.value = getLocalValueInArray(R.array.tb_test_result, saved?.chestXRayResult)
-        sputumCollected.value = boolToYesNo(saved?.isSputumCollected.takeIf { shouldShowSputumCollected() })
-        trueNatConducted.value = boolToYesNo(saved?.isNaatConducted.takeIf { shouldShowTrueNatConducted() })
-        trueNatResult.value = getLocalValueInArray(R.array.tb_test_result, saved?.naatResult)
-        liquidCultureConducted.value = boolToYesNo(saved?.isLiquidCultureConducted.takeIf { shouldShowLiquidCultureConducted() })
-        liquidCultureResult.value = getLocalValueInArray(R.array.tb_test_result, saved?.liquidCultureResult)
-
         setUpPage(buildFormList())
     }
 
     override suspend fun handleListOnValueChanged(formId: Int, index: Int): Int {
-        syncFieldStates()
         return when (formId) {
-            digitalChestXrayConducted.id -> getIndexOfElement(digitalChestXrayConducted)
-            trueNatConducted.id -> getIndexOfElement(trueNatConducted)
-            liquidCultureConducted.id -> getIndexOfElement(liquidCultureConducted)
+            digitalChestXrayConducted.id -> {
+                digitalChestXrayConducted.value = if (index == 0) yesValue else noValue
+                syncFieldStates()
+                if (index == 0) {
+                    triggerDependants(
+                        source = digitalChestXrayConducted,
+                        removeItems = emptyList(),
+                        addItems = listOf(digitalChestXrayResult)
+                    )
+                } else {
+                    triggerDependants(
+                        source = digitalChestXrayConducted,
+                        removeItems = listOf(digitalChestXrayResult),
+                        addItems = emptyList()
+                    )
+                }
+            }
+
+            trueNatConducted.id -> {
+                trueNatConducted.value = if (index == 0) yesValue else noValue
+                syncFieldStates()
+                if (index == 0) {
+                    triggerDependants(
+                        source = trueNatConducted,
+                        removeItems = emptyList(),
+                        addItems = listOf(trueNatResult)
+                    )
+                } else {
+                    triggerDependants(
+                        source = trueNatConducted,
+                        removeItems = listOf(trueNatResult),
+                        addItems = emptyList()
+                    )
+                }
+            }
+
+            liquidCultureConducted.id -> {
+                liquidCultureConducted.value = if (index == 0) yesValue else noValue
+                syncFieldStates()
+                if (index == 0) {
+                    triggerDependants(
+                        source = liquidCultureConducted,
+                        removeItems = emptyList(),
+                        addItems = listOf(liquidCultureResult)
+                    )
+                } else {
+                    triggerDependants(
+                        source = liquidCultureConducted,
+                        removeItems = listOf(liquidCultureResult),
+                        addItems = emptyList()
+                    )
+                }
+            }
+
             else -> 0
         }
     }
 
     override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
         (cacheModel as TBSuspectedCache).let { form ->
-            form.isChestXRayDone = if (shouldShowDigitalChestXray()) isYes(digitalChestXrayConducted) else null
-            form.chestXRayResult = if (isYes(digitalChestXrayConducted)) {
-                getEnglishValueInArray(R.array.tb_test_result, digitalChestXrayResult.value)
-            } else null
-            form.isSputumCollected = if (shouldShowSputumCollected()) isYes(sputumCollected) else null
-            form.isNaatConducted = if (shouldShowTrueNatConducted()) isYes(trueNatConducted) else null
-            form.naatResult = if (isYes(trueNatConducted)) {
-                getEnglishValueInArray(R.array.tb_test_result, trueNatResult.value)
-            } else null
-            form.isLiquidCultureConducted = if (shouldShowLiquidCultureConducted()) isYes(liquidCultureConducted) else null
-            form.liquidCultureResult = if (isYes(liquidCultureConducted)) {
-                getEnglishValueInArray(R.array.tb_test_result, liquidCultureResult.value)
-            } else null
+            form.isChestXRayDone =
+                if (shouldShowDigitalChestXray()) isYes(digitalChestXrayConducted) else null
+            form.chestXRayResult =
+                if (isYes(digitalChestXrayConducted)) {
+                    getEnglishValueInArray(R.array.tb_test_result, digitalChestXrayResult.value)
+                } else {
+                    null
+                }
+            form.isSputumCollected =
+                if (shouldShowSputumCollected()) isYes(sputumCollected) else null
+            form.isNaatConducted =
+                if (shouldShowTrueNatConducted()) isYes(trueNatConducted) else null
+            form.naatResult =
+                if (isYes(trueNatConducted)) {
+                    getEnglishValueInArray(R.array.tb_test_result, trueNatResult.value)
+                } else {
+                    null
+                }
+            form.isLiquidCultureConducted =
+                if (shouldShowLiquidCultureConducted()) isYes(liquidCultureConducted) else null
+            form.liquidCultureResult =
+                if (isYes(liquidCultureConducted)) {
+                    getEnglishValueInArray(R.array.tb_test_result, liquidCultureResult.value)
+                } else {
+                    null
+                }
 
             val isConfirmed = isPositive(form.chestXRayResult) ||
                 isPositive(form.naatResult) ||
@@ -137,50 +216,94 @@ class TBSuspectedQuickDataset(
         }
     }
 
+    fun shouldShowSubmit(): Boolean {
+        if (!referralMode) return true
+        return listOf(
+            shouldShowDigitalChestXray() && !lockDigitalChestXray,
+            shouldShowTrueNatConducted() && !lockTrueNat,
+            shouldShowLiquidCultureConducted() && !lockLiquidCulture
+        ).any { it }
+    }
+
     private fun buildFormList(): List<FormElement> = buildList {
         if (shouldShowDigitalChestXray()) {
             add(digitalChestXrayConducted)
-            if (isYes(digitalChestXrayConducted)) add(digitalChestXrayResult)
+            if (isYes(digitalChestXrayConducted)) {
+                add(digitalChestXrayResult)
+            }
         }
-        if (shouldShowSputumCollected()) add(sputumCollected)
+
+        if (shouldShowSputumCollected()) {
+            add(sputumCollected)
+        }
+
         if (shouldShowTrueNatConducted()) {
             add(trueNatConducted)
-            if (isYes(trueNatConducted)) add(trueNatResult)
+            if (isYes(trueNatConducted)) {
+                add(trueNatResult)
+            }
         }
+
         if (shouldShowLiquidCultureConducted()) {
             add(liquidCultureConducted)
-            if (isYes(liquidCultureConducted)) add(liquidCultureResult)
+            if (isYes(liquidCultureConducted)) {
+                add(liquidCultureResult)
+            }
         }
     }
 
+    private fun configureReferralLocks(saved: TBSuspectedCache?) {
+        if (!referralMode || saved == null) {
+            lockDigitalChestXray = false
+            lockTrueNat = false
+            lockLiquidCulture = false
+            return
+        }
+
+        lockDigitalChestXray = !saved.chestXRayResult.isNullOrBlank()
+        lockTrueNat = !saved.naatResult.isNullOrBlank()
+        lockLiquidCulture = !saved.liquidCultureResult.isNullOrBlank()
+    }
+
     private fun syncFieldStates() {
-        digitalChestXrayConducted.isEnabled = true
-        digitalChestXrayConducted.required = true
+        digitalChestXrayConducted.isEnabled = shouldShowDigitalChestXray() && !lockDigitalChestXray
+        digitalChestXrayConducted.required = shouldShowDigitalChestXray() && !lockDigitalChestXray
         if (!shouldShowDigitalChestXray()) resetField(digitalChestXrayConducted)
 
-        digitalChestXrayResult.isEnabled = shouldShowDigitalChestXray() && isYes(digitalChestXrayConducted)
+        digitalChestXrayResult.isEnabled =
+            shouldShowDigitalChestXray() && isYes(digitalChestXrayConducted) && !lockDigitalChestXray
         digitalChestXrayResult.required = digitalChestXrayResult.isEnabled
-        if (!digitalChestXrayResult.isEnabled) resetField(digitalChestXrayResult)
+        if (!shouldShowDigitalChestXray() || !isYes(digitalChestXrayConducted)) {
+            resetField(digitalChestXrayResult)
+        }
 
-        sputumCollected.isEnabled = true
-        sputumCollected.required = true
+        sputumCollected.isEnabled = !referralMode
+        sputumCollected.required = shouldShowSputumCollected() && !referralMode
         if (!shouldShowSputumCollected()) resetField(sputumCollected)
 
-        trueNatConducted.isEnabled = true
-        trueNatConducted.required = true
+        trueNatConducted.isEnabled = shouldShowTrueNatConducted() && !lockTrueNat
+        trueNatConducted.required = shouldShowTrueNatConducted() && !lockTrueNat
         if (!shouldShowTrueNatConducted()) resetField(trueNatConducted)
 
-        trueNatResult.isEnabled = shouldShowTrueNatConducted() && isYes(trueNatConducted)
+        trueNatResult.isEnabled =
+            shouldShowTrueNatConducted() && isYes(trueNatConducted) && !lockTrueNat
         trueNatResult.required = trueNatResult.isEnabled
-        if (!trueNatResult.isEnabled) resetField(trueNatResult)
+        if (!shouldShowTrueNatConducted() || !isYes(trueNatConducted)) {
+            resetField(trueNatResult)
+        }
 
-        liquidCultureConducted.isEnabled = true
-        liquidCultureConducted.required = true
+        liquidCultureConducted.isEnabled =
+            shouldShowLiquidCultureConducted() && !lockLiquidCulture
+        liquidCultureConducted.required =
+            shouldShowLiquidCultureConducted() && !lockLiquidCulture
         if (!shouldShowLiquidCultureConducted()) resetField(liquidCultureConducted)
 
-        liquidCultureResult.isEnabled = shouldShowLiquidCultureConducted() && isYes(liquidCultureConducted)
+        liquidCultureResult.isEnabled =
+            shouldShowLiquidCultureConducted() && isYes(liquidCultureConducted) && !lockLiquidCulture
         liquidCultureResult.required = liquidCultureResult.isEnabled
-        if (!liquidCultureResult.isEnabled) resetField(liquidCultureResult)
+        if (!shouldShowLiquidCultureConducted() || !isYes(liquidCultureConducted)) {
+            resetField(liquidCultureResult)
+        }
     }
 
     private fun shouldShowDigitalChestXray(): Boolean = !isUnderFive() && !isPregnant()

@@ -42,7 +42,7 @@ class VolunteerIconsFragment : Fragment() {
     private fun setUpIconRvAdapter() {
         val rvLayoutManager = GridLayoutManager(
             context,
-            requireContext().resources.getInteger(R.integer.icon_grid_span)
+            1
         )
         binding.rvIconGrid.layoutManager = rvLayoutManager
         val iconAdapter = IconGridAdapter(

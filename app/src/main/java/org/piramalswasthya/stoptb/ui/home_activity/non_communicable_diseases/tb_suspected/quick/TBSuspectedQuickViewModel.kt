@@ -47,6 +47,9 @@ class TBSuspectedQuickViewModel @Inject constructor(
     private val _state = MutableLiveData(State.IDLE)
     val state: LiveData<State> = _state
 
+    private val _showSubmit = MutableLiveData(true)
+    val showSubmit: LiveData<Boolean> = _showSubmit
+
     private lateinit var tbSuspected: TBSuspectedCache
 
     init {
@@ -60,7 +63,13 @@ class TBSuspectedQuickViewModel @Inject constructor(
             tbRepo.getTBSuspected(benId)?.let {
                 tbSuspected = it
             }
-            dataset.setUpPage(ben, tbScreening, if (::tbSuspected.isInitialized) tbSuspected else null)
+            dataset.setUpPage(
+                ben,
+                tbScreening,
+                if (::tbSuspected.isInitialized) tbSuspected else null,
+                referralMode = viewOnly
+            )
+            _showSubmit.value = dataset.shouldShowSubmit()
         }
     }
 
@@ -82,6 +91,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
     fun updateListOnValueChanged(formId: Int, index: Int) {
         viewModelScope.launch {
             dataset.updateList(formId, index)
+            _showSubmit.value = dataset.shouldShowSubmit()
         }
     }
 

@@ -42,12 +42,12 @@ class TBSuspectedQuickFragment : Fragment() {
             formValueListener = FormInputAdapter.FormValueListener { formId, index ->
                 viewModel.updateListOnValueChanged(formId, index)
             },
-            isEnabled = !viewModel.viewOnly
+            isEnabled = true
         )
         binding.form.rvInputForm.adapter = adapter
         binding.btnCancel.visibility = View.GONE
         binding.fabEdit.visibility = View.GONE
-        binding.btnSubmit.visibility = if (viewModel.viewOnly) View.GONE else View.VISIBLE
+        binding.btnSubmit.visibility = View.VISIBLE
 
         lifecycleScope.launch {
             viewModel.formList.collect {
@@ -63,6 +63,9 @@ class TBSuspectedQuickFragment : Fragment() {
         viewModel.benAgeGender.observe(viewLifecycleOwner) {
             binding.tvAgeGender.text = it
         }
+        viewModel.showSubmit.observe(viewLifecycleOwner) {
+            binding.btnSubmit.visibility = if (it) View.VISIBLE else View.GONE
+        }
         binding.btnSubmit.setOnClickListener {
             submitForm()
         }
@@ -74,13 +77,17 @@ class TBSuspectedQuickFragment : Fragment() {
                         getString(R.string.tb_tracking_submitted),
                         Toast.LENGTH_SHORT
                     ).show()
-                    findNavController().navigate(
-                        R.id.allBenFragment,
-                        null,
-                        NavOptions.Builder()
-                            .setPopUpTo(R.id.allBenFragment, false)
-                            .build()
-                    )
+                    if (viewModel.viewOnly) {
+                        findNavController().navigateUp()
+                    } else {
+                        findNavController().navigate(
+                            R.id.allBenFragment,
+                            null,
+                            NavOptions.Builder()
+                                .setPopUpTo(R.id.allBenFragment, false)
+                                .build()
+                        )
+                    }
                 }
 
                 TBSuspectedQuickViewModel.State.SAVE_FAILED -> {

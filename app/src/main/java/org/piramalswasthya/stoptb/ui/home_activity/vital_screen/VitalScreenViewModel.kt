@@ -45,6 +45,7 @@ class VitalScreenViewModel @Inject constructor(
     }
 
     val benId = VitalScreenFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
+    val benRegId = VitalScreenFragmentArgs.fromSavedStateHandle(savedStateHandle).benRegId
     val autoFlow = VitalScreenFragmentArgs.fromSavedStateHandle(savedStateHandle).autoFlow
 
     private val _benName = MutableLiveData<String>()
@@ -123,7 +124,7 @@ class VitalScreenViewModel @Inject constructor(
                         bpDiastolic = bpDiastolic,
                         rbs = rbs
                     )
-                    val cache = (_existingVitals.value ?: VitalCache(benId = benId)).copy(
+                    val cache = (_existingVitals.value ?: VitalCache(benId = benId,benRegId = benRegId)).copy(
                         capturedAt = System.currentTimeMillis(),
                         temperature = mapTemperatureOptionToValue(temperatureOption),
                         pulseRate = mapPulseOptionToValue(pulseRateOption),
@@ -242,7 +243,7 @@ class VitalScreenViewModel @Inject constructor(
             revisitDate = System.currentTimeMillis(),
             vanID = user.vanId,
             parkingPlaceID = user.serviceMapId,
-            beneficiaryRegID = benId,
+            beneficiaryRegID = benRegId,
             benVisitID = 0L,
             visitCode = 0L,
             providerServiceMapID = user.serviceMapId,

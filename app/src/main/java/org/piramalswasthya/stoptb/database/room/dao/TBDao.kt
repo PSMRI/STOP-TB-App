@@ -122,4 +122,64 @@ interface TBDao {
         AND (:endTime = 0 OR ts.visitDate <= :endTime)
     """)
     fun getDashboardNikshayCount(villageId: Int, startTime: Long, endTime: Long): Flow<Int>
+
+    @Query("""
+        SELECT COUNT(*) FROM TB_SUSPECTED ts
+        INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
+        WHERE ts.isChestXRayDone IS NOT NULL
+        AND (:villageId = 0 OR b.loc_village_id = :villageId)
+        AND (:startTime = 0 OR ts.visitDate >= :startTime)
+        AND (:endTime = 0 OR ts.visitDate <= :endTime)
+        AND (:gender = '' OR UPPER(COALESCE(b.gender, '')) = UPPER(:gender))
+        AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+    """)
+    fun getDashboardDigitalChestXRayCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>
+
+    @Query("""
+        SELECT COUNT(*) FROM TB_SUSPECTED ts
+        INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
+        WHERE ts.isSputumCollected IS NOT NULL
+        AND (:villageId = 0 OR b.loc_village_id = :villageId)
+        AND (:startTime = 0 OR ts.visitDate >= :startTime)
+        AND (:endTime = 0 OR ts.visitDate <= :endTime)
+        AND (:gender = '' OR UPPER(COALESCE(b.gender, '')) = UPPER(:gender))
+        AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+    """)
+    fun getDashboardSputumCollectionCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>
+
+    @Query("""
+        SELECT COUNT(*) FROM TB_SUSPECTED ts
+        INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
+        WHERE ts.isNaatConducted IS NOT NULL
+        AND (:villageId = 0 OR b.loc_village_id = :villageId)
+        AND (:startTime = 0 OR ts.visitDate >= :startTime)
+        AND (:endTime = 0 OR ts.visitDate <= :endTime)
+        AND (:gender = '' OR UPPER(COALESCE(b.gender, '')) = UPPER(:gender))
+        AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+    """)
+    fun getDashboardTrueNatCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>
+
+    @Query("""
+        SELECT COUNT(*) FROM TB_SUSPECTED ts
+        INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
+        WHERE ts.isLiquidCultureConducted IS NOT NULL
+        AND (:villageId = 0 OR b.loc_village_id = :villageId)
+        AND (:startTime = 0 OR ts.visitDate >= :startTime)
+        AND (:endTime = 0 OR ts.visitDate <= :endTime)
+        AND (:gender = '' OR UPPER(COALESCE(b.gender, '')) = UPPER(:gender))
+        AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+    """)
+    fun getDashboardLiquidCultureCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>
+
+    @Query("""
+        SELECT COUNT(*) FROM NCD_REFER nr
+        INNER JOIN beneficiary b ON b.beneficiaryId = nr.benId
+        WHERE UPPER(COALESCE(nr.referredToInstituteName, '')) = 'HWC'
+        AND (:villageId = 0 OR b.loc_village_id = :villageId)
+        AND (:startTime = 0 OR nr.revisitDate >= :startTime)
+        AND (:endTime = 0 OR nr.revisitDate <= :endTime)
+        AND (:gender = '' OR UPPER(COALESCE(b.gender, '')) = UPPER(:gender))
+        AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+    """)
+    fun getDashboardHwcReferralCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>
 }

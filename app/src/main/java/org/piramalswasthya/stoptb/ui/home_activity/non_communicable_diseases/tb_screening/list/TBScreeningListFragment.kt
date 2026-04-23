@@ -51,7 +51,8 @@ class TBScreeningListFragment : Fragment() {
             TbScreeningListAdapter.ClickListener { hhId, benId ->
                 findNavController().navigate(
                     TBScreeningListFragmentDirections.actionTBScreeningListFragmentToTBScreeningFormFragment(
-                        benId = benId
+                        benId = benId,
+                        viewOnly = true
                     )
                 )
             }

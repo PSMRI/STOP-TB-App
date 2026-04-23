@@ -30,6 +30,9 @@ class TBScreeningFormViewModel @Inject constructor(
 ) : ViewModel() {
     val benId =
         TBScreeningFormFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
+    var benRegId: Long = 0L
+    val viewOnly =
+        TBScreeningFormFragmentArgs.fromSavedStateHandle(savedStateHandle).viewOnly
     val autoFlow =
         TBScreeningFormFragmentArgs.fromSavedStateHandle(savedStateHandle).autoFlow
 
@@ -72,6 +75,7 @@ class TBScreeningFormViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             val ben = benRepo.getBenFromId(benId)?.also { ben ->
+                benRegId = ben.benRegId
                 _benName.value =
                     "${ben.firstName} ${if (ben.lastName == null) "" else ben.lastName}"
                 _benAgeGender.value = "${ben.age} ${ben.ageUnit?.name} | ${ben.gender?.name}"

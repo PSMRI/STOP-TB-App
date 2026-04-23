@@ -43,10 +43,7 @@ class TbScreeningListAdapter(
             clickListener: ClickListener?,
         ) {
             binding.benWithTb = item
-
-            if(item.tb?.historyOfTb == true){
-                binding.cvContent.visibility = View.GONE
-            }
+            binding.cvContent.visibility = View.VISIBLE
 
             binding.ivSyncState.visibility = if (item.tb == null) View.INVISIBLE else View.VISIBLE
 
@@ -78,8 +75,8 @@ class TbScreeningListAdapter(
                 }
             }
 
-            binding.btnFormTb.text = if (item.tb == null) binding.root.context.getString(R.string.screen) else binding.root.context.getString(R.string.view_screen)
-            binding.btnFormTb.setBackgroundColor(binding.root.resources.getColor(if (item.tb == null) android.R.color.holo_red_dark else android.R.color.holo_green_dark))
+            binding.btnFormTb.text = binding.root.context.getString(R.string.view_screen)
+            binding.btnFormTb.setBackgroundColor(binding.root.resources.getColor(android.R.color.holo_green_dark))
             binding.clickListener = clickListener
 
             binding.executePendingBindings()

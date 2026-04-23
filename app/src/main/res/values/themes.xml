@@ -46,6 +46,13 @@
         <item name="android:windowLightStatusBar">false</item>
     </style>
 
+    <style name="Theme.Sakhi.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/sakhi_toolbar_surface</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.Sakhi</item>
+        <item name="windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+    </style>
+
     <style name="ButtonStyled" parent="Widget.MaterialComponents.Button">
         <item name="iconGravity">textStart</item>
         <item name="iconPadding">12dp</item>

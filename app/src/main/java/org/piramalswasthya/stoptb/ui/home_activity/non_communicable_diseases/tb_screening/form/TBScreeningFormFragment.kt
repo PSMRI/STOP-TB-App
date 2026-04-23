@@ -68,9 +68,10 @@ class TBScreeningFormFragment : Fragment() {
                 val adapter = FormInputAdapter(
                     formValueListener = FormInputAdapter.FormValueListener { formId, index ->
                         viewModel.updateListOnValueChanged(formId, index)
-                    }, isEnabled = !recordExists
+                    }, isEnabled = !(recordExists || viewModel.viewOnly)
                 )
-                binding.btnSubmit.isEnabled = !recordExists
+                binding.btnSubmit.isEnabled = !(recordExists || viewModel.viewOnly)
+                binding.btnSubmit.visibility = if (viewModel.viewOnly) View.GONE else View.VISIBLE
                 binding.form.rvInputForm.adapter = adapter
                 lifecycleScope.launch {
                     viewModel.formList.collect {
@@ -107,6 +108,7 @@ class TBScreeningFormFragment : Fragment() {
                             R.id.vitalScreenFragment,
                             bundleOf(
                                 "benId" to viewModel.benId,
+                                "benRegId" to viewModel.benRegId,
                                 "autoFlow" to true
                             )
                         )

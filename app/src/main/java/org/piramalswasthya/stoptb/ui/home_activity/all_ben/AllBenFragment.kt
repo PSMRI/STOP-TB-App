@@ -203,9 +203,15 @@ class AllBenFragment : Fragment() {
                 { },
                 { item, benId, hhId ->
                     if (isReadOnlyReferralList) return@BenClickListener
-                    findNavController().navigate(
-                        AllBenFragmentDirections.actionAllBenFragmentToVitalScreenFragment(benId)
-                    )
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        val benRegId = viewModel.getBenFromId(benId)
+                        findNavController().navigate(
+                            AllBenFragmentDirections.actionAllBenFragmentToVitalScreenFragment(
+                                benId = benId,
+                                benRegId = benRegId
+                            )
+                        )
+                    }
                 },
                 { item, benId, hhId ->
                     if (!showResultButton) return@BenClickListener

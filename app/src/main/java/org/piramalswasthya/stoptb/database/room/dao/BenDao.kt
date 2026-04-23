@@ -414,10 +414,10 @@ interface BenDao {
     fun getAllTbScreeningBen(selectedVillage: Int): Flow<List<BenWithTbScreeningCache>>
 
     @Transaction
-    @Query("SELECT * FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0 and tbsnFilled = 0")
+    @Query("SELECT * FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0 and tbsnFilled = 1")
     fun getPendingTbScreeningBen(selectedVillage: Int): Flow<List<BenWithTbScreeningCache>>
 
-    @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0 and tbsnFilled = 0")
+    @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0 and tbsnFilled = 1")
     fun getPendingTbScreeningCount(selectedVillage: Int): Flow<Int>
 
     @Transaction

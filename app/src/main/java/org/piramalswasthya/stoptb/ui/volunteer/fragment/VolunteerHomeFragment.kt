@@ -50,8 +50,16 @@ class VolunteerHomeFragment : Fragment() {
                 R.drawable.ic_home,
                 getString(R.string.home)
             )
+            it.addClickListenerToHomepageActionBarTitle()
         }
         binding.vp2Home.setCurrentItem(1, false)
+    }
+
+    override fun onStop() {
+        activity?.let {
+            (it as VolunteerActivity).removeClickListenerToHomepageActionBarTitle()
+        }
+        super.onStop()
     }
 
     override fun onDestroyView() {

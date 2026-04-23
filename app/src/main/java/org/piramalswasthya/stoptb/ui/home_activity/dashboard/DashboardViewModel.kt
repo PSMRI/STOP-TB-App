@@ -61,6 +61,21 @@ class DashboardViewModel @Inject constructor(
     private val _tbConfirmed = MutableLiveData(TbGenderBreakdown())
     val tbConfirmed: LiveData<TbGenderBreakdown> get() = _tbConfirmed
 
+    private val _digitalChestXray = MutableLiveData(TbGenderBreakdown())
+    val digitalChestXray: LiveData<TbGenderBreakdown> get() = _digitalChestXray
+
+    private val _sputumCollection = MutableLiveData(TbGenderBreakdown())
+    val sputumCollection: LiveData<TbGenderBreakdown> get() = _sputumCollection
+
+    private val _trueNat = MutableLiveData(TbGenderBreakdown())
+    val trueNat: LiveData<TbGenderBreakdown> get() = _trueNat
+
+    private val _liquidCulture = MutableLiveData(TbGenderBreakdown())
+    val liquidCulture: LiveData<TbGenderBreakdown> get() = _liquidCulture
+
+    private val _hwcReferral = MutableLiveData(TbGenderBreakdown())
+    val hwcReferral: LiveData<TbGenderBreakdown> get() = _hwcReferral
+
     private val _nikshayCount = MutableLiveData(0)
     val nikshayCount: LiveData<Int> get() = _nikshayCount
 
@@ -142,6 +157,11 @@ class DashboardViewModel @Inject constructor(
         _tbScreening.value = TbGenderBreakdown()
         _tbSuspected.value = TbGenderBreakdown()
         _tbConfirmed.value = TbGenderBreakdown()
+        _digitalChestXray.value = TbGenderBreakdown()
+        _sputumCollection.value = TbGenderBreakdown()
+        _trueNat.value = TbGenderBreakdown()
+        _liquidCulture.value = TbGenderBreakdown()
+        _hwcReferral.value = TbGenderBreakdown()
 
         // TB Screening breakdown
         collectJobs += viewModelScope.launch {
@@ -239,6 +259,51 @@ class DashboardViewModel @Inject constructor(
             }
         }
 
+        collectBreakdown(
+            target = _digitalChestXray,
+            totalQuery = { tbDao.getDashboardDigitalChestXRayCount(village, startTime, endTime, "", 0) },
+            maleQuery = { tbDao.getDashboardDigitalChestXRayCount(village, startTime, endTime, "MALE", 0) },
+            femaleQuery = { tbDao.getDashboardDigitalChestXRayCount(village, startTime, endTime, "FEMALE", 0) },
+            childrenQuery = { tbDao.getDashboardDigitalChestXRayCount(village, startTime, endTime, "", 1) },
+            othersQuery = { tbDao.getDashboardDigitalChestXRayCount(village, startTime, endTime, "TRANSGENDER", 0) }
+        )
+
+        collectBreakdown(
+            target = _sputumCollection,
+            totalQuery = { tbDao.getDashboardSputumCollectionCount(village, startTime, endTime, "", 0) },
+            maleQuery = { tbDao.getDashboardSputumCollectionCount(village, startTime, endTime, "MALE", 0) },
+            femaleQuery = { tbDao.getDashboardSputumCollectionCount(village, startTime, endTime, "FEMALE", 0) },
+            childrenQuery = { tbDao.getDashboardSputumCollectionCount(village, startTime, endTime, "", 1) },
+            othersQuery = { tbDao.getDashboardSputumCollectionCount(village, startTime, endTime, "TRANSGENDER", 0) }
+        )
+
+        collectBreakdown(
+            target = _trueNat,
+            totalQuery = { tbDao.getDashboardTrueNatCount(village, startTime, endTime, "", 0) },
+            maleQuery = { tbDao.getDashboardTrueNatCount(village, startTime, endTime, "MALE", 0) },
+            femaleQuery = { tbDao.getDashboardTrueNatCount(village, startTime, endTime, "FEMALE", 0) },
+            childrenQuery = { tbDao.getDashboardTrueNatCount(village, startTime, endTime, "", 1) },
+            othersQuery = { tbDao.getDashboardTrueNatCount(village, startTime, endTime, "TRANSGENDER", 0) }
+        )
+
+        collectBreakdown(
+            target = _liquidCulture,
+            totalQuery = { tbDao.getDashboardLiquidCultureCount(village, startTime, endTime, "", 0) },
+            maleQuery = { tbDao.getDashboardLiquidCultureCount(village, startTime, endTime, "MALE", 0) },
+            femaleQuery = { tbDao.getDashboardLiquidCultureCount(village, startTime, endTime, "FEMALE", 0) },
+            childrenQuery = { tbDao.getDashboardLiquidCultureCount(village, startTime, endTime, "", 1) },
+            othersQuery = { tbDao.getDashboardLiquidCultureCount(village, startTime, endTime, "TRANSGENDER", 0) }
+        )
+
+        collectBreakdown(
+            target = _hwcReferral,
+            totalQuery = { tbDao.getDashboardHwcReferralCount(village, startTime, endTime, "", 0) },
+            maleQuery = { tbDao.getDashboardHwcReferralCount(village, startTime, endTime, "MALE", 0) },
+            femaleQuery = { tbDao.getDashboardHwcReferralCount(village, startTime, endTime, "FEMALE", 0) },
+            childrenQuery = { tbDao.getDashboardHwcReferralCount(village, startTime, endTime, "", 1) },
+            othersQuery = { tbDao.getDashboardHwcReferralCount(village, startTime, endTime, "TRANSGENDER", 0) }
+        )
+
         // NIKSHAY count
         collectJobs += viewModelScope.launch {
             tbDao.getDashboardNikshayCount(village, startTime, endTime).collect {
@@ -250,6 +315,46 @@ class DashboardViewModel @Inject constructor(
         collectJobs += viewModelScope.launch {
             benDao.getDashboardAbhaCount(village, startTime, endTime).collect {
                 _abhaCount.value = it
+            }
+        }
+    }
+
+    private fun collectBreakdown(
+        target: MutableLiveData<TbGenderBreakdown>,
+        totalQuery: () -> kotlinx.coroutines.flow.Flow<Int>,
+        maleQuery: () -> kotlinx.coroutines.flow.Flow<Int>,
+        femaleQuery: () -> kotlinx.coroutines.flow.Flow<Int>,
+        childrenQuery: () -> kotlinx.coroutines.flow.Flow<Int>,
+        othersQuery: () -> kotlinx.coroutines.flow.Flow<Int>,
+    ) {
+        collectJobs += viewModelScope.launch {
+            totalQuery().collect { total ->
+                val current = target.value ?: TbGenderBreakdown()
+                target.value = current.copy(total = total)
+            }
+        }
+        collectJobs += viewModelScope.launch {
+            maleQuery().collect { male ->
+                val current = target.value ?: TbGenderBreakdown()
+                target.value = current.copy(male = male)
+            }
+        }
+        collectJobs += viewModelScope.launch {
+            femaleQuery().collect { female ->
+                val current = target.value ?: TbGenderBreakdown()
+                target.value = current.copy(female = female)
+            }
+        }
+        collectJobs += viewModelScope.launch {
+            childrenQuery().collect { children ->
+                val current = target.value ?: TbGenderBreakdown()
+                target.value = current.copy(children = children)
+            }
+        }
+        collectJobs += viewModelScope.launch {
+            othersQuery().collect { others ->
+                val current = target.value ?: TbGenderBreakdown()
+                target.value = current.copy(others = others)
             }
         }
     }

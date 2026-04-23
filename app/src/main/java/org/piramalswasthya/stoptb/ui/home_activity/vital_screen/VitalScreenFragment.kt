@@ -86,7 +86,7 @@ class VitalScreenFragment : Fragment() {
                         getString(R.string.vitals_saved_successfully),
                         Toast.LENGTH_SHORT
                     ).show()
-                    navigateToSuspectedQuick()
+                    navigateAfterVitals()
                 }
                 VitalScreenViewModel.State.SAVE_FAILED -> {
                     binding.loadingOverlay.visibility = View.GONE
@@ -192,10 +192,14 @@ class VitalScreenFragment : Fragment() {
     }
 
     private fun skipVitals() {
-        navigateToSuspectedQuick()
+        navigateAfterVitals()
     }
 
-    private fun navigateToSuspectedQuick() {
+    private fun navigateAfterVitals() {
+        if (!viewModel.autoFlow) {
+            findNavController().navigateUp()
+            return
+        }
         val directions = VitalScreenFragmentDirections
             .actionVitalScreenFragmentToTBSuspectedQuickFragment(viewModel.benId)
         findNavController().navigate(directions)

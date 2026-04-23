@@ -24,9 +24,10 @@ data class VitalNurseDataRequest(
     companion object {
         fun from(vital: VitalCache, user: User): VitalNurseDataRequest {
             val benIdStr = vital.benId.toString()
+            val benRegIdStr = vital.benRegId.toString()
             return VitalNurseDataRequest(
                 beneficiaryID = benIdStr,
-                beneficiaryRegID = benIdStr,
+                beneficiaryRegID = benRegIdStr,
                 createdBy = user.userName,
                 providerServiceMapID = user.serviceMapId.toString(),
                 vanID = user.vanId,
@@ -76,7 +77,7 @@ data class VitalDetailsRequest(
         fun from(vital: VitalCache, user: User): VitalDetailsRequest {
             return VitalDetailsRequest(
                 bMI = vital.bmi,
-                beneficiaryRegID = vital.benId.toString(),
+                beneficiaryRegID = vital.benRegId.toString(),
                 createdBy = user.userName,
                 diastolicBP_1stReading = vital.bpDiastolic?.toString(),
                 height_cm = vital.height?.toString(),
