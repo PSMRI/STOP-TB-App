@@ -371,6 +371,10 @@ class TBRepo @Inject constructor(
         return true
     }
 
+    suspend fun pushUnSyncedTBScreeningRecords(): Int {
+        return pushUnSyncedRecordsTBScreening()
+    }
+
     // RECORD-LEVEL ISOLATION: TB Screening records are now sent in
     // chunks of 20 instead of one giant batch. Previously, if ANY record in
     // the batch was malformed, the ENTIRE batch failed and ALL records stayed

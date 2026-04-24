@@ -208,6 +208,12 @@ class BenRepo @Inject constructor(
         }
     }
 
+    suspend fun getBenFromRegId(benRegId: Long): BenRegCache? {
+        return withContext(Dispatchers.IO) {
+            benDao.getBenByRegId(benRegId)
+        }
+    }
+
     suspend fun substituteBenIdForDraft(ben: BenRegCache) {
         val extract = extractBenId()
         ben.beneficiaryId = extract.benId

@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.adapters
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -75,8 +76,16 @@ class TbScreeningListAdapter(
                 }
             }
 
-            binding.btnFormTb.text = binding.root.context.getString(R.string.view_screen)
-            binding.btnFormTb.setBackgroundColor(binding.root.resources.getColor(android.R.color.holo_green_dark))
+            val isScreened = item.tb != null
+            binding.btnFormTb.text = binding.root.context.getString(
+                if (isScreened) R.string.view_screen else R.string.screening
+            )
+            binding.btnFormTb.setBackgroundColor(
+                ContextCompat.getColor(
+                    binding.root.context,
+                    if (isScreened) android.R.color.holo_green_dark else android.R.color.holo_red_dark
+                )
+            )
             binding.clickListener = clickListener
 
             binding.executePendingBindings()
@@ -97,11 +106,11 @@ class TbScreeningListAdapter(
 
 
     class ClickListener(
-        private val clickedForm: ((hhId: Long, benId: Long) -> Unit)? = null
+        private val clickedForm: ((hhId: Long, benId: Long, viewOnly: Boolean) -> Unit)? = null
 
     ) {
         fun onClickForm(item: BenWithTbScreeningDomain) =
-            clickedForm?.let { it(item.ben.hhId, item.ben.benId) }
+            clickedForm?.let { it(item.ben.hhId, item.ben.benId, item.tb != null) }
     }
 
 }

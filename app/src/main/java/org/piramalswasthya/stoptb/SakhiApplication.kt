@@ -10,12 +10,14 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.google.firebase.FirebaseApp
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.helpers.CrashHandler
+import org.piramalswasthya.stoptb.helpers.CrashlyticsTree
 import org.piramalswasthya.stoptb.helpers.SyncLogFileWriter
 import org.piramalswasthya.stoptb.helpers.SyncLogManager
 import org.piramalswasthya.stoptb.helpers.SyncLogTree
@@ -62,6 +64,8 @@ class SakhiApplication : Application(), Configuration.Provider {
         KeyUtils.abhaClientSecret()
         KeyUtils.abhaTokenUrl()
         FirebaseApp.initializeApp(this)
+        FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(true)
+        Timber.plant(CrashlyticsTree())
         createNotificationChannels()
 
         Thread.setDefaultUncaughtExceptionHandler(CrashHandler(applicationContext))

@@ -36,6 +36,8 @@
     <!--    HBNC-->
 
     <string name="title_activity_home" translatable="false">STOP TB</string>
+    <string name="splash_stop_tb" translatable="false">Stop TB</string>
+    <string name="splash_tagline" translatable="false">Screen early. Treat early.</string>
     <string name="nav_header_desc" translatable="false">Navigation header</string>
 
     <string name="cd_icon_grid_icon">icon</string>

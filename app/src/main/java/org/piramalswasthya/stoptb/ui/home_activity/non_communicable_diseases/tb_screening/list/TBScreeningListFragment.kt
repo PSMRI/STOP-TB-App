@@ -48,11 +48,12 @@ class TBScreeningListFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         binding.btnNextPage.visibility = View.GONE
         val benAdapter = TbScreeningListAdapter(
-            TbScreeningListAdapter.ClickListener { hhId, benId ->
+            TbScreeningListAdapter.ClickListener { hhId, benId, viewOnly ->
                 findNavController().navigate(
                     TBScreeningListFragmentDirections.actionTBScreeningListFragmentToTBScreeningFormFragment(
                         benId = benId,
-                        viewOnly = true
+                        viewOnly = viewOnly,
+                        syncImmediately = !viewOnly
                     )
                 )
             }

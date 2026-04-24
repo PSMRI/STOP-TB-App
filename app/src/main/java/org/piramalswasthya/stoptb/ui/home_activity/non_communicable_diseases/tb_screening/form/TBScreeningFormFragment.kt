@@ -26,7 +26,6 @@ import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
-import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
 
 @AndroidEntryPoint
@@ -44,7 +43,7 @@ class TBScreeningFormFragment : Fragment() {
             .setMessage("it")
             .setPositiveButton(resources.getString(R.string.ok)) { dialog, _ ->
                 dialog.dismiss()
-                viewModel.saveForm()
+                handleSaveSuccessNavigation()
             }
             .create()
     }
@@ -98,23 +97,21 @@ class TBScreeningFormFragment : Fragment() {
         viewModel.state.observe(viewLifecycleOwner) {
             when (it) {
                 TBScreeningFormViewModel.State.SAVE_SUCCESS -> {
+                    val alertMessage = viewModel.getFamilyContactAlert()
+                    if (alertMessage.isNullOrBlank()) {
+                        handleSaveSuccessNavigation()
+                    } else {
+                        familyContactAlert.setMessage(alertMessage)
+                        familyContactAlert.show()
+                    }
+                }
+
+                TBScreeningFormViewModel.State.SAVE_FAILED -> {
                     Toast.makeText(
                         requireContext(),
-                        resources.getString(R.string.tb_screening_submitted), Toast.LENGTH_SHORT
+                        resources.getString(R.string.something_went_wrong_try_again),
+                        Toast.LENGTH_SHORT
                     ).show()
-                    WorkerUtils.triggerAmritPushWorker(requireContext())
-                    if (viewModel.autoFlow) {
-                        findNavController().navigate(
-                            R.id.vitalScreenFragment,
-                            bundleOf(
-                                "benId" to viewModel.benId,
-                                "benRegId" to viewModel.benRegId,
-                                "autoFlow" to true
-                            )
-                        )
-                    } else {
-                        findNavController().navigateUp()
-                    }
                 }
 
                 else -> {}
@@ -124,13 +121,26 @@ class TBScreeningFormFragment : Fragment() {
 
     private fun submitTBScreeningForm() {
         if (validateCurrentPage()) {
-            val alertMessage = viewModel.getFamilyContactAlert()
-            if (alertMessage.isNullOrBlank()) {
-                viewModel.saveForm()
-            } else {
-                familyContactAlert.setMessage(alertMessage)
-                familyContactAlert.show()
-            }
+            viewModel.saveForm()
+        }
+    }
+
+    private fun handleSaveSuccessNavigation() {
+        Toast.makeText(
+            requireContext(),
+            resources.getString(R.string.tb_screening_submitted), Toast.LENGTH_SHORT
+        ).show()
+        if (viewModel.autoFlow) {
+            findNavController().navigate(
+                R.id.vitalScreenFragment,
+                bundleOf(
+                    "benId" to viewModel.benId,
+                    "benRegId" to viewModel.benRegId,
+                    "autoFlow" to true
+                )
+            )
+        } else {
+            findNavController().navigateUp()
         }
     }
 

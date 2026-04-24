@@ -1,6 +1,7 @@
 package org.piramalswasthya.stoptb.helpers
 
 import android.content.Context
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import java.io.File
 import java.io.PrintWriter
@@ -17,6 +18,9 @@ class CrashHandler(private val context: Context) : Thread.UncaughtExceptionHandl
 
     override fun uncaughtException(t: Thread, e: Throwable) {
         try {
+            pref = PreferenceDao(context)
+            FirebaseCrashlytics.getInstance().recordException(e)
+
             val crashDir = File(context.filesDir, crashDirName)
             if (!crashDir.exists()) crashDir.mkdirs()
 
@@ -29,8 +33,6 @@ class CrashHandler(private val context: Context) : Thread.UncaughtExceptionHandl
             val pw = PrintWriter(sw)
             e.printStackTrace(pw)
             pw.flush()
-
-            pref =PreferenceDao(context)
 
 // You can add more context info here: device info, app version, user id, etc.
             val header = StringBuilder()

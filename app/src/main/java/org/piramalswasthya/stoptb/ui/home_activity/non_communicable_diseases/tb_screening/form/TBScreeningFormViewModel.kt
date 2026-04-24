@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.configuration.TBScreeningDataset
+import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.repositories.BenRepo
@@ -35,6 +36,8 @@ class TBScreeningFormViewModel @Inject constructor(
         TBScreeningFormFragmentArgs.fromSavedStateHandle(savedStateHandle).viewOnly
     val autoFlow =
         TBScreeningFormFragmentArgs.fromSavedStateHandle(savedStateHandle).autoFlow
+    private val syncImmediately =
+        TBScreeningFormFragmentArgs.fromSavedStateHandle(savedStateHandle).syncImmediately
 
     enum class State {
         IDLE, SAVING, SAVE_SUCCESS, SAVE_FAILED
@@ -116,7 +119,11 @@ class TBScreeningFormViewModel @Inject constructor(
                     tbScreeningCache.latitude = capturedLatitude
                     tbScreeningCache.longitude = capturedLongitude
                     tbScreeningCache.address = capturedAddress
+                    tbScreeningCache.syncState = SyncState.UNSYNCED
                     tbRepo.saveTBScreening(tbScreeningCache)
+                    if (syncImmediately) {
+                        tbRepo.pushUnSyncedTBScreeningRecords()
+                    }
                     _state.postValue(State.SAVE_SUCCESS)
                 } catch (e: Exception) {
                     Timber.d(e, "saving tb screening data failed!!")

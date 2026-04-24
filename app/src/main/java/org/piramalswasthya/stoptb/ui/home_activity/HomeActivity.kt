@@ -337,6 +337,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
         }
         binding.versionName.text = "${BuildConfig.VERSION_NAME}"//"APK Version 2.2.3"
 
+
         inAppUpdateHelper = InAppUpdateHelper(this)
         inAppUpdateHelper.checkForUpdate()
 

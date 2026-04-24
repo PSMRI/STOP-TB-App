@@ -201,7 +201,9 @@ class VitalScreenFragment : Fragment() {
             return
         }
         val directions = VitalScreenFragmentDirections
-            .actionVitalScreenFragmentToTBSuspectedQuickFragment(viewModel.benId)
+            .actionVitalScreenFragmentToTBSuspectedQuickFragment(
+                benId = viewModel.benId
+            )
         findNavController().navigate(directions)
     }
 

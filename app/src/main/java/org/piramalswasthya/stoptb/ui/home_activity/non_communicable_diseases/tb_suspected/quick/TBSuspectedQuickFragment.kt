@@ -16,6 +16,7 @@ import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
 
 @AndroidEntryPoint
@@ -77,6 +78,9 @@ class TBSuspectedQuickFragment : Fragment() {
                         getString(R.string.tb_tracking_submitted),
                         Toast.LENGTH_SHORT
                     ).show()
+                    if (!viewModel.viewOnly) {
+                        WorkerUtils.triggerAmritPushWorker(requireContext())
+                    }
                     if (viewModel.viewOnly) {
                         findNavController().navigateUp()
                     } else {

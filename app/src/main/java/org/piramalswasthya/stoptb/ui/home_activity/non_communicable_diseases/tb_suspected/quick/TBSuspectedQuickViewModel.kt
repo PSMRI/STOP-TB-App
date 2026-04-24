@@ -16,6 +16,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -81,7 +82,8 @@ class TBSuspectedQuickViewModel @Inject constructor(
                     dataset.mapValues(tbSuspected, 1)
                     tbRepo.saveTBSuspected(tbSuspected)
                     _state.postValue(State.SAVE_SUCCESS)
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    Timber.e(e, "Saving diagnostics failed for benId=%s", tbSuspected.benId)
                     _state.postValue(State.SAVE_FAILED)
                 }
             }

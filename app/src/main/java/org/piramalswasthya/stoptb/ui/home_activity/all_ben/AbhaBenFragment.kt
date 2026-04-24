@@ -2,7 +2,6 @@ package org.piramalswasthya.stoptb.ui.home_activity.all_ben
 
 import android.app.AlertDialog
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -10,7 +9,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
-import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -28,6 +26,7 @@ import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.ui.home_activity.home.HomeViewModel
+import org.piramalswasthya.stoptb.utils.callPhoneNumber
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -184,17 +183,7 @@ class AbhaBenFragment : Fragment() {
                 {item, benId, hhId, isViewMode, isIFA ->
                 },
                 {
-                    try {
-                        val callIntent = Intent(Intent.ACTION_CALL)
-                        callIntent.setData(Uri.parse("tel:${it.mobileNo}"))
-                        startActivity(callIntent)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        activity?.let {
-                            (it as HomeActivity).askForPermissions()
-                        }
-                        Toast.makeText(requireContext(), "Please allow permissions first", Toast.LENGTH_SHORT).show()
-                    }
+                    callPhoneNumber(it.mobileNo)
                 },{
 
                 }
@@ -244,17 +233,7 @@ class AbhaBenFragment : Fragment() {
                 { item,benId, hhId, isViewMode, isIFA ->
                 },
                 {
-                    try {
-                        val callIntent = Intent(Intent.ACTION_CALL)
-                        callIntent.setData(Uri.parse("tel:${it.mobileNo}"))
-                        startActivity(callIntent)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        activity?.let {
-                            (it as HomeActivity).askForPermissions()
-                        }
-                        Toast.makeText(requireContext(), "Please allow permissions first", Toast.LENGTH_SHORT).show()
-                    }
+                    callPhoneNumber(it.mobileNo)
                 },{
 
                 }

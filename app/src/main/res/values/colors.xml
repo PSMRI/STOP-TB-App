@@ -93,7 +93,7 @@
     <color name="sakhi_nav_header_end">#22897E</color>
     <color name="sakhi_drawer_selected_text">#12474B</color>
     <color name="sakhi_drawer_default_text">#5F7275</color>
-    <color name="sakhi_tab_bg">#FFFFFF</color>
+    <color name="sakhi_tab_bg">#F1F6F5</color>
     <color name="sakhi_tab_indicator">#DCEEEA</color>
     <color name="sakhi_login_wave">#D7EFEC</color>
     <color name="sakhi_login_wave_deep">#C6E5E0</color>

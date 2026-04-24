@@ -361,6 +361,10 @@
             android:name="autoFlow"
             android:defaultValue="false"
             app:argType="boolean" />
+        <argument
+            android:name="syncImmediately"
+            android:defaultValue="false"
+            app:argType="boolean" />
         <action
             android:id="@+id/action_TBScreeningFormFragment_to_ncdReferForm"
             app:destination="@id/NCDReferalForm" />

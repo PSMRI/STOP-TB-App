@@ -151,12 +151,12 @@ class VolunteerActivity : AppCompatActivity() {
         _binding = ActivityVolunteerBinding.inflate(layoutInflater)
         setContentView(binding.root)
         TapjackingProtectionHelper.enableTouchFiltering(this)
-
         setUpActionBar()
         setUpNavHeader()
         setUpMenu()
 
         binding.versionName.text = "APK Version ${BuildConfig.VERSION_NAME}"
+
 
         viewModel.navigateToLoginPage.observe(this) {
             if (it) {

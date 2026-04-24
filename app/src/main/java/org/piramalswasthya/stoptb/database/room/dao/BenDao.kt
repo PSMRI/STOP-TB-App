@@ -586,6 +586,9 @@ interface BenDao {
     @Query("SELECT * FROM BENEFICIARY WHERE beneficiaryId =:benId LIMIT 1")
     suspend fun getBen(benId: Long): BenRegCache?
 
+    @Query("SELECT * FROM BENEFICIARY WHERE benRegId = :benRegId LIMIT 1")
+    suspend fun getBenByRegId(benRegId: Long): BenRegCache?
+
     @Query("SELECT EXISTS(SELECT 1 FROM BENEFICIARY WHERE beneficiaryId = :benId AND isDeath = 1)")
     suspend fun isBenDead(benId: Long): Boolean
 

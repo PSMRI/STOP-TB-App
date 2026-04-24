@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.helpers
 import android.content.Context
 import android.os.Bundle
 import com.google.firebase.analytics.ktx.analytics
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.firebase.ktx.Firebase
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.json.JSONObject
@@ -12,13 +13,20 @@ class AnalyticsHelper @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     val firebaseAnalytics = Firebase.analytics
+    private val crashlytics = FirebaseCrashlytics.getInstance()
 
     fun setUserId(userId: String) {
         firebaseAnalytics.setUserId(userId)
+        crashlytics.setUserId(userId)
     }
 
     fun setUserProperty(key: String, value: String) {
         firebaseAnalytics.setUserProperty(key, value)
+        crashlytics.setCustomKey(key, value)
+    }
+
+    fun recordException(throwable: Throwable) {
+        crashlytics.recordException(throwable)
     }
 
     fun logEvent(name: String, params: Bundle? = null) {

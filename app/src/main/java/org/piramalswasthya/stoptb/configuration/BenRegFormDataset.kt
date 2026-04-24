@@ -476,11 +476,22 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         return agePopup.value?.let { getAgeFromDob(getLongFromDate(it)) >= Konstants.minAgeForGenBen } == true
     }
 
+    private fun shouldRequireMaritalStatus(): Boolean {
+        val isFemaleSelected = gender.value == gender.entries?.getOrNull(1)
+        val age = agePopup.value?.let { runCatching { getAgeFromDob(getLongFromDate(it)) }.getOrDefault(0) } ?: 0
+        return isFemaleSelected && age >= Konstants.minAgeForGenBen
+    }
+
+    private fun updateMaritalStatusRequirement() {
+        maritalStatus.required = shouldRequireMaritalStatus()
+    }
+
     private fun addMaritalStatusIfApplicable(list: MutableList<FormElement>) {
         if (!shouldShowMaritalStatus()) {
             maritalStatus.value = null
             return
         }
+        updateMaritalStatusRequirement()
         if (list.contains(maritalStatus)) return
 
         val villageIndex = list.indexOf(villageHamlet)
@@ -503,13 +514,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         }
         if (list.contains(reproductiveStatus)) return
 
-        val insertAfter = when {
-            list.contains(husbandName) -> husbandName
-            list.contains(wifeName) -> wifeName
-            list.contains(spouseName) -> spouseName
-            else -> maritalStatus
-        }
-        val insertIndex = list.indexOf(insertAfter).takeIf { it >= 0 } ?: list.indexOf(maritalStatus)
+        val insertIndex = list.indexOf(maritalStatus)
         list.add(insertIndex + 1, reproductiveStatus)
     }
 
@@ -595,6 +600,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                         else -> R.array.nbr_marital_status_male_array
                     }
                 }
+                updateMaritalStatusRequirement()
 
                 try { return updateReproductiveOptionsBasedOnAgeGender(formId = agePopup.id) }
                 catch (e: Exception) { e.printStackTrace(); return 1 }
@@ -624,6 +630,11 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             gender.id -> {
                 maritalStatus.value = null
                 reproductiveStatus.value = null
+                husbandName.value = null
+                wifeName.value = null
+                spouseName.value = null
+                ageAtMarriage.value = null
+                dateOfMarriage.value = null
                 maritalStatus.inputType = DROPDOWN
                 reproductiveStatus.inputType = RADIO
 
@@ -635,6 +646,20 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                     1 -> R.array.nbr_marital_status_female_array
                     else -> R.array.nbr_marital_status_male_array
                 }
+                updateMaritalStatusRequirement()
+
+                triggerDependants(
+                    source = maritalStatus,
+                    removeItems = listOf(
+                        wifeName,
+                        husbandName,
+                        spouseName,
+                        ageAtMarriage,
+                        dateOfMarriage,
+                        reproductiveStatus
+                    ),
+                    addItems = emptyList()
+                )
 
                 val listChanged = if (hasThirdPage()) {
                     updateReproductiveOptionsBasedOnAgeGender(formId = gender.id)
@@ -663,21 +688,27 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                         husbandName.required = false
                         wifeName.required = false
                         updateReproductiveOptionsBasedOnAgeGender(formId = maritalStatus.id)
-                        triggerDependants(
-                            source = motherName,
-                            addItems = when (gender.value) {
-                                gender.entries!![0] -> listOf(wifeName)
-                                gender.entries!![1] -> listOf(husbandName, reproductiveStatus)
-                                else -> listOf(spouseName)
-                            },
-                            removeItems = listOf(wifeName, husbandName, spouseName, ageAtMarriage, dateOfMarriage, reproductiveStatus)
-                        )
+                        if (gender.value == gender.entries!![1]) {
+                            triggerDependants(
+                                source = maritalStatus,
+                                addItems = listOf(reproductiveStatus, husbandName),
+                                removeItems = listOf(wifeName, husbandName, spouseName, ageAtMarriage, dateOfMarriage, reproductiveStatus)
+                            )
+                        } else {
+                            triggerDependants(
+                                source = motherName,
+                                addItems = when (gender.value) {
+                                    gender.entries!![0] -> listOf(wifeName)
+                                    else -> listOf(spouseName)
+                                },
+                                removeItems = listOf(wifeName, husbandName, spouseName, ageAtMarriage, dateOfMarriage, reproductiveStatus)
+                            )
+                        }
                     }
                 }
             }
 
             mobileNoOfRelation.id -> {
-                contactNumber.value = null
                 when (index) {
                     4 -> {
                         contactNumber.value = familyHeadPhoneNo

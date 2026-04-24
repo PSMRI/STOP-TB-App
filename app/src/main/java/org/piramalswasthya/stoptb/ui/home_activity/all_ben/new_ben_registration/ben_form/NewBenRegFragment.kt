@@ -235,7 +235,6 @@ class NewBenRegFragment : Fragment() {
                     binding.llContent.visibility = View.VISIBLE
                     binding.pbForm.visibility    = View.GONE
                     Toast.makeText(context, resources.getString(R.string.save_successful), Toast.LENGTH_LONG).show()
-                    WorkerUtils.triggerAmritPushWorker(requireContext())
                     try {
                         if (viewModel.benIdFromArgs == 0L) {
                             findNavController().navigate(
@@ -246,6 +245,7 @@ class NewBenRegFragment : Fragment() {
                                 )
                             )
                         } else {
+                            WorkerUtils.triggerAmritPushWorker(requireContext())
                             findNavController().navigateUp()
                         }
                     } catch (e: Exception) { Timber.e(e) }
