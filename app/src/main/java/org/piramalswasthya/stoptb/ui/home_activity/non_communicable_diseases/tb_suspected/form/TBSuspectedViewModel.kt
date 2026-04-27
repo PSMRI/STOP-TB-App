@@ -29,6 +29,8 @@ class TBSuspectedViewModel @Inject constructor(
 ) : ViewModel() {
     val benId =
         TBSuspectedFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
+    val viewOnly =
+        TBSuspectedFragmentArgs.fromSavedStateHandle(savedStateHandle).viewOnly
 
     enum class State {
         IDLE, SAVING, SAVE_SUCCESS, SAVE_FAILED

@@ -274,7 +274,8 @@ class VolunteerActivity : AppCompatActivity() {
 
         // ── Request to Delete Account ────────────────────────────────────
         binding.navView.menu.findItem(R.id.menu_delete_account)?.setOnMenuItemClickListener {
-            val url = "https://forms.office.com/Pages/ResponsePage.aspx?id=jQ49md0HKEGgbxRJvtPnRISY9UjAA01KtsFKYKhp1nNURUpKQzNJUkE1OUc0SllXQ0IzRFVJNlM2SC4u"
+//            val url = "https://forms.office.com/Pages/ResponsePage.aspx?id=jQ49md0HKEGgbxRJvtPnRISY9UjAA01KtsFKYKhp1nNURUpKQzNJUkE1OUc0SllXQ0IzRFVJNlM2SC4u"
+            val url = "https://forms.cloud.microsoft/r/iVtay7Kf6V"
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
             binding.drawerLayout.close()
             true

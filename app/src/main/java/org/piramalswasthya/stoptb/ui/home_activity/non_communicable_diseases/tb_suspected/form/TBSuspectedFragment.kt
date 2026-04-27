@@ -64,9 +64,10 @@ class TBSuspectedFragment : Fragment() {
                 val adapter = FormInputAdapter(
                     formValueListener = FormInputAdapter.FormValueListener { formId, index ->
                         viewModel.updateListOnValueChanged(formId, index)
-                    }, isEnabled = !recordExists
+                    }, isEnabled = !(recordExists || viewModel.viewOnly)
                 )
-                binding.btnSubmit.isEnabled = !recordExists
+                binding.btnSubmit.isEnabled = !(recordExists || viewModel.viewOnly)
+                binding.btnSubmit.visibility = if (recordExists || viewModel.viewOnly) View.GONE else View.VISIBLE
                 binding.form.rvInputForm.adapter = adapter
                 lifecycleScope.launch {
                     viewModel.formList.collect {

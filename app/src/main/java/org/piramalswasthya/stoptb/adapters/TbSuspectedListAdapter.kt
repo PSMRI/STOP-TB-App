@@ -107,11 +107,11 @@ class TbSuspectedListAdapter(
 
 
     class ClickListener(
-        private val clickedForm: ((hhId: Long, benId: Long) -> Unit)? = null
+        private val clickedForm: ((hhId: Long, benId: Long, viewOnly: Boolean) -> Unit)? = null
 
     ) {
         fun onClickForm(item: BenWithTbSuspectedDomain) =
-            clickedForm?.let { it(item.ben.hhId, item.ben.benId) }
+            clickedForm?.let { it(item.ben.hhId, item.ben.benId, !item.tbSuspected?.visitLabel.isNullOrBlank()) }
     }
 
 }

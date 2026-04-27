@@ -50,15 +50,15 @@ class SuspectedTBDataset(
         hasDependants = true
     )
 
-    private val sputumTestResult = FormElement(
-        id = 4,
-        inputType = InputType.RADIO,
-        title = resources.getString(R.string.sputum_test_result),
-        arrayId = R.array.tb_test_result,
-        entries = resources.getStringArray(R.array.tb_test_result),
-        required = false,
-        hasDependants = true
-    )
+//    private val sputumTestResult = FormElement(
+//        id = 4,
+//        inputType = InputType.RADIO,
+//        title = resources.getString(R.string.sputum_test_result),
+//        arrayId = R.array.tb_test_result,
+//        entries = resources.getStringArray(R.array.tb_test_result),
+//        required = false,
+//        hasDependants = true
+//    )
 
     private val digitalChestXRayConducted = FormElement(
         id = 5,
@@ -146,7 +146,7 @@ class SuspectedTBDataset(
                 R.array.tb_suspected_sample_submitted_at,
                 saved.sputumSubmittedAt
             )
-            sputumTestResult.value = getLocalValueInArray(R.array.tb_test_result, saved.sputumTestResult)
+//            sputumTestResult.value = getLocalValueInArray(R.array.tb_test_result, saved.sputumTestResult)
             digitalChestXRayConducted.value = boolToYesNo(saved.isChestXRayDone)
             digitalChestXRayResult.value = getLocalValueInArray(R.array.tb_test_result, saved.chestXRayResult)
             naatConducted.value = boolToYesNo(saved.isNaatConducted)
@@ -166,7 +166,8 @@ class SuspectedTBDataset(
             source = sputumCollected,
             passedIndex = if (isYes(sputumCollected)) 1 else 0,
             triggerIndex = 1,
-            target = listOf(sputumSubmittedAt, sputumTestResult)
+//            target = listOf(sputumSubmittedAt, sputumTestResult)
+            target = listOf(sputumSubmittedAt)
         )
         triggerDependants(
             source = digitalChestXRayConducted,
@@ -203,7 +204,7 @@ class SuspectedTBDataset(
             form.isSputumCollected = isYes(sputumCollected).takeIf { isSputumReferralEnabled() }
             form.sputumSubmittedAt =
                 getEnglishValueInArray(R.array.tb_suspected_sample_submitted_at, sputumSubmittedAt.value)
-            form.sputumTestResult = getEnglishValueInArray(R.array.tb_test_result, sputumTestResult.value)
+//            form.sputumTestResult = getEnglishValueInArray(R.array.tb_test_result, sputumTestResult.value)
             form.isChestXRayDone = isYes(digitalChestXRayConducted).takeIf { isDigitalChestXRayReferralEnabled() }
             form.chestXRayResult = getEnglishValueInArray(R.array.tb_test_result, digitalChestXRayResult.value)
             form.isAICoughAssessmentDone = null
@@ -225,30 +226,67 @@ class SuspectedTBDataset(
     fun getAlerts(): String? =
         if (isMarkedConfirmed()) resources.getString(R.string.tb_suspected_alert_confirmed) else null
 
+//    private fun buildFormList(): List<FormElement> = listOf(
+//        dateOfVisit,
+//    ).toMutableList().apply {
+//        add(digitalChestXRayConducted)
+//        if (isYes(digitalChestXRayConducted)) add(digitalChestXRayResult)
+//        if (isSputumReferralEnabled()) {
+//            add(sputumCollected)
+////            if (isYes(sputumCollected)) addAll(listOf(sputumSubmittedAt, sputumTestResult))
+//            if (isYes(sputumCollected)) addAll(listOf(sputumSubmittedAt))
+//        }
+//        if (isNaatReferralEnabled()) {
+//            add(naatConducted)
+//            if (isYes(naatConducted)) add(naatResult)
+//        }
+//        if (isLiquidCultureReferralEnabled()) {
+//            add(liquidCultureConducted)
+//            if (isYes(liquidCultureConducted)) add(liquidCultureResult)
+//        }
+//        if (shouldEnableNikshayId()) add(nikshayId)
+//    }
+
     private fun buildFormList(): List<FormElement> = listOf(
         dateOfVisit,
     ).toMutableList().apply {
-        add(digitalChestXRayConducted)
-        if (isYes(digitalChestXRayConducted)) add(digitalChestXRayResult)
+
+        if (isDigitalChestXRayReferralEnabled()) {
+            add(digitalChestXRayConducted)
+            if (isYes(digitalChestXRayConducted)) {
+                add(digitalChestXRayResult)
+            }
+        }
+
         if (isSputumReferralEnabled()) {
             add(sputumCollected)
-            if (isYes(sputumCollected)) addAll(listOf(sputumSubmittedAt, sputumTestResult))
+            if (isYes(sputumCollected)) {
+                add(sputumSubmittedAt)
+            }
         }
+
         if (isNaatReferralEnabled()) {
             add(naatConducted)
-            if (isYes(naatConducted)) add(naatResult)
+            if (isYes(naatConducted)) {
+                add(naatResult)
+            }
         }
+
         if (isLiquidCultureReferralEnabled()) {
             add(liquidCultureConducted)
-            if (isYes(liquidCultureConducted)) add(liquidCultureResult)
+            if (isYes(liquidCultureConducted)) {
+                add(liquidCultureResult)
+            }
         }
-        if (shouldEnableNikshayId()) add(nikshayId)
-    }
 
+        if (shouldEnableNikshayId()) {
+            add(nikshayId)
+        }
+    }
     private fun syncFieldStates() {
         syncReferralDrivenField(
             radioField = digitalChestXRayConducted,
-            referralEnabled = true,
+            referralEnabled =  isDigitalChestXRayReferralEnabled(),
             locked = shouldLockDigitalChestXRayConducted()
         )
         syncReferralDrivenField(
@@ -268,12 +306,13 @@ class SuspectedTBDataset(
         )
 
         sputumSubmittedAt.isEnabled = isSputumReferralEnabled() && isYes(sputumCollected)
-        sputumSubmittedAt.required = sputumSubmittedAt.isEnabled
+//        sputumSubmittedAt.required = sputumSubmittedAt.isEnabled
+        sputumSubmittedAt.required = false
         if (!sputumSubmittedAt.isEnabled) resetField(sputumSubmittedAt)
 
-        sputumTestResult.isEnabled = isSputumReferralEnabled() && isYes(sputumCollected)
-        sputumTestResult.required = sputumTestResult.isEnabled
-        if (!sputumTestResult.isEnabled) resetField(sputumTestResult)
+//        sputumTestResult.isEnabled = isSputumReferralEnabled() && isYes(sputumCollected)
+//        sputumTestResult.required = sputumTestResult.isEnabled
+//        if (!sputumTestResult.isEnabled) resetField(sputumTestResult)
 
         digitalChestXRayResult.isEnabled =
             isDigitalChestXRayReferralEnabled() &&
@@ -333,7 +372,7 @@ class SuspectedTBDataset(
             isYes(naatConducted)
 
     private fun isMarkedConfirmed(): Boolean =
-        sputumTestResult.value == positiveNegativeEntries.getOrNull(0) ||
+//        sputumTestResult.value == positiveNegativeEntries.getOrNull(0) ||
             digitalChestXRayResult.value == positiveNegativeEntries.getOrNull(0) ||
             naatResult.value == positiveNegativeEntries.getOrNull(0) ||
             liquidCultureResult.value == positiveNegativeEntries.getOrNull(0)
@@ -347,7 +386,7 @@ class SuspectedTBDataset(
             savedCache?.isSputumCollected != null
 
     private fun isDigitalChestXRayReferralEnabled(): Boolean =
-        true
+        !isUnderFive() && !isPregnant()
 
     private fun isNaatReferralEnabled(): Boolean =
         isChestXRayPositive() ||
@@ -397,7 +436,7 @@ class SuspectedTBDataset(
             isNaatReferralEnabled() -> naatConducted
             isDigitalChestXRayReferralEnabled() && isYes(digitalChestXRayConducted) -> digitalChestXRayResult
             isDigitalChestXRayReferralEnabled() -> digitalChestXRayConducted
-            isSputumReferralEnabled() && isYes(sputumCollected) -> sputumTestResult
+//            isSputumReferralEnabled() && isYes(sputumCollected) -> sputumTestResult
             else -> sputumCollected
         }
         triggerDependants(

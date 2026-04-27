@@ -68,7 +68,7 @@ class TBSuspectedQuickDataset(
         title = resources.getString(R.string.tb_digital_chest_xray_result),
         arrayId = R.array.tb_test_result,
         entries = resources.getStringArray(R.array.tb_test_result),
-        required = true
+        required = false
     )
 
     private val trueNatResult = FormElement(
@@ -77,7 +77,7 @@ class TBSuspectedQuickDataset(
         title = resources.getString(R.string.tb_naat_result),
         arrayId = R.array.tb_test_result,
         entries = resources.getStringArray(R.array.tb_test_result),
-        required = true
+        required = false
     )
 
     private val liquidCultureResult = FormElement(
@@ -86,7 +86,7 @@ class TBSuspectedQuickDataset(
         title = resources.getString(R.string.tb_liquid_culture_result),
         arrayId = R.array.tb_test_result,
         entries = resources.getStringArray(R.array.tb_test_result),
-        required = true
+        required = false
     )
 
     suspend fun setUpPage(
@@ -272,7 +272,7 @@ class TBSuspectedQuickDataset(
 
         digitalChestXrayResult.isEnabled =
             shouldShowDigitalChestXray() && isYes(digitalChestXrayConducted) && !lockDigitalChestXray
-        digitalChestXrayResult.required = digitalChestXrayResult.isEnabled
+//        digitalChestXrayResult.required = digitalChestXrayResult.isEnabled
         if (!shouldShowDigitalChestXray() || !isYes(digitalChestXrayConducted)) {
             resetField(digitalChestXrayResult)
         }
@@ -287,7 +287,7 @@ class TBSuspectedQuickDataset(
 
         trueNatResult.isEnabled =
             shouldShowTrueNatConducted() && isYes(trueNatConducted) && !lockTrueNat
-        trueNatResult.required = trueNatResult.isEnabled
+//        trueNatResult.required = trueNatResult.isEnabled
         if (!shouldShowTrueNatConducted() || !isYes(trueNatConducted)) {
             resetField(trueNatResult)
         }
@@ -300,7 +300,7 @@ class TBSuspectedQuickDataset(
 
         liquidCultureResult.isEnabled =
             shouldShowLiquidCultureConducted() && isYes(liquidCultureConducted) && !lockLiquidCulture
-        liquidCultureResult.required = liquidCultureResult.isEnabled
+//        liquidCultureResult.required = liquidCultureResult.isEnabled
         if (!shouldShowLiquidCultureConducted() || !isYes(liquidCultureConducted)) {
             resetField(liquidCultureResult)
         }

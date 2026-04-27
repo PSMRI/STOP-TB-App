@@ -386,6 +386,10 @@
         <argument
             android:name="benId"
             app:argType="long" />
+        <argument
+            android:name="viewOnly"
+            android:defaultValue="false"
+            app:argType="boolean" />
     </fragment>
 
     <fragment
