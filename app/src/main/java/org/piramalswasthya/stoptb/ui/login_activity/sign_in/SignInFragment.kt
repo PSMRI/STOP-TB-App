@@ -37,6 +37,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.utils.RoleConstants
 
 
 @AndroidEntryPoint
@@ -102,6 +103,7 @@ class SignInFragment : Fragment() {
 
         NoCopyPasteHelper.disableCopyPaste(binding.etPassword)
         NoCopyPasteHelper.disableCopyPaste(binding.etUsername)
+        binding.rbAssamese.visibility = View.GONE
 
         return binding.root
     }
@@ -201,28 +203,64 @@ class SignInFragment : Fragment() {
                     binding.tvError.visibility = View.VISIBLE
                 }
 
-                is NetworkResponse.Success -> {
-                    if (binding.cbRemember.isChecked) {
-                        val username = binding.etUsername.text.toString()
-                        val password = binding.etPassword.text.toString()
-                        viewModel.rememberUser(username, password)
-                    } else {
-                        viewModel.forgetUser()
-                    }
-                    binding.clContent.visibility = View.INVISIBLE
-                    binding.pbSignIn.visibility = View.VISIBLE
-                    binding.tvError.visibility = View.GONE
+//                is NetworkResponse.Success -> {
+//                    if (binding.cbRemember.isChecked) {
+//                        val username = binding.etUsername.text.toString()
+//                        val password = binding.etPassword.text.toString()
+//                        viewModel.rememberUser(username, password)
+//                    } else {
+//                        viewModel.forgetUser()
+//                    }
+//                    binding.clContent.visibility = View.INVISIBLE
+//                    binding.pbSignIn.visibility = View.VISIBLE
+//                    binding.tvError.visibility = View.GONE
+//
+//                    // TEMP: Volunteer ID aane ke baad role check se replace karein
+//                    activity?.finish()
+//                    startActivity(Intent(requireContext(), VolunteerActivity::class.java))
+//                }
 
-                    // TEMP: Volunteer ID aane ke baad role check se replace karein
-                    activity?.finish()
-                    startActivity(Intent(requireContext(), VolunteerActivity::class.java))
+                is NetworkResponse.Success -> {
+
+                    val user = state.data  // ya loggedInUser use karo
+
+                    if (user?.role.equals(RoleConstants.ROLE_VOLUNTEER, true)) {
+
+                        if (binding.cbRemember.isChecked) {
+                            val username = binding.etUsername.text.toString()
+                            val password = binding.etPassword.text.toString()
+                            viewModel.rememberUser(username, password)
+                        } else {
+                            viewModel.forgetUser()
+                        }
+
+                        binding.clContent.visibility = View.INVISIBLE
+                        binding.pbSignIn.visibility = View.VISIBLE
+                        binding.tvError.visibility = View.GONE
+
+                        activity?.finish()
+                        startActivity(Intent(requireContext(), VolunteerActivity::class.java))
+
+                    } else {
+                        // ❌ Non-volunteer block
+                        binding.pbSignIn.visibility = View.GONE
+                        binding.clContent.visibility = View.VISIBLE
+                        binding.tvError.text = "Login Failed: Only Volunteer allowed"
+                        binding.tvError.visibility = View.VISIBLE
+                    }
                 }
             }
         }
 
+//        viewModel.logoutComplete.observe(viewLifecycleOwner) {
+//            it?.let {
+//                if (it) validateInput()
+//            }
+//        }
+
         viewModel.logoutComplete.observe(viewLifecycleOwner) {
-            it?.let {
-                if (it) validateInput()
+            if (it == true) {
+                viewModel.updateState(NetworkResponse.Idle())
             }
         }
     }

@@ -194,17 +194,21 @@ class TBScreeningFormFragment : Fragment() {
                 is HomeActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.tb_screening_form)
-                )
+                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
                 is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.tb_screening_form)
-                )
+                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
             }
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
+    override fun onDestroyView() {
+        super.onDestroyView()
+        if (viewModel.autoFlow) {
+            (activity as? HomeActivity)?.setToolbarNavigationVisible(true)
+            (activity as? VolunteerActivity)?.setToolbarNavigationVisible(true)
+        }
         _binding = null
     }
 

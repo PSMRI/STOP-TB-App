@@ -160,7 +160,7 @@ class NewBenRegG15ViewModel @Inject constructor(
                         updatedDate = System.currentTimeMillis()
                         updatedBy = user.userName
                     }
-                    benRepo.persistRecord(ben)
+                    benRepo.persistRecord(ben, updateIfExists = benIdFromArgs > 0L)
                     _state.postValue(State.SAVE_SUCCESS)
                 } catch (e: IllegalAccessError) {
                     Timber.d("saving Ben data failed!! $e")

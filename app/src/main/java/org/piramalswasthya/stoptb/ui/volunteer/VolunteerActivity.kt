@@ -284,7 +284,9 @@ class VolunteerActivity : AppCompatActivity() {
 
     fun updateActionBar(icon: Int, title: String) {
         binding.ivToolbar.setImageResource(icon)
-        binding.toolbar.title = null
+//        binding.toolbar.title = null
+        binding.toolbar.title = ""
+        supportActionBar?.setDisplayShowTitleEnabled(false)
         binding.tvToolbar.text = title
     }
 
@@ -307,6 +309,16 @@ class VolunteerActivity : AppCompatActivity() {
         if (!::appBarConfiguration.isInitialized) return
         NavigationUI.setupWithNavController(binding.toolbar, navController, appBarConfiguration)
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration)
+    }
+
+    fun setToolbarNavigationVisible(visible: Boolean) {
+        if (visible) {
+            restoreToolbarNavigation()
+        } else {
+            binding.toolbar.navigationIcon = null
+            binding.toolbar.setNavigationOnClickListener(null)
+            supportActionBar?.setDisplayHomeAsUpEnabled(false)
+        }
     }
 
     override fun onPause() {

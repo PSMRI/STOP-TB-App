@@ -161,6 +161,39 @@ class SuspectedTBDataset(
     }
 
     override suspend fun handleListOnValueChanged(formId: Int, index: Int): Int {
+        if (formId == digitalChestXRayResult.id) {
+            return refreshXRayDependentFields(digitalChestXRayResult)
+        }
+
+        if (formId == digitalChestXRayConducted.id && !isYes(digitalChestXRayConducted)) {
+            digitalChestXRayResult.value = null
+            syncFieldStates()
+            val addItems = mutableListOf<FormElement>()
+            val removeItems = mutableListOf(digitalChestXRayResult)
+
+            if (isSputumReferralEnabled()) {
+                addItems.add(sputumCollected)
+                if (isYes(sputumCollected)) addItems.add(sputumSubmittedAt)
+            } else {
+                removeItems.addAll(listOf(sputumSubmittedAt, sputumCollected))
+            }
+
+            if (isNaatReferralEnabled()) {
+                addItems.add(naatConducted)
+                if (isYes(naatConducted)) addItems.add(naatResult)
+            } else {
+                removeItems.addAll(listOf(naatResult, naatConducted))
+            }
+
+            val updateIndex = triggerDependants(
+                source = digitalChestXRayConducted,
+                removeItems = removeItems,
+                addItems = addItems
+            )
+            updateNikshayVisibility()
+            return updateIndex
+        }
+
         syncFieldStates()
         triggerDependants(
             source = sputumCollected,
@@ -189,6 +222,34 @@ class SuspectedTBDataset(
         )
         updateNikshayVisibility()
         return 0
+    }
+
+    private fun refreshXRayDependentFields(source: FormElement): Int {
+        syncFieldStates()
+        val addItems = mutableListOf<FormElement>()
+        val removeItems = mutableListOf<FormElement>()
+
+        if (isSputumReferralEnabled()) {
+            addItems.add(sputumCollected)
+            if (isYes(sputumCollected)) addItems.add(sputumSubmittedAt)
+        } else {
+            removeItems.addAll(listOf(sputumSubmittedAt, sputumCollected))
+        }
+
+        if (isNaatReferralEnabled()) {
+            addItems.add(naatConducted)
+            if (isYes(naatConducted)) addItems.add(naatResult)
+        } else {
+            removeItems.addAll(listOf(naatResult, naatConducted))
+        }
+
+        val updateIndex = triggerDependants(
+            source = source,
+            removeItems = removeItems,
+            addItems = addItems
+        )
+        updateNikshayVisibility()
+        return updateIndex
     }
 
     override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
@@ -380,13 +441,12 @@ class SuspectedTBDataset(
     private fun isSputumReferralEnabled(): Boolean =
         isChestXRayPositive() ||
             screeningCache?.historyOfTb == true ||
-            isUnderFive() ||
             isPregnant() ||
             screeningCache?.takingAntiTBDrugs == true ||
             savedCache?.isSputumCollected != null
 
     private fun isDigitalChestXRayReferralEnabled(): Boolean =
-        !isUnderFive() && !isPregnant()
+        !isPregnant()
 
     private fun isNaatReferralEnabled(): Boolean =
         isChestXRayPositive() ||

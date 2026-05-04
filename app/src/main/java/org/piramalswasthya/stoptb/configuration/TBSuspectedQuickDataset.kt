@@ -306,7 +306,7 @@ class TBSuspectedQuickDataset(
         }
     }
 
-    private fun shouldShowDigitalChestXray(): Boolean = !isUnderFive() && !isPregnant()
+    private fun shouldShowDigitalChestXray(): Boolean =  !isPregnant()
 
     private fun shouldShowSputumCollected(): Boolean =
         screeningCache?.historyOfTb == true ||
@@ -315,7 +315,8 @@ class TBSuspectedQuickDataset(
             screeningCache?.takingAntiTBDrugs == true
 
     private fun shouldShowTrueNatConducted(): Boolean =
-        isUnderFive() || isPregnant()
+//        isUnderFive() || isPregnant()
+         isPregnant()
 
     private fun shouldShowLiquidCultureConducted(): Boolean =
         screeningCache?.historyOfTb == true || screeningCache?.takingAntiTBDrugs == true
@@ -332,8 +333,7 @@ class TBSuspectedQuickDataset(
     private fun isPregnant(): Boolean {
         val reproductiveStatus = benCache?.genDetails?.reproductiveStatus
         return benCache?.genDetails?.reproductiveStatusId == 1 ||
-            reproductiveStatus.equals("Yes", ignoreCase = true) ||
-            (reproductiveStatus?.contains("preg", ignoreCase = true) == true)
+            reproductiveStatus.equals("Yes", ignoreCase = true)
     }
 
     private fun resetField(formElement: FormElement) {

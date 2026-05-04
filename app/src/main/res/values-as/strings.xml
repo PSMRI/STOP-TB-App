@@ -479,8 +479,8 @@
         <item>PHC</item>
         <item>SC</item>
     </string-array>
-    <string name="vital_screen">ভাইটেল স্ক্ৰীণ</string>
-    <string name="vital_screen_placeholder">হিতাধিকাৰী আইডি %1$d ৰ বাবে ভাইটেল স্ক্ৰীণ</string>
+    <string name="vital_screen">সাধাৰণ পৰীক্ষা</string>
+    <string name="vital_screen_placeholder">হিতাধিকাৰী আইডি %1$d ৰ বাবে ভাইটেলছ আৰু মানৱমিতি</string>
     <string name="vital_details">ভাইটেল বিৱৰণ</string>
     <string name="temperature">তাপমাত্ৰা</string>
     <string name="pulse_rate">নাড়ীৰ গতি</string>
@@ -516,6 +516,7 @@
     <string name="tb_liquid_culture_conducted">লিকুইড কালচাৰ কৰা হৈছে নেকি?</string>
     <string name="tb_liquid_culture_result">লিকুইড কালচাৰৰ ফলাফল</string>
     <string name="result">ফলাফল</string>
+    <string name="diagnostics_submitted">Diagnostics submitted</string>
 </resources>
 
 

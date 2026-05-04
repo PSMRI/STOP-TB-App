@@ -35,6 +35,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
     private val args = TBSuspectedQuickFragmentArgs.fromSavedStateHandle(savedStateHandle)
     val benId = args.benId
     val viewOnly = args.viewOnly
+    val autoFlow = args.autoFlow
 
     private val dataset = TBSuspectedQuickDataset(context, preferenceDao.getCurrentLanguage())
     val formList = dataset.listFlow

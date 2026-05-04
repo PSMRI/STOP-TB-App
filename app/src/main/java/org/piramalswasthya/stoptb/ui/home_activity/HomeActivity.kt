@@ -785,6 +785,16 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration)
     }
 
+    fun setToolbarNavigationVisible(visible: Boolean) {
+        if (visible) {
+            restoreToolbarNavigation()
+        } else {
+            binding.toolbar.navigationIcon = null
+            binding.toolbar.setNavigationOnClickListener(null)
+            supportActionBar?.setDisplayHomeAsUpEnabled(false)
+        }
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (binding.drawerLayout.isDrawerOpen(GravityCompat.START))

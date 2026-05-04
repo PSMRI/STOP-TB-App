@@ -14,8 +14,8 @@ import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.ImageUtils
-import org.piramalswasthya.stoptb.model.LocationRecord
 import org.piramalswasthya.stoptb.repositories.UserRepo
 import javax.inject.Inject
 
@@ -41,8 +41,14 @@ class HomeViewModel @Inject constructor(
     private var _unprocessedRecordsCount: MutableLiveData<Int> = MutableLiveData(0)
     val unprocessedRecordsCount: LiveData<Int> get() = _unprocessedRecordsCount
 
-    val locationRecord: LocationRecord? = pref.getLocationRecord()
-    val currentLanguage = pref.getCurrentLanguage()
+    val homeToolbarTitle: String?
+        get() = pref.getLocationRecord()?.village?.let { village ->
+            when (pref.getCurrentLanguage()) {
+                Languages.ENGLISH -> village.name
+                Languages.HINDI -> village.nameHindi ?: village.name
+                Languages.ASSAMESE -> village.nameAssamese ?: village.name
+            }
+        }
 
     private val _navigateToLoginPage = MutableLiveData(false)
     val navigateToLoginPage: MutableLiveData<Boolean> get() = _navigateToLoginPage

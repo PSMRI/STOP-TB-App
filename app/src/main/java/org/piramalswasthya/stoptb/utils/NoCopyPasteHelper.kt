@@ -8,11 +8,9 @@ import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.widget.EditText
-import androidx.annotation.RequiresApi
 
 object NoCopyPasteHelper {
 
-    @RequiresApi(Build.VERSION_CODES.O)
     fun disableCopyPaste(editText: EditText) {
 
         // Disable long press menu
@@ -28,12 +26,14 @@ object NoCopyPasteHelper {
             override fun onDestroyActionMode(mode: ActionMode?) {
                 /*
                 Empty by design; required override with no behavior needed in this implementation.
-*/
+                */
             }
         }
 
         editText.apply {
-            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
+            }
             inputType = InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         }
 

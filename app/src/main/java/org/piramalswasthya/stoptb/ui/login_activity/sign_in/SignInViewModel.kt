@@ -110,19 +110,11 @@ class SignInViewModel @Inject constructor(
 
 
     fun rememberUser(username: String, password: String) {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                pref.registerLoginCred(username, password)
-            }
-        }
+        pref.registerLoginCred(username, password)
     }
 
     fun forgetUser() {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                pref.deleteLoginCred()
-            }
-        }
+        pref.deleteLoginCred()
     }
 
     fun updateState(state: NetworkResponse<User?>) {

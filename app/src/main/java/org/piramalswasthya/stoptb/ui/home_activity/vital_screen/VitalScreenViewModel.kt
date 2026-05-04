@@ -202,6 +202,11 @@ class VitalScreenViewModel @Inject constructor(
 
     fun shouldShowPulseReferral(option: String?): Boolean = mapPulseOptionToValue(option)?.let { it < 60 || it > 90 } == true
 
+
+
+
+
+
     fun shouldShowBpReferral(bpSystolic: String?, bpDiastolic: String?): Boolean {
         val systolic = bpSystolic?.trim()?.toIntOrNull()
         val diastolic = bpDiastolic?.trim()?.toIntOrNull()
@@ -255,15 +260,10 @@ class VitalScreenViewModel @Inject constructor(
     }
 
     private fun getDefaultReferralTests(ben: BenRegCache?): List<String> {
-        val isUnderFive = ben?.let {
-            when (it.ageUnit?.name) {
-                "YEARS" -> it.age <= 5
-                null -> false
-                else -> true
-            }
-        } == true
-        val isPregnant = ben?.genDetails?.reproductiveStatus?.contains("preg", ignoreCase = true) == true
-        return if (isUnderFive && isPregnant) {
+        val reproductiveStatus = ben?.genDetails?.reproductiveStatus
+        val isPregnant = ben?.genDetails?.reproductiveStatusId == 1 ||
+            reproductiveStatus.equals("Yes", ignoreCase = true)
+        return if (isPregnant) {
             listOf("True NAT")
         } else {
             listOf("Digital Chest X-ray")

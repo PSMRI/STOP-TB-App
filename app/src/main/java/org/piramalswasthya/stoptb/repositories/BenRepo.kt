@@ -220,7 +220,7 @@ class BenRepo @Inject constructor(
         ben.isDraft = false
     }
 
-    suspend fun persistRecord(ben: BenRegCache) {
+    suspend fun persistRecord(ben: BenRegCache, updateIfExists: Boolean = false) {
         withContext(Dispatchers.IO) {
 
             val originalImagePath = ben.userImage
@@ -263,7 +263,11 @@ class BenRepo @Inject constructor(
                 }
             }
             ben.userImage = finalImagePath
-            benDao.upsert(ben)
+            if (updateIfExists && benDao.getBen(ben.beneficiaryId) != null) {
+                benDao.updateBen(ben)
+            } else {
+                benDao.upsert(ben)
+            }
         }
     }
 

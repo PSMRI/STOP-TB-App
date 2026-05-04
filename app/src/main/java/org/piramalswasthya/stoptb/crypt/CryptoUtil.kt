@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.crypt
 
+import android.os.Build
 import android.util.Base64
 import org.piramalswasthya.stoptb.utils.KeyUtils
 import java.util.Random
@@ -16,12 +17,17 @@ class CryptoUtil {
     private val iterationCount = 1989
     private val passPhrase = KeyUtils.encryptedPassKey()
 
-    private fun generateKey(
-        salt: String,
-    ): ByteArray {
+    private fun generateKey(salt: String): ByteArray {
         val saltBytes = hexStringToByteArray(salt)
         val keySpec = PBEKeySpec(passPhrase.toCharArray(), saltBytes, iterationCount, keySize)
-        val secretKeyFactory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512")
+
+        val algorithm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            "PBKDF2WithHmacSHA512"
+        } else {
+            "PBKDF2WithHmacSHA1"
+        }
+
+        val secretKeyFactory = SecretKeyFactory.getInstance(algorithm)
         val secretKey = secretKeyFactory.generateSecret(keySpec)
         return secretKey.encoded
     }
@@ -58,7 +64,6 @@ class CryptoUtil {
 
         return salt + iv + ciphertext
     }
-
 
     private fun hexStringToByteArray(hexString: String): ByteArray {
         val len = hexString.length

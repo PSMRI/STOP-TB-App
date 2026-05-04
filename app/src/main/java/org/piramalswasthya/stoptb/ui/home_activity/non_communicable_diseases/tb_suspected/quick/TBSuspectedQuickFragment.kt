@@ -75,7 +75,7 @@ class TBSuspectedQuickFragment : Fragment() {
                 TBSuspectedQuickViewModel.State.SAVE_SUCCESS -> {
                     Toast.makeText(
                         requireContext(),
-                        getString(R.string.tb_tracking_submitted),
+                        getString(R.string.diagnostics_submitted),
                         Toast.LENGTH_SHORT
                     ).show()
                     if (!viewModel.viewOnly) {
@@ -128,17 +128,21 @@ class TBSuspectedQuickFragment : Fragment() {
                 is HomeActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.tb_suspected_quick_title)
-                )
+                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
                 is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.tb_suspected_quick_title)
-                )
+                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
             }
         }
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
+        if (viewModel.autoFlow) {
+            (activity as? HomeActivity)?.setToolbarNavigationVisible(true)
+            (activity as? VolunteerActivity)?.setToolbarNavigationVisible(true)
+        }
         _binding = null
     }
 }

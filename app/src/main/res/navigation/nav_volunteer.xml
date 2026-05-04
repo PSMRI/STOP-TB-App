@@ -119,6 +119,10 @@
             android:name="viewOnly"
             android:defaultValue="false"
             app:argType="boolean" />
+        <argument
+            android:name="autoFlow"
+            android:defaultValue="false"
+            app:argType="boolean" />
     </fragment>
 
     <fragment
@@ -260,13 +264,16 @@
     <fragment
         android:id="@+id/TBSuspectedQuickFragment"
         android:name="org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.tb_suspected.quick.TBSuspectedQuickFragment"
-        android:label="@string/tb_suspected_quick_title"
         tools:layout="@layout/fragment_tb_suspected_quick">
         <argument
             android:name="benId"
             app:argType="long" />
         <argument
             android:name="viewOnly"
+            android:defaultValue="false"
+            app:argType="boolean" />
+        <argument
+            android:name="autoFlow"
             android:defaultValue="false"
             app:argType="boolean" />
     </fragment>

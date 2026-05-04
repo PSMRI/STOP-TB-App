@@ -334,6 +334,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
         if (dateOfReg.value == null) dateOfReg.value = getCurrentDateString()
         contactNumber.value = familyHeadPhoneNo?.toString()
+        if (mobileNoOfRelation.value.isNullOrBlank()) {
+            mobileNoOfRelation.value = mobileNoOfRelation.entries?.firstOrNull()
+        }
         villageNames?.let { villageHamlet.entries = it }
         villageHamlet.value = villageName ?: villageNames?.firstOrNull() ?: ""
         val resolvedSubCentre = subCentreName?.takeIf { it.isNotBlank() } ?: ""

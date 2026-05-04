@@ -9,11 +9,16 @@ import com.google.android.material.tabs.TabLayoutMediator
 import dagger.hilt.android.AndroidEntryPoint
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.VolunteerPagerAdapter
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentHomeBinding
+import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class VolunteerHomeFragment : Fragment() {
+    @Inject
+    lateinit var pref: PreferenceDao
 
     private var _binding: FragmentHomeBinding? = null
     private val binding: FragmentHomeBinding
@@ -48,11 +53,20 @@ class VolunteerHomeFragment : Fragment() {
         activity?.let {
             (it as VolunteerActivity).updateActionBar(
                 R.drawable.ic_home,
-                getString(R.string.home)
+                getHomeToolbarTitle()
             )
             it.addClickListenerToHomepageActionBarTitle()
         }
         binding.vp2Home.setCurrentItem(1, false)
+    }
+
+    private fun getHomeToolbarTitle(): String {
+        val village = pref.getLocationRecord()?.village ?: return getString(R.string.home)
+        return when (pref.getCurrentLanguage()) {
+            Languages.ENGLISH -> village.name
+            Languages.HINDI -> village.nameHindi ?: village.name
+            Languages.ASSAMESE -> village.nameAssamese ?: village.name
+        }
     }
 
     override fun onStop() {

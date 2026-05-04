@@ -113,7 +113,7 @@ class ServiceLocationActivity : AppCompatActivity() {
                 viewModel.saveCurrentLocation()
                 finish()
                 val targetClass = if (intent.getBooleanExtra("fromVolunteer", false))
-                    VolunteerActivity::class.java else HomeActivity::class.java
+                    VolunteerActivity::class.java else VolunteerActivity ::class.java
                 startActivity(Intent(this@ServiceLocationActivity, targetClass))
             } else
                 incompleteLocationAlert.show()

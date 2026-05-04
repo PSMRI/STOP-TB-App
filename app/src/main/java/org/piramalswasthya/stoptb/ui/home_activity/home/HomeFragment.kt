@@ -21,10 +21,6 @@ import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.HomePagerAdapter
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentHomeBinding
-import org.piramalswasthya.stoptb.helpers.Languages
-
-import org.piramalswasthya.stoptb.helpers.Languages.ASSAMESE
-import org.piramalswasthya.stoptb.helpers.Languages.ENGLISH
 import org.piramalswasthya.stoptb.repositories.dynamicRepo.FormRepository
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.work.PullFromAmritWorker
@@ -181,16 +177,11 @@ class HomeFragment : Fragment() {
         super.onStart()
         (activity as HomeActivity?)?.let { homeActivity ->
             homeActivity.addClickListenerToHomepageActionBarTitle()
-            viewModel.locationRecord?.village?.let {
-                homeActivity.updateActionBar(
-                    R.drawable.ic_home, when (viewModel.currentLanguage) {
-                        ENGLISH -> it.name
-                        Languages.HINDI -> it.nameHindi ?: it.name
-                        ASSAMESE -> it.nameAssamese ?: it.name
-                    }
-                )
-                homeActivity.setHomeMenuItemVisibility(false)
-            }
+            homeActivity.updateActionBar(
+                R.drawable.ic_home,
+                viewModel.homeToolbarTitle ?: getString(R.string.home)
+            )
+            homeActivity.setHomeMenuItemVisibility(false)
             binding.vp2Home.setCurrentItem(1, false)
         }
     }

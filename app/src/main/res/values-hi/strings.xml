@@ -621,8 +621,8 @@
         <item>पीएचसी</item>
         <item>SC</item>
     </string-array>
-    <string name="vital_screen">वाइटल स्क्रीन</string>
-    <string name="vital_screen_placeholder">लाभार्थी आईडी %1$d के लिए वाइटल स्क्रीन</string>
+    <string name="vital_screen">सामान्य परीक्षण</string>
+    <string name="vital_screen_placeholder">लाभार्थी आईडी %1$d के लिए वाइटल्स और मानवमिति</string>
     <string name="vital_details">वाइटल विवरण</string>
     <string name="temperature">तापमान</string>
     <string name="pulse_rate">नाड़ी दर</string>
@@ -658,6 +658,7 @@
     <string name="diastolic_bp_mmhg">डायस्टोलिक ब्लड प्रेशर (mm Hg)</string>
     <string name="random_blood_sugar">रैंडम ब्लड शुगर</string>
     <string name="vital_referral_reason">वाइटल स्क्रीनिंग रेफरल</string>
+    <string name="diagnostics_submitted">Diagnostics submitted</string>
 </resources>
 
 

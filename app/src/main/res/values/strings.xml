@@ -82,6 +82,7 @@
     <string name="type_of_tb_case">Type of TB case?</string>
     <string name="reason_for_suspicion">Reason for suspicion</string>
     <string name="has_symptoms">Does the patient have symptoms?</string>
+    <string name="tb_asymptomatic_symptoms">TB screening for asymptomatic beneficiaries</string>
     <string name="is_chest_xray_done">Is the TB Chest X-Ray Test done?</string>
     <string name="chest_xray_result">Chest X-Ray Test Result</string>
     <string name="referral_facility">Referral Facility</string>
@@ -157,6 +158,15 @@
     <string-array name="yes_no_options">
         <item>Yes</item>
         <item>No</item>
+    </string-array>
+
+    <string-array name="temp_array">
+        <item>Item 1</item>
+        <item>Item 2</item>
+        <item>Item 3</item>
+        <item>Item 4</item>
+        <item>Item 5</item>
+        <item>Item 6</item>
     </string-array>
 
     <string-array name="mdsr_cause_of_death_type">
@@ -938,9 +948,9 @@
     <string name="discard">Discard</string>
     <string name="stay">Stay</string>
 
-    <string name="vital_screen">Vital Screen</string>
-    <string name="vital_screen_placeholder">Vital Screen for beneficiary ID: %1$d</string>
-    <string name="vital_details">Vital Details</string>
+    <string name="vital_screen">General Examination</string>
+    <string name="vital_screen_placeholder">Vitals and Anthropometric for beneficiary ID: %1$d</string>
+    <string name="vital_details">Vitals (Optional)</string>
     <string name="temperature">Temperature</string>
     <string name="pulse_rate">Pulse Rate</string>
     <string name="bp_systolic">BP Systolic</string>
@@ -950,8 +960,8 @@
     <string name="rbs">RBS</string>
     <string name="height">Height</string>
     <string name="weight">Weight</string>
-    <string name="bmi">BMI</string>
-    <string name="anthropometry">Anthropometry</string>
+    <string name="bmi">BMI (kg/m²)</string>
+    <string name="anthropometry">Anthropometric (Optional)</string>
     <string name="invalid_height_weight">Enter valid height and weight</string>
     <string name="vitals_saved_successfully">Vitals saved successfully.</string>
     <string name="vitals_save_failed">Unable to save vitals.</string>
@@ -959,9 +969,9 @@
     <string name="height_cms">Height (cms)</string>
     <string name="temperature_degree_fahrenheit">Temperature (Degree Fahrenheit)</string>
     <string name="pulse_rate_bpm">Pulse Rate (beats per minute)</string>
-    <string name="systolic_bp_mmhg">Systolic Blood Pressure (mm Hg)</string>
-    <string name="diastolic_bp_mmhg">Diastolic Blood Pressure (mm Hg)</string>
-    <string name="random_blood_sugar">Random Blood Sugar</string>
+    <string name="systolic_bp_mmhg">SBP (mm Hg)</string>
+    <string name="diastolic_bp_mmhg">DBP (mm Hg)</string>
+    <string name="random_blood_sugar">RBS (mg/dl)</string>
     <string name="referred_for">Referred for</string>
     <string name="refer_to_hwc_alert">Refer to Health and Wellness Centre</string>
     <string name="vital_referral_reason">Vital Screening Referral</string>
@@ -973,6 +983,7 @@
     <string name="pulse_option_60_70">60-70</string>
     <string name="pulse_option_70_80">70-80</string>
     <string name="pulse_option_above_90">More than 90</string>
+    <string name="diagnostics_submitted">Diagnostics submitted</string>
     <string-array name="vital_temperature_options">
         <item>@string/temperature_option_97_5</item>
         <item>@string/temperature_option_98_5</item>
