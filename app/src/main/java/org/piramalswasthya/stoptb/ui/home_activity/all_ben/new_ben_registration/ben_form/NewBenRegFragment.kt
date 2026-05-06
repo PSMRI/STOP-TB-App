@@ -21,6 +21,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.FaceDetection
+import com.google.mlkit.vision.face.FaceDetectorOptions
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
@@ -56,14 +59,16 @@ class NewBenRegFragment : Fragment() {
 
     // ─── Camera ──────────────────────────────────────────────────────────
     private var latestTmpUri: Uri? = null
+    private var continuePreviewAfterPhoto = false
     private val takePicture = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.TakePicture()
     ) { success ->
         if (success) {
             latestTmpUri?.let { uri ->
-                viewModel.setImageUriToFormElement(uri)
-                binding.form.rvInputForm.adapter?.notifyItemChanged(0)
+                validateFaceAndAcceptPhoto(uri)
             }
+        } else {
+            continuePreviewAfterPhoto = false
         }
     }
 
@@ -150,7 +155,9 @@ class NewBenRegFragment : Fragment() {
 
         // Submit button
         binding.btnSubmit.setOnClickListener {
-            if (validateCurrentPage()) showPreview()
+            if (validateCurrentPage()) {
+                handlePhotoReminderBeforePreview()
+            }
         }
 
         // Cancel button hidden — discard handled by back press
@@ -341,6 +348,26 @@ class NewBenRegFragment : Fragment() {
         }
     }
 
+    private fun handlePhotoReminderBeforePreview() {
+        if (viewModel.hasBeneficiaryPhoto()) {
+            showPreview()
+            return
+        }
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setMessage(getString(R.string.do_you_like_to_take_photo))
+            .setPositiveButton(android.R.string.yes) { dialog, _ ->
+                dialog.dismiss()
+                continuePreviewAfterPhoto = true
+                takeImage()
+            }
+            .setNegativeButton(android.R.string.no) { dialog, _ ->
+                dialog.dismiss()
+                showPreview()
+            }
+            .show()
+    }
+
     // ─── Validation ──────────────────────────────────────────────────────
     private fun validateCurrentPage(): Boolean {
         val result = (binding.form.rvInputForm.adapter as? FormInputAdapter)?.validateInput(resources)
@@ -373,6 +400,68 @@ class NewBenRegFragment : Fragment() {
             latestTmpUri = getTmpFileUri()
             takePicture.launch(latestTmpUri)
         }
+    }
+
+    private fun validateFaceAndAcceptPhoto(uri: Uri) {
+        val image = runCatching { InputImage.fromFilePath(requireContext(), uri) }
+            .getOrElse {
+                Timber.e(it, "Unable to read captured beneficiary photo")
+                Toast.makeText(
+                    requireContext(),
+                    getString(R.string.unable_to_validate_photo),
+                    Toast.LENGTH_SHORT
+                ).show()
+                continuePreviewAfterPhoto = false
+                return
+            }
+
+        val detector = FaceDetection.getClient(
+            FaceDetectorOptions.Builder()
+                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                .build()
+        )
+
+        detector.process(image)
+            .addOnSuccessListener { faces ->
+                if (faces.isNotEmpty()) {
+                    viewModel.setImageUriToFormElement(uri)
+                    binding.form.rvInputForm.adapter?.notifyItemChanged(0)
+                    if (continuePreviewAfterPhoto) {
+                        continuePreviewAfterPhoto = false
+                        showPreview()
+                    }
+                } else {
+                    val shouldContinueAfterRetake = continuePreviewAfterPhoto
+                    continuePreviewAfterPhoto = false
+                    showFaceNotDetectedDialog(shouldContinueAfterRetake)
+                }
+            }
+            .addOnFailureListener {
+                Timber.e(it, "Beneficiary face detection failed")
+                Toast.makeText(
+                    requireContext(),
+                    getString(R.string.unable_to_validate_photo),
+                    Toast.LENGTH_SHORT
+                ).show()
+                continuePreviewAfterPhoto = false
+            }
+            .addOnCompleteListener {
+                detector.close()
+            }
+    }
+
+    private fun showFaceNotDetectedDialog(continueAfterRetake: Boolean) {
+        MaterialAlertDialogBuilder(requireContext())
+            .setMessage(getString(R.string.human_face_not_detected))
+            .setPositiveButton(getString(R.string.retake)) { dialog, _ ->
+                dialog.dismiss()
+                continuePreviewAfterPhoto = continueAfterRetake
+                takeImage()
+            }
+            .setNegativeButton(android.R.string.cancel) { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
     }
 
     private fun getTmpFileUri(): Uri {

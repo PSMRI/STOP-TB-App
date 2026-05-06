@@ -16,6 +16,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.fragment.NavHostFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.crashlytics.internal.common.CommonUtils
 import dagger.hilt.EntryPoint
@@ -35,6 +36,10 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class LoginActivity : AppCompatActivity() {
+
+    companion object {
+        const val EXTRA_OPEN_CAMP_CONNECT = "extra-open-camp-connect"
+    }
 
     @Inject
     lateinit var accountDeactivationManager: AccountDeactivationManager
@@ -76,6 +81,7 @@ class LoginActivity : AppCompatActivity() {
         setContentView(R.layout.activity_login)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         TapjackingProtectionHelper.enableTouchFiltering(this)
+        openCampConnectIfRequested()
         createSyncServiceNotificationChannel()
         requestNotificationPermission()
         if (!BuildConfig.DEBUG && isDeviceRootedOrEmulator()) {
@@ -88,6 +94,16 @@ class LoginActivity : AppCompatActivity() {
         }
 
         observeAccountDeactivation()
+    }
+
+    private fun openCampConnectIfRequested() {
+        if (!intent.getBooleanExtra(EXTRA_OPEN_CAMP_CONNECT, false)) return
+
+        val navHostFragment = supportFragmentManager
+            .findFragmentById(R.id.nav_host_fragment_login) as? NavHostFragment
+            ?: return
+
+        navHostFragment.navController.navigate(R.id.campModeConnectFragment)
     }
 
     private var deactivationDialog: AlertDialog? = null

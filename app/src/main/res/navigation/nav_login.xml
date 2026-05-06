@@ -16,7 +16,15 @@
         <action
             android:id="@+id/action_signInFragment_to_serviceLocationActivity"
             app:destination="@id/serviceLocationActivity" />
+        <action
+            android:id="@+id/action_signInFragment_to_campModeConnectFragment"
+            app:destination="@id/campModeConnectFragment" />
     </fragment>
+    <fragment
+        android:id="@+id/campModeConnectFragment"
+        android:name="org.piramalswasthya.stoptb.ui.login_activity.camp_mode.CampModeConnectFragment"
+        android:label="@string/camp_connect_title"
+        tools:layout="@layout/fragment_camp_mode_connect" />
     <activity
         android:id="@+id/homeActivity"
         android:name="org.piramalswasthya.stoptb.ui.home_activity.HomeActivity"

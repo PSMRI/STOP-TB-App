@@ -238,6 +238,8 @@ class NewBenRegViewModel @Inject constructor(
         dataset.setImageUriToFormElement(lastImageFormId, dpUri)
     }
 
+    fun hasBeneficiaryPhoto(): Boolean = dataset.hasBeneficiaryPhoto()
+
     fun updateValueByIdAndReturnListIndex(id: Int, value: String?): Int {
         dataset.setValueById(id, value)
         return dataset.getIndexById(id)

@@ -178,6 +178,36 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         return uriString?.let { Uri.parse(it) }
     }
 
+    fun setCampModeEnabled(enabled: Boolean) {
+        val key = context.getString(R.string.PREF_camp_mode_enabled)
+        pref.edit().putBoolean(key, enabled).commit()
+    }
+
+    fun isCampModeEnabled(): Boolean {
+        val key = context.getString(R.string.PREF_camp_mode_enabled)
+        return pref.getBoolean(key, false)
+    }
+
+    fun setCampHubUrl(url: String) {
+        val key = context.getString(R.string.PREF_camp_hub_url)
+        pref.edit().putString(key, url).commit()
+    }
+
+    fun getCampHubUrl(): String {
+        val key = context.getString(R.string.PREF_camp_hub_url)
+        return pref.getString(key, null) ?: "http://192.168.137.1:8080/"
+    }
+
+    fun setCampHubConnected(connected: Boolean) {
+        val key = context.getString(R.string.PREF_camp_hub_connected)
+        pref.edit().putBoolean(key, connected).commit()
+    }
+
+    fun isCampHubConnected(): Boolean {
+        val key = context.getString(R.string.PREF_camp_hub_connected)
+        return pref.getBoolean(key, false)
+    }
+
     fun savePublicKeyForAbha(publicKey: String) {
         val key = "AUTH_CERT"
         val editor = pref.edit()

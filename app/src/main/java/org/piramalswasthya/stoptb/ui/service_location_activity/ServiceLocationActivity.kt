@@ -53,7 +53,7 @@ class ServiceLocationActivity : AppCompatActivity() {
     private val incompleteLocationAlert by lazy {
         MaterialAlertDialogBuilder(this)
             .setTitle("Missing Detail")
-            .setMessage("At least one of the following is missing value:\n \n\tState\n\tDistrict\n\tBlock\n\tVillage")
+            .setMessage("At least one of the following is missing value:\n \n\tState\n\tDistrict\n\tBlock\n\tTU\n\tHealth Facility\n\tVillage")
             .setPositiveButton("Understood") { dialog, _ ->
                 dialog.dismiss()
             }
@@ -137,6 +137,22 @@ class ServiceLocationActivity : AppCompatActivity() {
                             isEnabled = false
                             setText(viewModel.blockList.first())
                         }
+                        binding.actvTuDropdown.apply {
+                            isEnabled = false
+                            setText(viewModel.selectedTuName)
+                            if (viewModel.tuList.size == 1) {
+                                setText(viewModel.tuList.first())
+                                viewModel.setTu(0)
+                            }
+                        }
+                        binding.actvHealthFacilityDropdown.apply {
+                            isEnabled = false
+                            setText(viewModel.selectedHealthFacilityName)
+                            if (viewModel.healthFacilityList.size == 1) {
+                                setText(viewModel.healthFacilityList.first())
+                                viewModel.setHealthFacility(0)
+                            }
+                        }
                         binding.actvVillageDropdown.apply {
                             setText(viewModel.selectedVillageName)
                             if (viewModel.villageList.size == 1) {
@@ -157,6 +173,8 @@ class ServiceLocationActivity : AppCompatActivity() {
         return !(binding.actvStateDropdown.text.isNullOrBlank() ||
                 binding.actvDistrictDropdown.text.isNullOrBlank() ||
                 binding.actvBlockDropdown.text.isNullOrBlank() ||
+                (viewModel.isTuRequired() && binding.actvTuDropdown.text.isNullOrBlank()) ||
+                (viewModel.isHealthFacilityRequired() && binding.actvHealthFacilityDropdown.text.isNullOrBlank()) ||
                 binding.actvVillageDropdown.text.isNullOrBlank())
 
     }

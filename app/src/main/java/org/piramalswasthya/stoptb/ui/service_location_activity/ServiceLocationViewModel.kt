@@ -41,6 +41,14 @@ class ServiceTypeViewModel @Inject constructor(
     val blockList: Array<String>
         get() = arrayOf(blockDropdownEntry)
 
+    private lateinit var tuDropdownEntries: Array<String>
+    val tuList: Array<String>
+        get() = tuDropdownEntries
+
+    private lateinit var healthFacilityDropdownEntries: Array<String>
+    val healthFacilityList: Array<String>
+        get() = healthFacilityDropdownEntries
+
     private lateinit var villageDropdownEntries: Array<String>
     val villageList: Array<String>
         get() = villageDropdownEntries
@@ -52,12 +60,18 @@ class ServiceTypeViewModel @Inject constructor(
     private var _selectedVillage: LocationEntity? = null
     val selectedVillage: LocationEntity?
         get() = _selectedVillage
+    private var _selectedTu: LocationEntity? = null
+    val selectedTu: LocationEntity?
+        get() = _selectedTu
+    private var _selectedHealthFacility: LocationEntity? = null
+    val selectedHealthFacility: LocationEntity?
+        get() = _selectedHealthFacility
     val selectedVillageName: String?
-        get() = when (pref.getCurrentLanguage()) {
-            ENGLISH -> selectedVillage?.name
-            Languages.HINDI -> selectedVillage?.nameHindi ?: selectedVillage?.name
-            ASSAMESE -> selectedVillage?.nameAssamese ?: selectedVillage?.name
-        }
+        get() = selectedVillage?.localizedName()
+    val selectedTuName: String?
+        get() = selectedTu?.localizedName()
+    val selectedHealthFacilityName: String?
+        get() = selectedHealthFacility?.localizedName()
 
 
     private val _state = MutableLiveData(State.LOADING)
@@ -67,6 +81,10 @@ class ServiceTypeViewModel @Inject constructor(
 
     private var currentLocation: LocationRecord? = null
     private lateinit var user: User
+    private val tus: List<LocationEntity>
+        get() = user.tus.orEmpty()
+    private val healthFacilities: List<LocationEntity>
+        get() = user.healthFacilities.orEmpty()
 
     init {
         viewModelScope.launch {
@@ -75,11 +93,16 @@ class ServiceTypeViewModel @Inject constructor(
                 _userName = user.name
                 currentLocation = pref.getLocationRecord()
                 _selectedVillage = currentLocation?.village
+                _selectedTu = currentLocation?.tu
+                _selectedHealthFacility = currentLocation?.healthFacility
                 when (pref.getCurrentLanguage()) {
                     ENGLISH -> {
                         stateDropdownEntry = user.state.name
                         districtDropdownEntry = user.district.name
                         blockDropdownEntry = user.block.name
+                        tuDropdownEntries = tus.map { it.name }.toTypedArray()
+                        healthFacilityDropdownEntries =
+                            healthFacilities.map { it.name }.toTypedArray()
                         villageDropdownEntries = user.villages.map { it.name }.toTypedArray()
 
                     }
@@ -91,6 +114,10 @@ class ServiceTypeViewModel @Inject constructor(
                             user.district.let { it.nameHindi ?: it.name }
                         blockDropdownEntry =
                             user.block.let { it.nameHindi ?: it.name }
+                        tuDropdownEntries =
+                            tus.map { it.nameHindi ?: it.name }.toTypedArray()
+                        healthFacilityDropdownEntries =
+                            healthFacilities.map { it.nameHindi ?: it.name }.toTypedArray()
                         villageDropdownEntries =
                             user.villages.map { it.nameHindi ?: it.name }.toTypedArray()
                     }
@@ -102,6 +129,10 @@ class ServiceTypeViewModel @Inject constructor(
                             user.district.let { it.nameAssamese ?: it.name }
                         blockDropdownEntry =
                             user.block.let { it.nameAssamese ?: it.name }
+                        tuDropdownEntries =
+                            tus.map { it.nameAssamese ?: it.name }.toTypedArray()
+                        healthFacilityDropdownEntries =
+                            healthFacilities.map { it.nameAssamese ?: it.name }.toTypedArray()
                         villageDropdownEntries =
                             user.villages.map { it.nameAssamese ?: it.name }.toTypedArray()
                     }
@@ -125,16 +156,37 @@ class ServiceTypeViewModel @Inject constructor(
 
     }
 
+    fun setTu(i: Int) {
+        _selectedTu = tus[i]
+    }
+
+    fun setHealthFacility(i: Int) {
+        _selectedHealthFacility = healthFacilities[i]
+    }
+
+    fun isTuRequired(): Boolean = tus.isNotEmpty()
+
+    fun isHealthFacilityRequired(): Boolean = healthFacilities.isNotEmpty()
+
     fun saveCurrentLocation() {
         val locationRecord = LocationRecord(
-            LocationEntity(1, "India"),
-            user.state,
-            user.district,
-            user.block,
-            selectedVillage!!
+            country = LocationEntity(1, "India"),
+            state = user.state,
+            district = user.district,
+            block = user.block,
+            tu = selectedTu,
+            healthFacility = selectedHealthFacility,
+            village = selectedVillage!!
         )
         pref.saveLocationRecord(locationRecord)
     }
 
+    private fun LocationEntity.localizedName(): String {
+        return when (pref.getCurrentLanguage()) {
+            ENGLISH -> name
+            Languages.HINDI -> nameHindi ?: name
+            ASSAMESE -> nameAssamese ?: name
+        }
+    }
 
 }

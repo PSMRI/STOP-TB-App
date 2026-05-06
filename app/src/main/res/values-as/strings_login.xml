@@ -13,6 +13,12 @@
     <string name="cb_login_remember_me_text">মোক মনত পেলাওক</string>
     <string name="btn_login_forgot_password_text">পাচৱৰ্ড পাহৰিলে??</string>
     <string name="btn_login_text">লগইন কৰক</string>
+    <string name="camp_mode">কেম্প মোড</string>
+    <string name="camp_hub_checking">কেম্প হাব পৰীক্ষা কৰি আছে...</string>
+    <string name="camp_hub_connected">কেম্প হাব সংযুক্ত</string>
+    <string name="camp_hub_not_connected">কেম্প হাব সংযুক্ত নহয়</string>
+    <string name="camp_hub_retry">পুনৰ চেষ্টা কৰক</string>
+    <string name="camp_hub_login_blocked">কেম্প হাব সংযুক্ত নহয়। অনুগ্ৰহ কৰি কেম্প ৱাই-ফাইৰ সৈতে সংযোগ কৰি পুনৰ চেষ্টা কৰক।</string>
     <string name="login_diff_user">আপুনি আগতে ব্যৱহাৰকাৰীৰ নাম: @username ৰ সৈতে @asha হিচাপে লগ ইন কৰিছে, আপুনি আন এজন ব্যৱহাৰকাৰীৰ সৈতে লগ ইন কৰিব বিচাৰেনে?</string>
     <string name="unsync_record_count">Hello! there are @count un-sync records, please wait till all records are synced.</string>
     <string name="account_deactivated_title">একাউণ্ট নিষ্ক্ৰিয়</string>
@@ -22,4 +28,15 @@
     <string name="cd_piramal">পীৰামল ল\'গ\'</string>
     <string name="pwr_by_text">দ্বাৰা পৰিচালিত\n <b>পীৰামল ফাউণ্ডেচন</b></string>
 
+    <string name="camp_hub_url_hint">কেম্প হাব URL</string>
+    <string name="camp_connect_title">কেম্প হাব সংযোগ কৰক</string>
+    <string name="camp_connect_subtitle">কেম্প মোড সক্ৰিয় কৰাৰ আগতে লেপটপ হাবৰ সৈতে সংযোগ কৰক।</string>
+    <string name="camp_hub_scan">QR স্কেন কৰক</string>
+    <string name="camp_hub_connect">সংযোগ কৰক</string>
+    <string name="camp_hub_scan_failed">QR কোড পঢ়িব পৰা নহল। পুনৰ চেষ্টা কৰক বা URL মেনুৱেলি লিখক।</string>
+    <string name="camp_hub_scan_empty">QR কোড পোৱা নহল। পুনৰ চেষ্টা কৰক।</string>
+    <string name="camp_back">পিছলৈ</string>
+    <string name="camp_scan_qr_title">লেপটপ হাবৰ QR স্কেন কৰক</string>
+    <string name="camp_scan_qr_subtitle">এই ডিভাইচটো কেম্প নেটৱৰ্কৰ সৈতে সংযোগ কৰাৰ সৰ্বাধিক দ্ৰুত উপায়</string>
+    <string name="camp_manual_url_title">বা হাব URL মেনুৱেলি লিখক</string>
 </resources>

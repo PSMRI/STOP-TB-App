@@ -262,6 +262,8 @@ data class User(
     val state: LocationEntity,
     val district: LocationEntity,
     val block: LocationEntity,
+    val tus: List<LocationEntity>? = emptyList(),
+    val healthFacilities: List<LocationEntity>? = emptyList(),
     val villages: List<LocationEntity>,
     val subCentre: String? = null
 )
@@ -290,9 +292,14 @@ data class UserDetailsInResponse(
     val blockId: Int,
     val blockName: String,
     val villageId: String,
-    val villageName: String
+    val villageName: String,
+    val tuId: String? = null,
+    val tuName: String? = null,
+    val healthFacilityId: String? = null,
+    val healthFacilityName: String? = null
 ) {
     fun toUser(password: String, subCentre: String? = null): User {
+        val healthFacilityList = getLocationEntityList(healthFacilityId, healthFacilityName)
         return User(
             userId = userId,
             name = name,
@@ -303,17 +310,24 @@ data class UserDetailsInResponse(
             state = LocationEntity(id = stateId, name = stateName),
             district = LocationEntity(id = 1, name = workingDistrictName.toString()),
             block = LocationEntity(id = blockId, name = blockName),
-            villages = getLocationEntityListForVillage(villageId, villageName),
+            tus = getLocationEntityList(tuId, tuName),
+            healthFacilities = healthFacilityList.ifEmpty {
+                subCentre?.takeIf { it.isNotBlank() }?.let {
+                    listOf(LocationEntity(id = 0, name = it))
+                } ?: emptyList()
+            },
+            villages = getLocationEntityList(villageId, villageName),
             subCentre = subCentre
         )
     }
 
-    private fun getLocationEntityListForVillage(
-        villageId: String,
-        villageName: String
+    private fun getLocationEntityList(
+        locationId: String?,
+        locationName: String?
     ): List<LocationEntity> {
-        val idList = villageId.split(",").map { it.toInt() }
-        val nameList = villageName.split(",")
+        if (locationId.isNullOrBlank() || locationName.isNullOrBlank()) return emptyList()
+        val idList = locationId.split(",").mapNotNull { it.trim().toIntOrNull() }
+        val nameList = locationName.split(",").map { it.trim() }
         val locationEntityList = mutableListOf<LocationEntity>()
         if (idList.size == nameList.size) {
             for (index: Int in idList.indices) {

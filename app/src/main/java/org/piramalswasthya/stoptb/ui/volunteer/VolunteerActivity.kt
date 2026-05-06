@@ -9,6 +9,7 @@ import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.MotionEvent
+import android.view.View
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.viewModels
@@ -154,6 +155,10 @@ class VolunteerActivity : AppCompatActivity() {
         setUpActionBar()
         setUpNavHeader()
         setUpMenu()
+        binding.tvCampHubOffline.setOnClickListener {
+            openCampHubConnect()
+        }
+        refreshCampHubOfflineBanner()
 
         binding.versionName.text = "APK Version ${BuildConfig.VERSION_NAME}"
 
@@ -179,6 +184,7 @@ class VolunteerActivity : AppCompatActivity() {
         if (!pref.isFullPullComplete) {
             WorkerUtils.triggerAmritPullWorker(this)
         }
+        WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
     }
 
     private fun setUpMenu() {
@@ -329,6 +335,20 @@ class VolunteerActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         window.decorView.alpha = 1f
+        refreshCampHubOfflineBanner()
+        WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
+    }
+
+    private fun refreshCampHubOfflineBanner() {
+        binding.tvCampHubOffline.visibility =
+            if (pref.isCampModeEnabled() && !pref.isCampHubConnected()) View.VISIBLE else View.GONE
+    }
+
+    private fun openCampHubConnect() {
+        startActivity(
+            Intent(this, LoginActivity::class.java)
+                .putExtra(LoginActivity.EXTRA_OPEN_CAMP_CONNECT, true)
+        )
     }
 
     @Deprecated("Deprecated in Java")

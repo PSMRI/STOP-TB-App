@@ -10,6 +10,8 @@
     <string name="service_type_dd_state_text">State</string>
     <string name="service_type_dd_district_text">District</string>
     <string name="service_type_dd_block_text">Block</string>
+    <string name="service_type_dd_tu_text">TU</string>
+    <string name="service_type_dd_health_facility_text">Health Facility</string>
     <string name="service_type_dd_village_text">Village</string>
     <string name="btn_continue_text">Continue</string>
     <string name="menu_home">Home</string>

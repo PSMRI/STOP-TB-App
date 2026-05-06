@@ -13,6 +13,12 @@
     <string name="cb_login_remember_me_text">मुझे याद रखना</string>
     <string name="btn_login_forgot_password_text">पासवर्ड भूल गए?</string>
     <string name="btn_login_text">लॉग इन करें</string>
+    <string name="camp_mode">कैंप मोड</string>
+    <string name="camp_hub_checking">कैंप हब जांच रहे हैं...</string>
+    <string name="camp_hub_connected">कैंप हब जुड़ा हुआ है</string>
+    <string name="camp_hub_not_connected">कैंप हब जुड़ा नहीं है</string>
+    <string name="camp_hub_retry">फिर से प्रयास करें</string>
+    <string name="camp_hub_login_blocked">कैंप हब जुड़ा नहीं है। कृपया कैंप वाई-फाई से जुड़ें और फिर प्रयास करें।</string>
     <string name="login_diff_user">आप पहले @username के रूप में @ मितानिन से लॉगिन हैं, क्या आप किसी और यूज़र से लॉगिन करना चाहते हैं?</string>
     <string name="unsync_record_count">नमस्ते! @count रिकॉर्ड अभी सिंक नहीं हुए हैं, कृपया सभी रिकॉर्ड सिंक होने तक प्रतीक्षा करें</string>
     <string name="account_deactivated_title">खाता निष्क्रिय</string>
@@ -22,4 +28,15 @@
     <string name="cd_piramal">पीरामल लोगो</string>
     <string name="pwr_by_text">द्वारा संचालित\n <b>पीरामल फाउंडेशन</b></string>
 
+    <string name="camp_hub_url_hint">कैंप हब URL</string>
+    <string name="camp_connect_title">कैंप हब कनेक्ट करें</string>
+    <string name="camp_connect_subtitle">कैंप मोड चालू करने से पहले लैपटॉप हब से कनेक्ट करें।</string>
+    <string name="camp_hub_scan">QR स्कैन करें</string>
+    <string name="camp_hub_connect">कनेक्ट करें</string>
+    <string name="camp_hub_scan_failed">QR कोड पढ़ा नहीं जा सका। कृपया फिर से प्रयास करें या URL मैन्युअल दर्ज करें।</string>
+    <string name="camp_hub_scan_empty">QR कोड नहीं मिला। कृपया फिर से प्रयास करें।</string>
+    <string name="camp_back">वापस</string>
+    <string name="camp_scan_qr_title">लैपटॉप हब का QR स्कैन करें</string>
+    <string name="camp_scan_qr_subtitle">इस डिवाइस को कैंप नेटवर्क से जोड़ने का सबसे तेज तरीका</string>
+    <string name="camp_manual_url_title">या हब URL मैन्युअल दर्ज करें</string>
 </resources>

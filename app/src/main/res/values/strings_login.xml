@@ -15,6 +15,24 @@
     <string name="cb_login_remember_me_text">Remember me</string>
     <string name="btn_login_forgot_password_text">Forgot Password?</string>
     <string name="btn_login_text">Login</string>
+    <string name="camp_mode">Camp Mode</string>
+    <string name="camp_hub_checking">Checking Camp Hub...</string>
+    <string name="camp_hub_connected">Camp Hub Connected</string>
+    <string name="camp_hub_not_connected">Camp Hub Not Connected</string>
+    <string name="camp_hub_url_hint">Camp Hub URL</string>
+    <string name="camp_hub_retry">Retry</string>
+    <string name="camp_hub_login_blocked">Camp Hub is not connected. Please retry or connect to Camp Wi-Fi.</string>
+    <string name="camp_connect_title">Connect Camp Hub</string>
+    <string name="camp_connect_subtitle">Connect to the laptop hub before enabling Camp Mode.</string>
+    <string name="camp_hub_scan">Scan QR</string>
+    <string name="camp_hub_connect">Connect</string>
+    <string name="camp_hub_scan_failed">Unable to read QR code. Please try again or enter URL manually.</string>
+    <string name="camp_hub_scan_empty">No QR code found. Please try again.</string>
+    <string name="camp_back">Back</string>
+    <string name="camp_hub_offline" translatable="false">Camp Hub Offline - Tap to reconnect &gt;</string>
+    <string name="camp_scan_qr_title">Scan the QR from laptop hub</string>
+    <string name="camp_scan_qr_subtitle">Fastest way to connect this device to camp network</string>
+    <string name="camp_manual_url_title">Or enter hub URL manually</string>
     <string name="pwr_by_text" translatable="false">Powered by\n <b>Piramal Foundation</b></string>
     <string name="login_diff_user">You are previously logged in with Username: @username as @asha, Do you want to Log in with another User?</string>
     <string name="unsync_record_count">Hello! there are @count un-sync records, please wait till all records are synced.</string>

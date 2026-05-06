@@ -29,6 +29,10 @@
     <string name="nbr_gender">লিংগ</string>
     <string name="nbr_image">ফটো</string>
     <string name="nbr_image_sub">কেমেৰা ব্যৱহাৰ কৰিবলৈ টিপক</string>
+    <string name="do_you_like_to_take_photo">আপুনি ফটো তুলিব বিচাৰে নেকি</string>
+    <string name="human_face_not_detected">মানুহৰ মুখ চিনাক্ত হোৱা নাই। অনুগ্ৰহ কৰি ফটো পুনৰ তুলক।</string>
+    <string name="unable_to_validate_photo">ফটো যাচাই কৰিব পৰা নহল। অনুগ্ৰহ কৰি পুনৰ চেষ্টা কৰক।</string>
+    <string name="retake">পুনৰ লওক</string>
     <string name="nbr_dor">পঞ্জীয়নৰ তাৰিখ</string>
     <string name="nbr_nb_first_name">প্ৰথম নাম</string>
     <string name="nbr_nb_last_name">শেষ নাম / উপনাম</string>

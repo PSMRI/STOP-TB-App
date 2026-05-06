@@ -13,6 +13,10 @@ data class LocationRecord(
     val block: LocationEntity,
     @Embedded(prefix = "village_")
     val village: LocationEntity,
+    @Embedded(prefix = "tu_")
+    val tu: LocationEntity? = null,
+    @Embedded(prefix = "healthFacility_")
+    val healthFacility: LocationEntity? = null,
 ) : java.io.Serializable
 
 data class LocationEntity(

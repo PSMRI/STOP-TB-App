@@ -31,6 +31,10 @@
     <string name="nbr_abortion_image">Abortion Discharge </string>
     <string name="nbr_image_cam_gal">Tap to use camera/Gallery</string>
     <string name="nbr_image_sub">Tap to use camera</string>
+    <string name="do_you_like_to_take_photo">Do you like to Take Photo</string>
+    <string name="human_face_not_detected">Human face not detected. Please retake photo.</string>
+    <string name="unable_to_validate_photo">Unable to validate photo. Please try again.</string>
+    <string name="retake">Retake</string>
     <string name="nbr_dor">Date of Registration</string>
     <string name="vhnd_date">VHND Date</string>
     <string name="vhnc_date">VHSNC meeting Date</string>

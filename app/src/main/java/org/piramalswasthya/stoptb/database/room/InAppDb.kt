@@ -76,7 +76,7 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.NCDReferalFormResponseJson
         VitalCache::class
     ],
     views = [BenBasicCache::class],
-    version = 4, exportSchema = false
+    version = 5, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -178,6 +178,35 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                addLocationRecordExtraColumns(database, "BENEFICIARY")
+                addLocationRecordExtraColumns(database, "HOUSEHOLD")
+            }
+        }
+
+        private fun addLocationRecordExtraColumns(
+            database: SupportSQLiteDatabase,
+            tableName: String
+        ) {
+            val columns = listOf(
+                "loc_tu_id INTEGER DEFAULT NULL",
+                "loc_tu_name TEXT DEFAULT NULL",
+                "loc_tu_nameHindi TEXT DEFAULT NULL",
+                "loc_tu_nameAssamese TEXT DEFAULT NULL",
+                "loc_healthFacility_id INTEGER DEFAULT NULL",
+                "loc_healthFacility_name TEXT DEFAULT NULL",
+                "loc_healthFacility_nameHindi TEXT DEFAULT NULL",
+                "loc_healthFacility_nameAssamese TEXT DEFAULT NULL"
+            )
+            columns.forEach { columnDefinition ->
+                val columnName = columnDefinition.substringBefore(" ")
+                if (!columnExists(database, tableName, columnName)) {
+                    database.execSQL("ALTER TABLE $tableName ADD COLUMN $columnDefinition")
+                }
+            }
+        }
+
         fun getInstance(appContext: Context): InAppDb {
 
             // =====================================================================
@@ -224,6 +253,7 @@ abstract class InAppDb : RoomDatabase() {
                     instance = builder
                         .addMigrations(MIGRATION_2_3)
                         .addMigrations(MIGRATION_3_4)
+                        .addMigrations(MIGRATION_4_5)
                         .build()
 
                     INSTANCE = instance

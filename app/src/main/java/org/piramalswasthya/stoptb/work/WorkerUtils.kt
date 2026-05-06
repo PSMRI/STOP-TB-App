@@ -1,6 +1,7 @@
 package org.piramalswasthya.stoptb.work
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.work.BackoffPolicy
@@ -12,6 +13,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.Operation
 import androidx.work.WorkContinuation
 import androidx.work.WorkManager
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.work.dynamicWoker.FormSyncWorker
 import org.piramalswasthya.stoptb.work.dynamicWoker.NCDFollowUpSyncWorker
 import org.piramalswasthya.stoptb.work.dynamicWoker.NDCFollowUpPushWorker
@@ -21,6 +23,8 @@ object WorkerUtils {
 
     const val pushWorkerUniqueName = "PUSH-TO-AMRIT"
     const val pullWorkerUniqueName = "PULL-FROM-AMRIT"
+    private const val campQuickPullDebounceMs = 30_000L
+    private var lastCampQuickPullAt = 0L
 
     private val networkOnlyConstraint = Constraints.Builder()
         .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -101,6 +105,20 @@ object WorkerUtils {
         WorkContinuation.combine(listOf(chainA, chainB, chainE))
             .then(setSyncCompleteWorker)
             .enqueue()
+    }
+
+    fun triggerCampQuickPullIfConnected(
+        context: Context,
+        preferenceDao: PreferenceDao,
+        force: Boolean = false
+    ) {
+        if (!preferenceDao.isCampModeEnabled() || !preferenceDao.isCampHubConnected()) return
+
+        val now = SystemClock.elapsedRealtime()
+        if (!force && now - lastCampQuickPullAt < campQuickPullDebounceMs) return
+
+        lastCampQuickPullAt = now
+        triggerAmritPullWorker(context)
     }
 
     fun triggerD2dSyncWorker(context: Context) {}

@@ -102,6 +102,8 @@ class UserRepo @Inject constructor(
                 state = user.state,
                 district = user.district,
                 block = user.block,
+                tu = user.tus.orEmpty().firstOrNull(),
+                healthFacility = user.healthFacilities.orEmpty().firstOrNull(),
                 village = user.villages.first()
             )
             preferenceDao.saveLocationRecord(locationRecord)

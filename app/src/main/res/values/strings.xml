@@ -15,6 +15,9 @@
     <string name="PREF_first_pull_amrit_last_synced_page" translatable="false">full_load_sync_pull_amrit_first_sync_last_saved_page</string>
     <string name="PREF_current_saved_language" translatable="false">Locale.Helper.Selected.Language</string>
     <string name="PREF_current_dp_uri" translatable="false">DP_URI_cat</string>
+    <string name="PREF_camp_mode_enabled" translatable="false">camp-mode-enabled</string>
+    <string name="PREF_camp_hub_url" translatable="false">camp-hub-url</string>
+    <string name="PREF_camp_hub_connected" translatable="false">camp-hub-connected</string>
 
     <string name="radio_title" translatable="false">%s<span> *</span></string>
     <string name="radio_title_ds" translatable="false">%s<span> **</span></string>

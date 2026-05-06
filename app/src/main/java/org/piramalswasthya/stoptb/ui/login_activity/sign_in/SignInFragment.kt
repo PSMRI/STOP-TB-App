@@ -15,6 +15,7 @@ import androidx.annotation.RequiresApi
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -35,8 +36,10 @@ import org.piramalswasthya.stoptb.work.WorkerUtils
 import javax.inject.Inject
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.content.ContextCompat
 import androidx.core.view.updatePadding
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.ui.login_activity.sign_in.SignInViewModel.CampHubStatus
 import org.piramalswasthya.stoptb.utils.RoleConstants
 
 
@@ -52,6 +55,7 @@ class SignInFragment : Fragment() {
 
 
     private val viewModel: SignInViewModel by viewModels()
+    private var suppressCampModeListener = false
 
     private val stateUnselectedAlert by lazy {
         AlertDialog.Builder(context).setTitle("State Missing")
@@ -133,7 +137,45 @@ class SignInFragment : Fragment() {
                     activity?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
                 imm?.hideSoftInputFromWindow(view.windowToken, 0)
             }
+            if (viewModel.isCampModeEnabled() && !viewModel.isCampHubConnected()) {
+                binding.tvError.text = getString(R.string.camp_hub_login_blocked)
+                binding.tvError.visibility = View.VISIBLE
+                viewModel.checkCampHubConnection()
+                return@setOnClickListener
+            }
             viewModel.loginInClicked()
+        }
+
+        refreshCampModeUi()
+
+        binding.cbCampMode?.setOnCheckedChangeListener { _, isChecked ->
+            if (suppressCampModeListener) return@setOnCheckedChangeListener
+
+            if (isChecked) {
+                suppressCampModeListener = true
+                binding.cbCampMode?.isChecked = false
+                suppressCampModeListener = false
+                findNavController().navigate(R.id.action_signInFragment_to_campModeConnectFragment)
+                return@setOnCheckedChangeListener
+            }
+
+            viewModel.setCampModeEnabled(isChecked)
+            refreshCampModeUi()
+        }
+
+        binding.btnCampRetry?.setOnClickListener {
+            findNavController().navigate(R.id.action_signInFragment_to_campModeConnectFragment)
+        }
+
+        viewModel.campHubStatus.observe(viewLifecycleOwner) { status ->
+            updateCampHubStatus(status)
+            if (status == CampHubStatus.NOT_CONNECTED) {
+                refreshCampModeUi()
+            }
+        }
+
+        if (viewModel.isCampModeEnabled()) {
+            viewModel.checkCampHubConnection()
         }
 
         when (prefDao.getCurrentLanguage()) {
@@ -192,7 +234,9 @@ class SignInFragment : Fragment() {
                         binding.cbRemember.isChecked = true
                         hasRememberMePassword = true
                     }
-                    if (hasRememberMeUsername && hasRememberMePassword) validateInput()
+                    if (hasRememberMeUsername && hasRememberMePassword && !viewModel.isCampModeEnabled()) {
+                        validateInput()
+                    }
                 }
 
                 is NetworkResponse.Loading -> validateInput()
@@ -224,7 +268,7 @@ class SignInFragment : Fragment() {
 
                     val user = state.data  // ya loggedInUser use karo
 
-                    if (user?.role.equals(RoleConstants.ROLE_VOLUNTEER, true)) {
+                    if (RoleConstants.isAllowedStopTbRole(user?.role)) {
 
                         if (binding.cbRemember.isChecked) {
                             val username = binding.etUsername.text.toString()
@@ -245,7 +289,8 @@ class SignInFragment : Fragment() {
                         // ❌ Non-volunteer block
                         binding.pbSignIn.visibility = View.GONE
                         binding.clContent.visibility = View.VISIBLE
-                        binding.tvError.text = "Login Failed: Only Volunteer allowed"
+                        binding.tvError.text =
+                            "Login Failed: Only Registration Officer, Nurse or Counselling Officer allowed"
                         binding.tvError.visibility = View.VISIBLE
                     }
                 }
@@ -265,6 +310,51 @@ class SignInFragment : Fragment() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        refreshCampModeUi()
+    }
+
+    private fun refreshCampModeUi() {
+        val isCampEnabled = viewModel.isCampModeEnabled()
+        suppressCampModeListener = true
+        binding.cbCampMode?.isChecked = isCampEnabled
+        suppressCampModeListener = false
+        binding.llCampStatus?.visibility = if (isCampEnabled) View.VISIBLE else View.GONE
+        if (isCampEnabled && viewModel.isCampHubConnected()) {
+            updateCampHubStatus(CampHubStatus.CONNECTED)
+        } else if (isCampEnabled) {
+            updateCampHubStatus(CampHubStatus.NOT_CONNECTED)
+        } else {
+            updateCampHubStatus(CampHubStatus.IDLE)
+        }
+    }
+
+    private fun updateCampHubStatus(status: CampHubStatus) {
+        when (status) {
+            CampHubStatus.IDLE -> {
+                binding.tvCampStatus?.text = getString(R.string.camp_hub_not_connected)
+                binding.tvCampStatus?.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_theme_light_onSurfaceVariant))
+                binding.btnLogin.isEnabled = true
+            }
+            CampHubStatus.CHECKING -> {
+                binding.tvCampStatus?.text = getString(R.string.camp_hub_checking)
+                binding.tvCampStatus?.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_theme_light_onSurfaceVariant))
+                binding.btnLogin.isEnabled = false
+            }
+            CampHubStatus.CONNECTED -> {
+                binding.tvCampStatus?.text = getString(R.string.camp_hub_connected)
+                binding.tvCampStatus?.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_theme_light_primary))
+                binding.btnLogin.isEnabled = true
+            }
+            CampHubStatus.NOT_CONNECTED -> {
+                binding.tvCampStatus?.text = getString(R.string.camp_hub_not_connected)
+                binding.tvCampStatus?.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.holo_red_dark))
+                binding.btnLogin.isEnabled = !viewModel.isCampModeEnabled()
+            }
+        }
+    }
+
     /**
      * get username and password
      * validate with existing logged in user if exists else call login api
@@ -275,6 +365,19 @@ class SignInFragment : Fragment() {
         val username = binding.etUsername.text.toString()
         val password = binding.etPassword.text.toString()
 
+        if (viewModel.isCampModeEnabled()) {
+            if (viewModel.isCampHubConnected()) {
+                viewModel.authUser(username, password)
+            } else {
+                viewModel.updateState(NetworkResponse.Error(getString(R.string.camp_hub_login_blocked)))
+            }
+            return
+        }
+
+        continueNormalLogin(username, password)
+    }
+
+    private fun continueNormalLogin(username: String, password: String) {
         val loggedInUser = viewModel.getLoggedInUser()
 
         if (loggedInUser == null) {

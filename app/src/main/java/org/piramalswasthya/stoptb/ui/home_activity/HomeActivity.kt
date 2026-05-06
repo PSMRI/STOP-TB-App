@@ -255,6 +255,11 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
         setContentView(binding.root)
         setUpActionBar()
         setUpNavHeader()
+        binding.tvCampHubOffline.setOnClickListener {
+            openCampHubConnect()
+        }
+        refreshCampHubOfflineBanner()
+        WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
         viewModel.restoredProfilePicUri.observe(this) { uri ->
             uri?.let {
                 Glide.with(this).load(it)
@@ -536,6 +541,8 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
 
     override fun onResume() {
         super.onResume()
+        refreshCampHubOfflineBanner()
+        WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
         window.decorView.alpha = 1f
         if (isDeviceRootedOrEmulator()) {
             AlertDialog.Builder(this)
@@ -777,6 +784,18 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
             binding.toolbar.title = null
             binding.tvToolbar.text = it
         }
+    }
+
+    private fun refreshCampHubOfflineBanner() {
+        binding.tvCampHubOffline.visibility =
+            if (pref.isCampModeEnabled() && !pref.isCampHubConnected()) View.VISIBLE else View.GONE
+    }
+
+    private fun openCampHubConnect() {
+        startActivity(
+            Intent(this, LoginActivity::class.java)
+                .putExtra(LoginActivity.EXTRA_OPEN_CAMP_CONNECT, true)
+        )
     }
 
     fun restoreToolbarNavigation() {

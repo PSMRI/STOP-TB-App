@@ -102,6 +102,66 @@
 
                     </RadioGroup>
 
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cv_camp_mode"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        app:cardBackgroundColor="@color/sakhi_card_surface"
+                        app:cardCornerRadius="16dp"
+                        app:cardElevation="0dp"
+                        app:layout_constraintTop_toBottomOf="@id/rg_lang_select"
+                        app:strokeColor="@color/md_theme_light_outlineVariant"
+                        app:strokeWidth="1dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:paddingStart="12dp"
+                            android:paddingTop="8dp"
+                            android:paddingEnd="12dp"
+                            android:paddingBottom="10dp">
+
+                            <CheckBox
+                                android:id="@+id/cb_camp_mode"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/camp_mode"
+                                android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+                                android:textColor="@color/md_theme_light_onSurface" />
+
+                            <LinearLayout
+                                android:id="@+id/ll_camp_status"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal"
+                                android:visibility="gone"
+                                tools:visibility="visible">
+
+                                <TextView
+                                    android:id="@+id/tv_camp_status"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="@string/camp_hub_not_connected"
+                                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                    android:textColor="@color/md_theme_light_onSurfaceVariant" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btn_camp_retry"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:minHeight="40dp"
+                                    android:paddingStart="14dp"
+                                    android:paddingEnd="14dp"
+                                    android:text="@string/camp_hub_retry"
+                                    android:textAppearance="@style/TextAppearance.Material3.LabelLarge" />
+
+                            </LinearLayout>
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
 
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/til_username"
@@ -114,7 +174,7 @@
                         android:paddingBottom="@dimen/padding_normal"
                         app:endIconTint="?attr/colorOnPrimary"
 
-                        app:layout_constraintTop_toBottomOf="@id/rg_lang_select"
+                        app:layout_constraintTop_toBottomOf="@id/cv_camp_mode"
                         tools:layout_editor_absoluteX="16dp">
 
                         <com.google.android.material.textfield.TextInputEditText

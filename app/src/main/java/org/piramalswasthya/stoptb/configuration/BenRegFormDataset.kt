@@ -921,6 +921,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         pic.errorText = null
     }
 
+    fun hasBeneficiaryPhoto(): Boolean = !pic.value.isNullOrBlank()
+
     private fun calculateMarriageDate(marriageAge: Int, dob: Long): Long {
         val calendar = Calendar.getInstance()
         calendar.timeInMillis = dob

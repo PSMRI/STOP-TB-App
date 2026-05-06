@@ -57,6 +57,25 @@
 
             </androidx.appcompat.widget.Toolbar>
 
+            <TextView
+                android:id="@+id/tv_camp_hub_offline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@android:color/holo_orange_dark"
+                android:gravity="center"
+                android:paddingStart="12dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="6dp"
+                android:text="@string/camp_hub_offline"
+                android:textColor="@android:color/white"
+                android:textStyle="bold"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:visibility="gone"
+                tools:visibility="visible" />
+
         </com.google.android.material.appbar.AppBarLayout>
 
 
