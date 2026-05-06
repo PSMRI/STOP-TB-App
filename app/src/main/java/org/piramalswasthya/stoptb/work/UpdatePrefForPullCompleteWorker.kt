@@ -28,6 +28,8 @@ class UpdatePrefForPullCompleteWorker @AssistedInject constructor(
     override suspend fun getForegroundInfo(): ForegroundInfo = createForegroundInfo()
 
     override suspend fun doWork(): Result {
+        setForeground(getForegroundInfo())
+
         preferenceDao.isFullPullComplete = true
         return Result.success()
     }

@@ -29,7 +29,10 @@ class ReferPullFromAmritWorker @AssistedInject constructor(
 
     override suspend fun getForegroundInfo(): ForegroundInfo = createForegroundInfo()
 
-    override suspend fun doWork(): Result {        return withContext(Dispatchers.IO) {
+    override suspend fun doWork(): Result {
+        setForeground(getForegroundInfo())
+
+        return withContext(Dispatchers.IO) {
             return@withContext try {
                 val getNumPages: Int = referalRepo.pullAndPersistReferRecord()
                 if (getNumPages > 0) {

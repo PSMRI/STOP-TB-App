@@ -43,8 +43,11 @@ class DownloadCardWorker @AssistedInject constructor(
     override suspend fun getForegroundInfo(): ForegroundInfo = createForegroundInfo("Syncing data...")
 
     override suspend fun doWork(): Result {
+        setForeground(getForegroundInfo())
+
         val fileName = inputData.getString(file_name)
-        return try {            withContext(Dispatchers.IO) {
+        return try {
+            withContext(Dispatchers.IO) {
                 val response = abhaIdRepo.downloadPdfCard()
                 val directory =
                     Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
