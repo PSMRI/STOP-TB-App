@@ -93,7 +93,18 @@ class UserRepo @Inject constructor(
 
     private suspend fun setUserRole(userId: Int, password: String, subCentre: String?): User {
         val response = amritApiService.getUserDetailsById(userId = userId)
+        Timber.d(
+            "Login user details response: role=${response.data.roleName}, " +
+                    "tuId=${response.data.tuId}, tuName=${response.data.tuName}, " +
+                    "healthFacilityId=${response.data.healthFacilityId}, " +
+                    "healthFacilityName=${response.data.healthFacilityName}"
+        )
         val user = response.data.toUser(password, subCentre)
+        Timber.d(
+            "Login mapped locations: tuCount=${user.tus.orEmpty().size}, " +
+                    "healthFacilityCount=${user.healthFacilities.orEmpty().size}, " +
+                    "villageCount=${user.villages.size}"
+        )
         preferenceDao.registerUser(user)
         // Auto-set location if user has exactly one village (common for ASHA workers)
         if (user.villages.size == 1) {

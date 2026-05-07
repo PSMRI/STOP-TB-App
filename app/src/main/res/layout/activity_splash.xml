@@ -49,7 +49,7 @@
                 android:layout_height="108dp"
                 android:layout_gravity="center"
                 android:contentDescription="@string/app_native_name"
-                android:src="@mipmap/ic_launcher_foreground" />
+                android:src="@drawable/stop_tb_icon" />
 
         </FrameLayout>
 

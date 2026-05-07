@@ -11,6 +11,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
+import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -269,6 +270,7 @@ class SignInFragment : Fragment() {
                     val user = state.data  // ya loggedInUser use karo
 
                     if (RoleConstants.isAllowedStopTbRole(user?.role)) {
+                        showLoginRoleToast(user)
 
                         if (binding.cbRemember.isChecked) {
                             val username = binding.etUsername.text.toString()
@@ -308,6 +310,18 @@ class SignInFragment : Fragment() {
                 viewModel.updateState(NetworkResponse.Idle())
             }
         }
+    }
+
+    private fun showLoginRoleToast(user: org.piramalswasthya.stoptb.model.User?) {
+        val role = user?.role?.takeIf { it.isNotBlank() } ?: "Unknown"
+        val tuStatus = if (user?.tus.orEmpty().isNotEmpty()) "TU: Yes" else "TU: No"
+        val healthFacilityStatus =
+            if (user?.healthFacilities.orEmpty().isNotEmpty()) "Health Facility: Yes" else "Health Facility: No"
+        Toast.makeText(
+            requireContext(),
+            "Role: $role\n$tuStatus, $healthFacilityStatus",
+            Toast.LENGTH_LONG
+        ).show()
     }
 
     override fun onResume() {
