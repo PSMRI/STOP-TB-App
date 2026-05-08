@@ -45,6 +45,9 @@
             name="isMatched"
             type="Boolean" />
         <variable
+            name="isGeneralOpdDone"
+            type="Boolean" />
+        <variable
             name="showActionButtons"
             type="Boolean" />
 
@@ -452,7 +455,7 @@
                             android:id="@+id/ll_vital_action"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
+                            android:layout_weight="2"
                             android:orientation="vertical">
 
                             <com.google.android.material.button.MaterialButton
@@ -461,9 +464,15 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:backgroundTint="@android:color/holo_green_dark"
+                                android:gravity="center"
+                                android:minWidth="170dp"
+                                android:paddingHorizontal="@dimen/padding_small"
+                                android:maxLines="1"
+                                android:singleLine="true"
                                 android:onClick="@{()-> showActionButtons ? clickListener.onClickVitalScreen(ben) : clickListener.onClickResult(ben)}"
                                 android:text="@string/vital_screen"
                                 android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                android:textSize="14sp"
                                 android:textColor="?attr/colorOnPrimary"
                                 android:visibility="gone"
                                 app:cornerRadius="@dimen/padding_normal"
@@ -576,6 +585,45 @@
                             android:visibility="gone"
                             android:text="@string/str_duplicate_record" />
                     </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/ll_general_opd_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="start"
+                    android:layout_marginHorizontal="@dimen/padding_normal"
+                    android:layout_marginTop="@dimen/margin_small"
+                    android:visibility="gone"
+                    app:layout_constraintTop_toBottomOf="@id/ll_ben_details_3">
+
+                    <LinearLayout
+                        android:id="@+id/ll_general_opd_action"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_general_opd"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:backgroundTint="@android:color/holo_red_dark"
+                            android:gravity="center"
+                            android:minWidth="140dp"
+                            android:paddingHorizontal="@dimen/padding_normal"
+                            android:maxLines="1"
+                            android:singleLine="true"
+                            android:onClick="@{()-> clickListener.onClickGeneralOpd(ben, isGeneralOpdDone)}"
+                            android:text="@string/general_opd"
+                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                            android:textSize="14sp"
+                            android:textColor="?attr/colorOnPrimary"
+                            android:visibility="gone"
+                            app:cornerRadius="@dimen/padding_normal"
+                            app:strokeColor="?attr/colorPrimary"
+                            app:strokeWidth="1dp" />
+                    </LinearLayout>
+                </LinearLayout>
             <LinearLayout
                 android:id="@+id/ll_ben_details_4"
                 android:layout_width="match_parent"
@@ -585,7 +633,7 @@
                 android:layout_marginHorizontal="@dimen/padding_normal"
                 android:layout_marginBottom="0dp"
                 android:visibility="gone"
-                app:layout_constraintTop_toBottomOf="@id/ll_ben_details_3">
+                app:layout_constraintTop_toBottomOf="@id/ll_general_opd_row">
 
                         <Button
                             style="@style/Widget.Material3.Button.TonalButton"

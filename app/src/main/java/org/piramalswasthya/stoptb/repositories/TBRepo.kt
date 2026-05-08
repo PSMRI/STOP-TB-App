@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.repositories
 
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.piramalswasthya.stoptb.database.room.SyncState
@@ -9,12 +10,16 @@ import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.TBDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Konstants
+import org.piramalswasthya.stoptb.model.GeneralOpdCache
 import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
+import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.network.AmritApiService
+import org.piramalswasthya.stoptb.network.GeneralOpdRequestDTO
 import org.piramalswasthya.stoptb.network.GetDataPaginatedRequest
 import org.piramalswasthya.stoptb.network.TBConfirmedRequestDTO
+import org.piramalswasthya.stoptb.network.TBDiagnosticsRequestDTO
 import org.piramalswasthya.stoptb.network.TBScreeningRequestDTO
 import org.piramalswasthya.stoptb.network.TBSuspectedRequestDTO
 import timber.log.Timber
@@ -40,6 +45,34 @@ class TBRepo @Inject constructor(
     suspend fun saveTBScreening(tbScreeningCache: TBScreeningCache) {
         withContext(Dispatchers.IO) {
             tbDao.saveTbScreening(tbScreeningCache)
+        }
+    }
+
+    suspend fun getGeneralOpd(benId: Long): GeneralOpdCache? {
+        return withContext(Dispatchers.IO) {
+            tbDao.getGeneralOpd(benId)
+        }
+    }
+
+    val tbScreeningBenIds: Flow<List<Long>> = tbDao.getAllTbScreeningBenIds()
+
+    val generalOpdBenIds: Flow<List<Long>> = tbDao.getAllGeneralOpdBenIds()
+
+    suspend fun saveGeneralOpd(generalOpdCache: GeneralOpdCache) {
+        withContext(Dispatchers.IO) {
+            tbDao.saveGeneralOpd(generalOpdCache)
+        }
+    }
+
+    suspend fun getTBDiagnostics(benId: Long): TBDiagnosticsCache? {
+        return withContext(Dispatchers.IO) {
+            tbDao.getTbDiagnostics(benId)
+        }
+    }
+
+    suspend fun saveTBDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache) {
+        withContext(Dispatchers.IO) {
+            tbDao.saveTbDiagnostics(tbDiagnosticsCache)
         }
     }
 
@@ -161,6 +194,164 @@ class TBRepo @Inject constructor(
             }
         }
         return tbScreeningList
+    }
+
+    suspend fun getGeneralOpdDetailsFromServer(): Int {
+        return withContext(Dispatchers.IO) {
+            val user =
+                preferenceDao.getLoggedInUser()
+                    ?: throw IllegalStateException("No user logged in!!")
+            try {
+                val response = tmcNetworkApiService.getGeneralOpdData(
+                    GetDataPaginatedRequest(
+                        ashaId = user.userId,
+                        pageNo = 0,
+                        fromDate = BenRepo.getCurrentDate(Konstants.defaultTimeStamp),
+                        toDate = getCurrentDate()
+                    )
+                )
+                val statusCode = response.code()
+                if (statusCode == 200) {
+                    val responseString = response.body()?.string()
+                    if (responseString != null) {
+                        val jsonObj = JSONObject(responseString)
+                        val errorMessage = jsonObj.getString("errorMessage")
+                        when (val responseStatusCode = jsonObj.getInt("statusCode")) {
+                            200 -> {
+                                try {
+                                    saveGeneralOpdCacheFromResponse(jsonObj.getString("data"))
+                                } catch (e: Exception) {
+                                    Timber.d("General OPD entries not synced $e")
+                                    return@withContext 0
+                                }
+                                return@withContext 1
+                            }
+
+                            401, 5002 -> {
+                                if (userRepo.refreshTokenTmc(
+                                        user.userName,
+                                        user.password
+                                    )
+                                ) throw SocketTimeoutException("Refreshed Token!")
+                                else throw IllegalStateException("User Logged out!!")
+                            }
+
+                            5000 -> {
+                                if (errorMessage == "No record found") return@withContext 0
+                            }
+
+                            else -> {
+                                throw IllegalStateException("$responseStatusCode received, dont know what todo!?")
+                            }
+                        }
+                    }
+                }
+            } catch (e: SocketTimeoutException) {
+                Timber.e("get_general_opd error : $e")
+                return@withContext -2
+            } catch (e: IllegalStateException) {
+                Timber.e("get_general_opd error : $e")
+                return@withContext -1
+            }
+            -1
+        }
+    }
+
+    private suspend fun saveGeneralOpdCacheFromResponse(dataObj: String): MutableList<GeneralOpdCache> {
+        val generalOpdList = mutableListOf<GeneralOpdCache>()
+        val requestDTO = Gson().fromJson(dataObj, GeneralOpdRequestDTO::class.java)
+        requestDTO?.generalOpdList?.forEach { generalOpdDTO ->
+            if (tbDao.getGeneralOpd(generalOpdDTO.benId) == null) {
+                benDao.getBen(generalOpdDTO.benId)?.let {
+                    val cache = generalOpdDTO.toCache()
+                    tbDao.saveGeneralOpd(cache)
+                    generalOpdList.add(cache)
+                }
+            }
+        }
+        return generalOpdList
+    }
+
+    suspend fun getTbDiagnosticsDetailsFromServer(): Int {
+        return withContext(Dispatchers.IO) {
+            val user =
+                preferenceDao.getLoggedInUser()
+                    ?: throw IllegalStateException("No user logged in!!")
+            try {
+                val response = tmcNetworkApiService.getTBDiagnosticsData(
+                    GetDataPaginatedRequest(
+                        ashaId = user.userId,
+                        pageNo = 0,
+                        fromDate = BenRepo.getCurrentDate(Konstants.defaultTimeStamp),
+                        toDate = getCurrentDate()
+                    )
+                )
+                if (response.code() == 200) {
+                    val responseString = response.body()?.string()
+                    if (responseString != null) {
+                        val jsonObj = JSONObject(responseString)
+                        val errorMessage = jsonObj.getString("errorMessage")
+                        when (val responseStatusCode = jsonObj.getInt("statusCode")) {
+                            200 -> {
+                                try {
+                                    saveTBDiagnosticsCacheFromResponse(jsonObj.getString("data"))
+                                } catch (e: Exception) {
+                                    Timber.d("TB Diagnostics entries not synced $e")
+                                    return@withContext 0
+                                }
+                                return@withContext 1
+                            }
+
+                            401, 5002 -> {
+                                if (userRepo.refreshTokenTmc(user.userName, user.password)) {
+                                    throw SocketTimeoutException("Refreshed Token!")
+                                } else {
+                                    throw IllegalStateException("User Logged out!!")
+                                }
+                            }
+
+                            5000 -> {
+                                if (errorMessage == "No record found") return@withContext 0
+                            }
+
+                            else -> {
+                                throw IllegalStateException("$responseStatusCode received, don't know what todo!?")
+                            }
+                        }
+                    }
+                }
+            } catch (e: SocketTimeoutException) {
+                Timber.e("get_tb_diagnostics error : $e")
+                return@withContext -2
+            } catch (e: IllegalStateException) {
+                Timber.e("get_tb_diagnostics error : $e")
+                return@withContext -1
+            }
+            -1
+        }
+    }
+
+    private suspend fun saveTBDiagnosticsCacheFromResponse(dataObj: String): MutableList<TBDiagnosticsCache> {
+        val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
+        val requestDTO = Gson().fromJson(dataObj, TBDiagnosticsRequestDTO::class.java)
+        requestDTO?.tbDiagnosticsList?.forEach { tbDiagnosticsDTO ->
+            tbDiagnosticsDTO.visitDate?.let {
+                val tbDiagnosticsCache: TBDiagnosticsCache? =
+                    tbDao.getTbDiagnostics(
+                        tbDiagnosticsDTO.benId,
+                        getLongFromDate(tbDiagnosticsDTO.visitDate),
+                        getLongFromDate(tbDiagnosticsDTO.visitDate) - 19_800_000
+                    )
+                if (tbDiagnosticsCache == null) {
+                    benDao.getBen(tbDiagnosticsDTO.benId)?.let {
+                        val cache = tbDiagnosticsDTO.toCache()
+                        tbDao.saveTbDiagnostics(cache)
+                        tbDiagnosticsList.add(cache)
+                    }
+                }
+            }
+        }
+        return tbDiagnosticsList
     }
 
     suspend fun getTbSuspectedDetailsFromServer(): Int {
@@ -364,9 +555,11 @@ class TBRepo @Inject constructor(
     // could cause the worker to be marked as failed.
     suspend fun pushUnSyncedRecords(): Boolean {
         val screeningResult = pushUnSyncedRecordsTBScreening()
+        val generalOpdResult = pushUnSyncedRecordsGeneralOpd()
+        val diagnosticsResult = pushUnSyncedRecordsTBDiagnostics()
         val suspectedResult = pushUnSyncedRecordsTBSuspected()
         val confirmedResult = pushUnSyncedRecordsTBConfirmed()
-        Timber.d("TB push results: screening=$screeningResult, suspected=$suspectedResult, confirmed=$confirmedResult")
+        Timber.d("TB push results: screening=$screeningResult, generalOpd=$generalOpdResult, diagnostics=$diagnosticsResult, suspected=$suspectedResult, confirmed=$confirmedResult")
         // Worker succeeds — failed records stay UNSYNCED for next cycle
         return true
     }
@@ -448,6 +641,127 @@ class TBRepo @Inject constructor(
 
             Timber.d("TB Screening push complete: $successCount succeeded, $failCount failed out of ${tbsnList.size}")
             // Worker succeeds — failed records stay UNSYNCED for next cycle
+            return@withContext 1
+        }
+    }
+
+    private suspend fun pushUnSyncedRecordsGeneralOpd(): Int {
+        return withContext(Dispatchers.IO) {
+            val user =
+                preferenceDao.getLoggedInUser()
+                    ?: throw IllegalStateException("No user logged in!!")
+
+            val opdList: List<GeneralOpdCache> = tbDao.getGeneralOpd(SyncState.UNSYNCED)
+            if (opdList.isEmpty()) return@withContext 1
+
+            val chunks = opdList.chunked(20)
+            var successCount = 0
+            var failCount = 0
+
+            for (chunk in chunks) {
+                try {
+                    val response = tmcNetworkApiService.saveGeneralOpdData(
+                        GeneralOpdRequestDTO(
+                            userId = user.userId,
+                            generalOpdList = chunk.map { it.toDTO() }
+                        )
+                    )
+                    val statusCode = response.code()
+                    if (statusCode == 200) {
+                        val responseString = response.body()?.string()
+                        if (responseString != null) {
+                            val jsonObj = JSONObject(responseString)
+                            when (val responseStatusCode = jsonObj.getInt("statusCode")) {
+                                200 -> {
+                                    updateSyncStatusGeneralOpd(chunk)
+                                    successCount += chunk.size
+                                }
+
+                                401, 5002 -> {
+                                    if (userRepo.refreshTokenTmc(user.userName, user.password)) {
+                                        Timber.d("Token refreshed, General OPD chunk will retry next cycle")
+                                    }
+                                    failCount += chunk.size
+                                }
+
+                                else -> {
+                                    Timber.e("General OPD chunk failed with statusCode: $responseStatusCode")
+                                    failCount += chunk.size
+                                }
+                            }
+                        }
+                    } else {
+                        Timber.e("General OPD chunk HTTP error: $statusCode")
+                        failCount += chunk.size
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "General OPD chunk push failed: ${chunk.size} records")
+                    failCount += chunk.size
+                }
+            }
+
+            Timber.d("General OPD push complete: $successCount succeeded, $failCount failed out of ${opdList.size}")
+            return@withContext 1
+        }
+    }
+
+    private suspend fun pushUnSyncedRecordsTBDiagnostics(): Int {
+        return withContext(Dispatchers.IO) {
+            val user =
+                preferenceDao.getLoggedInUser()
+                    ?: throw IllegalStateException("No user logged in!!")
+
+            val diagnosticsList: List<TBDiagnosticsCache> =
+                tbDao.getTbDiagnostics(SyncState.UNSYNCED)
+            if (diagnosticsList.isEmpty()) return@withContext 1
+
+            val chunks = diagnosticsList.chunked(20)
+            var successCount = 0
+            var failCount = 0
+
+            for (chunk in chunks) {
+                try {
+                    val response = tmcNetworkApiService.saveTBDiagnosticsData(
+                        TBDiagnosticsRequestDTO(
+                            userId = user.userId,
+                            tbDiagnosticsList = chunk.map { it.toDTO() }
+                        )
+                    )
+                    val statusCode = response.code()
+                    if (statusCode == 200) {
+                        val responseString = response.body()?.string()
+                        if (responseString != null) {
+                            val jsonObj = JSONObject(responseString)
+                            when (val responseStatusCode = jsonObj.getInt("statusCode")) {
+                                200 -> {
+                                    updateSyncStatusDiagnostics(chunk)
+                                    successCount += chunk.size
+                                }
+
+                                401, 5002 -> {
+                                    if (userRepo.refreshTokenTmc(user.userName, user.password)) {
+                                        Timber.d("Token refreshed, TB Diagnostics chunk will retry next cycle")
+                                    }
+                                    failCount += chunk.size
+                                }
+
+                                else -> {
+                                    Timber.e("TB Diagnostics chunk failed with statusCode: $responseStatusCode")
+                                    failCount += chunk.size
+                                }
+                            }
+                        }
+                    } else {
+                        Timber.e("TB Diagnostics chunk HTTP error: $statusCode")
+                        failCount += chunk.size
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "TB Diagnostics chunk push failed: ${chunk.size} records")
+                    failCount += chunk.size
+                }
+            }
+
+            Timber.d("TB Diagnostics push complete: $successCount succeeded, $failCount failed out of ${diagnosticsList.size}")
             return@withContext 1
         }
     }
@@ -593,6 +907,20 @@ class TBRepo @Inject constructor(
         tbsnList.forEach {
             it.syncState = SyncState.SYNCED
             tbDao.saveTbScreening(it)
+        }
+    }
+
+    private suspend fun updateSyncStatusGeneralOpd(opdList: List<GeneralOpdCache>) {
+        opdList.forEach {
+            it.syncState = SyncState.SYNCED
+            tbDao.saveGeneralOpd(it)
+        }
+    }
+
+    private suspend fun updateSyncStatusDiagnostics(diagnosticsList: List<TBDiagnosticsCache>) {
+        diagnosticsList.forEach {
+            it.syncState = SyncState.SYNCED
+            tbDao.saveTbDiagnostics(it)
         }
     }
 

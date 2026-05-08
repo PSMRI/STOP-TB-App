@@ -6,11 +6,12 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.android.material.textfield.TextInputLayout
 import androidx.appcompat.app.AlertDialog
 import android.widget.Toast
-import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
@@ -29,6 +30,14 @@ class VitalScreenFragment : Fragment() {
 
     private val viewModel: VitalScreenViewModel by viewModels()
     private var referralAlert: AlertDialog? = null
+    private var riskFactorOptions: List<CodedOption> = emptyList()
+    private var selectedRiskFactors = BooleanArray(0)
+
+    private data class CodedOption(
+        val id: Int,
+        val code: String,
+        val label: String
+    )
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -43,20 +52,13 @@ class VitalScreenFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupInputLimits()
         setupDropdowns()
-        setupBmiCalculation()
         observeUi()
         binding.btnSubmit.setOnClickListener {
             submitVitals()
         }
-        binding.btnSkip.setOnClickListener {
-            skipVitals()
-        }
     }
 
     private fun setupInputLimits() {
-        binding.etHeight.filters = arrayOf(InputFilter.LengthFilter(6))
-        binding.etWeight.filters = arrayOf(InputFilter.LengthFilter(6))
-        binding.etTemperature.filters = arrayOf(InputFilter.LengthFilter(5))
         binding.etPulseRate.filters = arrayOf(InputFilter.LengthFilter(3))
         binding.etBpSystolic.filters = arrayOf(InputFilter.LengthFilter(3))
         binding.etBpDiastolic.filters = arrayOf(InputFilter.LengthFilter(3))
@@ -73,24 +75,26 @@ class VitalScreenFragment : Fragment() {
         viewModel.existingVitals.observe(viewLifecycleOwner) { vital ->
             val hasExistingVitals = vital != null
             binding.btnSubmit.visibility = if (hasExistingVitals) View.GONE else View.VISIBLE
-            binding.btnSkip.visibility = if (hasExistingVitals) View.GONE else View.VISIBLE
             setFormEditable(!hasExistingVitals)
             vital ?: return@observe
-            binding.etTemperature.setText(viewModel.getTemperatureDisplayValue(vital.temperature), false)
             binding.etPulseRate.setText(viewModel.getPulseDisplayValue(vital.pulseRate), false)
             binding.etBpSystolic.setText(vital.bpSystolic?.toString().orEmpty())
             binding.etBpDiastolic.setText(vital.bpDiastolic?.toString().orEmpty())
             binding.etRbs.setText(vital.rbs?.stripTrailingZeros())
-            binding.etHeight.setText(vital.height?.stripTrailingZeros())
-            binding.etWeight.setText(vital.weight?.stripTrailingZeros())
-            binding.etBmi.setText(vital.bmi?.stripTrailingZeros().orEmpty())
+            setPresentAbsentRadioGroupValue(binding.rgPallor, vital.pallorId, vital.pallor)
+            setPresentAbsentRadioGroupValue(binding.rgIcterus, vital.icterusId, vital.icterus)
+            setPresentAbsentRadioGroupValue(binding.rgCyanosis, vital.cyanosisId, vital.cyanosis)
+            setPresentAbsentRadioGroupValue(binding.rgClubbing, vital.clubbingId, vital.clubbing)
+            setPresentAbsentRadioGroupValue(binding.rgLymphadenopathy, vital.lymphadenopathyId, vital.lymphadenopathy)
+            setPresentAbsentRadioGroupValue(binding.rgOedema, vital.oedemaId, vital.oedema)
+            applyRiskFactorSelection(vital.keyPopulationRiskFactorIds.orEmpty(), vital.keyPopulationRiskFactors.orEmpty())
+            setHivStatusValue(vital.hivStatusId, vital.hivStatus)
         }
         viewModel.state.observe(viewLifecycleOwner) { state ->
             when (state) {
                 VitalScreenViewModel.State.SAVING -> {
                     binding.loadingOverlay.visibility = View.VISIBLE
                     binding.btnSubmit.isEnabled = false
-                    binding.btnSkip.isEnabled = false
                 }
                 VitalScreenViewModel.State.SAVE_SUCCESS -> {
                     binding.loadingOverlay.visibility = View.GONE
@@ -104,7 +108,6 @@ class VitalScreenFragment : Fragment() {
                 VitalScreenViewModel.State.SAVE_FAILED -> {
                     binding.loadingOverlay.visibility = View.GONE
                     binding.btnSubmit.isEnabled = true
-                    binding.btnSkip.isEnabled = true
                     Toast.makeText(
                         requireContext(),
                         getString(R.string.vitals_save_failed),
@@ -115,30 +118,29 @@ class VitalScreenFragment : Fragment() {
                 VitalScreenViewModel.State.IDLE -> {
                     binding.loadingOverlay.visibility = View.GONE
                     binding.btnSubmit.isEnabled = true
-                    binding.btnSkip.isEnabled = true
                 }
             }
         }
     }
 
     private fun setFormEditable(isEditable: Boolean) {
-        binding.etHeight.isEnabled = isEditable
-        binding.etWeight.isEnabled = isEditable
-        binding.etTemperature.isEnabled = isEditable
         binding.etPulseRate.isEnabled = isEditable
         binding.etBpSystolic.isEnabled = isEditable
         binding.etBpDiastolic.isEnabled = isEditable
         binding.etRbs.isEnabled = isEditable
+        setRadioGroupEnabled(binding.rgPallor, isEditable)
+        setRadioGroupEnabled(binding.rgIcterus, isEditable)
+        setRadioGroupEnabled(binding.rgCyanosis, isEditable)
+        setRadioGroupEnabled(binding.rgClubbing, isEditable)
+        setRadioGroupEnabled(binding.rgLymphadenopathy, isEditable)
+        setRadioGroupEnabled(binding.rgOedema, isEditable)
+        binding.etRiskFactors.isEnabled = isEditable
+        binding.tilRiskFactors.isEnabled = isEditable
+        binding.etHivStatus.isEnabled = isEditable
+        binding.tilHivStatus.isEnabled = isEditable
     }
 
     private fun setupDropdowns() {
-        binding.etTemperature.setAdapter(
-            ArrayAdapter(
-                requireContext(),
-                android.R.layout.simple_list_item_1,
-                resources.getStringArray(R.array.vital_temperature_options)
-            )
-        )
         binding.etPulseRate.setAdapter(
             ArrayAdapter(
                 requireContext(),
@@ -146,8 +148,16 @@ class VitalScreenFragment : Fragment() {
                 resources.getStringArray(R.array.vital_pulse_rate_options)
             )
         )
-        enableDropdownInteraction(binding.tilTemperature, binding.etTemperature)
+        val hivLabels = getHivStatusOptions().map { it.label }
+        binding.etHivStatus.setAdapter(
+            ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, hivLabels)
+        )
+        if (binding.etHivStatus.text.isNullOrBlank()) {
+            binding.etHivStatus.setText(getHivStatusOptions().first { it.code == "UNKNOWN" }.label, false)
+        }
+        setupRiskFactorSelection()
         enableDropdownInteraction(binding.tilPulseRate, binding.etPulseRate)
+        enableDropdownInteraction(binding.tilHivStatus, binding.etHivStatus)
     }
 
     private fun enableDropdownInteraction(
@@ -168,18 +178,6 @@ class VitalScreenFragment : Fragment() {
         }
     }
 
-    private fun setupBmiCalculation() {
-        val bmiWatcher: (CharSequence?) -> Unit = {
-            val bmi = viewModel.calculateBmi(
-                binding.etHeight.text?.toString(),
-                binding.etWeight.text?.toString()
-            )
-            binding.etBmi.setText(bmi?.stripTrailingZeros().orEmpty())
-        }
-        binding.etHeight.doAfterTextChanged(bmiWatcher)
-        binding.etWeight.doAfterTextChanged(bmiWatcher)
-    }
-
     private fun submitVitals() {
         if (!validateFields()) return
         if (shouldShowReferralAlert()) {
@@ -192,20 +190,40 @@ class VitalScreenFragment : Fragment() {
     }
 
     private fun saveVitals() {
+        val pallor = getPresentAbsentSelection(binding.rgPallor)
+        val icterus = getPresentAbsentSelection(binding.rgIcterus)
+        val cyanosis = getPresentAbsentSelection(binding.rgCyanosis)
+        val clubbing = getPresentAbsentSelection(binding.rgClubbing)
+        val lymphadenopathy = getPresentAbsentSelection(binding.rgLymphadenopathy)
+        val oedema = getPresentAbsentSelection(binding.rgOedema)
+        val riskFactors = getSelectedRiskFactorOptions()
+        val hivStatus = getHivStatusSelection()
         viewModel.saveVitals(
-            temperatureOption = binding.etTemperature.text?.toString(),
+            temperatureOption = null,
             pulseRateOption = binding.etPulseRate.text?.toString(),
             bpSystolic = binding.etBpSystolic.text?.toString(),
             bpDiastolic = binding.etBpDiastolic.text?.toString(),
-            height = binding.etHeight.text?.toString(),
-            weight = binding.etWeight.text?.toString(),
-            bmi = binding.etBmi.text?.toString(),
-            rbs = binding.etRbs.text?.toString()
+            height = null,
+            weight = null,
+            bmi = null,
+            rbs = binding.etRbs.text?.toString(),
+            pallorId = pallor?.id,
+            pallor = pallor?.code,
+            icterusId = icterus?.id,
+            icterus = icterus?.code,
+            cyanosisId = cyanosis?.id,
+            cyanosis = cyanosis?.code,
+            clubbingId = clubbing?.id,
+            clubbing = clubbing?.code,
+            lymphadenopathyId = lymphadenopathy?.id,
+            lymphadenopathy = lymphadenopathy?.code,
+            oedemaId = oedema?.id,
+            oedema = oedema?.code,
+            keyPopulationRiskFactorIds = riskFactors.map { it.id },
+            keyPopulationRiskFactors = riskFactors.map { it.code },
+            hivStatusId = hivStatus?.id,
+            hivStatus = hivStatus?.code
         )
-    }
-
-    private fun skipVitals() {
-        navigateAfterVitals()
     }
 
     private fun navigateAfterVitals() {
@@ -213,26 +231,18 @@ class VitalScreenFragment : Fragment() {
             findNavController().navigateUp()
             return
         }
-        val directions = VitalScreenFragmentDirections
-            .actionVitalScreenFragmentToTBSuspectedQuickFragment(
-                benId = viewModel.benId,
-                autoFlow = true
-            )
-        findNavController().navigate(directions)
+        findNavController().navigate(
+            R.id.TBScreeningFormFragment,
+            Bundle().apply {
+                putLong("benId", viewModel.benId)
+                putBoolean("autoFlow", true)
+            }
+        )
     }
 
     private fun validateFields(): Boolean {
         clearErrors()
         var isValid = true
-
-        val temperature = binding.etTemperature.text?.toString()?.trim().orEmpty()
-        if (temperature.isNotEmpty()) {
-            val value = parseTemperature(temperature)
-            if (value == null || value !in 90.0..110.0) {
-                binding.tilTemperature.error = "Enter temperature between 90 and 110"
-                isValid = false
-            }
-        }
 
         val pulse = binding.etPulseRate.text?.toString()?.trim().orEmpty()
         if (pulse.isNotEmpty()) {
@@ -288,35 +298,18 @@ class VitalScreenFragment : Fragment() {
             isValid = false
         }
 
-        val heightText = binding.etHeight.text?.toString()?.trim().orEmpty()
-        if (heightText.isNotEmpty() && validateDecimal(
-                value = heightText,
-                inputLayout = binding.tilHeight,
-                label = "Height",
-                min = 35.0,
-                max = 250.0
-            ) == null
-        ) {
+        if (getSelectedRiskFactors().isEmpty()) {
+            binding.tilRiskFactors.error = getString(R.string.risk_factor_required)
             isValid = false
         }
 
-        val weightText = binding.etWeight.text?.toString()?.trim().orEmpty()
-        if (weightText.isNotEmpty() && validateDecimal(
-                value = weightText,
-                inputLayout = binding.tilWeight,
-                label = "Weight",
-                min = 2.0,
-                max = 250.0
-            ) == null
-        ) {
+        if (binding.etHivStatus.text?.toString()?.trim().isNullOrEmpty()) {
+            binding.tilHivStatus.error = getString(R.string.hiv_status_required)
             isValid = false
         }
 
         return isValid
     }
-
-    private fun parseTemperature(value: String): Double? =
-        value.removePrefix(">=").trim().toDoubleOrNull()
 
     private fun parsePulse(value: String): Int? {
         return when (value.trim()) {
@@ -360,8 +353,7 @@ class VitalScreenFragment : Fragment() {
     }
 
     private fun shouldShowReferralAlert(): Boolean =
-        viewModel.shouldShowTemperatureReferral(binding.etTemperature.text?.toString()) ||
-            viewModel.shouldShowPulseReferral(binding.etPulseRate.text?.toString()) ||
+        viewModel.shouldShowPulseReferral(binding.etPulseRate.text?.toString()) ||
             viewModel.shouldShowBpReferral(
                 binding.etBpSystolic.text?.toString(),
                 binding.etBpDiastolic.text?.toString()
@@ -369,14 +361,210 @@ class VitalScreenFragment : Fragment() {
             viewModel.shouldShowRbsReferral(binding.etRbs.text?.toString())
 
     private fun clearErrors() {
-        binding.tilTemperature.error = null
         binding.tilPulseRate.error = null
         binding.tilBpSystolic.error = null
         binding.tilBpDiastolic.error = null
         binding.tilRbs.error = null
-        binding.tilHeight.error = null
-        binding.tilWeight.error = null
-        binding.tilBmi.error = null
+        binding.tilRiskFactors.error = null
+        binding.tilHivStatus.error = null
+    }
+
+    private fun setupRiskFactorSelection() {
+        riskFactorOptions = getRiskFactorOptions()
+        selectedRiskFactors = BooleanArray(riskFactorOptions.size)
+        binding.etRiskFactors.setOnClickListener {
+            showRiskFactorDialog()
+        }
+        binding.tilRiskFactors.setEndIconOnClickListener {
+            showRiskFactorDialog()
+        }
+    }
+
+    private fun showRiskFactorDialog() {
+        val labels = riskFactorOptions.map { it.label }.toTypedArray()
+        val notApplicableIndex = riskFactorOptions.indexOfFirst { it.code == "NOT_APPLICABLE" }
+        AlertDialog.Builder(requireContext())
+            .setTitle(getString(R.string.select_key_population_risk_factors))
+            .setMultiChoiceItems(labels, selectedRiskFactors) { dialog, which, isChecked ->
+                selectedRiskFactors[which] = isChecked
+                if (isChecked && which == notApplicableIndex) {
+                    selectedRiskFactors.indices
+                        .filter { it != notApplicableIndex }
+                        .forEach { selectedRiskFactors[it] = false }
+                } else if (isChecked && notApplicableIndex >= 0) {
+                    selectedRiskFactors[notApplicableIndex] = false
+                }
+                val listView = (dialog as? AlertDialog)?.listView
+                selectedRiskFactors.indices.forEach { index ->
+                    listView?.setItemChecked(index, selectedRiskFactors[index])
+                }
+            }
+            .setPositiveButton(android.R.string.ok) { dialog, _ ->
+                refreshRiskFactorText()
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun applyRiskFactorSelection(ids: List<Int>, values: List<String>) {
+        if (riskFactorOptions.isEmpty()) return
+        selectedRiskFactors = BooleanArray(riskFactorOptions.size) { index ->
+            val option = riskFactorOptions[index]
+            ids.contains(option.id) || values.any { saved ->
+                saved.equals(option.code, ignoreCase = true) ||
+                    saved.equals(option.label, ignoreCase = true)
+            }
+        }
+        refreshRiskFactorText()
+    }
+
+    private fun refreshRiskFactorText() {
+        binding.etRiskFactors.setText(getSelectedRiskFactorOptions().joinToString(", ") { it.label })
+        binding.tilRiskFactors.error = null
+    }
+
+    private fun getSelectedRiskFactors(): List<String> =
+        getSelectedRiskFactorOptions().map { it.label }
+
+    private fun getSelectedRiskFactorOptions(): List<CodedOption> =
+        riskFactorOptions.filterIndexed { index, _ ->
+            selectedRiskFactors.getOrNull(index) == true
+        }
+
+    private fun getPresentAbsentSelection(group: RadioGroup): CodedOption? {
+        val selectedId = group.checkedRadioButtonId
+        if (selectedId == View.NO_ID) return null
+        return when (selectedId) {
+            (group.getChildAt(0) as? RadioButton)?.id -> getPresentAbsentOptions()[0]
+            (group.getChildAt(1) as? RadioButton)?.id -> getPresentAbsentOptions()[1]
+            else -> null
+        }
+    }
+
+    private fun setPresentAbsentRadioGroupValue(group: RadioGroup, id: Int?, value: String?) {
+        val optionId = id ?: getPresentAbsentOptions().firstOrNull { option ->
+            value.equals(option.code, ignoreCase = true) ||
+                value.equals(option.label, ignoreCase = true) ||
+                value.matchesLegacyPresentAbsent(option.code)
+        }?.id
+        if (optionId == null) {
+            group.clearCheck()
+            return
+        }
+        val childIndex = getPresentAbsentOptions().indexOfFirst { it.id == optionId }
+        if (childIndex !in 0 until group.childCount) {
+            group.clearCheck()
+            return
+        }
+        val radioButton = group.getChildAt(childIndex) as? RadioButton
+        if (radioButton != null) {
+            group.check(radioButton.id)
+        }
+    }
+
+    private fun getPresentAbsentOptions(): List<CodedOption> = listOf(
+        CodedOption(1, "PRESENT", getString(R.string.present)),
+        CodedOption(2, "ABSENT", getString(R.string.absent))
+    )
+
+    private fun getHivStatusOptions(): List<CodedOption> = listOf(
+        CodedOption(1, "POSITIVE", getString(R.string.positive)),
+        CodedOption(2, "REACTIVE", getString(R.string.reactive)),
+        CodedOption(3, "NEGATIVE", getString(R.string.negative)),
+        CodedOption(4, "UNKNOWN", getString(R.string.unknown))
+    )
+
+    private fun getHivStatusSelection(): CodedOption? {
+        val selectedText = binding.etHivStatus.text?.toString()?.trim().orEmpty()
+        return getHivStatusOptions().firstOrNull {
+            selectedText.equals(it.label, ignoreCase = true) ||
+                selectedText.equals(it.code, ignoreCase = true)
+        }
+    }
+
+    private fun setHivStatusValue(id: Int?, value: String?) {
+        val option = getHivStatusOptions().firstOrNull { it.id == id } ?: getHivStatusOptions().firstOrNull {
+            value.equals(it.code, ignoreCase = true) ||
+                value.equals(it.label, ignoreCase = true) ||
+                value.matchesLegacyHivStatus(it.code)
+        } ?: getHivStatusOptions().first { it.code == "UNKNOWN" }
+        binding.etHivStatus.setText(option.label, false)
+    }
+
+    private fun String?.matchesLegacyPresentAbsent(code: String): Boolean {
+        val normalized = this?.trim()?.lowercase() ?: return false
+        return when (code) {
+            "PRESENT" -> normalized in listOf("present", "yes")
+            "ABSENT" -> normalized in listOf("absent", "no")
+            else -> false
+        }
+    }
+
+    private fun String?.matchesLegacyHivStatus(code: String): Boolean {
+        val normalized = this?.trim()?.lowercase() ?: return false
+        return when (code) {
+            "POSITIVE" -> normalized == "positive"
+            "REACTIVE" -> normalized == "reactive"
+            "NEGATIVE" -> normalized == "negative"
+            "UNKNOWN" -> normalized == "unknown"
+            else -> false
+        }
+    }
+
+    private fun getRiskFactorOptions(): List<CodedOption> {
+        val labels = resources.getStringArray(R.array.key_population_risk_factor_options)
+        val codes = listOf(
+            "PREGNANCY",
+            "LACTATING_MOTHER",
+            "ANTI_TNF_TREATMENT",
+            "BRONCHIAL_ASTHMA",
+            "CANCER",
+            "CARDIOVASCULAR_DISORDER",
+            "CONTACT_OF_KNOWN_TB_PATIENTS",
+            "COPD",
+            "COVID_RECOVERED_PATIENTS",
+            "DIABETES",
+            "DIALYSIS",
+            "HEALTH_CARE_WORKER",
+            "HYPERTENSIVE",
+            "LIVER_IMPAIRMENT",
+            "MIGRANT",
+            "MINER",
+            "PALLIATIVE_CARE",
+            "PATIENT_ON_IMMUNOSUPPRESSANTS",
+            "PRISON",
+            "ILLEGAL_IMMIGRANT",
+            "RENAL_IMPAIRMENT",
+            "TRANSPLANTATION",
+            "URBAN_SLUM",
+            "HISTORY_OF_ADULT_BCG_VACCINATION",
+            "UNDERNOURISHED_MALNOURISHED",
+            "ELDERLY",
+            "WORKPLACE_SETTINGS",
+            "TEA_GARDEN_WORKER",
+            "CONSTRUCTION_SITE_WORKER",
+            "CONGREGATE_SETTINGS",
+            "ATTENDEES_OF_DE_ADDICTION_CENTERS",
+            "INDOOR_AIR_POLLUTION_EXPOSURE",
+            "MARGINALIZED_POPULATIONS_AT_RISK_OF_HIV",
+            "LGBTQAI_PLUS_PLUS",
+            "SUBSTANCE_ABUSE",
+            "TOBACCO_SMOKER",
+            "SILICA_EXPOSURE_SILICOSIS",
+            "OTHER",
+            "NOT_APPLICABLE"
+        )
+        return labels.mapIndexed { index, label ->
+            CodedOption(index + 1, codes.getOrElse(index) { label.uppercase().replace(" ", "_") }, label)
+        }
+    }
+
+    private fun setRadioGroupEnabled(group: RadioGroup, isEnabled: Boolean) {
+        group.isEnabled = isEnabled
+        for (index in 0 until group.childCount) {
+            group.getChildAt(index).isEnabled = isEnabled
+        }
     }
 
     override fun onStart() {

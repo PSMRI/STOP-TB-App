@@ -55,6 +55,7 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                     val result1 =
                         awaitAll(
                             async { getTbScreeningDetails() },
+                            async { getGeneralOpdDetails() },
                             async { getTbSuspectedDetails() },
                             async { getTbConfirmedDetails() }
                         )
@@ -118,6 +119,18 @@ class PullTBFromAmritWorker @AssistedInject constructor(
         return withContext(Dispatchers.IO) {
             try {
                 val res = tbRepo.getTbSuspectedDetailsFromServer()
+                return@withContext res == 1 || res == 0
+            } catch (e: Exception) {
+                Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
+            }
+            true
+        }
+    }
+
+    private suspend fun getGeneralOpdDetails(): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val res = tbRepo.getGeneralOpdDetailsFromServer()
                 return@withContext res == 1 || res == 0
             } catch (e: Exception) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")

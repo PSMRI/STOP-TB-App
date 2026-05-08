@@ -128,6 +128,8 @@ class SakhiApplication : Application(), Configuration.Provider {
         database.malariaDao.resetScreeningSyncingToUnsynced()
         database.malariaDao.resetConfirmedSyncingToUnsynced()
         database.tbDao.resetScreeningSyncingToUnsynced()
+        database.tbDao.resetGeneralOpdSyncingToUnsynced()
+        database.tbDao.resetDiagnosticsSyncingToUnsynced()
         database.tbDao.resetSuspectedSyncingToUnsynced()
         database.tbDao.resetConfirmedSyncingToUnsynced()
 

@@ -8,6 +8,7 @@ import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.model.ABHAModel
 import org.piramalswasthya.stoptb.model.AESScreeningCache
 import org.piramalswasthya.stoptb.model.FilariaScreeningCache
+import org.piramalswasthya.stoptb.model.GeneralOpdCache
 import org.piramalswasthya.stoptb.model.KalaAzarScreeningCache
 import org.piramalswasthya.stoptb.model.LeprosyFollowUpCache
 import org.piramalswasthya.stoptb.model.LeprosyScreeningCache
@@ -15,6 +16,7 @@ import org.piramalswasthya.stoptb.model.MalariaConfirmedCasesCache
 import org.piramalswasthya.stoptb.model.MalariaScreeningCache
 import org.piramalswasthya.stoptb.model.ReferalCache
 import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
+import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.model.getDateTimeStringFromLong
@@ -334,6 +336,8 @@ data class AddHealthIdRecord(
 )
 
 data class TBScreeningRequestDTO(val userId: Int, val tbScreeningList: List<TBScreeningDTO>)
+data class TBDiagnosticsRequestDTO(val userId: Int, val tbDiagnosticsList: List<TBDiagnosticsDTO>)
+data class GeneralOpdRequestDTO(val userId: Int, val generalOpdList: List<GeneralOpdDTO>)
 data class KalaAzarScreeningRequestDTO(val userId: Int, val kalaAzarLists: List<KALAZARScreeningDTO>)
 data class MalariaScreeningRequestDTO(val userId: Int, val malariaLists: List<MalariaScreeningDTO>)
 data class IRSScreeningRequestDTO(val rounds: List<ScreeningRoundDTO>)
@@ -368,7 +372,10 @@ data class TBScreeningDTO(
     var age: Boolean? = null, var diabetic: Boolean? = null,
     var tobaccoUser: Boolean? = null, var bmi: Boolean? = null,
     var contactWithTBPatient: Boolean? = null, var historyOfTBInLastFiveYrs: Boolean? = null,
-    var referralRequired: Boolean? = null, var referralFor: List<String>? = null,
+    var referredForDigitalChestXray: Boolean? = null, var referredForSputumCollection: Boolean? = null,
+    var sputumSampleSubmittedAt: String? = null, var recommendedForTruenatTest: Boolean? = null,
+    var recommendedForLiquidCultureTest: Boolean? = null,
+    var reasonForDenialForGettingTested: List<String>? = null,
     var latitude: Double? = null, var longitude: Double? = null, var address: String? = null,
     var familyContactScreeningRequired: Boolean? = null,
     var sympotomatic: String? = null, var asymptomatic: String? = null, var recommandateTest: String? = null,
@@ -382,10 +389,39 @@ data class TBScreeningDTO(
         riseOfFever = riseOfFever, lossOfAppetite = lossOfAppetite, age = age,
         diabetic = diabetic, tobaccoUser = tobaccoUser, bmi = bmi,
         contactWithTBPatient = contactWithTBPatient, historyOfTBInLastFiveYrs = historyOfTBInLastFiveYrs,
-        referralRequired = referralRequired, referralFor = referralFor,
+        referredForDigitalChestXray = referredForDigitalChestXray,
+        referredForSputumCollection = referredForSputumCollection,
+        sputumSampleSubmittedAt = sputumSampleSubmittedAt,
+        recommendedForTruenatTest = recommendedForTruenatTest,
+        recommendedForLiquidCultureTest = recommendedForLiquidCultureTest,
+        reasonForDenialForGettingTested = reasonForDenialForGettingTested,
         latitude = latitude, longitude = longitude, address = address,
         familyContactScreeningRequired = familyContactScreeningRequired,
         sympotomatic = sympotomatic, asymptomatic = asymptomatic, recommandateTest = recommandateTest,
+        syncState = SyncState.SYNCED
+    )
+}
+
+data class GeneralOpdDTO(
+    val id: Long,
+    val benId: Long,
+    val visitDate: String?,
+    val chiefComplaints: List<String>? = null,
+    val medications: List<String>? = null,
+    val dosage: String? = null,
+    val frequency: String? = null,
+    val duration: String? = null,
+    val notes: String? = null
+) {
+    fun toCache(): GeneralOpdCache = GeneralOpdCache(
+        benId = benId,
+        visitDate = getLongFromDate(visitDate),
+        chiefComplaints = chiefComplaints,
+        medications = medications,
+        dosage = dosage,
+        frequency = frequency,
+        duration = duration,
+        notes = notes,
         syncState = SyncState.SYNCED
     )
 }
@@ -399,6 +435,7 @@ data class TBSuspectedDTO(
     var isChestXRayDone: Boolean? = null, var chestXRayResult: String? = null,
     var isAICoughAssessmentDone: Boolean? = null, var aiCoughAssessmentResult: String? = null,
     var isNaatConducted: Boolean? = null, var naatResult: String? = null,
+    var recommendedForLiquidCultureTest: Boolean? = null,
     var isLiquidCultureConducted: Boolean? = null, var liquidCultureResult: String? = null,
     var referralFacility: String? = null, var isTBConfirmed: Boolean? = null,
     var isDRTBConfirmed: Boolean? = null, var isConfirmed: Boolean = false,
@@ -417,6 +454,7 @@ data class TBSuspectedDTO(
         aiCoughAssessmentResult = aiCoughAssessmentResult,
         isNaatConducted = isNaatConducted,
         naatResult = naatResult,
+        recommendedForLiquidCultureTest = recommendedForLiquidCultureTest,
         isLiquidCultureConducted = isLiquidCultureConducted,
         liquidCultureResult = liquidCultureResult,
         referralFacility = referralFacility,
@@ -460,6 +498,48 @@ data class TBConfirmedRequestDTO(
 )
 
 data class TBSuspectedRequestDTO(val userId: Int, val tbSuspectedList: List<TBSuspectedDTO>)
+
+data class TBDiagnosticsDTO(
+    val id: Long,
+    val benId: Long,
+    val visitDate: String?,
+    val nikshayId: String? = null,
+    val isChestXRayDone: Boolean? = null,
+    val chestXRayResult: String? = null,
+    val isSputumCollected: Boolean? = null,
+    val sputumSubmittedAt: String? = null,
+    val isNaatConducted: Boolean? = null,
+    val naatResult: String? = null,
+    val recommendedForLiquidCultureTest: Boolean? = null,
+    val isLiquidCultureConducted: Boolean? = null,
+    val liquidCultureResult: String? = null,
+    val isTBConfirmed: Boolean? = null,
+    val isConfirmed: Boolean = false,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val address: String? = null
+) {
+    fun toCache(): TBDiagnosticsCache = TBDiagnosticsCache(
+        benId = benId,
+        visitDate = getLongFromDate(visitDate),
+        nikshayId = nikshayId,
+        isChestXRayDone = isChestXRayDone,
+        chestXRayResult = chestXRayResult,
+        isSputumCollected = isSputumCollected,
+        sputumSubmittedAt = sputumSubmittedAt,
+        isNaatConducted = isNaatConducted,
+        naatResult = naatResult,
+        recommendedForLiquidCultureTest = recommendedForLiquidCultureTest,
+        isLiquidCultureConducted = isLiquidCultureConducted,
+        liquidCultureResult = liquidCultureResult,
+        isTBConfirmed = isTBConfirmed,
+        isConfirmed = isConfirmed,
+        latitude = latitude,
+        longitude = longitude,
+        address = address,
+        syncState = SyncState.SYNCED
+    )
+}
 
 data class MalariaScreeningDTO(
     val id: Int = 0, val benId: Long, val visitId: Long, val caseDate: String,

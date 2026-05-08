@@ -27,6 +27,7 @@ import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.repositories.ABHAGenratedRepo
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
+import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
 import java.io.File
 import java.io.FileWriter
@@ -38,7 +39,8 @@ class AllBenViewModel @Inject constructor(
     private val recordsRepo: RecordsRepo,
     abhaGenratedRepo: ABHAGenratedRepo,
     private val benRepo: BenRepo,
-    private val vitalRepo: VitalRepo
+    private val vitalRepo: VitalRepo,
+    private val tbRepo: TBRepo
 ) : ViewModel() {
 
     private var sourceFromArgs = AllBenFragmentArgs.fromSavedStateHandle(savedStateHandle).source
@@ -63,6 +65,8 @@ class AllBenViewModel @Inject constructor(
 
     val childCounts: Flow<Map<Long, Int>> = recordsRepo.childCountsByBen
     val vitalBenIds: Flow<List<Long>> = vitalRepo.vitalBenIds
+    val tbScreeningBenIds: Flow<List<Long>> = tbRepo.tbScreeningBenIds
+    val generalOpdBenIds: Flow<List<Long>> = tbRepo.generalOpdBenIds
 
     private val _abha = MutableLiveData<String?>()
     val abha: LiveData<String?>

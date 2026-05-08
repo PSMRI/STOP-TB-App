@@ -2,7 +2,10 @@ package org.piramalswasthya.stoptb.ui.login_activity.sign_in
 
 import android.app.AlertDialog
 import android.content.Context
+import android.content.Context.CONNECTIVITY_SERVICE
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -30,7 +33,6 @@ import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.Languages.ASSAMESE
 import org.piramalswasthya.stoptb.helpers.Languages.ENGLISH
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
-import org.piramalswasthya.stoptb.helpers.isInternetAvailable
 import org.piramalswasthya.stoptb.ui.login_activity.LoginActivity
 import org.piramalswasthya.stoptb.utils.NoCopyPasteHelper
 import org.piramalswasthya.stoptb.work.WorkerUtils
@@ -270,7 +272,7 @@ class SignInFragment : Fragment() {
                     val user = state.data  // ya loggedInUser use karo
 
                     if (RoleConstants.isAllowedStopTbRole(user?.role)) {
-                        showLoginRoleToast(user)
+//                        showLoginRoleToast(user)
 
                         if (binding.cbRemember.isChecked) {
                             val username = binding.etUsername.text.toString()
@@ -448,6 +450,18 @@ class SignInFragment : Fragment() {
             }
 
             else -> Unit
+        }
+    }
+
+    @Suppress("deprecation")
+    private fun isInternetAvailable(context: Context): Boolean {
+        val connectivityManager = context.getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val network = connectivityManager.activeNetwork
+            val capabilities = connectivityManager.getNetworkCapabilities(network)
+            capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ?: false
+        } else {
+            connectivityManager.activeNetworkInfo?.let { it.isAvailable && it.isConnected } == true
         }
     }
 

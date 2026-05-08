@@ -597,7 +597,24 @@
     <string name="tb_asymptomatic_screening">लक्षणरहित स्क्रीनिंग</string>
     <string name="tb_referral_required">रेफरल आवश्यक</string>
     <string name="tb_referral_for">किसके लिए रेफरल</string>
-    <string name="tb_family_contact_screening_alert">कृपया इस लाभार्थी के सभी परिवार सदस्यों और नज़दीकी संपर्कों की टीबी स्क्रीनिंग करें।</string>
+    <string name="tb_family_contact_screening_alert">परिवार के सभी सदस्यों की ट्रेसिंग और स्क्रीनिंग की सलाह दें</string>
+    <string name="referred_for_digital_chest_xray">डिजिटल चेस्ट एक्स-रे के लिए रेफर किया गया</string>
+    <string name="referred_for_sputum_collection">स्पुटम कलेक्शन के लिए रेफर किया गया</string>
+    <string name="recommended_for_truenat_test">ट्रूनैट टेस्ट की सिफारिश</string>
+    <string name="recommended_for_liquid_culture_test">लिक्विड कल्चर टेस्ट की सिफारिश</string>
+    <string name="reason_for_denial_for_getting_tested">जांच कराने से मना करने का कारण</string>
+    <string-array name="tb_reason_for_denial_testing">
+        <item>डर और चिंता</item>
+        <item>गलत धारणाएं</item>
+        <item>सामाजिक कलंक</item>
+        <item>सांस्कृतिक और जेंडर संबंधी बाधाएं</item>
+        <item>स्वास्थ्यकर्मियों के साथ पहले का नकारात्मक अनुभव</item>
+        <item>गोपनीयता संबंधी चिंता</item>
+        <item>कैंप में लंबा इंतजार</item>
+        <item>दैनिक मजदूरी का नुकसान</item>
+        <item>सरकारी कार्यक्रमों या कैंप आयोजकों पर भरोसे की कमी</item>
+        <item>अन्य</item>
+    </string-array>
     <string name="tb_screening_referral_reason">टीबी स्क्रीनिंग रेफरल</string>
 
     <string-array name="tb_referral_tests">
@@ -658,7 +675,101 @@
     <string name="diastolic_bp_mmhg">डायस्टोलिक ब्लड प्रेशर (mm Hg)</string>
     <string name="random_blood_sugar">रैंडम ब्लड शुगर</string>
     <string name="vital_referral_reason">वाइटल स्क्रीनिंग रेफरल</string>
+    <string name="clinical_examination">क्लिनिकल परीक्षण (वैकल्पिक)</string>
+    <string name="pallor">पीलापन</string>
+    <string name="icterus">पीलिया</string>
+    <string name="cyanosis">सायनोसिस</string>
+    <string name="clubbing">क्लबिंग</string>
+    <string name="lymphadenopathy">लिम्फैडेनोपैथी</string>
+    <string name="oedema">सूजन</string>
+    <string name="key_population_risk_factors">मुख्य जनसंख्या / जोखिम कारक *</string>
+    <string name="select_key_population_risk_factors">मुख्य जनसंख्या / जोखिम कारक चुनें</string>
+    <string name="hiv_status">एचआईवी स्थिति *</string>
+    <string name="risk_factor_required">मुख्य जनसंख्या / जोखिम कारक चुनें</string>
+    <string name="hiv_status_required">एचआईवी स्थिति चुनें</string>
+    <string name="present">मौजूद</string>
+    <string name="absent">अनुपस्थित</string>
+    <string name="positive">पॉजिटिव</string>
+    <string name="reactive">रिएक्टिव</string>
+    <string name="negative">नेगेटिव</string>
+    <string name="unknown">अज्ञात</string>
+    <string name="not_applicable">लागू नहीं</string>
     <string name="diagnostics_submitted">Diagnostics submitted</string>
+    <string name="general_opd">जनरल ओपीडी</string>
+    <string name="chief_complaint">मुख्य शिकायत</string>
+    <string name="medication">दवा</string>
+    <string name="dosage">खुराक</string>
+    <string name="frequency">आवृत्ति</string>
+    <string name="duration">अवधि</string>
+    <string name="notes_remarks">नोट्स / टिप्पणी</string>
+    <string name="general_opd_submitted">जनरल ओपीडी सबमिट हो गया</string>
+    <string name="general_opd_medication_required_error">मुख्य शिकायत चुनने पर दवा भरना जरूरी है।</string>
+
+    <string-array name="general_opd_chief_complaint_array">
+        <item>बुखार</item>
+        <item>हल्का से मध्यम शरीर दर्द</item>
+        <item>सिरदर्द</item>
+        <item>बुखार के साथ कमजोरी</item>
+        <item>एसिडिटी</item>
+        <item>पेट में जलन</item>
+        <item>अपच</item>
+        <item>गैस</item>
+        <item>पेट फूलना</item>
+        <item>ऊपरी पेट में असुविधा</item>
+        <item>एलर्जी के लक्षण</item>
+        <item>छींक आना</item>
+        <item>नाक बहना</item>
+        <item>खुजली (त्वचा या आंख)</item>
+        <item>हल्का एलर्जिक रैश</item>
+        <item>दस्त</item>
+        <item>ढीला मल</item>
+        <item>आंत का असंतुलन</item>
+        <item>ढीले मल के साथ अपच</item>
+        <item>डिहाइड्रेशन</item>
+        <item>कमजोरी के साथ उल्टी</item>
+        <item>गर्मी से थकावट</item>
+        <item>सामान्य कमजोरी</item>
+        <item>थकान</item>
+        <item>पोषण की कमी</item>
+        <item>भूख कम लगना</item>
+        <item>बच्चों में बुखार</item>
+        <item>बच्चों में शरीर दर्द</item>
+        <item>टीकाकरण के बाद बुखार</item>
+        <item>बच्चों में एलर्जी</item>
+        <item>छींक के साथ सर्दी</item>
+        <item>बच्चों में खुजली</item>
+        <item>हल्की त्वचा एलर्जी</item>
+        <item>बच्चों में दस्त</item>
+        <item>कमजोर प्रतिरक्षा</item>
+        <item>बीमारी से रिकवरी</item>
+    </string-array>
+
+    <string-array name="general_opd_medication_array">
+        <item>Tab Paracetamol (500 mg)</item>
+        <item>Tab Digene (Aluminium hydroxide + magnesium aluminium silicate + magnesium oxide + simethicone)</item>
+        <item>Tab Cetrizine (10 mg)</item>
+        <item>Tab Sporolac DS 120M (Lactic acid bacillus tablets)</item>
+        <item>ORS sachets</item>
+        <item>Tab Multivitamin</item>
+        <item>Syp Paracetamol 250mg (60ml)</item>
+        <item>Syp Cetrizine 60 ml</item>
+        <item>Syp Zinc 60 ml</item>
+    </string-array>
+
+    <string-array name="general_opd_frequency_array">
+        <item>दिन में एक बार</item>
+        <item>दिन में दो बार</item>
+        <item>दिन में तीन बार</item>
+        <item>जरूरत पड़ने पर</item>
+    </string-array>
+
+    <string-array name="general_opd_duration_array">
+        <item>1 दिन</item>
+        <item>2 दिन</item>
+        <item>3 दिन</item>
+        <item>5 दिन</item>
+        <item>7 दिन</item>
+    </string-array>
 </resources>
 
 

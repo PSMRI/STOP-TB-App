@@ -9,7 +9,7 @@ import org.piramalswasthya.stoptb.database.room.dao.VitalDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.VitalCache
 import org.piramalswasthya.stoptb.network.AmritApiService
-import org.piramalswasthya.stoptb.network.VitalNurseDataRequest
+import org.piramalswasthya.stoptb.network.GeneralExaminationSaveRequest
 import timber.log.Timber
 import java.net.SocketTimeoutException
 import javax.inject.Inject
@@ -49,8 +49,8 @@ class VitalRepo @Inject constructor(
     private suspend fun pushSingleVital(vitalCache: VitalCache): Boolean {
         val user = preferenceDao.getLoggedInUser() ?: return false
         return try {
-            val response = tmcNetworkApiService.saveVitalNurseData(
-                VitalNurseDataRequest.from(vitalCache, user)
+            val response = tmcNetworkApiService.saveGeneralExamination(
+                GeneralExaminationSaveRequest.from(vitalCache, user)
             )
             val responseBody = response.body()?.string()
             if (!response.isSuccessful || responseBody.isNullOrBlank()) return false

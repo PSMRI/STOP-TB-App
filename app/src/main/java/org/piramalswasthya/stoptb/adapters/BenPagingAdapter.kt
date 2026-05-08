@@ -23,6 +23,8 @@ class BenPagingAdapter(
     PagingDataAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenListAdapter.BenDiffUtilCallBack) {
 
     private val benIds = mutableListOf<Long>()
+    private val tbScreeningBenIds = mutableListOf<Long>()
+    private val generalOpdBenIds = mutableListOf<Long>()
     private val childCountMap = mutableMapOf<Long, Int>()
 
     override fun onCreateViewHolder(
@@ -44,6 +46,8 @@ class BenPagingAdapter(
             pref,
             context,
             benIds,
+            tbScreeningBenIds,
+            generalOpdBenIds,
             childCountMap,
             showActionButtons = showActionButtons,
             showResultButton = showResultButton
@@ -55,6 +59,32 @@ class BenPagingAdapter(
         benIds.clear()
         benIds.addAll(list)
         val newIds = benIds.toSet()
+        val changed = (oldIds - newIds) + (newIds - oldIds)
+        if (changed.isNotEmpty()) {
+            val items = snapshot()
+            items.forEachIndexed { index, item ->
+                if (item != null && item.benId in changed) {
+                    notifyItemChanged(index)
+                }
+            }
+        }
+    }
+
+    fun submitTbScreeningBenIds(list: List<Long>) {
+        val oldIds = tbScreeningBenIds.toSet()
+        tbScreeningBenIds.clear()
+        tbScreeningBenIds.addAll(list)
+        notifyChangedIds(oldIds, tbScreeningBenIds.toSet())
+    }
+
+    fun submitGeneralOpdBenIds(list: List<Long>) {
+        val oldIds = generalOpdBenIds.toSet()
+        generalOpdBenIds.clear()
+        generalOpdBenIds.addAll(list)
+        notifyChangedIds(oldIds, generalOpdBenIds.toSet())
+    }
+
+    private fun notifyChangedIds(oldIds: Set<Long>, newIds: Set<Long>) {
         val changed = (oldIds - newIds) + (newIds - oldIds)
         if (changed.isNotEmpty()) {
             val items = snapshot()

@@ -5,6 +5,112 @@ import org.piramalswasthya.stoptb.model.User
 import org.piramalswasthya.stoptb.model.VitalCache
 
 @JsonClass(generateAdapter = true)
+data class GeneralExaminationSaveRequest(
+    val beneficiaryID: Long,
+    val beneficiaryRegID: Long,
+    val createdBy: String?,
+    val providerServiceMapID: Int,
+    val pulseRate: Int? = null,
+    val systolicBP: Int? = null,
+    val diastolicBP: Int? = null,
+    val randomBloodSugar: Double? = null,
+    val pallorId: Int? = null,
+    val pallor: String? = null,
+    val icterusId: Int? = null,
+    val icterus: String? = null,
+    val cyanosisId: Int? = null,
+    val cyanosis: String? = null,
+    val clubbingId: Int? = null,
+    val clubbing: String? = null,
+    val lymphadenopathyId: Int? = null,
+    val lymphadenopathy: String? = null,
+    val oedemaId: Int? = null,
+    val oedema: String? = null,
+    val keyPopulationRiskFactorIds: List<Int>? = null,
+    val keyPopulationRiskFactors: List<String>? = null,
+    val hivStatusId: Int? = null,
+    val hivStatus: String? = null
+) {
+    companion object {
+        fun from(vital: VitalCache, user: User): GeneralExaminationSaveRequest {
+            return GeneralExaminationSaveRequest(
+                beneficiaryID = vital.benId,
+                beneficiaryRegID = vital.benRegId,
+                createdBy = user.userName,
+                providerServiceMapID = user.serviceMapId,
+                pulseRate = vital.pulseRate,
+                systolicBP = vital.bpSystolic,
+                diastolicBP = vital.bpDiastolic,
+                randomBloodSugar = vital.rbs,
+                pallorId = vital.pallorId,
+                pallor = vital.pallor,
+                icterusId = vital.icterusId,
+                icterus = vital.icterus,
+                cyanosisId = vital.cyanosisId,
+                cyanosis = vital.cyanosis,
+                clubbingId = vital.clubbingId,
+                clubbing = vital.clubbing,
+                lymphadenopathyId = vital.lymphadenopathyId,
+                lymphadenopathy = vital.lymphadenopathy,
+                oedemaId = vital.oedemaId,
+                oedema = vital.oedema,
+                keyPopulationRiskFactorIds = vital.keyPopulationRiskFactorIds,
+                keyPopulationRiskFactors = vital.keyPopulationRiskFactors,
+                hivStatusId = vital.hivStatusId,
+                hivStatus = vital.hivStatus
+            )
+        }
+    }
+}
+
+@JsonClass(generateAdapter = true)
+data class GeneralExaminationGetRequest(
+    val userId: Int,
+    val providerServiceMapID: Int,
+    val villageId: Int? = null,
+    val pageNo: Int = 0,
+    val pageSize: Int = 100
+)
+
+@JsonClass(generateAdapter = true)
+data class GeneralExaminationResponse(
+    val statusCode: Int,
+    val status: String? = null,
+    val message: String? = null,
+    val data: List<GeneralExaminationRecord>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class GeneralExaminationRecord(
+    val id: Long? = null,
+    val beneficiaryID: Long,
+    val beneficiaryRegID: Long,
+    val createdBy: String? = null,
+    val providerServiceMapID: Int? = null,
+    val pulseRate: Int? = null,
+    val systolicBP: Int? = null,
+    val diastolicBP: Int? = null,
+    val randomBloodSugar: Double? = null,
+    val pallorId: Int? = null,
+    val pallor: String? = null,
+    val icterusId: Int? = null,
+    val icterus: String? = null,
+    val cyanosisId: Int? = null,
+    val cyanosis: String? = null,
+    val clubbingId: Int? = null,
+    val clubbing: String? = null,
+    val lymphadenopathyId: Int? = null,
+    val lymphadenopathy: String? = null,
+    val oedemaId: Int? = null,
+    val oedema: String? = null,
+    val keyPopulationRiskFactorIds: List<Int>? = null,
+    val keyPopulationRiskFactors: List<String>? = null,
+    val hivStatusId: Int? = null,
+    val hivStatus: String? = null,
+    val createdDate: String? = null
+)
+
+@JsonClass(generateAdapter = true)
 data class VitalNurseDataRequest(
     val benFlowID: String? = null,
     val beneficiaryID: String?,
@@ -56,8 +162,26 @@ data class VitalDetailsRequest(
     val midUpperArmCircumference_MUAC_cm: String? = null,
     val painInChestChecked: String? = null,
     val parkingPlaceID: Int? = null,
+    val pallorId: Int? = null,
+    val pallor: String? = null,
     val providerServiceMapID: String?,
     val pulseRate: String?,
+    val icterusId: Int? = null,
+    val icterus: String? = null,
+    val cyanosisId: Int? = null,
+    val cyanosis: String? = null,
+    val clubbingId: Int? = null,
+    val clubbing: String? = null,
+    val lymphadenopathyId: Int? = null,
+    val lymphadenopathy: String? = null,
+    val oedemaId: Int? = null,
+    val oedema: String? = null,
+    val keyPopulationRiskFactorIds: List<Int>? = null,
+    val keyPopulationRiskFactors: List<String>? = null,
+    val hivStatusId: Int? = null,
+    val hivStatus: String? = null,
+    val referralToHwcNeeded: Boolean? = null,
+    val referralTriggers: List<String>? = null,
     val rbsCheckBox: Boolean?,
     val rbsTestRemarks: String? = null,
     val rbsTestResult: String?,
@@ -81,8 +205,26 @@ data class VitalDetailsRequest(
                 createdBy = user.userName,
                 diastolicBP_1stReading = vital.bpDiastolic?.toString(),
                 height_cm = vital.height?.toString(),
+                pallorId = vital.pallorId,
+                pallor = vital.pallor,
                 providerServiceMapID = user.serviceMapId.toString(),
                 pulseRate = vital.pulseRate?.toString(),
+                icterusId = vital.icterusId,
+                icterus = vital.icterus,
+                cyanosisId = vital.cyanosisId,
+                cyanosis = vital.cyanosis,
+                clubbingId = vital.clubbingId,
+                clubbing = vital.clubbing,
+                lymphadenopathyId = vital.lymphadenopathyId,
+                lymphadenopathy = vital.lymphadenopathy,
+                oedemaId = vital.oedemaId,
+                oedema = vital.oedema,
+                keyPopulationRiskFactorIds = vital.keyPopulationRiskFactorIds,
+                keyPopulationRiskFactors = vital.keyPopulationRiskFactors,
+                hivStatusId = vital.hivStatusId,
+                hivStatus = vital.hivStatus,
+                referralToHwcNeeded = vital.referralToHwcNeeded,
+                referralTriggers = vital.referralTriggers,
                 rbsCheckBox = vital.rbs != null,
                 rbsTestResult = vital.rbs?.toString(),
                 respiratoryRate = vital.respiratoryRate?.toString(),

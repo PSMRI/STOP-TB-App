@@ -9,6 +9,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -208,7 +209,8 @@ class AllBenFragment : Fragment() {
                         findNavController().navigate(
                             AllBenFragmentDirections.actionAllBenFragmentToVitalScreenFragment(
                                 benId = benId,
-                                benRegId = benRegId
+                                benRegId = benRegId,
+                                autoFlow = true
                             )
                         )
                     }
@@ -219,6 +221,17 @@ class AllBenFragment : Fragment() {
                         AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
                             benId = benId,
                             viewOnly = true
+                        )
+                    )
+                },
+                { item, benId, hhId, viewOnly ->
+                    if (isReadOnlyReferralList) return@BenClickListener
+                    findNavController().navigate(
+                        R.id.GeneralOpdFormFragment,
+                        bundleOf(
+                            "benId" to benId,
+                            "viewOnly" to viewOnly,
+                            "autoFlow" to false
                         )
                     )
                 }
@@ -268,6 +281,18 @@ class AllBenFragment : Fragment() {
         lifecycleScope.launch {
             viewModel.vitalBenIds.collectLatest { benIds ->
                 benAdapter.submitBenIds(benIds)
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.tbScreeningBenIds.collectLatest { benIds ->
+                benAdapter.submitTbScreeningBenIds(benIds)
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.generalOpdBenIds.collectLatest { benIds ->
+                benAdapter.submitGeneralOpdBenIds(benIds)
             }
         }
 

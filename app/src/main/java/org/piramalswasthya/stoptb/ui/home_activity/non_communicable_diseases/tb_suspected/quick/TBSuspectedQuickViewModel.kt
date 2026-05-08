@@ -12,8 +12,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.configuration.TBSuspectedQuickDataset
+import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
-import org.piramalswasthya.stoptb.model.TBSuspectedCache
+import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import timber.log.Timber
@@ -52,23 +53,45 @@ class TBSuspectedQuickViewModel @Inject constructor(
     private val _showSubmit = MutableLiveData(true)
     val showSubmit: LiveData<Boolean> = _showSubmit
 
-    private lateinit var tbSuspected: TBSuspectedCache
+    private lateinit var tbDiagnostics: TBDiagnosticsCache
 
     init {
         viewModelScope.launch {
             val ben = benRepo.getBenFromId(benId)?.also { beneficiary ->
                 _benName.value = listOfNotNull(beneficiary.firstName, beneficiary.lastName).joinToString(" ")
                 _benAgeGender.value = "${beneficiary.age} ${beneficiary.ageUnit?.name} | ${beneficiary.gender?.name}"
-                tbSuspected = TBSuspectedCache(benId = beneficiary.beneficiaryId)
+                tbDiagnostics = TBDiagnosticsCache(benId = beneficiary.beneficiaryId)
             }
             val tbScreening = tbRepo.getTBScreening(benId)
-            tbRepo.getTBSuspected(benId)?.let {
-                tbSuspected = it
+            tbRepo.getTBDiagnostics(benId)?.let {
+                tbDiagnostics = it
+            } ?: tbRepo.getTBSuspected(benId)?.let { legacySuspected ->
+                // Existing installs may already have diagnostics captured in TB_SUSPECTED.
+                // Use it only as a read fallback; new saves go to TB_DIAGNOSTICS.
+                tbDiagnostics = TBDiagnosticsCache(
+                    benId = legacySuspected.benId,
+                    visitDate = legacySuspected.visitDate,
+                    nikshayId = legacySuspected.nikshayId,
+                    isChestXRayDone = legacySuspected.isChestXRayDone,
+                    chestXRayResult = legacySuspected.chestXRayResult,
+                    isSputumCollected = legacySuspected.isSputumCollected,
+                    sputumSubmittedAt = legacySuspected.sputumSubmittedAt,
+                    isNaatConducted = legacySuspected.isNaatConducted,
+                    naatResult = legacySuspected.naatResult,
+                    recommendedForLiquidCultureTest = legacySuspected.recommendedForLiquidCultureTest,
+                    isLiquidCultureConducted = legacySuspected.isLiquidCultureConducted,
+                    liquidCultureResult = legacySuspected.liquidCultureResult,
+                    isTBConfirmed = legacySuspected.isTBConfirmed,
+                    isConfirmed = legacySuspected.isConfirmed,
+                    latitude = legacySuspected.latitude,
+                    longitude = legacySuspected.longitude,
+                    address = legacySuspected.address
+                )
             }
             dataset.setUpPage(
                 ben,
                 tbScreening,
-                if (::tbSuspected.isInitialized) tbSuspected else null,
+                if (::tbDiagnostics.isInitialized) tbDiagnostics else null,
                 referralMode = viewOnly
             )
             _showSubmit.value = dataset.shouldShowSubmit()
@@ -80,11 +103,12 @@ class TBSuspectedQuickViewModel @Inject constructor(
             withContext(Dispatchers.IO) {
                 try {
                     _state.postValue(State.SAVING)
-                    dataset.mapValues(tbSuspected, 1)
-                    tbRepo.saveTBSuspected(tbSuspected)
+                    dataset.mapValues(tbDiagnostics, 1)
+                    tbDiagnostics.syncState = SyncState.UNSYNCED
+                    tbRepo.saveTBDiagnostics(tbDiagnostics)
                     _state.postValue(State.SAVE_SUCCESS)
                 } catch (e: Exception) {
-                    Timber.e(e, "Saving diagnostics failed for benId=%s", tbSuspected.benId)
+                    Timber.e(e, "Saving diagnostics failed for benId=%s", benId)
                     _state.postValue(State.SAVE_FAILED)
                 }
             }

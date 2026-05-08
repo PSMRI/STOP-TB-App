@@ -69,11 +69,20 @@ interface AmritApiService {
     @POST("flw-api/tb/suspected/getAll")
     suspend fun getTBSuspectedData(@Body userDetail: GetDataPaginatedRequest): Response<ResponseBody>
 
+    @POST("flw-api/tb/diagnostics/getAll")
+    suspend fun getTBDiagnosticsData(@Body userDetail: GetDataPaginatedRequest): Response<ResponseBody>
+
     @GET("flw-api/tb/confirmed/getAll")
     suspend fun getTBConfirmedData(): Response<ResponseBody>
 
     @POST("flw-api/tb/screening/saveAll")
     suspend fun saveTBScreeningData(@Body tbScreeningRequestDTO: TBScreeningRequestDTO): Response<ResponseBody>
+
+    @POST("flw-api/general-opd/getAll")
+    suspend fun getGeneralOpdData(@Body userDetail: GetDataPaginatedRequest): Response<ResponseBody>
+
+    @POST("flw-api/general-opd/saveAll")
+    suspend fun saveGeneralOpdData(@Body generalOpdRequestDTO: GeneralOpdRequestDTO): Response<ResponseBody>
 
     @POST("flw-api/disease/kalaAzar/saveAll")
     suspend fun saveKalaAzarScreeningData(@Body kalaAzarScreenRequestDTO: KalaAzarScreeningRequestDTO): Response<ResponseBody>
@@ -105,8 +114,17 @@ interface AmritApiService {
     @POST("flw-api/tb/suspected/saveAll")
     suspend fun saveTBSuspectedData(@Body tbSuspectedRequestDTO: TBSuspectedRequestDTO): Response<ResponseBody>
 
+    @POST("flw-api/tb/diagnostics/saveAll")
+    suspend fun saveTBDiagnosticsData(@Body tbDiagnosticsRequestDTO: TBDiagnosticsRequestDTO): Response<ResponseBody>
+
     @POST("flw-api/tb/confirmed/save")
     suspend fun saveTBConfirmedData(@Body tbConfirmedRequestDTO: TBConfirmedRequestDTO): Response<ResponseBody>
+
+    @POST("flw-api/general-examination/save")
+    suspend fun saveGeneralExamination(@Body request: GeneralExaminationSaveRequest): Response<ResponseBody>
+
+    @POST("flw-api/general-examination/getAll")
+    suspend fun getGeneralExaminations(@Body request: GeneralExaminationGetRequest): Response<GeneralExaminationResponse>
 
     @POST("/hwc-api/sync/generalOPDNurseFormDataToServer")
     suspend fun saveVitalNurseData(@Body patientVisitInfo: VitalNurseDataRequest): Response<ResponseBody>

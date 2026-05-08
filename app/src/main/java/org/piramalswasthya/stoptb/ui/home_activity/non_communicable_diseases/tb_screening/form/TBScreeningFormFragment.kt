@@ -70,7 +70,7 @@ class TBScreeningFormFragment : Fragment() {
                     }, isEnabled = !(recordExists || viewModel.viewOnly)
                 )
                 binding.btnSubmit.isEnabled = !(recordExists || viewModel.viewOnly)
-                binding.btnSubmit.visibility = if (viewModel.viewOnly) View.GONE else View.VISIBLE
+                binding.btnSubmit.visibility = if (recordExists || viewModel.viewOnly) View.GONE else View.VISIBLE
                 binding.form.rvInputForm.adapter = adapter
                 lifecycleScope.launch {
                     viewModel.formList.collect {
@@ -132,10 +132,9 @@ class TBScreeningFormFragment : Fragment() {
         ).show()
         if (viewModel.autoFlow) {
             findNavController().navigate(
-                R.id.vitalScreenFragment,
+                R.id.GeneralOpdFormFragment,
                 bundleOf(
                     "benId" to viewModel.benId,
-                    "benRegId" to viewModel.benRegId,
                     "autoFlow" to true
                 )
             )
