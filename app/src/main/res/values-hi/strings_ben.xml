@@ -12,6 +12,7 @@
     <string name="has_aadhaar_number">आधार नंबर है</string>
     <string name="enter_aadhaar_number_ben">आधार नंबर दर्ज करें</string>
     <string name="reproductive_status">क्या आप गर्भवती हैं</string>
+
     <string name="birth_certificate_number">Birth Certificate No.</string>
     <string name="beneficiary_details">लाभार्थी विवरण</string>
     <string name="wife_s_name">पत्नी का नाम</string>
@@ -41,6 +42,7 @@
     <string name="icon_title_abortion">गर्भपात सूची</string>
     <string name="icon_title_pmsma">ई-पीएमएसएमए सूची</string>
     <string name="mother_rch_id">मां की RCH आईडी</string>
+
     <string-array name="anc_paiucd_done_by">
         <item>डॉक्टर</item>
         <item>नर्स</item>
@@ -82,6 +84,19 @@
         <item>हाँ</item>
         <item>नहीं</item>
     </string-array>
+
+
+    <string-array name="person_from_array">
+        <item>सार्वजनिक क्षेत्र</item>
+        <item>निजी क्षेत्र</item>
+    </string-array>
+
+
+    <string-array name="type_of_case_finding_array">
+        <item>निष्क्रिय (सामान्य कार्यक्रम)</item>
+        <item>सक्रिय (सक्रिय केस खोज)</item>
+    </string-array>
+
 
     <string name="dd_ec">लक्ष्य दम्पति</string>
     <string name="dd_pw">गर्भवती महिला</string>
@@ -332,7 +347,8 @@
     <string name="frag_new_ben_type_adult_text">सामान्य पंजीकरण \n( 15 वर्ष और उससे अधिक )</string>
     <string name="frag_new_ben_type_select_text">लाभार्थी प्रकार चुनें</string>
     <string name="frag_new_ben_reg_type_title">लाभार्थी पंजीकरण</string>
-    <string name="consent_text">सहमति:\nमुझे वॉलंटियर द्वारा समझाया गया है कि मेरे से जो जानकारी और माप एकत्र की जा रही है उसका उद्देश्य क्या है, एक ऐसी भाषा में जो मैं समझती/समझता हूँ और मैं अपनी व्यक्तिगत स्वास्थ्य प्रोफाइल पर जानकारी और माप एकत्र करने के लिए अपनी सहमति देती/देता हूँ।</string>
+<!--    <string name="consent_text">सहमति:\nमुझे वॉलंटियर द्वारा समझाया गया है कि मेरे से जो जानकारी और माप एकत्र की जा रही है उसका उद्देश्य क्या है, एक ऐसी भाषा में जो मैं समझती/समझता हूँ और मैं अपनी व्यक्तिगत स्वास्थ्य प्रोफाइल पर जानकारी और माप एकत्र करने के लिए अपनी सहमति देती/देता हूँ।</string>-->
+    <string name="consent_text">सहमति:\nमुझे उस उद्देश्य के बारे में समझाया गया है जिसके लिए मुझसे जानकारी और निष्कर्ष एकत्र किए जा रहे हैं, ऐसी भाषा में जिसे मैं समझता/समझती हूँ, और मैं अपनी व्यक्तिगत स्वास्थ्य प्रोफ़ाइल पर जानकारी और निष्कर्ष एकत्र करने के लिए अपनी सहमति देता/देती हूँ।</string>
     <string name="other_place_of_death">मृत्यु का अन्य स्थान</string>
     <string name="deworming_done">कृमि मुक्ति चक्र पूरा हुआ?</string>
     <string name="deworming_date">कृमि मुक्ति की तारीख</string>
@@ -388,4 +404,16 @@
     </string-array>
 
     <string name="whose_mobile_number">किसका मोबाइल नंबर</string>
+
+    <string name="person_from">व्यक्ति कहाँ से है</string>
+    <string name="type_of_case_finding">मामला खोजने का प्रकार</string>
+    <string name="mobile_number_not_available">मोबाइल नंबर उपलब्ध नहीं है</string>
+    <string name="ben_reg_address">पता</string>
+    <string name="ben_reg_state">राज्य</string>
+    <string name="ben_reg_tu">टीयू</string>
+    <string name="ben_reg_health_facility">स्वास्थ्य सुविधा</string>
+
+    <string-array name="mobile_not_available_array">
+        <item>उपलब्ध नहीं है</item>
+    </string-array>
 </resources>

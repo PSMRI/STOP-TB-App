@@ -41,8 +41,8 @@ class VolunteerHomeFragment : Fragment() {
         binding.vp2Home.adapter = VolunteerPagerAdapter(this)
         TabLayoutMediator(binding.tlHomeViewpager, binding.vp2Home) { tab, position ->
             tab.text = when (position) {
-                0 -> requireActivity().getString(R.string.menu_home_scheduler)
-                1 -> requireActivity().getString(R.string.menu_home_home)
+                0 -> requireActivity().getString(R.string.menu_home_home)
+                1 -> requireActivity().getString(R.string.menu_home_scheduler)
                 else -> "NA"
             }
         }.attach()
@@ -57,7 +57,7 @@ class VolunteerHomeFragment : Fragment() {
             )
             it.addClickListenerToHomepageActionBarTitle()
         }
-        binding.vp2Home.setCurrentItem(1, false)
+        binding.vp2Home.setCurrentItem(0, false)
     }
 
     private fun getHomeToolbarTitle(): String {

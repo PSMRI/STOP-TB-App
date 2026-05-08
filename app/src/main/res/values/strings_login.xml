@@ -33,7 +33,7 @@
     <string name="camp_scan_qr_title">Scan the QR from laptop hub</string>
     <string name="camp_scan_qr_subtitle">Fastest way to connect this device to camp network</string>
     <string name="camp_manual_url_title">Or enter hub URL manually</string>
-    <string name="pwr_by_text" translatable="false">Powered by\n <b>Piramal Foundation</b></string>
+    <string name="pwr_by_text" translatable="false">Powered by\n <b>STOP TB</b></string>
     <string name="login_diff_user">You are previously logged in with Username: @username as @asha, Do you want to Log in with another User?</string>
     <string name="unsync_record_count">Hello! there are @count un-sync records, please wait till all records are synced.</string>
     <string name="account_deactivated_title">Account Deactivated</string>

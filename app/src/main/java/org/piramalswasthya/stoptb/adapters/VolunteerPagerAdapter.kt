@@ -9,8 +9,8 @@ class VolunteerPagerAdapter(fragment: Fragment) : FragmentStateAdapter(fragment)
     override fun getItemCount() = 2
     override fun createFragment(position: Int): Fragment {
         return when (position) {
-            0 -> DashboardFragment()
-            1 -> VolunteerIconsFragment()
+            0 -> VolunteerIconsFragment()
+            1 -> DashboardFragment()
             else -> throw IllegalStateException("Index >1 called!")
         }
     }

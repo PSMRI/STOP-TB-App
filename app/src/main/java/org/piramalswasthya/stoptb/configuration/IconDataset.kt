@@ -22,21 +22,22 @@ class IconDataset @Inject constructor(
         MALARIA, KALA_AZAR, AES_JE, FILARIA, LEPROSY, DEWARMING
     }
 
-    fun getVolunteerIconDataset(resources: Resources) = listOf(
-        Icon(
-            R.drawable.ic__ben,
-            resources.getString(R.string.icon_title_ben),
-            resources.getString(R.string.home_card_all_ben_subtitle),
-            recordsRepo.allBenListCount,
-            VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment()
-        ),
-        Icon(
-            R.drawable.ic__ncd,
-            resources.getString(R.string.icon_title_ncd_tb_screening),
-            resources.getString(R.string.home_card_tb_subtitle),
-            null,
-            VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToTbFragment()
-        ),
+    fun getVolunteerIconDataset(resources: Resources): List<Icon> {
+        val iconList = mutableListOf(
+            Icon(
+                R.drawable.ic__ben,
+                resources.getString(R.string.icon_title_ben),
+                resources.getString(R.string.home_card_all_ben_subtitle),
+                recordsRepo.allBenListCount,
+                VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment()
+            ),
+            Icon(
+                R.drawable.ic__ncd,
+                resources.getString(R.string.icon_title_ncd_tb_screening),
+                resources.getString(R.string.home_card_tb_subtitle),
+                null,
+                VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToTbFragment()
+            ),
 //        Icon(
 //            R.drawable.ic__ncd,
 //            resources.getString(R.string.icon_title_ncd),
@@ -44,17 +45,37 @@ class IconDataset @Inject constructor(
 //            null,
 //            VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToNcdFragment()
 //        ),
-        Icon(
-            R.drawable.ic_ncd_noneligible,
-            resources.getString(R.string.ncd_refer_list),
-            resources.getString(R.string.home_card_referral_subtitle),
-            null,
-            VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToReferralIconsFragment()
+            Icon(
+                R.drawable.ic_ncd_noneligible,
+                resources.getString(R.string.ncd_refer_list),
+                resources.getString(R.string.home_card_referral_subtitle),
+                null,
+                VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToReferralIconsFragment()
+            )
         )
-    ).apply {
-        forEachIndexed { index, icon ->
-            icon.colorPrimary = index % 2 == 0
+
+        if (isRegistrarRole()) {
+            iconList.removeAll {
+                it.title == resources.getString(R.string.icon_title_ncd_tb_screening) ||
+                        it.title == resources.getString(R.string.ncd_refer_list)
+            }
         }
+
+        return iconList.apply {
+            forEachIndexed { index, icon ->
+                icon.colorPrimary = index % 2 == 0
+            }
+        }
+    }
+
+    private fun isRegistrarRole(): Boolean {
+        val normalizedRole = preferenceDao.getLoggedInUser()?.role
+            ?.trim()
+            ?.lowercase()
+            ?.replace(" ", "")
+            ?.replace("-", "")
+            ?.replace("_", "")
+        return normalizedRole == "registrar" || normalizedRole == "registrationofficer"
     }
 
     fun getNCDDataset(resources: Resources) = listOf(

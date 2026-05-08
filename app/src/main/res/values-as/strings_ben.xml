@@ -12,6 +12,7 @@
     <string name="has_aadhaar_number">আধাৰ নম্বৰ আছে</string>
     <string name="enter_aadhaar_number_ben">আধাৰ নম্বৰ লিখক</string>
     <string name="reproductive_status">আপুনি গৰ্ভৱতী নেকি</string>
+
     <string name="birth_certificate_number">Birth Certificate No.</string>
     <string name="beneficiary_details">সুবিধা প্ৰাপ্তবোৰ বিৱৰণ</string>
     <string name="wife_s_name">বাইৰ নাম</string>
@@ -55,8 +56,9 @@
     <string name="frag_new_ben_type_adult_text">সাধারণ নিবন্ধন\n( 15 বছর এবং তার উপর )</string>
     <string name="frag_new_ben_type_select_text">সুবিধানুগতের ধরন নির্বাচন করুন</string>
     <string name="frag_new_ben_reg_type_title">সুবিধাভোগী পঞ্জীয়ন</string>
-    <string name="consent_text">সন্মতি:\n
-    ভলান্টিয়াৰ মোক বুজাইছে, যিটো উদ্দেশ্যৰ বাবে মোৰ পৰা তথ্য আৰু জোখ-মাখৰ তথ্য সংগ্ৰহ কৰা হৈছে, মই বুজি পোৱা ভাষাত আৰু মই মোৰ ব্যক্তিগত স্বাস্থ্য প্ৰফাইলত তথ্য আৰু জোখ-মাখৰ তথ্য সংগ্ৰহ কৰিবলৈ মোৰ সন্মতি দিছো।</string>
+<!--    <string name="consent_text">সন্মতি:\n-->
+<!--    ভলান্টিয়াৰ মোক বুজাইছে, যিটো উদ্দেশ্যৰ বাবে মোৰ পৰা তথ্য আৰু জোখ-মাখৰ তথ্য সংগ্ৰহ কৰা হৈছে, মই বুজি পোৱা ভাষাত আৰু মই মোৰ ব্যক্তিগত স্বাস্থ্য প্ৰফাইলত তথ্য আৰু জোখ-মাখৰ তথ্য সংগ্ৰহ কৰিবলৈ মোৰ সন্মতি দিছো।</string>-->
+    <string name="consent_text">সম্মতি:\nমোৰ পৰা যি উদ্দেশ্যে তথ্য আৰু ফলাফল সংগ্ৰহ কৰা হৈছে, সেই বিষয়ে মোক মই বুজি পোৱা ভাষাত বুজাই দিয়া হৈছে আৰু মই মোৰ ব্যক্তিগত স্বাস্থ্য প্ৰফাইলত তথ্য আৰু ফলাফল সংগ্ৰহ কৰাৰ বাবে মোৰ সম্মতি দিছোঁ।</string>
     <string name="disagree">অসম্মত</string>
     <string name="agree">সম্মত</string>
     <string name="name_ben">নাম</string>
@@ -99,6 +101,19 @@
     <string-array name="nbr_reproductive_status_married_women_array">
         <item>হয়</item>
         <item>নহয়</item>
+    </string-array>
+
+    <string-array name="person_from_array">
+        <item>সাৰ্বজনীন খণ্ড</item>
+        <item>বেচৰকাৰী খণ্ড</item>
+    </string-array>
+
+
+
+
+    <string-array name="type_of_case_finding_array">
+        <item>নিষ্ক্ৰিয় (নিয়মীয়া কাৰ্যসূচী)</item>
+        <item>সক্ৰিয় (সক্ৰিয় ৰোগী সন্ধান)</item>
     </string-array>
 
     <string-array name="nbr_marital_status_male_array">
@@ -346,4 +361,17 @@
     </string-array>
 
     <string name="whose_mobile_number">কাৰ মোবাইল নম্বৰ</string>
+
+
+    <string name="person_from">ব্যক্তি কৰ পৰা</string>
+    <string name="type_of_case_finding">কেছ সন্ধানৰ ধৰণ</string>
+    <string name="mobile_number_not_available">মোবাইল নম্বৰ উপলব্ধ নহয়</string>
+    <string name="ben_reg_address">ঠিকনা</string>
+    <string name="ben_reg_state">ৰাজ্য</string>
+    <string name="ben_reg_tu">টিইউ</string>
+    <string name="ben_reg_health_facility">স্বাস্থ্য সুবিধা</string>
+
+    <string-array name="mobile_not_available_array">
+        <item>উপলব্ধ নহয়</item>
+    </string-array>
 </resources>

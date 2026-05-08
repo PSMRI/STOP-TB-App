@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.text.InputType
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.model.LocationEntity
 import org.piramalswasthya.stoptb.helpers.Languages
@@ -26,12 +27,20 @@ import org.piramalswasthya.stoptb.model.InputType.EDIT_TEXT
 import org.piramalswasthya.stoptb.model.InputType.IMAGE_VIEW
 import org.piramalswasthya.stoptb.model.InputType.RADIO
 import org.piramalswasthya.stoptb.model.InputType.TEXT_VIEW
+import org.piramalswasthya.stoptb.model.LocationRecord
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel.Companion.isOtpVerified
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
 class BenRegFormDataset(context: Context, language: Languages) : Dataset(context, language) {
+    private var currentLocation: LocationRecord? = null
+
+    private val preferenceDao = PreferenceDao(context)
+
+
+
+
 
     companion object {
         private fun getCurrentDateString(): String {
@@ -45,6 +54,17 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             cal.add(Calendar.YEAR, -1 * Konstants.maxAgeForGenBen)
             return cal.timeInMillis
         }
+    }
+
+    private fun isMobileNotAvailableChecked(): Boolean {
+        val normalizedIndexes = getCheckboxIndexesFromValues(
+            mobileNotAvailable.arrayId,
+            mobileNotAvailable.value
+        )
+        return normalizedIndexes
+            ?.split("|")
+            ?.mapNotNull { it.trim().toIntOrNull() }
+            ?.contains(0) == true
     }
 
     // ─────────────────────────── FORM FIELDS ───────────────────────────
@@ -72,6 +92,22 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         arrayId = R.array.beneficiary_status,
         entries = resources.getStringArray(R.array.beneficiary_status),
         required = false, hasDependants = true
+    )
+
+    private val personFrom = FormElement(
+        id = 1050, inputType = RADIO,
+        title = resources.getString(R.string.person_from),
+        arrayId = R.array.person_from_array,
+        entries = resources.getStringArray(R.array.person_from_array),
+        required = true
+    )
+
+    private val typeOfCaseFinding = FormElement(
+        id = 1051, inputType = RADIO,
+        title = resources.getString(R.string.type_of_case_finding),
+        arrayId = R.array.type_of_case_finding_array,
+        entries = resources.getStringArray(R.array.type_of_case_finding_array),
+        required = true
     )
 
     private val dateOfDeath = FormElement(
@@ -158,6 +194,39 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         etInputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL,
         isMobileNumber = true, etMaxLength = 10,
         max = 9999999999, min = 6000000000
+    )
+    private val mobileNotAvailable = FormElement(
+        id = 1052, inputType = org.piramalswasthya.stoptb.model.InputType.CHECKBOXES,
+        title = resources.getString(R.string.mobile_number_not_available),
+        arrayId = R.array.mobile_not_available_array,
+        entries = resources.getStringArray(R.array.mobile_not_available_array),
+        required = false, hasDependants = true
+    )
+    private val address = FormElement(
+        id = 1053, inputType = EDIT_TEXT,
+        title = resources.getString(R.string.ben_reg_address),
+        arrayId = -1, required = true, etMaxLength = 2000,
+        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+    )
+    private val state = FormElement(
+        id = 1054, inputType = DROPDOWN,
+        title = resources.getString(R.string.ben_reg_state),
+        arrayId = -1, required = true, hasDependants = true
+    )
+    private val district = FormElement(
+        id = 1055, inputType = DROPDOWN,
+        title = resources.getString(R.string.district),
+        arrayId = -1, required = true, hasDependants = true
+    )
+    private val tu = FormElement(
+        id = 1056, inputType = DROPDOWN,
+        title = resources.getString(R.string.ben_reg_tu),
+        arrayId = -1, required = true, hasDependants = true
+    )
+    private val healthFacility = FormElement(
+        id = 1057, inputType = DROPDOWN,
+        title = resources.getString(R.string.ben_reg_health_facility),
+        arrayId = -1, required = true
     )
 
     // 9. Marital Status
@@ -313,16 +382,24 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         val list = mutableListOf(
             pic,
             dateOfReg,
+            personFrom,
+            typeOfCaseFinding,
             firstName,
             lastName,
             agePopup,
             gender,
+            mobileNotAvailable,
+            contactNumber,
+            mobileNoOfRelation,
+            address,
+            state,
+            district,
+            tu,
+            healthFacility,
             villageHamlet,
             subCentre,
             fatherName,
             motherName,
-            contactNumber,
-            mobileNoOfRelation,
             community,
             religion,
             economicStatus,
@@ -333,10 +410,23 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         this.familyHeadPhoneNo = familyHeadPhoneNo?.toString()
 
         if (dateOfReg.value == null) dateOfReg.value = getCurrentDateString()
+        if (personFrom.value.isNullOrBlank()) personFrom.value = personFrom.entries?.firstOrNull()
+        if (typeOfCaseFinding.value.isNullOrBlank()) typeOfCaseFinding.value = typeOfCaseFinding.entries?.firstOrNull()
         contactNumber.value = familyHeadPhoneNo?.toString()
+        contactNumber.isEnabled = true
+        mobileNotAvailable.value = null
         if (mobileNoOfRelation.value.isNullOrBlank()) {
             mobileNoOfRelation.value = mobileNoOfRelation.entries?.firstOrNull()
         }
+        if (address.value.isNullOrBlank()) address.value = ""
+        state.entries = arrayOf(ben?.locationRecord?.state?.name ?: "")
+        district.entries = arrayOf(ben?.locationRecord?.district?.name ?: "")
+        tu.entries = arrayOf(ben?.locationRecord?.tu?.name ?: "")
+        healthFacility.entries = arrayOf(ben?.locationRecord?.healthFacility?.name ?: "")
+        state.value = state.entries?.firstOrNull() ?: ""
+        district.value = district.entries?.firstOrNull() ?: ""
+        tu.value = tu.entries?.firstOrNull() ?: ""
+        healthFacility.value = healthFacility.entries?.firstOrNull() ?: ""
         villageNames?.let { villageHamlet.entries = it }
         villageHamlet.value = villageName ?: villageNames?.firstOrNull() ?: ""
         val resolvedSubCentre = subCentreName?.takeIf { it.isNotBlank() } ?: ""
@@ -370,6 +460,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
             pic.value        = saved.userImage
             dateOfReg.value  = getDateFromLong(saved.regDate)
+            personFrom.value = personFrom.entries?.firstOrNull()
+            typeOfCaseFinding.value = typeOfCaseFinding.entries?.firstOrNull()
             firstName.value  = saved.firstName
             lastName.value   = saved.lastName
             agePopup.value   = getDateFromLong(saved.dob)
@@ -407,6 +499,18 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             mobileNoOfRelation.value = mobileNoOfRelation.getStringFromPosition(saved.mobileNoOfRelationId)
             otherMobileNoOfRelation.value = saved.mobileOthers
             contactNumber.value = saved.contactNumber?.toString()
+            if (contactNumber.value == "9999999999") {
+                mobileNotAvailable.value = "0"
+                contactNumber.isEnabled = false
+            }
+            state.entries = arrayOf(saved.locationRecord.state.name)
+            district.entries = arrayOf(saved.locationRecord.district.name)
+            tu.entries = arrayOf(saved.locationRecord.tu?.name ?: "")
+            healthFacility.entries = arrayOf(saved.locationRecord.healthFacility?.name ?: "")
+            state.value = saved.locationRecord.state.name
+            district.value = saved.locationRecord.district.name
+            tu.value = saved.locationRecord.tu?.name ?: ""
+            healthFacility.value = saved.locationRecord.healthFacility?.name ?: ""
 
             community.value  = community.getStringFromPosition(saved.communityId)
             religion.value   = religion.getStringFromPosition(saved.religionId)
@@ -459,6 +563,21 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
         addReproductiveStatusIfApplicable(list)
 
+        currentLocation = preferenceDao.getLocationRecord()
+
+        currentLocation?.let {
+            state.entries = arrayOf(it.state.name)
+            district.entries = arrayOf(it.district.name)
+            tu.entries = arrayOf(it.tu?.name ?: "")
+            healthFacility.entries = arrayOf(it.healthFacility?.name ?: "")
+
+            state.value = it.state.name
+            district.value = it.district.name
+            tu.value = it.tu?.name ?: ""
+            healthFacility.value = it.healthFacility?.name ?: ""
+        }
+
+
         setUpPage(list)
     }
 
@@ -507,7 +626,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         val selectedMaritalStatus = maritalStatus.value
         val marriedValue = maritalStatus.entries?.getOrNull(1)
         return selectedGender == gender.entries?.getOrNull(1) &&
-            selectedMaritalStatus == marriedValue
+                selectedMaritalStatus == marriedValue
     }
 
     private fun addReproductiveStatusIfApplicable(list: MutableList<FormElement>) {
@@ -738,6 +857,43 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             contactNumber.id -> {
                 validateEmptyOnEditText(contactNumber)
                 validateMobileNumberOnEditText(contactNumber)
+                return -1
+            }
+            mobileNotAvailable.id -> {
+                val isChecked = index >= 0 || isMobileNotAvailableChecked()
+                if (isChecked) {
+                    // Keep checkbox value in index format so adapter can render it checked.
+                    mobileNotAvailable.value = "0"
+                    contactNumber.value = "9999999999"
+                    contactNumber.errorText = null
+                    contactNumber.isEnabled = false
+                } else {
+                    mobileNotAvailable.value = null
+                    contactNumber.isEnabled = true
+                    contactNumber.value = null
+                    contactNumber.errorText = null
+                }
+                return 1
+            }
+            address.id -> {
+                validateEmptyOnEditText(address)
+                validateAllAlphabetsSpaceOnEditText(address)
+                return -1
+            }
+            state.id -> {
+                district.value = district.entries?.firstOrNull()
+                tu.value = tu.entries?.firstOrNull()
+                healthFacility.value = healthFacility.entries?.firstOrNull()
+                return 1
+            }
+            district.id -> {
+                tu.value = tu.entries?.firstOrNull()
+                healthFacility.value = healthFacility.entries?.firstOrNull()
+                return 1
+            }
+            tu.id -> {
+                healthFacility.value = healthFacility.entries?.firstOrNull()
+                return 1
             }
 
             fatherName.id -> {
@@ -849,6 +1005,26 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                 villageEntities.find { it.name == selectedName }?.let { selectedVillage ->
                     ben.locationRecord = ben.locationRecord.copy(village = selectedVillage)
                 }
+            }
+            state.value?.takeIf { it.isNotBlank() }?.let {
+                ben.locationRecord = ben.locationRecord.copy(
+                    state = LocationEntity(ben.locationRecord.state.id, it)
+                )
+            }
+            district.value?.takeIf { it.isNotBlank() }?.let {
+                ben.locationRecord = ben.locationRecord.copy(
+                    district = LocationEntity(ben.locationRecord.district.id, it)
+                )
+            }
+            tu.value?.takeIf { it.isNotBlank() }?.let {
+                ben.locationRecord = ben.locationRecord.copy(
+                    tu = LocationEntity(ben.locationRecord.tu?.id ?: 0, it)
+                )
+            }
+            healthFacility.value?.takeIf { it.isNotBlank() }?.let {
+                ben.locationRecord = ben.locationRecord.copy(
+                    healthFacility = LocationEntity(ben.locationRecord.healthFacility?.id ?: 0, it)
+                )
             }
             subCentre.value?.takeIf { it.isNotBlank() }?.let { selectedSubCentre ->
                 ben.locationRecord = ben.locationRecord.copy(

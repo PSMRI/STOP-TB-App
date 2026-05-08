@@ -100,10 +100,10 @@ class FormInputAdapter(
         override fun areContentsTheSame(oldItem: FormElement, newItem: FormElement): Boolean {
             Timber.d("${oldItem.id} error:${oldItem.errorText} value:${oldItem.value}")
             return oldItem.errorText == newItem.errorText &&
-                oldItem.value == newItem.value &&
-                oldItem.isEnabled == newItem.isEnabled &&
-                oldItem.required == newItem.required &&
-                oldItem.title == newItem.title
+                    oldItem.value == newItem.value &&
+                    oldItem.isEnabled == newItem.isEnabled &&
+                    oldItem.required == newItem.required &&
+                    oldItem.title == newItem.title
         }
     }
 
@@ -119,19 +119,27 @@ class FormInputAdapter(
         }
 
         fun bind(item: FormElement, isEnabled: Boolean, formValueListener: FormValueListener?) {
-            Timber.d("binding triggered!!! $isEnabled ${item.id}")
-            if (!isEnabled) {
+            val effectiveEnabled = isEnabled && item.isEnabled
+            Timber.d("binding triggered!!! $effectiveEnabled ${item.id}")
+            if (!effectiveEnabled) {
+                binding.et.isEnabled = false
                 binding.et.isClickable = false
                 binding.et.isFocusable = false
+                binding.et.isFocusableInTouchMode = false
+                binding.et.isCursorVisible = false
+                binding.tilEditText.endIconDrawable = null
+                binding.tilEditText.setEndIconOnClickListener(null)
                 handleHintLength(item)
                 binding.form = item
                 binding.et.setText(item.value)
                 binding.executePendingBindings()
                 return
             } else {
+                binding.et.isEnabled = true
                 binding.et.isClickable = true
                 binding.et.isFocusable = true
                 binding.et.isFocusableInTouchMode = true
+                binding.et.isCursorVisible = true
             }
             if (isOtpVerified && item.id == 44 && item.title.equals("Contact Number")) {
                 binding.et.isClickable = false
@@ -617,7 +625,8 @@ class FormInputAdapter(
                     item.errorText = null
                     binding.clRi.setBackgroundResource(0)
 
-                    formValueListener?.onValueChanged(item, index)
+                    val callbackIndex = if (isChecked) index else -(index + 1)
+                    formValueListener?.onValueChanged(item, callbackIndex)
                 }
 
                 binding.llChecks.addView(cbx)

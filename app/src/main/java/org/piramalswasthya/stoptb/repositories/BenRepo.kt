@@ -978,6 +978,9 @@ class BenRepo @Inject constructor(
                                 fatherName = if (benDataObj.has("fatherName")) benDataObj.getString(
                                     "fatherName"
                                 ) else null,
+//                                personFrom = if (benDataObj.has("personFrom")) benDataObj.getString(
+//                                    "personFrom"
+//                                ) else null,
                                 motherName = if (benDataObj.has("motherName")) benDataObj.getString(
                                     "motherName"
                                 ) else null,

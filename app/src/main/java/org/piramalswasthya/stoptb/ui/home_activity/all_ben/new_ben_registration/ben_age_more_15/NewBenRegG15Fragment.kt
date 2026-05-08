@@ -266,6 +266,8 @@ class NewBenRegG15Fragment : Fragment() {
 
                 28 -> notifyItemChanged(1)
 
+                1052 -> notifyDataSetChanged()
+
             }
         }
     }
