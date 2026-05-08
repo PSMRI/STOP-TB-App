@@ -37,6 +37,7 @@ import org.piramalswasthya.stoptb.model.BenBasicCache
 import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.CbacCache
 import org.piramalswasthya.stoptb.model.FilariaScreeningCache
+import org.piramalswasthya.stoptb.model.GeneralOpdCache
 import org.piramalswasthya.stoptb.model.HouseholdCache
 import org.piramalswasthya.stoptb.model.KalaAzarScreeningCache
 import org.piramalswasthya.stoptb.model.LeprosyFollowUpCache
@@ -44,6 +45,7 @@ import org.piramalswasthya.stoptb.model.LeprosyScreeningCache
 import org.piramalswasthya.stoptb.model.MalariaConfirmedCasesCache
 import org.piramalswasthya.stoptb.model.MalariaScreeningCache
 import org.piramalswasthya.stoptb.model.ReferalCache
+import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
@@ -73,10 +75,12 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.NCDReferalFormResponseJson
         NCDReferalFormResponseJsonEntity::class,
         ReferalCache::class,
         TBConfirmedTreatmentCache::class,
-        VitalCache::class
+        VitalCache::class,
+        GeneralOpdCache::class,
+        TBDiagnosticsCache::class
     ],
     views = [BenBasicCache::class],
-    version = 5, exportSchema = false
+    version = 11, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -140,6 +144,7 @@ abstract class InAppDb : RoomDatabase() {
                     """
                     CREATE TABLE IF NOT EXISTS `BEN_VITALS` (
                         `benId` INTEGER NOT NULL,
+                        `benRegId` INTEGER NOT NULL DEFAULT 0,
                         `capturedAt` INTEGER NOT NULL,
                         `temperature` REAL,
                         `pulseRate` INTEGER,
@@ -151,9 +156,27 @@ abstract class InAppDb : RoomDatabase() {
                         `weight` REAL,
                         `bmi` REAL,
                         `rbs` REAL,
+                        `pallorId` INTEGER,
+                        `pallor` TEXT,
+                        `icterusId` INTEGER,
+                        `icterus` TEXT,
+                        `cyanosisId` INTEGER,
+                        `cyanosis` TEXT,
+                        `clubbingId` INTEGER,
+                        `clubbing` TEXT,
+                        `lymphadenopathyId` INTEGER,
+                        `lymphadenopathy` TEXT,
+                        `oedemaId` INTEGER,
+                        `oedema` TEXT,
+                        `keyPopulationRiskFactorIds` TEXT,
+                        `keyPopulationRiskFactors` TEXT,
+                        `hivStatusId` INTEGER,
+                        `hivStatus` TEXT,
+                        `referralToHwcNeeded` INTEGER,
+                        `referralTriggers` TEXT,
                         `syncState` INTEGER NOT NULL,
                         PRIMARY KEY(`benId`),
-                        FOREIGN KEY(`benId`) REFERENCES `beneficiary`(`beneficiaryId`) ON UPDATE CASCADE ON DELETE CASCADE
+                        FOREIGN KEY(`benId`) REFERENCES `BENEFICIARY`(`beneficiaryId`) ON UPDATE CASCADE ON DELETE CASCADE
                     )
                     """.trimIndent()
                 )
@@ -182,6 +205,160 @@ abstract class InAppDb : RoomDatabase() {
             override fun migrate(database: SupportSQLiteDatabase) {
                 addLocationRecordExtraColumns(database, "BENEFICIARY")
                 addLocationRecordExtraColumns(database, "HOUSEHOLD")
+            }
+        }
+
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                addVitalGeneralExaminationColumns(database)
+            }
+        }
+
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                addVitalGeneralExaminationIdColumns(database)
+            }
+        }
+
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                addTBScreeningReferralColumns(database)
+            }
+        }
+
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DROP TABLE IF EXISTS `GENERAL_OPD`")
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `GENERAL_OPD` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `benId` INTEGER NOT NULL,
+                        `visitDate` INTEGER NOT NULL,
+                        `chiefComplaints` TEXT,
+                        `medications` TEXT,
+                        `dosage` TEXT,
+                        `frequency` TEXT,
+                        `duration` TEXT,
+                        `notes` TEXT,
+                        `syncState` INTEGER NOT NULL,
+                        FOREIGN KEY(`benId`) REFERENCES `BENEFICIARY`(`beneficiaryId`) ON UPDATE CASCADE ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `ind_general_opd_ben` ON `GENERAL_OPD` (`benId`)"
+                )
+            }
+        }
+
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "TB_SUSPECTED", "recommendedForLiquidCultureTest")) {
+                    database.execSQL(
+                        "ALTER TABLE TB_SUSPECTED ADD COLUMN recommendedForLiquidCultureTest INTEGER DEFAULT NULL"
+                    )
+                }
+            }
+        }
+
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `TB_DIAGNOSTICS` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `benId` INTEGER NOT NULL,
+                        `visitDate` INTEGER NOT NULL,
+                        `nikshayId` TEXT,
+                        `isChestXRayDone` INTEGER,
+                        `chestXRayResult` TEXT,
+                        `isSputumCollected` INTEGER,
+                        `sputumSubmittedAt` TEXT,
+                        `isNaatConducted` INTEGER,
+                        `naatResult` TEXT,
+                        `recommendedForLiquidCultureTest` INTEGER,
+                        `isLiquidCultureConducted` INTEGER,
+                        `liquidCultureResult` TEXT,
+                        `isTBConfirmed` INTEGER,
+                        `isConfirmed` INTEGER NOT NULL,
+                        `latitude` REAL,
+                        `longitude` REAL,
+                        `address` TEXT,
+                        `syncState` INTEGER NOT NULL,
+                        FOREIGN KEY(`benId`) REFERENCES `BENEFICIARY`(`beneficiaryId`) ON UPDATE CASCADE ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `ind_tb_diagnostics_ben` ON `TB_DIAGNOSTICS` (`benId`)"
+                )
+            }
+        }
+
+        private fun addVitalGeneralExaminationColumns(database: SupportSQLiteDatabase) {
+            val columns = listOf(
+                "benRegId INTEGER NOT NULL DEFAULT 0",
+                "pallorId INTEGER DEFAULT NULL",
+                "pallor TEXT DEFAULT NULL",
+                "icterusId INTEGER DEFAULT NULL",
+                "icterus TEXT DEFAULT NULL",
+                "cyanosisId INTEGER DEFAULT NULL",
+                "cyanosis TEXT DEFAULT NULL",
+                "clubbingId INTEGER DEFAULT NULL",
+                "clubbing TEXT DEFAULT NULL",
+                "lymphadenopathyId INTEGER DEFAULT NULL",
+                "lymphadenopathy TEXT DEFAULT NULL",
+                "oedemaId INTEGER DEFAULT NULL",
+                "oedema TEXT DEFAULT NULL",
+                "keyPopulationRiskFactorIds TEXT DEFAULT NULL",
+                "keyPopulationRiskFactors TEXT DEFAULT NULL",
+                "hivStatusId INTEGER DEFAULT NULL",
+                "hivStatus TEXT DEFAULT NULL",
+                "referralToHwcNeeded INTEGER DEFAULT NULL",
+                "referralTriggers TEXT DEFAULT NULL"
+            )
+            columns.forEach { columnDefinition ->
+                val columnName = columnDefinition.substringBefore(" ")
+                if (!columnExists(database, "BEN_VITALS", columnName)) {
+                    database.execSQL("ALTER TABLE BEN_VITALS ADD COLUMN $columnDefinition")
+                }
+            }
+        }
+
+        private fun addVitalGeneralExaminationIdColumns(database: SupportSQLiteDatabase) {
+            val columns = listOf(
+                "pallorId INTEGER DEFAULT NULL",
+                "icterusId INTEGER DEFAULT NULL",
+                "cyanosisId INTEGER DEFAULT NULL",
+                "clubbingId INTEGER DEFAULT NULL",
+                "lymphadenopathyId INTEGER DEFAULT NULL",
+                "oedemaId INTEGER DEFAULT NULL",
+                "keyPopulationRiskFactorIds TEXT DEFAULT NULL",
+                "hivStatusId INTEGER DEFAULT NULL"
+            )
+            columns.forEach { columnDefinition ->
+                val columnName = columnDefinition.substringBefore(" ")
+                if (!columnExists(database, "BEN_VITALS", columnName)) {
+                    database.execSQL("ALTER TABLE BEN_VITALS ADD COLUMN $columnDefinition")
+                }
+            }
+        }
+
+        private fun addTBScreeningReferralColumns(database: SupportSQLiteDatabase) {
+            val columns = listOf(
+                "referredForDigitalChestXray INTEGER DEFAULT NULL",
+                "referredForSputumCollection INTEGER DEFAULT NULL",
+                "sputumSampleSubmittedAt TEXT DEFAULT NULL",
+                "recommendedForTruenatTest INTEGER DEFAULT NULL",
+                "recommendedForLiquidCultureTest INTEGER DEFAULT NULL",
+                "reasonForDenialForGettingTested TEXT DEFAULT NULL"
+            )
+            columns.forEach { columnDefinition ->
+                val columnName = columnDefinition.substringBefore(" ")
+                if (!columnExists(database, "TB_SCREENING", columnName)) {
+                    database.execSQL("ALTER TABLE TB_SCREENING ADD COLUMN $columnDefinition")
+                }
             }
         }
 
@@ -254,6 +431,12 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_2_3)
                         .addMigrations(MIGRATION_3_4)
                         .addMigrations(MIGRATION_4_5)
+                        .addMigrations(MIGRATION_5_6)
+                        .addMigrations(MIGRATION_6_7)
+                        .addMigrations(MIGRATION_7_8)
+                        .addMigrations(MIGRATION_8_9)
+                        .addMigrations(MIGRATION_9_10)
+                        .addMigrations(MIGRATION_10_11)
                         .build()
 
                     INSTANCE = instance

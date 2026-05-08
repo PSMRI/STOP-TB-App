@@ -6,7 +6,9 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 import org.piramalswasthya.stoptb.database.room.SyncState
+import org.piramalswasthya.stoptb.model.GeneralOpdCache
 import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
+import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
 
@@ -21,6 +23,27 @@ interface TBDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveTbScreening(tbScreeningCache: TBScreeningCache)
+
+    @Query("SELECT * FROM GENERAL_OPD WHERE benId =:benId limit 1")
+    suspend fun getGeneralOpd(benId: Long): GeneralOpdCache?
+
+    @Query("SELECT benId FROM TB_SCREENING")
+    fun getAllTbScreeningBenIds(): Flow<List<Long>>
+
+    @Query("SELECT benId FROM GENERAL_OPD")
+    fun getAllGeneralOpdBenIds(): Flow<List<Long>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveGeneralOpd(generalOpdCache: GeneralOpdCache)
+
+    @Query("SELECT * FROM TB_DIAGNOSTICS WHERE benId =:benId limit 1")
+    suspend fun getTbDiagnostics(benId: Long): TBDiagnosticsCache?
+
+    @Query("SELECT * FROM TB_DIAGNOSTICS WHERE benId =:benId and (visitDate = :visitDate or visitDate = :visitDateGMT) limit 1")
+    suspend fun getTbDiagnostics(benId: Long, visitDate: Long, visitDateGMT: Long): TBDiagnosticsCache?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveTbDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache)
 
     @Query("SELECT * FROM TB_SUSPECTED WHERE benId =:benId limit 1")
     suspend fun getTbSuspected(benId: Long): TBSuspectedCache?
@@ -57,6 +80,12 @@ interface TBDao {
     @Query("SELECT * FROM TB_SCREENING WHERE  syncState = :syncState")
     suspend fun getTBScreening(syncState: SyncState): List<TBScreeningCache>
 
+    @Query("SELECT * FROM GENERAL_OPD WHERE syncState = :syncState")
+    suspend fun getGeneralOpd(syncState: SyncState): List<GeneralOpdCache>
+
+    @Query("SELECT * FROM TB_DIAGNOSTICS WHERE syncState = :syncState")
+    suspend fun getTbDiagnostics(syncState: SyncState): List<TBDiagnosticsCache>
+
     @Query("SELECT * FROM TB_SUSPECTED WHERE  syncState = :syncState")
     suspend fun getTbSuspected(syncState: SyncState): List<TBSuspectedCache>
 
@@ -68,6 +97,12 @@ interface TBDao {
 
     @Query("UPDATE TB_SCREENING SET syncState = 0 WHERE syncState = 1")
     suspend fun resetScreeningSyncingToUnsynced()
+
+    @Query("UPDATE GENERAL_OPD SET syncState = 0 WHERE syncState = 1")
+    suspend fun resetGeneralOpdSyncingToUnsynced()
+
+    @Query("UPDATE TB_DIAGNOSTICS SET syncState = 0 WHERE syncState = 1")
+    suspend fun resetDiagnosticsSyncingToUnsynced()
 
     @Query("UPDATE TB_SUSPECTED SET syncState = 0 WHERE syncState = 1")
     suspend fun resetSuspectedSyncingToUnsynced()

@@ -455,7 +455,24 @@
     <string name="tb_asymptomatic_screening">লক্ষণবিহীন স্ক্রিনিং</string>
     <string name="tb_referral_required">ৰেফাৰেল প্ৰয়োজন</string>
     <string name="tb_referral_for">কিহৰ বাবে ৰেফাৰেল</string>
-    <string name="tb_family_contact_screening_alert">অনুগ্ৰহ কৰি এই হিতাধিকাৰীৰ সকলো পৰিয়াল সদস্য আৰু ওচৰ-চাপৰ সংস্পৰ্শৰ লোকৰ TB স্ক্ৰিনিং কৰক।</string>
+    <string name="tb_family_contact_screening_alert">পৰিয়ালৰ সকলো সদস্যৰ ট্ৰেচিং আৰু স্ক্ৰিনিং কৰিবলৈ পৰামৰ্শ দিয়ক</string>
+    <string name="referred_for_digital_chest_xray">ডিজিটেল চেষ্ট এক্স-ৰেৰ বাবে ৰেফাৰ কৰা হৈছে</string>
+    <string name="referred_for_sputum_collection">কফ নমুনা সংগ্ৰহৰ বাবে ৰেফাৰ কৰা হৈছে</string>
+    <string name="recommended_for_truenat_test">Truenat পৰীক্ষাৰ পৰামৰ্শ দিয়া হৈছে</string>
+    <string name="recommended_for_liquid_culture_test">লিকুইড কালচাৰ পৰীক্ষাৰ পৰামৰ্শ দিয়া হৈছে</string>
+    <string name="reason_for_denial_for_getting_tested">পৰীক্ষা কৰাবলৈ অস্বীকাৰ কৰাৰ কাৰণ</string>
+    <string-array name="tb_reason_for_denial_testing">
+        <item>ভয় আৰু উদ্বেগ</item>
+        <item>ভুল ধাৰণা</item>
+        <item>সামাজিক কলংক</item>
+        <item>সাংস্কৃতিক আৰু লিংগ-সম্পৰ্কীয় বাধা</item>
+        <item>স্বাস্থ্যকৰ্মীৰ সৈতে পূৰ্বৰ নেতিবাচক অভিজ্ঞতা</item>
+        <item>গোপনীয়তাৰ চিন্তা</item>
+        <item>কেম্পত দীঘলীয়া অপেক্ষা</item>
+        <item>দৈনিক মজুৰিৰ ক্ষতি</item>
+        <item>চৰকাৰী কাৰ্যসূচী বা কেম্প আয়োজকৰ ওপৰত বিশ্বাসৰ অভাৱ</item>
+        <item>অন্যান্য</item>
+    </string-array>
     <string name="tb_screening_referral_reason">TB স্ক্ৰিনিং ৰেফাৰেল</string>
 
     <string-array name="tb_referral_tests">
@@ -516,7 +533,101 @@
     <string name="tb_liquid_culture_conducted">লিকুইড কালচাৰ কৰা হৈছে নেকি?</string>
     <string name="tb_liquid_culture_result">লিকুইড কালচাৰৰ ফলাফল</string>
     <string name="result">ফলাফল</string>
+    <string name="clinical_examination">ক্লিনিকেল পৰীক্ষা (ঐচ্ছিক)</string>
+    <string name="pallor">শেঁতা পৰা</string>
+    <string name="icterus">জণ্ডিছ</string>
+    <string name="cyanosis">চায়ানোছিছ</string>
+    <string name="clubbing">ক্লাবিং</string>
+    <string name="lymphadenopathy">লিম্ফাডেনোপেথি</string>
+    <string name="oedema">স্ফীতি</string>
+    <string name="key_population_risk_factors">মূল জনসংখ্যা / ঝুঁকি কাৰক *</string>
+    <string name="select_key_population_risk_factors">মূল জনসংখ্যা / ঝুঁকি কাৰক বাছক</string>
+    <string name="hiv_status">এইচআইভি স্থিতি *</string>
+    <string name="risk_factor_required">মূল জনসংখ্যা / ঝুঁকি কাৰক বাছক</string>
+    <string name="hiv_status_required">এইচআইভি স্থিতি বাছক</string>
+    <string name="present">আছে</string>
+    <string name="absent">নাই</string>
+    <string name="positive">পজিটিভ</string>
+    <string name="reactive">ৰিএক্টিভ</string>
+    <string name="negative">নেগেটিভ</string>
+    <string name="unknown">অজ্ঞাত</string>
+    <string name="not_applicable">প্ৰযোজ্য নহয়</string>
     <string name="diagnostics_submitted">Diagnostics submitted</string>
+    <string name="general_opd">সাধাৰণ OPD</string>
+    <string name="chief_complaint">মুখ্য অভিযোগ</string>
+    <string name="medication">ঔষধ</string>
+    <string name="dosage">ডোজ</string>
+    <string name="frequency">বাৰম্বাৰতা</string>
+    <string name="duration">সময়কাল</string>
+    <string name="notes_remarks">নোট / মন্তব্য</string>
+    <string name="general_opd_submitted">সাধাৰণ OPD জমা হল</string>
+    <string name="general_opd_medication_required_error">মুখ্য অভিযোগ বাছনি কৰিলে ঔষধ বাধ্যতামূলক।</string>
+
+    <string-array name="general_opd_chief_complaint_array">
+        <item>জ্বৰ</item>
+        <item>সামান্যৰ পৰা মধ্যম শৰীৰৰ বিষ</item>
+        <item>মূৰৰ বিষ</item>
+        <item>জ্বৰৰ সৈতে সাধাৰণ দুৰ্বলতা</item>
+        <item>এচিডিটি</item>
+        <item>পেটত জ্বলা-পোৰা</item>
+        <item>অজীৰ্ণতা</item>
+        <item>গেছ</item>
+        <item>পেট ফুলা</item>
+        <item>ওপৰৰ পেটত অস্বস্তি</item>
+        <item>এলাৰ্জিৰ লক্ষণ</item>
+        <item>হাঁচি</item>
+        <item>নাক বোৱা</item>
+        <item>খজুৱতি (চাল বা চকু)</item>
+        <item>সামান্য এলাৰ্জিক ৰেশ</item>
+        <item>ডায়েৰিয়া</item>
+        <item>ঢিলা পায়খানা</item>
+        <item>আন্ত্ৰিক অসামঞ্জস্য</item>
+        <item>ঢিলা পায়খানাৰ সৈতে অজীৰ্ণতা</item>
+        <item>ডিহাইড্ৰেচন</item>
+        <item>দুৰ্বলতাৰ সৈতে বমি</item>
+        <item>গৰমত অৱসাদ</item>
+        <item>সাধাৰণ দুৰ্বলতা</item>
+        <item>অৱসাদ</item>
+        <item>পুষ্টিৰ অভাৱ</item>
+        <item>ভোক কম</item>
+        <item>শিশুৰ জ্বৰ</item>
+        <item>শিশুৰ শৰীৰৰ বিষ</item>
+        <item>টিকাকৰণৰ পিছত জ্বৰ</item>
+        <item>শিশুৰ এলাৰ্জি</item>
+        <item>হাঁচিৰ সৈতে চৰ্দি</item>
+        <item>শিশুৰ খজুৱতি</item>
+        <item>সামান্য চালৰ এলাৰ্জি</item>
+        <item>শিশুৰ ডায়েৰিয়া</item>
+        <item>দুৰ্বল ৰোগ-প্ৰতিৰোধ</item>
+        <item>ৰোগৰ পৰা সুস্থ হোৱা</item>
+    </string-array>
+
+    <string-array name="general_opd_medication_array">
+        <item>Tab Paracetamol (500 mg)</item>
+        <item>Tab Digene (Aluminium hydroxide + magnesium aluminium silicate + magnesium oxide + simethicone)</item>
+        <item>Tab Cetrizine (10 mg)</item>
+        <item>Tab Sporolac DS 120M (Lactic acid bacillus tablets)</item>
+        <item>ORS sachets</item>
+        <item>Tab Multivitamin</item>
+        <item>Syp Paracetamol 250mg (60ml)</item>
+        <item>Syp Cetrizine 60 ml</item>
+        <item>Syp Zinc 60 ml</item>
+    </string-array>
+
+    <string-array name="general_opd_frequency_array">
+        <item>দিনত এবাৰ</item>
+        <item>দিনত দুবাৰ</item>
+        <item>দিনত তিনিবাৰ</item>
+        <item>প্ৰয়োজন অনুসৰি</item>
+    </string-array>
+
+    <string-array name="general_opd_duration_array">
+        <item>1 দিন</item>
+        <item>2 দিন</item>
+        <item>3 দিন</item>
+        <item>5 দিন</item>
+        <item>7 দিন</item>
+    </string-array>
 </resources>
 
 

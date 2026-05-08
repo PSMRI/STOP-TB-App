@@ -37,7 +37,8 @@ class VitalScreenViewModel @Inject constructor(
 
     data class ThresholdEvaluation(
         val shouldRefer: Boolean,
-        val referredFor: List<String>
+        val referredFor: List<String>,
+        val triggers: List<String>
     )
 
     enum class State {
@@ -98,7 +99,23 @@ class VitalScreenViewModel @Inject constructor(
         height: String?,
         weight: String?,
         bmi: String?,
-        rbs: String?
+        rbs: String?,
+        pallorId: Int?,
+        pallor: String?,
+        icterusId: Int?,
+        icterus: String?,
+        cyanosisId: Int?,
+        cyanosis: String?,
+        clubbingId: Int?,
+        clubbing: String?,
+        lymphadenopathyId: Int?,
+        lymphadenopathy: String?,
+        oedemaId: Int?,
+        oedema: String?,
+        keyPopulationRiskFactorIds: List<Int>,
+        keyPopulationRiskFactors: List<String>,
+        hivStatusId: Int?,
+        hivStatus: String?
     ) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
@@ -110,7 +127,23 @@ class VitalScreenViewModel @Inject constructor(
                             bpDiastolic = bpDiastolic,
                             height = height,
                             weight = weight,
-                            rbs = rbs
+                            rbs = rbs,
+                            pallorId = pallorId,
+                            pallor = pallor,
+                            icterusId = icterusId,
+                            icterus = icterus,
+                            cyanosisId = cyanosisId,
+                            cyanosis = cyanosis,
+                            clubbingId = clubbingId,
+                            clubbing = clubbing,
+                            lymphadenopathyId = lymphadenopathyId,
+                            lymphadenopathy = lymphadenopathy,
+                            oedemaId = oedemaId,
+                            oedema = oedema,
+                            keyPopulationRiskFactorIds = keyPopulationRiskFactorIds,
+                            keyPopulationRiskFactors = keyPopulationRiskFactors,
+                            hivStatusId = hivStatusId,
+                            hivStatus = hivStatus
                         )
                     ) {
                         _state.postValue(State.SAVE_SUCCESS)
@@ -136,6 +169,24 @@ class VitalScreenViewModel @Inject constructor(
                         weight = weight?.trim()?.toDoubleOrNull(),
                         bmi = bmi?.trim()?.toDoubleOrNull(),
                         rbs = rbs?.trim()?.toDoubleOrNull(),
+                        pallorId = pallorId,
+                        pallor = pallor?.trim()?.takeIf { it.isNotBlank() },
+                        icterusId = icterusId,
+                        icterus = icterus?.trim()?.takeIf { it.isNotBlank() },
+                        cyanosisId = cyanosisId,
+                        cyanosis = cyanosis?.trim()?.takeIf { it.isNotBlank() },
+                        clubbingId = clubbingId,
+                        clubbing = clubbing?.trim()?.takeIf { it.isNotBlank() },
+                        lymphadenopathyId = lymphadenopathyId,
+                        lymphadenopathy = lymphadenopathy?.trim()?.takeIf { it.isNotBlank() },
+                        oedemaId = oedemaId,
+                        oedema = oedema?.trim()?.takeIf { it.isNotBlank() },
+                        keyPopulationRiskFactorIds = keyPopulationRiskFactorIds,
+                        keyPopulationRiskFactors = keyPopulationRiskFactors,
+                        hivStatusId = hivStatusId,
+                        hivStatus = hivStatus?.trim()?.takeIf { it.isNotBlank() },
+                        referralToHwcNeeded = thresholdEvaluation.shouldRefer,
+                        referralTriggers = thresholdEvaluation.triggers,
                         syncState = SyncState.UNSYNCED
                     )
                     vitalRepo.saveVitalsAndSync(cache)
@@ -162,7 +213,23 @@ class VitalScreenViewModel @Inject constructor(
         bpDiastolic: String?,
         height: String?,
         weight: String?,
-        rbs: String?
+        rbs: String?,
+        pallorId: Int?,
+        pallor: String?,
+        icterusId: Int?,
+        icterus: String?,
+        cyanosisId: Int?,
+        cyanosis: String?,
+        clubbingId: Int?,
+        clubbing: String?,
+        lymphadenopathyId: Int?,
+        lymphadenopathy: String?,
+        oedemaId: Int?,
+        oedema: String?,
+        keyPopulationRiskFactorIds: List<Int>,
+        keyPopulationRiskFactors: List<String>,
+        hivStatusId: Int?,
+        hivStatus: String?
     ): Boolean {
         return !temperatureOption.isNullOrBlank() ||
             !pulseRateOption.isNullOrBlank() ||
@@ -170,7 +237,23 @@ class VitalScreenViewModel @Inject constructor(
             !bpDiastolic.isNullOrBlank() ||
             !height.isNullOrBlank() ||
             !weight.isNullOrBlank() ||
-            !rbs.isNullOrBlank()
+            !rbs.isNullOrBlank() ||
+            pallorId != null ||
+            !pallor.isNullOrBlank() ||
+            icterusId != null ||
+            !icterus.isNullOrBlank() ||
+            cyanosisId != null ||
+            !cyanosis.isNullOrBlank() ||
+            clubbingId != null ||
+            !clubbing.isNullOrBlank() ||
+            lymphadenopathyId != null ||
+            !lymphadenopathy.isNullOrBlank() ||
+            oedemaId != null ||
+            !oedema.isNullOrBlank() ||
+            keyPopulationRiskFactorIds.isNotEmpty() ||
+            keyPopulationRiskFactors.isNotEmpty() ||
+            hivStatusId != null ||
+            !hivStatus.isNullOrBlank()
     }
 
     fun resetState() {
@@ -210,13 +293,13 @@ class VitalScreenViewModel @Inject constructor(
     fun shouldShowBpReferral(bpSystolic: String?, bpDiastolic: String?): Boolean {
         val systolic = bpSystolic?.trim()?.toIntOrNull()
         val diastolic = bpDiastolic?.trim()?.toIntOrNull()
-        return (systolic != null && (systolic < 90 || systolic > 140)) ||
-            (diastolic != null && (diastolic < 60 || diastolic > 90))
+        return (systolic != null && (systolic < 90 || systolic >= 140)) ||
+            (diastolic != null && (diastolic < 60 || diastolic >= 90))
     }
 
     fun shouldShowRbsReferral(rbs: String?): Boolean {
         val rbsValue = rbs?.trim()?.toDoubleOrNull() ?: return false
-        return rbsValue < 60.0 || rbsValue > 90.0
+        return rbsValue >= 100.0
     }
 
     private fun evaluateThresholds(
@@ -226,14 +309,55 @@ class VitalScreenViewModel @Inject constructor(
         bpDiastolic: String?,
         rbs: String?
     ): ThresholdEvaluation {
-        val shouldRefer = shouldShowTemperatureReferral(temperatureOption) ||
-            shouldShowPulseReferral(pulseRateOption) ||
-            shouldShowBpReferral(bpSystolic, bpDiastolic) ||
-            shouldShowRbsReferral(rbs)
+        val triggers = getReferralTriggers(
+            temperatureOption = temperatureOption,
+            pulseRateOption = pulseRateOption,
+            bpSystolic = bpSystolic,
+            bpDiastolic = bpDiastolic,
+            rbs = rbs
+        )
+        val shouldRefer = triggers.isNotEmpty()
         return ThresholdEvaluation(
             shouldRefer = shouldRefer,
-            referredFor = getDefaultReferralTests(benCache)
+            referredFor = getDefaultReferralTests(benCache),
+            triggers = triggers
         )
+    }
+
+    private fun getReferralTriggers(
+        temperatureOption: String?,
+        pulseRateOption: String?,
+        bpSystolic: String?,
+        bpDiastolic: String?,
+        rbs: String?
+    ): List<String> {
+        val triggers = mutableListOf<String>()
+        val temperature = mapTemperatureOptionToValue(temperatureOption)
+        if (temperature != null && temperature >= 100.0) {
+            triggers += "High Temperature: ${temperature.stripTrailingZeros()} F"
+        }
+
+        val pulse = mapPulseOptionToValue(pulseRateOption)
+        if (pulse != null && pulse > 90) {
+            triggers += "High Pulse: $pulse BPM"
+        } else if (pulse != null && pulse < 60) {
+            triggers += "Low Pulse: $pulse BPM"
+        }
+
+        val systolic = bpSystolic?.trim()?.toIntOrNull()
+        val diastolic = bpDiastolic?.trim()?.toIntOrNull()
+        if (systolic != null && diastolic != null) {
+            when {
+                systolic >= 140 || diastolic >= 90 -> triggers += "High BP: $systolic/$diastolic mmHg"
+                systolic < 90 || diastolic < 60 -> triggers += "Low BP: $systolic/$diastolic mmHg"
+            }
+        }
+
+        val rbsValue = rbs?.trim()?.toDoubleOrNull()
+        if (rbsValue != null && rbsValue >= 100.0) {
+            triggers += "High RBS: ${rbsValue.stripTrailingZeros()} mg/dl"
+        }
+        return triggers
     }
 
     private fun buildAutoReferral(selectedTests: List<String>): ReferalCache? {
@@ -296,4 +420,7 @@ class VitalScreenViewModel @Inject constructor(
             else -> normalized?.toIntOrNull()
         }
     }
+
+    private fun Double.stripTrailingZeros(): String =
+        if (this % 1.0 == 0.0) toInt().toString() else toString()
 }

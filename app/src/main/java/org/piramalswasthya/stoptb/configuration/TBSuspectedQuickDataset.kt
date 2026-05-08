@@ -7,8 +7,8 @@ import org.piramalswasthya.stoptb.model.AgeUnit
 import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.FormElement
 import org.piramalswasthya.stoptb.model.InputType
+import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
-import org.piramalswasthya.stoptb.model.TBSuspectedCache
 
 class TBSuspectedQuickDataset(
     context: Context,
@@ -41,7 +41,8 @@ class TBSuspectedQuickDataset(
         inputType = InputType.RADIO,
         title = resources.getString(R.string.tb_sputum_sample_collected),
         entries = yesNoEntries,
-        required = true
+        required = true,
+        hasDependants = true
     )
 
     private val trueNatConducted = FormElement(
@@ -56,7 +57,7 @@ class TBSuspectedQuickDataset(
     private val liquidCultureConducted = FormElement(
         id = 4,
         inputType = InputType.RADIO,
-        title = resources.getString(R.string.tb_liquid_culture_conducted),
+        title = resources.getString(R.string.recommended_for_liquid_culture_test),
         entries = yesNoEntries,
         required = true,
         hasDependants = true
@@ -68,7 +69,8 @@ class TBSuspectedQuickDataset(
         title = resources.getString(R.string.tb_digital_chest_xray_result),
         arrayId = R.array.tb_test_result,
         entries = resources.getStringArray(R.array.tb_test_result),
-        required = false
+        required = false,
+        hasDependants = true
     )
 
     private val trueNatResult = FormElement(
@@ -89,10 +91,17 @@ class TBSuspectedQuickDataset(
         required = false
     )
 
+    private val nikshayId = FormElement(
+        id = 8,
+        inputType = InputType.EDIT_TEXT,
+        title = resources.getString(R.string.nikshay_id),
+        required = false
+    )
+
     suspend fun setUpPage(
         ben: BenRegCache?,
         screening: TBScreeningCache?,
-        saved: TBSuspectedCache?,
+        saved: TBDiagnosticsCache?,
         referralMode: Boolean = false
     ) {
         benCache = ben
@@ -100,17 +109,35 @@ class TBSuspectedQuickDataset(
         this.referralMode = referralMode
 
         digitalChestXrayConducted.value =
-            boolToYesNo(saved?.isChestXRayDone.takeIf { shouldShowDigitalChestXray() })
+            conductedValueFromScreening(
+                savedValue = saved?.isChestXRayDone,
+                shouldShow = shouldShowDigitalChestXray(),
+                screeningRecommended = screeningCache?.referredForDigitalChestXray
+            )
         digitalChestXrayResult.value =
             getLocalValueInArray(R.array.tb_test_result, saved?.chestXRayResult)
         sputumCollected.value =
-            boolToYesNo(saved?.isSputumCollected.takeIf { shouldShowSputumCollected() })
+            conductedValueFromScreening(
+                savedValue = saved?.isSputumCollected,
+                shouldShow = shouldShowSputumCollected(),
+                screeningRecommended = screeningCache?.referredForSputumCollection
+            )
         trueNatConducted.value =
-            boolToYesNo(saved?.isNaatConducted.takeIf { shouldShowTrueNatConducted() })
+            conductedValueFromScreening(
+                savedValue = saved?.isNaatConducted,
+                shouldShow = shouldShowTrueNatConducted(),
+                screeningRecommended = screeningCache?.recommendedForTruenatTest
+            )
         trueNatResult.value =
             getLocalValueInArray(R.array.tb_test_result, saved?.naatResult)
+        nikshayId.value = saved?.nikshayId
         liquidCultureConducted.value =
-            boolToYesNo(saved?.isLiquidCultureConducted.takeIf { shouldShowLiquidCultureConducted() })
+            conductedValueFromScreening(
+                savedValue = saved?.recommendedForLiquidCultureTest
+                    ?: saved?.isLiquidCultureConducted,
+                shouldShow = shouldShowLiquidCultureConducted(),
+                screeningRecommended = screeningCache?.recommendedForLiquidCultureTest
+            )
         liquidCultureResult.value =
             getLocalValueInArray(R.array.tb_test_result, saved?.liquidCultureResult)
 
@@ -125,33 +152,77 @@ class TBSuspectedQuickDataset(
                 digitalChestXrayConducted.value = if (index == 0) yesValue else noValue
                 syncFieldStates()
                 if (index == 0) {
+                    val addItems = mutableListOf(digitalChestXrayResult)
+                    if (!isYes(sputumCollected) && !isYes(trueNatConducted)) {
+                        addItems.add(nikshayId)
+                    }
                     triggerDependants(
                         source = digitalChestXrayConducted,
                         removeItems = emptyList(),
-                        addItems = listOf(digitalChestXrayResult)
+                        addItems = addItems
                     )
                 } else {
+                    val removeItems = mutableListOf(
+                        digitalChestXrayResult,
+                        trueNatResult,
+                        trueNatConducted
+                    )
+                    if (!shouldEnableNikshayId()) {
+                        removeItems.add(nikshayId)
+                    }
                     triggerDependants(
                         source = digitalChestXrayConducted,
-                        removeItems = listOf(digitalChestXrayResult),
+                        removeItems = removeItems,
                         addItems = emptyList()
                     )
                 }
+            }
+
+            sputumCollected.id -> {
+                sputumCollected.value = if (index == 0) yesValue else noValue
+                syncFieldStates()
+                updateNikshayVisibility(sputumCollected)
+            }
+
+            digitalChestXrayResult.id -> {
+                digitalChestXrayResult.value = digitalChestXrayResult.entries?.getOrNull(index)
+                syncFieldStates()
+                val addItems = mutableListOf<FormElement>()
+                val removeItems = mutableListOf<FormElement>()
+                if (shouldShowTrueNatConducted()) {
+                    addItems.add(trueNatConducted)
+                    if (isYes(trueNatConducted)) addItems.add(trueNatResult)
+                } else {
+                    removeItems.addAll(listOf(trueNatResult, trueNatConducted))
+                }
+                triggerDependants(
+                    source = digitalChestXrayResult,
+                    removeItems = removeItems,
+                    addItems = addItems
+                )
             }
 
             trueNatConducted.id -> {
                 trueNatConducted.value = if (index == 0) yesValue else noValue
                 syncFieldStates()
                 if (index == 0) {
+                    val addItems = mutableListOf(trueNatResult)
+                    if (!isYes(digitalChestXrayConducted) && !isYes(sputumCollected)) {
+                        addItems.add(nikshayId)
+                    }
                     triggerDependants(
                         source = trueNatConducted,
                         removeItems = emptyList(),
-                        addItems = listOf(trueNatResult)
+                        addItems = addItems
                     )
                 } else {
+                    val removeItems = mutableListOf(trueNatResult)
+                    if (!shouldEnableNikshayId()) {
+                        removeItems.add(nikshayId)
+                    }
                     triggerDependants(
                         source = trueNatConducted,
-                        removeItems = listOf(trueNatResult),
+                        removeItems = removeItems,
                         addItems = emptyList()
                     )
                 }
@@ -180,7 +251,7 @@ class TBSuspectedQuickDataset(
     }
 
     override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
-        (cacheModel as TBSuspectedCache).let { form ->
+        (cacheModel as TBDiagnosticsCache).let { form ->
             form.isChestXRayDone =
                 if (shouldShowDigitalChestXray()) isYes(digitalChestXrayConducted) else null
             form.chestXRayResult =
@@ -199,7 +270,11 @@ class TBSuspectedQuickDataset(
                 } else {
                     null
                 }
+            form.nikshayId =
+                if (shouldEnableNikshayId()) nikshayId.value?.trim()?.takeIf { it.isNotEmpty() } else null
             form.isLiquidCultureConducted =
+                if (shouldShowLiquidCultureConducted()) isYes(liquidCultureConducted) else null
+            form.recommendedForLiquidCultureTest =
                 if (shouldShowLiquidCultureConducted()) isYes(liquidCultureConducted) else null
             form.liquidCultureResult =
                 if (isYes(liquidCultureConducted)) {
@@ -226,6 +301,10 @@ class TBSuspectedQuickDataset(
     }
 
     private fun buildFormList(): List<FormElement> = buildList {
+        if (shouldEnableNikshayId()) {
+            add(nikshayId)
+        }
+
         if (shouldShowDigitalChestXray()) {
             add(digitalChestXrayConducted)
             if (isYes(digitalChestXrayConducted)) {
@@ -252,7 +331,7 @@ class TBSuspectedQuickDataset(
         }
     }
 
-    private fun configureReferralLocks(saved: TBSuspectedCache?) {
+    private fun configureReferralLocks(saved: TBDiagnosticsCache?) {
         if (!referralMode || saved == null) {
             lockDigitalChestXray = false
             lockTrueNat = false
@@ -292,6 +371,9 @@ class TBSuspectedQuickDataset(
             resetField(trueNatResult)
         }
 
+        nikshayId.isEnabled = shouldEnableNikshayId() && (!referralMode || shouldShowSubmit())
+        if (!shouldEnableNikshayId()) resetField(nikshayId)
+
         liquidCultureConducted.isEnabled =
             shouldShowLiquidCultureConducted() && !lockLiquidCulture
         liquidCultureConducted.required =
@@ -306,20 +388,38 @@ class TBSuspectedQuickDataset(
         }
     }
 
-    private fun shouldShowDigitalChestXray(): Boolean =  !isPregnant()
+    private fun shouldShowDigitalChestXray(): Boolean =
+        screeningCache?.referredForDigitalChestXray ?: !isPregnant()
 
     private fun shouldShowSputumCollected(): Boolean =
-        screeningCache?.historyOfTb == true ||
-            isUnderFive() ||
-            isPregnant() ||
-            screeningCache?.takingAntiTBDrugs == true
+        screeningCache?.referredForSputumCollection ?: (
+            screeningCache?.historyOfTb == true ||
+                isPregnant() ||
+                screeningCache?.takingAntiTBDrugs == true
+            )
 
     private fun shouldShowTrueNatConducted(): Boolean =
-//        isUnderFive() || isPregnant()
-         isPregnant()
+        screeningCache?.recommendedForTruenatTest == true ||
+            isPregnant() ||
+            isPositive(getEnglishValueInArray(R.array.tb_test_result, digitalChestXrayResult.value))
 
     private fun shouldShowLiquidCultureConducted(): Boolean =
-        screeningCache?.historyOfTb == true || screeningCache?.takingAntiTBDrugs == true
+        screeningCache?.recommendedForLiquidCultureTest ?: (
+            screeningCache?.historyOfTb == true && screeningCache?.takingAntiTBDrugs == true
+            )
+
+    private fun shouldEnableNikshayId(): Boolean =
+        (shouldShowSputumCollected() && isYes(sputumCollected)) ||
+            (shouldShowDigitalChestXray() && isYes(digitalChestXrayConducted)) ||
+            (shouldShowTrueNatConducted() && isYes(trueNatConducted))
+
+    private fun updateNikshayVisibility(source: FormElement): Int =
+        triggerDependants(
+            source = source,
+            passedIndex = if (shouldEnableNikshayId()) 1 else 0,
+            triggerIndex = 1,
+            target = nikshayId
+        )
 
     private fun isUnderFive(): Boolean {
         val ben = benCache ?: return false
@@ -351,6 +451,19 @@ class TBSuspectedQuickDataset(
         true -> yesValue
         false -> noValue
         null -> ""
+    }
+
+    private fun conductedValueFromScreening(
+        savedValue: Boolean?,
+        shouldShow: Boolean,
+        screeningRecommended: Boolean?
+    ): String {
+        if (!shouldShow) return ""
+        return when (savedValue) {
+            true -> yesValue
+            false -> noValue
+            null -> if (screeningRecommended == true) yesValue else ""
+        }
     }
 
     private fun isYes(formElement: FormElement): Boolean = formElement.value == yesValue

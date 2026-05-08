@@ -904,8 +904,25 @@
     <string name="tb_history_last_5_years">Last 5 years history of TB</string>
     <string name="tb_referral_required">Referral Required</string>
     <string name="tb_referral_for">Referral For</string>
-    <string name="tb_family_contact_screening_alert">Please screen all family members and close contacts of this beneficiary for TB.</string>
+    <string name="tb_family_contact_screening_alert">Advise tracing and screening of all family members</string>
+    <string name="referred_for_digital_chest_xray">Referred for digital chest x-ray</string>
+    <string name="referred_for_sputum_collection">Referred for Sputum Collection</string>
+    <string name="recommended_for_truenat_test">Recommended for Truenat test</string>
+    <string name="recommended_for_liquid_culture_test">Recommended for liquid culture test</string>
+    <string name="reason_for_denial_for_getting_tested">Reason for denial for getting tested</string>
     <string name="tb_screening_referral_reason">TB Screening Referral</string>
+    <string-array name="tb_reason_for_denial_testing">
+        <item>Fear and anxiety</item>
+        <item>Misconceptions</item>
+        <item>Social stigma</item>
+        <item>Cultural and gender-related barriers</item>
+        <item>Prior negative experiences with healthcare staff</item>
+        <item>Privacy concerns</item>
+        <item>Long waiting times at the camp</item>
+        <item>Loss of daily wages</item>
+        <item>Lack of trust in government programs or camp organizers</item>
+        <item>Others</item>
+    </string-array>
 
     <string name="filter_sort_by">Sort By</string>
     <string name="filter_newest_first">Newest First</string>
@@ -978,6 +995,32 @@
     <string name="referred_for">Referred for</string>
     <string name="refer_to_hwc_alert">Refer to Health and Wellness Centre</string>
     <string name="vital_referral_reason">Vital Screening Referral</string>
+    <string name="clinical_examination">Clinical Examination (Optional)</string>
+    <string name="pallor">Pallor</string>
+    <string name="icterus">Icterus</string>
+    <string name="cyanosis">Cyanosis</string>
+    <string name="clubbing">Clubbing</string>
+    <string name="lymphadenopathy">Lymphadenopathy</string>
+    <string name="oedema">Oedema</string>
+    <string name="key_population_risk_factors">Key Population / Risk Factors *</string>
+    <string name="select_key_population_risk_factors">Select Key Population / Risk Factors</string>
+    <string name="hiv_status">HIV Status *</string>
+    <string name="no_risk_factor_selected">No risk factor selected</string>
+    <string name="risk_factor_required">Select Key Population / Risk Factors</string>
+    <string name="hiv_status_required">Select HIV Status</string>
+    <string name="present">Present</string>
+    <string name="absent">Absent</string>
+    <string name="positive">Positive</string>
+    <string name="reactive">Reactive</string>
+    <string name="negative">Negative</string>
+    <string name="unknown">Unknown</string>
+    <string name="not_applicable">Not Applicable</string>
+    <string name="high_bp_trigger">High BP: %1$d/%2$d mmHg</string>
+    <string name="low_bp_trigger">Low BP: %1$d/%2$d mmHg</string>
+    <string name="high_rbs_trigger">High RBS: %1$s mg/dl</string>
+    <string name="high_pulse_trigger">High Pulse: %1$d BPM</string>
+    <string name="low_pulse_trigger">Low Pulse: %1$d BPM</string>
+    <string name="high_temperature_trigger">High Temperature: %1$s F</string>
     <string name="temperature_option_97_5">97.5</string>
     <string name="temperature_option_98_5">98.5</string>
     <string name="temperature_option_99_5">99.5</string>
@@ -998,6 +1041,133 @@
         <item>@string/pulse_option_60_70</item>
         <item>@string/pulse_option_70_80</item>
         <item>@string/pulse_option_above_90</item>
+    </string-array>
+    <string-array name="present_absent_options">
+        <item>@string/present</item>
+        <item>@string/absent</item>
+    </string-array>
+    <string-array name="hiv_status_options">
+        <item>@string/positive</item>
+        <item>@string/reactive</item>
+        <item>@string/negative</item>
+        <item>@string/unknown</item>
+    </string-array>
+    <string-array name="key_population_risk_factor_options">
+        <item>Pregnancy</item>
+        <item>Lactating mother</item>
+        <item>Anti-TNF treatment</item>
+        <item>Bronchial Asthma</item>
+        <item>Cancer</item>
+        <item>Cardiovascular Disorder</item>
+        <item>Contact of Known TB Patients</item>
+        <item>COPD</item>
+        <item>COVID recovered patients</item>
+        <item>Diabetes</item>
+        <item>Dialysis</item>
+        <item>Health Care Worker</item>
+        <item>Hypertensive</item>
+        <item>Liver Impairment</item>
+        <item>Migrant</item>
+        <item>Miner</item>
+        <item>Palliative Care</item>
+        <item>Patient on immunosuppressants</item>
+        <item>Prison</item>
+        <item>Illegal Immigrant</item>
+        <item>Renal Impairment</item>
+        <item>Transplantation</item>
+        <item>Urban Slum</item>
+        <item>H/o Adult BCG Vaccination</item>
+        <item>Undernourished / Malnourished (BMI &lt;18.5 kg/m2)</item>
+        <item>Elderly (age &gt;60 years)</item>
+        <item>Workplace settings (coal/sandblasting/brick kiln)</item>
+        <item>Tea garden worker</item>
+        <item>Construction site worker</item>
+        <item>Congregate settings</item>
+        <item>Attendees of de-addiction centers</item>
+        <item>Person exposed to indoor air pollution</item>
+        <item>Marginalized populations at risk of HIV</item>
+        <item>LGBTQAI++</item>
+        <item>Substance abuse (alcoholic/intravenous drug users)</item>
+        <item>Tobacco/smoker</item>
+        <item>Silica exposure/silicosis</item>
+        <item>Other</item>
+        <item>@string/not_applicable</item>
+    </string-array>
+
+    <string name="general_opd">General OPD</string>
+    <string name="chief_complaint">Chief Complaint</string>
+    <string name="medication">Medication</string>
+    <string name="dosage">Dosage</string>
+    <string name="frequency">Frequency</string>
+    <string name="duration">Duration</string>
+    <string name="notes_remarks">Notes / Remarks</string>
+    <string name="general_opd_submitted">General OPD submitted</string>
+    <string name="general_opd_medication_required_error">Medication is required when a chief complaint is selected.</string>
+
+    <string-array name="general_opd_chief_complaint_array">
+        <item>Fever</item>
+        <item>Mild to moderate body pain</item>
+        <item>Headache</item>
+        <item>General weakness with fever</item>
+        <item>Acidity</item>
+        <item>Burning sensation in stomach</item>
+        <item>Indigestion</item>
+        <item>Gas</item>
+        <item>Bloating</item>
+        <item>Upper abdominal discomfort</item>
+        <item>Allergic symptoms</item>
+        <item>Sneezing</item>
+        <item>Runny nose</item>
+        <item>Itching (skin or eyes)</item>
+        <item>Mild allergic rash</item>
+        <item>Diarrhea</item>
+        <item>Loose stools</item>
+        <item>Gut imbalance</item>
+        <item>Indigestion with loose motion</item>
+        <item>Dehydration</item>
+        <item>Vomiting with weakness</item>
+        <item>Heat exhaustion</item>
+        <item>General weakness</item>
+        <item>Fatigue</item>
+        <item>Nutritional deficiency</item>
+        <item>Poor appetite</item>
+        <item>Fever in children</item>
+        <item>Body ache in children</item>
+        <item>Post-vaccination fever</item>
+        <item>Allergies in children</item>
+        <item>Cold with sneezing</item>
+        <item>Itching in children</item>
+        <item>Mild skin allergy</item>
+        <item>Diarrhea in children</item>
+        <item>Weak immunity</item>
+        <item>Recovery from illness</item>
+    </string-array>
+
+    <string-array name="general_opd_medication_array">
+        <item>Tab Paracetamol (500 mg)</item>
+        <item>Tab Digene (Aluminium hydroxide + magnesium aluminium silicate + magnesium oxide + simethicone)</item>
+        <item>Tab Cetrizine (10 mg)</item>
+        <item>Tab Sporolac DS 120M (Lactic acid bacillus tablets)</item>
+        <item>ORS sachets</item>
+        <item>Tab Multivitamin</item>
+        <item>Syp Paracetamol 250mg (60ml)</item>
+        <item>Syp Cetrizine 60 ml</item>
+        <item>Syp Zinc 60 ml</item>
+    </string-array>
+
+    <string-array name="general_opd_frequency_array">
+        <item>Once daily</item>
+        <item>Twice daily</item>
+        <item>Thrice daily</item>
+        <item>SoS</item>
+    </string-array>
+
+    <string-array name="general_opd_duration_array">
+        <item>1 day</item>
+        <item>2 days</item>
+        <item>3 days</item>
+        <item>5 days</item>
+        <item>7 days</item>
     </string-array>
 </resources>
 
