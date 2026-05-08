@@ -26,8 +26,7 @@
     <string name="session_expired_message">আপোনাৰ চেচন সমাপ্ত হৈছে। অনুগ্ৰহ কৰি পুনৰ লগ ইন কৰক।</string>
     <string name="cd_assam_nhm_logo">অসম NHM ল\'গ\'</string>
     <string name="cd_piramal">পীৰামল ল\'গ\'</string>
-    <string name="pwr_by_text">দ্বাৰা পৰিচালিত\n <b>পীৰামল ফাউণ্ডেচন</b></string>
-
+    <string name="pwr_by_text" translatable="false">চালিত\n <b>ষ্টপ টিবি</b></string>
     <string name="camp_hub_url_hint">কেম্প হাব URL</string>
     <string name="camp_connect_title">কেম্প হাব সংযোগ কৰক</string>
     <string name="camp_connect_subtitle">কেম্প মোড সক্ৰিয় কৰাৰ আগতে লেপটপ হাবৰ সৈতে সংযোগ কৰক।</string>

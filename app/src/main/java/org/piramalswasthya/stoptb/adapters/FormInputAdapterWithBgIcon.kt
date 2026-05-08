@@ -90,8 +90,12 @@ class FormInputAdapterWithBgIcon (
             oldItem.id == newItem.id
 
         override fun areContentsTheSame(oldItem: FormElement, newItem: FormElement): Boolean {
-            Timber.d("${oldItem.id}   ${oldItem.errorText} ${newItem.errorText}")
-            return oldItem.errorText == newItem.errorText
+            Timber.d("${oldItem.id} error:${oldItem.errorText} value:${oldItem.value}")
+            return oldItem.errorText == newItem.errorText &&
+                    oldItem.value == newItem.value &&
+                    oldItem.isEnabled == newItem.isEnabled &&
+                    oldItem.required == newItem.required &&
+                    oldItem.title == newItem.title
         }
     }
 
@@ -106,8 +110,10 @@ class FormInputAdapterWithBgIcon (
         }
 
         fun bind(item: FormElement, isEnabled: Boolean, formValueListener: FormValueListener?) {
-            Timber.d("binding triggered!!! $isEnabled ${item.id}")
-            if (!isEnabled) {
+            val effectiveEnabled = isEnabled && item.isEnabled
+            Timber.d("binding triggered!!! $effectiveEnabled ${item.id}")
+            if (!effectiveEnabled) {
+                binding.et.isEnabled = false
                 binding.et.isClickable = false
                 binding.et.isFocusable = false
                 handleHintLength(item)
@@ -116,6 +122,7 @@ class FormInputAdapterWithBgIcon (
                 binding.executePendingBindings()
                 return
             } else {
+                binding.et.isEnabled = true
                 binding.et.isClickable = true
                 binding.et.isFocusable = true
             }
@@ -664,51 +671,51 @@ class FormInputAdapterWithBgIcon (
         private lateinit var countDownTimer : CountDownTimer
         private var countdownTimers : HashMap<Int, CountDownTimer> = HashMap()
 
-    class MultiFileUploadInputViewHolder private constructor(private val binding: LayoutMultiFileUploadBinding) :
-        ViewHolder(binding.root) {
-        companion object {
-            fun from(parent: ViewGroup): ViewHolder {
-                val layoutInflater = LayoutInflater.from(parent.context)
-                val binding = LayoutMultiFileUploadBinding.inflate(layoutInflater, parent, false)
-                return MultiFileUploadInputViewHolder(binding)
+        class MultiFileUploadInputViewHolder private constructor(private val binding: LayoutMultiFileUploadBinding) :
+            ViewHolder(binding.root) {
+            companion object {
+                fun from(parent: ViewGroup): ViewHolder {
+                    val layoutInflater = LayoutInflater.from(parent.context)
+                    val binding = LayoutMultiFileUploadBinding.inflate(layoutInflater, parent, false)
+                    return MultiFileUploadInputViewHolder(binding)
+                }
             }
-        }
-        var selectedFiles = mutableListOf<Uri>()
+            var selectedFiles = mutableListOf<Uri>()
 
-        private lateinit var fileAdapter: FileListAdapter
+            private lateinit var fileAdapter: FileListAdapter
 
-        fun bind(
-            item: FormElement,
-            clickListener: SelectUploadImageClickListener?,
-            documentOnClick: ViewDocumentOnClick?,
-            isEnabled: Boolean
-        ) {
-            /* binding.form = item
-             binding.tvTitle.text = item.title
-             binding.clickListener = clickListener
-             binding.documentclickListener = documentOnClick
-             binding.btnView.visibility = if (item.value != null) View.VISIBLE else View.GONE
+            fun bind(
+                item: FormElement,
+                clickListener: SelectUploadImageClickListener?,
+                documentOnClick: ViewDocumentOnClick?,
+                isEnabled: Boolean
+            ) {
+                /* binding.form = item
+                 binding.tvTitle.text = item.title
+                 binding.clickListener = clickListener
+                 binding.documentclickListener = documentOnClick
+                 binding.btnView.visibility = if (item.value != null) View.VISIBLE else View.GONE
 
-             if (isEnabled) {
-                 binding.addFile.isEnabled = true
-                 binding.addFile.alpha = 1f
-             } else {
-                 binding.addFile.isEnabled = false
-                 binding.addFile.alpha = 0.5f
-             }*/
+                 if (isEnabled) {
+                     binding.addFile.isEnabled = true
+                     binding.addFile.alpha = 1f
+                 } else {
+                     binding.addFile.isEnabled = false
+                     binding.addFile.alpha = 0.5f
+                 }*/
 
-            fileAdapter = FileListAdapter(selectedFiles)
-            binding.rvFiles.adapter = fileAdapter
+                fileAdapter = FileListAdapter(selectedFiles)
+                binding.rvFiles.adapter = fileAdapter
 
-            binding.btnSelectFiles.isEnabled = isEnabled
-            binding.btnSelectFiles.alpha = if (isEnabled) 1f else 0.5f
+                binding.btnSelectFiles.isEnabled = isEnabled
+                binding.btnSelectFiles.alpha = if (isEnabled) 1f else 0.5f
 
-            binding.btnSelectFiles.setOnClickListener {
-                clickListener?.onSelectImageClick(item)
+                binding.btnSelectFiles.setOnClickListener {
+                    clickListener?.onSelectImageClick(item)
+                }
             }
-        }
 
-    }
+        }
         private fun formatTimeInSeconds(millis: Long) : String {
             val seconds = millis / 1000
             return "${seconds} sec"

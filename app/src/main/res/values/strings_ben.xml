@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="nbr_village">Village / Hamlet</string>
     <string name="nbr_occupation">Occupation</string>
     <string name="nbr_occupation_default">Unknown</string>
@@ -11,6 +11,7 @@
     <string name="has_aadhaar_number">Has Aadhaar Number</string>
     <string name="enter_aadhaar_number_ben">Enter Aadhaar Number</string>
     <string name="reproductive_status">Are you pregnant</string>
+
     <string name="birth_certificate_number">Birth Certificate No.</string>
     <string name="beneficiary_details">Beneficiary Details</string>
     <string name="wife_s_name">Wife\'s Name</string>
@@ -22,6 +23,13 @@
     <string name="mother_s_name">Mother\'s Name</string>
     <string name="mobile_number_of">Mobile Number Of</string>
     <string name="whose_mobile_number">Whose mobile number</string>
+    <string name="person_from">Person from</string>
+    <string name="type_of_case_finding">Type of Case Finding</string>
+    <string name="mobile_number_not_available">Mobile number not available</string>
+    <string name="ben_reg_address">Address</string>
+    <string name="ben_reg_state">State</string>
+    <string name="ben_reg_tu">TU</string>
+    <string name="ben_reg_health_facility">Health Facility</string>
     <string name="other_mobile_number_of">Other - Mobile Number of</string>
     <string name="rch_id_ben">RCH ID</string>
     <string name="nbr_age">Age</string>
@@ -61,7 +69,10 @@
     <string name="frag_new_ben_type_adult_text">General Registration \n( 15 years and above )</string>
     <string name="frag_new_ben_type_select_text">Select Beneficiary Type</string>
     <string name="frag_new_ben_reg_type_title">Beneficiary Registration</string>
-    <string name="consent_text">Consent:\nI have been explained by the volunteer, the purpose for which the information and measurement findings is being collected from me, in a language I understand and I give my consent to collect the information and measurement findings on my personal health profile.</string>
+<!--    <string name="consent_text">Consent:\nI have been explained by the volunteer, the purpose for which the information and measurement findings is being collected from me, in a language I understand and I give my consent to collect the information and measurement findings on my personal health profile.</string>-->
+    <string name="consent_text">Consent:\nI have been explained, the purpose for which the information and findings is being collected from
+me, in a language I understand and I give my consent to collect the information and findings on my
+personal health profile.</string>
     <string name="disagree">DISAGREE</string>
     <string name="other_place_of_death">Other Place of Death</string>
     <string name="agree">AGREE</string>
@@ -118,6 +129,18 @@
         <item>Yes</item>
         <item>No</item>
     </string-array>
+
+    <string-array name="person_from_array">
+        <item>Public Sector</item>
+        <item>Private Sector</item>
+    </string-array>
+
+    <string-array name="type_of_case_finding_array">
+        <item>Passive (Routine programme)</item>
+        <item>Active (Active Case Finding)</item>
+    </string-array>
+
+
 
     <string name="dd_ec">Eligible Couple</string>
     <string name="dd_pw">Pregnant Woman</string>
@@ -458,6 +481,10 @@
     <string-array name="ahd_referral_status_array">
         <item>Pending</item>
         <item>Completed</item>
+    </string-array>
+
+    <string-array name="mobile_not_available_array">
+        <item>Not Available</item>
     </string-array>
 
 </resources>

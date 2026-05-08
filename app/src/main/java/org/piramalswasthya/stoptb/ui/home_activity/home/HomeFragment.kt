@@ -104,7 +104,7 @@ class HomeFragment : Fragment() {
         setUpWorkerProgress()
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
             val currentLang = pref.getCurrentLanguage()
-          val langCode = currentLang.symbol
+            val langCode = currentLang.symbol
             formRepository.downloadAllFormsSchemas(langCode)
         }
 
@@ -153,11 +153,11 @@ class HomeFragment : Fragment() {
         binding.vp2Home.adapter = HomePagerAdapter(this)
         TabLayoutMediator(binding.tlHomeViewpager, binding.vp2Home) { tab, position ->
             tab.text = when (position) {
-                0 -> requireActivity().getString(R.string.menu_home_scheduler)
-                1 -> requireActivity().getString(R.string.menu_home_home)
+                0 -> requireActivity().getString(R.string.menu_home_home)
+                1 -> requireActivity().getString(R.string.menu_home_scheduler)
                 else -> "NA"
             }
-            if (position == 1) {
+            if (position == 0) {
                 tab.view.setOnLongClickListener {
                     if (viewModel.getDebMode()) {
                         viewModel.setDevMode(false)
@@ -182,7 +182,7 @@ class HomeFragment : Fragment() {
                 viewModel.homeToolbarTitle ?: getString(R.string.home)
             )
             homeActivity.setHomeMenuItemVisibility(false)
-            binding.vp2Home.setCurrentItem(1, false)
+            binding.vp2Home.setCurrentItem(0, false)
         }
     }
 
