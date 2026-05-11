@@ -201,6 +201,20 @@ interface BenDao {
     fun getAllBen(selectedVillage: Int): Flow<List<BenBasicCache>>
 
     @Query("""
+        SELECT beneficiaryId FROM BENEFICIARY
+        WHERE loc_village_id = :selectedVillage
+        AND isDeactivate = 0
+        AND isDraft = 0
+        AND (
+            height IS NOT NULL
+            OR weight IS NOT NULL
+            OR bmi IS NOT NULL
+            OR temperature IS NOT NULL
+        )
+    """)
+    fun getAnthropometryFilledBenIds(selectedVillage: Int): Flow<List<Long>>
+
+    @Query("""
         SELECT * FROM BEN_BASIC_CACHE
         WHERE villageId = :selectedVillage
         AND isDeactivate = 0

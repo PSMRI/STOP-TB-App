@@ -23,6 +23,8 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.FormRespons
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.helpers.Konstants
+import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
+import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.model.*
 import org.piramalswasthya.stoptb.network.*
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel
@@ -626,14 +628,31 @@ class BenRepo @Inject constructor(
                     ?: throw IllegalStateException("No user logged in!!")
             val lastTimeStamp = preferenceDao.getLastSyncedTimeStamp()
             try {
-                val response = tmcNetworkApiService.getBeneficiaries(
-                    GetDataPaginatedRequest(
-                        user.userId,
-                        pageNumber,
-                        getCurrentDate(lastTimeStamp),
-                        getCurrentDate()
+                val locationRecord = preferenceDao.getLocationRecord()
+                val response = if (locationRecord != null && user.role.isNurseRole()) {
+                    val request = NurseWorklistRequest(
+                        providerServiceMapID = user.serviceMapId,
+                        villageId = locationRecord.village.id
                     )
-                )
+                    Timber.d("Pull nurse worklist: $request")
+                    tmcNetworkApiService.getNurseWorklist(request)
+                } else if (locationRecord != null && user.role.isRegistrationOfficerRole()) {
+                    val request = NurseWorklistRequest(
+                        providerServiceMapID = user.serviceMapId,
+                        villageId = locationRecord.village.id
+                    )
+                    Timber.d("Pull registrar worklist: $request")
+                    tmcNetworkApiService.getRegistrarWorklist(request)
+                } else {
+                    tmcNetworkApiService.getBeneficiaries(
+                        GetDataPaginatedRequest(
+                            user.userId,
+                            pageNumber,
+                            getCurrentDate(lastTimeStamp),
+                            getCurrentDate()
+                        )
+                    )
+                }
                 val statusCode = response.code()
                 if (statusCode == 200) {
                     val responseString = response.body()?.string()
@@ -646,8 +665,8 @@ class BenRepo @Inject constructor(
                         when (responseStatusCode) {
                             200 -> {
 
-                                val dataObj = jsonObj.getJSONObject("data")
-                                val pageSize = dataObj.getInt("totalPage")
+                                val jsonArray = getResponseDataArray(jsonObj)
+                                val pageSize = getResponseTotalPage(jsonObj)
 
 //                                HelperUtil.allPagesContent.append("Page $pageNumber:\n")
 //                                HelperUtil.allPagesContent.append(responseString)
@@ -714,14 +733,31 @@ class BenRepo @Inject constructor(
                 preferenceDao.getLoggedInUser()
                     ?: throw IllegalStateException("No user logged in!!")
             try {
-                val response = tmcNetworkApiService.getBeneficiaries(
-                    GetDataPaginatedRequest(
-                        user.userId,
-                        pageNumber,
-                        "2020-10-20T15:50:45.000Z",
-                        getCurrentDate()
+                val locationRecord = preferenceDao.getLocationRecord()
+                val response = if (locationRecord != null && user.role.isNurseRole()) {
+                    val request = NurseWorklistRequest(
+                        providerServiceMapID = user.serviceMapId,
+                        villageId = locationRecord.village.id
                     )
-                )
+                    Timber.d("Pull nurse worklist: $request")
+                    tmcNetworkApiService.getNurseWorklist(request)
+                } else if (locationRecord != null && user.role.isRegistrationOfficerRole()) {
+                    val request = NurseWorklistRequest(
+                        providerServiceMapID = user.serviceMapId,
+                        villageId = locationRecord.village.id
+                    )
+                    Timber.d("Pull registrar worklist: $request")
+                    tmcNetworkApiService.getRegistrarWorklist(request)
+                } else {
+                    tmcNetworkApiService.getBeneficiaries(
+                        GetDataPaginatedRequest(
+                            user.userId,
+                            pageNumber,
+                            "2020-10-20T15:50:45.000Z",
+                            getCurrentDate()
+                        )
+                    )
+                }
                 val statusCode = response.code()
                 if (statusCode == 200) {
                     val responseString = response.body()?.string()
@@ -731,15 +767,15 @@ class BenRepo @Inject constructor(
                         val errorMessage = jsonObj.optString("errorMessage", "")
                         val responseStatusCode = jsonObj.getInt("statusCode")
                         if (responseStatusCode == 200) {
-                            val dataObj = jsonObj.getJSONObject("data")
-                            val jsonArray = dataObj.getJSONArray("data")
-                            val pageSize = dataObj.getInt("totalPage")
+                                val jsonArray = getResponseDataArray(jsonObj)
+                                val pageSize = getResponseTotalPage(jsonObj)
 
                             if (jsonArray.length() != 0) {
 
                                 for (i in 0 until jsonArray.length()) {
                                     val jsonObject = jsonArray.getJSONObject(i)
-                                    val houseDataObj = jsonObject.getJSONObject("householdDetails")
+//                                    val houseDataObj = jsonObject.getJSONObject("householdDetails")
+                                    val houseDataObj = jsonObject.optJSONObject("householdDetails") ?: JSONObject()
                                     val benDataObj = jsonObject.getJSONObject("beneficiaryDetails")
 
                                     val benId =
@@ -835,7 +871,7 @@ class BenRepo @Inject constructor(
                                     )
                                 } catch (e: Exception) {
                                     Timber.d("HouseHold entries not synced $e")
-                                    return@withContext Pair(0, benDataList)
+                                    // StopTB worklist can be beneficiary-only; do not block beneficiary upsert.
                                 }
                                 val benCacheList = getBenCacheFromServerResponse(responseString)
                                 benDao.upsert(*benCacheList.toTypedArray())
@@ -860,9 +896,40 @@ class BenRepo @Inject constructor(
     }
 
     private fun getLongFromDate(date: String): Long {
-        val formatter = SimpleDateFormat("MMM dd, yyyy HH:mm:ss a", Locale.ENGLISH)
-        val localDateTime = formatter.parse(date)
-        return localDateTime?.time ?: 0
+        val patterns = listOf(
+            "MMM dd, yyyy HH:mm:ss a",
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+        )
+        for (pattern in patterns) {
+            runCatching {
+                SimpleDateFormat(pattern, Locale.ENGLISH).parse(date)?.time
+            }.getOrNull()?.let { return it }
+        }
+        return 0
+    }
+
+    private fun getResponseDataArray(jsonObj: JSONObject): JSONArray {
+        val data = jsonObj.opt("data")
+        return when (data) {
+            is JSONArray -> data
+            is JSONObject -> data.optJSONArray("data") ?: JSONArray()
+            else -> JSONArray()
+        }
+    }
+
+    private fun getResponseTotalPage(jsonObj: JSONObject): Int {
+        val data = jsonObj.opt("data")
+        return when (data) {
+            is JSONObject -> data.optInt("totalPage", 1)
+            is JSONArray -> 1
+            else -> 0
+        }
+    }
+
+    private fun JSONObject.optStringOrNull(name: String): String? {
+        if (!has(name) || isNull(name)) return null
+        return optString(name).takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
     }
 
     var count = 0
@@ -872,18 +939,38 @@ class BenRepo @Inject constructor(
 
         val responseStatusCode = jsonObj.getInt("statusCode")
         if (responseStatusCode == 200) {
-            val dataObj = jsonObj.getJSONObject("data")
-            val jsonArray = dataObj.getJSONArray("data")
+            val jsonArray = getResponseDataArray(jsonObj)
 
             if (jsonArray.length() != 0) {
                 for (i in 0 until jsonArray.length()) {
                     val jsonObject = jsonArray.getJSONObject(i)
                     val benDataObj = jsonObject.getJSONObject("beneficiaryDetails")
-                    val abhaHealthDetailsObj = jsonObject.getJSONObject("abhaHealthDetails")
+                    val abhaHealthDetailsObj = jsonObject.optJSONObject("abhaHealthDetails") ?: JSONObject()
+                    val anthropometryObj = jsonObject.optJSONObject("anthropometry")
+                    val stopTBDetailsObj = jsonObject.optJSONObject("stopTBDetails")
+                    val fullName = benDataObj.optStringOrNull("benName").orEmpty().trim()
+                    val firstNameFromFullName = fullName.substringBefore(" ").takeIf { it.isNotBlank() }
+                    val lastNameFromFullName = fullName.substringAfter(" ", "").takeIf { it.isNotBlank() }
+                    val dobMillis = benDataObj.optStringOrNull("dob")?.let { getLongFromDate(it) } ?: 0L
+                    val ageUnitText = benDataObj.optStringOrNull("age_unit") ?: "Years"
+                    val currentLocation = preferenceDao.getLocationRecord()
+                    val createdByValue = benDataObj.optStringOrNull("createdBy")
+                        ?: preferenceDao.getLoggedInUser()?.userName
+                        ?: ""
+                    val createdDateValue = benDataObj.optStringOrNull("createdDate")
+                        ?: benDataObj.optStringOrNull("registrationDate")
+                    val updatedDateValue = benDataObj.optStringOrNull("updatedDate") ?: createdDateValue
+                    val ageValue = if (benDataObj.has("age")) {
+                        benDataObj.optInt("age")
+                    } else if (dobMillis > 0L) {
+                        BenBasicCache.getAgeFromDob(dobMillis)
+                    } else {
+                        0
+                    }
 
 //                    val houseDataObj = jsonObject.getJSONObject("householdDetails")
 //                    val cbacDataObj = jsonObject.getJSONObject("cbacDetails")
-                    val childDataObj = jsonObject.getJSONObject("bornbirthDeatils")
+                    val childDataObj = jsonObject.optJSONObject("bornbirthDeatils") ?: JSONObject()
                     val benId =
                         if (jsonObject.has("benficieryid")) jsonObject.getLong("benficieryid") else -1L
                     val hhId =
@@ -930,39 +1017,35 @@ class BenRepo @Inject constructor(
                                     .takeIf { !it.isNullOrEmpty() },
 
 
-                                ashaId = jsonObject.getInt("ashaId"),
+                                ashaId = jsonObject.optInt("ashaId", 0),
                                 benRegId = jsonObject.getLong("BenRegId"),
                                 isNewAbha = if (abhaHealthDetailsObj.has("isNewAbha")) abhaHealthDetailsObj.getBoolean(
                                     "isNewAbha"
                                 ) else false,
-                                age = benDataObj.getInt("age"),
+                                age = ageValue,
                                 isDeactivate = if (benDataObj.has("isDeactivate")) benDataObj.getBoolean("isDeactivate") else false,
                                 ageUnit = if (benDataObj.has("gender")) {
-                                    when (benDataObj.getString("age_unit")) {
+                                    when (ageUnitText) {
                                         "Years" -> AgeUnit.YEARS
                                         "Months" -> AgeUnit.MONTHS
                                         "Days" -> AgeUnit.DAYS
                                         else -> AgeUnit.YEARS
                                     }
                                 } else null,
-                                ageUnitId = when (benDataObj.getString("age_unit")) {
+                                ageUnitId = when (ageUnitText) {
                                     "Years" -> 3
                                     "Months" -> 2
                                     "Days" -> 1
                                     else -> 3
                                 },
-                                isKid = !(benDataObj.getString("age_unit") == "Years" && benDataObj.getInt(
-                                    "age"
-                                ) > 14),
-                                isAdult = (benDataObj.getString("age_unit") == "Years" && benDataObj.getInt(
-                                    "age"
-                                ) > 14),
+                                isKid = !(ageUnitText == "Years" && ageValue > 14),
+                                isAdult = (ageUnitText == "Years" && ageValue > 14),
 //                                userImageBlob = getCompressedByteArray(benId, benDataObj),
                                 regDate = if (benDataObj.has("registrationDate")) getLongFromDate(
                                     benDataObj.getString("registrationDate")
                                 ) else 0,
-                                firstName = if (benDataObj.has("firstName")) benDataObj.getString("firstName") else null,
-                                lastName = if (benDataObj.has("lastName")) benDataObj.getString("lastName") else null,
+                                firstName = benDataObj.optStringOrNull("firstName") ?: firstNameFromFullName,
+                                lastName = benDataObj.optStringOrNull("lastName") ?: lastNameFromFullName,
                                 genderId = benDataObj.getInt("genderId"),
                                 gender = if (benDataObj.has("gender")) {
                                     when (benDataObj.getInt("genderId")) {
@@ -973,17 +1056,16 @@ class BenRepo @Inject constructor(
                                         else -> Gender.MALE
                                     }
                                 } else null,
-                                dob = getLongFromDate(benDataObj.getString("dob")),
+                                dob = dobMillis,
 
-                                fatherName = if (benDataObj.has("fatherName")) benDataObj.getString(
-                                    "fatherName"
-                                ) else null,
-//                                personFrom = if (benDataObj.has("personFrom")) benDataObj.getString(
-//                                    "personFrom"
-//                                ) else null,
-                                motherName = if (benDataObj.has("motherName")) benDataObj.getString(
-                                    "motherName"
-                                ) else null,
+                                fatherName = benDataObj.optStringOrNull("fatherName"),
+                                personFrom = stopTBDetailsObj?.optStringOrNull("personFrom"),
+                                typeOfCaseFinding = stopTBDetailsObj?.optStringOrNull("caseFindingType"),
+                                height = anthropometryObj?.optDouble("height")?.takeIf { !it.isNaN() },
+                                weight = anthropometryObj?.optDouble("weight")?.takeIf { !it.isNaN() },
+                                bmi = anthropometryObj?.optDouble("bmi")?.takeIf { !it.isNaN() },
+                                temperature = anthropometryObj?.optDouble("temperatureValue")?.takeIf { !it.isNaN() },
+                                motherName = benDataObj.optStringOrNull("motherName"),
                                 familyHeadRelation = if (benDataObj.has("familyHeadRelation")) benDataObj.getString(
                                     "familyHeadRelation"
                                 ) else null,
@@ -1006,8 +1088,8 @@ class BenRepo @Inject constructor(
                                 ).toLongOrNull() else null,
 //                            literacy = literacy,
                                 literacyId = if (benDataObj.has("literacyId")) benDataObj.getInt("literacyId") else 0,
-                                communityId = if (benDataObj.has("communityId")) benDataObj.getInt("communityId") else 0,
-                                community = if (benDataObj.has("community")) benDataObj.getString("community") else null,
+                                communityId = benDataObj.optInt("communityId", 0),
+                                community = benDataObj.optStringOrNull("community"),
                                 religion = if (benDataObj.has("religion")) benDataObj.getString("religion") else null,
                                 religionId = if (benDataObj.has("religionID")) benDataObj.getInt("religionID") else 0,
                                 religionOthers = if (benDataObj.has("religionOthers") && benDataObj.getString(
@@ -1055,12 +1137,12 @@ class BenRepo @Inject constructor(
 //                                    else -> TypeOfList.GENERAL
 //                                }
 //                            } else TypeOfList.OTHER,
-                                latitude = benDataObj.getDouble("latitude"),
-                                longitude = benDataObj.getDouble("longitude"),
+                                latitude = if (benDataObj.has("latitude")) benDataObj.optDouble("latitude") else 0.0,
+                                longitude = if (benDataObj.has("longitude")) benDataObj.optDouble("longitude") else 0.0,
                                 aadharNum = if (benDataObj.has("aadhaNo")) benDataObj.getString("aadhaNo") else null,
-                                aadharNumId = benDataObj.getInt("aadha_noId"),
+                                aadharNumId = if (benDataObj.has("aadha_noId")) benDataObj.getInt("aadha_noId") else 0,
                                 hasAadhar = if (benDataObj.has("aadhaNo")) benDataObj.getString("aadhaNo") != "" else false,
-                                hasAadharId = if (benDataObj.getInt("aadha_noId") == 1) 1 else 0,
+                                hasAadharId = if (benDataObj.optInt("aadha_noId", 0) == 1) 1 else 0,
 //                            bankAccountId = benDataObj.getString("bank_accountId"),
                                 bankAccount = if (benDataObj.has("bankAccount")) benDataObj.getString(
                                     "bankAccount"
@@ -1117,43 +1199,43 @@ class BenRepo @Inject constructor(
 //                                "diagnosis_status"
 //                            ) else null,
                                 locationRecord = LocationRecord(
-                                    country = preferenceDao.getLocationRecord()?.country ?: LocationEntity(1, "India"),
+                                    country = currentLocation?.country ?: LocationEntity(1, "India"),
                                     state = LocationEntity(
-                                        benDataObj.getInt("stateId"),
-                                        benDataObj.getString("stateName"),
+                                        if (benDataObj.has("stateId")) benDataObj.getInt("stateId") else currentLocation?.state?.id ?: 0,
+                                        benDataObj.optStringOrNull("stateName") ?: currentLocation?.state?.name.orEmpty(),
                                     ),
                                     district = LocationEntity(
-                                        benDataObj.getInt("districtid"),
-                                        benDataObj.getString("districtname"),
+                                        benDataObj.optInt("districtid", currentLocation?.district?.id ?: 0),
+                                        benDataObj.optStringOrNull("districtname") ?: currentLocation?.district?.name.orEmpty(),
                                     ),
                                     block = LocationEntity(
-                                        benDataObj.getInt("blockId"),
+                                        benDataObj.optInt("blockId", currentLocation?.block?.id ?: 0),
                                         if (benDataObj.has("facilitySelection") &&
                                             !benDataObj.isNull("facilitySelection") &&
                                             benDataObj.getString("facilitySelection").isNotBlank()
                                         ) {
                                             benDataObj.getString("facilitySelection")
                                         } else {
-                                            benDataObj.getString("blockName")
+                                            benDataObj.optStringOrNull("blockName") ?: currentLocation?.block?.name.orEmpty()
                                         },
                                     ),
                                     village = LocationEntity(
                                         benDataObj.getInt("villageId"),
                                         benDataObj.getString("villageName"),
                                     ),
+                                    tu = stopTBDetailsObj?.optInt("tuId")?.takeIf { it > 0 }?.let { id ->
+                                        LocationEntity(id, stopTBDetailsObj.optStringOrNull("tuName").orEmpty())
+                                    } ?: currentLocation?.tu,
+                                    healthFacility = stopTBDetailsObj?.optInt("healthFacilityId")?.takeIf { it > 0 }?.let { id ->
+                                        LocationEntity(id, stopTBDetailsObj.optStringOrNull("healthFacilityName").orEmpty())
+                                    } ?: currentLocation?.healthFacility,
                                 ),
                                 processed = "P",
                                 serverUpdatedStatus = 1,
-                                createdBy = benDataObj.getString("createdBy"),
-                                updatedBy = if (benDataObj.has("updatedBy")) benDataObj.getString("updatedBy") else benDataObj.getString(
-                                    "createdBy"
-                                ),
-                                createdDate = getLongFromDate(benDataObj.getString("createdDate")),
-                                updatedDate = getLongFromDate(
-                                    if (benDataObj.has("updatedDate")) benDataObj.getString("updatedDate") else benDataObj.getString(
-                                        "createdDate"
-                                    )
-                                ),
+                                createdBy = createdByValue,
+                                updatedBy = benDataObj.optStringOrNull("updatedBy") ?: createdByValue,
+                                createdDate = createdDateValue?.let { getLongFromDate(it) } ?: 0L,
+                                updatedDate = updatedDateValue?.let { getLongFromDate(it) } ?: 0L,
                                 userImage = if (benDataObj.has("user_image"))
                                     ImageUtils.saveBenImageFromServerToStorage(
                                         context,
@@ -1299,9 +1381,8 @@ class BenRepo @Inject constructor(
                                     ) else ""
                                 ),
                                 genDetails = if (childDataObj.length() != 0) null else BenRegGen(
-                                    maritalStatus = if (benDataObj.has("maritalstatus")) benDataObj.getString(
-                                        "maritalstatus"
-                                    ) else null,
+                                    maritalStatus = benDataObj.optStringOrNull("maritalstatus")
+                                        ?: benDataObj.optStringOrNull("maritalStatus"),
                                     maritalStatusId = if (benDataObj.has("maritalstatusId")) benDataObj.getInt(
                                         "maritalstatusId"
                                     ) else 0,
@@ -1450,8 +1531,7 @@ class BenRepo @Inject constructor(
 
         val responseStatusCode = jsonObj.getInt("statusCode")
         if (responseStatusCode == 200) {
-            val dataObj = jsonObj.getJSONObject("data")
-            val jsonArray = dataObj.getJSONArray("data")
+            val jsonArray = getResponseDataArray(jsonObj)
 
             if (jsonArray.length() != 0) {
                 for (i in 0 until jsonArray.length()) {

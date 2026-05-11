@@ -45,6 +45,9 @@ class RecordsRepo @Inject constructor(
         benDao.getChildCountsForAllBen(selectedVillage)
             .map { list -> list.associate { it.benId to it.childCount } }
 
+    val anthropometryFilledBenIds: Flow<List<Long>> get() =
+        benDao.getAnthropometryFilledBenIds(selectedVillage)
+
     fun searchBen(query: String, filterType: Int, source: Int): Flow<List<BenBasicDomain>> =
         benDao.searchBen(selectedVillage, source, filterType, query)
             .map { list -> list.map { it.asBasicDomainModel() } }

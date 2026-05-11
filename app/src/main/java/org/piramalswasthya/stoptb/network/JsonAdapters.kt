@@ -66,6 +66,12 @@ data class GetDataPaginatedRequest(
 )
 
 @JsonClass(generateAdapter = true)
+data class NurseWorklistRequest(
+    val providerServiceMapID: Int,
+    val villageId: Int
+)
+
+@JsonClass(generateAdapter = true)
 data class GetCBACRequest(val createdBy: String)
 
 @JsonClass(generateAdapter = true)

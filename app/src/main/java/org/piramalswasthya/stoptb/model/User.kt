@@ -308,7 +308,10 @@ data class UserDetailsInResponse(
             role = roleName,
             serviceMapId = providerServiceMapId,
             state = LocationEntity(id = stateId, name = stateName),
-            district = LocationEntity(id = 1, name = workingDistrictName.toString()),
+            district = LocationEntity(
+                id = workingDistrictId ?: 1,
+                name = workingDistrictName?.takeIf { it.isNotBlank() } ?: blockName
+            ),
             block = LocationEntity(id = blockId, name = blockName),
             tus = getLocationEntityList(tuId, tuName),
             healthFacilities = healthFacilityList.ifEmpty {

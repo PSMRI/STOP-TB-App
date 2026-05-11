@@ -27,6 +27,9 @@ import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertFilterBinding
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchAndToggleRvButtonBinding
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
+import org.piramalswasthya.stoptb.helpers.isNurseRole
+import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
@@ -125,12 +128,21 @@ class AllBenFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-//        val isVolunteer = prefDao.getLoggedInUser()?.role
-//            .equals(RoleConstants.ROLE_VOLUNTEER, true)
-        val isVolunteer = true
+        val roleName = prefDao.getLoggedInUser()?.role
+        val isRegistrar = roleName.isRegistrationOfficerRole()
+        val isNurse = roleName.isNurseRole()
+        val isCounsellor = roleName.isCounsellingOfficerRole()
+        val isKnownRestrictedRole = isRegistrar || isNurse || isCounsellor
+        val allowLegacyAccess = !isKnownRestrictedRole
         val isReadOnlyReferralList = args.source in READ_ONLY_REFERRAL_SOURCES
         val showResultButton = args.source == 6 || args.source == 7 || args.source == 8
-        if (isVolunteer) {
+        val showAddBeneficiary = (isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
+        val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
+        val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
+        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess) && !isReadOnlyReferralList
+        val showCallButton = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
+
+        if (showAddBeneficiary) {
             if (isReadOnlyReferralList) {
                 binding.btnNextPage.visibility = View.GONE
             } else {
@@ -234,17 +246,28 @@ class AllBenFragment : Fragment() {
                             "autoFlow" to false
                         )
                     )
+                },
+                { item, benId, hhId, viewOnly ->
+                    if (!showAnthropometryButton) return@BenClickListener
+                    findNavController().navigate(
+                        R.id.anthropometryFragment,
+                        bundleOf(
+                            "benId" to benId,
+                            "autoFlow" to false
+                        )
+                    )
                 }
             ),
             showBeneficiaries = true,
             showRegistrationDate = true,
             showSyncIcon = true,
-            showAbha = !isReadOnlyReferralList,
-            showCall = !isReadOnlyReferralList,
+            showAbha = showAbhaButton,
+            showCall = showCallButton,
             pref = prefDao,
             context = requireActivity(),
-            showActionButtons = !isReadOnlyReferralList,
-            showResultButton = showResultButton
+            showActionButtons = showBenActionButtons,
+            showResultButton = showResultButton,
+            showAnthropometryButton = showAnthropometryButton
         )
 
         binding.rvAny.adapter = benAdapter
@@ -265,8 +288,7 @@ class AllBenFragment : Fragment() {
                 val isEmpty = loadStates.refresh is LoadState.NotLoading
                         && benAdapter.itemCount == 0
                 binding.flEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
-                // Volunteer ke liye button hamesha visible rahega except read-only referral lists
-                if (isVolunteer && !isReadOnlyReferralList) {
+                if (showAddBeneficiary) {
                     binding.btnNextPage.visibility = View.VISIBLE
                 }
             }
@@ -293,6 +315,12 @@ class AllBenFragment : Fragment() {
         lifecycleScope.launch {
             viewModel.generalOpdBenIds.collectLatest { benIds ->
                 benAdapter.submitGeneralOpdBenIds(benIds)
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.anthropometryFilledBenIds.collectLatest { benIds ->
+                benAdapter.submitAnthropometryBenIds(benIds)
             }
         }
 

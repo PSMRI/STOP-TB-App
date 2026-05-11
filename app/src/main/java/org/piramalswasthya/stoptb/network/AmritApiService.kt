@@ -39,6 +39,12 @@ interface AmritApiService {
     @POST("flw-api/beneficiary/getBeneficiaryData")
     suspend fun getBeneficiaries(@Body userDetail: GetDataPaginatedRequest): Response<ResponseBody>
 
+    @POST("flw-api/stoptb/nurse/worklist")
+    suspend fun getNurseWorklist(@Body request: NurseWorklistRequest): Response<ResponseBody>
+
+    @POST("flw-api/stoptb/registrar/worklist")
+    suspend fun getRegistrarWorklist(@Body request: NurseWorklistRequest): Response<ResponseBody>
+
     @POST("common-api/beneficiaryConsent/sendConsent")
     suspend fun sendOtp(@Body sendOtpRequest: sendOtpRequest): Response<ResponseBody>
 

@@ -696,6 +696,7 @@
     <string name="not_applicable">लागू नहीं</string>
     <string name="diagnostics_submitted">Diagnostics submitted</string>
     <string name="general_opd">जनरल ओपीडी</string>
+    <string name="enter_value_between">%1$s %2$s और %3$s के बीच दर्ज करें</string>
     <string name="chief_complaint">मुख्य शिकायत</string>
     <string name="medication">दवा</string>
     <string name="dosage">खुराक</string>

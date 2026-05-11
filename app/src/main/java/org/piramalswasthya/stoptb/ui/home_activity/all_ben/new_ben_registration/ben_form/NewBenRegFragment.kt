@@ -245,7 +245,7 @@ class NewBenRegFragment : Fragment() {
                     try {
                         if (viewModel.benIdFromArgs == 0L) {
                             findNavController().navigate(
-                                R.id.TBScreeningFormFragment,
+                                R.id.anthropometryFragment,
                                 bundleOf(
                                     "benId" to viewModel.getCurrentBenId(),
                                     "autoFlow" to true

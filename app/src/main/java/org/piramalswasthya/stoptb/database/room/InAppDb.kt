@@ -80,7 +80,7 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.NCDReferalFormResponseJson
         TBDiagnosticsCache::class
     ],
     views = [BenBasicCache::class],
-    version = 11, exportSchema = false
+    version = 12, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -296,6 +296,29 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val columns = listOf(
+                    "personFrom TEXT DEFAULT NULL",
+                    "personFromId INTEGER DEFAULT NULL",
+                    "typeOfCaseFinding TEXT DEFAULT NULL",
+                    "typeOfCaseFindingId INTEGER DEFAULT NULL",
+                    "mobileNumberAvailable INTEGER DEFAULT NULL",
+                    "address TEXT DEFAULT NULL",
+                    "height REAL DEFAULT NULL",
+                    "weight REAL DEFAULT NULL",
+                    "bmi REAL DEFAULT NULL",
+                    "temperature REAL DEFAULT NULL"
+                )
+                columns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "BENEFICIARY", columnName)) {
+                        database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN $columnDefinition")
+                    }
+                }
+            }
+        }
+
         private fun addVitalGeneralExaminationColumns(database: SupportSQLiteDatabase) {
             val columns = listOf(
                 "benRegId INTEGER NOT NULL DEFAULT 0",
@@ -437,6 +460,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_8_9)
                         .addMigrations(MIGRATION_9_10)
                         .addMigrations(MIGRATION_10_11)
+                        .addMigrations(MIGRATION_11_12)
                         .build()
 
                     INSTANCE = instance

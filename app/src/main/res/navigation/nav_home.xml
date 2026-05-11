@@ -216,6 +216,20 @@
     </fragment>
 
     <fragment
+        android:id="@+id/anthropometryFragment"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.anthropometry.AnthropometryFragment"
+        android:label="@string/anthropometry_screen"
+        tools:layout="@layout/fragment_anthropometry">
+        <argument
+            android:name="benId"
+            app:argType="long" />
+        <argument
+            android:name="autoFlow"
+            android:defaultValue="true"
+            app:argType="boolean" />
+    </fragment>
+
+    <fragment
         android:id="@+id/ncdFragment"
         android:name="org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.NcdFragment"
         android:label="@string/icon_title_ncd"
