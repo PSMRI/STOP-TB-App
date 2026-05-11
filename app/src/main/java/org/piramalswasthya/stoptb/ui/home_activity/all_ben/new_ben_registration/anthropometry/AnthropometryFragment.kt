@@ -1,0 +1,243 @@
+package org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.anthropometry
+
+import android.app.AlertDialog
+import android.os.Bundle
+import android.text.InputFilter
+import android.text.Spanned
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Toast
+import androidx.core.os.bundleOf
+import androidx.core.widget.doAfterTextChanged
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
+import androidx.navigation.fragment.findNavController
+import dagger.hilt.android.AndroidEntryPoint
+import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.databinding.FragmentAnthropometryBinding
+import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
+import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.work.WorkerUtils
+
+@AndroidEntryPoint
+class AnthropometryFragment : Fragment() {
+
+    private companion object {
+        const val MIN_WEIGHT_KG = 1.0
+        const val MAX_WEIGHT_KG = 250.0
+        const val MIN_HEIGHT_CM = 35.0
+        const val MAX_HEIGHT_CM = 250.0
+        const val MIN_TEMPERATURE_F = 95.0
+        const val MAX_TEMPERATURE_F = 110.0
+    }
+
+    private var _binding: FragmentAnthropometryBinding? = null
+    private val binding: FragmentAnthropometryBinding
+        get() = _binding!!
+
+    private val viewModel: AnthropometryViewModel by viewModels()
+    private var highTemperatureAlertShown = false
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        _binding = FragmentAnthropometryBinding.inflate(inflater, container, false)
+        return binding.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        binding.etWeight.filters = arrayOf(decimalInputFilter())
+        binding.etHeight.filters = arrayOf(decimalInputFilter())
+        binding.etTemperature.filters = arrayOf(decimalInputFilter())
+
+        viewModel.benName.observe(viewLifecycleOwner) {
+            binding.tvBenName.text = it
+        }
+        viewModel.benAgeGender.observe(viewLifecycleOwner) {
+            binding.tvAgeGender.text = it
+        }
+        viewModel.existingAnthropometry.observe(viewLifecycleOwner) { ben ->
+            ben ?: return@observe
+            binding.etWeight.setText(ben.weight?.formatOneDecimal().orEmpty())
+            binding.etHeight.setText(ben.height?.formatOneDecimal().orEmpty())
+            binding.etBmi.setText(ben.bmi?.formatOneDecimal().orEmpty())
+            binding.etTemperature.setText(ben.temperature?.formatOneDecimal().orEmpty())
+        }
+
+        binding.etWeight.doAfterTextChanged { updateBmi() }
+        binding.etHeight.doAfterTextChanged { updateBmi() }
+        binding.etTemperature.doAfterTextChanged {
+            if (isHighTemperature()) showHighTemperatureAlert()
+        }
+
+        binding.rgTemperature.setOnCheckedChangeListener { _, checkedId ->
+            when (checkedId) {
+                R.id.rbTempNormal -> binding.etTemperature.setText("98.0")
+                R.id.rbTempHigh -> {
+                    binding.etTemperature.setText("100.0")
+                    showHighTemperatureAlert()
+                }
+            }
+        }
+
+        binding.btnSubmit.setOnClickListener {
+            if (!validateInput()) return@setOnClickListener
+            if (isHighTemperature()) showHighTemperatureAlert()
+            viewModel.saveAnthropometry(
+                weightKg = binding.etWeight.text?.toString(),
+                heightCm = binding.etHeight.text?.toString(),
+                temperatureF = binding.etTemperature.text?.toString()
+            )
+        }
+
+        viewModel.state.observe(viewLifecycleOwner) { state ->
+            when (state) {
+                AnthropometryViewModel.State.SAVING -> binding.loadingOverlay.visibility = View.VISIBLE
+                AnthropometryViewModel.State.SAVE_SUCCESS -> {
+                    binding.loadingOverlay.visibility = View.GONE
+                    WorkerUtils.triggerAmritPushWorker(requireContext())
+                    Toast.makeText(requireContext(), R.string.save_successful, Toast.LENGTH_SHORT).show()
+                    if (viewModel.autoFlow) {
+                        findNavController().navigate(
+                            R.id.TBScreeningFormFragment,
+                            bundleOf(
+                                "benId" to viewModel.benId,
+                                "autoFlow" to true
+                            )
+                        )
+                    } else {
+                        findNavController().popBackStack()
+                    }
+                    viewModel.resetState()
+                }
+                AnthropometryViewModel.State.SAVE_FAILED -> {
+                    binding.loadingOverlay.visibility = View.GONE
+                    Toast.makeText(
+                        requireContext(),
+                        R.string.something_went_wrong_try_again,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    viewModel.resetState()
+                }
+                else -> binding.loadingOverlay.visibility = View.GONE
+            }
+        }
+    }
+
+    private fun updateBmi() {
+        val bmi = viewModel.calculateBmi(
+            heightCm = binding.etHeight.text?.toString(),
+            weightKg = binding.etWeight.text?.toString()
+        )
+        binding.etBmi.setText(bmi?.formatOneDecimal().orEmpty())
+    }
+
+    private fun validateInput(): Boolean {
+        var valid = true
+        binding.tilWeight.error = null
+        binding.tilHeight.error = null
+        binding.tilTemperature.error = null
+
+        if (binding.etWeight.text.isNullOrBlank()) {
+            binding.tilWeight.error = getString(R.string.field_is_required, getString(R.string.weight_kgs))
+            valid = false
+        } else if (!isWithinRange(binding.etWeight.text?.toString(), MIN_WEIGHT_KG, MAX_WEIGHT_KG)) {
+            binding.tilWeight.error = getString(
+                R.string.enter_value_between,
+                getString(R.string.weight_kgs),
+                MIN_WEIGHT_KG.stripTrailingZero(),
+                MAX_WEIGHT_KG.stripTrailingZero()
+            )
+            valid = false
+        }
+        if (binding.etHeight.text.isNullOrBlank()) {
+            binding.tilHeight.error = getString(R.string.field_is_required, getString(R.string.height_cms))
+            valid = false
+        } else if (!isWithinRange(binding.etHeight.text?.toString(), MIN_HEIGHT_CM, MAX_HEIGHT_CM)) {
+            binding.tilHeight.error = getString(
+                R.string.enter_value_between,
+                getString(R.string.height_cms),
+                MIN_HEIGHT_CM.stripTrailingZero(),
+                MAX_HEIGHT_CM.stripTrailingZero()
+            )
+            valid = false
+        }
+        if (binding.etTemperature.text.isNullOrBlank()) {
+            binding.tilTemperature.error = getString(R.string.field_is_required, getString(R.string.temperature_degree_fahrenheit))
+            valid = false
+        } else if (!isWithinRange(binding.etTemperature.text?.toString(), MIN_TEMPERATURE_F, MAX_TEMPERATURE_F)) {
+            binding.tilTemperature.error = getString(
+                R.string.enter_value_between,
+                getString(R.string.temperature_degree_fahrenheit),
+                MIN_TEMPERATURE_F.stripTrailingZero(),
+                MAX_TEMPERATURE_F.stripTrailingZero()
+            )
+            valid = false
+        }
+        return valid
+    }
+
+    private fun isWithinRange(value: String?, min: Double, max: Double): Boolean {
+        val number = value?.trim()?.toDoubleOrNull() ?: return false
+        return number in min..max
+    }
+
+    private fun isHighTemperature(): Boolean =
+        (binding.etTemperature.text?.toString()?.toDoubleOrNull() ?: 0.0) >= 100.0
+
+    private fun showHighTemperatureAlert() {
+        if (highTemperatureAlertShown) return
+        highTemperatureAlertShown = true
+        AlertDialog.Builder(requireContext())
+            .setMessage(R.string.refer_to_hwc_alert)
+            .setPositiveButton(R.string.ok) { dialog, _ -> dialog.dismiss() }
+            .show()
+    }
+
+    private fun decimalInputFilter(): InputFilter {
+        val regex = Regex("^\\d{0,3}(\\.\\d{0,1})?$")
+        return InputFilter { source: CharSequence, start: Int, end: Int, dest: Spanned, dstart: Int, dend: Int ->
+            val current = dest.toString()
+            val updated = current.substring(0, dstart) +
+                source.subSequence(start, end).toString() +
+                current.substring(dend)
+            if (updated.isEmpty() || regex.matches(updated)) null else ""
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        activity?.let {
+            when (it) {
+                is HomeActivity -> it.updateActionBar(
+                    R.drawable.ic__ncd,
+                    getString(R.string.anthropometry_screen)
+                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+
+                is VolunteerActivity -> it.updateActionBar(
+                    R.drawable.ic__ncd,
+                    getString(R.string.anthropometry_screen)
+                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+            }
+        }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        if (viewModel.autoFlow) {
+            (activity as? HomeActivity)?.setToolbarNavigationVisible(true)
+            (activity as? VolunteerActivity)?.setToolbarNavigationVisible(true)
+        }
+        _binding = null
+    }
+
+    private fun Double.formatOneDecimal(): String = String.format("%.1f", this)
+
+    private fun Double.stripTrailingZero(): String =
+        if (this % 1.0 == 0.0) this.toInt().toString() else this.toString()
+}
