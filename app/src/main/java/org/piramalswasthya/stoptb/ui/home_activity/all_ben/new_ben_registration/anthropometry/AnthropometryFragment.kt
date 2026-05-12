@@ -107,13 +107,13 @@ class AnthropometryFragment : Fragment() {
                     WorkerUtils.triggerAmritPushWorker(requireContext())
                     Toast.makeText(requireContext(), R.string.save_successful, Toast.LENGTH_SHORT).show()
                     if (viewModel.autoFlow) {
-                        findNavController().navigate(
-                            R.id.TBScreeningFormFragment,
-                            bundleOf(
-                                "benId" to viewModel.benId,
-                                "autoFlow" to true
+                        val returnedToList = findNavController().popBackStack(R.id.allBenFragment, false)
+                        if (!returnedToList) {
+                            findNavController().navigate(
+                                R.id.allBenFragment,
+                                bundleOf("source" to 0)
                             )
-                        )
+                        }
                     } else {
                         findNavController().popBackStack()
                     }
