@@ -37,7 +37,7 @@ interface AmritApiService {
     suspend fun submitRmnchDataAmrit(@Body sendingRMNCHData: SendingRMNCHData): Response<ResponseBody>
 
     @POST("flw-api/beneficiary/getBeneficiaryData")
-    suspend fun getBeneficiaries(@Body userDetail: GetDataPaginatedRequest): Response<ResponseBody>
+    suspend fun getBeneficiaries(@Body userDetail: GetDataPaginatedRequests): Response<ResponseBody>
 
     @POST("flw-api/stoptb/nurse/worklist")
     suspend fun getNurseWorklist(@Body request: NurseWorklistRequest): Response<ResponseBody>

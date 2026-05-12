@@ -416,4 +416,20 @@
     <string-array name="mobile_not_available_array">
         <item>उपलब्ध नहीं है</item>
     </string-array>
+
+
+    <string-array name="occupation_array">
+        <item>अज्ञात</item>
+        <item>विद्यार्थी</item>
+        <item>बेरोजगार</item>
+        <item>गृहिणी</item>
+        <item>किसान</item>
+        <item>मजदूर / दैनिक वेतन कर्मी</item>
+        <item>स्वरोजगार / व्यवसाय</item>
+        <item>सरकारी कर्मचारी</item>
+        <item>निजी कर्मचारी</item>
+        <item>स्वास्थ्य कर्मी</item>
+        <item>सेवानिवृत्त / पेंशनभोगी</item>
+        <item>अन्य</item>
+    </string-array>
 </resources>

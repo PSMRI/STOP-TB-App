@@ -374,4 +374,21 @@
     <string-array name="mobile_not_available_array">
         <item>উপলব্ধ নহয়</item>
     </string-array>
+
+
+    <string-array name="occupation_array">
+        <item>অজ্ঞাত</item>
+        <item>ছাত্ৰ / ছাত্ৰী</item>
+        <item>নিয়োজিত নহয়</item>
+        <item>গৃহিণী</item>
+        <item>কৃষক</item>
+        <item>শ্ৰমিক / দৈনিক মজুৰি কৰ্মী</item>
+        <item>স্বনিয়োজিত / ব্যৱসায়</item>
+        <item>চৰকাৰী কৰ্মচাৰী</item>
+        <item>বেচৰকাৰী কৰ্মচাৰী</item>
+        <item>স্বাস্থ্য কৰ্মী</item>
+        <item>অৱসৰপ্ৰাপ্ত / পেঞ্চনভোগী</item>
+        <item>অন্যান্য</item>
+    </string-array>
+
 </resources>

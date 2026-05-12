@@ -348,10 +348,12 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
     // 17. Occupation (free text, default "unknown")
     private val occupation = FormElement(
-        id = 1041, inputType = EDIT_TEXT,
+        id = 1041, inputType = DROPDOWN,
         title = resources.getString(R.string.nbr_occupation),
-        arrayId = -1, required = false,
-        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        arrayId = R.array.occupation_array,
+        entries = resources.getStringArray(R.array.occupation_array),
+        required = false,
+
     )
 
     // 18. RCH ID
