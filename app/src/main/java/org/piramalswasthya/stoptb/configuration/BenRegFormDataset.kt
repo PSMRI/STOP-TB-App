@@ -352,7 +352,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         title = resources.getString(R.string.nbr_occupation),
         arrayId = R.array.occupation_array,
         entries = resources.getStringArray(R.array.occupation_array),
-        required = false,
+        required = true,
 
     )
 
