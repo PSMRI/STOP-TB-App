@@ -1,6 +1,7 @@
 package org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.anthropometry
 
 import android.app.AlertDialog
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.text.InputFilter
 import android.text.Spanned
@@ -8,6 +9,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
 import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
@@ -67,6 +69,8 @@ class AnthropometryFragment : Fragment() {
             binding.etHeight.setText(ben.height?.formatOneDecimal().orEmpty())
             binding.etBmi.setText(ben.bmi?.formatOneDecimal().orEmpty())
             binding.etTemperature.setText(ben.temperature?.formatOneDecimal().orEmpty())
+            selectTemperatureRange(ben.temperature)
+            lockFormIfExistingData(ben)
         }
 
         binding.etWeight.doAfterTextChanged { updateBmi() }
@@ -197,6 +201,36 @@ class AnthropometryFragment : Fragment() {
             .setMessage(R.string.refer_to_hwc_alert)
             .setPositiveButton(R.string.ok) { dialog, _ -> dialog.dismiss() }
             .show()
+    }
+
+    private fun selectTemperatureRange(temperature: Double?) {
+        val temp = temperature ?: return
+        if (temp >= 100.0) {
+            binding.rbTempHigh.isChecked = true
+        } else {
+            binding.rbTempNormal.isChecked = true
+        }
+    }
+
+    private fun lockFormIfExistingData(ben: org.piramalswasthya.stoptb.model.BenRegCache) {
+        val hasSavedAnthropometry =
+            ben.weight != null || ben.height != null || ben.bmi != null || ben.temperature != null
+        if (!hasSavedAnthropometry) return
+
+        binding.etWeight.isEnabled = false
+        binding.etHeight.isEnabled = false
+        binding.etTemperature.isEnabled = false
+        binding.rbTempNormal.isEnabled = false
+        binding.rbTempHigh.isEnabled = false
+        binding.btnSubmit.isEnabled = false
+
+        val disabledGray = ContextCompat.getColor(requireContext(), R.color.read_only)
+        val disabledGrayStateList = ColorStateList.valueOf(disabledGray)
+        binding.rbTempNormal.setTextColor(disabledGray)
+        binding.rbTempHigh.setTextColor(disabledGray)
+        binding.rbTempNormal.buttonTintList = disabledGrayStateList
+        binding.rbTempHigh.buttonTintList = disabledGrayStateList
+        binding.btnSubmit.backgroundTintList = disabledGrayStateList
     }
 
     private fun decimalInputFilter(): InputFilter {
