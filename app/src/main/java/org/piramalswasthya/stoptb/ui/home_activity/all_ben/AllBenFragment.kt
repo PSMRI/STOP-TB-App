@@ -181,10 +181,8 @@ class AllBenFragment : Fragment() {
                 { item, hhId, benId, relToHeadId ->
                     if (isReadOnlyReferralList) return@BenClickListener
                     val now = System.currentTimeMillis()
-                    timber.log.Timber.d("BEN_CLICK: clicked benId=$benId, hhId=$hhId, time=$now")
-                    if (now - lastClickTime > 1000) {
+                    if (now - lastClickTime > 800) {
                         lastClickTime = now
-                        timber.log.Timber.d("BEN_CLICK: navigating to form for benId=$benId")
                         val navOptions = NavOptions.Builder()
                             .setEnterAnim(0)
                             .setExitAnim(0)
@@ -378,6 +376,15 @@ class AllBenFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
+        updateToolbarTitle()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateToolbarTitle()
+    }
+
+    private fun updateToolbarTitle() {
         activity?.let {
             val title = if (args.source == 1) {
                 getString(R.string.icon_title_abhas)
