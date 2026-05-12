@@ -90,7 +90,7 @@ class AnthropometryFragment : Fragment() {
         }
 
         binding.btnSubmit.setOnClickListener {
-            if (!validateInput()) return@setOnClickListener
+//            if (!validateInput()) return@setOnClickListener
             if (isHighTemperature()) showHighTemperatureAlert()
             viewModel.saveAnthropometry(
                 weightKg = binding.etWeight.text?.toString(),
