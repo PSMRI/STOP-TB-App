@@ -189,14 +189,7 @@ class TBConfirmedDataset(
                     followUpDate,
                     monthlyFollowUpDone,
                     adherenceToMedicines,
-                    anyDiscomfort,
-                    treatmentCompleted,
-                    actualTreatmentCompletionDate,
-                    treatmentOutcome,
-                    dateOfDeath,
-                    placeOfDeath,
-                    reasonForDeath,
-                    reasonForNotCompleting
+                    anyDiscomfort
                 )
             )
 
