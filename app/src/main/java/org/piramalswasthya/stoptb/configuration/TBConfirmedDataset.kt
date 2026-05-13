@@ -69,7 +69,7 @@ class TBConfirmedDataset(
     private val followUpDate = FormElement(
         id = 4,
         inputType = InputType.DATE_PICKER,
-        title = resources.getString(R.string.follow_up_date),
+        title = resources.getString(R.string.followupdate),
         required = true,
         max = System.currentTimeMillis(),
         min = System.currentTimeMillis() - (90L * 24 * 60 * 60 * 1000),
@@ -189,7 +189,14 @@ class TBConfirmedDataset(
                     followUpDate,
                     monthlyFollowUpDone,
                     adherenceToMedicines,
-                    anyDiscomfort
+                    anyDiscomfort,
+                    treatmentCompleted,
+                    actualTreatmentCompletionDate,
+                    treatmentOutcome,
+                    dateOfDeath,
+                    placeOfDeath,
+                    reasonForDeath,
+                    reasonForNotCompleting
                 )
             )
 
