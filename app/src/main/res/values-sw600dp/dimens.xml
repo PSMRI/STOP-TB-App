@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="activity_horizontal_margin">32dp</dimen>
+    <dimen name="activity_vertical_margin">24dp</dimen>
+    <dimen name="fab_margin">24dp</dimen>
+    <dimen name="padding_tiny">4dp</dimen>
+    <dimen name="padding_small">8dp</dimen>
+    <dimen name="padding_normal">14dp</dimen>
+    <dimen name="padding_wide">24dp</dimen>
+    <dimen name="margin_huge">48dp</dimen>
+    <dimen name="margin_big">28dp</dimen>
+    <dimen name="margin_normal">18dp</dimen>
+    <dimen name="margin_small">10dp</dimen>
+    <dimen name="margin_narrow">6dp</dimen>
+    <dimen name="bottom_sheet_height">640dp</dimen>
+</resources>
