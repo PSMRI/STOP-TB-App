@@ -263,7 +263,15 @@ class VolunteerActivity : AppCompatActivity() {
             true
         }
 
+        binding.navView.menu.findItem(R.id.menu_connect_camp_hub)?.setOnMenuItemClickListener {
+            binding.drawerLayout.close()
+            openCampHubConnect()
+            true
+        }
+
         // ── Create ABHA ID ───────────────────────────────────────────────
+        refreshCampHubDrawerItem()
+
         binding.navView.menu.findItem(R.id.abha_id_activity)?.setOnMenuItemClickListener {
             startActivity(Intent(this, AbhaIdActivity::class.java))
             binding.drawerLayout.close()
@@ -336,12 +344,18 @@ class VolunteerActivity : AppCompatActivity() {
         super.onResume()
         window.decorView.alpha = 1f
         refreshCampHubOfflineBanner()
+        refreshCampHubDrawerItem()
         WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
     }
 
     private fun refreshCampHubOfflineBanner() {
         binding.tvCampHubOffline.visibility =
             if (pref.isCampModeEnabled() && !pref.isCampHubConnected()) View.VISIBLE else View.GONE
+    }
+
+    private fun refreshCampHubDrawerItem() {
+        binding.navView.menu.findItem(R.id.menu_connect_camp_hub)?.isVisible =
+            pref.isCampModeEnabled()
     }
 
     private fun openCampHubConnect() {

@@ -771,6 +771,12 @@
         <item>5 दिन</item>
         <item>7 दिन</item>
     </string-array>
+    <string name="quick_refresh_not_updated">अंतिम अपडेट: अभी तक नहीं</string>
+    <string name="quick_refresh_last_updated">अंतिम अपडेट: %1$s</string>
+    <string name="quick_refresh_refreshing">लाभार्थी डेटा अपडेट हो रहा है...</string>
+    <string name="quick_refresh_failed">अपडेट विफल। फिर कोशिश करें</string>
+    <string name="quick_refresh_action">रिफ्रेश</string>
+    <string name="quick_refresh_camp_disconnected">कैंप हब जुड़ा नहीं है। पहले दोबारा कनेक्ट करें।</string>
 </resources>
 
 

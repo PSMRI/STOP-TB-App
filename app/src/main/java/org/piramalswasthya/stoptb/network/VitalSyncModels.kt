@@ -6,7 +6,6 @@ import org.piramalswasthya.stoptb.model.VitalCache
 
 @JsonClass(generateAdapter = true)
 data class GeneralExaminationSaveRequest(
-    val beneficiaryID: Long,
     val beneficiaryRegID: Long,
     val createdBy: String?,
     val providerServiceMapID: Int,
@@ -29,12 +28,12 @@ data class GeneralExaminationSaveRequest(
     val keyPopulationRiskFactorIds: List<Int>? = null,
     val keyPopulationRiskFactors: List<String>? = null,
     val hivStatusId: Int? = null,
-    val hivStatus: String? = null
+    val hivStatus: String? = null,
+    val referralToHWCNeeded: Boolean? = null
 ) {
     companion object {
         fun from(vital: VitalCache, user: User): GeneralExaminationSaveRequest {
             return GeneralExaminationSaveRequest(
-                beneficiaryID = vital.benId,
                 beneficiaryRegID = vital.benRegId,
                 createdBy = user.userName,
                 providerServiceMapID = user.serviceMapId,
@@ -57,7 +56,8 @@ data class GeneralExaminationSaveRequest(
                 keyPopulationRiskFactorIds = vital.keyPopulationRiskFactorIds,
                 keyPopulationRiskFactors = vital.keyPopulationRiskFactors,
                 hivStatusId = vital.hivStatusId,
-                hivStatus = vital.hivStatus
+                hivStatus = vital.hivStatus,
+                referralToHWCNeeded = vital.referralToHwcNeeded
             )
         }
     }
@@ -65,48 +65,104 @@ data class GeneralExaminationSaveRequest(
 
 @JsonClass(generateAdapter = true)
 data class GeneralExaminationGetRequest(
-    val userId: Int,
     val providerServiceMapID: Int,
-    val villageId: Int? = null,
-    val pageNo: Int = 0,
-    val pageSize: Int = 100
+    val villageID: Int
 )
+//
+//@JsonClass(generateAdapter = true)
+//data class GeneralExaminationResponse(
+//    val statusCode: Int,
+//    val status: String? = null,
+//    val message: String? = null,
+//    val data: List<GeneralExaminationRecord>? = null
+//)
+//
+//@JsonClass(generateAdapter = true)
+//data class GeneralExaminationRecord(
+//    val id: Long? = null,
+//    val beneficiaryID: Long,
+//    val beneficiaryRegID: Long,
+//    val createdBy: String? = null,
+//    val providerServiceMapID: Int? = null,
+//    val pulseRate: Int? = null,
+//    val systolicBP: Int? = null,
+//    val diastolicBP: Int? = null,
+//    val randomBloodSugar: Double? = null,
+//    val pallorId: Int? = null,
+//    val pallor: String? = null,
+//    val icterusId: Int? = null,
+//    val icterus: String? = null,
+//    val cyanosisId: Int? = null,
+//    val cyanosis: String? = null,
+//    val clubbingId: Int? = null,
+//    val clubbing: String? = null,
+//    val lymphadenopathyId: Int? = null,
+//    val lymphadenopathy: String? = null,
+//    val oedemaId: Int? = null,
+//    val oedema: String? = null,
+//    val keyPopulationRiskFactorIds: List<Int>? = null,
+//    val keyPopulationRiskFactors: List<String>? = null,
+//    val hivStatusId: Int? = null,
+//    val hivStatus: String? = null,
+//    val createdDate: String? = null
+//)
 
 @JsonClass(generateAdapter = true)
 data class GeneralExaminationResponse(
     val statusCode: Int,
     val status: String? = null,
     val message: String? = null,
+    val data: GeneralExaminationData? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class GeneralExaminationData(
+    val count: Int? = null,
     val data: List<GeneralExaminationRecord>? = null
 )
 
 @JsonClass(generateAdapter = true)
 data class GeneralExaminationRecord(
     val id: Long? = null,
-    val beneficiaryID: Long,
-    val beneficiaryRegID: Long,
+
+    // nullable rakha hai safety ke liye
+    val beneficiaryID: Long? = null,
+    val beneficiaryRegID: Long? = null,
+
     val createdBy: String? = null,
     val providerServiceMapID: Int? = null,
+
     val pulseRate: Int? = null,
     val systolicBP: Int? = null,
     val diastolicBP: Int? = null,
     val randomBloodSugar: Double? = null,
+
     val pallorId: Int? = null,
     val pallor: String? = null,
+
     val icterusId: Int? = null,
     val icterus: String? = null,
+
     val cyanosisId: Int? = null,
     val cyanosis: String? = null,
+
     val clubbingId: Int? = null,
     val clubbing: String? = null,
+
     val lymphadenopathyId: Int? = null,
     val lymphadenopathy: String? = null,
+
     val oedemaId: Int? = null,
     val oedema: String? = null,
-    val keyPopulationRiskFactorIds: List<Int>? = null,
-    val keyPopulationRiskFactors: List<String>? = null,
+
+    // backend string bhej raha hai
+    val keyPopulationRiskFactorIds: String? = null,
+    val keyPopulationRiskFactors: String? = null,
+
     val hivStatusId: Int? = null,
     val hivStatus: String? = null,
+    val referralToHWCNeeded: Boolean? = null,
+
     val createdDate: String? = null
 )
 

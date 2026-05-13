@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.repositories.TBRepo
+import org.piramalswasthya.stoptb.repositories.VitalRepo
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
 
@@ -27,6 +28,7 @@ class PullTBFromAmritWorker @AssistedInject constructor(
     @Assisted private val appContext: Context,
     @Assisted params: WorkerParameters,
     private val tbRepo: TBRepo,
+    private val vitalRepo: VitalRepo,
     private val preferenceDao: PreferenceDao,
 ) : CoroutineWorker(appContext, params) {
 
@@ -54,8 +56,10 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                 try {
                     val result1 =
                         awaitAll(
+                            async { getGeneralExaminationDetails() },
                             async { getTbScreeningDetails() },
                             async { getGeneralOpdDetails() },
+                            async { getTbDiagnosticsDetails() },
                             async { getTbSuspectedDetails() },
                             async { getTbConfirmedDetails() }
                         )
@@ -115,6 +119,18 @@ class PullTBFromAmritWorker @AssistedInject constructor(
         }
     }
 
+    private suspend fun getGeneralExaminationDetails(): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val res = vitalRepo.getGeneralExaminationDetailsFromServer()
+                return@withContext res == 1 || res == 0
+            } catch (e: Exception) {
+                Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
+            }
+            true
+        }
+    }
+
     private suspend fun getTbSuspectedDetails(): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -131,6 +147,18 @@ class PullTBFromAmritWorker @AssistedInject constructor(
         return withContext(Dispatchers.IO) {
             try {
                 val res = tbRepo.getGeneralOpdDetailsFromServer()
+                return@withContext res == 1 || res == 0
+            } catch (e: Exception) {
+                Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
+            }
+            true
+        }
+    }
+
+    private suspend fun getTbDiagnosticsDetails(): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val res = tbRepo.getTbDiagnosticsDetailsFromServer()
                 return@withContext res == 1 || res == 0
             } catch (e: Exception) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")

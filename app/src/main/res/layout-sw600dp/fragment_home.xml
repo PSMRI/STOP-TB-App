@@ -13,42 +13,20 @@
         android:layout_height="match_parent"
         android:background="@color/md_theme_light_background">
 
-<!--        <com.google.android.material.textfield.TextInputLayout-->
-<!--            android:id="@+id/til_select_village"-->
-<!--            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"-->
-<!--            android:layout_width="match_parent"-->
-<!--            android:layout_height="wrap_content"-->
-<!--            android:hint="@string/til_hint_selected_village"-->
-<!--            android:padding="@dimen/padding_normal"-->
-<!--            app:layout_constraintTop_toTopOf="parent">-->
-
-<!--            <com.google.android.material.textfield.TextInputEditText-->
-<!--                android:id="@+id/et_select_village"-->
-<!--                android:layout_width="match_parent"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:drawableEnd="@drawable/ic_edit"-->
-<!--                android:focusable="false"-->
-<!--                android:inputType="textNoSuggestions"-->
-<!--                tools:text="NONE" />-->
-<!--        </com.google.android.material.textfield.TextInputLayout>-->
-
-
         <LinearLayout
-            android:id="@+id/ll_home_content"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:orientation="vertical"
             app:layout_constraintBottom_toTopOf="@+id/ll_full_load_progress"
             app:layout_constraintTop_toTopOf="parent">
-<!--            app:layout_constraintTop_toBottomOf="@+id/til_select_village">-->
 
             <LinearLayout
                 android:id="@+id/ll_quick_refresh"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:layout_marginTop="12dp"
-                android:layout_marginEnd="16dp"
+                android:layout_marginStart="48dp"
+                android:layout_marginTop="18dp"
+                android:layout_marginEnd="48dp"
                 android:background="@drawable/bg_dashboard_chip"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
@@ -89,26 +67,26 @@
                 android:id="@+id/tl_home_viewpager"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:layout_marginTop="16dp"
-                android:layout_marginEnd="16dp"
+                android:layout_marginStart="48dp"
+                android:layout_marginTop="24dp"
+                android:layout_marginEnd="48dp"
                 android:background="@drawable/bg_tab_strip"
-                android:padding="6dp"
+                android:padding="8dp"
+                app:tabGravity="fill"
                 app:tabIndicator="@drawable/bg_tab_indicator"
                 app:tabIndicatorFullWidth="false"
                 app:tabIndicatorHeight="0dp"
-                app:tabGravity="fill"
+                app:tabInlineLabel="true"
                 app:tabMaxWidth="0dp"
+                app:tabMode="fixed"
+                app:tabPaddingBottom="16dp"
+                app:tabPaddingEnd="24dp"
+                app:tabPaddingStart="24dp"
+                app:tabPaddingTop="16dp"
                 app:tabRippleColor="@color/md_theme_light_primaryContainer"
                 app:tabSelectedTextColor="@color/md_theme_light_primary"
                 app:tabTextAppearance="@style/TextAppearance.Sakhi.HomeTab"
-                app:tabTextColor="@color/md_theme_light_onSurfaceVariant"
-                app:tabInlineLabel="true"
-                app:tabMode="fixed"
-                app:tabPaddingStart="20dp"
-                app:tabPaddingEnd="20dp"
-                app:tabPaddingTop="14dp"
-                app:tabPaddingBottom="14dp" />
+                app:tabTextColor="@color/md_theme_light_onSurfaceVariant" />
 
             <androidx.viewpager2.widget.ViewPager2
                 android:id="@+id/vp2_home"
@@ -132,9 +110,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:padding="@dimen/padding_small"
-                android:textColor="@color/md_theme_light_onSurfaceVariant"
                 android:text="@string/home_fragment_percent_download_text"
                 android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                android:textColor="@color/md_theme_light_onSurfaceVariant"
                 tools:visibility="visible" />
 
             <ProgressBar

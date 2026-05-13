@@ -19,7 +19,8 @@ class GeneralOpdDataset(
         arrayId = R.array.general_opd_chief_complaint_array,
         entries = resources.getStringArray(R.array.general_opd_chief_complaint_array),
         required = false,
-        hasDependants = true
+        hasDependants = true,
+        showAsMultiSelectDialog = true
     )
 
     private val medication = FormElement(
@@ -29,7 +30,8 @@ class GeneralOpdDataset(
         arrayId = R.array.general_opd_medication_array,
         entries = resources.getStringArray(R.array.general_opd_medication_array),
         required = false,
-        hasDependants = true
+        hasDependants = true,
+        showAsMultiSelectDialog = true
     )
 
     private val dosage = FormElement(

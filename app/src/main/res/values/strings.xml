@@ -967,6 +967,12 @@
     <string name="discard_changes_message">Are you sure you want to go back? Changes will be lost.</string>
     <string name="discard">Discard</string>
     <string name="stay">Stay</string>
+    <string name="quick_refresh_not_updated">Last updated: Not yet</string>
+    <string name="quick_refresh_last_updated">Last updated: %1$s</string>
+    <string name="quick_refresh_refreshing">Refreshing beneficiary data...</string>
+    <string name="quick_refresh_failed">Refresh failed. Try again</string>
+    <string name="quick_refresh_action">Refresh</string>
+    <string name="quick_refresh_camp_disconnected">Camp Hub is not connected. Please reconnect first.</string>
 
     <string name="vital_screen">General Examination</string>
     <string name="vital_screen_placeholder">Vitals and Anthropometric for beneficiary ID: %1$d</string>

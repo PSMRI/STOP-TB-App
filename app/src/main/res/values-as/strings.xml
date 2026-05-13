@@ -629,6 +629,12 @@
         <item>5 দিন</item>
         <item>7 দিন</item>
     </string-array>
+    <string name="quick_refresh_not_updated">শেষ আপডেট: এতিয়ালৈকে নহয়</string>
+    <string name="quick_refresh_last_updated">শেষ আপডেট: %1$s</string>
+    <string name="quick_refresh_refreshing">হিতাধিকাৰীৰ তথ্য আপডেট হৈ আছে...</string>
+    <string name="quick_refresh_failed">আপডেট বিফল। পুনৰ চেষ্টা কৰক</string>
+    <string name="quick_refresh_action">ৰিফ্ৰেছ</string>
+    <string name="quick_refresh_camp_disconnected">কেম্প হাব সংযুক্ত নহয়। প্ৰথমে পুনৰ সংযোগ কৰক।</string>
 </resources>
 
 

@@ -105,6 +105,16 @@
         <item name="android:insetBottom">0dp</item>
         <item name="elevation">0dp</item>
         <item name="android:minHeight">52dp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="textAppearance">@style/TextAppearance.Sakhi.Button</item>
+        <item name="android:textAppearance">@style/TextAppearance.Sakhi.Button</item>
+    </style>
+
+    <style name="Widget.Sakhi.PlatformButton" parent="Widget.AppCompat.Button">
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAppearance">@style/TextAppearance.Sakhi.Button</item>
+        <item name="fontFamily">@font/roboto_bold</item>
+        <item name="android:fontFamily">@font/roboto_bold</item>
     </style>
 
     <style name="Widget.Sakhi.TextInputLayout" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
@@ -151,6 +161,12 @@
     <style name="TextAppearance.Sakhi.HomeTab" parent="TextAppearance.Material3.TitleMedium">
         <item name="android:textStyle">bold</item>
         <item name="android:textColor">@color/md_theme_light_onSurface</item>
+    </style>
+
+    <style name="TextAppearance.Sakhi.Button" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:textStyle">bold</item>
+        <item name="fontFamily">@font/roboto_bold</item>
+        <item name="android:fontFamily">@font/roboto_bold</item>
     </style>
 
     <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">

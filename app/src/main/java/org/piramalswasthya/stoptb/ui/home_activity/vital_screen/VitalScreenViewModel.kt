@@ -232,28 +232,28 @@ class VitalScreenViewModel @Inject constructor(
         hivStatus: String?
     ): Boolean {
         return !temperatureOption.isNullOrBlank() ||
-            !pulseRateOption.isNullOrBlank() ||
-            !bpSystolic.isNullOrBlank() ||
-            !bpDiastolic.isNullOrBlank() ||
-            !height.isNullOrBlank() ||
-            !weight.isNullOrBlank() ||
-            !rbs.isNullOrBlank() ||
-            pallorId != null ||
-            !pallor.isNullOrBlank() ||
-            icterusId != null ||
-            !icterus.isNullOrBlank() ||
-            cyanosisId != null ||
-            !cyanosis.isNullOrBlank() ||
-            clubbingId != null ||
-            !clubbing.isNullOrBlank() ||
-            lymphadenopathyId != null ||
-            !lymphadenopathy.isNullOrBlank() ||
-            oedemaId != null ||
-            !oedema.isNullOrBlank() ||
-            keyPopulationRiskFactorIds.isNotEmpty() ||
-            keyPopulationRiskFactors.isNotEmpty() ||
-            hivStatusId != null ||
-            !hivStatus.isNullOrBlank()
+                !pulseRateOption.isNullOrBlank() ||
+                !bpSystolic.isNullOrBlank() ||
+                !bpDiastolic.isNullOrBlank() ||
+                !height.isNullOrBlank() ||
+                !weight.isNullOrBlank() ||
+                !rbs.isNullOrBlank() ||
+                pallorId != null ||
+                !pallor.isNullOrBlank() ||
+                icterusId != null ||
+                !icterus.isNullOrBlank() ||
+                cyanosisId != null ||
+                !cyanosis.isNullOrBlank() ||
+                clubbingId != null ||
+                !clubbing.isNullOrBlank() ||
+                lymphadenopathyId != null ||
+                !lymphadenopathy.isNullOrBlank() ||
+                oedemaId != null ||
+                !oedema.isNullOrBlank() ||
+                keyPopulationRiskFactorIds.isNotEmpty() ||
+                keyPopulationRiskFactors.isNotEmpty() ||
+                hivStatusId != null ||
+                !hivStatus.isNullOrBlank()
     }
 
     fun resetState() {
@@ -294,7 +294,7 @@ class VitalScreenViewModel @Inject constructor(
         val systolic = bpSystolic?.trim()?.toIntOrNull()
         val diastolic = bpDiastolic?.trim()?.toIntOrNull()
         return (systolic != null && (systolic < 90 || systolic >= 140)) ||
-            (diastolic != null && (diastolic < 60 || diastolic >= 90))
+                (diastolic != null && (diastolic < 60 || diastolic >= 90))
     }
 
     fun shouldShowRbsReferral(rbs: String?): Boolean {
@@ -386,7 +386,7 @@ class VitalScreenViewModel @Inject constructor(
     private fun getDefaultReferralTests(ben: BenRegCache?): List<String> {
         val reproductiveStatus = ben?.genDetails?.reproductiveStatus
         val isPregnant = ben?.genDetails?.reproductiveStatusId == 1 ||
-            reproductiveStatus.equals("Yes", ignoreCase = true)
+                reproductiveStatus.equals("Yes", ignoreCase = true)
         return if (isPregnant) {
             listOf("True NAT")
         } else {

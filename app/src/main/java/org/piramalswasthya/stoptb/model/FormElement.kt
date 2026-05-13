@@ -41,4 +41,5 @@ data class FormElement(
     var maxFileSizeMB: Int? = null,
     var selectedFiles: MutableList<String>? = null,
     val showDrawable: Boolean? = false,
+    val showAsMultiSelectDialog: Boolean = false,
 )
