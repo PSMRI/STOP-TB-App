@@ -414,6 +414,7 @@
     <string name="bottle_number">Bottle Number</string>
     <string name="s_no">S. No</string>
     <string name="follow_up_date">Follow Up Dates</string>
+    <string name="followupdate">Follow Up Date</string>
     <string name="last_follow_up_date">Last Follow Up Date"</string>
     <string name="bottle_distribution">Bottle Distribution</string>
     <string name="reminder">Reminder!!</string>
@@ -988,6 +989,10 @@
     <string name="weight_kgs">Weight (Kgs)</string>
     <string name="height_cms">Height (cms)</string>
     <string name="temperature_degree_fahrenheit">Temperature (Degree Fahrenheit)</string>
+    <string name="anthropometry_screen">Anthropometry Screen</string>
+    <string name="normal_temperature_range">Normal range: 97-99&#176;F</string>
+    <string name="temperature_100_or_more">&gt;= 100&#176;F</string>
+    <string name="enter_value_between">Enter %1$s between %2$s and %3$s</string>
     <string name="pulse_rate_bpm">Pulse Rate (beats per minute)</string>
     <string name="systolic_bp_mmhg">SBP (mm Hg)</string>
     <string name="diastolic_bp_mmhg">DBP (mm Hg)</string>

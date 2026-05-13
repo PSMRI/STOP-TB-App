@@ -74,6 +74,26 @@ data class BenPost(
     val expectedDateOfDelivery: String? = null,
     @Json(name = "facilitySelection")
     val facilitySelection: String = "",
+    @Json(name = "personFrom")
+    val personFrom: String? = null,
+    @Json(name = "personFromId")
+    val personFromId: Int? = null,
+    @Json(name = "typeOfCaseFinding")
+    val typeOfCaseFinding: String? = null,
+    @Json(name = "typeOfCaseFindingId")
+    val typeOfCaseFindingId: Int? = null,
+    @Json(name = "mobileNumberAvailable")
+    val mobileNumberAvailable: Boolean? = null,
+    @Json(name = "address")
+    val address: String? = null,
+    @Json(name = "height")
+    val height: Double? = null,
+    @Json(name = "weight")
+    val weight: Double? = null,
+    @Json(name = "bmi")
+    val bmi: Double? = null,
+    @Json(name = "temperature")
+    val temperature: Double? = null,
     @Json(name = "familyHeadRelation")
     val familyHeadRelation: String,
     @Json(name = "familyHeadRelationPosition")

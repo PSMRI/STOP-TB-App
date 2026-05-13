@@ -348,10 +348,12 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
     // 17. Occupation (free text, default "unknown")
     private val occupation = FormElement(
-        id = 1041, inputType = EDIT_TEXT,
+        id = 1041, inputType = DROPDOWN,
         title = resources.getString(R.string.nbr_occupation),
-        arrayId = -1, required = false,
-        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        arrayId = R.array.occupation_array,
+        entries = resources.getStringArray(R.array.occupation_array),
+        required = true,
+
     )
 
     // 18. RCH ID
@@ -393,9 +395,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             mobileNoOfRelation,
             address,
             state,
-            district,
-            tu,
-            healthFacility,
+//            district,
+//            tu,
+//            hea   lthFacility,
             villageHamlet,
 //            subCentre,
             fatherName,
@@ -460,8 +462,12 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
             pic.value        = saved.userImage
             dateOfReg.value  = getDateFromLong(saved.regDate)
-            personFrom.value = personFrom.entries?.firstOrNull()
-            typeOfCaseFinding.value = typeOfCaseFinding.entries?.firstOrNull()
+            personFrom.value = saved.personFromId?.let { personFrom.getStringFromPosition(it) }
+                ?: saved.personFrom
+                ?: personFrom.entries?.firstOrNull()
+            typeOfCaseFinding.value = saved.typeOfCaseFindingId?.let { typeOfCaseFinding.getStringFromPosition(it) }
+                ?: saved.typeOfCaseFinding
+                ?: typeOfCaseFinding.entries?.firstOrNull()
             firstName.value  = saved.firstName
             lastName.value   = saved.lastName
             agePopup.value   = getDateFromLong(saved.dob)
@@ -503,6 +509,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                 mobileNotAvailable.value = "0"
                 contactNumber.isEnabled = false
             }
+            address.value = saved.address ?: ""
             state.entries = arrayOf(saved.locationRecord.state.name)
             district.entries = arrayOf(saved.locationRecord.district.name)
             tu.entries = arrayOf(saved.locationRecord.tu?.name ?: "")
@@ -969,6 +976,12 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
             ben.fatherName = fatherName.value
             ben.motherName = motherName.value
+            ben.personFromId = personFrom.getPosition()
+            ben.personFrom = personFrom.getEnglishStringFromPosition(ben.personFromId ?: 0)
+            ben.typeOfCaseFindingId = typeOfCaseFinding.getPosition()
+            ben.typeOfCaseFinding = typeOfCaseFinding.getEnglishStringFromPosition(ben.typeOfCaseFindingId ?: 0)
+            ben.mobileNumberAvailable = !isMobileNotAvailableChecked()
+            ben.address = address.value
 
             // No relation to head in StopTB — set to default
             ben.familyHeadRelationPosition = 19

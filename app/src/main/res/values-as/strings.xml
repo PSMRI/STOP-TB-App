@@ -554,6 +554,7 @@
     <string name="not_applicable">প্ৰযোজ্য নহয়</string>
     <string name="diagnostics_submitted">Diagnostics submitted</string>
     <string name="general_opd">সাধাৰণ OPD</string>
+    <string name="enter_value_between">%1$s %2$s আৰু %3$s ৰ মাজত দিয়ক</string>
     <string name="chief_complaint">মুখ্য অভিযোগ</string>
     <string name="medication">ঔষধ</string>
     <string name="dosage">ডোজ</string>

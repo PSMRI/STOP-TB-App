@@ -67,6 +67,7 @@ class AllBenViewModel @Inject constructor(
     val vitalBenIds: Flow<List<Long>> = vitalRepo.vitalBenIds
     val tbScreeningBenIds: Flow<List<Long>> = tbRepo.tbScreeningBenIds
     val generalOpdBenIds: Flow<List<Long>> = tbRepo.generalOpdBenIds
+    val anthropometryFilledBenIds: Flow<List<Long>> = recordsRepo.anthropometryFilledBenIds
 
     private val _abha = MutableLiveData<String?>()
     val abha: LiveData<String?>

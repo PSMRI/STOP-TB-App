@@ -26,7 +26,8 @@ object RoleConstants {
                     normalizedRole == "counselor" ||
                     normalizedRole == "volunteer" ||
                     normalizedRole == "registrar" ||
-                    normalizedRole == "volenteer"
+                    normalizedRole == "volenteer" ||
+                    normalizedRole == "registrar"
         } ?: false
     }
 }

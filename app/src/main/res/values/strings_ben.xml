@@ -487,4 +487,20 @@ personal health profile.</string>
         <item>Not Available</item>
     </string-array>
 
+
+    <string-array name="occupation_array">
+        <item>Unknown</item>
+        <item>Student</item>
+        <item>Unemployed</item>
+        <item>Homemaker</item>
+        <item>Farmer</item>
+        <item>Laborer / Daily Wage Worker</item>
+        <item>Self-employed / Business</item>
+        <item>Government Employee</item>
+        <item>Private Employee</item>
+        <item>Health Care Worker</item>
+        <item>Retired / Pensioner</item>
+        <item>Other</item>
+    </string-array>
+
 </resources>
