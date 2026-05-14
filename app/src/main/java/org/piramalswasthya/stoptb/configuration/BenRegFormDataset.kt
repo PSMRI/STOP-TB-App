@@ -149,7 +149,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     private val lastName = FormElement(
         id = 4, inputType = EDIT_TEXT,
         title = resources.getString(R.string.nbr_nb_last_name),
-        arrayId = -1, required = false, allCaps = true, hasSpeechToText = true,
+        arrayId = -1, required = true, allCaps = true, hasSpeechToText = true,
         etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
     )
 
@@ -395,9 +395,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             mobileNoOfRelation,
             address,
             state,
-//            district,
+            district,
 //            tu,
-//            hea   lthFacility,
+//            healthFacility,
             villageHamlet,
 //            subCentre,
             fatherName,

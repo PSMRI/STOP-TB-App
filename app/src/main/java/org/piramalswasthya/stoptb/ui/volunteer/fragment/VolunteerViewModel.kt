@@ -22,8 +22,15 @@ class VolunteerViewModel @Inject constructor(
 
     fun logout() {
         viewModelScope.launch {
+            val rememberedUser = pref.getRememberedUserName()
+            val rememberedPwd = pref.getRememberedPassword()
+            val restoreUsernameOnly =
+                !rememberedUser.isNullOrBlank() && !rememberedPwd.isNullOrBlank()
             pref.deleteForLogout()
             pref.setLastSyncedTimeStamp(Konstants.defaultTimeStamp)
+            if (restoreUsernameOnly) {
+                pref.setRememberedUsernameOnly(rememberedUser!!.trim())
+            }
             _navigateToLoginPage.value = true
         }
     }

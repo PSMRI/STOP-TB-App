@@ -92,6 +92,24 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         editor.apply()
     }
 
+    /** After logout: keep remembered username but drop password so user must re-enter it. */
+    fun clearRememberedPasswordKeepUsername() {
+        val editor = pref.edit()
+        val prefUserPwdKey = context.getString(R.string.PREF_rem_me_pwd)
+        editor.remove(prefUserPwdKey)
+        editor.apply()
+    }
+
+    /** After full pref clear on logout: restore only username for next login (no password stored). */
+    fun setRememberedUsernameOnly(userName: String) {
+        val editor = pref.edit()
+        val prefUserKey = context.getString(R.string.PREF_rem_me_uname)
+        val prefUserPwdKey = context.getString(R.string.PREF_rem_me_pwd)
+        editor.putString(prefUserKey, userName.trim())
+        editor.remove(prefUserPwdKey)
+        editor.apply()
+    }
+
     fun getRememberedUserName(): String? {
         val key = context.getString(R.string.PREF_rem_me_uname)
         return pref.getString(key, null)

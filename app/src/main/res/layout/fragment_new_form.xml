@@ -177,12 +177,10 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_cancel"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="@dimen/margin_small"
-                    android:text="@string/cancel"
-                    android:visibility="gone" />
+                    android:layout_marginEnd="@dimen/margin_big"
+                    android:text="@string/cancel" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_submit"

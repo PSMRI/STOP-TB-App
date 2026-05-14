@@ -30,7 +30,7 @@
     <string-array name="nhhr_poverty_line_array">
         <item>এপিএল</item>
         <item>বিপিএল</item>
-        <item>নাজানো</item>
+        <item>অজ্ঞাত</item>
     </string-array>
     <string name="btn_frag_nhhr_prev">previous</string>
     <string name="btn_frag_nhhr_next">next</string>

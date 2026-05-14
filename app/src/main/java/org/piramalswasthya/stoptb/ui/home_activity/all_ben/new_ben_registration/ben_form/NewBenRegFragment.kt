@@ -156,6 +156,9 @@ class NewBenRegFragment : Fragment() {
             }
         }
 
+        binding.btnCancel.setOnClickListener {
+            findNavController().popBackStack()
+        }
         // Cancel button hidden — discard handled by back press
 
         // Death badge visibility — only show fab if record exists AND not dead
