@@ -41,6 +41,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.updatePadding
+import androidx.core.widget.doOnTextChanged
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.ui.login_activity.sign_in.SignInViewModel.CampHubStatus
 import org.piramalswasthya.stoptb.utils.RoleConstants
@@ -110,6 +111,12 @@ class SignInFragment : Fragment() {
 
         NoCopyPasteHelper.disableCopyPaste(binding.etPassword)
         NoCopyPasteHelper.disableCopyPaste(binding.etUsername)
+        binding.etUsername.isEnabled = true
+        binding.etUsername.isFocusable = true
+        binding.etUsername.isFocusableInTouchMode = true
+        binding.etPassword.isEnabled = true
+        binding.etPassword.isFocusable = true
+        binding.etPassword.isFocusableInTouchMode = true
         binding.rbAssamese.visibility = View.GONE
 
         return binding.root
@@ -134,6 +141,14 @@ class SignInFragment : Fragment() {
             insets
         }
         ViewCompat.requestApplyInsets(binding.root)
+
+        binding.etUsername.doOnTextChanged { _, _, _, _ ->
+            binding.tilUsername.error = null
+        }
+        binding.etPassword.doOnTextChanged { _, _, _, _ ->
+            binding.tilPassword.error = null
+        }
+
         binding.btnLogin.setOnClickListener {
             view.findFocus()?.let { view ->
                 val imm =
@@ -146,17 +161,23 @@ class SignInFragment : Fragment() {
                 viewModel.checkCampHubConnection()
                 return@setOnClickListener
             }
+            val username = binding.etUsername.text.toString()
+            val password = binding.etPassword.text.toString()
+            if (!applyLoginEmptyFieldErrors(username, password)) {
+                binding.tvError.visibility = View.GONE
+                return@setOnClickListener
+            }
             viewModel.loginInClicked()
         }
 
         refreshCampModeUi()
 
-        binding.cbCampMode?.setOnCheckedChangeListener { _, isChecked ->
+        binding.cbCampMode.setOnCheckedChangeListener { _, isChecked ->
             if (suppressCampModeListener) return@setOnCheckedChangeListener
 
             if (isChecked) {
                 suppressCampModeListener = true
-                binding.cbCampMode?.isChecked = false
+                binding.cbCampMode.isChecked = false
                 suppressCampModeListener = false
                 findNavController().navigate(R.id.action_signInFragment_to_campModeConnectFragment)
                 return@setOnCheckedChangeListener
@@ -166,7 +187,7 @@ class SignInFragment : Fragment() {
             refreshCampModeUi()
         }
 
-        binding.btnCampRetry?.setOnClickListener {
+        binding.btnCampRetry.setOnClickListener {
             findNavController().navigate(R.id.action_signInFragment_to_campModeConnectFragment)
         }
 
@@ -226,17 +247,18 @@ class SignInFragment : Fragment() {
                 is NetworkResponse.Idle -> {
                     binding.clContent.visibility = View.VISIBLE
                     binding.pbSignIn.visibility = View.INVISIBLE
+                    clearLoginFieldErrors()
                     var hasRememberMeUsername = false
                     var hasRememberMePassword = false
                     viewModel.fetchRememberedUserName()?.let {
                         binding.etUsername.setText(it)
                         hasRememberMeUsername = true
                     }
-                    viewModel.fetchRememberedPassword()?.let {
+                    viewModel.fetchRememberedPassword()?.takeIf { it.isNotEmpty() }?.let {
                         binding.etPassword.setText(it)
-                        binding.cbRemember.isChecked = true
                         hasRememberMePassword = true
-                    }
+                    } ?: binding.etPassword.text?.clear()
+                    binding.cbRemember.isChecked = hasRememberMeUsername
                     if (hasRememberMeUsername && hasRememberMePassword && !viewModel.isCampModeEnabled()) {
                         validateInput()
                     }
@@ -246,8 +268,22 @@ class SignInFragment : Fragment() {
                 is NetworkResponse.Error -> {
                     binding.pbSignIn.visibility = View.GONE
                     binding.clContent.visibility = View.VISIBLE
-                    binding.tvError.text = state.message
-                    binding.tvError.visibility = View.VISIBLE
+                    clearLoginFieldErrors()
+                    when (val msg = state.message.orEmpty()) {
+                        getString(R.string.error_login_invalid_password) -> {
+                            binding.tilPassword.error = msg
+                            binding.tvError.visibility = View.GONE
+                        }
+                        getString(R.string.error_sign_in_invalid_u_p) -> {
+                            binding.tilUsername.error = msg
+                            binding.tilPassword.error = msg
+                            binding.tvError.visibility = View.GONE
+                        }
+                        else -> {
+                            binding.tvError.text = state.message
+                            binding.tvError.visibility = View.VISIBLE
+                        }
+                    }
                 }
 
 //                is NetworkResponse.Success -> {
@@ -285,6 +321,7 @@ class SignInFragment : Fragment() {
                         binding.clContent.visibility = View.INVISIBLE
                         binding.pbSignIn.visibility = View.VISIBLE
                         binding.tvError.visibility = View.GONE
+                        clearLoginFieldErrors()
 
                         activity?.finish()
                         startActivity(Intent(requireContext(), VolunteerActivity::class.java))
@@ -293,8 +330,8 @@ class SignInFragment : Fragment() {
                         // ❌ Non-volunteer block
                         binding.pbSignIn.visibility = View.GONE
                         binding.clContent.visibility = View.VISIBLE
-                        binding.tvError.text =
-                            "Login Failed: Only Registration Officer, Nurse or Counselling Officer allowed"
+                        clearLoginFieldErrors()
+                        binding.tvError.text = getString(R.string.error_login_role_not_allowed)
                         binding.tvError.visibility = View.VISIBLE
                     }
                 }
@@ -334,9 +371,9 @@ class SignInFragment : Fragment() {
     private fun refreshCampModeUi() {
         val isCampEnabled = viewModel.isCampModeEnabled()
         suppressCampModeListener = true
-        binding.cbCampMode?.isChecked = isCampEnabled
+        binding.cbCampMode.isChecked = isCampEnabled
         suppressCampModeListener = false
-        binding.llCampStatus?.visibility = if (isCampEnabled) View.VISIBLE else View.GONE
+        binding.llCampStatus.visibility = if (isCampEnabled) View.VISIBLE else View.GONE
         if (isCampEnabled && viewModel.isCampHubConnected()) {
             updateCampHubStatus(CampHubStatus.CONNECTED)
         } else if (isCampEnabled) {
@@ -349,26 +386,42 @@ class SignInFragment : Fragment() {
     private fun updateCampHubStatus(status: CampHubStatus) {
         when (status) {
             CampHubStatus.IDLE -> {
-                binding.tvCampStatus?.text = getString(R.string.camp_hub_not_connected)
-                binding.tvCampStatus?.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_theme_light_onSurfaceVariant))
+                binding.tvCampStatus.text = getString(R.string.camp_hub_not_connected)
+                binding.tvCampStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_theme_light_onSurfaceVariant))
                 binding.btnLogin.isEnabled = true
             }
             CampHubStatus.CHECKING -> {
-                binding.tvCampStatus?.text = getString(R.string.camp_hub_checking)
-                binding.tvCampStatus?.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_theme_light_onSurfaceVariant))
+                binding.tvCampStatus.text = getString(R.string.camp_hub_checking)
+                binding.tvCampStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_theme_light_onSurfaceVariant))
                 binding.btnLogin.isEnabled = false
             }
             CampHubStatus.CONNECTED -> {
-                binding.tvCampStatus?.text = getString(R.string.camp_hub_connected)
-                binding.tvCampStatus?.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_theme_light_primary))
+                binding.tvCampStatus.text = getString(R.string.camp_hub_connected)
+                binding.tvCampStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_theme_light_primary))
                 binding.btnLogin.isEnabled = true
             }
             CampHubStatus.NOT_CONNECTED -> {
-                binding.tvCampStatus?.text = getString(R.string.camp_hub_not_connected)
-                binding.tvCampStatus?.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.holo_red_dark))
+                binding.tvCampStatus.text = getString(R.string.camp_hub_not_connected)
+                binding.tvCampStatus.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.holo_red_dark))
                 binding.btnLogin.isEnabled = !viewModel.isCampModeEnabled()
             }
         }
+    }
+
+    private fun clearLoginFieldErrors() {
+        binding.tilUsername.error = null
+        binding.tilPassword.error = null
+    }
+
+    /** @return true if username and password are both present */
+    private fun applyLoginEmptyFieldErrors(username: String, password: String): Boolean {
+        clearLoginFieldErrors()
+        val usernameMissing = username.trim().isEmpty()
+        val passwordMissing = password.isEmpty()
+        if (!usernameMissing && !passwordMissing) return true
+        if (usernameMissing) binding.tilUsername.error = getString(R.string.error_login_username_required)
+        if (passwordMissing) binding.tilPassword.error = getString(R.string.error_login_password_required)
+        return false
     }
 
     /**
@@ -380,6 +433,14 @@ class SignInFragment : Fragment() {
         binding.pbSignIn.visibility = View.VISIBLE
         val username = binding.etUsername.text.toString()
         val password = binding.etPassword.text.toString()
+
+        if (!applyLoginEmptyFieldErrors(username, password)) {
+            binding.pbSignIn.visibility = View.GONE
+            binding.clContent.visibility = View.VISIBLE
+            binding.tvError.visibility = View.GONE
+            viewModel.updateState(NetworkResponse.Idle())
+            return
+        }
 
         if (viewModel.isCampModeEnabled()) {
             if (viewModel.isCampHubConnected()) {
@@ -402,19 +463,17 @@ class SignInFragment : Fragment() {
             if (loggedInUser.userName.equals(username.trim(), true)) {
                 if (loggedInUser.password == password) {
                     if(isInternetAvailable(requireActivity())){
-                        if (loggedInUser == null){
-                            viewModel.authUser(username, password)
-                        }else{
-                            lifecycleScope.launch {
-                                migrateLegacySessionIfNeeded()
-                                viewModel.updateState(NetworkResponse.Success(loggedInUser))
-                            }
+                        lifecycleScope.launch {
+                            migrateLegacySessionIfNeeded()
+                            viewModel.updateState(NetworkResponse.Success(loggedInUser))
                         }
                     }else{
                         viewModel.updateState(NetworkResponse.Success(loggedInUser))
                     }
                 } else {
-                    viewModel.updateState(NetworkResponse.Error("Invalid Password"))
+                    viewModel.updateState(
+                        NetworkResponse.Error(getString(R.string.error_login_invalid_password))
+                    )
                 }
             } else {
                 userChangeAlert.setCanceledOnTouchOutside(false)

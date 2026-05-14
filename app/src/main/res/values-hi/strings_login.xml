@@ -3,13 +3,21 @@
     <!--    Login-->
     <string name="tv_text_welcome">स्वागत</string>
     <string name="tv_text_welcome_user">स्वागत, %s</string>
-    <string name="tv_text_sign_in">जारी रखने के लिए लॉग इन करें</string>
+    <string name="tv_text_sign_in">लॉग इन</string>
     <string name="tv_text_select_language">कृपया अपनी भाषा का चयन कीजिए</string>
     <string name="text_english" translatable="false">English</string>
     <string name="text_hindi" translatable="false">हिंदी</string>
     <string name="text_assamese" translatable="false">অসমীয়া</string>
     <string name="til_username_hint_text">उपयोगकर्ता नाम</string>
     <string name="til_password_hint_text">पासवर्ड</string>
+    <string name="error_login_username_required">उपयोगकर्ता नाम आवश्यक है</string>
+    <string name="error_login_password_required">पासवर्ड आवश्यक है</string>
+    <string name="error_login_failed">लॉग इन असफल। कृपया पुनः प्रयास करें।</string>
+    <string name="error_login_unable_to_reach_server">सर्वर से कनेक्ट नहीं हो पा रहा है।</string>
+    <string name="error_login_server_refused">सर्वर ने कनेक्शन अस्वीकार कर दिया।</string>
+    <string name="error_login_generic">कुछ गलत हो गया। कृपया बाद में पुनः प्रयास करें।</string>
+    <string name="error_login_invalid_password">गलत पासवर्ड</string>
+    <string name="error_login_role_not_allowed">लॉग इन असफल: केवल पंजीकरण अधिकारी, नर्स या परामर्श अधिकारी को अनुमति है।</string>
     <string name="cb_login_remember_me_text">मुझे याद रखना</string>
     <string name="btn_login_forgot_password_text">पासवर्ड भूल गए?</string>
     <string name="btn_login_text">लॉग इन करें</string>

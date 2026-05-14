@@ -137,15 +137,20 @@
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/service_type_dd_village_text"
+                    asteriskRequired="@{false}"
+                    hintText="@{@string/service_type_dd_village_text}"
                     android:labelFor="@id/actv_village_dropdown">
 
-                    <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                    <AutoCompleteTextView
                         android:id="@+id/actv_village_dropdown"
-                        listItems="@{viewModel.villageList}"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="none" />
+                        android:cursorVisible="false"
+                        android:focusable="false"
+                        android:focusableInTouchMode="false"
+                        android:inputType="none"
+                        app:listItems="@{viewModel.villageList}"
+                        tools:ignore="SpeakableTextPresentCheck" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.button.MaterialButton
@@ -155,7 +160,7 @@
                     android:layout_gravity="center_horizontal"
                     android:layout_margin="@dimen/padding_normal"
                     android:padding="@dimen/padding_normal"
-                    android:text="@string/btn_continue_text"
+                    android:text="@string/btn_submit_text"
                     android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
                     android:textColor="?attr/colorOnPrimary" />
             </LinearLayout>

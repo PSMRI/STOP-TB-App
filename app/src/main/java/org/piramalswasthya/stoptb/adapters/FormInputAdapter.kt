@@ -1369,34 +1369,33 @@ class FormInputAdapter(
     /**
      * Validation Result : -1 -> all good
      * else index of element creating trouble
+     *
+     * Required empty fields are always re-evaluated first. Previously, returning early on any
+     * existing [FormElement.errorText] skipped this pass — e.g. after DOB click cleared its error,
+     * another field could still hold stale errorText and submit would never re-set the DOB error.
      */
     fun validateInput(resources: Resources): Int {
-        var retVal = -1
-        if (!isEnabled) return retVal
-        currentList.forEachIndexed { index, it ->
-            Timber.d("Error text for ${it.title} ${it.errorText}")
-            if (it.inputType != TEXT_VIEW && it.errorText != null) {
-                retVal = index
-                return@forEachIndexed
-            }
-        }
-        Timber.d("Validation : $retVal")
-        if (retVal != -1) return retVal
+        if (!isEnabled) return -1
+        var firstEmptyRequired = -1
         currentList.forEachIndexed { index, it ->
             if (it.inputType != TEXT_VIEW && it.required) {
                 if (it.value.isNullOrBlank()) {
-                    Timber.d("validateInput called for item $it, with index ${index}")
+                    Timber.d("validateInput called for item $it, with index $index")
                     it.errorText = resources.getString(R.string.form_input_empty_error)
                     notifyItemChanged(index)
-                    if (retVal == -1) retVal = index
+                    if (firstEmptyRequired == -1) firstEmptyRequired = index
                 }
             }
-            /*            if(it.regex!=null){
-                            Timber.d("Regex not null")
-                            retVal= false
-                        }*/
         }
-        return retVal
+        if (firstEmptyRequired != -1) return firstEmptyRequired
+        currentList.forEachIndexed { index, it ->
+            if (it.inputType != TEXT_VIEW && it.errorText != null) {
+                Timber.d("validateInput existing error for ${it.title} at $index")
+                notifyItemChanged(index)
+                return index
+            }
+        }
+        return -1
     }
 
 

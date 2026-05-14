@@ -69,7 +69,7 @@ class HomeViewModel @Inject constructor(
 
     fun logout() {
         viewModelScope.launch {
-            pref.deleteLoginCred()
+            pref.clearRememberedPasswordKeepUsername()
             _navigateToLoginPage.value = true
         }
     }
