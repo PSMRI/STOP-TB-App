@@ -3,7 +3,7 @@
     <!--    Login-->
     <string name="tv_text_welcome">स्वागत</string>
     <string name="tv_text_welcome_user">स्वागत, %s</string>
-    <string name="tv_text_sign_in">जारी रखने के लिए लॉग इन करें</string>
+    <string name="tv_text_sign_in">लॉग इन</string>
     <string name="tv_text_select_language">कृपया अपनी भाषा का चयन कीजिए</string>
     <string name="text_english" translatable="false">English</string>
     <string name="text_hindi" translatable="false">हिंदी</string>

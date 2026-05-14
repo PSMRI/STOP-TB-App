@@ -7,6 +7,7 @@ import android.view.MotionEvent
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import org.piramalswasthya.stoptb.R
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -52,9 +53,9 @@ class ServiceLocationActivity : AppCompatActivity() {
     }
     private val incompleteLocationAlert by lazy {
         MaterialAlertDialogBuilder(this)
-            .setTitle("Missing Detail")
-            .setMessage("At least one of the following is missing value:\n \n\tState\n\tDistrict\n\tBlock\n\tTU\n\tHealth Facility\n\tVillage")
-            .setPositiveButton("Understood") { dialog, _ ->
+            .setTitle(getString(R.string.missing_detail_title))
+            .setMessage(getString(R.string.missing_detail_message))
+            .setPositiveButton(getString(R.string.understood)) { dialog, _ ->
                 dialog.dismiss()
             }
             .create()

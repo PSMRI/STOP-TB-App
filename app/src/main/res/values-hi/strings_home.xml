@@ -9,7 +9,10 @@
     <string name="service_type_dd_block_text">उप जिला</string>
     <string name="service_type_dd_village_text">गांव</string>
     <string name="btn_continue_text">जारी रखें</string>
-
+    <string name="btn_submit_text">जमा करें</string>
+    <string name="missing_detail_title">विवरण अनुपलब्ध</string>
+    <string name="missing_detail_message">निम्न में से कम से कम एक मान अनुपलब्ध है:\n\n\tराज्य\n\tजिला\n\tब्लॉक\n\tटीयू\n\tस्वास्थ्य सुविधा\n\tगांव</string>
+    <string name="understood">समझ गया</string>
     <string name="menu_home">घर</string>
     <string name="menu_home_home">होम</string>
     <string name="menu_home_scheduler">डैशबोर्ड</string>
