@@ -76,7 +76,6 @@ class NewBenRegFragment : Fragment() {
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
-        timber.log.Timber.d("BEN_FORM: onCreateView called, benId=${viewModel.benIdFromArgs}")
         _binding = FragmentNewFormBinding.inflate(layoutInflater, container, false)
         return binding.root
     }
@@ -84,17 +83,14 @@ class NewBenRegFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        timber.log.Timber.d("BEN_FORM: onResume called")
     }
 
     // ─── onViewCreated ───────────────────────────────────────────────────
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        timber.log.Timber.d("BEN_FORM: onViewCreated called")
 
-        // Show loading, hide content until form is ready
-        binding.llLoading.visibility = View.VISIBLE
-        binding.llContent.visibility = View.GONE
+        binding.llLoading.visibility = View.GONE
+        binding.llContent.visibility = View.VISIBLE
 
         // Back press — show discard dialog in edit mode
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner,
@@ -195,31 +191,17 @@ class NewBenRegFragment : Fragment() {
         binding.form.rvInputForm.adapter = adapter
         binding.form.rvInputForm.itemAnimator = null
 
-        // Collect form list — show loading until ready
-        var formShown = false
+        // Collect form list without forcing a full-screen loading blink.
         lifecycleScope.launch {
             viewModel.formList.collect {
-                timber.log.Timber.d("BEN_FORM: formList collected, size=${it.size}")
                 if (it.isNotEmpty()) {
-                    adapter.submitList(it) {
-                        if (!formShown) {
-                            formShown = true
-                            // Wait for RecyclerView to fully layout before showing
-                            binding.form.rvInputForm.post {
-                                binding.form.rvInputForm.post {
-                                    binding.llLoading.visibility = View.GONE
-                                    binding.llContent.visibility = View.VISIBLE
-                                }
-                            }
-                        }
-                    }
+                    adapter.submitList(it)
                 }
             }
         }
 
         // Record exists observer — drives view/edit mode + consent
         viewModel.recordExists.observe(viewLifecycleOwner) { recordExists ->
-            timber.log.Timber.d("BEN_FORM: recordExists=$recordExists")
             binding.fabEdit.visibility  = if (recordExists) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (recordExists) View.GONE else View.VISIBLE
             // btnCancel hidden — discard via back press
@@ -384,7 +366,7 @@ class NewBenRegFragment : Fragment() {
             when (formId) {
                 1008 -> notifyDataSetChanged()          // marital status
                 1012 -> {                               // age at marriage
-                    if ((viewModel.dataset.ageAtMarriage.value?.length ?: 0) >= 2)
+                    if (viewModel.getAgeAtMarriageLength() >= 2)
                         notifyDataSetChanged()
                 }
                 9    -> notifyDataSetChanged()          // gender
@@ -502,7 +484,7 @@ class NewBenRegFragment : Fragment() {
         ) {
             fetchLocation()
         } else {
-            requestLocationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            // Avoid permission prompt during screen open to keep navigation smooth.
         }
     }
 
