@@ -612,6 +612,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
 
     private fun finishAndStartServiceLocationActivity() {
         val serviceLocationActivity = Intent(this, ServiceLocationActivity::class.java)
+            .putExtra(ServiceLocationActivity.EXTRA_FROM_HOME_SWITCH, true)
         finish()
         startActivity(serviceLocationActivity)
     }

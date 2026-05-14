@@ -1533,7 +1533,7 @@ data class BenRegCache(
 //            parkingPlaceID = user.parkingPlaceId,
 //            servicePointID = user.servicePointId.toString(),
 //            servicePointName = user.servicePointName,
-                address = address,
+                address = null,
                 addressLine1 = address ?: "",
                 addressLine2 = "",
                 addressLine3 = "",

@@ -6,13 +6,14 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
-import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
-import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import dagger.hilt.android.AndroidEntryPoint
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -27,6 +28,7 @@ class CampModeConnectFragment : Fragment() {
 
     companion object {
         private const val TAG = "CampHub"
+        const val CAMP_HUB_CONNECTION_UPDATED = "campHubConnectionUpdated"
     }
 
     @Inject
@@ -43,11 +45,16 @@ class CampModeConnectFragment : Fragment() {
             false
         )
 
-    private val qrScannerOptions by lazy {
-        GmsBarcodeScannerOptions.Builder()
-                .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
-                .enableAutoZoom()
-                .build()
+    private val qrScannerLauncher = registerForActivityResult(ScanContract()) { result ->
+        binding.pbConnect.visibility = View.GONE
+        val scannedUrl = result.contents
+        Log.d(TAG, "QR scanner result. scannedUrl=$scannedUrl")
+        if (scannedUrl.isNullOrBlank()) {
+            showToast(R.string.camp_hub_scan_empty)
+        } else {
+            binding.etCampHubUrl.setText(scannedUrl)
+            binding.etCampHubUrl.setSelection(scannedUrl.length)
+        }
     }
 
     override fun onCreateView(
@@ -64,8 +71,16 @@ class CampModeConnectFragment : Fragment() {
 
         binding.etCampHubUrl.setText(viewModel.getCampHubUrl())
         binding.ibBack.setOnClickListener {
-            closeConnectScreen()
+            closeConnectScreen(refreshSignIn = false)
         }
+        requireActivity().onBackPressedDispatcher.addCallback(
+            viewLifecycleOwner,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    closeConnectScreen(refreshSignIn = false)
+                }
+            }
+        )
 
         binding.btnScan.setOnClickListener {
             startQrScanner()
@@ -85,28 +100,13 @@ class CampModeConnectFragment : Fragment() {
     private fun startQrScanner() {
         Log.d(TAG, "QR scanner opened.")
         binding.pbConnect.visibility = View.VISIBLE
-        GmsBarcodeScanning.getClient(requireContext(), qrScannerOptions)
-            .startScan()
-            .addOnSuccessListener { barcode ->
-                binding.pbConnect.visibility = View.GONE
-                val scannedUrl = barcode.rawValue
-                Log.d(TAG, "QR scanner success. scannedUrl=$scannedUrl")
-                if (scannedUrl.isNullOrBlank()) {
-                    showToast(R.string.camp_hub_scan_empty)
-                } else {
-                    binding.etCampHubUrl.setText(scannedUrl)
-                    binding.etCampHubUrl.setSelection(scannedUrl.length)
-                }
-            }
-            .addOnCanceledListener {
-                Log.d(TAG, "QR scanner cancelled.")
-                binding.pbConnect.visibility = View.GONE
-            }
-            .addOnFailureListener { error ->
-                Log.e(TAG, "QR scanner failed. error=${error.javaClass.simpleName}: ${error.message}", error)
-                binding.pbConnect.visibility = View.GONE
-                showToast(R.string.camp_hub_scan_failed)
-            }
+        val options = ScanOptions()
+            .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+            .setPrompt("")
+            .setBeepEnabled(false)
+            .setOrientationLocked(true)
+            .setCaptureActivity(PortraitQrCaptureActivity::class.java)
+        qrScannerLauncher.launch(options)
     }
 
     private fun showToast(messageResId: Int) {
@@ -144,7 +144,7 @@ class CampModeConnectFragment : Fragment() {
                 if (openedFromOfflineChip) {
                     WorkerUtils.triggerCampQuickPullIfConnected(requireContext(), pref, force = true)
                 }
-                closeConnectScreen()
+                closeConnectScreen(refreshSignIn = true)
             }
 
             CampHubStatus.NOT_CONNECTED -> {
@@ -163,11 +163,24 @@ class CampModeConnectFragment : Fragment() {
         _binding = null
     }
 
-    private fun closeConnectScreen() {
+    private fun closeConnectScreen(refreshSignIn: Boolean) {
         if (openedFromOfflineChip) {
             requireActivity().finish()
+        } else if (refreshSignIn) {
+            parentFragmentManager.setFragmentResult(CAMP_HUB_CONNECTION_UPDATED, Bundle.EMPTY)
+            findNavController().previousBackStackEntry
+                ?.savedStateHandle
+                ?.set(CAMP_HUB_CONNECTION_UPDATED, true)
+            findNavController().navigate(
+                R.id.signInFragment,
+                null,
+                NavOptions.Builder()
+                    .setPopUpTo(R.id.signInFragment, true)
+                    .build()
+            )
         } else {
             findNavController().popBackStack()
         }
     }
+
 }

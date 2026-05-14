@@ -42,6 +42,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.updatePadding
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.ui.login_activity.camp_mode.CampModeConnectFragment
 import org.piramalswasthya.stoptb.ui.login_activity.sign_in.SignInViewModel.CampHubStatus
 import org.piramalswasthya.stoptb.utils.RoleConstants
 
@@ -59,6 +60,7 @@ class SignInFragment : Fragment() {
 
     private val viewModel: SignInViewModel by viewModels()
     private var suppressCampModeListener = false
+    private var pendingLoginAfterCampCheck = false
 
     private val stateUnselectedAlert by lazy {
         AlertDialog.Builder(context).setTitle("State Missing")
@@ -118,6 +120,7 @@ class SignInFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        updateLoginAppName()
         val initialLeft = binding.root.paddingLeft
         val initialTop = binding.root.paddingTop
         val initialRight = binding.root.paddingRight
@@ -134,15 +137,21 @@ class SignInFragment : Fragment() {
             insets
         }
         ViewCompat.requestApplyInsets(binding.root)
+        parentFragmentManager.setFragmentResultListener(
+            CampModeConnectFragment.CAMP_HUB_CONNECTION_UPDATED,
+            viewLifecycleOwner
+        ) { _, _ ->
+            binding.root.post { refreshCampModeUi() }
+        }
         binding.btnLogin.setOnClickListener {
             view.findFocus()?.let { view ->
                 val imm =
                     activity?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
                 imm?.hideSoftInputFromWindow(view.windowToken, 0)
             }
-            if (viewModel.isCampModeEnabled() && !viewModel.isCampHubConnected()) {
-                binding.tvError.text = getString(R.string.camp_hub_login_blocked)
-                binding.tvError.visibility = View.VISIBLE
+            if (viewModel.isCampModeEnabled()) {
+                pendingLoginAfterCampCheck = true
+                binding.tvError.visibility = View.GONE
                 viewModel.checkCampHubConnection()
                 return@setOnClickListener
             }
@@ -162,6 +171,11 @@ class SignInFragment : Fragment() {
                 return@setOnCheckedChangeListener
             }
 
+            if (viewModel.isCampModeEnabled() || viewModel.isCampHubConnected()) {
+                showCampDisconnectConfirmation()
+                return@setOnCheckedChangeListener
+            }
+
             viewModel.setCampModeEnabled(isChecked)
             refreshCampModeUi()
         }
@@ -172,8 +186,22 @@ class SignInFragment : Fragment() {
 
         viewModel.campHubStatus.observe(viewLifecycleOwner) { status ->
             updateCampHubStatus(status)
-            if (status == CampHubStatus.NOT_CONNECTED) {
-                refreshCampModeUi()
+            when (status) {
+                CampHubStatus.CONNECTED -> {
+                    if (pendingLoginAfterCampCheck) {
+                        pendingLoginAfterCampCheck = false
+                        viewModel.loginInClicked()
+                    }
+                }
+                CampHubStatus.NOT_CONNECTED -> {
+                    if (pendingLoginAfterCampCheck) {
+                        pendingLoginAfterCampCheck = false
+                        binding.tvError.text = getString(R.string.camp_hub_login_blocked)
+                        binding.tvError.visibility = View.VISIBLE
+                    }
+                    refreshCampModeUi()
+                }
+                else -> Unit
             }
         }
 
@@ -312,6 +340,13 @@ class SignInFragment : Fragment() {
                 viewModel.updateState(NetworkResponse.Idle())
             }
         }
+
+        findNavController().currentBackStackEntry
+            ?.savedStateHandle
+            ?.getLiveData<Boolean>(CampModeConnectFragment.CAMP_HUB_CONNECTION_UPDATED)
+            ?.observe(viewLifecycleOwner) {
+                binding.root.post { refreshCampModeUi() }
+            }
     }
 
     private fun showLoginRoleToast(user: org.piramalswasthya.stoptb.model.User?) {
@@ -326,9 +361,50 @@ class SignInFragment : Fragment() {
         ).show()
     }
 
+    private fun updateLoginAppName() {
+        val titleRes = if (BuildConfig.FLAVOR.contains("uat", ignoreCase = true)) {
+            R.string.login_app_native_name_uat
+        } else {
+            R.string.login_app_native_name
+        }
+        binding.tvAppName?.text = getString(titleRes)
+    }
+
+    private fun showCampDisconnectConfirmation() {
+        fun keepCampModeChecked() {
+            suppressCampModeListener = true
+            binding.cbCampMode?.isChecked = true
+            suppressCampModeListener = false
+        }
+
+        keepCampModeChecked()
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.camp_disconnect_title)
+            .setMessage(R.string.camp_disconnect_message)
+            .setPositiveButton(R.string.camp_disconnect_positive) { dialog, _ ->
+                viewModel.setCampModeEnabled(false)
+                refreshCampModeUi()
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.camp_disconnect_negative) { dialog, _ ->
+                keepCampModeChecked()
+                dialog.dismiss()
+            }
+            .setOnCancelListener {
+                keepCampModeChecked()
+            }
+            .show()
+    }
+
     override fun onResume() {
         super.onResume()
-        refreshCampModeUi()
+        binding.root.post { refreshCampModeUi() }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        binding.root.post { refreshCampModeUi() }
     }
 
     private fun refreshCampModeUi() {

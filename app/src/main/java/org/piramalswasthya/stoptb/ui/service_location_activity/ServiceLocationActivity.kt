@@ -17,12 +17,15 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.ActivityServiceTypeBinding
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
 import org.piramalswasthya.stoptb.helpers.TapjackingProtectionHelper
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import timber.log.Timber
 
 @AndroidEntryPoint
 class ServiceLocationActivity : AppCompatActivity() {
+
+    companion object {
+        const val EXTRA_FROM_HOME_SWITCH = "fromHomeSwitch"
+    }
 
     @EntryPoint
     @InstallIn(SingletonComponent::class)
@@ -38,11 +41,13 @@ class ServiceLocationActivity : AppCompatActivity() {
     private val onBackPressedCallback by lazy {
         object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                if (intent.getBooleanExtra(EXTRA_FROM_HOME_SWITCH, false)) {
+                    finish()
+                    return
+                }
                 if (viewModel.isLocationSet()) {
                     finish()
-                    val targetClass = if (intent.getBooleanExtra("fromVolunteer", false))
-                        VolunteerActivity::class.java else HomeActivity::class.java
-                    startActivity(Intent(this@ServiceLocationActivity, targetClass))
+                    startActivity(Intent(this@ServiceLocationActivity, VolunteerActivity::class.java))
                 } else
                     if (!exitAlert.isShowing)
                         exitAlert.show()
@@ -112,9 +117,7 @@ class ServiceLocationActivity : AppCompatActivity() {
             if (dataValid()) {
                 viewModel.saveCurrentLocation()
                 finish()
-                val targetClass = if (intent.getBooleanExtra("fromVolunteer", false))
-                    VolunteerActivity::class.java else VolunteerActivity ::class.java
-                startActivity(Intent(this@ServiceLocationActivity, targetClass))
+                startActivity(Intent(this@ServiceLocationActivity, VolunteerActivity::class.java))
             } else
                 incompleteLocationAlert.show()
         }

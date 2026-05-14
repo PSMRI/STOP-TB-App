@@ -3,6 +3,8 @@
     <!--    Login-->
     <string name="tv_text_welcome">स्वागत</string>
     <string name="tv_text_welcome_user">स्वागत, %s</string>
+    <string name="login_app_native_name">स्टॉप टीबी</string>
+    <string name="login_app_native_name_uat">स्टॉप टीबी-यूएटी</string>
     <string name="tv_text_sign_in">जारी रखने के लिए लॉग इन करें</string>
     <string name="tv_text_select_language">कृपया अपनी भाषा का चयन कीजिए</string>
     <string name="text_english" translatable="false">English</string>
@@ -17,6 +19,10 @@
     <string name="camp_hub_checking">कैंप हब जांच रहे हैं...</string>
     <string name="camp_hub_connected">कैंप हब जुड़ा हुआ है</string>
     <string name="camp_hub_not_connected">कैंप हब जुड़ा नहीं है</string>
+    <string name="camp_disconnect_title">कैंप हब डिस्कनेक्ट करें?</string>
+    <string name="camp_disconnect_message">क्या आप कैंप हब से डिस्कनेक्ट होकर सामान्य मोड में जारी रखना चाहते हैं?</string>
+    <string name="camp_disconnect_positive">डिस्कनेक्ट करें</string>
+    <string name="camp_disconnect_negative">जुड़ा रहने दें</string>
     <string name="camp_hub_retry">फिर से प्रयास करें</string>
     <string name="camp_hub_login_blocked">कैंप हब जुड़ा नहीं है। कृपया कैंप वाई-फाई से जुड़ें और फिर प्रयास करें।</string>
     <string name="login_diff_user">आप पहले @username के रूप में @ मितानिन से लॉगिन हैं, क्या आप किसी और यूज़र से लॉगिन करना चाहते हैं?</string>

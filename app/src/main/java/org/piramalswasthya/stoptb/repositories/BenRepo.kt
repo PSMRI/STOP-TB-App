@@ -1672,7 +1672,10 @@ class BenRepo @Inject constructor(
 
                                 address = demographicsObj.optString("addressLine1")
                                     .ifEmpty { demographicsObj.optString("address") }
-                                    .ifEmpty { benDataObj.optString("address") },
+                                    .ifEmpty { benDataObj.optString("addressLine1") }
+                                    .ifEmpty { benDataObj.optString("address") }
+                                    .ifEmpty { jsonObject.optString("addressLine1") }
+                                    .ifEmpty { jsonObject.optString("address") },
 
                                 genderId = benDataObj.optInt(
                                     "genderId",
@@ -1747,22 +1750,59 @@ class BenRepo @Inject constructor(
                                     ?: demographicsObj.optStringOrNull("occupation"),
 
                                 economicStatus = benDataObj.optStringOrNull("economicStatus")
-                                    ?: benDataObj.optStringOrNull("type_bpl_apl"),
+                                    ?: benDataObj.optStringOrNull("type_bpl_apl")
+                                    ?: benDataObj.optStringOrNull("incomeStatusName")
+                                    ?: demographicsObj.optStringOrNull("economicStatus")
+                                    ?: demographicsObj.optStringOrNull("type_bpl_apl")
+                                    ?: demographicsObj.optStringOrNull("incomeStatusName")
+                                    ?: jsonObject.optStringOrNull("economicStatus")
+                                    ?: jsonObject.optStringOrNull("type_bpl_apl")
+                                    ?: jsonObject.optStringOrNull("incomeStatusName"),
 
                                 economicStatusId = if (benDataObj.has("economicStatusId"))
                                     benDataObj.optInt("economicStatusId")
                                 else if (benDataObj.has("bpl_aplId"))
                                     benDataObj.optInt("bpl_aplId")
+                                else if (benDataObj.has("incomeStatusID"))
+                                    benDataObj.optInt("incomeStatusID")
+                                else if (benDataObj.has("incomeStatusId"))
+                                    benDataObj.optInt("incomeStatusId")
+                                else if (demographicsObj.has("economicStatusId"))
+                                    demographicsObj.optInt("economicStatusId")
+                                else if (demographicsObj.has("bpl_aplId"))
+                                    demographicsObj.optInt("bpl_aplId")
+                                else if (demographicsObj.has("incomeStatusID"))
+                                    demographicsObj.optInt("incomeStatusID")
+                                else if (demographicsObj.has("incomeStatusId"))
+                                    demographicsObj.optInt("incomeStatusId")
+                                else if (jsonObject.has("economicStatusId"))
+                                    jsonObject.optInt("economicStatusId")
+                                else if (jsonObject.has("bpl_aplId"))
+                                    jsonObject.optInt("bpl_aplId")
+                                else if (jsonObject.has("incomeStatusID"))
+                                    jsonObject.optInt("incomeStatusID")
+                                else if (jsonObject.has("incomeStatusId"))
+                                    jsonObject.optInt("incomeStatusId")
                                 else null,
 
-                                residentialArea = benDataObj.optStringOrNull("residentialArea"),
+                                residentialArea = benDataObj.optStringOrNull("residentialArea")
+                                    ?: demographicsObj.optStringOrNull("residentialArea")
+                                    ?: jsonObject.optStringOrNull("residentialArea"),
 
                                 residentialAreaId = if (benDataObj.has("residentialAreaId"))
                                     benDataObj.optInt("residentialAreaId")
+                                else if (demographicsObj.has("residentialAreaId"))
+                                    demographicsObj.optInt("residentialAreaId")
+                                else if (jsonObject.has("residentialAreaId"))
+                                    jsonObject.optInt("residentialAreaId")
                                 else null,
 
                                 otherResidentialArea = benDataObj.optStringOrNull("otherResidentialArea")
-                                    ?: benDataObj.optStringOrNull("other_residentialArea"),
+                                    ?: benDataObj.optStringOrNull("other_residentialArea")
+                                    ?: demographicsObj.optStringOrNull("otherResidentialArea")
+                                    ?: demographicsObj.optStringOrNull("other_residentialArea")
+                                    ?: jsonObject.optStringOrNull("otherResidentialArea")
+                                    ?: jsonObject.optStringOrNull("other_residentialArea"),
 
                                 latitude = benDataObj.optDouble("latitude", 0.0),
                                 longitude = benDataObj.optDouble("longitude", 0.0),
