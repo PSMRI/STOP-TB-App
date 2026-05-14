@@ -52,6 +52,8 @@
         <item name="nbr_gender_1">पुरुष</item>
         <item name="nbr_gender_2">महिला</item>
         <item name="nbr_gender_3">ट्रांसजेंडर</item>
+        <item name="nbr_gender_4">बताना पसंद नहीं है</item>
+
     </string-array>
 
     <string-array name="nbr_reproductive_status_array1">

@@ -71,6 +71,7 @@
         <item name="nbr_gender_1">পুৰুষ</item>
         <item name="nbr_gender_2">মহিলা</item>
         <item name="nbr_gender_3">ট্ৰান্সজেন্ডাৰ</item>
+        <item name="nbr_gender_4">ক\'বলৈ ইচ্ছা নাই</item>
     </string-array>
 
     <string-array name="nbr_reproductive_status_array1">

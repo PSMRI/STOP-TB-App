@@ -156,10 +156,10 @@ class TBConfirmedDataset(
 
     private val reasonForDeath = FormElement(
         id = 13,
-        inputType = InputType.TEXT_VIEW,
+        inputType = InputType.EDIT_TEXT,
         title = resources.getString(R.string.reason_for_death),
         required = false,
-        isEnabled = true
+        isEnabled = false
     )
 
     private val reasonForNotCompleting = FormElement(
