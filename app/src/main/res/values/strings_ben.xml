@@ -10,7 +10,7 @@
     <string name="other_enter_religion">Other - Enter Religion</string>
     <string name="has_aadhaar_number">Has Aadhaar Number</string>
     <string name="enter_aadhaar_number_ben">Enter Aadhaar Number</string>
-    <string name="reproductive_status">Are you pregnant</string>
+    <string name="reproductive_status">Are you pregnant?</string>
 
     <string name="birth_certificate_number">Birth Certificate No.</string>
     <string name="beneficiary_details">Beneficiary Details</string>
