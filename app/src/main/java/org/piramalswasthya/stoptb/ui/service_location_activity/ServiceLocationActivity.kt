@@ -155,13 +155,14 @@ class ServiceLocationActivity : AppCompatActivity() {
                             }
                         }
                         binding.actvVillageDropdown.apply {
-                            setText(viewModel.selectedVillageName)
                             if (viewModel.villageList.size == 1) {
                                 setText(viewModel.villageList.first())
                                 viewModel.setVillage(0)
+                            } else {
+                                setText(viewModel.selectedVillageName.orEmpty())
                             }
-                            setOnItemClickListener { _, _, i, _ ->
-                                viewModel.setVillage(i)
+                            setOnItemClickListener { _, _, position, _ ->
+                                viewModel.setVillage(position)
                             }
                         }
                     }
