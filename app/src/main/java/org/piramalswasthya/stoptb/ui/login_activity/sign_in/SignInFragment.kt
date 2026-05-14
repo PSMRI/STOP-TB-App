@@ -111,6 +111,12 @@ class SignInFragment : Fragment() {
 
         NoCopyPasteHelper.disableCopyPaste(binding.etPassword)
         NoCopyPasteHelper.disableCopyPaste(binding.etUsername)
+        binding.etUsername.isEnabled = true
+        binding.etUsername.isFocusable = true
+        binding.etUsername.isFocusableInTouchMode = true
+        binding.etPassword.isEnabled = true
+        binding.etPassword.isFocusable = true
+        binding.etPassword.isFocusableInTouchMode = true
         binding.rbAssamese.visibility = View.GONE
 
         return binding.root
@@ -248,11 +254,11 @@ class SignInFragment : Fragment() {
                         binding.etUsername.setText(it)
                         hasRememberMeUsername = true
                     }
-                    viewModel.fetchRememberedPassword()?.let {
+                    viewModel.fetchRememberedPassword()?.takeIf { it.isNotEmpty() }?.let {
                         binding.etPassword.setText(it)
-                        binding.cbRemember.isChecked = true
                         hasRememberMePassword = true
-                    }
+                    } ?: binding.etPassword.text?.clear()
+                    binding.cbRemember.isChecked = hasRememberMeUsername
                     if (hasRememberMeUsername && hasRememberMePassword && !viewModel.isCampModeEnabled()) {
                         validateInput()
                     }

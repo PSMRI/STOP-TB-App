@@ -171,11 +171,18 @@ class SignInViewModel @Inject constructor(
      */
     fun logout() {
         viewModelScope.launch {
+            val rememberedUser = pref.getRememberedUserName()
+            val rememberedPwd = pref.getRememberedPassword()
+            val restoreUsernameOnly =
+                !rememberedUser.isNullOrBlank() && !rememberedPwd.isNullOrBlank()
             withContext(Dispatchers.IO) {
                 database.clearAllTables()
             }
             pref.deleteForLogout()
             pref.setLastSyncedTimeStamp(Konstants.defaultTimeStamp)
+            if (restoreUsernameOnly) {
+                pref.setRememberedUsernameOnly(rememberedUser!!.trim())
+            }
             _loggedInUser.value = null
             Thread.sleep(2000)
             _logoutComplete.value = true
