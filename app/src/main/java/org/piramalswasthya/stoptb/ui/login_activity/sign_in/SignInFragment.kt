@@ -166,12 +166,12 @@ class SignInFragment : Fragment() {
 
         refreshCampModeUi()
 
-        binding.cbCampMode?.setOnCheckedChangeListener { _, isChecked ->
+        binding.cbCampMode.setOnCheckedChangeListener { _, isChecked ->
             if (suppressCampModeListener) return@setOnCheckedChangeListener
 
             if (isChecked) {
                 suppressCampModeListener = true
-                binding.cbCampMode?.isChecked = false
+                binding.cbCampMode.isChecked = false
                 suppressCampModeListener = false
                 findNavController().navigate(R.id.action_signInFragment_to_campModeConnectFragment)
                 return@setOnCheckedChangeListener
@@ -181,7 +181,7 @@ class SignInFragment : Fragment() {
             refreshCampModeUi()
         }
 
-        binding.btnCampRetry?.setOnClickListener {
+        binding.btnCampRetry.setOnClickListener {
             findNavController().navigate(R.id.action_signInFragment_to_campModeConnectFragment)
         }
 
@@ -263,13 +263,12 @@ class SignInFragment : Fragment() {
                     binding.pbSignIn.visibility = View.GONE
                     binding.clContent.visibility = View.VISIBLE
                     clearLoginFieldErrors()
-                    val msg = state.message.orEmpty()
-                    when {
-                        msg == getString(R.string.error_login_invalid_password) -> {
+                    when (val msg = state.message.orEmpty()) {
+                        getString(R.string.error_login_invalid_password) -> {
                             binding.tilPassword.error = msg
                             binding.tvError.visibility = View.GONE
                         }
-                        msg == getString(R.string.error_sign_in_invalid_u_p) -> {
+                        getString(R.string.error_sign_in_invalid_u_p) -> {
                             binding.tilUsername.error = msg
                             binding.tilPassword.error = msg
                             binding.tvError.visibility = View.GONE
@@ -366,9 +365,9 @@ class SignInFragment : Fragment() {
     private fun refreshCampModeUi() {
         val isCampEnabled = viewModel.isCampModeEnabled()
         suppressCampModeListener = true
-        binding.cbCampMode?.isChecked = isCampEnabled
+        binding.cbCampMode.isChecked = isCampEnabled
         suppressCampModeListener = false
-        binding.llCampStatus?.visibility = if (isCampEnabled) View.VISIBLE else View.GONE
+        binding.llCampStatus.visibility = if (isCampEnabled) View.VISIBLE else View.GONE
         if (isCampEnabled && viewModel.isCampHubConnected()) {
             updateCampHubStatus(CampHubStatus.CONNECTED)
         } else if (isCampEnabled) {
@@ -381,23 +380,23 @@ class SignInFragment : Fragment() {
     private fun updateCampHubStatus(status: CampHubStatus) {
         when (status) {
             CampHubStatus.IDLE -> {
-                binding.tvCampStatus?.text = getString(R.string.camp_hub_not_connected)
-                binding.tvCampStatus?.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_theme_light_onSurfaceVariant))
+                binding.tvCampStatus.text = getString(R.string.camp_hub_not_connected)
+                binding.tvCampStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_theme_light_onSurfaceVariant))
                 binding.btnLogin.isEnabled = true
             }
             CampHubStatus.CHECKING -> {
-                binding.tvCampStatus?.text = getString(R.string.camp_hub_checking)
-                binding.tvCampStatus?.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_theme_light_onSurfaceVariant))
+                binding.tvCampStatus.text = getString(R.string.camp_hub_checking)
+                binding.tvCampStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_theme_light_onSurfaceVariant))
                 binding.btnLogin.isEnabled = false
             }
             CampHubStatus.CONNECTED -> {
-                binding.tvCampStatus?.text = getString(R.string.camp_hub_connected)
-                binding.tvCampStatus?.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_theme_light_primary))
+                binding.tvCampStatus.text = getString(R.string.camp_hub_connected)
+                binding.tvCampStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_theme_light_primary))
                 binding.btnLogin.isEnabled = true
             }
             CampHubStatus.NOT_CONNECTED -> {
-                binding.tvCampStatus?.text = getString(R.string.camp_hub_not_connected)
-                binding.tvCampStatus?.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.holo_red_dark))
+                binding.tvCampStatus.text = getString(R.string.camp_hub_not_connected)
+                binding.tvCampStatus.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.holo_red_dark))
                 binding.btnLogin.isEnabled = !viewModel.isCampModeEnabled()
             }
         }
@@ -458,13 +457,9 @@ class SignInFragment : Fragment() {
             if (loggedInUser.userName.equals(username.trim(), true)) {
                 if (loggedInUser.password == password) {
                     if(isInternetAvailable(requireActivity())){
-                        if (loggedInUser == null){
-                            viewModel.authUser(username, password)
-                        }else{
-                            lifecycleScope.launch {
-                                migrateLegacySessionIfNeeded()
-                                viewModel.updateState(NetworkResponse.Success(loggedInUser))
-                            }
+                        lifecycleScope.launch {
+                            migrateLegacySessionIfNeeded()
+                            viewModel.updateState(NetworkResponse.Success(loggedInUser))
                         }
                     }else{
                         viewModel.updateState(NetworkResponse.Success(loggedInUser))

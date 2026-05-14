@@ -12,6 +12,7 @@ import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.SyncDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.MyContextWrapper
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.SyncStatusCache
 import org.piramalswasthya.stoptb.model.LocationEntity
@@ -41,6 +42,11 @@ class UserRepo @Inject constructor(
     private val selectedVillage get() = preferenceDao.getLocationRecord()?.village?.id ?: 0
     val unProcessedRecordCount: Flow<List<SyncStatusCache>> get() = syncDao.getSyncStatus(selectedVillage)
 
+    /** Same locale as login/home (prefs); [ApplicationContext] alone stays English on many devices. */
+    private fun userMessageContext(): Context =
+        MyContextWrapper.updateBaseContextLocale(preferenceDao.getCurrentLanguage().symbol, appContext)
+            ?: appContext
+
 
 
     suspend fun authenticateUser(userName: String, password: String): NetworkResponse<User?> {
@@ -51,24 +57,24 @@ class UserRepo @Inject constructor(
                 return@withContext NetworkResponse.Success(user)
             } catch (se: SocketTimeoutException) {
                 return@withContext NetworkResponse.Error(
-                    message = appContext.getString(R.string.error_sign_in_timeout)
+                    message = userMessageContext().getString(R.string.error_sign_in_timeout)
                 )
             } catch (se: HttpException) {
                 return@withContext when (se.code()) {
                     401 -> NetworkResponse.Error(
-                        message = appContext.getString(R.string.error_sign_in_invalid_u_p)
+                        message = userMessageContext().getString(R.string.error_sign_in_invalid_u_p)
                     )
                     else -> NetworkResponse.Error(
-                        message = appContext.getString(R.string.error_login_unable_to_reach_server)
+                        message = userMessageContext().getString(R.string.error_login_unable_to_reach_server)
                     )
                 }
             } catch (ce: ConnectException) {
                 return@withContext NetworkResponse.Error(
-                    message = appContext.getString(R.string.error_login_server_refused)
+                    message = userMessageContext().getString(R.string.error_login_server_refused)
                 )
             } catch (ue: UnknownHostException) {
                 return@withContext NetworkResponse.Error(
-                    message = appContext.getString(R.string.error_login_unable_to_reach_server)
+                    message = userMessageContext().getString(R.string.error_login_unable_to_reach_server)
                 )
             } catch (ie: Exception) {
                 return@withContext NetworkResponse.Error(message = localizedAuthExceptionMessage(ie))
@@ -84,19 +90,19 @@ class UserRepo @Inject constructor(
                 return@withContext NetworkResponse.Success(user)
             } catch (se: SocketTimeoutException) {
                 return@withContext NetworkResponse.Error(
-                    message = appContext.getString(R.string.error_sign_in_timeout)
+                    message = userMessageContext().getString(R.string.error_sign_in_timeout)
                 )
             } catch (se: HttpException) {
                 return@withContext NetworkResponse.Error(
-                    message = appContext.getString(R.string.error_login_unable_to_reach_server)
+                    message = userMessageContext().getString(R.string.error_login_unable_to_reach_server)
                 )
             } catch (ce: ConnectException) {
                 return@withContext NetworkResponse.Error(
-                    message = appContext.getString(R.string.error_login_server_refused)
+                    message = userMessageContext().getString(R.string.error_login_server_refused)
                 )
             } catch (ue: UnknownHostException) {
                 return@withContext NetworkResponse.Error(
-                    message = appContext.getString(R.string.error_login_unable_to_reach_server)
+                    message = userMessageContext().getString(R.string.error_login_unable_to_reach_server)
                 )
             } catch (ie: Exception) {
                 return@withContext NetworkResponse.Error(message = localizedAuthExceptionMessage(ie))
@@ -106,18 +112,7 @@ class UserRepo @Inject constructor(
 
     private suspend fun setUserRole(userId: Int, password: String, subCentre: String?): User {
         val response = amritApiService.getUserDetailsById(userId = userId)
-        Timber.d(
-            "Login user details response: role=${response.data.roleName}, " +
-                    "tuId=${response.data.tuId}, tuName=${response.data.tuName}, " +
-                    "healthFacilityId=${response.data.healthFacilityId}, " +
-                    "healthFacilityName=${response.data.healthFacilityName}"
-        )
         val user = response.data.toUser(password, subCentre)
-        Timber.d(
-            "Login mapped locations: tuCount=${user.tus.orEmpty().size}, " +
-                    "healthFacilityCount=${user.healthFacilities.orEmpty().size}, " +
-                    "villageCount=${user.villages.size}"
-        )
         preferenceDao.registerUser(user)
         // Auto-set location if user has exactly one village (common for ASHA workers)
         if (user.villages.size == 1) {
@@ -253,11 +248,11 @@ class UserRepo @Inject constructor(
     private fun localizedAuthExceptionMessage(ie: Exception): String {
         return when (ie.message) {
             "Invalid username / password",
-            "Invalid Username/password" -> appContext.getString(R.string.error_sign_in_invalid_u_p)
+            "Invalid Username/password" -> userMessageContext().getString(R.string.error_sign_in_invalid_u_p)
 
-            "Login failed" -> appContext.getString(R.string.error_login_failed)
+            "Login failed" -> userMessageContext().getString(R.string.error_login_failed)
             else -> ie.message?.takeIf { it.isNotBlank() }
-                ?: appContext.getString(R.string.error_login_generic)
+                ?: userMessageContext().getString(R.string.error_login_generic)
         }
     }
 
