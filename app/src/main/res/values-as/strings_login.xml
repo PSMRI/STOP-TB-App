@@ -10,6 +10,14 @@
     <string name="text_assamese" translatable="false">অসমীয়া</string>
     <string name="til_username_hint_text">ব্যৱহাৰকাৰীৰ নাম</string>
     <string name="til_password_hint_text">পাছৱৰ্ড</string>
+    <string name="error_login_username_required">ব্যৱহাৰকাৰীৰ নাম প্ৰয়োজন</string>
+    <string name="error_login_password_required">পাছৱৰ্ড প্ৰয়োজন</string>
+    <string name="error_login_failed">লগইন বিফল। অনুগ্ৰহ কৰি পুনৰ চেষ্টা কৰক।</string>
+    <string name="error_login_unable_to_reach_server">চাৰ্ভাৰৰ সৈতে সংযোগ কৰিব পৰা নাই।</string>
+    <string name="error_login_server_refused">চাৰ্ভাৰে সংযোগ অগ্ৰাহ্য কৰিলে।</string>
+    <string name="error_login_generic">কিবা ভুল হ\'ল। অনুগ্ৰহ কৰি পিছত পুনৰ চেষ্টা কৰক।</string>
+    <string name="error_login_invalid_password">অবৈধ পাছৱৰ্ড</string>
+    <string name="error_login_role_not_allowed">লগইন বিফল: কেৱল পঞ্জীয়ন বিষয়া, নাৰ্ছ বা পৰামৰ্শ বিষয়াক অনুমতি দিয়া হয়।</string>
     <string name="cb_login_remember_me_text">মোক মনত পেলাওক</string>
     <string name="btn_login_forgot_password_text">পাচৱৰ্ড পাহৰিলে??</string>
     <string name="btn_login_text">লগইন কৰক</string>

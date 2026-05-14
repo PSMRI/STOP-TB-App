@@ -12,6 +12,14 @@
     <string name="cd_piramal" translatable="false">Piramal Logo</string>
     <string name="til_username_hint_text">Username</string>
     <string name="til_password_hint_text">Password</string>
+    <string name="error_login_username_required">Username required</string>
+    <string name="error_login_password_required">Password required</string>
+    <string name="error_login_failed">Login failed. Please try again.</string>
+    <string name="error_login_unable_to_reach_server">Unable to connect to the server.</string>
+    <string name="error_login_server_refused">Server refused connection.</string>
+    <string name="error_login_generic">Something went wrong. Please try again later.</string>
+    <string name="error_login_invalid_password">Invalid password</string>
+    <string name="error_login_role_not_allowed">Login failed: Only Registration Officer, Nurse or Counselling Officer are allowed.</string>
     <string name="cb_login_remember_me_text">Remember me</string>
     <string name="btn_login_forgot_password_text">Forgot Password?</string>
     <string name="btn_login_text">Login</string>

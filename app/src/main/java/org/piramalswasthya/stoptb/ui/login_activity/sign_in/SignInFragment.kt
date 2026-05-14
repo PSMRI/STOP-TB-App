@@ -41,6 +41,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.updatePadding
+import androidx.core.widget.doOnTextChanged
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.ui.login_activity.sign_in.SignInViewModel.CampHubStatus
 import org.piramalswasthya.stoptb.utils.RoleConstants
@@ -134,6 +135,14 @@ class SignInFragment : Fragment() {
             insets
         }
         ViewCompat.requestApplyInsets(binding.root)
+
+        binding.etUsername.doOnTextChanged { _, _, _, _ ->
+            binding.tilUsername.error = null
+        }
+        binding.etPassword.doOnTextChanged { _, _, _, _ ->
+            binding.tilPassword.error = null
+        }
+
         binding.btnLogin.setOnClickListener {
             view.findFocus()?.let { view ->
                 val imm =
@@ -144,6 +153,12 @@ class SignInFragment : Fragment() {
                 binding.tvError.text = getString(R.string.camp_hub_login_blocked)
                 binding.tvError.visibility = View.VISIBLE
                 viewModel.checkCampHubConnection()
+                return@setOnClickListener
+            }
+            val username = binding.etUsername.text.toString()
+            val password = binding.etPassword.text.toString()
+            if (!applyLoginEmptyFieldErrors(username, password)) {
+                binding.tvError.visibility = View.GONE
                 return@setOnClickListener
             }
             viewModel.loginInClicked()
@@ -226,6 +241,7 @@ class SignInFragment : Fragment() {
                 is NetworkResponse.Idle -> {
                     binding.clContent.visibility = View.VISIBLE
                     binding.pbSignIn.visibility = View.INVISIBLE
+                    clearLoginFieldErrors()
                     var hasRememberMeUsername = false
                     var hasRememberMePassword = false
                     viewModel.fetchRememberedUserName()?.let {
@@ -246,8 +262,23 @@ class SignInFragment : Fragment() {
                 is NetworkResponse.Error -> {
                     binding.pbSignIn.visibility = View.GONE
                     binding.clContent.visibility = View.VISIBLE
-                    binding.tvError.text = state.message
-                    binding.tvError.visibility = View.VISIBLE
+                    clearLoginFieldErrors()
+                    val msg = state.message.orEmpty()
+                    when {
+                        msg == getString(R.string.error_login_invalid_password) -> {
+                            binding.tilPassword.error = msg
+                            binding.tvError.visibility = View.GONE
+                        }
+                        msg == getString(R.string.error_sign_in_invalid_u_p) -> {
+                            binding.tilUsername.error = msg
+                            binding.tilPassword.error = msg
+                            binding.tvError.visibility = View.GONE
+                        }
+                        else -> {
+                            binding.tvError.text = state.message
+                            binding.tvError.visibility = View.VISIBLE
+                        }
+                    }
                 }
 
 //                is NetworkResponse.Success -> {
@@ -285,6 +316,7 @@ class SignInFragment : Fragment() {
                         binding.clContent.visibility = View.INVISIBLE
                         binding.pbSignIn.visibility = View.VISIBLE
                         binding.tvError.visibility = View.GONE
+                        clearLoginFieldErrors()
 
                         activity?.finish()
                         startActivity(Intent(requireContext(), VolunteerActivity::class.java))
@@ -293,8 +325,8 @@ class SignInFragment : Fragment() {
                         // ❌ Non-volunteer block
                         binding.pbSignIn.visibility = View.GONE
                         binding.clContent.visibility = View.VISIBLE
-                        binding.tvError.text =
-                            "Login Failed: Only Registration Officer, Nurse or Counselling Officer allowed"
+                        clearLoginFieldErrors()
+                        binding.tvError.text = getString(R.string.error_login_role_not_allowed)
                         binding.tvError.visibility = View.VISIBLE
                     }
                 }
@@ -371,6 +403,22 @@ class SignInFragment : Fragment() {
         }
     }
 
+    private fun clearLoginFieldErrors() {
+        binding.tilUsername.error = null
+        binding.tilPassword.error = null
+    }
+
+    /** @return true if username and password are both present */
+    private fun applyLoginEmptyFieldErrors(username: String, password: String): Boolean {
+        clearLoginFieldErrors()
+        val usernameMissing = username.trim().isEmpty()
+        val passwordMissing = password.isEmpty()
+        if (!usernameMissing && !passwordMissing) return true
+        if (usernameMissing) binding.tilUsername.error = getString(R.string.error_login_username_required)
+        if (passwordMissing) binding.tilPassword.error = getString(R.string.error_login_password_required)
+        return false
+    }
+
     /**
      * get username and password
      * validate with existing logged in user if exists else call login api
@@ -380,6 +428,14 @@ class SignInFragment : Fragment() {
         binding.pbSignIn.visibility = View.VISIBLE
         val username = binding.etUsername.text.toString()
         val password = binding.etPassword.text.toString()
+
+        if (!applyLoginEmptyFieldErrors(username, password)) {
+            binding.pbSignIn.visibility = View.GONE
+            binding.clContent.visibility = View.VISIBLE
+            binding.tvError.visibility = View.GONE
+            viewModel.updateState(NetworkResponse.Idle())
+            return
+        }
 
         if (viewModel.isCampModeEnabled()) {
             if (viewModel.isCampHubConnected()) {
@@ -414,7 +470,9 @@ class SignInFragment : Fragment() {
                         viewModel.updateState(NetworkResponse.Success(loggedInUser))
                     }
                 } else {
-                    viewModel.updateState(NetworkResponse.Error("Invalid Password"))
+                    viewModel.updateState(
+                        NetworkResponse.Error(getString(R.string.error_login_invalid_password))
+                    )
                 }
             } else {
                 userChangeAlert.setCanceledOnTouchOutside(false)

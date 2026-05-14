@@ -1,9 +1,12 @@
 package org.piramalswasthya.stoptb.repositories
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.crypt.CryptoUtil
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
@@ -31,7 +34,8 @@ class UserRepo @Inject constructor(
     private val db: InAppDb,
     private val preferenceDao: PreferenceDao,
     private val syncDao: SyncDao,
-    private val amritApiService: AmritApiService
+    private val amritApiService: AmritApiService,
+    @ApplicationContext private val appContext: Context,
 ) {
 
     private val selectedVillage get() = preferenceDao.getLocationRecord()?.village?.id ?: 0
@@ -46,23 +50,28 @@ class UserRepo @Inject constructor(
                 val user = setUserRole(authData.userId, password, authData.subCentre)
                 return@withContext NetworkResponse.Success(user)
             } catch (se: SocketTimeoutException) {
-                return@withContext NetworkResponse.Error(message = "Server timed out !")
+                return@withContext NetworkResponse.Error(
+                    message = appContext.getString(R.string.error_sign_in_timeout)
+                )
             } catch (se: HttpException) {
                 return@withContext when (se.code()) {
-                    401 -> NetworkResponse.Error(message = "Unauthorized: Invalid credentials")
-                    else -> NetworkResponse.Error(message = "Unable to connect to server!")
+                    401 -> NetworkResponse.Error(
+                        message = appContext.getString(R.string.error_sign_in_invalid_u_p)
+                    )
+                    else -> NetworkResponse.Error(
+                        message = appContext.getString(R.string.error_login_unable_to_reach_server)
+                    )
                 }
-                // return@withContext NetworkResponse.Error(message = "Unable to connect to server !")
             } catch (ce: ConnectException) {
-                return@withContext NetworkResponse.Error(message = "Server refused connection !")
+                return@withContext NetworkResponse.Error(
+                    message = appContext.getString(R.string.error_login_server_refused)
+                )
             } catch (ue: UnknownHostException) {
-                return@withContext NetworkResponse.Error(message = "Unable to connect to server !")
+                return@withContext NetworkResponse.Error(
+                    message = appContext.getString(R.string.error_login_unable_to_reach_server)
+                )
             } catch (ie: Exception) {
-                if (ie.message == "Invalid username / password")
-                    return@withContext NetworkResponse.Error(message = "Invalid Username/password")
-                else
-                    return@withContext NetworkResponse.Error(message = ie.message ?: "Something went wrong... Try again later")
-
+                return@withContext NetworkResponse.Error(message = localizedAuthExceptionMessage(ie))
             }
         }
     }
@@ -74,19 +83,23 @@ class UserRepo @Inject constructor(
                 val user = setUserRole(authData.userId, password, authData.subCentre)
                 return@withContext NetworkResponse.Success(user)
             } catch (se: SocketTimeoutException) {
-                return@withContext NetworkResponse.Error(message = "Server timed out !")
+                return@withContext NetworkResponse.Error(
+                    message = appContext.getString(R.string.error_sign_in_timeout)
+                )
             } catch (se: HttpException) {
-                return@withContext NetworkResponse.Error(message = "Unable to connect to server !")
+                return@withContext NetworkResponse.Error(
+                    message = appContext.getString(R.string.error_login_unable_to_reach_server)
+                )
             } catch (ce: ConnectException) {
-                return@withContext NetworkResponse.Error(message = "Server refused connection !")
+                return@withContext NetworkResponse.Error(
+                    message = appContext.getString(R.string.error_login_server_refused)
+                )
             } catch (ue: UnknownHostException) {
-                return@withContext NetworkResponse.Error(message = "Unable to connect to server !")
+                return@withContext NetworkResponse.Error(
+                    message = appContext.getString(R.string.error_login_unable_to_reach_server)
+                )
             } catch (ie: Exception) {
-                if (ie.message == "Invalid username / password")
-                    return@withContext NetworkResponse.Error(message = "Invalid Username/password")
-                else
-                    return@withContext NetworkResponse.Error(message = ie.message ?: "Something went wrong... Try again later")
-
+                return@withContext NetworkResponse.Error(message = localizedAuthExceptionMessage(ie))
             }
         }
     }
@@ -234,6 +247,17 @@ class UserRepo @Inject constructor(
             preferenceDao.registerAmritToken(token)
             preferenceDao.lastAmritTokenFetchTimestamp = System.currentTimeMillis()
             return@withContext AuthUserData(userId, subCentre)
+        }
+    }
+
+    private fun localizedAuthExceptionMessage(ie: Exception): String {
+        return when (ie.message) {
+            "Invalid username / password",
+            "Invalid Username/password" -> appContext.getString(R.string.error_sign_in_invalid_u_p)
+
+            "Login failed" -> appContext.getString(R.string.error_login_failed)
+            else -> ie.message?.takeIf { it.isNotBlank() }
+                ?: appContext.getString(R.string.error_login_generic)
         }
     }
 
