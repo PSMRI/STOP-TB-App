@@ -119,8 +119,10 @@ interface TBDao {
         AND (:endTime = 0 OR ts.visitDate <= :endTime)
         AND (:gender = '' OR UPPER(COALESCE(b.gender, '')) = UPPER(:gender))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+        AND (:isSeniorCitizen  = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
     """)
-    fun getDashboardTbScreeningCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>
+    fun getDashboardTbScreeningCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int,    isSeniorCitizen: Int
+    ): Flow<Int>
 
     // Dashboard queries - TB Suspected count by gender with time + village filter
     @Query("""
@@ -131,8 +133,9 @@ interface TBDao {
         AND (:endTime = 0 OR ts.visitDate <= :endTime)
         AND (:gender = '' OR UPPER(COALESCE(b.gender, '')) = UPPER(:gender))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+        AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >=60))
     """)
-    fun getDashboardTbSuspectedCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>
+    fun getDashboardTbSuspectedCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int,isSeniorCitizen: Int): Flow<Int>
 
     // Dashboard queries - TB Confirmed count by gender with time + village filter
     @Query("""
@@ -144,8 +147,9 @@ interface TBDao {
         AND (:endTime = 0 OR ts.visitDate <= :endTime)
         AND (:gender = '' OR UPPER(COALESCE(b.gender, '')) = UPPER(:gender))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+        AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
     """)
-    fun getDashboardTbConfirmedCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>
+    fun getDashboardTbConfirmedCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int): Flow<Int>
 
     // NIKSHAY IDs count with time + village filter
     @Query("""
@@ -167,8 +171,9 @@ interface TBDao {
         AND (:endTime = 0 OR ts.visitDate <= :endTime)
         AND (:gender = '' OR UPPER(COALESCE(b.gender, '')) = UPPER(:gender))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+        AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
     """)
-    fun getDashboardDigitalChestXRayCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>
+    fun getDashboardDigitalChestXRayCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int): Flow<Int>
 
     @Query("""
         SELECT COUNT(*) FROM TB_SUSPECTED ts
@@ -179,8 +184,9 @@ interface TBDao {
         AND (:endTime = 0 OR ts.visitDate <= :endTime)
         AND (:gender = '' OR UPPER(COALESCE(b.gender, '')) = UPPER(:gender))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+        AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
     """)
-    fun getDashboardSputumCollectionCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>
+    fun getDashboardSputumCollectionCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int): Flow<Int>
 
     @Query("""
         SELECT COUNT(*) FROM TB_SUSPECTED ts
@@ -191,8 +197,10 @@ interface TBDao {
         AND (:endTime = 0 OR ts.visitDate <= :endTime)
         AND (:gender = '' OR UPPER(COALESCE(b.gender, '')) = UPPER(:gender))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+                AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
+
     """)
-    fun getDashboardTrueNatCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>
+    fun getDashboardTrueNatCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int): Flow<Int>
 
     @Query("""
         SELECT COUNT(*) FROM TB_SUSPECTED ts
@@ -203,8 +211,10 @@ interface TBDao {
         AND (:endTime = 0 OR ts.visitDate <= :endTime)
         AND (:gender = '' OR UPPER(COALESCE(b.gender, '')) = UPPER(:gender))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+                        AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
+
     """)
-    fun getDashboardLiquidCultureCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>
+    fun getDashboardLiquidCultureCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int,isSeniorCitizen: Int): Flow<Int>
 
     @Query("""
         SELECT COUNT(*) FROM NCD_REFER nr
@@ -215,6 +225,8 @@ interface TBDao {
         AND (:endTime = 0 OR nr.revisitDate <= :endTime)
         AND (:gender = '' OR UPPER(COALESCE(b.gender, '')) = UPPER(:gender))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+                        AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
+
     """)
-    fun getDashboardHwcReferralCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int): Flow<Int>
+    fun getDashboardHwcReferralCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int,isSeniorCitizen: Int): Flow<Int>
 }

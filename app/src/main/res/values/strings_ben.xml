@@ -6,6 +6,7 @@
     <string name="relation_with_family_head">Relation with Family Head</string>
     <string name="other_enter_relation_to_head">Other - Enter relation to head</string>
     <string name="community">Community</string>
+    <string name="caste">Caste</string>
     <string name="religion">Religion</string>
     <string name="other_enter_religion">Other - Enter Religion</string>
     <string name="has_aadhaar_number">Has Aadhaar Number</string>
@@ -309,6 +310,23 @@ personal health profile.</string>
         <item>Other</item>
         <item>Not disclosed</item>
     </string-array>
+
+
+    <string-array name="occupation_array">
+        <item>Unknown</item>
+        <item>Student</item>
+        <item>Unemployed</item>
+        <item>Homemaker</item>
+        <item>Farmer</item>
+        <item>Laborer / Daily Wage Worker</item>
+        <item>Self-employed / Business</item>
+        <item>Government Employee</item>
+        <item>Private Employee</item>
+        <item>Health Care Worker</item>
+        <item>Retired / Pensioner</item>
+        <item>Other</item>
+    </string-array>
+
 
     <string-array name="yes_no_donno">
         <item>Yes</item>

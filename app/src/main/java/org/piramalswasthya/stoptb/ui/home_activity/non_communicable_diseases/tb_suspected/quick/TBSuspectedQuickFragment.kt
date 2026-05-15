@@ -125,14 +125,23 @@ class TBSuspectedQuickFragment : Fragment() {
         super.onStart()
         activity?.let {
             when (it) {
+//                is HomeActivity -> it.updateActionBar(
+//                    R.drawable.ic__ncd,
+//                    getString(R.string.tb_suspected_quick_title)
+//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+//                is VolunteerActivity -> it.updateActionBar(
+//                    R.drawable.ic__ncd,
+//                    getString(R.string.tb_suspected_quick_title)
+//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+
                 is HomeActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.tb_suspected_quick_title)
-                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+                )
                 is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.tb_suspected_quick_title)
-                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+                )
             }
         }
     }

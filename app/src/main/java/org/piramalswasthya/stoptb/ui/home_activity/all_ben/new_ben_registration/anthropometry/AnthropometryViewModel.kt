@@ -56,6 +56,7 @@ class AnthropometryViewModel @Inject constructor(
                 _benName.value = listOfNotNull(ben.firstName, ben.lastName).joinToString(" ")
                 _benAgeGender.value = "${ben.age} ${ben.ageUnit?.name} | ${ben.gender?.name}"
                 _existingAnthropometry.value = ben
+
             }
         }
     }
@@ -73,6 +74,8 @@ class AnthropometryViewModel @Inject constructor(
         heightCm: String?,
         temperatureF: String?
     ) {
+
+
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 try {
@@ -101,6 +104,8 @@ class AnthropometryViewModel @Inject constructor(
                         }
                     }
                     _state.postValue(State.SAVE_SUCCESS)
+
+
                 } catch (e: Exception) {
                     Timber.e(e, "Saving anthropometry failed for benId=%s", benId)
                     _state.postValue(State.SAVE_FAILED)

@@ -289,7 +289,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     // 12. Community
     private val community = FormElement(
         id = 17, inputType = DROPDOWN,
-        title = resources.getString(R.string.community),
+        title = resources.getString(R.string.caste),
         arrayId = R.array.community_array,
         entries = resources.getStringArray(R.array.community_array), required = false
     )
@@ -354,6 +354,16 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
     )
 
+
+
+    val occupationDrop = FormElement(
+        id = 18, inputType = DROPDOWN,
+        title = resources.getString(R.string.nbr_occupation),
+        arrayId = R.array.occupation_array,
+        entries = resources.getStringArray(R.array.occupation_array),
+        required = true, hasDependants = true
+    )
+
     // 18. RCH ID
     val rchId = FormElement(
         id = 23, inputType = EDIT_TEXT,
@@ -402,9 +412,11 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             motherName,
             community,
             religion,
-            economicStatus,
+
             residentialAreaType,
-            occupation,
+           // occupation,
+            occupationDrop,
+            economicStatus,
         )
 
         this.familyHeadPhoneNo = familyHeadPhoneNo?.toString()
@@ -433,7 +445,12 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         subCentre.entries = arrayOf(resolvedSubCentre)
         subCentre.value = resolvedSubCentre
         this.villageEntities = villageEntityList
-        if (occupation.value == null) occupation.value = resources.getString(R.string.nbr_occupation_default)
+//        if (occupation.value == null) occupation.value = resources.getString(R.string.nbr_occupation_default)
+
+        if (occupationDrop.entries?.isNotEmpty() == true) {
+            occupationDrop.value = occupationDrop.entries?.get(0)
+            occupation.value = occupationDrop.value
+        }
 
         ben?.takeIf { !it.isDraft }?.let { saved ->
             // Beneficiary Status (death)
@@ -525,7 +542,11 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             residentialAreaType.value = residentialAreaType.getStringFromPosition(saved.residentialAreaId ?: 0)
             otherResidentialAreaType.value = saved.otherResidentialArea
 
-            if (!saved.occupation.isNullOrEmpty() && saved.occupation != "unknown") occupation.value = saved.occupation
+//            if (!saved.occupation.isNullOrEmpty() && saved.occupation != "unknown") occupation.value = saved.occupation
+
+            if (!saved.occupation.isNullOrEmpty() && saved.occupation != "unknown") {
+                occupationDrop.value = saved.occupation
+            }
 
             reproductiveStatus.value = saved.genDetails?.reproductiveStatus?.let {
                 normalizeReproductiveStatusForDisplay(it)
@@ -1144,12 +1165,16 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
             val dobMillis = sdf.parse(dob ?: return false)?.time ?: return false
             getAgeFromDob(dobMillis) in 15..49
-        } catch (e: Exception) { false }
+        } catch (e: Exception) {
+            false
+        }
     }
 
     private fun getMinDateFromRegistration(registrationDate: String): Long {
         return try {
             SimpleDateFormat("dd-MM-yyyy", Locale.US).parse(registrationDate)?.time ?: 0L
-        } catch (e: Exception) { 0L }
+        } catch (e: Exception) {
+            0L
+        }
     }
 }

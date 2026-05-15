@@ -132,12 +132,24 @@ class AbhaIdActivity : AppCompatActivity() {
             }
         }
     }
+//
+//    fun updateActionBar(logoResource: Int, title: String? = null) {
+//        title?.let {
+//            binding.toolbar.title = null
+//            binding.tvToolbarAbha.text = it
+//
+//        }
+//    }
+
 
     fun updateActionBar(logoResource: Int, title: String? = null) {
-        title?.let {
-            binding.toolbar.title = null
-            binding.tvToolbarAbha.text = it
-        }
+
+        // Hide default toolbar title near back arrowsetupWithNavController
+        binding.toolbar.title = ""
+        supportActionBar?.setDisplayShowTitleEnabled(false)
+
+        // Show custom title
+        binding.tvToolbarAbha.text = title ?: ""
     }
 
     private val exitAlert by lazy {
@@ -177,6 +189,12 @@ class AbhaIdActivity : AppCompatActivity() {
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(false)
         NavigationUI.setupActionBarWithNavController(this, navController)
+        // Fix toolbar title appearing beside back button
+        navController.addOnDestinationChangedListener { _, _, _ ->
+            binding.toolbar.title = ""
+            supportActionBar?.setDisplayShowTitleEnabled(false)
+        }
+
     }
 
     override fun onDestroy() {

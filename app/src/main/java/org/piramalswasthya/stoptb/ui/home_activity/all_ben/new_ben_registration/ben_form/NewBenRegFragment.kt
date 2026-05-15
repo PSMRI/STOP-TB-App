@@ -134,19 +134,7 @@ class NewBenRegFragment : Fragment() {
             }
         }
 
-        // Set action bar title once
-        activity?.let {
-            when (it) {
-                is HomeActivity -> it.updateActionBar(
-                    R.drawable.ic__ben,
-                    getString(R.string.frag_new_ben_reg_type_title)
-                )
-                is VolunteerActivity -> it.updateActionBar(
-                    R.drawable.ic__ben,
-                    getString(R.string.frag_new_ben_reg_type_title)
-                )
-            }
-        }
+
 
         // Capture geolocation silently
         captureGeolocation()
@@ -281,6 +269,14 @@ class NewBenRegFragment : Fragment() {
     // ─── onStart ───────────────────────────────────────────────────────────
     override fun onStart() {
         super.onStart()
+        activity?.let {
+            when (it) {
+                is HomeActivity -> it.updateActionBar(R.drawable.ic__ben, getString(R.string.frag_new_ben_reg_type_title))
+                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ben, getString(R.string.frag_new_ben_reg_type_title))
+            }
+        }
+
+
     }
 
     // ─── Consent popup ───────────────────────────────────────────────────

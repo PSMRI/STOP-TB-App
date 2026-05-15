@@ -27,7 +27,7 @@
     <string name="nhhr_ward_no">वार्ड नंबर</string>
     <string name="nhhr_ward_name">वार्ड का नाम</string>
     <string name="nhhr_mohalla_name">मोहल्ला का नाम</string>
-    <string name="nhhr_poverty_line">गरीबी रेखा</string>
+    <string name="nhhr_poverty_line">सामाजिक-आर्थिक स्थिति</string>
     <string-array name="nhhr_poverty_line_array">
         <item>एपीएल</item>
         <item>बीपीएल</item>
