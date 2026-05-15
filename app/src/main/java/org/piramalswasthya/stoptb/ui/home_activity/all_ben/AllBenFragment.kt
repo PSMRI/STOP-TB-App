@@ -141,6 +141,7 @@ class AllBenFragment : Fragment() {
         val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
         val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess) && !isReadOnlyReferralList
         val showCallButton = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
+        binding.llQuickRefresh.visibility = View.GONE
 
         if (showAddBeneficiary) {
             if (isReadOnlyReferralList) {

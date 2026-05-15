@@ -62,9 +62,6 @@ class IconDataset @Inject constructor(
             role.isRegistrationOfficerRole() -> iconList.removeAll {
                 it.title != resources.getString(R.string.icon_title_ben)
             }
-            role.isNurseRole() -> iconList.removeAll {
-                it.title == resources.getString(R.string.ncd_refer_list)
-            }
             role.isCounsellingOfficerRole() -> iconList.removeAll {
                 it.title != resources.getString(R.string.icon_title_ncd_tb_screening) &&
                         it.title != resources.getString(R.string.ncd_refer_list)
@@ -171,7 +168,7 @@ class IconDataset @Inject constructor(
     ).filter { icon ->
             when {
                 role.isRegistrationOfficerRole() -> false
-                role.isNurseRole() -> icon.title != tbConfirmedTitle
+                role.isNurseRole() -> true
                 role.isCounsellingOfficerRole() -> icon.title == tbConfirmedTitle
                 else -> true
             }

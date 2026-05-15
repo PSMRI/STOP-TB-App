@@ -27,9 +27,9 @@
         tools:layout="@layout/fragment_camp_mode_connect" />
     <activity
         android:id="@+id/homeActivity"
-        android:name="org.piramalswasthya.stoptb.ui.home_activity.HomeActivity"
+        android:name="org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity"
         android:label="@string/home"
-        tools:layout="@layout/activity_home_content" />
+        tools:layout="@layout/activity_volunteer" />
     <activity
         android:id="@+id/serviceLocationActivity"
         android:name="org.piramalswasthya.stoptb.ui.service_location_activity.ServiceLocationActivity"

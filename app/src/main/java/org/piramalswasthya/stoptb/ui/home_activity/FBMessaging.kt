@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 
 
 class FBMessaging : FirebaseMessagingService() {
@@ -197,7 +198,7 @@ class FBMessaging : FirebaseMessagingService() {
         senderId:Int
     ) {
 
-        val intent = Intent(applicationContext, HomeActivity::class.java)
+        val intent = Intent(applicationContext, VolunteerActivity::class.java)
 //        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
         intent.putExtra("uniqueNotificationCode", mUniqueNotificationCode)

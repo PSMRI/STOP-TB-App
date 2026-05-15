@@ -245,6 +245,7 @@
     <string name="low_birth_weight_babies">Low Birth Weight Babies</string>
     <string name="registration_date">Registration Date</string>
     <string name="beneficiary_id">Beneficiary ID</string>
+    <string name="not_available_short">N/A</string>
     <string name="rch_id">RCH ID</string>
     <string name="sync_to_local">SYNC TO LOCAL</string>
     <string name="husband_s_name">Husband\'s Name</string>
@@ -969,6 +970,12 @@
     <string name="discard_changes_message">Are you sure you want to go back? Changes will be lost.</string>
     <string name="discard">Discard</string>
     <string name="stay">Stay</string>
+    <string name="quick_refresh_not_updated">Last updated: Not yet</string>
+    <string name="quick_refresh_last_updated">Last updated: %1$s</string>
+    <string name="quick_refresh_refreshing">Refreshing beneficiary data...</string>
+    <string name="quick_refresh_failed">Refresh failed. Try again</string>
+    <string name="quick_refresh_action">Refresh</string>
+    <string name="quick_refresh_camp_disconnected">Camp Hub is not connected. Please reconnect first.</string>
 
     <string name="vital_screen">General Examination</string>
     <string name="vital_screen_placeholder">Vitals and Anthropometric for beneficiary ID: %1$d</string>
@@ -993,6 +1000,14 @@
     <string name="anthropometry_screen">Anthropometry Screen</string>
     <string name="normal_temperature_range">Normal range: 97-99&#176;F</string>
     <string name="temperature_100_or_more">&gt;= 100&#176;F</string>
+    <string name="anthropometry_age_gender_format">%1$d %2$s | %3$s</string>
+    <string name="age_unit_years">Years</string>
+    <string name="age_unit_months">Months</string>
+    <string name="age_unit_days">Days</string>
+    <string name="gender_male">Male</string>
+    <string name="gender_female">Female</string>
+    <string name="gender_transgender">Transgender</string>
+    <string name="gender_prefer_not_to_say">Prefer not to say</string>
     <string name="enter_value_between">Enter %1$s between %2$s and %3$s</string>
     <string name="pulse_rate_bpm">Pulse Rate (beats per minute)</string>
     <string name="systolic_bp_mmhg">SBP (mm Hg)</string>

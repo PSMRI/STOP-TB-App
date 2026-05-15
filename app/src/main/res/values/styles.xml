@@ -30,6 +30,15 @@
         <item name="android:windowExitAnimation">@android:anim/fade_out</item>
     </style>
 
+    <style name="AppSpinnerDatePickerDialog" parent="@android:style/Theme.Material.Light.Dialog.Alert">
+        <item name="android:datePickerStyle">@style/AppSpinnerDatePicker</item>
+    </style>
+
+    <style name="AppSpinnerDatePicker" parent="@android:style/Widget.Material.DatePicker">
+        <item name="android:datePickerMode">spinner</item>
+        <item name="android:calendarViewShown">false</item>
+    </style>
+
     <style name="cbac_rl_risk_assessment">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
@@ -105,6 +114,16 @@
         <item name="android:insetBottom">0dp</item>
         <item name="elevation">0dp</item>
         <item name="android:minHeight">52dp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="textAppearance">@style/TextAppearance.Sakhi.Button</item>
+        <item name="android:textAppearance">@style/TextAppearance.Sakhi.Button</item>
+    </style>
+
+    <style name="Widget.Sakhi.PlatformButton" parent="Widget.AppCompat.Button">
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAppearance">@style/TextAppearance.Sakhi.Button</item>
+        <item name="fontFamily">@font/roboto_bold</item>
+        <item name="android:fontFamily">@font/roboto_bold</item>
     </style>
 
     <style name="Widget.Sakhi.TextInputLayout" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
@@ -151,6 +170,12 @@
     <style name="TextAppearance.Sakhi.HomeTab" parent="TextAppearance.Material3.TitleMedium">
         <item name="android:textStyle">bold</item>
         <item name="android:textColor">@color/md_theme_light_onSurface</item>
+    </style>
+
+    <style name="TextAppearance.Sakhi.Button" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:textStyle">bold</item>
+        <item name="fontFamily">@font/roboto_bold</item>
+        <item name="android:fontFamily">@font/roboto_bold</item>
     </style>
 
     <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">

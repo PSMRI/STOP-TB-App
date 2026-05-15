@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.ui.volunteer
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -14,6 +15,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.text.HtmlCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.MenuProvider
@@ -155,6 +157,7 @@ class VolunteerActivity : AppCompatActivity() {
         setUpActionBar()
         setUpNavHeader()
         setUpMenu()
+        askForPermissions()
         binding.tvCampHubOffline.setOnClickListener {
             openCampHubConnect()
         }
@@ -185,6 +188,23 @@ class VolunteerActivity : AppCompatActivity() {
             WorkerUtils.triggerAmritPullWorker(this)
         }
         WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
+    }
+
+    private fun askForPermissions() {
+        val permissions = arrayOf(
+            Manifest.permission.CALL_PHONE,
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            Manifest.permission.INTERNET,
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.CAMERA
+        )
+
+        ActivityCompat.requestPermissions(
+            this,
+            permissions,
+            1010
+        )
     }
 
     private fun setUpMenu() {
@@ -270,7 +290,15 @@ class VolunteerActivity : AppCompatActivity() {
             true
         }
 
+        binding.navView.menu.findItem(R.id.menu_connect_camp_hub)?.setOnMenuItemClickListener {
+            binding.drawerLayout.close()
+            openCampHubConnect()
+            true
+        }
+
         // ── Create ABHA ID ───────────────────────────────────────────────
+        refreshCampHubDrawerItem()
+
         binding.navView.menu.findItem(R.id.abha_id_activity)?.setOnMenuItemClickListener {
             startActivity(Intent(this, AbhaIdActivity::class.java))
             binding.drawerLayout.close()
@@ -315,6 +343,8 @@ class VolunteerActivity : AppCompatActivity() {
 
     private fun finishAndStartServiceLocationActivity() {
         val serviceLocationActivity = Intent(this, ServiceLocationActivity::class.java)
+            .putExtra("fromVolunteer", true)
+            .putExtra(ServiceLocationActivity.EXTRA_FROM_HOME_SWITCH, true)
         finish()
         startActivity(serviceLocationActivity)
     }
@@ -350,12 +380,18 @@ class VolunteerActivity : AppCompatActivity() {
         super.onResume()
         window.decorView.alpha = 1f
         refreshCampHubOfflineBanner()
+        refreshCampHubDrawerItem()
         WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
     }
 
     private fun refreshCampHubOfflineBanner() {
         binding.tvCampHubOffline.visibility =
             if (pref.isCampModeEnabled() && !pref.isCampHubConnected()) View.VISIBLE else View.GONE
+    }
+
+    private fun refreshCampHubDrawerItem() {
+        binding.navView.menu.findItem(R.id.menu_connect_camp_hub)?.isVisible =
+            pref.isCampModeEnabled()
     }
 
     private fun openCampHubConnect() {

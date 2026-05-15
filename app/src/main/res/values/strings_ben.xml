@@ -28,6 +28,14 @@
     <string name="type_of_case_finding">Type of Case Finding</string>
     <string name="mobile_number_not_available">Mobile number not available</string>
     <string name="ben_reg_address">Address</string>
+    <string-array name="nbr_residential_area_array">
+        <item>Tribal NPVTG</item>
+        <item>Tribal-PVTG</item>
+        <item>Rural</item>
+        <item>Urban</item>
+        <item>Urban Slum</item>
+        <item>Unknown</item>
+    </string-array>
     <string name="ben_reg_state">State</string>
     <string name="ben_reg_tu">TU</string>
     <string name="ben_reg_health_facility">Health Facility</string>
@@ -151,12 +159,9 @@ personal health profile.</string>
     <string name="dd_ps">Permanently Sterilised</string>
 
     <string-array name="nbr_marital_status_male_array">
-        <item>Unmarried</item>
+        <item>Single</item>
         <item>Married</item>
-        <item>Divorced</item>
-        <item>Separated</item>
-        <item>Widower</item>
-
+        <item>Unknown</item>
     </string-array>
 
     <string-array name="place_of_vhsnc">
@@ -167,12 +172,9 @@ personal health profile.</string>
     </string-array>
 
     <string-array name="nbr_marital_status_female_array">
-        <item>Unmarried</item>
+        <item>Single</item>
         <item>Married</item>
-        <item>Divorced</item>
-        <item>Separated</item>
-        <item>Widow</item>
-
+        <item>Unknown</item>
     </string-array>
 
     <string-array name="nbr_mobile_no_relation_array">

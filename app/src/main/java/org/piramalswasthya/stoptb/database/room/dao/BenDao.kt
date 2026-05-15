@@ -17,6 +17,9 @@ interface BenDao {
     @Update
     suspend fun updateBen(ben: BenRegCache)
 
+    @Query("UPDATE BENEFICIARY SET nikshayId = :nikshayId WHERE beneficiaryId = :benId")
+    suspend fun updateNikshayId(benId: Long, nikshayId: String)
+
     @Query("UPDATE  BENEFICIARY SET syncState = :unsynced ,processed = :proccess , serverUpdatedStatus =:updateStatus WHERE householdId = :householdId")
     suspend fun updateBenToSync(
         householdId: Long,
@@ -935,7 +938,7 @@ interface BenDao {
     fun getScreeningList(villageId: Int): Flow<List<BenBasicCache>>
 
     @Transaction
-    @Query("select b.* from BEN_BASIC_CACHE b inner join tb_screening t on b.benId = t.benId LEFT JOIN TB_SUSPECTED ts ON b.benId = ts.benId where villageId = :villageId and isDeactivate=0 and tbsnFilled = 1 and (\n" +
+    @Query("select b.* from BEN_BASIC_CACHE b inner join tb_screening t on b.benId = t.benId LEFT JOIN TB_SUSPECTED ts ON b.benId = ts.benId LEFT JOIN TB_DIAGNOSTICS td ON b.benId = td.benId where villageId = :villageId and isDeactivate=0 and tbsnFilled = 1 and (\n" +
             "            t.bloodInSputum = 1\n" +
             "            OR t.coughMoreThan2Weeks = 1\n" +
             "            OR t.feverMoreThan2Weeks = 1\n" +
@@ -948,6 +951,7 @@ interface BenDao {
 //            "            OR CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) <= 5\n" +
             "            OR b.reproductiveStatusId = 1\n" +
             "            OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'\n" +
+            "            OR UPPER(IFNULL(td.chestXRayResult, '')) = 'POSITIVE'\n" +
             "        ) AND (\n" +
             "            ts.benId IS NULL\n" +
             "            OR ts.isConfirmed = 0\n" +

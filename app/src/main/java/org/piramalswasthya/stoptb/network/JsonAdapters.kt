@@ -348,9 +348,123 @@ data class AddHealthIdRecord(
     var ABHAProfile: ABHAProfile?, var isNew: Boolean?
 )
 
+data class StopTbVillageRequest(val providerServiceMapID: Int, val villageID: Int)
 data class TBScreeningRequestDTO(val userId: Int, val tbScreeningList: List<TBScreeningDTO>)
+data class TBScreeningSaveRequest(
+    val beneficiaryRegID: Long,
+    val providerServiceMapID: Int,
+    val visitDate: Long,
+    val coughMoreThan2Weeks: Boolean?,
+    val bloodInSputum: Boolean?,
+    val feverMoreThan2Weeks: Boolean?,
+    val lossOfWeight: Boolean?,
+    val nightSweats: Boolean?,
+    val historyOfTb: Boolean?,
+    val takingAntiTBDrugs: Boolean?,
+    val familySufferingFromTB: Boolean?,
+    val riseOfFever: Boolean?,
+    val lossOfAppetite: Boolean?,
+    val contactWithTBPatient: Boolean?,
+    val symptomatic: String?,
+    val referredForDigitalChestXray: Boolean?,
+    val referredForSputumCollection: Boolean?,
+    val sputumSampleSubmittedAt: String?,
+    val recommendedForTruenat: Boolean?,
+    val recommendedForLiquidCulture: Boolean?,
+    val testDenialReasons: Any?,
+    val createdBy: String?
+) {
+    companion object {
+        fun from(cache: TBScreeningCache, beneficiaryRegID: Long, providerServiceMapID: Int, createdBy: String?): TBScreeningSaveRequest {
+            return TBScreeningSaveRequest(
+                beneficiaryRegID = beneficiaryRegID,
+                providerServiceMapID = providerServiceMapID,
+                visitDate = cache.visitDate,
+                coughMoreThan2Weeks = cache.coughMoreThan2Weeks,
+                bloodInSputum = cache.bloodInSputum,
+                feverMoreThan2Weeks = cache.feverMoreThan2Weeks,
+                lossOfWeight = cache.lossOfWeight,
+                nightSweats = cache.nightSweats,
+                historyOfTb = cache.historyOfTb,
+                takingAntiTBDrugs = cache.takingAntiTBDrugs,
+                familySufferingFromTB = cache.familySufferingFromTB,
+                riseOfFever = cache.riseOfFever,
+                lossOfAppetite = cache.lossOfAppetite,
+                contactWithTBPatient = cache.contactWithTBPatient,
+                symptomatic = cache.sympotomatic ?: cache.asymptomatic,
+                referredForDigitalChestXray = cache.referredForDigitalChestXray,
+                referredForSputumCollection = cache.referredForSputumCollection,
+                sputumSampleSubmittedAt = cache.sputumSampleSubmittedAt,
+                recommendedForTruenat = cache.recommendedForTruenatTest,
+                recommendedForLiquidCulture = cache.recommendedForLiquidCultureTest,
+                testDenialReasons = cache.reasonForDenialForGettingTested?.let {
+                    if (it.size == 1) it.first() else it
+                },
+                createdBy = createdBy
+            )
+        }
+    }
+}
 data class TBDiagnosticsRequestDTO(val userId: Int, val tbDiagnosticsList: List<TBDiagnosticsDTO>)
 data class GeneralOpdRequestDTO(val userId: Int, val generalOpdList: List<GeneralOpdDTO>)
+data class GeneralOpdSaveRequest(
+    val beneficiaryRegID: Long,
+    val providerServiceMapID: Int,
+    val chiefComplaint: List<String>?,
+    val medication: String?,
+    val dosage: String?,
+    val frequency: String?,
+    val duration: String?,
+    val notes: String?,
+    val createdBy: String?
+) {
+    companion object {
+        fun from(cache: GeneralOpdCache, beneficiaryRegID: Long, providerServiceMapID: Int, createdBy: String?): GeneralOpdSaveRequest {
+            return GeneralOpdSaveRequest(
+                beneficiaryRegID = beneficiaryRegID,
+                providerServiceMapID = providerServiceMapID,
+                chiefComplaint = cache.chiefComplaints,
+                medication = cache.medications?.joinToString(", "),
+                dosage = cache.dosage,
+                frequency = cache.frequency,
+                duration = cache.duration,
+                notes = cache.notes,
+                createdBy = createdBy
+            )
+        }
+    }
+}
+data class TBDiagnosticsSaveRequest(
+    val benRegID: Long,
+    val providerServiceMapID: Int,
+    val visitDate: Long,
+    val nikshayId: String?,
+    val isDigitalChestXrayConducted: Boolean?,
+    val digitalChestXrayResult: String?,
+    val isTruenatConducted: Boolean?,
+    val truenatResult: String?,
+    val recommendedForLiquidCulture: Boolean?,
+    val liquidCultureResult: String?,
+    val createdBy: String?
+) {
+    companion object {
+        fun from(cache: TBDiagnosticsCache, benRegID: Long, providerServiceMapID: Int, createdBy: String?): TBDiagnosticsSaveRequest {
+            return TBDiagnosticsSaveRequest(
+                benRegID = benRegID,
+                providerServiceMapID = providerServiceMapID,
+                visitDate = cache.visitDate,
+                nikshayId = cache.nikshayId,
+                isDigitalChestXrayConducted = cache.isChestXRayDone,
+                digitalChestXrayResult = cache.chestXRayResult,
+                isTruenatConducted = cache.isNaatConducted,
+                truenatResult = cache.naatResult,
+                recommendedForLiquidCulture = cache.recommendedForLiquidCultureTest,
+                liquidCultureResult = cache.liquidCultureResult,
+                createdBy = createdBy
+            )
+        }
+    }
+}
 data class KalaAzarScreeningRequestDTO(val userId: Int, val kalaAzarLists: List<KALAZARScreeningDTO>)
 data class MalariaScreeningRequestDTO(val userId: Int, val malariaLists: List<MalariaScreeningDTO>)
 data class IRSScreeningRequestDTO(val rounds: List<ScreeningRoundDTO>)

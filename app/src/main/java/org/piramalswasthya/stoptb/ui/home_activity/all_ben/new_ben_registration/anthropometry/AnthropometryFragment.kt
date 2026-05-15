@@ -18,6 +18,9 @@ import androidx.navigation.fragment.findNavController
 import dagger.hilt.android.AndroidEntryPoint
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.databinding.FragmentAnthropometryBinding
+import org.piramalswasthya.stoptb.model.AgeUnit
+import org.piramalswasthya.stoptb.model.BenRegCache
+import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.work.WorkerUtils
@@ -65,6 +68,7 @@ class AnthropometryFragment : Fragment() {
         }
         viewModel.existingAnthropometry.observe(viewLifecycleOwner) { ben ->
             ben ?: return@observe
+            binding.tvAgeGender.text = formatAgeGender(ben)
             binding.etWeight.setText(ben.weight?.formatOneDecimal().orEmpty())
             binding.etHeight.setText(ben.height?.formatOneDecimal().orEmpty())
             binding.etBmi.setText(ben.bmi?.formatOneDecimal().orEmpty())
@@ -189,6 +193,22 @@ class AnthropometryFragment : Fragment() {
     private fun isWithinRange(value: String?, min: Double, max: Double): Boolean {
         val number = value?.trim()?.toDoubleOrNull() ?: return false
         return number in min..max
+    }
+
+    private fun formatAgeGender(ben: BenRegCache): String {
+        val ageUnit = when (ben.ageUnit) {
+            AgeUnit.DAYS -> getString(R.string.age_unit_days)
+            AgeUnit.MONTHS -> getString(R.string.age_unit_months)
+            AgeUnit.YEARS, null -> getString(R.string.age_unit_years)
+        }
+        val gender = when (ben.gender) {
+            Gender.MALE -> getString(R.string.gender_male)
+            Gender.FEMALE -> getString(R.string.gender_female)
+            Gender.TRANSGENDER -> getString(R.string.gender_transgender)
+            Gender.PREFER_NOT_TO_SAY -> getString(R.string.gender_prefer_not_to_say)
+            null -> ""
+        }
+        return getString(R.string.anthropometry_age_gender_format, ben.age, ageUnit, gender)
     }
 
     private fun isHighTemperature(): Boolean =

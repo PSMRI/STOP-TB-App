@@ -259,6 +259,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
             openCampHubConnect()
         }
         refreshCampHubOfflineBanner()
+        refreshCampHubDrawerItem()
         WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
         viewModel.restoredProfilePicUri.observe(this) { uri ->
             uri?.let {
@@ -542,6 +543,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
     override fun onResume() {
         super.onResume()
         refreshCampHubOfflineBanner()
+        refreshCampHubDrawerItem()
         WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
         window.decorView.alpha = 1f
         if (isDeviceRootedOrEmulator()) {
@@ -610,6 +612,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
 
     private fun finishAndStartServiceLocationActivity() {
         val serviceLocationActivity = Intent(this, ServiceLocationActivity::class.java)
+            .putExtra(ServiceLocationActivity.EXTRA_FROM_HOME_SWITCH, true)
         finish()
         startActivity(serviceLocationActivity)
     }
@@ -704,6 +707,13 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
             true
 
         }
+
+        binding.navView.menu.findItem(R.id.menu_connect_camp_hub)?.setOnMenuItemClickListener {
+            binding.drawerLayout.close()
+            openCampHubConnect()
+            true
+        }
+        refreshCampHubDrawerItem()
 
         binding.navView.menu.findItem(R.id.syncDashboardFragment).setOnMenuItemClickListener {
             navController.navigate(R.id.syncDashboardFragment)
@@ -805,6 +815,11 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
     private fun refreshCampHubOfflineBanner() {
         binding.tvCampHubOffline.visibility =
             if (pref.isCampModeEnabled() && !pref.isCampHubConnected()) View.VISIBLE else View.GONE
+    }
+
+    private fun refreshCampHubDrawerItem() {
+        binding.navView.menu.findItem(R.id.menu_connect_camp_hub)?.isVisible =
+            pref.isCampModeEnabled()
     }
 
     private fun openCampHubConnect() {

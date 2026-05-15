@@ -3,6 +3,8 @@
     <!--    Login-->
     <string name="tv_text_welcome">Welcome, please login</string>
     <string name="tv_text_welcome_user">Welcome, %s</string>
+    <string name="login_app_native_name">StopTB</string>
+    <string name="login_app_native_name_uat">StopTB-UAT</string>
     <string name="tv_text_sign_in">Login</string>
     <string name="tv_text_select_language">Please Select Your Language</string>
     <string name="text_english" translatable="false">English</string>
@@ -27,6 +29,10 @@
     <string name="camp_hub_checking">Checking Camp Hub...</string>
     <string name="camp_hub_connected">Camp Hub Connected</string>
     <string name="camp_hub_not_connected">Camp Hub Not Connected</string>
+    <string name="camp_disconnect_title">Disconnect Camp Hub?</string>
+    <string name="camp_disconnect_message">Are you sure you want to disconnect Camp Hub and continue in normal mode?</string>
+    <string name="camp_disconnect_positive">Disconnect</string>
+    <string name="camp_disconnect_negative">Keep connected</string>
     <string name="camp_hub_url_hint">Camp Hub URL</string>
     <string name="camp_hub_retry">Retry</string>
     <string name="camp_hub_login_blocked">Camp Hub is not connected. Please retry or connect to Camp Wi-Fi.</string>

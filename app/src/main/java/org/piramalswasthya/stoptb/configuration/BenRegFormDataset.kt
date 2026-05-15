@@ -69,6 +69,21 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
     // ─────────────────────────── FORM FIELDS ───────────────────────────
 
+    private fun setDefaultResidentialAreaIfNeeded() {
+        if (residentialAreaType.value.isNullOrBlank()) {
+            residentialAreaType.value = residentialAreaType.entries?.lastOrNull()
+        }
+    }
+
+    private fun getSavedResidentialAreaValue(saved: BenRegCache): String? {
+        val savedArea = saved.residentialArea?.trim()
+        getLocalValueInArray(R.array.nbr_residential_area_array, savedArea)?.let {
+            return it
+        }
+        if (!savedArea.isNullOrBlank()) return null
+        return saved.residentialAreaId?.let { residentialAreaType.getStringFromPosition(it) }
+    }
+
     // 1. Photo
     private val pic = FormElement(
         id = 1, inputType = IMAGE_VIEW,
@@ -88,7 +103,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     // 3. Beneficiary Status (Alive/Death)
     private val beneficiaryStatus = FormElement(
         id = 50, inputType = RADIO,
-        title = context.getString(R.string.beneficiary_status),
+        title = resources.getString(R.string.beneficiary_status),
         arrayId = R.array.beneficiary_status,
         entries = resources.getStringArray(R.array.beneficiary_status),
         required = false, hasDependants = true
@@ -112,28 +127,28 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
     private val dateOfDeath = FormElement(
         id = 51, arrayId = -1, inputType = DATE_PICKER,
-        title = context.getString(R.string.date_of_death),
+        title = resources.getString(R.string.date_of_death),
         max = System.currentTimeMillis(), required = true
     )
     private val timeOfDeath = FormElement(
         id = 52, inputType = org.piramalswasthya.stoptb.model.InputType.TIME_PICKER,
-        title = context.getString(R.string.time_of_death), required = false
+        title = resources.getString(R.string.time_of_death), required = false
     )
     private val reasonOfDeath = FormElement(
         id = 53, inputType = DROPDOWN,
-        title = context.getString(R.string.reason_for_death),
+        title = resources.getString(R.string.reason_for_death),
         arrayId = R.array.reason_of_death_array,
         entries = resources.getStringArray(R.array.reason_of_death_array), required = true
     )
     private val placeOfDeath = FormElement(
         id = 54, inputType = DROPDOWN,
-        title = context.getString(R.string.place_of_death),
+        title = resources.getString(R.string.place_of_death),
         arrayId = R.array.death_place_array,
         entries = resources.getStringArray(R.array.death_place_array), required = true
     )
     private val otherPlaceOfDeath = FormElement(
         id = 55, inputType = EDIT_TEXT,
-        title = context.getString(R.string.other_place_of_death),
+        title = resources.getString(R.string.other_place_of_death),
         required = true, hasDependants = true
     )
 
@@ -236,7 +251,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         id = 1008, inputType = DROPDOWN,
         title = resources.getString(R.string.marital_status),
         arrayId = R.array.nbr_marital_status_male_array,
-        entries = maritalStatusMale, required = false, hasDependants = true
+        entries = maritalStatusMale, required = true, hasDependants = true
     )
     private val husbandName = FormElement(
         id = 1009, inputType = EDIT_TEXT,
@@ -321,10 +336,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         id = 1031,
         inputType = DROPDOWN,
         title = resources.getString(R.string.nhhr_type_residential_area),
-        arrayId = R.array.nhhr_type_residential_area_array,
-        entries = resources.getStringArray(R.array.nhhr_type_residential_area_array),
-        required = false,
-        hasDependants = true
+        arrayId = R.array.nbr_residential_area_array,
+        entries = resources.getStringArray(R.array.nbr_residential_area_array),
+        required = true,
+        hasDependants = false
     )
     private val otherResidentialAreaType = FormElement(
         id = 1032,
@@ -447,12 +462,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         subCentre.entries = arrayOf(resolvedSubCentre)
         subCentre.value = resolvedSubCentre
         this.villageEntities = villageEntityList
-//        if (occupation.value == null) occupation.value = resources.getString(R.string.nbr_occupation_default)
-
-        if (occupationDrop.entries?.isNotEmpty() == true) {
-            occupationDrop.value = occupationDrop.entries?.get(0)
-            occupation.value = occupationDrop.value
-        }
+        if (occupation.value == null) occupation.value = resources.getString(R.string.nbr_occupation_default)
+        setDefaultResidentialAreaIfNeeded()
 
         ben?.takeIf { !it.isDraft }?.let { saved ->
             // Beneficiary Status (death)
@@ -541,8 +552,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             otherReligion.value = saved.religionOthers
 
             economicStatus.value = economicStatus.getStringFromPosition(saved.economicStatusId ?: 0)
-            residentialAreaType.value = residentialAreaType.getStringFromPosition(saved.residentialAreaId ?: 0)
-            otherResidentialAreaType.value = saved.otherResidentialArea
+            residentialAreaType.value = getSavedResidentialAreaValue(saved)
+            setDefaultResidentialAreaIfNeeded()
+            otherResidentialAreaType.value = null
 
 //            if (!saved.occupation.isNullOrEmpty() && saved.occupation != "unknown") occupation.value = saved.occupation
 
@@ -583,12 +595,6 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             list.add(religionIndex + 1, otherReligion)
         }
 
-        // Residential area other
-        val residentialIndex = list.indexOf(residentialAreaType)
-        if (residentialAreaType.value == residentialAreaType.entries!!.last() && residentialIndex >= 0) {
-            list.add(residentialIndex + 1, otherResidentialAreaType)
-        }
-
         addReproductiveStatusIfApplicable(list)
 
         currentLocation = preferenceDao.getLocationRecord()
@@ -627,13 +633,18 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     }
 
     private fun shouldRequireMaritalStatus(): Boolean {
-        val isFemaleSelected = gender.value == gender.entries?.getOrNull(1)
         val age = agePopup.value?.let { runCatching { getAgeFromDob(getLongFromDate(it)) }.getOrDefault(0) } ?: 0
-        return isFemaleSelected && age >= Konstants.minAgeForGenBen
+        return age >= Konstants.minAgeForGenBen
     }
 
     private fun updateMaritalStatusRequirement() {
         maritalStatus.required = shouldRequireMaritalStatus()
+    }
+
+    private fun setDefaultMaritalStatusIfNeeded() {
+        if (maritalStatus.value.isNullOrBlank()) {
+            maritalStatus.value = maritalStatus.entries?.getOrNull(2)
+        }
     }
 
     private fun addMaritalStatusIfApplicable(list: MutableList<FormElement>) {
@@ -642,6 +653,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             return
         }
         updateMaritalStatusRequirement()
+        setDefaultMaritalStatusIfNeeded()
         if (list.contains(maritalStatus)) return
 
         val villageIndex = list.indexOf(villageHamlet)
@@ -749,6 +761,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                         1 -> R.array.nbr_marital_status_female_array
                         else -> R.array.nbr_marital_status_male_array
                     }
+                    setDefaultMaritalStatusIfNeeded()
                 }
                 updateMaritalStatusRequirement()
 
@@ -796,6 +809,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                     1 -> R.array.nbr_marital_status_female_array
                     else -> R.array.nbr_marital_status_male_array
                 }
+                setDefaultMaritalStatusIfNeeded()
                 updateMaritalStatusRequirement()
 
                 triggerDependants(
@@ -823,16 +837,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
             maritalStatus.id -> {
                 when (maritalStatus.value) {
-                    maritalStatus.entries!![0] -> {
-                        fatherName.required = false
-                        motherName.required = false
-                        updateReproductiveOptionsBasedOnAgeGender(formId = maritalStatus.id)
-                        triggerDependants(
-                            source = maritalStatus, addItems = emptyList(),
-                            removeItems = listOf(spouseName, husbandName, wifeName, ageAtMarriage, dateOfMarriage, reproductiveStatus)
-                        )
-                    }
-                    else -> {
+                    maritalStatus.entries?.getOrNull(1) -> {
                         fatherName.required = false
                         motherName.required = false
                         husbandName.required = false
@@ -855,6 +860,15 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                             )
                         }
                     }
+                    else -> {
+                        fatherName.required = false
+                        motherName.required = false
+                        updateReproductiveOptionsBasedOnAgeGender(formId = maritalStatus.id)
+                        triggerDependants(
+                            source = maritalStatus, addItems = emptyList(),
+                            removeItems = listOf(spouseName, husbandName, wifeName, ageAtMarriage, dateOfMarriage, reproductiveStatus)
+                        )
+                    }
                 }
             }
 
@@ -874,12 +888,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             }
 
             residentialAreaType.id -> {
-                triggerDependants(
-                    source = residentialAreaType,
-                    passedIndex = index,
-                    triggerIndex = residentialAreaType.entries!!.lastIndex,
-                    target = otherResidentialAreaType
-                )
+                otherResidentialAreaType.value = null
+                return -1
             }
 
             contactNumber.id -> {
@@ -1032,7 +1042,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             ben.economicStatus     = economicStatus.getEnglishStringFromPosition(ben.economicStatusId ?: 0)
             ben.residentialAreaId  = residentialAreaType.getPosition()
             ben.residentialArea    = residentialAreaType.getEnglishStringFromPosition(ben.residentialAreaId ?: 0)
-            ben.otherResidentialArea = otherResidentialAreaType.value
+            ben.otherResidentialArea = null
 
             // Village — update locationRecord if user changed village
             villageHamlet.value?.let { selectedName ->

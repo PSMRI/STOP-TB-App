@@ -516,6 +516,17 @@
     <string name="weight_kgs">ওজন (কেজি)</string>
     <string name="height_cms">উচ্চতা (চে.মি.)</string>
     <string name="temperature_degree_fahrenheit">তাপমাত্ৰা (ডিগ্ৰী ফাৰেনহাইট)</string>
+    <string name="normal_temperature_range">সাধাৰণ সীমা: 97-99&#176;F</string>
+    <string name="temperature_100_or_more">&gt;= 100&#176;F</string>
+    <string name="anthropometry_age_gender_format">%1$d %2$s | %3$s</string>
+    <string name="age_unit_years">বছৰ</string>
+    <string name="age_unit_months">মাহ</string>
+    <string name="age_unit_days">দিন</string>
+    <string name="gender_male">পুৰুষ</string>
+    <string name="gender_female">মহিলা</string>
+    <string name="gender_transgender">ট্ৰান্সজেণ্ডাৰ</string>
+    <string name="gender_prefer_not_to_say">ক\'বলৈ ইচ্ছা নাই</string>
+    <string name="refer_to_hwc_alert">হেল্থ এণ্ড ৱেলনেছ চেণ্টাৰলৈ ৰেফাৰ কৰক</string>
     <string name="pulse_rate_bpm">নাড়ীৰ গতি (প্ৰতি মিনিটত ধপধপনি)</string>
     <string name="systolic_bp_mmhg">চিষ্টোলিক ৰক্তচাপ (mm Hg)</string>
     <string name="diastolic_bp_mmhg">ডায়েষ্টোলিক ৰক্তচাপ (mm Hg)</string>
@@ -629,6 +640,12 @@
         <item>5 দিন</item>
         <item>7 দিন</item>
     </string-array>
+    <string name="quick_refresh_not_updated">শেষ আপডেট: এতিয়ালৈকে নহয়</string>
+    <string name="quick_refresh_last_updated">শেষ আপডেট: %1$s</string>
+    <string name="quick_refresh_refreshing">হিতাধিকাৰীৰ তথ্য আপডেট হৈ আছে...</string>
+    <string name="quick_refresh_failed">আপডেট বিফল। পুনৰ চেষ্টা কৰক</string>
+    <string name="quick_refresh_action">ৰিফ্ৰেছ</string>
+    <string name="quick_refresh_camp_disconnected">কেম্প হাব সংযুক্ত নহয়। প্ৰথমে পুনৰ সংযোগ কৰক।</string>
 </resources>
 
 

@@ -134,7 +134,7 @@ class SchedulerFragment : Fragment() {
                 binding.cvAllBen.visibility = View.VISIBLE
                 binding.cvTb.visibility = View.VISIBLE
                 binding.cvNcd.visibility = View.GONE
-                binding.cvReferrals.visibility = View.GONE
+                binding.cvReferrals.visibility = View.VISIBLE
                 binding.cvAbha.visibility = View.GONE
                 binding.cvRch.visibility = View.GONE
             }

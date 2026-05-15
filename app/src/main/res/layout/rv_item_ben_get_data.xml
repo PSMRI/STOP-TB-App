@@ -157,7 +157,7 @@
                         android:id="@+id/rl_ben_mobile_no"
                         style="@style/rv_item_ben_fields"
                         layout="@layout/rv_item_ben_element"
-                        app:field="@{ben.mobileNo}"
+                        app:field="@{ben.mobileNoDisplay}"
                         app:fieldTitle="@{@string/tv_mob_no_ph}" />
                 </LinearLayout>
 
