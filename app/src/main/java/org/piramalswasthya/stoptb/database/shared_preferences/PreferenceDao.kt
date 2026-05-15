@@ -286,4 +286,10 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
             pref.edit().putLong("last asha update timestamp ", value).apply()
         }
 
+    var lastQuickRefreshTimestamp: Long
+        get() = pref.getLong("last quick refresh timestamp", 0L)
+        set(value) {
+            pref.edit().putLong("last quick refresh timestamp", value).apply()
+        }
+
 }

@@ -670,6 +670,17 @@
     <string name="weight_kgs">वज़न (किग्रा)</string>
     <string name="height_cms">लंबाई (सेमी)</string>
     <string name="temperature_degree_fahrenheit">तापमान (डिग्री फारेनहाइट)</string>
+    <string name="normal_temperature_range">सामान्य सीमा: 97-99&#176;F</string>
+    <string name="temperature_100_or_more">&gt;= 100&#176;F</string>
+    <string name="anthropometry_age_gender_format">%1$d %2$s | %3$s</string>
+    <string name="age_unit_years">वर्ष</string>
+    <string name="age_unit_months">महीने</string>
+    <string name="age_unit_days">दिन</string>
+    <string name="gender_male">पुरुष</string>
+    <string name="gender_female">महिला</string>
+    <string name="gender_transgender">ट्रांसजेंडर</string>
+    <string name="gender_prefer_not_to_say">बताना पसंद नहीं है</string>
+    <string name="refer_to_hwc_alert">हेल्थ एंड वेलनेस सेंटर पर रेफर करें</string>
     <string name="pulse_rate_bpm">नाड़ी दर (प्रति मिनट धड़कन)</string>
     <string name="systolic_bp_mmhg">सिस्टोलिक ब्लड प्रेशर (mm Hg)</string>
     <string name="diastolic_bp_mmhg">डायस्टोलिक ब्लड प्रेशर (mm Hg)</string>

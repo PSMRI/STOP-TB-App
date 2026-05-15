@@ -272,7 +272,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="@{benWithAes.ben.mobileNo}"
+                                android:text="@{benWithAes.ben.mobileNoDisplay}"
                                 android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
                                 android:textColor="?attr/colorOnPrimary"
                                 tools:text="9999999999" />

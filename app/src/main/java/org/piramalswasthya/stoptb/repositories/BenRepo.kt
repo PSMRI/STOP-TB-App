@@ -1598,8 +1598,20 @@ class BenRepo @Inject constructor(
 
                     if (benId == -1L) continue
 
+                    val nikshayIdValue = benDataObj.optStringOrNull("nikshayId")
+                        ?: benDataObj.optStringOrNull("nikshayID")
+                        ?: jsonObject.optStringOrNull("nikshayId")
+                        ?: jsonObject.optStringOrNull("nikshayID")
+                        ?: stopTBDetailsObj.optStringOrNull("nikshayId")
+                        ?: stopTBDetailsObj.optStringOrNull("nikshayID")
+
                     val benExists = benDao.getBen(benId) != null
-                    if (benExists) continue
+                    if (benExists) {
+                        nikshayIdValue?.takeIf { it.isNotBlank() }?.let {
+                            benDao.updateNikshayId(benId, it)
+                        }
+                        continue
+                    }
 
                     try {
                         result.add(
@@ -1707,6 +1719,7 @@ class BenRepo @Inject constructor(
                                 weight = anthropometryObj.optDouble("weight").takeIf { !it.isNaN() },
                                 bmi = anthropometryObj.optDouble("bmi").takeIf { !it.isNaN() },
                                 temperature = anthropometryObj.optDouble("temperatureValue").takeIf { !it.isNaN() },
+                                nikshayId = nikshayIdValue,
 
                                 motherName = benDataObj.optStringOrNull("motherName"),
 

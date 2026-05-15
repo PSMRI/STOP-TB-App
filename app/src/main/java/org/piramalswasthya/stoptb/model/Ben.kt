@@ -60,7 +60,7 @@ enum class BenStatus {
 @DatabaseView(
     viewName = "BEN_BASIC_CACHE",
     value = "SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId" +
-            ", b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod" +
+            ", b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod" +
             ", b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus" +
             ", b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId" +
             ", b.isNewAbha" +
@@ -115,6 +115,7 @@ data class BenBasicCache(
 //    val typeOfList: TypeOfList,
     val spouseName: String? = null,
     val rchId: String? = null,
+    val nikshayId: String? = null,
     val hrpStatus: Boolean,
     val syncState: SyncState?,
     val reproductiveStatusId: Int,
@@ -277,6 +278,7 @@ data class BenBasicCache(
 //            typeOfList = typeOfList.name,
             spouseName = spouseName?.takeIf { it.isNotEmpty() } ?: "Not Available",
             rchId = rchId?.takeIf { it.isNotEmpty() },
+            nikshayId = nikshayId?.takeIf { it.isNotBlank() },
             hrpStatus = hrpStatus,
             syncState = syncState,
             isConsent = isConsent,
@@ -308,6 +310,7 @@ data class BenBasicCache(
             fatherName = fatherName,
             familyHeadName = familyHeadName ?: "",
             rchId = rchId,
+            nikshayId = nikshayId?.takeIf { it.isNotBlank() },
             hrpStatus = hrpStatus,
             relToHeadId = 0,
             syncState = syncState,
@@ -859,6 +862,7 @@ data class BenBasicDomain(
     val spouseName: String? = null,
 //    val typeOfList: String,
     val rchId: String? = null,
+    val nikshayId: String? = null,
     val hrpStatus: Boolean = false,
     var syncState: SyncState?,
     val isConsent: Boolean,
@@ -874,6 +878,12 @@ data class BenBasicDomain(
     val dobString: String
         get() = java.text.SimpleDateFormat("dd-MM-yyyy", java.util.Locale.ENGLISH)
             .format(java.util.Date(dob))
+
+    val nikshayIdDisplay: String
+        get() = nikshayId?.takeIf { it.isNotBlank() } ?: "N/A"
+
+    val mobileNoDisplay: String
+        get() = mobileNo.takeIf { it.isNotBlank() && it != "9999999999" } ?: "N/A"
 }
 
 
@@ -922,6 +932,9 @@ data class BenBasicDomainForForm(
     val isConsent: Boolean,
 
     ) {
+    val mobileNoDisplay: String
+        get() = mobileNo.takeIf { it.isNotBlank() && it != "9999999999" } ?: "N/A"
+
     companion object
 }
 
@@ -1355,6 +1368,7 @@ data class BenRegCache(
     var weight: Double? = null,
     var bmi: Double? = null,
     var temperature: Double? = null,
+    var nikshayId: String? = null,
 
 
 

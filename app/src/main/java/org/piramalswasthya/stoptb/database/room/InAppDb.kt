@@ -80,7 +80,7 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.NCDReferalFormResponseJson
         TBDiagnosticsCache::class
     ],
     views = [BenBasicCache::class],
-    version = 12, exportSchema = false
+    version = 13, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -319,6 +319,49 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "BENEFICIARY", "nikshayId")) {
+                    database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN nikshayId TEXT DEFAULT NULL")
+                }
+                recreateBenBasicCacheView(database)
+            }
+        }
+
+        private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
+            database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
+            database.execSQL(
+                "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId" +
+                    ", b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod" +
+                    ", b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus" +
+                    ", b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId" +
+                    ", b.isNewAbha" +
+                    ", IFNULL(cbac.benId IS NOT NULL, 0) as cbacFilled, cbac.syncState as cbacSyncState" +
+                    ", 0 as cdrFilled, NULL as cdrSyncState" +
+                    ", 0 as mdsrFilled, NULL as mdsrSyncState" +
+                    ", NULL as pmsmaSyncState, 0 as pmsmaFilled" +
+                    ", 0 as hbncFilled" +
+                    ", 0 as hbycFilled" +
+                    ", 0 as pwrFilled, NULL as pwrSyncState" +
+                    ", NULL as doSyncState, NULL as irSyncState, NULL as crSyncState" +
+                    ", 0 as ecrFilled, 0 as ectFilled" +
+                    ", 0 as isMdsr" +
+                    ", IFNULL(tbsn.benId IS NOT NULL, 0) as tbsnFilled, tbsn.syncState as tbsnSyncState" +
+                    ", IFNULL(tbsp.benId IS NOT NULL, 0) as tbspFilled, tbsp.syncState as tbspSyncState" +
+                    ", 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled" +
+                    ", 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled" +
+                    ", NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState" +
+                    ", 0 as isDelivered, 0 as pwHrp" +
+                    ", 0 as irFilled, 0 as crFilled, 0 as doFilled" +
+                    " FROM BENEFICIARY b " +
+                    "LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId " +
+                    "LEFT OUTER JOIN CBAC cbac ON b.beneficiaryId = cbac.benId " +
+                    "LEFT OUTER JOIN TB_SCREENING tbsn ON b.beneficiaryId = tbsn.benId " +
+                    "LEFT OUTER JOIN TB_SUSPECTED tbsp ON b.beneficiaryId = tbsp.benId " +
+                    "WHERE b.isDraft = 0 GROUP BY b.beneficiaryId ORDER BY b.updatedDate DESC"
+            )
+        }
+
         private fun addVitalGeneralExaminationColumns(database: SupportSQLiteDatabase) {
             val columns = listOf(
                 "benRegId INTEGER NOT NULL DEFAULT 0",
@@ -461,6 +504,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_9_10)
                         .addMigrations(MIGRATION_10_11)
                         .addMigrations(MIGRATION_11_12)
+                        .addMigrations(MIGRATION_12_13)
                         .build()
 
                     INSTANCE = instance

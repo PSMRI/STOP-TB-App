@@ -78,9 +78,18 @@ import org.piramalswasthya.stoptb.utils.HelperUtil.getDobFromAge
 import org.piramalswasthya.stoptb.utils.HelperUtil.getLongFromDate
 import org.piramalswasthya.stoptb.utils.HelperUtil.updateAgeDTO
 import timber.log.Timber
+import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
+private fun parseFormDate(value: String?): Calendar? {
+    if (value.isNullOrBlank()) return null
+    val parsedDate = runCatching {
+        SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).apply { isLenient = false }
+            .parse(value.trim())
+    }.getOrNull() ?: return null
+    return Calendar.getInstance().apply { time = parsedDate }
+}
 
 class FormInputAdapter(
     private val imageClickListener: ImageClickListener? = null,
@@ -798,13 +807,13 @@ class FormInputAdapter(
                 val originalLocale = Locale.getDefault()
                 HelperUtil.setEnLocaleForDatePicker(activity)
 
-                item.value?.let { value ->
-                    thisYear = value.substring(6).toInt()
-                    thisMonth = value.substring(3, 5).trim().toInt() - 1
-                    thisDay = value.substring(0, 2).trim().toInt()
+                parseFormDate(item.value)?.let { selectedDate ->
+                    thisYear = selectedDate.get(Calendar.YEAR)
+                    thisMonth = selectedDate.get(Calendar.MONTH)
+                    thisDay = selectedDate.get(Calendar.DAY_OF_MONTH)
                 }
                 val datePickerDialog = DatePickerDialog(
-                    it.context, { _, year, month, day ->
+                    it.context, R.style.AppSpinnerDatePickerDialog, { _, year, month, day ->
                         val millis = Calendar.getInstance().apply {
                             set(Calendar.YEAR, year)
                             set(Calendar.MONTH, month)
@@ -820,10 +829,24 @@ class FormInputAdapter(
                         if (item.hasDependants) formValueListener?.onValueChanged(item, -1)
                     }, thisYear, thisMonth, thisDay
                 )
+                runCatching {
+                    datePickerDialog.datePicker.calendarViewShown = false
+                    datePickerDialog.datePicker.spinnersShown = true
+                }
                 item.errorText = null
                 binding.tilEditText.error = null
-                item.min?.let { datePickerDialog.datePicker.minDate = it }
-                item.max?.let { datePickerDialog.datePicker.maxDate = it }
+                val effectiveMin = item.min
+                val effectiveMax = item.max
+                when {
+                    effectiveMin != null && effectiveMax != null && effectiveMin > effectiveMax -> {
+                        datePickerDialog.datePicker.minDate = effectiveMax
+                        datePickerDialog.datePicker.maxDate = effectiveMax
+                    }
+                    else -> {
+                        effectiveMin?.let { datePickerDialog.datePicker.minDate = it }
+                        effectiveMax?.let { datePickerDialog.datePicker.maxDate = it }
+                    }
+                }
                 if (item.showYearFirstInDatePicker)
                     datePickerDialog.datePicker.touchables[0].performClick()
                 datePickerDialog.show()
@@ -1001,13 +1024,13 @@ class FormInputAdapter(
                 val originalLocale = Locale.getDefault()
                 HelperUtil.setEnLocaleForDatePicker(activity)
 
-                item.value?.let { value ->
-                    thisYear = value.substring(6).toInt()
-                    thisMonth = value.substring(3, 5).trim().toInt() - 1
-                    thisDay = value.substring(0, 2).trim().toInt()
+                parseFormDate(item.value)?.let { selectedDate ->
+                    thisYear = selectedDate.get(Calendar.YEAR)
+                    thisMonth = selectedDate.get(Calendar.MONTH)
+                    thisDay = selectedDate.get(Calendar.DAY_OF_MONTH)
                 }
                 val datePickerDialog = DatePickerDialog(
-                    it.context, { _, year, month, day ->
+                    it.context, R.style.AppSpinnerDatePickerDialog, { _, year, month, day ->
                         val millisCal = Calendar.getInstance().apply {
                             set(Calendar.YEAR, year)
                             set(Calendar.MONTH, month)
@@ -1027,6 +1050,10 @@ class FormInputAdapter(
                         if (item.hasDependants) formValueListener?.onValueChanged(item, -1)
                     }, thisYear, thisMonth, thisDay
                 )
+                runCatching {
+                    datePickerDialog.datePicker.calendarViewShown = false
+                    datePickerDialog.datePicker.spinnersShown = true
+                }
                 item.errorText = null
                 binding.tilEditTextDate.error = null
                 val effectiveMin = item.min

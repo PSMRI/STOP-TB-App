@@ -14,7 +14,9 @@ import org.piramalswasthya.stoptb.adapters.VolunteerPagerAdapter
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentHomeBinding
 import org.piramalswasthya.stoptb.helpers.Languages
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.helpers.isNurseRole
+import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import java.text.SimpleDateFormat
@@ -48,13 +50,17 @@ class VolunteerHomeFragment : Fragment() {
     }
 
     private fun setupNurseQuickRefresh() {
-        if (!pref.getLoggedInUser()?.role.isNurseRole()) {
+        val role = pref.getLoggedInUser()?.role
+        val canUseQuickRefresh = role.isNurseRole() ||
+                role.isRegistrationOfficerRole() ||
+                role.isCounsellingOfficerRole()
+        if (!canUseQuickRefresh) {
             binding.llQuickRefresh.visibility = View.GONE
             return
         }
 
         binding.llQuickRefresh.visibility = View.VISIBLE
-        binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_not_updated)
+        updateQuickRefreshStatus()
         setQuickRefreshButtonEnabled(true)
 
         binding.btnQuickRefresh.setOnClickListener {
@@ -101,13 +107,23 @@ class VolunteerHomeFragment : Fragment() {
                     isFinished -> {
                         manualHomeRefreshRequested = false
                         setQuickRefreshButtonEnabled(true)
-                        binding.tvQuickRefreshStatus.text = getString(
-                            R.string.quick_refresh_last_updated,
-                            SimpleDateFormat("hh:mm a", Locale.ENGLISH).format(Date())
-                        )
+                        pref.lastQuickRefreshTimestamp = System.currentTimeMillis()
+                        updateQuickRefreshStatus()
                     }
                 }
             }
+    }
+
+    private fun updateQuickRefreshStatus() {
+        val lastUpdated = pref.lastQuickRefreshTimestamp
+        binding.tvQuickRefreshStatus.text = if (lastUpdated > 0L) {
+            getString(
+                R.string.quick_refresh_last_updated,
+                SimpleDateFormat("hh:mm a", Locale.ENGLISH).format(Date(lastUpdated))
+            )
+        } else {
+            getString(R.string.quick_refresh_not_updated)
+        }
     }
 
     private fun setQuickRefreshButtonEnabled(enabled: Boolean) {

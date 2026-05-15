@@ -23,6 +23,14 @@
     <string name="mother_s_name">মাতৃৰ নাম</string>
     <string name="mobile_number_of">ৰ মোবাইল নম্বৰ</string>
     <string name="other_mobile_number_of">অন্যান্য - মোবাইল নম্বৰ</string>
+    <string-array name="nbr_residential_area_array">
+        <item>জনজাতীয় NPVTG</item>
+        <item>জনজাতীয়-PVTG</item>
+        <item>গ্ৰাম্য</item>
+        <item>নগৰ</item>
+        <item>নগৰীয়া বস্তি</item>
+        <item>অজ্ঞাত</item>
+    </string-array>
     <string name="form_name">ফৰ্মৰ নাম</string>
     <string name="rch_id_ben">RCH ID</string>
     <string name="nbr_age">বয়স</string>
@@ -121,9 +129,7 @@
     <string-array name="nbr_marital_status_male_array">
         <item>অবিবাহিত</item>
         <item>বিবাহিত</item>
-        <item>তালাকপ্ৰাপ্ত</item>
-        <item>পৃথিবীৰ সালুৱা</item>
-        <item>বিধবা</item>
+        <item>অজ্ঞাত</item>
     </string-array>
 
     <string-array name="place_of_vhsnc">
@@ -136,9 +142,7 @@
     <string-array name="nbr_marital_status_female_array">
         <item>অবিবাহিত</item>
         <item>বিবাহিত</item>
-        <item>তালাকপ্ৰাপ্ত</item>
-        <item>পৃথিবীৰ সালুৱা</item>
-        <item>বিধবা</item>
+        <item>অজ্ঞাত</item>
     </string-array>
 
     <string-array name="nbr_mobile_no_relation_array">
@@ -241,6 +245,25 @@
         <item>ব্যক্তিগত চিকিৎসালয়</item>
         <item>ট্ৰেনজিটত</item>
         <item>মৃত্যুৰ অন্যান্য স্থান</item>
+    </string-array>
+
+    <string-array name="reason_of_death_array">
+        <item>স্বাভাৱিক মৃত্যু</item>
+        <item>দুৰ্ঘটনা</item>
+        <item>সংক্ৰামক ৰোগ</item>
+        <item>পশুৰ কামোৰত মৃত্যু</item>
+        <item>আত্মহত্যা</item>
+        <item>অনিশ্চিত</item>
+    </string-array>
+
+    <string-array name="reason_of_death_array_with_maternal">
+        <item>স্বাভাৱিক মৃত্যু</item>
+        <item>দুৰ্ঘটনা</item>
+        <item>সংক্ৰামক ৰোগ</item>
+        <item>পশুৰ কামোৰত মৃত্যু</item>
+        <item>আত্মহত্যা</item>
+        <item>অনিশ্চিত</item>
+        <item>মাতৃ মৃত্যু</item>
     </string-array>
 
     <string-array name="religion_array">

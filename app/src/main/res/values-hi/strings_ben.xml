@@ -23,6 +23,14 @@
     <string name="mother_s_name">मां का नाम</string>
     <string name="mobile_number_of">किसका मोबाइल नंबर</string>
     <string name="other_mobile_number_of">अन्य - मोबाइल नंबर किसका</string>
+    <string-array name="nbr_residential_area_array">
+        <item>जनजातीय NPVTG</item>
+        <item>जनजातीय-PVTG</item>
+        <item>ग्रामीण</item>
+        <item>शहरी</item>
+        <item>शहरी स्लम</item>
+        <item>अज्ञात</item>
+    </string-array>
     <string name="form_name">फ़ॉर्म का नाम</string>
     <string name="rch_id_ben">RCH आईडी</string>
     <string name="nbr_age">आयु</string>
@@ -110,9 +118,7 @@
     <string-array name="nbr_marital_status_male_array">
         <item>अविवाहित</item>
         <item>विवाहित</item>
-        <item>तलाकशुदा</item>
-        <item>अलग</item>
-        <item>विधुर</item>
+        <item>अज्ञात</item>
     </string-array>
 
     <string-array name="place_of_vhsnc">
@@ -125,9 +131,7 @@
     <string-array name="nbr_marital_status_female_array">
         <item>अविवाहित</item>
         <item>विवाहित</item>
-        <item>तलाकशुदा</item>
-        <item>अलग</item>
-        <item>विधवा</item>
+        <item>अज्ञात</item>
     </string-array>
 
     <string-array name="nbr_mobile_no_relation_array">
@@ -241,6 +245,25 @@
         <item>निजी अस्पताल</item>
         <item>यात्रा के दौरान</item>
         <item>अन्य मृत्यु स्थान</item>
+    </string-array>
+
+    <string-array name="reason_of_death_array">
+        <item>प्राकृतिक मृत्यु</item>
+        <item>दुर्घटना</item>
+        <item>संक्रामक रोग</item>
+        <item>पशु काटने से मृत्यु</item>
+        <item>आत्महत्या</item>
+        <item>अनिश्चित</item>
+    </string-array>
+
+    <string-array name="reason_of_death_array_with_maternal">
+        <item>प्राकृतिक मृत्यु</item>
+        <item>दुर्घटना</item>
+        <item>संक्रामक रोग</item>
+        <item>पशु काटने से मृत्यु</item>
+        <item>आत्महत्या</item>
+        <item>अनिश्चित</item>
+        <item>मातृ मृत्यु</item>
     </string-array>
 
     <string-array name="yes_no_donno">
