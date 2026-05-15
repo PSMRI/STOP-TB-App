@@ -144,15 +144,20 @@ class GeneralOpdFormFragment : Fragment() {
         super.onStart()
         activity?.let {
             when (it) {
-                is HomeActivity -> it.updateActionBar(
-                    R.drawable.ic__ncd,
-                    getString(R.string.general_opd)
-                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+//                is HomeActivity -> it.updateActionBar(
+//                    R.drawable.ic__ncd,
+//                    getString(R.string.general_opd)
+//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow)
+//                }
+//
+//                is VolunteerActivity -> it.updateActionBar(
+//                    R.drawable.ic__ncd,
+//                    getString(R.string.general_opd)
+//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow)
+//                }
 
-                is VolunteerActivity -> it.updateActionBar(
-                    R.drawable.ic__ncd,
-                    getString(R.string.general_opd)
-                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+                is HomeActivity -> it.updateActionBar(R.drawable.ic__ben, getString(R.string.general_opd))
+                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ben, getString(R.string.general_opd))
             }
         }
     }

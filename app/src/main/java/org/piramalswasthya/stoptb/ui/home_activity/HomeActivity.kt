@@ -679,7 +679,11 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
 
         NavigationUI.setupWithNavController(binding.toolbar, navController, appBarConfiguration)
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration)
-
+        // Fix toolbar title appearing beside back button
+        navController.addOnDestinationChangedListener { _, _, _ ->
+            binding.toolbar.title = ""
+            supportActionBar?.setDisplayShowTitleEnabled(false)
+        }
 
         binding.navView.menu.findItem(R.id.homeFragment).setOnMenuItemClickListener {
             navController.popBackStack(R.id.homeFragment, false)
@@ -787,13 +791,25 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
     }
 
 
+//    fun updateActionBar(logoResource: Int, title: String? = null) {
+//        binding.ivToolbar.setImageResource(logoResource)
+////        binding.toolbar.setLogo(logoResource)
+//        title?.let {
+//            binding.toolbar.title = null
+//            binding.tvToolbar.text = it
+//        }
+//    }
+
+
     fun updateActionBar(logoResource: Int, title: String? = null) {
         binding.ivToolbar.setImageResource(logoResource)
-//        binding.toolbar.setLogo(logoResource)
-        title?.let {
-            binding.toolbar.title = null
-            binding.tvToolbar.text = it
-        }
+
+        // Hide default toolbar title beside back button
+        binding.toolbar.title = ""
+        supportActionBar?.setDisplayShowTitleEnabled(false)
+
+        // Show custom centered title
+        binding.tvToolbar.text = title ?: ""
     }
 
     private fun refreshCampHubOfflineBanner() {
@@ -817,6 +833,14 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
         if (!::appBarConfiguration.isInitialized) return
         NavigationUI.setupWithNavController(binding.toolbar, navController, appBarConfiguration)
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration)
+
+        // Fix toolbar title appearing beside back button
+        navController.addOnDestinationChangedListener { _, _, _ ->
+            binding.toolbar.title = ""
+            supportActionBar?.setDisplayShowTitleEnabled(false)
+        }
+
+
     }
 
     fun setToolbarNavigationVisible(visible: Boolean) {

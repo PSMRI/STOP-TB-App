@@ -268,15 +268,18 @@ class AnthropometryFragment : Fragment() {
         super.onStart()
         activity?.let {
             when (it) {
-                is HomeActivity -> it.updateActionBar(
-                    R.drawable.ic__ncd,
-                    getString(R.string.anthropometry_screen)
-                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+//                is HomeActivity -> it.updateActionBar(
+//                    R.drawable.ic__ncd,
+//                    getString(R.string.anthropometry_screen)
+//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+//
+//                is VolunteerActivity -> it.updateActionBar(
+//                    R.drawable.ic__ncd,
+//                    getString(R.string.anthropometry_screen)
+//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
 
-                is VolunteerActivity -> it.updateActionBar(
-                    R.drawable.ic__ncd,
-                    getString(R.string.anthropometry_screen)
-                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+                is HomeActivity -> it.updateActionBar(R.drawable.ic__ncd, getString(R.string.vital_screen))
+                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ncd, getString(R.string.vital_screen))
             }
         }
     }

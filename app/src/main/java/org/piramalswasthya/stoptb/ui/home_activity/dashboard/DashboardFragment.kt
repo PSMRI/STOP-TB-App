@@ -1,10 +1,16 @@
 package org.piramalswasthya.stoptb.ui.home_activity.dashboard
 
+import android.content.Context
+import android.graphics.Typeface
 import android.os.Bundle
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.StyleSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
+import androidx.annotation.StringRes
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import dagger.hilt.android.AndroidEntryPoint
@@ -91,68 +97,75 @@ class DashboardFragment : Fragment() {
         // TB Screening card
         viewModel.tbScreening.observe(viewLifecycleOwner) { data ->
             binding.tvTbScreeningTotal.text = data.total.toString()
-            binding.tvTbScreeningMale.text = getString(R.string.label_male, data.male)
-            binding.tvTbScreeningFemale.text = getString(R.string.label_female, data.female)
-            binding.tvTbScreeningChildren.text = getString(R.string.label_children, data.children)
-            binding.tvTbScreeningOthers.text = getString(R.string.label_others, data.others)
+           // binding.tvTbScreeningMale.text = getString(R.string.label_male, data.male)
+            binding.tvTbScreeningMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
+            binding.tvTbScreeningFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
+            binding.tvTbScreeningChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
+            binding.tvTbScreeningOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
+
         }
 
         // TB Suspected card
         viewModel.tbSuspected.observe(viewLifecycleOwner) { data ->
             binding.tvTbSuspectedTotal.text = data.total.toString()
-            binding.tvTbSuspectedMale.text = getString(R.string.label_male, data.male)
-            binding.tvTbSuspectedFemale.text = getString(R.string.label_female, data.female)
-            binding.tvTbSuspectedChildren.text = getString(R.string.label_children, data.children)
-            binding.tvTbSuspectedOthers.text = getString(R.string.label_others, data.others)
+            binding.tvTbSuspectedMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
+            binding.tvTbSuspectedFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
+            binding.tvTbSuspectedChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
+            binding.tvTbSuspectedOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
         }
 
         // TB Confirmed card
         viewModel.tbConfirmed.observe(viewLifecycleOwner) { data ->
             binding.tvTbConfirmedTotal.text = data.total.toString()
-            binding.tvTbConfirmedMale.text = getString(R.string.label_male, data.male)
-            binding.tvTbConfirmedFemale.text = getString(R.string.label_female, data.female)
-            binding.tvTbConfirmedChildren.text = getString(R.string.label_children, data.children)
-            binding.tvTbConfirmedOthers.text = getString(R.string.label_others, data.others)
+            binding.tvTbConfirmedMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
+            binding.tvTbConfirmedFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
+            binding.tvTbConfirmedChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
+            binding.tvTbConfirmedOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
         }
 
         viewModel.digitalChestXray.observe(viewLifecycleOwner) { data ->
             binding.tvDigitalXrayTotal.text = data.total.toString()
-            binding.tvDigitalXrayMale.text = getString(R.string.label_male, data.male)
-            binding.tvDigitalXrayFemale.text = getString(R.string.label_female, data.female)
-            binding.tvDigitalXrayChildren.text = getString(R.string.label_children, data.children)
-            binding.tvDigitalXrayOthers.text = getString(R.string.label_others, data.others)
+            binding.tvDigitalXrayMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
+            binding.tvDigitalXrayFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
+            binding.tvDigitalXrayChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
+            binding.tvDigitalXrayOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
+            binding.tvDigitalXraySeniorCitizen.text = requireContext().getBoldSecondValue(R.string.label_senior_citizen, data.seniorCitizen)
         }
 
         viewModel.sputumCollection.observe(viewLifecycleOwner) { data ->
             binding.tvSputumTotal.text = data.total.toString()
-            binding.tvSputumMale.text = getString(R.string.label_male, data.male)
-            binding.tvSputumFemale.text = getString(R.string.label_female, data.female)
-            binding.tvSputumChildren.text = getString(R.string.label_children, data.children)
-            binding.tvSputumOthers.text = getString(R.string.label_others, data.others)
+            binding.tvSputumMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
+            binding.tvSputumFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
+            binding.tvSputumChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
+            binding.tvSputumOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
+            binding.tvSputumSeniorCitizen.text = requireContext().getBoldSecondValue(R.string.label_senior_citizen, data.seniorCitizen)
         }
 
         viewModel.trueNat.observe(viewLifecycleOwner) { data ->
             binding.tvTrueNatTotal.text = data.total.toString()
-            binding.tvTrueNatMale.text = getString(R.string.label_male, data.male)
-            binding.tvTrueNatFemale.text = getString(R.string.label_female, data.female)
-            binding.tvTrueNatChildren.text = getString(R.string.label_children, data.children)
-            binding.tvTrueNatOthers.text = getString(R.string.label_others, data.others)
+            binding.tvTrueNatMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
+            binding.tvTrueNatFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
+            binding.tvTrueNatChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
+            binding.tvTrueNatOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
+            binding.tvTrueNatSeniorCitizen.text = requireContext().getBoldSecondValue(R.string.label_senior_citizen, data.seniorCitizen)
         }
 
         viewModel.liquidCulture.observe(viewLifecycleOwner) { data ->
             binding.tvLiquidCultureTotal.text = data.total.toString()
-            binding.tvLiquidCultureMale.text = getString(R.string.label_male, data.male)
-            binding.tvLiquidCultureFemale.text = getString(R.string.label_female, data.female)
-            binding.tvLiquidCultureChildren.text = getString(R.string.label_children, data.children)
-            binding.tvLiquidCultureOthers.text = getString(R.string.label_others, data.others)
+            binding.tvLiquidCultureMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
+            binding.tvLiquidCultureFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
+            binding.tvLiquidCultureChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
+            binding.tvLiquidCultureOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
+            binding.tvLiquidCultureSeniorCitizen.text = requireContext().getBoldSecondValue(R.string.label_senior_citizen, data.seniorCitizen)
         }
 
         viewModel.hwcReferral.observe(viewLifecycleOwner) { data ->
             binding.tvHwcReferralTotal.text = data.total.toString()
-            binding.tvHwcReferralMale.text = getString(R.string.label_male, data.male)
-            binding.tvHwcReferralFemale.text = getString(R.string.label_female, data.female)
-            binding.tvHwcReferralChildren.text = getString(R.string.label_children, data.children)
-            binding.tvHwcReferralOthers.text = getString(R.string.label_others, data.others)
+            binding.tvHwcReferralMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
+            binding.tvHwcReferralFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
+            binding.tvHwcReferralChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
+            binding.tvHwcReferralOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
+            binding.tvHwcReferralSeniorCitizen.text = requireContext().getBoldSecondValue(R.string.label_senior_citizen, data.seniorCitizen)
         }
 
         // NIKSHAY count
@@ -177,5 +190,27 @@ class DashboardFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+    }
+
+
+    private fun Context.getBoldSecondValue(
+        @StringRes labelRes: Int,
+        value: Any
+    ): SpannableString {
+
+        val fullText = getString(labelRes, value)
+        val valueText = value.toString()
+
+        val start = fullText.lastIndexOf(valueText)
+        val end = start + valueText.length
+
+        return SpannableString(fullText).apply {
+            setSpan(
+                StyleSpan(Typeface.BOLD),
+                start,
+                end,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
     }
 }

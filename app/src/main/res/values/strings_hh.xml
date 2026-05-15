@@ -26,7 +26,7 @@
     <string name="nhhr_ward_no">Ward No</string>
     <string name="nhhr_ward_name">Ward Name</string>
     <string name="nhhr_mohalla_name">Mohalla Name</string>
-    <string name="nhhr_poverty_line">Economic Status</string>
+    <string name="nhhr_poverty_line">Socioeconomic Status</string>
     <string-array name="nhhr_poverty_line_array">
         <item>APL</item>
         <item>BPL</item>

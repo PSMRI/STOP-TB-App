@@ -7,6 +7,7 @@
     <string name="relation_with_family_head">পৰিৱাৰ প্ৰধানৰ সৈতে সম্পৰ্ক</string>
     <string name="other_enter_relation_to_head">অন্য - পৰিৱাৰ প্ৰধানলৈ সম্পৰ্ক লিখক</string>
     <string name="community">সমুদায়</string>
+    <string name="caste">জাতি</string>
     <string name="religion">ধৰ্ম</string>
     <string name="other_enter_religion">অন্য - ধৰ্ম লিখক</string>
     <string name="has_aadhaar_number">আধাৰ নম্বৰ আছে</string>
@@ -276,6 +277,21 @@
         <item>পার্সী</item>
         <item>অন্যান্য</item>
         <item>প্ৰকাশন হোৱা নাই</item>
+    </string-array>
+
+    <string-array name="occupation_array">
+        <item>অজ্ঞাত</item>
+        <item>ছাত্ৰ / ছাত্ৰী</item>
+        <item>নিয়োজিত নহয়</item>
+        <item>গৃহিণী</item>
+        <item>কৃষক</item>
+        <item>শ্ৰমিক / দৈনিক মজুৰি কৰ্মী</item>
+        <item>স্বনিয়োজিত / ব্যৱসায়</item>
+        <item>চৰকাৰী কৰ্মচাৰী</item>
+        <item>বেচৰকাৰী কৰ্মচাৰী</item>
+        <item>স্বাস্থ্য কৰ্মী</item>
+        <item>অৱসৰপ্ৰাপ্ত / পেঞ্চনভোগী</item>
+        <item>অন্যান্য</item>
     </string-array>
 
     <string-array name="yes_no_donno">

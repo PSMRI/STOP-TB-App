@@ -36,7 +36,7 @@ class IconDataset @Inject constructor(
             ),
             Icon(
                 R.drawable.ic__ncd,
-                resources.getString(R.string.icon_title_ncd_tb_screening),
+                resources.getString(R.string.tuberculosis),
                 resources.getString(R.string.home_card_tb_subtitle),
                 null,
                 VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToTbFragment()

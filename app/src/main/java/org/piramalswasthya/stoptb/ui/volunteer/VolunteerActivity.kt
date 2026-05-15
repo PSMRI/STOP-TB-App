@@ -263,6 +263,13 @@ class VolunteerActivity : AppCompatActivity() {
         NavigationUI.setupWithNavController(binding.toolbar, navController, appBarConfiguration)
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration)
 
+
+        // Fix toolbar title appearing beside back button
+        navController.addOnDestinationChangedListener { _, _, _ ->
+            binding.toolbar.title = ""
+            supportActionBar?.setDisplayShowTitleEnabled(false)
+        }
+
         // ── Logout ──────────────────────────────────────────────────────
         binding.navView.menu.findItem(R.id.menu_logout)?.setOnMenuItemClickListener {
             logoutAlert.show()
@@ -322,6 +329,7 @@ class VolunteerActivity : AppCompatActivity() {
         binding.toolbar.title = ""
         supportActionBar?.setDisplayShowTitleEnabled(false)
         binding.tvToolbar.text = title
+
     }
 
     fun addClickListenerToHomepageActionBarTitle() {
@@ -345,6 +353,12 @@ class VolunteerActivity : AppCompatActivity() {
         if (!::appBarConfiguration.isInitialized) return
         NavigationUI.setupWithNavController(binding.toolbar, navController, appBarConfiguration)
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration)
+
+        // Fix toolbar title appearing beside back button
+        navController.addOnDestinationChangedListener { _, _, _ ->
+            binding.toolbar.title = ""
+            supportActionBar?.setDisplayShowTitleEnabled(false)
+        }
     }
 
     fun setToolbarNavigationVisible(visible: Boolean) {

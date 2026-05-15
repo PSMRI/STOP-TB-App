@@ -344,6 +344,7 @@
     <string name="label_female">Female: %d</string>
     <string name="label_children">Children(&lt;15y): %d</string>
     <string name="label_others">Others: %d</string>
+    <string name="label_senior_citizen">Age(>=60): %d</string>
     <string name="month_january">January</string>
     <string name="month_february">February</string>
     <string name="month_march">March</string>
