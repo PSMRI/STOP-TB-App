@@ -279,6 +279,15 @@
                         android:textColor="#4E5D5F"
                         android:textSize="12sp"
                         tools:text="Others: 0" />
+
+                    <TextView
+                        android:id="@+id/tvDigitalXraySeniorCitizen"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="#4E5D5F"
+                        android:textSize="12sp"
+                        tools:text="Age(>=60): 0" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -375,6 +384,15 @@
                         android:textColor="#4E5D5F"
                         android:textSize="12sp"
                         tools:text="Others: 0" />
+
+                    <TextView
+                        android:id="@+id/tvSputumSeniorCitizen"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="#4E5D5F"
+                        android:textSize="12sp"
+                        tools:text="Age(>=60): 0" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -471,6 +489,15 @@
                         android:textColor="#4E5D5F"
                         android:textSize="12sp"
                         tools:text="Others: 0" />
+
+                    <TextView
+                        android:id="@+id/tvTrueNatSeniorCitizen"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="#4E5D5F"
+                        android:textSize="12sp"
+                        tools:text="Age(>=60): 0" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -567,6 +594,15 @@
                         android:textColor="#4E5D5F"
                         android:textSize="12sp"
                         tools:text="Others: 0" />
+
+                    <TextView
+                        android:id="@+id/tvLiquidCultureSeniorCitizen"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="#4E5D5F"
+                        android:textSize="12sp"
+                        tools:text="Age(>=60): 0" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -663,6 +699,15 @@
                         android:textColor="#4E5D5F"
                         android:textSize="12sp"
                         tools:text="Others: 0" />
+
+                    <TextView
+                        android:id="@+id/tvHwcReferralSeniorCitizen"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="#4E5D5F"
+                        android:textSize="12sp"
+                        tools:text="Age(>=60): 0" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

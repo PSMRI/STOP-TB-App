@@ -7,6 +7,7 @@
     <string name="relation_with_family_head">परिवार के मुखिया के साथ संबंध</string>
     <string name="other_enter_relation_to_head">अन्य - संबंध दर्ज करें</string>
     <string name="community">समुदाय</string>
+    <string name="caste">जाति</string>
     <string name="religion">धर्म</string>
     <string name="other_enter_religion">अन्य - धर्म दर्ज करें</string>
     <string name="has_aadhaar_number">आधार नंबर है</string>
@@ -229,6 +230,22 @@
         <item>पारसी</item>
         <item>अन्य</item>
         <item>अप्रकटित</item>
+    </string-array>
+
+
+    <string-array name="occupation_array">
+        <item>अज्ञात</item>
+        <item>विद्यार्थी</item>
+        <item>बेरोजगार</item>
+        <item>गृहिणी</item>
+        <item>किसान</item>
+        <item>मजदूर / दैनिक वेतन कर्मी</item>
+        <item>स्वरोजगार / व्यवसाय</item>
+        <item>सरकारी कर्मचारी</item>
+        <item>निजी कर्मचारी</item>
+        <item>स्वास्थ्य कर्मी</item>
+        <item>सेवानिवृत्त / पेंशनभोगी</item>
+        <item>अन्य</item>
     </string-array>
 
     <string-array name="death_place_array">
