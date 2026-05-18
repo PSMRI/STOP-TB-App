@@ -14,8 +14,8 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
-import org.piramalswasthya.stoptb.helpers.applyAutoFlowBackPolicyOnResume
-import org.piramalswasthya.stoptb.helpers.blockBackNavigationInAutoFlow
+import org.piramalswasthya.stoptb.helpers.applyManagedFlowBackPolicyOnResume
+import org.piramalswasthya.stoptb.helpers.blockBackNavigationInManagedFlow
 import org.piramalswasthya.stoptb.helpers.setAutoFlowBackNavigationBlocked
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
@@ -31,6 +31,9 @@ class TBSuspectedQuickFragment : Fragment() {
 
     private val viewModel: TBSuspectedQuickViewModel by viewModels()
 
+    private val isManagedFlow: Boolean
+        get() = viewModel.autoFlow || viewModel.generalOpdFlow
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -42,7 +45,7 @@ class TBSuspectedQuickFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: android.os.Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        blockBackNavigationInAutoFlow(viewModel.autoFlow)
+        blockBackNavigationInManagedFlow(isManagedFlow, allowBack = false)
         val adapter = FormInputAdapter(
             formValueListener = FormInputAdapter.FormValueListener { formId, index ->
                 viewModel.updateListOnValueChanged(formId, index)
@@ -152,15 +155,15 @@ class TBSuspectedQuickFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        applyAutoFlowBackPolicyOnResume(
-            isAutoFlow = viewModel.autoFlow,
-            allowBack = !viewModel.autoFlow
+        applyManagedFlowBackPolicyOnResume(
+            isManagedFlow = isManagedFlow,
+            allowBack = false
         )
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        if (viewModel.autoFlow) {
+        if (isManagedFlow) {
             setAutoFlowBackNavigationBlocked(false)
         }
         _binding = null

@@ -16,11 +16,11 @@ fun Fragment.setAutoFlowBackNavigationBlocked(blocked: Boolean) {
 }
 
 /**
- * In the nurse auto-flow (General Examination → TB Screening → General OPD → Diagnostics),
- * back navigation must be disabled on intermediate steps so users cannot return to a prior form.
+ * @param isManagedFlow True when the screen is part of a multi-step flow (nurse or General OPD flow).
+ * @param allowBack When true, toolbar and system back work normally (e.g. first screen in a flow).
  */
-fun Fragment.blockBackNavigationInAutoFlow(isAutoFlow: Boolean) {
-    if (!isAutoFlow) return
+fun Fragment.blockBackNavigationInManagedFlow(isManagedFlow: Boolean, allowBack: Boolean) {
+    if (!isManagedFlow || allowBack) return
     requireActivity().onBackPressedDispatcher.addCallback(
         viewLifecycleOwner,
         object : OnBackPressedCallback(true) {
@@ -29,13 +29,20 @@ fun Fragment.blockBackNavigationInAutoFlow(isAutoFlow: Boolean) {
     )
 }
 
-/**
- * @param allowBack When true, toolbar and system back work normally (e.g. General Examination entry).
- */
-fun Fragment.applyAutoFlowBackPolicyOnResume(isAutoFlow: Boolean, allowBack: Boolean) {
-    if (!isAutoFlow) {
+fun Fragment.applyManagedFlowBackPolicyOnResume(isManagedFlow: Boolean, allowBack: Boolean) {
+    if (!isManagedFlow) {
         setAutoFlowBackNavigationBlocked(false)
         return
     }
     setAutoFlowBackNavigationBlocked(!allowBack)
+}
+
+/** @see blockBackNavigationInManagedFlow */
+fun Fragment.blockBackNavigationInAutoFlow(isAutoFlow: Boolean) {
+    blockBackNavigationInManagedFlow(isManagedFlow = isAutoFlow, allowBack = false)
+}
+
+/** @see applyManagedFlowBackPolicyOnResume */
+fun Fragment.applyAutoFlowBackPolicyOnResume(isAutoFlow: Boolean, allowBack: Boolean) {
+    applyManagedFlowBackPolicyOnResume(isManagedFlow = isAutoFlow, allowBack = allowBack)
 }

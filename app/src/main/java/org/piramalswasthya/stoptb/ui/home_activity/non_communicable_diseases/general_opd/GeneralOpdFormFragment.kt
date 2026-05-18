@@ -15,8 +15,8 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
-import org.piramalswasthya.stoptb.helpers.applyAutoFlowBackPolicyOnResume
-import org.piramalswasthya.stoptb.helpers.blockBackNavigationInAutoFlow
+import org.piramalswasthya.stoptb.helpers.applyManagedFlowBackPolicyOnResume
+import org.piramalswasthya.stoptb.helpers.blockBackNavigationInManagedFlow
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import timber.log.Timber
@@ -30,6 +30,13 @@ class GeneralOpdFormFragment : Fragment() {
 
     private val viewModel: GeneralOpdFormViewModel by viewModels()
 
+    private val isManagedFlow: Boolean
+        get() = viewModel.autoFlow || viewModel.generalOpdFlow
+
+    /** First screen in General OPD flow; nurse auto-flow blocks back on this step. */
+    private val allowBackNavigation: Boolean
+        get() = viewModel.generalOpdFlow && !viewModel.autoFlow
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -41,7 +48,7 @@ class GeneralOpdFormFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        blockBackNavigationInAutoFlow(viewModel.autoFlow)
+        blockBackNavigationInManagedFlow(isManagedFlow, allowBackNavigation)
 
         viewModel.recordExists.observe(viewLifecycleOwner) { exists ->
             exists?.let { recordExists ->
@@ -138,7 +145,8 @@ class GeneralOpdFormFragment : Fragment() {
             R.id.TBSuspectedQuickFragment,
             bundleOf(
                 "benId" to viewModel.benId,
-                "autoFlow" to viewModel.autoFlow
+                "autoFlow" to viewModel.autoFlow,
+                "generalOpdFlow" to viewModel.generalOpdFlow
             )
         )
     }
@@ -167,9 +175,9 @@ class GeneralOpdFormFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        applyAutoFlowBackPolicyOnResume(
-            isAutoFlow = viewModel.autoFlow,
-            allowBack = !viewModel.autoFlow
+        applyManagedFlowBackPolicyOnResume(
+            isManagedFlow = isManagedFlow,
+            allowBack = allowBackNavigation
         )
     }
 
