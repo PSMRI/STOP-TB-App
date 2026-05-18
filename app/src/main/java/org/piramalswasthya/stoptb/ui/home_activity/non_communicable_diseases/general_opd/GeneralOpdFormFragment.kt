@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
+import org.piramalswasthya.stoptb.helpers.applyAutoFlowBackPolicyOnResume
+import org.piramalswasthya.stoptb.helpers.blockBackNavigationInAutoFlow
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import timber.log.Timber
@@ -39,6 +41,7 @@ class GeneralOpdFormFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        blockBackNavigationInAutoFlow(viewModel.autoFlow)
 
         viewModel.recordExists.observe(viewLifecycleOwner) { exists ->
             exists?.let { recordExists ->
@@ -162,12 +165,16 @@ class GeneralOpdFormFragment : Fragment() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        applyAutoFlowBackPolicyOnResume(
+            isAutoFlow = viewModel.autoFlow,
+            allowBack = !viewModel.autoFlow
+        )
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
-        if (viewModel.autoFlow) {
-            (activity as? HomeActivity)?.setToolbarNavigationVisible(true)
-            (activity as? VolunteerActivity)?.setToolbarNavigationVisible(true)
-        }
         _binding = null
     }
 }

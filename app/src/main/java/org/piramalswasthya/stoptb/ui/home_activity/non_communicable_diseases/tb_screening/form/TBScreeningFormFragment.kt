@@ -24,6 +24,8 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
+import org.piramalswasthya.stoptb.helpers.applyAutoFlowBackPolicyOnResume
+import org.piramalswasthya.stoptb.helpers.blockBackNavigationInAutoFlow
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import timber.log.Timber
@@ -62,6 +64,7 @@ class TBScreeningFormFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        blockBackNavigationInAutoFlow(viewModel.autoFlow)
         binding.btnCancel.visibility = View.GONE
         viewModel.recordExists.observe(viewLifecycleOwner) { notIt ->
             notIt?.let { recordExists ->
@@ -207,16 +210,21 @@ class TBScreeningFormFragment : Fragment() {
                 is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.tb_screening_form)
-                )            }
+                )
+            }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        applyAutoFlowBackPolicyOnResume(
+            isAutoFlow = viewModel.autoFlow,
+            allowBack = !viewModel.autoFlow
+        )
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        if (viewModel.autoFlow) {
-            (activity as? HomeActivity)?.setToolbarNavigationVisible(true)
-            (activity as? VolunteerActivity)?.setToolbarNavigationVisible(true)
-        }
         _binding = null
     }
 

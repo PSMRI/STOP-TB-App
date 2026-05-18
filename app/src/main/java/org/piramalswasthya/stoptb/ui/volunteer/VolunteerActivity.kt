@@ -33,6 +33,7 @@ import org.piramalswasthya.stoptb.BuildConfig
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.ActivityVolunteerBinding
+import org.piramalswasthya.stoptb.helpers.AutoFlowBackNavigationHost
 import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
@@ -47,7 +48,9 @@ import java.util.Locale
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class VolunteerActivity : AppCompatActivity() {
+class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
+
+    private var autoFlowBackNavigationBlocked: Boolean = false
 
     @EntryPoint
     @InstallIn(SingletonComponent::class)
@@ -361,14 +364,30 @@ class VolunteerActivity : AppCompatActivity() {
         }
     }
 
-    fun setToolbarNavigationVisible(visible: Boolean) {
-        if (visible) {
-            restoreToolbarNavigation()
-        } else {
+    override fun setAutoFlowBackNavigationBlocked(blocked: Boolean) {
+        autoFlowBackNavigationBlocked = blocked
+        if (blocked) {
             binding.toolbar.navigationIcon = null
             binding.toolbar.setNavigationOnClickListener(null)
             supportActionBar?.setDisplayHomeAsUpEnabled(false)
+        } else if (::appBarConfiguration.isInitialized) {
+            restoreToolbarNavigation()
         }
+    }
+
+    fun setToolbarNavigationVisible(visible: Boolean) {
+        if (!visible || autoFlowBackNavigationBlocked) {
+            binding.toolbar.navigationIcon = null
+            binding.toolbar.setNavigationOnClickListener(null)
+            supportActionBar?.setDisplayHomeAsUpEnabled(false)
+        } else {
+            restoreToolbarNavigation()
+        }
+    }
+
+    override fun onSupportNavigateUp(): Boolean {
+        if (autoFlowBackNavigationBlocked) return false
+        return navController.navigateUp() || super.onSupportNavigateUp()
     }
 
     override fun onPause() {

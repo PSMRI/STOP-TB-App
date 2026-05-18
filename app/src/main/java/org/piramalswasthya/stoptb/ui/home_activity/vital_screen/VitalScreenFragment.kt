@@ -18,6 +18,7 @@ import androidx.navigation.fragment.findNavController
 import dagger.hilt.android.AndroidEntryPoint
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.databinding.FragmentVitalScreenBinding
+import org.piramalswasthya.stoptb.helpers.applyAutoFlowBackPolicyOnResume
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 
@@ -574,14 +575,18 @@ class VitalScreenFragment : Fragment() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        applyAutoFlowBackPolicyOnResume(
+            isAutoFlow = viewModel.autoFlow,
+            allowBack = true
+        )
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
         referralAlert?.dismiss()
         referralAlert = null
-        if (viewModel.autoFlow) {
-            (activity as? HomeActivity)?.setToolbarNavigationVisible(true)
-            (activity as? VolunteerActivity)?.setToolbarNavigationVisible(true)
-        }
         _binding = null
     }
 
