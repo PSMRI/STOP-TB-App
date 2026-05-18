@@ -33,6 +33,7 @@ import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.utils.callPhoneNumber
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -140,7 +141,7 @@ class AllBenFragment : Fragment() {
         val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
         val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
         val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess) && !isReadOnlyReferralList
-        val showCallButton = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
+        val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
         binding.llQuickRefresh.visibility = View.GONE
 
         if (showAddBeneficiary) {
@@ -211,7 +212,7 @@ class AllBenFragment : Fragment() {
                     checkAndGenerateABHA(benId)
                 },
                 { item, benId, hhId, isViewMode, isIFA -> },
-                { },
+                { ben -> callPhoneNumber(ben.mobileNo) },
                 { },
                 { item, benId, hhId ->
                     if (isReadOnlyReferralList) return@BenClickListener

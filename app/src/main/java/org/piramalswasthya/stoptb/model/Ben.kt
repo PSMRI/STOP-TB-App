@@ -882,8 +882,11 @@ data class BenBasicDomain(
     val nikshayIdDisplay: String
         get() = nikshayId?.takeIf { it.isNotBlank() } ?: "N/A"
 
+    val hasCallableMobileNo: Boolean
+        get() = mobileNo.isNotBlank() && mobileNo != "9999999999"
+
     val mobileNoDisplay: String
-        get() = mobileNo.takeIf { it.isNotBlank() && it != "9999999999" } ?: "N/A"
+        get() = if (hasCallableMobileNo) mobileNo else "N/A"
 }
 
 
