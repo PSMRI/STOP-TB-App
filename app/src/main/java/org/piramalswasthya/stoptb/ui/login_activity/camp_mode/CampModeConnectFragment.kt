@@ -8,6 +8,9 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.NavOptions
@@ -69,6 +72,8 @@ class CampModeConnectFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        applyStatusBarInsetsToHeader()
+
         binding.etCampHubUrl.setText(viewModel.getCampHubUrl())
         binding.ibBack.setOnClickListener {
             closeConnectScreen(refreshSignIn = false)
@@ -95,6 +100,16 @@ class CampModeConnectFragment : Fragment() {
         viewModel.campHubStatus.observe(viewLifecycleOwner) { status ->
             updateCampHubStatus(status)
         }
+    }
+
+    private fun applyStatusBarInsetsToHeader() {
+        val initialHeaderPaddingTop = binding.header.paddingTop
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
+            val statusBarTop = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
+            binding.header.updatePadding(top = initialHeaderPaddingTop + statusBarTop)
+            insets
+        }
+        ViewCompat.requestApplyInsets(binding.root)
     }
 
     private fun startQrScanner() {
