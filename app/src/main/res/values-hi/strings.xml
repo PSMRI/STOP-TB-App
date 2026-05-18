@@ -684,6 +684,9 @@
     <string name="pulse_rate_bpm">नाड़ी दर (प्रति मिनट धड़कन)</string>
     <string name="systolic_bp_mmhg">सिस्टोलिक ब्लड प्रेशर (mm Hg)</string>
     <string name="diastolic_bp_mmhg">डायस्टोलिक ब्लड प्रेशर (mm Hg)</string>
+    <string name="vital_systolic">सिस्टोलिक</string>
+    <string name="vital_diastolic">डायस्टोलिक</string>
+    <string name="bp_mmhg">BP (mm Hg)</string>
     <string name="random_blood_sugar">रैंडम ब्लड शुगर</string>
     <string name="vital_referral_reason">वाइटल स्क्रीनिंग रेफरल</string>
     <string name="clinical_examination">क्लिनिकल परीक्षण (वैकल्पिक)</string>

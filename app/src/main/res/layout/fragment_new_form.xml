@@ -163,7 +163,7 @@
 
             </androidx.core.widget.NestedScrollView>
 
-            <!-- Submit + Cancel buttons row -->
+            <!-- Submit button row -->
             <LinearLayout
                 android:id="@+id/ll_buttons"
                 android:layout_width="0dp"
@@ -180,6 +180,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="@dimen/margin_big"
+                    android:visibility="gone"
                     android:text="@string/cancel" />
 
                 <com.google.android.material.button.MaterialButton

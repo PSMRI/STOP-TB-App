@@ -271,14 +271,7 @@ class VitalScreenViewModel @Inject constructor(
     }
 
     fun getPulseDisplayValue(value: Int?): String? {
-        return when {
-            value == null -> null
-            value < 60 -> "Less than 60"
-            value <= 70 -> "60-70"
-            value <= 80 -> "70-80"
-            value > 90 -> "More than 90"
-            else -> null
-        }
+        return value?.toString()
     }
 
     fun shouldShowTemperatureReferral(option: String?): Boolean = mapTemperatureOptionToValue(option)?.let { it >= 100.0 } == true
@@ -409,16 +402,7 @@ class VitalScreenViewModel @Inject constructor(
     }
 
     private fun mapPulseOptionToValue(option: String?): Int? {
-        val normalized = option?.trim()
-        return when (normalized) {
-            "Less than 60" -> 59
-            "less than 60" -> 59
-            "60-70" -> 65
-            "70-80" -> 75
-            "More than 90" -> 91
-            "more than 90" -> 91
-            else -> normalized?.toIntOrNull()
-        }
+        return option?.trim()?.toIntOrNull()
     }
 
     private fun Double.stripTrailingZeros(): String =

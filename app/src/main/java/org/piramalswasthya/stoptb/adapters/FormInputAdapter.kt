@@ -4,6 +4,7 @@ import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Context.INPUT_METHOD_SERVICE
+import android.content.DialogInterface
 import android.content.res.ColorStateList
 import android.content.res.Resources
 import android.graphics.Color
@@ -89,6 +90,18 @@ private fun parseFormDate(value: String?): Calendar? {
             .parse(value.trim())
     }.getOrNull() ?: return null
     return Calendar.getInstance().apply { time = parsedDate }
+}
+
+private fun DatePickerDialog.showOnlyOkButton() {
+    setOnShowListener {
+        getButton(DialogInterface.BUTTON_POSITIVE)?.apply {
+            visibility = View.VISIBLE
+            setText(android.R.string.ok)
+            setTextColor(Color.rgb(0, 121, 107))
+        }
+        getButton(DialogInterface.BUTTON_NEGATIVE)?.visibility = View.GONE
+        getButton(DialogInterface.BUTTON_NEUTRAL)?.visibility = View.GONE
+    }
 }
 
 class FormInputAdapter(
@@ -833,6 +846,7 @@ class FormInputAdapter(
                     datePickerDialog.datePicker.calendarViewShown = false
                     datePickerDialog.datePicker.spinnersShown = true
                 }
+                datePickerDialog.showOnlyOkButton()
                 item.errorText = null
                 binding.tilEditText.error = null
                 val effectiveMin = item.min
@@ -1054,6 +1068,7 @@ class FormInputAdapter(
                     datePickerDialog.datePicker.calendarViewShown = false
                     datePickerDialog.datePicker.spinnersShown = true
                 }
+                datePickerDialog.showOnlyOkButton()
                 item.errorText = null
                 binding.tilEditTextDate.error = null
                 val effectiveMin = item.min

@@ -84,6 +84,27 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         return saved.residentialAreaId?.let { residentialAreaType.getStringFromPosition(it) }
     }
 
+    private fun getSavedCommunityValue(saved: BenRegCache): String? {
+        val savedCommunity = saved.community?.trim()
+        getLocalValueInArray(R.array.community_array, savedCommunity)?.let {
+            return it
+        }
+        if (!savedCommunity.isNullOrBlank()) return null
+        return saved.communityId.takeIf { it > 0 }?.let { community.getStringFromPosition(it) }
+    }
+
+    private fun setDefaultOccupationIfNeeded() {
+        if (occupationDrop.value.isNullOrBlank()) {
+            occupationDrop.value = occupationDrop.entries?.firstOrNull()
+        }
+    }
+
+    private fun setDefaultEconomicStatusIfNeeded() {
+        if (economicStatus.value.isNullOrBlank()) {
+            economicStatus.value = economicStatus.entries?.lastOrNull()
+        }
+    }
+
     // 1. Photo
     private val pic = FormElement(
         id = 1, inputType = IMAGE_VIEW,
@@ -306,7 +327,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         id = 17, inputType = DROPDOWN,
         title = resources.getString(R.string.caste),
         arrayId = R.array.community_array,
-        entries = resources.getStringArray(R.array.community_array), required = false
+        entries = resources.getStringArray(R.array.community_array), required = true
     )
 
     // 13. Religion
@@ -329,7 +350,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         title = resources.getString(R.string.nhhr_poverty_line),
         arrayId = R.array.nhhr_poverty_line_array,
         entries = resources.getStringArray(R.array.nhhr_poverty_line_array),
-        required = false
+        required = true
     )
 
     private val residentialAreaType = FormElement(
@@ -462,7 +483,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         subCentre.entries = arrayOf(resolvedSubCentre)
         subCentre.value = resolvedSubCentre
         this.villageEntities = villageEntityList
-        if (occupation.value == null) occupation.value = resources.getString(R.string.nbr_occupation_default)
+        setDefaultOccupationIfNeeded()
+        setDefaultEconomicStatusIfNeeded()
         setDefaultResidentialAreaIfNeeded()
 
         ben?.takeIf { !it.isDraft }?.let { saved ->
@@ -547,20 +569,18 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             tu.value = saved.locationRecord.tu?.name ?: ""
             healthFacility.value = saved.locationRecord.healthFacility?.name ?: ""
 
-            community.value  = community.getStringFromPosition(saved.communityId)
+            community.value  = getSavedCommunityValue(saved)
             religion.value   = religion.getStringFromPosition(saved.religionId)
             otherReligion.value = saved.religionOthers
 
             economicStatus.value = economicStatus.getStringFromPosition(saved.economicStatusId ?: 0)
+            setDefaultEconomicStatusIfNeeded()
             residentialAreaType.value = getSavedResidentialAreaValue(saved)
             setDefaultResidentialAreaIfNeeded()
             otherResidentialAreaType.value = null
 
-//            if (!saved.occupation.isNullOrEmpty() && saved.occupation != "unknown") occupation.value = saved.occupation
-
-            if (!saved.occupation.isNullOrEmpty() && saved.occupation != "unknown") {
-                occupationDrop.value = saved.occupation
-            }
+            occupationDrop.value = getLocalValueInArray(R.array.occupation_array, saved.occupation)
+            setDefaultOccupationIfNeeded()
 
             reproductiveStatus.value = saved.genDetails?.reproductiveStatus?.let {
                 normalizeReproductiveStatusForDisplay(it)
@@ -1080,8 +1100,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             }
 
             // Occupation
-            val defaultOccupation = resources.getString(R.string.nbr_occupation_default)
-            ben.occupation = occupation.value?.ifEmpty { defaultOccupation } ?: defaultOccupation
+            val defaultOccupation = englishResources.getStringArray(R.array.occupation_array).first()
+            ben.occupation = getEnglishValueInArray(R.array.occupation_array, occupationDrop.value)
+                ?.ifEmpty { defaultOccupation }
+                ?: defaultOccupation
 
             // Marital Status
             ben.genDetails?.maritalStatusId = maritalStatus.getPosition()
