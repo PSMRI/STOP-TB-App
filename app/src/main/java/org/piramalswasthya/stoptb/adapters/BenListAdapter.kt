@@ -90,10 +90,10 @@ class BenListAdapter(
             binding.hasAbha = !item.abhaId.isNullOrEmpty()
             binding.role = role
 
-            if (showCall) {
-                binding.ivCall.visibility = View.VISIBLE
+            binding.ivCall.visibility = if (showCall && item.hasCallableMobileNo) {
+                View.VISIBLE
             } else {
-                binding.ivCall.visibility = View.GONE
+                View.GONE
             }
 
             val isMatched = benIdList.contains(item.benId)

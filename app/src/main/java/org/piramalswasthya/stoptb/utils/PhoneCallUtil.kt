@@ -9,9 +9,12 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 
+private fun String?.toCallablePhoneNumber(): String? =
+    this?.trim()?.takeIf { it.isNotBlank() && it != "9999999999" }
+
 fun Fragment.callPhoneNumber(phoneNumber: String?) {
-    val number = phoneNumber?.trim()
-    if (number.isNullOrEmpty()) {
+    val number = phoneNumber.toCallablePhoneNumber()
+    if (number == null) {
         Toast.makeText(requireContext(), "Mobile number not available", Toast.LENGTH_SHORT).show()
         return
     }
