@@ -3,8 +3,8 @@
     <!--    Login-->
     <string name="tv_text_welcome">Welcome, please login</string>
     <string name="tv_text_welcome_user">Welcome, %s</string>
-    <string name="login_app_native_name">StopTB</string>
-    <string name="login_app_native_name_uat">StopTB-UAT</string>
+    <string name="login_app_native_name">Stop TB</string>
+    <string name="login_app_native_name_uat">Stop TB-UAT</string>
     <string name="tv_text_sign_in">Login</string>
     <string name="tv_text_select_language">Please Select Your Language</string>
     <string name="text_english" translatable="false">English</string>
