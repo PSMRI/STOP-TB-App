@@ -221,7 +221,7 @@ class AllBenFragment : Fragment() {
                             AllBenFragmentDirections.actionAllBenFragmentToVitalScreenFragment(
                                 benId = benId,
                                 benRegId = benRegId,
-                                autoFlow = false
+                                autoFlow = isNurse
                             )
                         )
                     }
