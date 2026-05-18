@@ -10,10 +10,23 @@ import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import androidx.appcompat.app.AppCompatActivity
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.ui.login_activity.LoginActivity
+import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.utils.RoleConstants
 
 class SplashActivity : AppCompatActivity() {
+
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface WrapperEntryPoint {
+        val preferenceDao: PreferenceDao
+    }
 
     private val handler = Handler(Looper.getMainLooper())
 
@@ -23,10 +36,26 @@ class SplashActivity : AppCompatActivity() {
         playSplashAnimation()
 
         handler.postDelayed({
-            startActivity(Intent(this, LoginActivity::class.java))
+            navigateToNextScreen()
             overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
             finish()
         }, SPLASH_DURATION_MS)
+    }
+
+    private fun navigateToNextScreen() {
+        val pref = EntryPointAccessors.fromApplication(
+            applicationContext,
+            WrapperEntryPoint::class.java
+        ).preferenceDao
+        val loggedInUser = pref.getLoggedInUser()
+        val destination = if (
+            loggedInUser != null && RoleConstants.isAllowedStopTbRole(loggedInUser.role)
+        ) {
+            VolunteerActivity::class.java
+        } else {
+            LoginActivity::class.java
+        }
+        startActivity(Intent(this, destination))
     }
 
     override fun onDestroy() {
