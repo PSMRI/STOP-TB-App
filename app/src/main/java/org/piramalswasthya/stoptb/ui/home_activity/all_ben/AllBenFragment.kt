@@ -140,7 +140,7 @@ class AllBenFragment : Fragment() {
         val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
         val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
         val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess) && !isReadOnlyReferralList
-        val showCallButton = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
+        val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
         binding.llQuickRefresh.visibility = View.GONE
 
         if (showAddBeneficiary) {
