@@ -1012,6 +1012,9 @@
     <string name="pulse_rate_bpm">Pulse Rate (beats per minute)</string>
     <string name="systolic_bp_mmhg">SBP (mm Hg)</string>
     <string name="diastolic_bp_mmhg">DBP (mm Hg)</string>
+    <string name="vital_systolic">Systolic</string>
+    <string name="vital_diastolic">Diastolic</string>
+    <string name="bp_mmhg">BP (mm Hg)</string>
     <string name="random_blood_sugar">RBS (mg/dl)</string>
     <string name="referred_for">Referred for</string>
     <string name="refer_to_hwc_alert">Refer to Health and Wellness Centre</string>

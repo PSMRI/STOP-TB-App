@@ -77,7 +77,7 @@ class VitalScreenFragment : Fragment() {
             binding.btnSubmit.visibility = if (hasExistingVitals) View.GONE else View.VISIBLE
             setFormEditable(!hasExistingVitals)
             vital ?: return@observe
-            binding.etPulseRate.setText(viewModel.getPulseDisplayValue(vital.pulseRate), false)
+            binding.etPulseRate.setText(viewModel.getPulseDisplayValue(vital.pulseRate))
             binding.etBpSystolic.setText(vital.bpSystolic?.toString().orEmpty())
             binding.etBpDiastolic.setText(vital.bpDiastolic?.toString().orEmpty())
             binding.etRbs.setText(vital.rbs?.stripTrailingZeros())
@@ -141,13 +141,6 @@ class VitalScreenFragment : Fragment() {
     }
 
     private fun setupDropdowns() {
-        binding.etPulseRate.setAdapter(
-            ArrayAdapter(
-                requireContext(),
-                android.R.layout.simple_list_item_1,
-                resources.getStringArray(R.array.vital_pulse_rate_options)
-            )
-        )
         val hivLabels = getHivStatusOptions().map { it.label }
         binding.etHivStatus.setAdapter(
             ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, hivLabels)
@@ -156,7 +149,6 @@ class VitalScreenFragment : Fragment() {
             binding.etHivStatus.setText(getHivStatusOptions().first { it.code == "UNKNOWN" }.label, false)
         }
         setupRiskFactorSelection()
-        enableDropdownInteraction(binding.tilPulseRate, binding.etPulseRate)
         enableDropdownInteraction(binding.tilHivStatus, binding.etHivStatus)
     }
 
@@ -312,13 +304,7 @@ class VitalScreenFragment : Fragment() {
     }
 
     private fun parsePulse(value: String): Int? {
-        return when (value.trim()) {
-            "Less than 60", "less than 60" -> 59
-            "60-70" -> 65
-            "70-80" -> 75
-            "More than 90", "more than 90" -> 91
-            else -> value.trim().toIntOrNull()
-        }
+        return value.trim().toIntOrNull()
     }
 
     private fun validateWholeNumber(

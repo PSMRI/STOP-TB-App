@@ -228,12 +228,9 @@
     </string-array>
 
     <string-array name="community_array">
-        <item>সাধাৰণ</item>
-        <item>এছি</item>
-        <item>এসটি</item>
-        <item>অবিচ</item>
-        <item>ওচি</item>
-        <item>দিয়া হোৱা নাই</item>
+        <item>SC</item>
+        <item>ST</item>
+        <item>অন্যান্য</item>
     </string-array>
 
     <string-array name="death_place_array">
@@ -417,19 +414,5 @@
     </string-array>
 
 
-    <string-array name="occupation_array">
-        <item>অজ্ঞাত</item>
-        <item>ছাত্ৰ / ছাত্ৰী</item>
-        <item>নিয়োজিত নহয়</item>
-        <item>গৃহিণী</item>
-        <item>কৃষক</item>
-        <item>শ্ৰমিক / দৈনিক মজুৰি কৰ্মী</item>
-        <item>স্বনিয়োজিত / ব্যৱসায়</item>
-        <item>চৰকাৰী কৰ্মচাৰী</item>
-        <item>বেচৰকাৰী কৰ্মচাৰী</item>
-        <item>স্বাস্থ্য কৰ্মী</item>
-        <item>অৱসৰপ্ৰাপ্ত / পেঞ্চনভোগী</item>
-        <item>অন্যান্য</item>
-    </string-array>
 
 </resources>

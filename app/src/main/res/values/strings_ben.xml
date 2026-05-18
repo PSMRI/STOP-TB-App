@@ -293,12 +293,9 @@ personal health profile.</string>
     </string-array>
 
     <string-array name="community_array">
-        <item>General</item>
         <item>SC</item>
         <item>ST</item>
-        <item>OBC</item>
-        <item>OC</item>
-        <item>Not given</item>
+        <item>Other</item>
     </string-array>
 
     <string-array name="religion_array">
@@ -508,19 +505,5 @@ personal health profile.</string>
     </string-array>
 
 
-    <string-array name="occupation_array">
-        <item>Unknown</item>
-        <item>Student</item>
-        <item>Unemployed</item>
-        <item>Homemaker</item>
-        <item>Farmer</item>
-        <item>Laborer / Daily Wage Worker</item>
-        <item>Self-employed / Business</item>
-        <item>Government Employee</item>
-        <item>Private Employee</item>
-        <item>Health Care Worker</item>
-        <item>Retired / Pensioner</item>
-        <item>Other</item>
-    </string-array>
 
 </resources>
