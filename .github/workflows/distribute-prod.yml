@@ -1,0 +1,85 @@
+name: Build & Distribute PROD
+run-name: STOP TB Android Build - PROD
+
+on:
+  workflow_dispatch:  # Manual trigger
+
+permissions:
+  contents: read
+
+concurrency:
+  group: distribute-prod-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-distribute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Create local.properties
+        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - name: Create google-services.json (UAT)
+        run: |
+          mkdir -p app/src/stoptbUat
+          echo '${{ secrets.GOOGLE_SERVICES_JSON_UAT }}' > app/src/stoptbUat/google-services.json
+
+      - name: Create google-services.json (Prod)
+        run: |
+          mkdir -p app/src/stoptb
+          echo '${{ secrets.GOOGLE_SERVICES_JSON_PROD }}' > app/src/stoptb/google-services.json
+
+      - name: Accept SDK licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+
+      - name: Install NDK
+        run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;29.0.14033849"
+
+      - name: Build PROD Release APK
+        env:
+          ENCRYPTED_PASS_KEY: ${{ secrets.ENCRYPTED_PASS_KEY }}
+          ABHA_CLIENT_SECRET: ${{ secrets.ABHA_CLIENT_SECRET }}
+          ABHA_CLIENT_ID: ${{ secrets.ABHA_CLIENT_ID }}
+          BASE_TMC_URL: ${{ secrets.BASE_TMC_URL }}
+          BASE_ABHA_URL: ${{ secrets.BASE_ABHA_URL }}
+          ABHA_TOKEN_URL: ${{ secrets.ABHA_TOKEN_URL }}
+          ABHA_AUTH_URL: ${{ secrets.ABHA_AUTH_URL }}
+          CHAT_URL: ${{ secrets.CHAT_URL }}
+        run: ./gradlew assembleStoptbRelease --no-daemon
+
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-release-apk
+          path: app/build/outputs/apk/stoptb/release/*.apk
+
+      - name: Distribute to Firebase App Distribution
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ secrets.FIREBASE_APP_ID_PROD }}
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          groups: testers
+          file: app/build/outputs/apk/stoptb/release/app-stoptb-universal-release.apk
+          releaseNotes: |
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Message: ${{ github.event.head_commit.message }}
