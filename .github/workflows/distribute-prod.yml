@@ -68,6 +68,16 @@ jobs:
           echo "VERSION=${{ github.event.inputs.versionName }}" > version/version.properties
           echo "VERSIONCODE=${{ github.event.inputs.versionCode }}" >> version/version.properties
 
+      - name: Create release keystore
+        run: |
+          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 --decode > stoptb_signing_key.jks
+          cat > keystore.properties <<EOF
+          storeFile=../stoptb_signing_key.jks
+          storePassword=${{ secrets.RELEASE_STORE_PASSWORD }}
+          keyAlias=${{ secrets.RELEASE_KEY_ALIAS }}
+          keyPassword=${{ secrets.RELEASE_KEY_PASSWORD }}
+          EOF
+
       - name: Build PROD Release APK
         env:
           ENCRYPTED_PASS_KEY: ${{ secrets.ENCRYPTED_PASS_KEY }}
