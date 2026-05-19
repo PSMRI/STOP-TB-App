@@ -38,7 +38,7 @@ class NCDReferalFormFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
 
-        binding.benId.text = viewModel.benId.toString()
+//        binding.benId?.text = viewModel.benId.toString()
         viewModel.benName.observe(viewLifecycleOwner) {
             binding.tvBenName.text = it
         }
