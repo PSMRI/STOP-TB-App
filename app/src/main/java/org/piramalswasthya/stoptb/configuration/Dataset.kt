@@ -605,6 +605,47 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
         return -1
     }
 
+//    protected fun validateAllCapsOrSpaceOnEditTextWithHindiEnabled(formElement: FormElement): Int {
+//        val value = formElement.value.orEmpty().trim()
+//
+//        // Function to check if a character is Hindi or Assamese
+//        fun Char.isHindiOrAssamese(): Boolean {
+//            return this in '\u0900'..'\u097F' || this in '\u0980'..'\u09FF'
+//        }
+//
+//        // Function to check if a string contains only uppercase English letters or spaces
+//        fun String.isAllUppercaseOrSpace(): Boolean {
+//            return this.all { it.isUpperCase() || it.isWhitespace() || it.isHindiOrAssamese() }
+//        }
+//
+//        if (formElement.allCaps) {
+//            when {
+//                value.isEmpty() -> {
+//                    if (formElement.required) {
+//                        formElement.errorText = resources.getString(R.string.form_input_empty_error)
+//                    } else {
+//                        formElement.errorText = null
+//                    }
+//                    return -1
+//                }
+//                !value.isAllUppercaseOrSpace() -> {
+//                    formElement.errorText = resources.getString(R.string.form_input_upper_case_error)
+//                    return -1
+//                }
+//            }
+//
+//            // Convert only English letters to uppercase, keep Hindi/Assamese as is
+//            val transformedValue = value.map {
+//                if (it.isLowerCase() && !it.isHindiOrAssamese()) it.uppercaseChar() else it
+//            }.joinToString("")
+//
+//            formElement.value = transformedValue
+//        }
+//
+//        return -1
+//    }
+
+
     protected fun validateAllCapsOrSpaceOnEditTextWithHindiEnabled(formElement: FormElement): Int {
         val value = formElement.value.orEmpty().trim()
 
@@ -615,28 +656,44 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 
         // Function to check if a string contains only uppercase English letters or spaces
         fun String.isAllUppercaseOrSpace(): Boolean {
-            return this.all { it.isUpperCase() || it.isWhitespace() || it.isHindiOrAssamese() }
+            return this.all {
+                it.isUpperCase() || it.isWhitespace() || it.isHindiOrAssamese()
+            }
         }
 
         if (formElement.allCaps) {
+
             when {
+
                 value.isEmpty() -> {
-                    if (formElement.required) {
-                        formElement.errorText = resources.getString(R.string.form_input_empty_error)
-                    } else {
-                        formElement.errorText = null
-                    }
+                    formElement.errorText =
+                        if (formElement.required) {
+                            resources.getString(R.string.form_input_empty_error)
+                        } else {
+                            null
+                        }
                     return -1
                 }
+
                 !value.isAllUppercaseOrSpace() -> {
-                    formElement.errorText = resources.getString(R.string.form_input_upper_case_error)
+                    formElement.errorText =
+                        resources.getString(R.string.form_input_upper_case_error)
                     return -1
+                }
+
+                // VALID CASE
+                else -> {
+                    formElement.errorText = null
                 }
             }
 
             // Convert only English letters to uppercase, keep Hindi/Assamese as is
             val transformedValue = value.map {
-                if (it.isLowerCase() && !it.isHindiOrAssamese()) it.uppercaseChar() else it
+                if (it.isLowerCase() && !it.isHindiOrAssamese()) {
+                    it.uppercaseChar()
+                } else {
+                    it
+                }
             }.joinToString("")
 
             formElement.value = transformedValue
@@ -644,7 +701,6 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 
         return -1
     }
-
     protected fun validateEditTextFullLengthOccupied(formElement: FormElement): Int {
 
         formElement.value?.takeIf { it.isNotEmpty() }?.let {

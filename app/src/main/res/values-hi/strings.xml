@@ -154,6 +154,8 @@
     <string name="dashboard">डैशबोर्ड</string>
     <string name="sign_in">साइन इन</string>
     <string name="save_successful">सफलतापूर्वक सहेजें</string>
+    <string name="patient_save_successful">रोगी सफलतापूर्वक पंजीकृत हो गया</string>
+    <string name="patient_update_successful">रोगी का रिकॉर्ड अपडेट हो गया</string>
     <string name="something_wend_wong_contact_testing">कुछ गड़बड़ है! संपर्क परीक्षण!</string>
     <string name="error_input">त्रुटि इनपुट</string>
     <string name="exit_application">एप्लिकेशन से बाहर निकलें</string>
