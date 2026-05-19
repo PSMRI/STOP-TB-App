@@ -8,7 +8,6 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.model.LocationEntity
 import org.piramalswasthya.stoptb.helpers.Languages
-import org.piramalswasthya.stoptb.helpers.setToStartOfTheDay
 import org.piramalswasthya.stoptb.model.AgeUnit
 import org.piramalswasthya.stoptb.model.BenBasicCache.Companion.getAgeFromDob
 import org.piramalswasthya.stoptb.model.BenBasicCache.Companion.getYearsFromDate
@@ -178,7 +177,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         id = 3, inputType = EDIT_TEXT,
         title = resources.getString(R.string.nbr_nb_first_name),
         arrayId = -1, required = true, allCaps = true, hasSpeechToText = true,
-        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS  or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
     )
 
     // 5. Last Name
@@ -186,7 +185,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         id = 4, inputType = EDIT_TEXT,
         title = resources.getString(R.string.nbr_nb_last_name),
         arrayId = -1, required = true, allCaps = true, hasSpeechToText = true,
-        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS  or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
     )
 
     // 6. Age / DOB
@@ -278,19 +277,19 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         id = 1009, inputType = EDIT_TEXT,
         title = resources.getString(R.string.husband_s_name),
         arrayId = -1, required = false, allCaps = true, hasSpeechToText = true,
-        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS  or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
     )
     private val wifeName = FormElement(
         id = 1010, inputType = EDIT_TEXT,
         title = resources.getString(R.string.wife_s_name),
         arrayId = -1, required = false, allCaps = true, hasSpeechToText = true,
-        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS  or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
     )
     private val spouseName = FormElement(
         id = 1011, inputType = EDIT_TEXT,
         title = resources.getString(R.string.spouse_s_name),
         arrayId = -1, required = false, allCaps = true, hasSpeechToText = true,
-        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS  or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
     )
     var ageAtMarriage = FormElement(
         id = 1012, inputType = EDIT_TEXT,
@@ -311,7 +310,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         id = 10, inputType = EDIT_TEXT,
         title = resources.getString(R.string.nbr_father_name),
         arrayId = -1, required = false, allCaps = true, hasSpeechToText = true,
-        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS  or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
     )
 
     // 11. Mother Name
@@ -319,7 +318,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         id = 11, inputType = EDIT_TEXT,
         title = resources.getString(R.string.nbr_mother_name),
         arrayId = -1, required = false, allCaps = true, hasSpeechToText = true,
-        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS  or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
     )
 
     // 12. Community
@@ -895,7 +894,11 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             mobileNoOfRelation.id -> {
                 when (index) {
                     4 -> {
-                        contactNumber.value = familyHeadPhoneNo
+                        if (!familyHeadPhoneNo.isNullOrBlank()) {
+                            contactNumber.value = familyHeadPhoneNo
+                            contactNumber.errorText = null
+                        }
+                      //  contactNumber.value = familyHeadPhoneNo
                         triggerDependants(source = mobileNoOfRelation, removeItems = listOf(otherMobileNoOfRelation), addItems = emptyList())
                     }
                     in 0..3 -> triggerDependants(source = mobileNoOfRelation, removeItems = listOf(otherMobileNoOfRelation), addItems = emptyList())

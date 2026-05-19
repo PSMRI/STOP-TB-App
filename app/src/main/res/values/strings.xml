@@ -363,6 +363,8 @@
     //................VHND........................
 
     <string name="save_successful">Save Successful</string>
+    <string name="patient_save_successful">Patient Registered Succesfully</string>
+    <string name="patient_update_successful">Patient Updated Succesfully</string>
     <string name="otp_resent">OTP Resent</string>
     <string name="something_wend_wong_contact_testing">Something wend wong! Contact testing!</string>
     <string name="error_input">Error Input</string>
