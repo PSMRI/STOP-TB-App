@@ -20,7 +20,9 @@ import android.widget.TextView
 import androidx.core.view.children
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.RecyclerView.ViewHolder
+import org.piramalswasthya.stoptb.utils.scrollToFormValidationError
 import com.google.android.material.button.MaterialButton
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter.SelectUploadImageClickListener
@@ -853,7 +855,7 @@ class FormInputAdapterOld(
      * Validation Result : -1 -> all good
      * else index of element creating trouble
      */
-    fun validateInput(): Int {
+    fun validateInput(formRecyclerView: RecyclerView? = null): Int {
         var retVal = -1
         if (!isEnabled)
             return retVal
@@ -865,8 +867,10 @@ class FormInputAdapterOld(
             }
         }
         Timber.d("Validation : $retVal")
-        if (retVal != -1)
+        if (retVal != -1) {
+            formRecyclerView?.scrollToFormValidationError(retVal)
             return retVal
+        }
         currentList.forEach {
             if (it.required) {
                 if (it.value.value.isNullOrBlank()) {
@@ -881,6 +885,9 @@ class FormInputAdapterOld(
                             Timber.d("Regex not null")
                             retVal= false
                         }*/
+        }
+        if (retVal != -1) {
+            formRecyclerView?.scrollToFormValidationError(retVal)
         }
         return retVal
     }

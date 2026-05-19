@@ -34,7 +34,9 @@ import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.view.children
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.RecyclerView.ViewHolder
+import org.piramalswasthya.stoptb.utils.scrollToFormValidationError
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
@@ -1486,7 +1488,7 @@ class FormInputAdapter(
      * existing [FormElement.errorText] skipped this pass — e.g. after DOB click cleared its error,
      * another field could still hold stale errorText and submit would never re-set the DOB error.
      */
-    fun validateInput(resources: Resources): Int {
+    fun validateInput(resources: Resources, formRecyclerView: RecyclerView? = null): Int {
         if (!isEnabled) return -1
         var firstEmptyRequired = -1
         currentList.forEachIndexed { index, it ->
@@ -1499,11 +1501,15 @@ class FormInputAdapter(
                 }
             }
         }
-        if (firstEmptyRequired != -1) return firstEmptyRequired
+        if (firstEmptyRequired != -1) {
+            formRecyclerView?.scrollToFormValidationError(firstEmptyRequired)
+            return firstEmptyRequired
+        }
         currentList.forEachIndexed { index, it ->
             if (it.inputType != TEXT_VIEW && it.errorText != null) {
                 Timber.d("validateInput existing error for ${it.title} at $index")
                 notifyItemChanged(index)
+                formRecyclerView?.scrollToFormValidationError(index)
                 return index
             }
         }

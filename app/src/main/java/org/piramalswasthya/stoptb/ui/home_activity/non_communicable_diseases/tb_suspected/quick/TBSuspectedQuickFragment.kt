@@ -118,13 +118,11 @@ class TBSuspectedQuickFragment : Fragment() {
 
     private fun submitForm() {
         val result = binding.form.rvInputForm.adapter?.let {
-            (it as FormInputAdapter).validateInput(resources)
-        }
+            (it as FormInputAdapter).validateInput(resources, binding.form.rvInputForm)
+        } ?: -1
         Timber.d("Validation : $result")
         if (result == -1) {
             viewModel.saveForm()
-        } else if (result != null) {
-            binding.form.rvInputForm.scrollToPosition(result)
         }
     }
 

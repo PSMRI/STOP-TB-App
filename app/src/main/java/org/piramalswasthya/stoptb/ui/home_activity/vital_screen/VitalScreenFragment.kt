@@ -21,6 +21,7 @@ import org.piramalswasthya.stoptb.databinding.FragmentVitalScreenBinding
 import org.piramalswasthya.stoptb.helpers.applyAutoFlowBackPolicyOnResume
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.utils.scrollToFormValidationField
 
 @AndroidEntryPoint
 class VitalScreenFragment : Fragment() {
@@ -301,7 +302,24 @@ class VitalScreenFragment : Fragment() {
             isValid = false
         }
 
+        if (!isValid) {
+            scrollToFirstFieldWithError()
+        }
         return isValid
+    }
+
+    private fun scrollToFirstFieldWithError() {
+        val fieldsInVisualOrder = listOf(
+            binding.tilPulseRate,
+            binding.tilBpSystolic,
+            binding.tilBpDiastolic,
+            binding.tilRbs,
+            binding.tilRiskFactors,
+            binding.tilHivStatus,
+        )
+        fieldsInVisualOrder
+            .firstOrNull { !it.error.isNullOrBlank() }
+            ?.scrollToFormValidationField()
     }
 
     private fun parsePulse(value: String): Int? {

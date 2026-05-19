@@ -19,6 +19,7 @@ import org.piramalswasthya.stoptb.helpers.applyManagedFlowBackPolicyOnResume
 import org.piramalswasthya.stoptb.helpers.blockBackNavigationInManagedFlow
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.utils.scrollToFormValidationError
 import timber.log.Timber
 
 @AndroidEntryPoint
@@ -118,7 +119,7 @@ class GeneralOpdFormFragment : Fragment() {
         val businessRuleResult = viewModel.validateBusinessRules()
         if (businessRuleResult != -1) {
             binding.form.rvInputForm.adapter?.notifyItemChanged(businessRuleResult)
-            binding.form.rvInputForm.scrollToPosition(businessRuleResult)
+            binding.form.rvInputForm.scrollToFormValidationError(businessRuleResult)
             return
         }
         if (validateCurrentPage()) {
@@ -128,16 +129,10 @@ class GeneralOpdFormFragment : Fragment() {
 
     private fun validateCurrentPage(): Boolean {
         val result = binding.form.rvInputForm.adapter?.let {
-            (it as FormInputAdapter).validateInput(resources)
-        }
+            (it as FormInputAdapter).validateInput(resources, binding.form.rvInputForm)
+        } ?: -1
         Timber.d("Validation : $result")
-        return if (result == -1) true
-        else {
-            if (result != null) {
-                binding.form.rvInputForm.scrollToPosition(result)
-            }
-            false
-        }
+        return result == -1
     }
 
     private fun navigateToDiagnostics() {
