@@ -235,7 +235,7 @@ class TBScreeningDataset(
         title = resources.getString(R.string.reason_for_denial_for_getting_tested),
         arrayId = R.array.tb_reason_for_denial_testing,
         entries = resources.getStringArray(R.array.tb_reason_for_denial_testing),
-        required = true
+        required = false
     )
 
     suspend fun setUpPage(

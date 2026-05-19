@@ -688,7 +688,7 @@
     <string name="diastolic_bp_mmhg">डायस्टोलिक ब्लड प्रेशर (mm Hg)</string>
     <string name="vital_systolic">सिस्टोलिक</string>
     <string name="vital_diastolic">डायस्टोलिक</string>
-    <string name="bp_mmhg">BP (mm Hg)</string>
+    <string name="bp_mmhg">बीपी (मिमी पारा)</string>
     <string name="random_blood_sugar">रैंडम ब्लड शुगर</string>
     <string name="vital_referral_reason">वाइटल स्क्रीनिंग रेफरल</string>
     <string name="clinical_examination">क्लिनिकल परीक्षण (वैकल्पिक)</string>
@@ -710,7 +710,7 @@
     <string name="negative">नेगेटिव</string>
     <string name="unknown">अज्ञात</string>
     <string name="not_applicable">लागू नहीं</string>
-    <string name="diagnostics_submitted">Diagnostics submitted</string>
+    <string name="diagnostics_submitted">जांच जमा की गई</string>
     <string name="general_opd">जनरल ओपीडी</string>
     <string name="enter_value_between">%1$s %2$s और %3$s के बीच दर्ज करें</string>
     <string name="chief_complaint">मुख्य शिकायत</string>
@@ -761,16 +761,58 @@
         <item>बीमारी से रिकवरी</item>
     </string-array>
 
+    <string-array name="key_population_risk_factor_options">
+        <item>गर्भावस्था</item>
+        <item>स्तनपान कराने वाली माँ</item>
+        <item>एंटी-TNF उपचार</item>
+        <item>ब्रोंकियल अस्थमा</item>
+        <item>कैंसर</item>
+        <item>हृदय संबंधी विकार</item>
+        <item>ज्ञात टीबी रोगियों के संपर्क में</item>
+        <item>COPD</item>
+        <item>कोविड से ठीक हुए मरीज</item>
+        <item>मधुमेह</item>
+        <item>डायलिसिस</item>
+        <item>स्वास्थ्य कर्मी</item>
+        <item>उच्च रक्तचाप</item>
+        <item>यकृत विकार</item>
+        <item>प्रवासी</item>
+        <item>खनिक</item>
+        <item>उपशामक देखभाल</item>
+        <item>इम्यूनोसप्रेसेंट लेने वाला मरीज</item>
+        <item>जेल</item>
+        <item>अवैध प्रवासी</item>
+        <item>गुर्दा विकार</item>
+        <item>प्रत्यारोपण</item>
+        <item>शहरी झुग्गी</item>
+        <item>वयस्क BCG टीकाकरण का इतिहास</item>
+        <item>कुपोषित / अल्पपोषित (BMI &lt;18.5 kg/m2)</item>
+        <item>वृद्ध (आयु &gt;60 वर्ष)</item>
+        <item>कार्यस्थल सेटिंग्स (कोयला/सैंडब्लास्टिंग/ईंट भट्टा)</item>
+        <item>चाय बागान कर्मी</item>
+        <item>निर्माण स्थल कर्मी</item>
+        <item>सामूहिक सेटिंग्स</item>
+        <item>नशा मुक्ति केंद्र के प्रतिभागी</item>
+        <item>इनडोर वायु प्रदूषण के संपर्क में व्यक्ति</item>
+        <item>एचआईवी जोखिम वाली वंचित आबादी</item>
+        <item>LGBTQAI++</item>
+        <item>नशा सेवन (शराबी/इंट्रावेनस ड्रग उपयोगकर्ता)</item>
+        <item>तंबाकू/धूम्रपान करने वाला</item>
+        <item>सिलिका संपर्क/सिलिकोसिस</item>
+        <item>अन्य</item>
+        <item>@string/not_applicable</item>
+    </string-array>
+
     <string-array name="general_opd_medication_array">
-        <item>Tab Paracetamol (500 mg)</item>
-        <item>Tab Digene (Aluminium hydroxide + magnesium aluminium silicate + magnesium oxide + simethicone)</item>
-        <item>Tab Cetrizine (10 mg)</item>
-        <item>Tab Sporolac DS 120M (Lactic acid bacillus tablets)</item>
-        <item>ORS sachets</item>
-        <item>Tab Multivitamin</item>
-        <item>Syp Paracetamol 250mg (60ml)</item>
-        <item>Syp Cetrizine 60 ml</item>
-        <item>Syp Zinc 60 ml</item>
+        <item>टैब पैरासिटामोल (500 मि.ग्रा.)</item>
+        <item>टैब डाइजीन (एल्यूमिनियम हाइड्रॉक्साइड + मैग्नीशियम एल्यूमिनियम सिलिकेट + मैग्नीशियम ऑक्साइड + सिमेथिकोन)</item>
+        <item>टैब सेट्रीजिन (10 मि.ग्रा.)</item>
+        <item>टैब स्पोरोलैक डीएस 120एम (लैक्टिक एसिड बैसिलस टैबलेट)</item>
+        <item>ओआरएस सैशे</item>
+        <item>टैब मल्टीविटामिन</item>
+        <item>सिरप पैरासिटामोल 250 मि.ग्रा. (60 मि.ली.)</item>
+        <item>सिरप सेट्रीजिन 60 मि.ली.</item>
+        <item>सिरप जिंक 60 मि.ली.</item>
     </string-array>
 
     <string-array name="general_opd_frequency_array">

@@ -342,16 +342,10 @@ class NewChildAsBenRegistrationFragment : Fragment() {
 
     private fun validateCurrentPage(): Boolean {
         val result = binding.form.rvInputForm.adapter?.let {
-            (it as FormInputAdapter).validateInput(resources)
-        }
+            (it as FormInputAdapter).validateInput(resources, binding.form.rvInputForm)
+        } ?: -1
         Timber.Forest.d("Validation : $result")
-        return if (result == -1) true
-        else {
-            if (result != null) {
-                binding.form.rvInputForm.scrollToPosition(result)
-            }
-            false
-        }
+        return result == -1
     }
 
     override fun onStart() {

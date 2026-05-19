@@ -64,6 +64,7 @@ import org.piramalswasthya.stoptb.helpers.TokenExpiryManager
 import org.piramalswasthya.stoptb.databinding.ActivityHomeBinding
 import org.piramalswasthya.stoptb.helpers.AnalyticsHelper
 import org.piramalswasthya.stoptb.helpers.ImageUtils
+import org.piramalswasthya.stoptb.helpers.AutoFlowBackNavigationHost
 import org.piramalswasthya.stoptb.helpers.InAppUpdateHelper
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
@@ -82,7 +83,9 @@ import javax.inject.Inject
 
 
 @AndroidEntryPoint
-class HomeActivity : AppCompatActivity(), MessageUpdate {
+class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationHost {
+
+    private var autoFlowBackNavigationBlocked: Boolean = false
 
     var isChatSupportEnabled : Boolean = false
     private lateinit var updateHelper: InAppUpdateHelper
@@ -843,14 +846,30 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
 
     }
 
-    fun setToolbarNavigationVisible(visible: Boolean) {
-        if (visible) {
-            restoreToolbarNavigation()
-        } else {
+    override fun setAutoFlowBackNavigationBlocked(blocked: Boolean) {
+        autoFlowBackNavigationBlocked = blocked
+        if (blocked) {
             binding.toolbar.navigationIcon = null
             binding.toolbar.setNavigationOnClickListener(null)
             supportActionBar?.setDisplayHomeAsUpEnabled(false)
+        } else if (::appBarConfiguration.isInitialized) {
+            restoreToolbarNavigation()
         }
+    }
+
+    fun setToolbarNavigationVisible(visible: Boolean) {
+        if (!visible || autoFlowBackNavigationBlocked) {
+            binding.toolbar.navigationIcon = null
+            binding.toolbar.setNavigationOnClickListener(null)
+            supportActionBar?.setDisplayHomeAsUpEnabled(false)
+        } else {
+            restoreToolbarNavigation()
+        }
+    }
+
+    override fun onSupportNavigateUp(): Boolean {
+        if (autoFlowBackNavigationBlocked) return false
+        return navController.navigateUp() || super.onSupportNavigateUp()
     }
 
     @Deprecated("Deprecated in Java")

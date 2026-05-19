@@ -205,8 +205,7 @@ class NewBenRegFragment : Fragment() {
         // State observer
         viewModel.state.observe(viewLifecycleOwner) { state ->
             when (state!!) {
-                State.IDLE -> { /* nothing */
-                }
+                State.IDLE -> { /* nothing */ }
 
                 State.SAVING -> {
                     binding.llContent.visibility = View.GONE
@@ -392,13 +391,9 @@ class NewBenRegFragment : Fragment() {
 
     // ─── Validation ──────────────────────────────────────────────────────
     private fun validateCurrentPage(): Boolean {
-        val result =
-            (binding.form.rvInputForm.adapter as? FormInputAdapter)?.validateInput(resources)
-        return if (result == -1) true
-        else {
-            result?.let { binding.form.rvInputForm.scrollToPosition(it) }
-            false
-        }
+        val result = (binding.form.rvInputForm.adapter as? FormInputAdapter)
+            ?.validateInput(resources, binding.form.rvInputForm) ?: -1
+        return result == -1
     }
 
     // ─── Hard-coded adapter refresh for specific formIds ─────────────────
@@ -532,8 +527,7 @@ class NewBenRegFragment : Fragment() {
 
     @SuppressLint("MissingPermission")
     private fun fetchLocation() {
-        val locationManager =
-            requireContext().getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val locationManager = requireContext().getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
             ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
         location?.let {

@@ -243,7 +243,8 @@ class AllBenFragment : Fragment() {
                         bundleOf(
                             "benId" to benId,
                             "viewOnly" to viewOnly,
-                            "autoFlow" to false
+                            "autoFlow" to false,
+                            "generalOpdFlow" to !viewOnly
                         )
                     )
                 },

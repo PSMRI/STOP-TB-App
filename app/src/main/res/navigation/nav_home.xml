@@ -99,6 +99,10 @@
             android:name="autoFlow"
             android:defaultValue="false"
             app:argType="boolean" />
+        <argument
+            android:name="generalOpdFlow"
+            android:defaultValue="false"
+            app:argType="boolean" />
     </fragment>
 
     <fragment
@@ -401,6 +405,10 @@
             app:argType="boolean" />
         <argument
             android:name="autoFlow"
+            android:defaultValue="false"
+            app:argType="boolean" />
+        <argument
+            android:name="generalOpdFlow"
             android:defaultValue="false"
             app:argType="boolean" />
     </fragment>

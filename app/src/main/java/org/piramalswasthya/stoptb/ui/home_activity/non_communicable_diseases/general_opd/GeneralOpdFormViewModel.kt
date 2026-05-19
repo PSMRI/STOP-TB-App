@@ -32,6 +32,7 @@ class GeneralOpdFormViewModel @Inject constructor(
     val benId = GeneralOpdFormFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
     val viewOnly = GeneralOpdFormFragmentArgs.fromSavedStateHandle(savedStateHandle).viewOnly
     val autoFlow = GeneralOpdFormFragmentArgs.fromSavedStateHandle(savedStateHandle).autoFlow
+    val generalOpdFlow = GeneralOpdFormFragmentArgs.fromSavedStateHandle(savedStateHandle).generalOpdFlow
 
     enum class State {
         IDLE, SAVING, SAVE_SUCCESS, SAVE_FAILED, SKIP_SUCCESS

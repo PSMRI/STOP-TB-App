@@ -1336,7 +1336,7 @@ class CbacFragment : Fragment() {
         )
 
 
-        binding.benId.text = benId.toString()
+//        binding.benId?.text = benId.toString()
 
         referViewModel.benName.observe(fragment.viewLifecycleOwner) {
             binding.tvBenName.text = it
