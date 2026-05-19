@@ -15,8 +15,11 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
+import org.piramalswasthya.stoptb.helpers.applyManagedFlowBackPolicyOnResume
+import org.piramalswasthya.stoptb.helpers.blockBackNavigationInManagedFlow
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.utils.scrollToFormValidationError
 import timber.log.Timber
 
 @AndroidEntryPoint
@@ -27,6 +30,13 @@ class GeneralOpdFormFragment : Fragment() {
         get() = _binding!!
 
     private val viewModel: GeneralOpdFormViewModel by viewModels()
+
+    private val isManagedFlow: Boolean
+        get() = viewModel.autoFlow || viewModel.generalOpdFlow
+
+    /** First screen in General OPD flow; nurse auto-flow blocks back on this step. */
+    private val allowBackNavigation: Boolean
+        get() = viewModel.generalOpdFlow && !viewModel.autoFlow
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -39,6 +49,7 @@ class GeneralOpdFormFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        blockBackNavigationInManagedFlow(isManagedFlow, allowBackNavigation)
 
         viewModel.recordExists.observe(viewLifecycleOwner) { exists ->
             exists?.let { recordExists ->
@@ -79,11 +90,11 @@ class GeneralOpdFormFragment : Fragment() {
         viewModel.state.observe(viewLifecycleOwner) {
             when (it) {
                 GeneralOpdFormViewModel.State.SAVE_SUCCESS -> {
-                    Toast.makeText(
-                        requireContext(),
-                        getString(R.string.general_opd_submitted),
-                        Toast.LENGTH_SHORT
-                    ).show()
+//                    Toast.makeText(
+//                        requireContext(),
+//                        getString(R.string.general_opd_submitted),
+//                        Toast.LENGTH_SHORT
+//                    ).show()
                     navigateToDiagnostics()
                 }
 
@@ -108,7 +119,7 @@ class GeneralOpdFormFragment : Fragment() {
         val businessRuleResult = viewModel.validateBusinessRules()
         if (businessRuleResult != -1) {
             binding.form.rvInputForm.adapter?.notifyItemChanged(businessRuleResult)
-            binding.form.rvInputForm.scrollToPosition(businessRuleResult)
+            binding.form.rvInputForm.scrollToFormValidationError(businessRuleResult)
             return
         }
         if (validateCurrentPage()) {
@@ -118,16 +129,10 @@ class GeneralOpdFormFragment : Fragment() {
 
     private fun validateCurrentPage(): Boolean {
         val result = binding.form.rvInputForm.adapter?.let {
-            (it as FormInputAdapter).validateInput(resources)
-        }
+            (it as FormInputAdapter).validateInput(resources, binding.form.rvInputForm)
+        } ?: -1
         Timber.d("Validation : $result")
-        return if (result == -1) true
-        else {
-            if (result != null) {
-                binding.form.rvInputForm.scrollToPosition(result)
-            }
-            false
-        }
+        return result == -1
     }
 
     private fun navigateToDiagnostics() {
@@ -135,7 +140,8 @@ class GeneralOpdFormFragment : Fragment() {
             R.id.TBSuspectedQuickFragment,
             bundleOf(
                 "benId" to viewModel.benId,
-                "autoFlow" to viewModel.autoFlow
+                "autoFlow" to viewModel.autoFlow,
+                "generalOpdFlow" to viewModel.generalOpdFlow
             )
         )
     }
@@ -162,12 +168,16 @@ class GeneralOpdFormFragment : Fragment() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        applyManagedFlowBackPolicyOnResume(
+            isManagedFlow = isManagedFlow,
+            allowBack = allowBackNavigation
+        )
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
-        if (viewModel.autoFlow) {
-            (activity as? HomeActivity)?.setToolbarNavigationVisible(true)
-            (activity as? VolunteerActivity)?.setToolbarNavigationVisible(true)
-        }
         _binding = null
     }
 }

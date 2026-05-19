@@ -38,7 +38,7 @@ class NCDReferalFormFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
 
-        binding.benId.text = viewModel.benId.toString()
+//        binding.benId?.text = viewModel.benId.toString()
         viewModel.benName.observe(viewLifecycleOwner) {
             binding.tvBenName.text = it
         }
@@ -98,16 +98,10 @@ class NCDReferalFormFragment : Fragment() {
     }
     private fun validateCurrentPage(): Boolean {
         val result = binding.form.rvInputForm.adapter?.let {
-            (it as FormInputAdapter).validateInput(resources)
-        }
+            (it as FormInputAdapter).validateInput(resources, binding.form.rvInputForm)
+        } ?: -1
         Timber.d("Validation : $result")
-        return if (result == -1) true
-        else {
-            if (result != null) {
-                binding.form.rvInputForm.scrollToPosition(result)
-            }
-            false
-        }
+        return result == -1
     }
     override fun onCreateView(
         inflater: LayoutInflater,

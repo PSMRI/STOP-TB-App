@@ -87,17 +87,10 @@ class NewBenRegG15ObjectFragment : Fragment() {
 
     fun validate(): Boolean {
         val result = binding.inputForm.rvInputForm.adapter?.let {
-            (it as FormInputAdapterOld).validateInput()
-        }
+            (it as FormInputAdapterOld).validateInput(binding.inputForm.rvInputForm)
+        } ?: -1
         Timber.d("Validation : $result")
-        return if (result == -1)
-            true
-        else {
-            if (result != null) {
-                binding.inputForm.rvInputForm.scrollToPosition(result)
-            }
-            false
-        }
+        return result == -1
     }
 
     override fun onDestroy() {

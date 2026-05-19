@@ -351,12 +351,9 @@ class NewBenRegFragment : Fragment() {
 
     // ─── Validation ──────────────────────────────────────────────────────
     private fun validateCurrentPage(): Boolean {
-        val result = (binding.form.rvInputForm.adapter as? FormInputAdapter)?.validateInput(resources)
-        return if (result == -1) true
-        else {
-            result?.let { binding.form.rvInputForm.scrollToPosition(it) }
-            false
-        }
+        val result = (binding.form.rvInputForm.adapter as? FormInputAdapter)
+            ?.validateInput(resources, binding.form.rvInputForm) ?: -1
+        return result == -1
     }
 
     // ─── Hard-coded adapter refresh for specific formIds ─────────────────

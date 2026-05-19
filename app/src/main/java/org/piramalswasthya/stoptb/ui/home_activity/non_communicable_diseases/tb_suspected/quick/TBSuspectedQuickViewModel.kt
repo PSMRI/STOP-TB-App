@@ -37,6 +37,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
     val benId = args.benId
     val viewOnly = args.viewOnly
     val autoFlow = args.autoFlow
+    val generalOpdFlow = args.generalOpdFlow
 
     private val dataset = TBSuspectedQuickDataset(context, preferenceDao.getCurrentLanguage())
     val formList = dataset.listFlow

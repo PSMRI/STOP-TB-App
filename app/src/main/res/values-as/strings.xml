@@ -532,7 +532,7 @@
     <string name="diastolic_bp_mmhg">ডায়েষ্টোলিক ৰক্তচাপ (mm Hg)</string>
     <string name="vital_systolic">চিষ্টোলিক</string>
     <string name="vital_diastolic">ডায়েষ্টোলিক</string>
-    <string name="bp_mmhg">BP (mm Hg)</string>
+    <string name="bp_mmhg">বিপি (মিমি পাৰা)</string>
     <string name="random_blood_sugar">ৰেণ্ডম ব্লাড চুগাৰ</string>
     <string name="vital_referral_reason">ভাইটেল স্ক্ৰীণিং ৰেফাৰেল</string>
     <string name="tb_digital_chest_xray_conducted">ডিজিটেল চেষ্ট এক্স-ৰে কৰা হৈছে নে?</string>
@@ -566,7 +566,7 @@
     <string name="negative">নেগেটিভ</string>
     <string name="unknown">অজ্ঞাত</string>
     <string name="not_applicable">প্ৰযোজ্য নহয়</string>
-    <string name="diagnostics_submitted">Diagnostics submitted</string>
+    <string name="diagnostics_submitted">পৰীক্ষা জমা দিয়া হৈছে</string>
     <string name="general_opd">সাধাৰণ OPD</string>
     <string name="enter_value_between">%1$s %2$s আৰু %3$s ৰ মাজত দিয়ক</string>
     <string name="chief_complaint">মুখ্য অভিযোগ</string>
@@ -617,16 +617,58 @@
         <item>ৰোগৰ পৰা সুস্থ হোৱা</item>
     </string-array>
 
+    <string-array name="key_population_risk_factor_options">
+        <item>গৰ্ভাৱস্থা</item>
+        <item>দুগ্ধপান কৰোৱা মাক</item>
+        <item>এণ্টি-TNF চিকিৎসা</item>
+        <item>ব্ৰংকিয়েল হাঁপানি</item>
+        <item>কেঞ্চাৰ</item>
+        <item>হৃদৰোগজনিত সমস্যা</item>
+        <item>জনা টিবি ৰোগীৰ সংস্পৰ্শত থকা</item>
+        <item>COPD</item>
+        <item>কোভিডৰ পৰা আৰোগ্য লাভ কৰা ৰোগী</item>
+        <item>ডায়েবেটিছ</item>
+        <item>ডায়েলাইছিছ</item>
+        <item>স্বাস্থ্যকৰ্মী</item>
+        <item>উচ্চ ৰক্তচাপ</item>
+        <item>যকৃতৰ সমস্যা</item>
+        <item>প্ৰব্ৰজনকাৰী</item>
+        <item>খনিশ্ৰমিক</item>
+        <item>পেলিয়েটিভ কেয়াৰ</item>
+        <item>ইমিউনোচাপকাৰী ঔষধ গ্ৰহণ কৰা ৰোগী</item>
+        <item>কাৰাগাৰ</item>
+        <item>অবৈধ প্ৰব্ৰজনকাৰী</item>
+        <item>বৃক্কৰ সমস্যা</item>
+        <item>প্ৰত্যাৰোপণ</item>
+        <item>শহুৰীয়া বস্তি</item>
+        <item>প্ৰাপ্তবয়স্ক BCG টিকাকৰণৰ ইতিহাস</item>
+        <item>অপুষ্ট / কুপুষ্ট (BMI &lt;18.5 kg/m2)</item>
+        <item>বৃদ্ধ (বয়স &gt;60 বছৰ)</item>
+        <item>কৰ্মস্থল পৰিৱেশ (কয়লা/চেণ্ডব্লাষ্টিং/ইটাভাটা)</item>
+        <item>চাহ বাগিচাৰ কৰ্মী</item>
+        <item>নিৰ্মাণ স্থানৰ কৰ্মী</item>
+        <item>সমষ্টিগত পৰিৱেশ</item>
+        <item>নেশামুক্তি কেন্দ্ৰৰ অংশগ্ৰহণকাৰী</item>
+        <item>ঘৰৰ ভিতৰৰ বায়ু দূষণৰ সংস্পৰ্শত থকা ব্যক্তি</item>
+        <item>HIV ঝুঁকিপূর্ণ প্ৰান্তিক জনগোষ্ঠী</item>
+        <item>LGBTQAI++</item>
+        <item>নেশাজাতীয় পদাৰ্থ ব্যৱহাৰ (মদ্যপ/ইন্ট্ৰাভেনাছ ড্ৰাগ ব্যৱহাৰকাৰী)</item>
+        <item>তামাক/ধূমপায়ী</item>
+        <item>ছিলিকা সংস্পৰ্শ/ছিলিকোছিছ</item>
+        <item>অন্যান্য</item>
+        <item>@string/not_applicable</item>
+    </string-array>
+
     <string-array name="general_opd_medication_array">
-        <item>Tab Paracetamol (500 mg)</item>
-        <item>Tab Digene (Aluminium hydroxide + magnesium aluminium silicate + magnesium oxide + simethicone)</item>
-        <item>Tab Cetrizine (10 mg)</item>
-        <item>Tab Sporolac DS 120M (Lactic acid bacillus tablets)</item>
-        <item>ORS sachets</item>
-        <item>Tab Multivitamin</item>
-        <item>Syp Paracetamol 250mg (60ml)</item>
-        <item>Syp Cetrizine 60 ml</item>
-        <item>Syp Zinc 60 ml</item>
+        <item>টেবলেট পেৰাচিটামল (500 মি.গ্ৰা.)</item>
+        <item>টেবলেট ডাইজিন (এলুমিনিয়াম হাইড্ৰক্সাইড + মেগনেছিয়াম এলুমিনিয়াম চিলিকেট + মেগনেছিয়াম অক্সাইড + চাইমেথিকন)</item>
+        <item>টেবলেট চেট্ৰিজিন (10 মি.গ্ৰা.)</item>
+        <item>টেবলেট স্পোৰোলেক DS 120M (লেক্টিক এচিড বেচিলাছ টেবলেট)</item>
+        <item>ORS চেচেট</item>
+        <item>টেবলেট মাল্টিভিটামিন</item>
+        <item>চিৰাপ পেৰাচিটামল 250 মি.গ্ৰা. (60ml)</item>
+        <item>চিৰাপ চেট্ৰিজিন 60 ml</item>
+        <item>চিৰাপ জিংক 60 ml</item>
     </string-array>
 
     <string-array name="general_opd_frequency_array">
