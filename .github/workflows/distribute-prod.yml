@@ -1,4 +1,4 @@
-name: Build & Distribute PROD
+name: StopTB PROD Build
 run-name: STOP TB Android Build - PROD
 
 on:
