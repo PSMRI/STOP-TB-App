@@ -1,9 +1,7 @@
 name: Build & Distribute UAT
 
 on:
-  push:
-    branches: [ main, develop ]
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:  # Manual trigger only
 
 jobs:
   build-and-distribute:
@@ -43,6 +41,15 @@ jobs:
         run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;29.0.14033849"
 
       - name: Build UAT Debug APK
+        env:
+          ENCRYPTED_PASS_KEY: ${{ secrets.ENCRYPTED_PASS_KEY }}
+          ABHA_CLIENT_SECRET: ${{ secrets.ABHA_CLIENT_SECRET }}
+          ABHA_CLIENT_ID: ${{ secrets.ABHA_CLIENT_ID }}
+          BASE_TMC_URL: ${{ secrets.BASE_TMC_URL }}
+          BASE_ABHA_URL: ${{ secrets.BASE_ABHA_URL }}
+          ABHA_TOKEN_URL: ${{ secrets.ABHA_TOKEN_URL }}
+          ABHA_AUTH_URL: ${{ secrets.ABHA_AUTH_URL }}
+          CHAT_URL: ${{ secrets.CHAT_URL }}
         run: ./gradlew assembleStoptbUatDebug --no-daemon
 
       - name: Upload APK as artifact
@@ -57,7 +64,7 @@ jobs:
           appId: ${{ secrets.FIREBASE_APP_ID_UAT }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
           groups: testers
-          file: app/build/outputs/apk/stoptbUat/debug/app-stoptbUat-debug.apk
+          file: app/build/outputs/apk/stoptbUat/debug/app-stoptbUat-universal-debug.apk
           releaseNotes: |
             Branch: ${{ github.ref_name }}
             Commit: ${{ github.sha }}
