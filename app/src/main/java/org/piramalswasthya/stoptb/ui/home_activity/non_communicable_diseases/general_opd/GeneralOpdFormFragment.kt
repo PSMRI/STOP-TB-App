@@ -89,11 +89,11 @@ class GeneralOpdFormFragment : Fragment() {
         viewModel.state.observe(viewLifecycleOwner) {
             when (it) {
                 GeneralOpdFormViewModel.State.SAVE_SUCCESS -> {
-                    Toast.makeText(
-                        requireContext(),
-                        getString(R.string.general_opd_submitted),
-                        Toast.LENGTH_SHORT
-                    ).show()
+//                    Toast.makeText(
+//                        requireContext(),
+//                        getString(R.string.general_opd_submitted),
+//                        Toast.LENGTH_SHORT
+//                    ).show()
                     navigateToDiagnostics()
                 }
 
