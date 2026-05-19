@@ -566,7 +566,7 @@
     <string name="negative">নেগেটিভ</string>
     <string name="unknown">অজ্ঞাত</string>
     <string name="not_applicable">প্ৰযোজ্য নহয়</string>
-    <string name="diagnostics_submitted">Diagnostics submitted</string>
+    <string name="diagnostics_submitted">পৰীক্ষা জমা দিয়া হৈছে</string>
     <string name="general_opd">সাধাৰণ OPD</string>
     <string name="enter_value_between">%1$s %2$s আৰু %3$s ৰ মাজত দিয়ক</string>
     <string name="chief_complaint">মুখ্য অভিযোগ</string>
@@ -615,6 +615,48 @@
         <item>শিশুৰ ডায়েৰিয়া</item>
         <item>দুৰ্বল ৰোগ-প্ৰতিৰোধ</item>
         <item>ৰোগৰ পৰা সুস্থ হোৱা</item>
+    </string-array>
+
+    <string-array name="key_population_risk_factor_options">
+        <item>গৰ্ভাৱস্থা</item>
+        <item>দুগ্ধপান কৰোৱা মাক</item>
+        <item>এণ্টি-TNF চিকিৎসা</item>
+        <item>ব্ৰংকিয়েল হাঁপানি</item>
+        <item>কেঞ্চাৰ</item>
+        <item>হৃদৰোগজনিত সমস্যা</item>
+        <item>জনা টিবি ৰোগীৰ সংস্পৰ্শত থকা</item>
+        <item>COPD</item>
+        <item>কোভিডৰ পৰা আৰোগ্য লাভ কৰা ৰোগী</item>
+        <item>ডায়েবেটিছ</item>
+        <item>ডায়েলাইছিছ</item>
+        <item>স্বাস্থ্যকৰ্মী</item>
+        <item>উচ্চ ৰক্তচাপ</item>
+        <item>যকৃতৰ সমস্যা</item>
+        <item>প্ৰব্ৰজনকাৰী</item>
+        <item>খনিশ্ৰমিক</item>
+        <item>পেলিয়েটিভ কেয়াৰ</item>
+        <item>ইমিউনোচাপকাৰী ঔষধ গ্ৰহণ কৰা ৰোগী</item>
+        <item>কাৰাগাৰ</item>
+        <item>অবৈধ প্ৰব্ৰজনকাৰী</item>
+        <item>বৃক্কৰ সমস্যা</item>
+        <item>প্ৰত্যাৰোপণ</item>
+        <item>শহুৰীয়া বস্তি</item>
+        <item>প্ৰাপ্তবয়স্ক BCG টিকাকৰণৰ ইতিহাস</item>
+        <item>অপুষ্ট / কুপুষ্ট (BMI &lt;18.5 kg/m2)</item>
+        <item>বৃদ্ধ (বয়স &gt;60 বছৰ)</item>
+        <item>কৰ্মস্থল পৰিৱেশ (কয়লা/চেণ্ডব্লাষ্টিং/ইটাভাটা)</item>
+        <item>চাহ বাগিচাৰ কৰ্মী</item>
+        <item>নিৰ্মাণ স্থানৰ কৰ্মী</item>
+        <item>সমষ্টিগত পৰিৱেশ</item>
+        <item>নেশামুক্তি কেন্দ্ৰৰ অংশগ্ৰহণকাৰী</item>
+        <item>ঘৰৰ ভিতৰৰ বায়ু দূষণৰ সংস্পৰ্শত থকা ব্যক্তি</item>
+        <item>HIV ঝুঁকিপূর্ণ প্ৰান্তিক জনগোষ্ঠী</item>
+        <item>LGBTQAI++</item>
+        <item>নেশাজাতীয় পদাৰ্থ ব্যৱহাৰ (মদ্যপ/ইন্ট্ৰাভেনাছ ড্ৰাগ ব্যৱহাৰকাৰী)</item>
+        <item>তামাক/ধূমপায়ী</item>
+        <item>ছিলিকা সংস্পৰ্শ/ছিলিকোছিছ</item>
+        <item>অন্যান্য</item>
+        <item>@string/not_applicable</item>
     </string-array>
 
     <string-array name="general_opd_medication_array">
