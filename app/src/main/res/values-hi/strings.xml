@@ -686,7 +686,7 @@
     <string name="diastolic_bp_mmhg">डायस्टोलिक ब्लड प्रेशर (mm Hg)</string>
     <string name="vital_systolic">सिस्टोलिक</string>
     <string name="vital_diastolic">डायस्टोलिक</string>
-    <string name="bp_mmhg">BP (mm Hg)</string>
+    <string name="bp_mmhg">बीपी (मिमी पारा)</string>
     <string name="random_blood_sugar">रैंडम ब्लड शुगर</string>
     <string name="vital_referral_reason">वाइटल स्क्रीनिंग रेफरल</string>
     <string name="clinical_examination">क्लिनिकल परीक्षण (वैकल्पिक)</string>
@@ -802,15 +802,15 @@
     </string-array>
 
     <string-array name="general_opd_medication_array">
-        <item>Tab Paracetamol (500 mg)</item>
-        <item>Tab Digene (Aluminium hydroxide + magnesium aluminium silicate + magnesium oxide + simethicone)</item>
-        <item>Tab Cetrizine (10 mg)</item>
-        <item>Tab Sporolac DS 120M (Lactic acid bacillus tablets)</item>
-        <item>ORS sachets</item>
-        <item>Tab Multivitamin</item>
-        <item>Syp Paracetamol 250mg (60ml)</item>
-        <item>Syp Cetrizine 60 ml</item>
-        <item>Syp Zinc 60 ml</item>
+        <item>टैब पैरासिटामोल (500 मि.ग्रा.)</item>
+        <item>टैब डाइजीन (एल्यूमिनियम हाइड्रॉक्साइड + मैग्नीशियम एल्यूमिनियम सिलिकेट + मैग्नीशियम ऑक्साइड + सिमेथिकोन)</item>
+        <item>टैब सेट्रीजिन (10 मि.ग्रा.)</item>
+        <item>टैब स्पोरोलैक डीएस 120एम (लैक्टिक एसिड बैसिलस टैबलेट)</item>
+        <item>ओआरएस सैशे</item>
+        <item>टैब मल्टीविटामिन</item>
+        <item>सिरप पैरासिटामोल 250 मि.ग्रा. (60 मि.ली.)</item>
+        <item>सिरप सेट्रीजिन 60 मि.ली.</item>
+        <item>सिरप जिंक 60 मि.ली.</item>
     </string-array>
 
     <string-array name="general_opd_frequency_array">
