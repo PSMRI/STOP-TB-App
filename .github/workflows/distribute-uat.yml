@@ -1,4 +1,4 @@
-name: Build & Distribute UAT
+name: StopTB UAT Build
 run-name: STOP TB Android Build - UAT
 
 on:
