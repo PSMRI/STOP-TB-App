@@ -2,7 +2,16 @@ name: Build & Distribute PROD
 run-name: STOP TB Android Build - PROD
 
 on:
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      versionName:
+        description: 'Version name (example: 1.0.3)'
+        required: true
+        default: '1.0.2'
+      versionCode:
+        description: 'Version code (example: 4)'
+        required: true
+        default: '3'
 
 permissions:
   contents: read
@@ -54,6 +63,11 @@ jobs:
       - name: Install NDK
         run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;29.0.14033849"
 
+      - name: Set app version
+        run: |
+          echo "VERSION=${{ github.event.inputs.versionName }}" > version/version.properties
+          echo "VERSIONCODE=${{ github.event.inputs.versionCode }}" >> version/version.properties
+
       - name: Build PROD Release APK
         env:
           ENCRYPTED_PASS_KEY: ${{ secrets.ENCRYPTED_PASS_KEY }}
@@ -80,6 +94,8 @@ jobs:
           groups: testers
           file: app/build/outputs/apk/stoptb/release/app-stoptb-universal-release.apk
           releaseNotes: |
+            Environment: PROD
+            Version: ${{ github.event.inputs.versionName }} (${{ github.event.inputs.versionCode }})
             Branch: ${{ github.ref_name }}
             Commit: ${{ github.sha }}
             Message: ${{ github.event.head_commit.message }}
