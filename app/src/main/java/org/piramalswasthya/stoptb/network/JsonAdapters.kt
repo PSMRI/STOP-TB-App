@@ -506,6 +506,7 @@ data class TBScreeningDTO(
     var latitude: Double? = null, var longitude: Double? = null, var address: String? = null,
     var familyContactScreeningRequired: Boolean? = null,
     var sympotomatic: String? = null, var asymptomatic: String? = null, var recommandateTest: String? = null,
+    var updateDate: String? = null,
 ) {
     fun toCache(): TBScreeningCache = TBScreeningCache(
         benId = benId, visitDate = getLongFromDate(visitDate),
@@ -525,6 +526,7 @@ data class TBScreeningDTO(
         latitude = latitude, longitude = longitude, address = address,
         familyContactScreeningRequired = familyContactScreeningRequired,
         sympotomatic = sympotomatic, asymptomatic = asymptomatic, recommandateTest = recommandateTest,
+        serverUpdatedDate = getLongFromDateMultipleSupport(updateDate),
         syncState = SyncState.SYNCED
     )
 }
@@ -538,7 +540,8 @@ data class GeneralOpdDTO(
     val dosage: String? = null,
     val frequency: String? = null,
     val duration: String? = null,
-    val notes: String? = null
+    val notes: String? = null,
+    val updateDate: String? = null
 ) {
     fun toCache(): GeneralOpdCache = GeneralOpdCache(
         benId = benId,
@@ -549,6 +552,7 @@ data class GeneralOpdDTO(
         frequency = frequency,
         duration = duration,
         notes = notes,
+        serverUpdatedDate = getLongFromDateMultipleSupport(updateDate),
         syncState = SyncState.SYNCED
     )
 }
@@ -568,6 +572,7 @@ data class TBSuspectedDTO(
     var isDRTBConfirmed: Boolean? = null, var isConfirmed: Boolean = false,
     var otherReasonForSuspicion: String? = null,
     var latitude: Double? = null, var longitude: Double? = null, var address: String? = null,
+    var updateDate: String? = null,
 ) {
     fun toCache(): TBSuspectedCache = TBSuspectedCache(
         benId = benId, visitDate = getLongFromDate(visitDate),
@@ -591,6 +596,7 @@ data class TBSuspectedDTO(
         latitude = latitude,
         longitude = longitude,
         address = address,
+        serverUpdatedDate = getLongFromDateMultipleSupport(updateDate),
         syncState = SyncState.SYNCED
     )
 }
@@ -602,7 +608,8 @@ data class TBConfirmedTreatmentDTO(
     val adherenceToMedicines: String?, val anyDiscomfort: Boolean?,
     val treatmentCompleted: Boolean?, val actualTreatmentCompletionDate: String?,
     val treatmentOutcome: String?, val dateOfDeath: String?,
-    val placeOfDeath: String?, val reasonForDeath: String?, val reasonForNotCompleting: String?
+    val placeOfDeath: String?, val reasonForDeath: String?, val reasonForNotCompleting: String?,
+    val updateDate: String? = null
 ) {
     fun toCache(): TBConfirmedTreatmentCache = TBConfirmedTreatmentCache(
         benId = benId, regimenType = regimenType,
@@ -615,6 +622,7 @@ data class TBConfirmedTreatmentDTO(
         treatmentOutcome = treatmentOutcome, dateOfDeath = getLongFromDateMultipleSupport(dateOfDeath),
         placeOfDeath = placeOfDeath, reasonForDeath = reasonForDeath ?: "Tuberculosis",
         reasonForNotCompleting = reasonForNotCompleting,
+        serverUpdatedDate = getLongFromDateMultipleSupport(updateDate),
         syncState = SyncState.SYNCED
     )
 }
@@ -644,7 +652,8 @@ data class TBDiagnosticsDTO(
     val isConfirmed: Boolean = false,
     val latitude: Double? = null,
     val longitude: Double? = null,
-    val address: String? = null
+    val address: String? = null,
+    val updateDate: String? = null
 ) {
     fun toCache(): TBDiagnosticsCache = TBDiagnosticsCache(
         benId = benId,
@@ -664,6 +673,7 @@ data class TBDiagnosticsDTO(
         latitude = latitude,
         longitude = longitude,
         address = address,
+        serverUpdatedDate = getLongFromDateMultipleSupport(updateDate),
         syncState = SyncState.SYNCED
     )
 }
@@ -712,13 +722,15 @@ data class MalariaConfirmedDTO(
     var dateOfDiagnosis: String, var treatmentStartDate: String,
     var treatmentCompletionDate: String, var treatmentGiven: String,
     var referralDate: String, var day: String,
+    var updateDate: String? = null,
 ) {
     fun toCache(): MalariaConfirmedCasesCache = MalariaConfirmedCasesCache(
         benId = benId, dateOfDiagnosis = getLongFromDate(dateOfDiagnosis),
         treatmentStartDate = getLongFromDate(treatmentStartDate),
         treatmentCompletionDate = getLongFromDate(treatmentCompletionDate),
         referralDate = getLongFromDate(referralDate), treatmentGiven = treatmentGiven,
-        houseHoldDetailsId = houseHoldDetailsId, diseaseId = diseaseId, day = day
+        houseHoldDetailsId = houseHoldDetailsId, diseaseId = diseaseId, day = day,
+        serverUpdatedDate = getLongFromDateMultipleSupport(updateDate)
     )
 }
 
@@ -919,7 +931,7 @@ fun getLongFromDate(dateString: String?): Long {
 
 fun getLongFromDateMultipleSupport(dateStr: String?): Long? {
     if (dateStr.isNullOrBlank() || dateStr == "1970-01-01") return null
-    val formats = listOf("yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss", "MMM dd, yyyy hh:mm:ss a", "MMM dd, yyyy", "dd/MM/yyyy")
+    val formats = listOf("yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss", "MMM dd, yyyy h:mm:ss a", "MMM dd, yyyy hh:mm:ss a", "MMM dd, yyyy", "dd/MM/yyyy")
     for (format in formats) {
         try {
             val sdf = SimpleDateFormat(format, Locale.ENGLISH)

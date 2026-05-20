@@ -128,11 +128,21 @@ class GeneralOpdDataset(
             .any { !it.value.isNullOrBlank() }
 
     private fun syncRequiredFlags() {
-        medication.required = hasChiefComplaint()
+        val chiefComplaintSelected = hasChiefComplaint()
+        medication.required = chiefComplaintSelected
         val medicationSelected = hasMedication()
         dosage.required = medicationSelected
         frequency.required = medicationSelected
         duration.required = medicationSelected
+
+        if (!chiefComplaintSelected || medicationSelected) {
+            medication.errorText = null
+        }
+        if (!medicationSelected) {
+            listOf(dosage, frequency, duration).forEach {
+                it.errorText = null
+            }
+        }
     }
 
     private fun hasChiefComplaint(): Boolean = !chiefComplaint.value.isNullOrBlank()

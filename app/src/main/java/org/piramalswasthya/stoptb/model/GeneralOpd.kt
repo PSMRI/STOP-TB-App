@@ -30,6 +30,7 @@ data class GeneralOpdCache(
     var frequency: String? = null,
     var duration: String? = null,
     var notes: String? = null,
+    var serverUpdatedDate: Long? = null,
     var syncState: SyncState = SyncState.UNSYNCED
 ) : FormDataModel {
     fun toDTO(): GeneralOpdDTO = GeneralOpdDTO(

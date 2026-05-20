@@ -80,7 +80,7 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.NCDReferalFormResponseJson
         TBDiagnosticsCache::class
     ],
     views = [BenBasicCache::class],
-    version = 13, exportSchema = false
+    version = 15, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -328,6 +328,34 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "BENEFICIARY", "serverUpdatedDate")) {
+                    database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN serverUpdatedDate INTEGER DEFAULT NULL")
+                }
+            }
+        }
+
+        private val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val tables = listOf(
+                    "TB_SCREENING",
+                    "TB_SUSPECTED",
+                    "TB_DIAGNOSTICS",
+                    "GENERAL_OPD",
+                    "BEN_VITALS",
+                    "TB_CONFIRMED_TREATMENT",
+                    "MALARIA_CONFIRMED",
+                    "USER"
+                )
+                tables.forEach { tableName ->
+                    if (tableExists(database, tableName) && !columnExists(database, tableName, "serverUpdatedDate")) {
+                        database.execSQL("ALTER TABLE $tableName ADD COLUMN serverUpdatedDate INTEGER DEFAULT NULL")
+                    }
+                }
+            }
+        }
+
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(
@@ -505,6 +533,8 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_10_11)
                         .addMigrations(MIGRATION_11_12)
                         .addMigrations(MIGRATION_12_13)
+                        .addMigrations(MIGRATION_13_14)
+                        .addMigrations(MIGRATION_14_15)
                         .build()
 
                     INSTANCE = instance

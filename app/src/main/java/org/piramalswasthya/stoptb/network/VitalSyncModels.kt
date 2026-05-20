@@ -163,7 +163,8 @@ data class GeneralExaminationRecord(
     val hivStatus: String? = null,
     val referralToHWCNeeded: Boolean? = null,
 
-    val createdDate: String? = null
+    val createdDate: String? = null,
+    val updateDate: String? = null
 )
 
 @JsonClass(generateAdapter = true)
