@@ -16,6 +16,8 @@ import org.piramalswasthya.stoptb.network.GeneralExaminationRecord
 import org.piramalswasthya.stoptb.network.GeneralExaminationSaveRequest
 import timber.log.Timber
 import java.net.SocketTimeoutException
+import java.text.SimpleDateFormat
+import java.util.Locale
 import javax.inject.Inject
 
 class VitalRepo @Inject constructor(
@@ -108,6 +110,10 @@ class VitalRepo @Inject constructor(
                     val benRegId = record.beneficiaryRegID ?: beneficiary?.benRegId ?: return@forEach
 
                     val existing = vitalDao.getVitals(benId)
+                    val serverUpdatedDate = parseServerUpdateDate(record.updateDate)
+                    if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
+                        return@forEach
+                    }
                     vitalDao.saveVitals(
                         (existing ?: VitalCache(benId = benId, benRegId = benRegId)).copy(
                             benRegId = benRegId,
@@ -132,6 +138,7 @@ class VitalRepo @Inject constructor(
                             hivStatusId = record.hivStatusId,
                             hivStatus = record.hivStatus,
                             referralToHwcNeeded = record.referralToHWCNeeded,
+                            serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
                             syncState = SyncState.SYNCED
                         )
                     )
@@ -270,9 +277,37 @@ class VitalRepo @Inject constructor(
                     hivStatusId = item.optIntOrNull("hivStatusId"),
                     hivStatus = item.optStringOrNull("hivStatus"),
                     referralToHWCNeeded = item.optBooleanOrNull("referralToHWCNeeded"),
-                    createdDate = item.optStringOrNull("createdDate")
+                    createdDate = item.optStringOrNull("createdDate"),
+                    updateDate = item.optStringOrNull("updateDate")
+                        ?: item.optStringOrNull("updatedDate")
                 )
             }
+    }
+
+    private fun parseServerUpdateDate(dateString: String?): Long {
+        if (dateString.isNullOrBlank() || dateString.equals("null", ignoreCase = true)) return 0L
+        val patterns = listOf(
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+            "MMM dd, yyyy h:mm:ss a",
+            "MMM d, yyyy h:mm:ss a"
+        )
+        patterns.forEach { pattern ->
+            runCatching {
+                SimpleDateFormat(pattern, Locale.ENGLISH).parse(dateString)?.time
+            }.getOrNull()?.let { return it }
+        }
+        return 0L
+    }
+
+    private fun shouldApplyServerRecord(
+        existingSyncState: SyncState?,
+        savedServerUpdatedDate: Long?,
+        serverUpdatedDate: Long
+    ): Boolean {
+        if (existingSyncState != null && existingSyncState != SyncState.SYNCED) return false
+        if (serverUpdatedDate <= 0L) return true
+        return serverUpdatedDate > (savedServerUpdatedDate ?: 0L)
     }
 
     private fun JSONObject.optLongOrNull(name: String): Long? =

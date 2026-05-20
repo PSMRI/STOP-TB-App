@@ -26,6 +26,7 @@ class TBSuspectedQuickDataset(
     private var lockDigitalChestXray = false
     private var lockTrueNat = false
     private var lockLiquidCulture = false
+    private val nikshayIdUnavailable = "N/A"
 
     private val digitalChestXrayConducted = FormElement(
         id = 1,
@@ -93,7 +94,7 @@ class TBSuspectedQuickDataset(
 
     private val nikshayId = FormElement(
         id = 8,
-        inputType = InputType.EDIT_TEXT,
+        inputType = InputType.TEXT_VIEW,
         title = resources.getString(R.string.nikshay_id),
         required = false
     )
@@ -130,7 +131,9 @@ class TBSuspectedQuickDataset(
             )
         trueNatResult.value =
             getLocalValueInArray(R.array.tb_test_result, saved?.naatResult)
-        nikshayId.value = saved?.nikshayId
+        nikshayId.value = ben?.nikshayId?.takeIf { it.isNotBlank() }
+            ?: saved?.nikshayId?.takeIf { it.isNotBlank() }
+            ?: nikshayIdUnavailable
         liquidCultureConducted.value =
             conductedValueFromScreening(
                 savedValue = saved?.recommendedForLiquidCultureTest
@@ -152,36 +155,33 @@ class TBSuspectedQuickDataset(
                 digitalChestXrayConducted.value = if (index == 0) yesValue else noValue
                 syncFieldStates()
                 if (index == 0) {
-                    val addItems = mutableListOf(digitalChestXrayResult)
-                    if (!isYes(sputumCollected) && !isYes(trueNatConducted)) {
-                        addItems.add(nikshayId)
-                    }
-                    triggerDependants(
+                    val updateIndex = triggerDependants(
                         source = digitalChestXrayConducted,
                         removeItems = emptyList(),
-                        addItems = addItems
+                        addItems = listOf(digitalChestXrayResult)
                     )
+                    val changedIndex = getChangedElementIndex(digitalChestXrayConducted)
+                    if (changedIndex != -1) changedIndex else updateIndex
                 } else {
                     val removeItems = mutableListOf(
                         digitalChestXrayResult,
                         trueNatResult,
                         trueNatConducted
                     )
-                    if (!shouldEnableNikshayId()) {
-                        removeItems.add(nikshayId)
-                    }
-                    triggerDependants(
+                    val updateIndex = triggerDependants(
                         source = digitalChestXrayConducted,
                         removeItems = removeItems,
                         addItems = emptyList()
                     )
+                    val changedIndex = getChangedElementIndex(digitalChestXrayConducted)
+                    if (changedIndex != -1) changedIndex else updateIndex
                 }
             }
 
             sputumCollected.id -> {
                 sputumCollected.value = if (index == 0) yesValue else noValue
                 syncFieldStates()
-                updateNikshayVisibility(sputumCollected)
+                getChangedElementIndex(sputumCollected)
             }
 
             digitalChestXrayResult.id -> {
@@ -206,25 +206,22 @@ class TBSuspectedQuickDataset(
                 trueNatConducted.value = if (index == 0) yesValue else noValue
                 syncFieldStates()
                 if (index == 0) {
-                    val addItems = mutableListOf(trueNatResult)
-                    if (!isYes(digitalChestXrayConducted) && !isYes(sputumCollected)) {
-                        addItems.add(nikshayId)
-                    }
-                    triggerDependants(
+                    val updateIndex = triggerDependants(
                         source = trueNatConducted,
                         removeItems = emptyList(),
-                        addItems = addItems
+                        addItems = listOf(trueNatResult)
                     )
+                    val changedIndex = getChangedElementIndex(trueNatConducted)
+                    if (changedIndex != -1) changedIndex else updateIndex
                 } else {
                     val removeItems = mutableListOf(trueNatResult)
-                    if (!shouldEnableNikshayId()) {
-                        removeItems.add(nikshayId)
-                    }
-                    triggerDependants(
+                    val updateIndex = triggerDependants(
                         source = trueNatConducted,
                         removeItems = removeItems,
                         addItems = emptyList()
                     )
+                    val changedIndex = getChangedElementIndex(trueNatConducted)
+                    if (changedIndex != -1) changedIndex else updateIndex
                 }
             }
 
@@ -271,7 +268,7 @@ class TBSuspectedQuickDataset(
                     null
                 }
             form.nikshayId =
-                if (shouldEnableNikshayId()) nikshayId.value?.trim()?.takeIf { it.isNotEmpty() } else null
+                nikshayId.value?.trim()?.takeIf { it.isNotEmpty() && it != nikshayIdUnavailable }
             form.isLiquidCultureConducted =
                 if (shouldShowLiquidCultureConducted()) isYes(liquidCultureConducted) else null
             form.recommendedForLiquidCultureTest =
@@ -301,9 +298,7 @@ class TBSuspectedQuickDataset(
     }
 
     private fun buildFormList(): List<FormElement> = buildList {
-        if (shouldEnableNikshayId()) {
-            add(nikshayId)
-        }
+        add(nikshayId)
 
         if (shouldShowDigitalChestXray()) {
             add(digitalChestXrayConducted)
@@ -371,8 +366,7 @@ class TBSuspectedQuickDataset(
             resetField(trueNatResult)
         }
 
-        nikshayId.isEnabled = shouldEnableNikshayId() && (!referralMode || shouldShowSubmit())
-        if (!shouldEnableNikshayId()) resetField(nikshayId)
+        nikshayId.isEnabled = false
 
         liquidCultureConducted.isEnabled =
             shouldShowLiquidCultureConducted() && !lockLiquidCulture
@@ -408,18 +402,7 @@ class TBSuspectedQuickDataset(
             screeningCache?.historyOfTb == true && screeningCache?.takingAntiTBDrugs == true
             )
 
-    private fun shouldEnableNikshayId(): Boolean =
-        (shouldShowSputumCollected() && isYes(sputumCollected)) ||
-            (shouldShowDigitalChestXray() && isYes(digitalChestXrayConducted)) ||
-            (shouldShowTrueNatConducted() && isYes(trueNatConducted))
-
-    private fun updateNikshayVisibility(source: FormElement): Int =
-        triggerDependants(
-            source = source,
-            passedIndex = if (shouldEnableNikshayId()) 1 else 0,
-            triggerIndex = 1,
-            target = nikshayId
-        )
+    private fun getChangedElementIndex(source: FormElement): Int = getIndexOfElement(source)
 
     private fun isUnderFive(): Boolean {
         val ben = benCache ?: return false

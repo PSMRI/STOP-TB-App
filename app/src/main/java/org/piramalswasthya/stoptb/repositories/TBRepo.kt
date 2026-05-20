@@ -187,9 +187,15 @@ class TBRepo @Inject constructor(
                         getLongFromDate(tbScreeningDTO.visitDate),
                         getLongFromDate(tbScreeningDTO.visitDate) - 19_800_000
                     )
-                if (tbScreeningCache == null) {
+                val cache = tbScreeningDTO.toCache()
+                if (shouldApplyServerRecord(
+                        tbScreeningCache?.syncState,
+                        tbScreeningCache?.serverUpdatedDate,
+                        cache.serverUpdatedDate ?: 0L
+                    )
+                ) {
                     benDao.getBen(tbScreeningDTO.benId)?.let {
-                        tbDao.saveTbScreening(tbScreeningDTO.toCache())
+                        tbDao.saveTbScreening(cache)
                     }
                 }
             }
@@ -269,6 +275,10 @@ class TBRepo @Inject constructor(
             val ben = benDao.getBenByRegId(benRegId) ?: continue
             val visitDate = getLongFromDateMultipleSupport(item.optString("visitDate"))
             val existing = tbDao.getTbScreening(ben.beneficiaryId)
+            val serverUpdatedDate = getServerUpdatedDate(item)
+            if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
+                continue
+            }
             val cache = (existing ?: TBScreeningCache(benId = ben.beneficiaryId)).copy(
                 visitDate = visitDate,
                 coughMoreThan2Weeks = item.optNullableBoolean("coughMoreThan2Weeks"),
@@ -287,6 +297,7 @@ class TBRepo @Inject constructor(
                 recommendedForTruenatTest = item.optNullableBoolean("recommendedForTruenat"),
                 recommendedForLiquidCultureTest = item.optNullableBoolean("recommendedForLiquidCulture"),
                 reasonForDenialForGettingTested = item.optStringListOrNull("testDenialReasons"),
+                serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
                 syncState = SyncState.SYNCED
             )
             tbDao.saveTbScreening(cache)
@@ -299,9 +310,15 @@ class TBRepo @Inject constructor(
         val generalOpdList = mutableListOf<GeneralOpdCache>()
         val requestDTO = Gson().fromJson(dataObj, GeneralOpdRequestDTO::class.java)
         requestDTO?.generalOpdList?.forEach { generalOpdDTO ->
-            if (tbDao.getGeneralOpd(generalOpdDTO.benId) == null) {
+            val existing = tbDao.getGeneralOpd(generalOpdDTO.benId)
+            val cache = generalOpdDTO.toCache()
+            if (shouldApplyServerRecord(
+                    existing?.syncState,
+                    existing?.serverUpdatedDate,
+                    cache.serverUpdatedDate ?: 0L
+                )
+            ) {
                 benDao.getBen(generalOpdDTO.benId)?.let {
-                    val cache = generalOpdDTO.toCache()
                     tbDao.saveGeneralOpd(cache)
                     generalOpdList.add(cache)
                 }
@@ -318,6 +335,10 @@ class TBRepo @Inject constructor(
             val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { it > 0 } ?: continue
             val ben = benDao.getBenByRegId(benRegId) ?: continue
             val existing = tbDao.getGeneralOpd(ben.beneficiaryId)
+            val serverUpdatedDate = getServerUpdatedDate(item)
+            if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
+                continue
+            }
             val cache = (existing ?: GeneralOpdCache(benId = ben.beneficiaryId)).copy(
                 chiefComplaints = item.optStringListOrNull("chiefComplaint"),
                 medications = item.optStringOrNull("medication")?.let { listOf(it) },
@@ -325,6 +346,7 @@ class TBRepo @Inject constructor(
                 frequency = item.optStringOrNull("frequency"),
                 duration = item.optStringOrNull("duration"),
                 notes = item.optStringOrNull("notes"),
+                serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
                 syncState = SyncState.SYNCED
             )
             tbDao.saveGeneralOpd(cache)
@@ -401,9 +423,14 @@ class TBRepo @Inject constructor(
                         getLongFromDate(tbDiagnosticsDTO.visitDate),
                         getLongFromDate(tbDiagnosticsDTO.visitDate) - 19_800_000
                     )
-                if (tbDiagnosticsCache == null) {
+                val cache = tbDiagnosticsDTO.toCache()
+                if (shouldApplyServerRecord(
+                        tbDiagnosticsCache?.syncState,
+                        tbDiagnosticsCache?.serverUpdatedDate,
+                        cache.serverUpdatedDate ?: 0L
+                    )
+                ) {
                     benDao.getBen(tbDiagnosticsDTO.benId)?.let {
-                        val cache = tbDiagnosticsDTO.toCache()
                         tbDao.saveTbDiagnostics(cache)
                         tbDiagnosticsList.add(cache)
                     }
@@ -422,6 +449,10 @@ class TBRepo @Inject constructor(
             val ben = benDao.getBenByRegId(benRegId) ?: continue
             val visitDate = getLongFromDateMultipleSupport(item.optString("visitDate"))
             val existing = tbDao.getTbDiagnostics(ben.beneficiaryId)
+            val serverUpdatedDate = getServerUpdatedDate(item)
+            if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
+                continue
+            }
             val cache = (existing ?: TBDiagnosticsCache(benId = ben.beneficiaryId)).copy(
                 visitDate = visitDate,
                 nikshayId = item.optStringOrNull("nikshayId"),
@@ -431,6 +462,7 @@ class TBRepo @Inject constructor(
                 naatResult = item.optStringOrNull("truenatResult"),
                 recommendedForLiquidCultureTest = item.optNullableBoolean("recommendedForLiquidCulture"),
                 liquidCultureResult = item.optStringOrNull("liquidCultureResult"),
+                serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
                 syncState = SyncState.SYNCED
             )
             tbDao.saveTbDiagnostics(cache)
@@ -518,7 +550,12 @@ class TBRepo @Inject constructor(
                         getLongFromDate(tbSuspectedDTO.visitDate),
                         getLongFromDate(tbSuspectedDTO.visitDate) - 19_800_000
                     )
-                if (tbSuspectedCache == null) {
+                if (shouldApplyServerRecord(
+                        tbSuspectedCache?.syncState,
+                        tbSuspectedCache?.serverUpdatedDate,
+                        tbSuspectedDTO.toCache().serverUpdatedDate ?: 0L
+                    )
+                ) {
                     benDao.getBen(tbSuspectedDTO.benId)?.let {
                         tbDao.saveTbSuspected(tbSuspectedDTO.toCache())
                     }
@@ -615,11 +652,16 @@ class TBRepo @Inject constructor(
 
                 try {
                     val cache = tbConfirmedDTO.toCache()
-
-                    tbDao.saveTbConfirmed(cache)
-
-
-                    tbConfirmedList.add(cache)
+                    val existing = tbDao.getTbConfirmed(cache.benId)
+                    if (shouldApplyServerRecord(
+                            existing?.syncState,
+                            existing?.serverUpdatedDate,
+                            cache.serverUpdatedDate ?: 0L
+                        )
+                    ) {
+                        tbDao.saveTbConfirmed(cache)
+                        tbConfirmedList.add(cache)
+                    }
 
                 } catch (e: Exception) {
                 }
@@ -1082,6 +1124,39 @@ class TBRepo @Inject constructor(
                 }.getOrNull()?.let { return it }
             }
             return System.currentTimeMillis()
+        }
+
+        private fun getServerUpdatedDate(jsonObject: JSONObject): Long {
+            return parseServerUpdateDate(
+                jsonObject.optStringOrNull("updateDate")
+                    ?: jsonObject.optStringOrNull("updatedDate")
+            )
+        }
+
+        private fun parseServerUpdateDate(dateString: String?): Long {
+            if (dateString.isNullOrBlank() || dateString.equals("null", ignoreCase = true)) return 0L
+            val patterns = listOf(
+                "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+                "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+                "MMM dd, yyyy h:mm:ss a",
+                "MMM d, yyyy h:mm:ss a"
+            )
+            patterns.forEach { pattern ->
+                runCatching {
+                    SimpleDateFormat(pattern, Locale.ENGLISH).parse(dateString)?.time
+                }.getOrNull()?.let { return it }
+            }
+            return 0L
+        }
+
+        private fun shouldApplyServerRecord(
+            existingSyncState: SyncState?,
+            savedServerUpdatedDate: Long?,
+            serverUpdatedDate: Long
+        ): Boolean {
+            if (existingSyncState != null && existingSyncState != SyncState.SYNCED) return false
+            if (serverUpdatedDate <= 0L) return true
+            return serverUpdatedDate > (savedServerUpdatedDate ?: 0L)
         }
 
         private fun JSONObject.optNullableBoolean(name: String): Boolean? {

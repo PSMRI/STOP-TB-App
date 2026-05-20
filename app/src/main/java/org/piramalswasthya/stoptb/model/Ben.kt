@@ -1339,6 +1339,8 @@ data class BenRegCache(
 
     var updatedDate: Long? = null,
 
+    var serverUpdatedDate: Long? = null,
+
     var syncState: SyncState,
 
     var isDraft: Boolean,
