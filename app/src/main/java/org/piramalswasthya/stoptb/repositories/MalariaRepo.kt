@@ -183,8 +183,14 @@ class MalariaRepo @Inject constructor(
                     getLongFromDate(dto.dateOfDiagnosis),
                     getLongFromDate(dto.dateOfDiagnosis) - 19_800_000
                 )
-                if (existing == null) {
-                    benDao.getBen(dto.benId)?.let { malariaDao.saveMalariaConfirmed(dto.toCache()) }
+                val cache = dto.toCache()
+                if (shouldApplyServerRecord(
+                        existing?.syncState,
+                        existing?.serverUpdatedDate,
+                        cache.serverUpdatedDate ?: 0L
+                    )
+                ) {
+                    benDao.getBen(dto.benId)?.let { malariaDao.saveMalariaConfirmed(cache) }
                 }
             }
         }
@@ -260,6 +266,16 @@ class MalariaRepo @Inject constructor(
                 SimpleDateFormat("MMM d, yyyy h:mm:ss a", Locale.ENGLISH).parse(dateString)
             }
             return date?.time ?: throw IllegalStateException("Invalid date: $dateString")
+        }
+
+        private fun shouldApplyServerRecord(
+            existingSyncState: SyncState?,
+            savedServerUpdatedDate: Long?,
+            serverUpdatedDate: Long
+        ): Boolean {
+            if (existingSyncState != null && existingSyncState != SyncState.SYNCED) return false
+            if (serverUpdatedDate <= 0L) return true
+            return serverUpdatedDate > (savedServerUpdatedDate ?: 0L)
         }
     }
 }

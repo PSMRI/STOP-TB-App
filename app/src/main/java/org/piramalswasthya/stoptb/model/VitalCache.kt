@@ -52,5 +52,6 @@ data class VitalCache(
     var hivStatus: String? = null,
     var referralToHwcNeeded: Boolean? = null,
     var referralTriggers: List<String>? = null,
+    var serverUpdatedDate: Long? = null,
     var syncState: SyncState = SyncState.UNSYNCED,
 )

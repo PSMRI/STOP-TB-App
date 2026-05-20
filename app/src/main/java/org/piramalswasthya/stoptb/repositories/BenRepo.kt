@@ -898,6 +898,7 @@ class BenRepo @Inject constructor(
     private fun getLongFromDate(date: String): Long {
         val patterns = listOf(
             "MMM dd, yyyy HH:mm:ss a",
+            "MMM dd, yyyy h:mm:ss a",
             "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
             "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
         )
@@ -1579,7 +1580,11 @@ class BenRepo @Inject constructor(
                         ?: benDataObj.optStringOrNull("registrationDate")
 
                     val updatedDateValue =
-                        benDataObj.optStringOrNull("updatedDate") ?: createdDateValue
+                        benDataObj.optStringOrNull("updatedDate")
+                            ?: benDataObj.optStringOrNull("updateDate")
+                            ?: jsonObject.optStringOrNull("updatedDate")
+                            ?: jsonObject.optStringOrNull("updateDate")
+                            ?: createdDateValue
 
                     val ageValue = if (benDataObj.has("age")) {
                         benDataObj.optInt("age")
@@ -1605,16 +1610,10 @@ class BenRepo @Inject constructor(
                         ?: stopTBDetailsObj.optStringOrNull("nikshayId")
                         ?: stopTBDetailsObj.optStringOrNull("nikshayID")
 
-                    val benExists = benDao.getBen(benId) != null
-                    if (benExists) {
-                        nikshayIdValue?.takeIf { it.isNotBlank() }?.let {
-                            benDao.updateNikshayId(benId, it)
-                        }
-                        continue
-                    }
+                    val existingBen = benDao.getBen(benId)
 
                     try {
-                        result.add(
+                        val serverBen =
                             BenRegCache(
                                 householdId = if (jsonObject.has("houseoldId"))
                                     jsonObject.getLong("houseoldId") else -1L,
@@ -1899,6 +1898,7 @@ class BenRepo @Inject constructor(
 
                                 createdDate = createdDateValue?.let { getLongFromDate(it) } ?: 0L,
                                 updatedDate = updatedDateValue?.let { getLongFromDate(it) } ?: 0L,
+                                serverUpdatedDate = updatedDateValue?.let { getLongFromDate(it) } ?: 0L,
 
                                 userImage = if (benDataObj.has("user_image"))
                                     ImageUtils.saveBenImageFromServerToStorage(
@@ -1966,7 +1966,33 @@ class BenRepo @Inject constructor(
                                 noOfAliveChildren = jsonObject.optInt("noofAlivechildren", 0),
                                 noOfChildren = jsonObject.optInt("noOfchildren", 0),
                             )
-                        )
+
+                        if (existingBen == null) {
+                            result.add(serverBen)
+                        } else {
+                            val savedServerUpdatedDate = existingBen.serverUpdatedDate ?: 0L
+                            val serverUpdatedDate = serverBen.serverUpdatedDate ?: 0L
+                            if (existingBen.syncState != SyncState.SYNCED || serverUpdatedDate <= savedServerUpdatedDate) {
+                                nikshayIdValue?.takeIf { it.isNotBlank() && it != existingBen.nikshayId }?.let {
+                                    benDao.updateNikshayId(benId, it)
+                                }
+                                continue
+                            }
+
+                            result.add(
+                                serverBen.copy(
+                                    userImage = serverBen.userImage ?: existingBen.userImage,
+                                    healthIdDetails = serverBen.healthIdDetails ?: existingBen.healthIdDetails,
+                                    height = serverBen.height ?: existingBen.height,
+                                    weight = serverBen.weight ?: existingBen.weight,
+                                    bmi = serverBen.bmi ?: existingBen.bmi,
+                                    temperature = serverBen.temperature ?: existingBen.temperature,
+                                    isConsent = serverBen.isConsent || existingBen.isConsent,
+                                    syncState = SyncState.SYNCED,
+                                    processed = "P"
+                                )
+                            )
+                        }
                     } catch (e: JSONException) {
                         Timber.e("Beneficiary skipped: ${jsonObject.optLong("benficieryid", -1L)} with error $e")
                     } catch (e: NumberFormatException) {

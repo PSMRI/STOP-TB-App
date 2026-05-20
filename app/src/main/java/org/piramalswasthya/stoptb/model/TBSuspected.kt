@@ -55,6 +55,7 @@ data class TBSuspectedCache(
     var address: String? = null,
     var referred: Boolean? = null,
     var followUps: String? = null,
+    var serverUpdatedDate: Long? = null,
     var syncState: SyncState = SyncState.UNSYNCED,
 ) : FormDataModel {
     fun toDTO(): TBSuspectedDTO {

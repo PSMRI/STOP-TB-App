@@ -33,6 +33,7 @@ data class MalariaConfirmedCasesCache(
     var treatmentGiven: String? = null,
     var referralDate: Long = System.currentTimeMillis(),
     var day: String? = null,
+    var serverUpdatedDate: Long? = null,
     var syncState: SyncState = SyncState.UNSYNCED,
 ) : FormDataModel {
     fun toDTO(): MalariaConfirmedDTO {

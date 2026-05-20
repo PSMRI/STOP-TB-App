@@ -39,6 +39,7 @@ data class TBDiagnosticsCache(
     var latitude: Double? = null,
     var longitude: Double? = null,
     var address: String? = null,
+    var serverUpdatedDate: Long? = null,
     var syncState: SyncState = SyncState.UNSYNCED
 ) : FormDataModel {
     fun toDTO(): TBDiagnosticsDTO = TBDiagnosticsDTO(

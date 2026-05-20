@@ -270,14 +270,15 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
         passedIndex: Int,
         triggerIndex: Int,
         target: FormElement,
-        targetSideEffect: List<FormElement>? = null
+        targetSideEffect: List<FormElement>? = null,
+        position: Int = -1
     ): Int {
         return if (passedIndex == triggerIndex) {
             if (!list.contains(target)) {
                 val listIndex = list.indexOf(source)
-                val safeIndex = (listIndex + 1).coerceAtMost(list.size)
+                val safeIndex = position.takeIf { it != -1 } ?: (listIndex + 1).coerceAtMost(list.size)
                 list.add(safeIndex, target)
-                listIndex
+                safeIndex
             } else {
                 -1
             }
