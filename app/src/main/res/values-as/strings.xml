@@ -455,7 +455,24 @@
     <string name="tb_asymptomatic_screening">লক্ষণবিহীন স্ক্রিনিং</string>
     <string name="tb_referral_required">ৰেফাৰেল প্ৰয়োজন</string>
     <string name="tb_referral_for">কিহৰ বাবে ৰেফাৰেল</string>
-    <string name="tb_family_contact_screening_alert">অনুগ্ৰহ কৰি এই হিতাধিকাৰীৰ সকলো পৰিয়াল সদস্য আৰু ওচৰ-চাপৰ সংস্পৰ্শৰ লোকৰ TB স্ক্ৰিনিং কৰক।</string>
+    <string name="tb_family_contact_screening_alert">পৰিয়ালৰ সকলো সদস্যৰ ট্ৰেচিং আৰু স্ক্ৰিনিং কৰিবলৈ পৰামৰ্শ দিয়ক</string>
+    <string name="referred_for_digital_chest_xray">ডিজিটেল চেষ্ট এক্স-ৰেৰ বাবে ৰেফাৰ কৰা হৈছে</string>
+    <string name="referred_for_sputum_collection">কফ নমুনা সংগ্ৰহৰ বাবে ৰেফাৰ কৰা হৈছে</string>
+    <string name="recommended_for_truenat_test">Truenat পৰীক্ষাৰ পৰামৰ্শ দিয়া হৈছে</string>
+    <string name="recommended_for_liquid_culture_test">লিকুইড কালচাৰ পৰীক্ষাৰ পৰামৰ্শ দিয়া হৈছে</string>
+    <string name="reason_for_denial_for_getting_tested">পৰীক্ষা কৰাবলৈ অস্বীকাৰ কৰাৰ কাৰণ</string>
+    <string-array name="tb_reason_for_denial_testing">
+        <item>ভয় আৰু উদ্বেগ</item>
+        <item>ভুল ধাৰণা</item>
+        <item>সামাজিক কলংক</item>
+        <item>সাংস্কৃতিক আৰু লিংগ-সম্পৰ্কীয় বাধা</item>
+        <item>স্বাস্থ্যকৰ্মীৰ সৈতে পূৰ্বৰ নেতিবাচক অভিজ্ঞতা</item>
+        <item>গোপনীয়তাৰ চিন্তা</item>
+        <item>কেম্পত দীঘলীয়া অপেক্ষা</item>
+        <item>দৈনিক মজুৰিৰ ক্ষতি</item>
+        <item>চৰকাৰী কাৰ্যসূচী বা কেম্প আয়োজকৰ ওপৰত বিশ্বাসৰ অভাৱ</item>
+        <item>অন্যান্য</item>
+    </string-array>
     <string name="tb_screening_referral_reason">TB স্ক্ৰিনিং ৰেফাৰেল</string>
 
     <string-array name="tb_referral_tests">
@@ -499,9 +516,23 @@
     <string name="weight_kgs">ওজন (কেজি)</string>
     <string name="height_cms">উচ্চতা (চে.মি.)</string>
     <string name="temperature_degree_fahrenheit">তাপমাত্ৰা (ডিগ্ৰী ফাৰেনহাইট)</string>
+    <string name="normal_temperature_range">সাধাৰণ সীমা: 97-99&#176;F</string>
+    <string name="temperature_100_or_more">&gt;= 100&#176;F</string>
+    <string name="anthropometry_age_gender_format">%1$d %2$s | %3$s</string>
+    <string name="age_unit_years">বছৰ</string>
+    <string name="age_unit_months">মাহ</string>
+    <string name="age_unit_days">দিন</string>
+    <string name="gender_male">পুৰুষ</string>
+    <string name="gender_female">মহিলা</string>
+    <string name="gender_transgender">ট্ৰান্সজেণ্ডাৰ</string>
+    <string name="gender_prefer_not_to_say">ক\'বলৈ ইচ্ছা নাই</string>
+    <string name="refer_to_hwc_alert">হেল্থ এণ্ড ৱেলনেছ চেণ্টাৰলৈ ৰেফাৰ কৰক</string>
     <string name="pulse_rate_bpm">নাড়ীৰ গতি (প্ৰতি মিনিটত ধপধপনি)</string>
     <string name="systolic_bp_mmhg">চিষ্টোলিক ৰক্তচাপ (mm Hg)</string>
     <string name="diastolic_bp_mmhg">ডায়েষ্টোলিক ৰক্তচাপ (mm Hg)</string>
+    <string name="vital_systolic">চিষ্টোলিক</string>
+    <string name="vital_diastolic">ডায়েষ্টোলিক</string>
+    <string name="bp_mmhg">বিপি (মিমি পাৰা)</string>
     <string name="random_blood_sugar">ৰেণ্ডম ব্লাড চুগাৰ</string>
     <string name="vital_referral_reason">ভাইটেল স্ক্ৰীণিং ৰেফাৰেল</string>
     <string name="tb_digital_chest_xray_conducted">ডিজিটেল চেষ্ট এক্স-ৰে কৰা হৈছে নে?</string>
@@ -516,7 +547,150 @@
     <string name="tb_liquid_culture_conducted">লিকুইড কালচাৰ কৰা হৈছে নেকি?</string>
     <string name="tb_liquid_culture_result">লিকুইড কালচাৰৰ ফলাফল</string>
     <string name="result">ফলাফল</string>
-    <string name="diagnostics_submitted">Diagnostics submitted</string>
+    <string name="clinical_examination">ক্লিনিকেল পৰীক্ষা (ঐচ্ছিক)</string>
+    <string name="pallor">শেঁতা পৰা</string>
+    <string name="icterus">জণ্ডিছ</string>
+    <string name="cyanosis">চায়ানোছিছ</string>
+    <string name="clubbing">ক্লাবিং</string>
+    <string name="lymphadenopathy">লিম্ফাডেনোপেথি</string>
+    <string name="oedema">স্ফীতি</string>
+    <string name="key_population_risk_factors">মূল জনসংখ্যা / ঝুঁকি কাৰক *</string>
+    <string name="select_key_population_risk_factors">মূল জনসংখ্যা / ঝুঁকি কাৰক বাছক</string>
+    <string name="hiv_status">এইচআইভি স্থিতি *</string>
+    <string name="risk_factor_required">মূল জনসংখ্যা / ঝুঁকি কাৰক বাছক</string>
+    <string name="hiv_status_required">এইচআইভি স্থিতি বাছক</string>
+    <string name="present">আছে</string>
+    <string name="absent">নাই</string>
+    <string name="positive">পজিটিভ</string>
+    <string name="reactive">ৰিএক্টিভ</string>
+    <string name="negative">নেগেটিভ</string>
+    <string name="unknown">অজ্ঞাত</string>
+    <string name="not_applicable">প্ৰযোজ্য নহয়</string>
+    <string name="diagnostics_submitted">পৰীক্ষা জমা দিয়া হৈছে</string>
+    <string name="general_opd">সাধাৰণ OPD</string>
+    <string name="enter_value_between">%1$s %2$s আৰু %3$s ৰ মাজত দিয়ক</string>
+    <string name="chief_complaint">মুখ্য অভিযোগ</string>
+    <string name="medication">ঔষধ</string>
+    <string name="dosage">ডোজ</string>
+    <string name="frequency">বাৰম্বাৰতা</string>
+    <string name="duration">সময়কাল</string>
+    <string name="notes_remarks">নোট / মন্তব্য</string>
+    <string name="general_opd_submitted">সাধাৰণ OPD জমা হল</string>
+    <string name="general_opd_medication_required_error">মুখ্য অভিযোগ বাছনি কৰিলে ঔষধ বাধ্যতামূলক।</string>
+
+    <string-array name="general_opd_chief_complaint_array">
+        <item>জ্বৰ</item>
+        <item>সামান্যৰ পৰা মধ্যম শৰীৰৰ বিষ</item>
+        <item>মূৰৰ বিষ</item>
+        <item>জ্বৰৰ সৈতে সাধাৰণ দুৰ্বলতা</item>
+        <item>এচিডিটি</item>
+        <item>পেটত জ্বলা-পোৰা</item>
+        <item>অজীৰ্ণতা</item>
+        <item>গেছ</item>
+        <item>পেট ফুলা</item>
+        <item>ওপৰৰ পেটত অস্বস্তি</item>
+        <item>এলাৰ্জিৰ লক্ষণ</item>
+        <item>হাঁচি</item>
+        <item>নাক বোৱা</item>
+        <item>খজুৱতি (চাল বা চকু)</item>
+        <item>সামান্য এলাৰ্জিক ৰেশ</item>
+        <item>ডায়েৰিয়া</item>
+        <item>ঢিলা পায়খানা</item>
+        <item>আন্ত্ৰিক অসামঞ্জস্য</item>
+        <item>ঢিলা পায়খানাৰ সৈতে অজীৰ্ণতা</item>
+        <item>ডিহাইড্ৰেচন</item>
+        <item>দুৰ্বলতাৰ সৈতে বমি</item>
+        <item>গৰমত অৱসাদ</item>
+        <item>সাধাৰণ দুৰ্বলতা</item>
+        <item>অৱসাদ</item>
+        <item>পুষ্টিৰ অভাৱ</item>
+        <item>ভোক কম</item>
+        <item>শিশুৰ জ্বৰ</item>
+        <item>শিশুৰ শৰীৰৰ বিষ</item>
+        <item>টিকাকৰণৰ পিছত জ্বৰ</item>
+        <item>শিশুৰ এলাৰ্জি</item>
+        <item>হাঁচিৰ সৈতে চৰ্দি</item>
+        <item>শিশুৰ খজুৱতি</item>
+        <item>সামান্য চালৰ এলাৰ্জি</item>
+        <item>শিশুৰ ডায়েৰিয়া</item>
+        <item>দুৰ্বল ৰোগ-প্ৰতিৰোধ</item>
+        <item>ৰোগৰ পৰা সুস্থ হোৱা</item>
+    </string-array>
+
+    <string-array name="key_population_risk_factor_options">
+        <item>গৰ্ভাৱস্থা</item>
+        <item>দুগ্ধপান কৰোৱা মাক</item>
+        <item>এণ্টি-TNF চিকিৎসা</item>
+        <item>ব্ৰংকিয়েল হাঁপানি</item>
+        <item>কেঞ্চাৰ</item>
+        <item>হৃদৰোগজনিত সমস্যা</item>
+        <item>জনা টিবি ৰোগীৰ সংস্পৰ্শত থকা</item>
+        <item>COPD</item>
+        <item>কোভিডৰ পৰা আৰোগ্য লাভ কৰা ৰোগী</item>
+        <item>ডায়েবেটিছ</item>
+        <item>ডায়েলাইছিছ</item>
+        <item>স্বাস্থ্যকৰ্মী</item>
+        <item>উচ্চ ৰক্তচাপ</item>
+        <item>যকৃতৰ সমস্যা</item>
+        <item>প্ৰব্ৰজনকাৰী</item>
+        <item>খনিশ্ৰমিক</item>
+        <item>পেলিয়েটিভ কেয়াৰ</item>
+        <item>ইমিউনোচাপকাৰী ঔষধ গ্ৰহণ কৰা ৰোগী</item>
+        <item>কাৰাগাৰ</item>
+        <item>অবৈধ প্ৰব্ৰজনকাৰী</item>
+        <item>বৃক্কৰ সমস্যা</item>
+        <item>প্ৰত্যাৰোপণ</item>
+        <item>শহুৰীয়া বস্তি</item>
+        <item>প্ৰাপ্তবয়স্ক BCG টিকাকৰণৰ ইতিহাস</item>
+        <item>অপুষ্ট / কুপুষ্ট (BMI &lt;18.5 kg/m2)</item>
+        <item>বৃদ্ধ (বয়স &gt;60 বছৰ)</item>
+        <item>কৰ্মস্থল পৰিৱেশ (কয়লা/চেণ্ডব্লাষ্টিং/ইটাভাটা)</item>
+        <item>চাহ বাগিচাৰ কৰ্মী</item>
+        <item>নিৰ্মাণ স্থানৰ কৰ্মী</item>
+        <item>সমষ্টিগত পৰিৱেশ</item>
+        <item>নেশামুক্তি কেন্দ্ৰৰ অংশগ্ৰহণকাৰী</item>
+        <item>ঘৰৰ ভিতৰৰ বায়ু দূষণৰ সংস্পৰ্শত থকা ব্যক্তি</item>
+        <item>HIV ঝুঁকিপূর্ণ প্ৰান্তিক জনগোষ্ঠী</item>
+        <item>LGBTQAI++</item>
+        <item>নেশাজাতীয় পদাৰ্থ ব্যৱহাৰ (মদ্যপ/ইন্ট্ৰাভেনাছ ড্ৰাগ ব্যৱহাৰকাৰী)</item>
+        <item>তামাক/ধূমপায়ী</item>
+        <item>ছিলিকা সংস্পৰ্শ/ছিলিকোছিছ</item>
+        <item>অন্যান্য</item>
+        <item>@string/not_applicable</item>
+    </string-array>
+
+    <string-array name="general_opd_medication_array">
+        <item>টেবলেট পেৰাচিটামল (500 মি.গ্ৰা.)</item>
+        <item>টেবলেট ডাইজিন (এলুমিনিয়াম হাইড্ৰক্সাইড + মেগনেছিয়াম এলুমিনিয়াম চিলিকেট + মেগনেছিয়াম অক্সাইড + চাইমেথিকন)</item>
+        <item>টেবলেট চেট্ৰিজিন (10 মি.গ্ৰা.)</item>
+        <item>টেবলেট স্পোৰোলেক DS 120M (লেক্টিক এচিড বেচিলাছ টেবলেট)</item>
+        <item>ORS চেচেট</item>
+        <item>টেবলেট মাল্টিভিটামিন</item>
+        <item>চিৰাপ পেৰাচিটামল 250 মি.গ্ৰা. (60ml)</item>
+        <item>চিৰাপ চেট্ৰিজিন 60 ml</item>
+        <item>চিৰাপ জিংক 60 ml</item>
+    </string-array>
+
+    <string-array name="general_opd_frequency_array">
+        <item>দিনত এবাৰ</item>
+        <item>দিনত দুবাৰ</item>
+        <item>দিনত তিনিবাৰ</item>
+        <item>প্ৰয়োজন অনুসৰি</item>
+    </string-array>
+
+    <string-array name="general_opd_duration_array">
+        <item>1 দিন</item>
+        <item>2 দিন</item>
+        <item>3 দিন</item>
+        <item>5 দিন</item>
+        <item>7 দিন</item>
+    </string-array>
+    <string name="quick_refresh_not_updated">শেষ আপডেট: এতিয়ালৈকে নহয়</string>
+    <string name="quick_refresh_last_updated">শেষ আপডেট: %1$s</string>
+    <string name="quick_refresh_refreshing">হিতাধিকাৰীৰ তথ্য আপডেট হৈ আছে...</string>
+    <string name="quick_refresh_failed">আপডেট বিফল। পুনৰ চেষ্টা কৰক</string>
+    <string name="quick_refresh_action">ৰিফ্ৰেছ</string>
+    <string name="quick_refresh_camp_disconnected">কেম্প হাব সংযুক্ত নহয়। প্ৰথমে পুনৰ সংযোগ কৰক।</string>
 </resources>
 
 

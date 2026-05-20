@@ -13,7 +13,7 @@ import org.piramalswasthya.stoptb.model.Gender.PREFER_NOT_TO_SAY
 @JsonClass(generateAdapter = true)
 data class BeneficiaryDataSending(
     @Json(name = "ageAtMarriage")
-    val ageAtMarriage: String?,
+    val ageAtMarriage: Int?,
 
     @Json(name = "benImage")
     val benImage: String,
@@ -58,6 +58,15 @@ data class BeneficiaryDataSending(
     @Json(name = "dOB")
     val dob: String,
 
+    @Json(name = "dob")
+    val dobLowerCase: String,
+
+    @Json(name = "age")
+    val age: Int,
+
+    @Json(name = "ageUnits")
+    val ageUnits: String,
+
     @Json(name = "email")
     val email: String,
 
@@ -97,7 +106,7 @@ data class BeneficiaryDataSending(
     val spouseName: String?,
 
     @Json(name = "titleId")
-    val titleId: String,
+    val titleId: String?,
 
 
 //    @Json(name = "parkingPlaceID")
@@ -107,7 +116,7 @@ data class BeneficiaryDataSending(
     val bankName: String? = null,
 //
     @Json(name = "providerServiceMapID")
-    val providerServiceMapID: String,
+    val providerServiceMapID: Int,
 
     @Json(name = "maritalStatusID")
     val maritalStatusID: String? = null,
@@ -134,7 +143,10 @@ data class BeneficiaryDataSending(
     val branchName: String? = null,
 
     @Json(name = "providerServiceMapId")
-    val providerServiceMapId: String,
+    val providerServiceMapId: Int,
+
+    @Json(name = "visitCategory")
+    val visitCategory: String = "Stop TB",
 
 
     @Json(name = "maritalStatusName")
@@ -143,6 +155,47 @@ data class BeneficiaryDataSending(
 
     @Json(name = "beneficiaryConsent")
     val beneficiaryConsent: Boolean = false,
+
+    @Json(name = "personFrom")
+    val personFrom: String? = null,
+
+    @Json(name = "personFromId")
+    val personFromId: Int? = null,
+
+    @Json(name = "caseFindingType")
+    val typeOfCaseFinding: String? = null,
+
+    @Json(name = "typeOfCaseFindingId")
+    val typeOfCaseFindingId: Int? = null,
+
+    @Json(name = "isMobileAvailable")
+    val mobileNumberAvailable: Boolean? = null,
+
+    @Json(name = "tuId")
+    val tuId: Int? = null,
+
+    @Json(name = "tuName")
+    val tuName: String? = null,
+
+    @Json(name = "healthFacilityId")
+    val healthFacilityId: Int? = null,
+
+    @Json(name = "healthFacilityName")
+    val healthFacilityName: String? = null,
+
+    @Json(name = "address")
+    val address: String? = null,
+
+    @Json(name = "height")
+    val height: Double? = null,
+
+    @Json(name = "weight")
+    val weight: Double? = null,
+
+    @Json(name = "bmi")
+    val bmi: Double? = null,
+    @Json(name = "temperatureValue")
+    val temperature: Double? = null,
 
     )
 
@@ -156,8 +209,20 @@ data class BenDemographics(
     @Json(name = "blockID")
     var blockID: Int,
 
+    @Json(name = "tuId")
+    var tuId: Int? = null,
+
+    @Json(name = "tuName")
+    var tuName: String? = null,
+
+    @Json(name = "healthFacilityId")
+    var healthFacilityId: Int? = null,
+
+    @Json(name = "healthFacilityName")
+    var healthFacilityName: String? = null,
+
     @Json(name = "communityID")
-    var communityID: String,
+    var communityID: Int?,
     @Json(name = "communityName")
     var communityName: String,
 
@@ -179,7 +244,7 @@ data class BenDemographics(
 //    var parkingPlaceName: String,
 
     @Json(name = "religionID")
-    var religionID: String,
+    var religionID: Int?,
 
     @Json(name = "religionName")
     var religionName: String,
@@ -223,6 +288,9 @@ data class BenDemographics(
     @Json(name = "pinCode")
     var pinCode: String? = null,
 
+    @Json(name = "address")
+    var address: String? = null,
+
     @Json(name = "occupation")
     var occupation: String? = null,
 
@@ -246,6 +314,9 @@ data class BenDemographics(
 
     @Json(name = "longitude")
     var longitude: Double? = null,
+
+    @Json(name = "createdBy")
+    var createdBy: String? = null,
 
     )
 
@@ -274,7 +345,10 @@ data class BenPhoneMaps(
     var createdBy: String,
 
     @Json(name = "phoneNo")
-    var phoneNo: String
+    var phoneNo: String,
+
+    @Json(name = "phoneTypeID")
+    var phoneTypeID: Int = 1
 
 )
 
@@ -302,6 +376,9 @@ fun BenRegCache.asNetworkSendingModel(
         firstName = firstName!!,
         lastName = lastName ?: "",
         dob = getDateTimeStringFromLong(dob) ?: "",
+        dobLowerCase = getDateTimeStringFromLong(dob) ?: "",
+        age = age,
+        ageUnits = ageUnit.asApiValue(),
         fatherName = fatherName ?: "",
         motherName = motherName ?: "",
         facilitySelection = locationRecord.block.name.takeIf { it.isNotBlank() },
@@ -309,14 +386,14 @@ fun BenRegCache.asNetworkSendingModel(
         govtIdentityNo = null,
         govtIdentityTypeID = null,
         isEmergencyRegistration = false,
-        titleId = "",
+        titleId = null,
         //benImage = null,
         bankName = nameOfBank,
         branchName = nameOfBranch,
         ifscCode = ifscCode ?: "",
         accountNo = bankAccount,
-        ageAtMarriage = genDetails?.ageAtMarriage?.toString() ?: "0",
-        marriageDate = getDateTimeStringFromLong(genDetails?.marriageDate),
+        ageAtMarriage = genDetails?.ageAtMarriage?.takeIf { it > 0 },
+        marriageDate = genDetails?.marriageDate?.takeIf { it > 0 }?.let { getDateTimeStringFromLong(it) },
         genderID = genderId,
         genderName = when (gender) {
             MALE -> "Male"
@@ -325,15 +402,15 @@ fun BenRegCache.asNetworkSendingModel(
             PREFER_NOT_TO_SAY -> "Prefer not to say"
             null -> "NA"
         },
-        maritalStatusID = if (isKid) null else genDetails?.maritalStatusId?.toString() ?: "",
-        maritalStatusName = if (isKid) null else genDetails?.maritalStatus ?: "",
+        maritalStatusID = if (isKid) null else genDetails?.maritalStatusId?.takeIf { it > 0 }?.toString(),
+        maritalStatusName = if (isKid) null else genDetails?.maritalStatus?.takeIf { it.isNotBlank() },
         email = "",
-        providerServiceMapID = user.serviceMapId.toString(),
-        providerServiceMapId = user.serviceMapId.toString(),
+        providerServiceMapID = user.serviceMapId,
+        providerServiceMapId = user.serviceMapId,
         benDemographics = BenDemographics(
-            communityID = communityId.toString(),
+            communityID = communityId.takeIf { it > 0 },
             communityName = community ?: "",
-            religionID = religionId.toString(),
+            religionID = religionId.takeIf { it > 0 },
             religionName = religion ?: "",
             countryID = 1,
             countryName = "India",
@@ -342,6 +419,10 @@ fun BenRegCache.asNetworkSendingModel(
             districtID = locationRecord.district.id,
             districtName = locationRecord.district.name,
             blockID = locationRecord.block.id,
+            tuId = null,
+            tuName = null,
+            healthFacilityId = null,
+            healthFacilityName = null,
             districtBranchID = locationRecord.village.id,
             districtBranchName = locationRecord.village.name,
 //            zoneID = user.zoneId,
@@ -350,9 +431,10 @@ fun BenRegCache.asNetworkSendingModel(
 //            parkingPlaceID = user.parkingPlaceId,
 //            servicePointID = user.servicePointId.toString(),
 //            servicePointName = user.servicePointName,
-            addressLine1 = "D.No 3-160E",
-            addressLine2 = "ARS Road",
-            addressLine3 = "Neggipudi",
+            address = null,
+            addressLine1 = address ?: "",
+            addressLine2 = "",
+            addressLine3 = "",
             occupation = occupation ?: "unknown",
             economicStatus = economicStatus,
             economicStatusId = economicStatusId,
@@ -361,6 +443,7 @@ fun BenRegCache.asNetworkSendingModel(
             otherResidentialArea = otherResidentialArea,
             latitude = latitude,
             longitude = longitude,
+            createdBy = user.userName,
         ),
         benPhoneMaps = arrayOf(
             BenPhoneMaps(
@@ -368,20 +451,31 @@ fun BenRegCache.asNetworkSendingModel(
                 createdBy = user.userName,
             )
         ),
-        beneficiaryIdentities = arrayOf(
-            BeneficiaryIdentities(
-                govtIdentityNo = 0,
-                govtIdentityTypeName = "null",
-                govtIdentityTypeID = 0,
-                identityType = "National ID",
-                createdBy = user.userName
-
-            )
-        ),
+        beneficiaryIdentities = emptyArray(),
 //        vanID = user.vanId,
 //        parkingPlaceID = user.parkingPlaceId,
         createdBy = user.userName,
         beneficiaryConsent = isConsent,
+        personFrom = personFrom,
+        personFromId = personFromId,
+        typeOfCaseFinding = typeOfCaseFinding,
+        typeOfCaseFindingId = typeOfCaseFindingId,
+        mobileNumberAvailable = mobileNumberAvailable,
+        tuId = locationRecord.tu?.id,
+        tuName = locationRecord.tu?.name,
+        healthFacilityId = locationRecord.healthFacility?.id,
+        healthFacilityName = locationRecord.healthFacility?.name,
+        address = address,
+        height = height,
+        weight = weight,
+        bmi = bmi,
+        temperature = temperature,
 
     )
+}
+
+private fun AgeUnit?.asApiValue(): String = when (this) {
+    AgeUnit.DAYS -> "Days"
+    AgeUnit.MONTHS -> "Months"
+    AgeUnit.YEARS, null -> "Years"
 }

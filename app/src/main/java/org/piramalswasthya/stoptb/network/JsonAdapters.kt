@@ -8,6 +8,7 @@ import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.model.ABHAModel
 import org.piramalswasthya.stoptb.model.AESScreeningCache
 import org.piramalswasthya.stoptb.model.FilariaScreeningCache
+import org.piramalswasthya.stoptb.model.GeneralOpdCache
 import org.piramalswasthya.stoptb.model.KalaAzarScreeningCache
 import org.piramalswasthya.stoptb.model.LeprosyFollowUpCache
 import org.piramalswasthya.stoptb.model.LeprosyScreeningCache
@@ -15,6 +16,7 @@ import org.piramalswasthya.stoptb.model.MalariaConfirmedCasesCache
 import org.piramalswasthya.stoptb.model.MalariaScreeningCache
 import org.piramalswasthya.stoptb.model.ReferalCache
 import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
+import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.model.getDateTimeStringFromLong
@@ -61,6 +63,19 @@ data class TmcGenerateBenIdsRequest(val benIDRequired: Int, val vanID: Int)
 @JsonClass(generateAdapter = true)
 data class GetDataPaginatedRequest(
     val ashaId: Int, val pageNo: Int, val fromDate: String, val toDate: String
+)
+@JsonClass(generateAdapter = true)
+data class GetDataPaginatedRequests(
+    val providerServiceMapID: Int,
+    val villageID: Int,
+    val pageNo: Int,
+)
+
+@JsonClass(generateAdapter = true)
+data class NurseWorklistRequest(
+    val providerServiceMapID: Int,
+    val villageId: Int,
+    val pageNumber: Int,
 )
 
 @JsonClass(generateAdapter = true)
@@ -333,7 +348,123 @@ data class AddHealthIdRecord(
     var ABHAProfile: ABHAProfile?, var isNew: Boolean?
 )
 
+data class StopTbVillageRequest(val providerServiceMapID: Int, val villageID: Int)
 data class TBScreeningRequestDTO(val userId: Int, val tbScreeningList: List<TBScreeningDTO>)
+data class TBScreeningSaveRequest(
+    val beneficiaryRegID: Long,
+    val providerServiceMapID: Int,
+    val visitDate: Long,
+    val coughMoreThan2Weeks: Boolean?,
+    val bloodInSputum: Boolean?,
+    val feverMoreThan2Weeks: Boolean?,
+    val lossOfWeight: Boolean?,
+    val nightSweats: Boolean?,
+    val historyOfTb: Boolean?,
+    val takingAntiTBDrugs: Boolean?,
+    val familySufferingFromTB: Boolean?,
+    val riseOfFever: Boolean?,
+    val lossOfAppetite: Boolean?,
+    val contactWithTBPatient: Boolean?,
+    val symptomatic: String?,
+    val referredForDigitalChestXray: Boolean?,
+    val referredForSputumCollection: Boolean?,
+    val sputumSampleSubmittedAt: String?,
+    val recommendedForTruenat: Boolean?,
+    val recommendedForLiquidCulture: Boolean?,
+    val testDenialReasons: Any?,
+    val createdBy: String?
+) {
+    companion object {
+        fun from(cache: TBScreeningCache, beneficiaryRegID: Long, providerServiceMapID: Int, createdBy: String?): TBScreeningSaveRequest {
+            return TBScreeningSaveRequest(
+                beneficiaryRegID = beneficiaryRegID,
+                providerServiceMapID = providerServiceMapID,
+                visitDate = cache.visitDate,
+                coughMoreThan2Weeks = cache.coughMoreThan2Weeks,
+                bloodInSputum = cache.bloodInSputum,
+                feverMoreThan2Weeks = cache.feverMoreThan2Weeks,
+                lossOfWeight = cache.lossOfWeight,
+                nightSweats = cache.nightSweats,
+                historyOfTb = cache.historyOfTb,
+                takingAntiTBDrugs = cache.takingAntiTBDrugs,
+                familySufferingFromTB = cache.familySufferingFromTB,
+                riseOfFever = cache.riseOfFever,
+                lossOfAppetite = cache.lossOfAppetite,
+                contactWithTBPatient = cache.contactWithTBPatient,
+                symptomatic = cache.sympotomatic ?: cache.asymptomatic,
+                referredForDigitalChestXray = cache.referredForDigitalChestXray,
+                referredForSputumCollection = cache.referredForSputumCollection,
+                sputumSampleSubmittedAt = cache.sputumSampleSubmittedAt,
+                recommendedForTruenat = cache.recommendedForTruenatTest,
+                recommendedForLiquidCulture = cache.recommendedForLiquidCultureTest,
+                testDenialReasons = cache.reasonForDenialForGettingTested?.let {
+                    if (it.size == 1) it.first() else it
+                },
+                createdBy = createdBy
+            )
+        }
+    }
+}
+data class TBDiagnosticsRequestDTO(val userId: Int, val tbDiagnosticsList: List<TBDiagnosticsDTO>)
+data class GeneralOpdRequestDTO(val userId: Int, val generalOpdList: List<GeneralOpdDTO>)
+data class GeneralOpdSaveRequest(
+    val beneficiaryRegID: Long,
+    val providerServiceMapID: Int,
+    val chiefComplaint: List<String>?,
+    val medication: String?,
+    val dosage: String?,
+    val frequency: String?,
+    val duration: String?,
+    val notes: String?,
+    val createdBy: String?
+) {
+    companion object {
+        fun from(cache: GeneralOpdCache, beneficiaryRegID: Long, providerServiceMapID: Int, createdBy: String?): GeneralOpdSaveRequest {
+            return GeneralOpdSaveRequest(
+                beneficiaryRegID = beneficiaryRegID,
+                providerServiceMapID = providerServiceMapID,
+                chiefComplaint = cache.chiefComplaints,
+                medication = cache.medications?.joinToString(", "),
+                dosage = cache.dosage,
+                frequency = cache.frequency,
+                duration = cache.duration,
+                notes = cache.notes,
+                createdBy = createdBy
+            )
+        }
+    }
+}
+data class TBDiagnosticsSaveRequest(
+    val benRegID: Long,
+    val providerServiceMapID: Int,
+    val visitDate: Long,
+    val nikshayId: String?,
+    val isDigitalChestXrayConducted: Boolean?,
+    val digitalChestXrayResult: String?,
+    val isTruenatConducted: Boolean?,
+    val truenatResult: String?,
+    val recommendedForLiquidCulture: Boolean?,
+    val liquidCultureResult: String?,
+    val createdBy: String?
+) {
+    companion object {
+        fun from(cache: TBDiagnosticsCache, benRegID: Long, providerServiceMapID: Int, createdBy: String?): TBDiagnosticsSaveRequest {
+            return TBDiagnosticsSaveRequest(
+                benRegID = benRegID,
+                providerServiceMapID = providerServiceMapID,
+                visitDate = cache.visitDate,
+                nikshayId = cache.nikshayId,
+                isDigitalChestXrayConducted = cache.isChestXRayDone,
+                digitalChestXrayResult = cache.chestXRayResult,
+                isTruenatConducted = cache.isNaatConducted,
+                truenatResult = cache.naatResult,
+                recommendedForLiquidCulture = cache.recommendedForLiquidCultureTest,
+                liquidCultureResult = cache.liquidCultureResult,
+                createdBy = createdBy
+            )
+        }
+    }
+}
 data class KalaAzarScreeningRequestDTO(val userId: Int, val kalaAzarLists: List<KALAZARScreeningDTO>)
 data class MalariaScreeningRequestDTO(val userId: Int, val malariaLists: List<MalariaScreeningDTO>)
 data class IRSScreeningRequestDTO(val rounds: List<ScreeningRoundDTO>)
@@ -368,10 +499,14 @@ data class TBScreeningDTO(
     var age: Boolean? = null, var diabetic: Boolean? = null,
     var tobaccoUser: Boolean? = null, var bmi: Boolean? = null,
     var contactWithTBPatient: Boolean? = null, var historyOfTBInLastFiveYrs: Boolean? = null,
-    var referralRequired: Boolean? = null, var referralFor: List<String>? = null,
+    var referredForDigitalChestXray: Boolean? = null, var referredForSputumCollection: Boolean? = null,
+    var sputumSampleSubmittedAt: String? = null, var recommendedForTruenatTest: Boolean? = null,
+    var recommendedForLiquidCultureTest: Boolean? = null,
+    var reasonForDenialForGettingTested: List<String>? = null,
     var latitude: Double? = null, var longitude: Double? = null, var address: String? = null,
     var familyContactScreeningRequired: Boolean? = null,
     var sympotomatic: String? = null, var asymptomatic: String? = null, var recommandateTest: String? = null,
+    var updateDate: String? = null,
 ) {
     fun toCache(): TBScreeningCache = TBScreeningCache(
         benId = benId, visitDate = getLongFromDate(visitDate),
@@ -382,10 +517,42 @@ data class TBScreeningDTO(
         riseOfFever = riseOfFever, lossOfAppetite = lossOfAppetite, age = age,
         diabetic = diabetic, tobaccoUser = tobaccoUser, bmi = bmi,
         contactWithTBPatient = contactWithTBPatient, historyOfTBInLastFiveYrs = historyOfTBInLastFiveYrs,
-        referralRequired = referralRequired, referralFor = referralFor,
+        referredForDigitalChestXray = referredForDigitalChestXray,
+        referredForSputumCollection = referredForSputumCollection,
+        sputumSampleSubmittedAt = sputumSampleSubmittedAt,
+        recommendedForTruenatTest = recommendedForTruenatTest,
+        recommendedForLiquidCultureTest = recommendedForLiquidCultureTest,
+        reasonForDenialForGettingTested = reasonForDenialForGettingTested,
         latitude = latitude, longitude = longitude, address = address,
         familyContactScreeningRequired = familyContactScreeningRequired,
         sympotomatic = sympotomatic, asymptomatic = asymptomatic, recommandateTest = recommandateTest,
+        serverUpdatedDate = getLongFromDateMultipleSupport(updateDate),
+        syncState = SyncState.SYNCED
+    )
+}
+
+data class GeneralOpdDTO(
+    val id: Long,
+    val benId: Long,
+    val visitDate: String?,
+    val chiefComplaints: List<String>? = null,
+    val medications: List<String>? = null,
+    val dosage: String? = null,
+    val frequency: String? = null,
+    val duration: String? = null,
+    val notes: String? = null,
+    val updateDate: String? = null
+) {
+    fun toCache(): GeneralOpdCache = GeneralOpdCache(
+        benId = benId,
+        visitDate = getLongFromDate(visitDate),
+        chiefComplaints = chiefComplaints,
+        medications = medications,
+        dosage = dosage,
+        frequency = frequency,
+        duration = duration,
+        notes = notes,
+        serverUpdatedDate = getLongFromDateMultipleSupport(updateDate),
         syncState = SyncState.SYNCED
     )
 }
@@ -399,11 +566,13 @@ data class TBSuspectedDTO(
     var isChestXRayDone: Boolean? = null, var chestXRayResult: String? = null,
     var isAICoughAssessmentDone: Boolean? = null, var aiCoughAssessmentResult: String? = null,
     var isNaatConducted: Boolean? = null, var naatResult: String? = null,
+    var recommendedForLiquidCultureTest: Boolean? = null,
     var isLiquidCultureConducted: Boolean? = null, var liquidCultureResult: String? = null,
     var referralFacility: String? = null, var isTBConfirmed: Boolean? = null,
     var isDRTBConfirmed: Boolean? = null, var isConfirmed: Boolean = false,
     var otherReasonForSuspicion: String? = null,
     var latitude: Double? = null, var longitude: Double? = null, var address: String? = null,
+    var updateDate: String? = null,
 ) {
     fun toCache(): TBSuspectedCache = TBSuspectedCache(
         benId = benId, visitDate = getLongFromDate(visitDate),
@@ -417,6 +586,7 @@ data class TBSuspectedDTO(
         aiCoughAssessmentResult = aiCoughAssessmentResult,
         isNaatConducted = isNaatConducted,
         naatResult = naatResult,
+        recommendedForLiquidCultureTest = recommendedForLiquidCultureTest,
         isLiquidCultureConducted = isLiquidCultureConducted,
         liquidCultureResult = liquidCultureResult,
         referralFacility = referralFacility,
@@ -426,6 +596,7 @@ data class TBSuspectedDTO(
         latitude = latitude,
         longitude = longitude,
         address = address,
+        serverUpdatedDate = getLongFromDateMultipleSupport(updateDate),
         syncState = SyncState.SYNCED
     )
 }
@@ -437,7 +608,8 @@ data class TBConfirmedTreatmentDTO(
     val adherenceToMedicines: String?, val anyDiscomfort: Boolean?,
     val treatmentCompleted: Boolean?, val actualTreatmentCompletionDate: String?,
     val treatmentOutcome: String?, val dateOfDeath: String?,
-    val placeOfDeath: String?, val reasonForDeath: String?, val reasonForNotCompleting: String?
+    val placeOfDeath: String?, val reasonForDeath: String?, val reasonForNotCompleting: String?,
+    val updateDate: String? = null
 ) {
     fun toCache(): TBConfirmedTreatmentCache = TBConfirmedTreatmentCache(
         benId = benId, regimenType = regimenType,
@@ -450,6 +622,7 @@ data class TBConfirmedTreatmentDTO(
         treatmentOutcome = treatmentOutcome, dateOfDeath = getLongFromDateMultipleSupport(dateOfDeath),
         placeOfDeath = placeOfDeath, reasonForDeath = reasonForDeath ?: "Tuberculosis",
         reasonForNotCompleting = reasonForNotCompleting,
+        serverUpdatedDate = getLongFromDateMultipleSupport(updateDate),
         syncState = SyncState.SYNCED
     )
 }
@@ -460,6 +633,50 @@ data class TBConfirmedRequestDTO(
 )
 
 data class TBSuspectedRequestDTO(val userId: Int, val tbSuspectedList: List<TBSuspectedDTO>)
+
+data class TBDiagnosticsDTO(
+    val id: Long,
+    val benId: Long,
+    val visitDate: String?,
+    val nikshayId: String? = null,
+    val isChestXRayDone: Boolean? = null,
+    val chestXRayResult: String? = null,
+    val isSputumCollected: Boolean? = null,
+    val sputumSubmittedAt: String? = null,
+    val isNaatConducted: Boolean? = null,
+    val naatResult: String? = null,
+    val recommendedForLiquidCultureTest: Boolean? = null,
+    val isLiquidCultureConducted: Boolean? = null,
+    val liquidCultureResult: String? = null,
+    val isTBConfirmed: Boolean? = null,
+    val isConfirmed: Boolean = false,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val address: String? = null,
+    val updateDate: String? = null
+) {
+    fun toCache(): TBDiagnosticsCache = TBDiagnosticsCache(
+        benId = benId,
+        visitDate = getLongFromDate(visitDate),
+        nikshayId = nikshayId,
+        isChestXRayDone = isChestXRayDone,
+        chestXRayResult = chestXRayResult,
+        isSputumCollected = isSputumCollected,
+        sputumSubmittedAt = sputumSubmittedAt,
+        isNaatConducted = isNaatConducted,
+        naatResult = naatResult,
+        recommendedForLiquidCultureTest = recommendedForLiquidCultureTest,
+        isLiquidCultureConducted = isLiquidCultureConducted,
+        liquidCultureResult = liquidCultureResult,
+        isTBConfirmed = isTBConfirmed,
+        isConfirmed = isConfirmed,
+        latitude = latitude,
+        longitude = longitude,
+        address = address,
+        serverUpdatedDate = getLongFromDateMultipleSupport(updateDate),
+        syncState = SyncState.SYNCED
+    )
+}
 
 data class MalariaScreeningDTO(
     val id: Int = 0, val benId: Long, val visitId: Long, val caseDate: String,
@@ -505,13 +722,15 @@ data class MalariaConfirmedDTO(
     var dateOfDiagnosis: String, var treatmentStartDate: String,
     var treatmentCompletionDate: String, var treatmentGiven: String,
     var referralDate: String, var day: String,
+    var updateDate: String? = null,
 ) {
     fun toCache(): MalariaConfirmedCasesCache = MalariaConfirmedCasesCache(
         benId = benId, dateOfDiagnosis = getLongFromDate(dateOfDiagnosis),
         treatmentStartDate = getLongFromDate(treatmentStartDate),
         treatmentCompletionDate = getLongFromDate(treatmentCompletionDate),
         referralDate = getLongFromDate(referralDate), treatmentGiven = treatmentGiven,
-        houseHoldDetailsId = houseHoldDetailsId, diseaseId = diseaseId, day = day
+        houseHoldDetailsId = houseHoldDetailsId, diseaseId = diseaseId, day = day,
+        serverUpdatedDate = getLongFromDateMultipleSupport(updateDate)
     )
 }
 
@@ -712,7 +931,7 @@ fun getLongFromDate(dateString: String?): Long {
 
 fun getLongFromDateMultipleSupport(dateStr: String?): Long? {
     if (dateStr.isNullOrBlank() || dateStr == "1970-01-01") return null
-    val formats = listOf("yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss", "MMM dd, yyyy hh:mm:ss a", "MMM dd, yyyy", "dd/MM/yyyy")
+    val formats = listOf("yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss", "MMM dd, yyyy h:mm:ss a", "MMM dd, yyyy hh:mm:ss a", "MMM dd, yyyy", "dd/MM/yyyy")
     for (format in formats) {
         try {
             val sdf = SimpleDateFormat(format, Locale.ENGLISH)

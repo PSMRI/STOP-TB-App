@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.adapters
 
 
 import android.net.Uri
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -30,6 +31,7 @@ class PreviewAdapter(
     override fun onBindViewHolder(holder: PreviewVH, position: Int) {
         val it = items[position]
         holder.tvLabel.text = it.label
+
         if (it.isImage) {
             // show image view, hide text value
             holder.tvValue.visibility = View.GONE
@@ -45,9 +47,13 @@ class PreviewAdapter(
                 }
             }
         } else {
-            holder.ivImage.visibility = View.GONE
-            holder.tvValue.visibility = View.VISIBLE
-            holder.tvValue.text = it.value
+            if (it.label == holder.itemView.context.getString(R.string.mobile_number_not_available)) {
+                holder.tvValue.visibility = View.GONE
+            }else{
+                holder.ivImage.visibility = View.GONE
+                holder.tvValue.visibility = View.VISIBLE
+                holder.tvValue.text = it.value
+            }
         }
     }
 

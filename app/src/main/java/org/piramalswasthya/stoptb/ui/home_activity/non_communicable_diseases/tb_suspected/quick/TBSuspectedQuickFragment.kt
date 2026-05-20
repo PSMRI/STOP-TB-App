@@ -14,6 +14,9 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
+import org.piramalswasthya.stoptb.helpers.applyManagedFlowBackPolicyOnResume
+import org.piramalswasthya.stoptb.helpers.blockBackNavigationInManagedFlow
+import org.piramalswasthya.stoptb.helpers.setAutoFlowBackNavigationBlocked
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.work.WorkerUtils
@@ -28,6 +31,9 @@ class TBSuspectedQuickFragment : Fragment() {
 
     private val viewModel: TBSuspectedQuickViewModel by viewModels()
 
+    private val isManagedFlow: Boolean
+        get() = viewModel.autoFlow || viewModel.generalOpdFlow
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -39,6 +45,7 @@ class TBSuspectedQuickFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: android.os.Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        blockBackNavigationInManagedFlow(isManagedFlow, allowBack = false)
         val adapter = FormInputAdapter(
             formValueListener = FormInputAdapter.FormValueListener { formId, index ->
                 viewModel.updateListOnValueChanged(formId, index)
@@ -111,13 +118,11 @@ class TBSuspectedQuickFragment : Fragment() {
 
     private fun submitForm() {
         val result = binding.form.rvInputForm.adapter?.let {
-            (it as FormInputAdapter).validateInput(resources)
-        }
+            (it as FormInputAdapter).validateInput(resources, binding.form.rvInputForm)
+        } ?: -1
         Timber.d("Validation : $result")
         if (result == -1) {
             viewModel.saveForm()
-        } else if (result != null) {
-            binding.form.rvInputForm.scrollToPosition(result)
         }
     }
 
@@ -125,23 +130,39 @@ class TBSuspectedQuickFragment : Fragment() {
         super.onStart()
         activity?.let {
             when (it) {
+//                is HomeActivity -> it.updateActionBar(
+//                    R.drawable.ic__ncd,
+//                    getString(R.string.tb_suspected_quick_title)
+//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+//                is VolunteerActivity -> it.updateActionBar(
+//                    R.drawable.ic__ncd,
+//                    getString(R.string.tb_suspected_quick_title)
+//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+
                 is HomeActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.tb_suspected_quick_title)
-                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+                )
                 is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.tb_suspected_quick_title)
-                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+                )
             }
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        applyManagedFlowBackPolicyOnResume(
+            isManagedFlow = isManagedFlow,
+            allowBack = false
+        )
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
-        if (viewModel.autoFlow) {
-            (activity as? HomeActivity)?.setToolbarNavigationVisible(true)
-            (activity as? VolunteerActivity)?.setToolbarNavigationVisible(true)
+        if (isManagedFlow) {
+            setAutoFlowBackNavigationBlocked(false)
         }
         _binding = null
     }

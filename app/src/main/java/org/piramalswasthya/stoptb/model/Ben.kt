@@ -60,7 +60,7 @@ enum class BenStatus {
 @DatabaseView(
     viewName = "BEN_BASIC_CACHE",
     value = "SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId" +
-            ", b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod" +
+            ", b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod" +
             ", b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus" +
             ", b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId" +
             ", b.isNewAbha" +
@@ -115,6 +115,7 @@ data class BenBasicCache(
 //    val typeOfList: TypeOfList,
     val spouseName: String? = null,
     val rchId: String? = null,
+    val nikshayId: String? = null,
     val hrpStatus: Boolean,
     val syncState: SyncState?,
     val reproductiveStatusId: Int,
@@ -277,6 +278,7 @@ data class BenBasicCache(
 //            typeOfList = typeOfList.name,
             spouseName = spouseName?.takeIf { it.isNotEmpty() } ?: "Not Available",
             rchId = rchId?.takeIf { it.isNotEmpty() },
+            nikshayId = nikshayId?.takeIf { it.isNotBlank() },
             hrpStatus = hrpStatus,
             syncState = syncState,
             isConsent = isConsent,
@@ -308,6 +310,7 @@ data class BenBasicCache(
             fatherName = fatherName,
             familyHeadName = familyHeadName ?: "",
             rchId = rchId,
+            nikshayId = nikshayId?.takeIf { it.isNotBlank() },
             hrpStatus = hrpStatus,
             relToHeadId = 0,
             syncState = syncState,
@@ -859,6 +862,7 @@ data class BenBasicDomain(
     val spouseName: String? = null,
 //    val typeOfList: String,
     val rchId: String? = null,
+    val nikshayId: String? = null,
     val hrpStatus: Boolean = false,
     var syncState: SyncState?,
     val isConsent: Boolean,
@@ -874,6 +878,15 @@ data class BenBasicDomain(
     val dobString: String
         get() = java.text.SimpleDateFormat("dd-MM-yyyy", java.util.Locale.ENGLISH)
             .format(java.util.Date(dob))
+
+    val nikshayIdDisplay: String
+        get() = nikshayId?.takeIf { it.isNotBlank() } ?: "N/A"
+
+    val hasCallableMobileNo: Boolean
+        get() = mobileNo.isNotBlank() && mobileNo != "9999999999"
+
+    val mobileNoDisplay: String
+        get() = if (hasCallableMobileNo) mobileNo else "N/A"
 }
 
 
@@ -922,6 +935,9 @@ data class BenBasicDomainForForm(
     val isConsent: Boolean,
 
     ) {
+    val mobileNoDisplay: String
+        get() = mobileNo.takeIf { it.isNotBlank() && it != "9999999999" } ?: "N/A"
+
     companion object
 }
 
@@ -1323,6 +1339,8 @@ data class BenRegCache(
 
     var updatedDate: Long? = null,
 
+    var serverUpdatedDate: Long? = null,
+
     var syncState: SyncState,
 
     var isDraft: Boolean,
@@ -1344,6 +1362,18 @@ data class BenRegCache(
     var residentialArea: String? = null,
     var residentialAreaId: Int? = 0,
     var otherResidentialArea: String? = null,
+
+    var personFrom: String? = null,
+    var personFromId: Int? = null,
+    var typeOfCaseFinding: String? = null,
+    var typeOfCaseFindingId: Int? = null,
+    var mobileNumberAvailable: Boolean? = null,
+    var address: String? = null,
+    var height: Double? = null,
+    var weight: Double? = null,
+    var bmi: Double? = null,
+    var temperature: Double? = null,
+    var nikshayId: String? = null,
 
 
 
@@ -1456,6 +1486,16 @@ data class BenRegCache(
 //            whoConductedDelivery = genDetails?.whoConductedDelivery,
 //            lastDeliveryConducted = genDetails?.lastDeliveryConducted,
             facilitySelection = locationRecord.block.name.takeIf { it.isNotBlank() } ?: "",
+            personFrom = personFrom,
+            personFromId = personFromId,
+            typeOfCaseFinding = typeOfCaseFinding,
+            typeOfCaseFindingId = typeOfCaseFindingId,
+            mobileNumberAvailable = mobileNumberAvailable,
+            address = address,
+            height = height,
+            weight = weight,
+            bmi = bmi,
+            temperature = temperature,
             serverUpdatedStatus = serverUpdatedStatus,
             createdBy = createdBy!!,
             createdDate = getDateTimeStringFromLong(createdDate!!)!!,
@@ -1489,9 +1529,9 @@ data class BenRegCache(
                 beneficiaryId
             ) ?: "",// Base64.encodeToString(userImageBlob, Base64.DEFAULT),
             benDemographics = BenDemographics(
-                communityID = communityId.toString(),
+                communityID = communityId.takeIf { it > 0 },
                 communityName = community ?: "",
-                religionID = religionId.toString(),
+                religionID = religionId.takeIf { it > 0 },
                 religionName = religion ?: "",
                 countryID = 1,
                 countryName = "India",
@@ -1500,6 +1540,10 @@ data class BenRegCache(
                 districtID = locationRecord.district.id,
                 districtName = locationRecord.district.name,
                 blockID = locationRecord.block.id,
+                tuId = null,
+                tuName = null,
+                healthFacilityId = null,
+                healthFacilityName = null,
                 districtBranchID = locationRecord.village.id,
                 districtBranchName = locationRecord.village.name,
 //            zoneID = user.zoneId,
@@ -1508,9 +1552,10 @@ data class BenRegCache(
 //            parkingPlaceID = user.parkingPlaceId,
 //            servicePointID = user.servicePointId.toString(),
 //            servicePointName = user.servicePointName,
-                addressLine1 = "D.No 3-160E",
-                addressLine2 = "ARS Road",
-                addressLine3 = "Neggipudi",
+                address = null,
+                addressLine1 = address ?: "",
+                addressLine2 = "",
+                addressLine3 = "",
                 occupation = occupation ?: "unknown",
                 economicStatus = economicStatus,
                 economicStatusId = economicStatusId,
@@ -1519,6 +1564,7 @@ data class BenRegCache(
                 otherResidentialArea = otherResidentialArea,
                 latitude = latitude,
                 longitude = longitude,
+                createdBy = user.userName,
             ),
             benPhoneMaps = arrayOf(
                 BenPhoneMaps(

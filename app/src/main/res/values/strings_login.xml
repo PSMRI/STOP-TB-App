@@ -3,6 +3,8 @@
     <!--    Login-->
     <string name="tv_text_welcome">Welcome, please login</string>
     <string name="tv_text_welcome_user">Welcome, %s</string>
+    <string name="login_app_native_name">Stop TB</string>
+    <string name="login_app_native_name_uat">Stop TB-UAT</string>
     <string name="tv_text_sign_in">Login</string>
     <string name="tv_text_select_language">Please Select Your Language</string>
     <string name="text_english" translatable="false">English</string>
@@ -12,6 +14,14 @@
     <string name="cd_piramal" translatable="false">Piramal Logo</string>
     <string name="til_username_hint_text">Username</string>
     <string name="til_password_hint_text">Password</string>
+    <string name="error_login_username_required">Username required</string>
+    <string name="error_login_password_required">Password required</string>
+    <string name="error_login_failed">Login failed. Please try again.</string>
+    <string name="error_login_unable_to_reach_server">Unable to connect to the server.</string>
+    <string name="error_login_server_refused">Server refused connection.</string>
+    <string name="error_login_generic">Something went wrong. Please try again later.</string>
+    <string name="error_login_invalid_password">Invalid password</string>
+    <string name="error_login_role_not_allowed">Login failed: Only Registration Officer, Nurse or Counselling Officer are allowed.</string>
     <string name="cb_login_remember_me_text">Remember me</string>
     <string name="btn_login_forgot_password_text">Forgot Password?</string>
     <string name="btn_login_text">Login</string>
@@ -19,6 +29,10 @@
     <string name="camp_hub_checking">Checking Camp Hub...</string>
     <string name="camp_hub_connected">Camp Hub Connected</string>
     <string name="camp_hub_not_connected">Camp Hub Not Connected</string>
+    <string name="camp_disconnect_title">Disconnect Camp Hub?</string>
+    <string name="camp_disconnect_message">Are you sure you want to disconnect Camp Hub and continue in normal mode?</string>
+    <string name="camp_disconnect_positive">Disconnect</string>
+    <string name="camp_disconnect_negative">Keep connected</string>
     <string name="camp_hub_url_hint">Camp Hub URL</string>
     <string name="camp_hub_retry">Retry</string>
     <string name="camp_hub_login_blocked">Camp Hub is not connected. Please retry or connect to Camp Wi-Fi.</string>
@@ -33,7 +47,7 @@
     <string name="camp_scan_qr_title">Scan the QR from laptop hub</string>
     <string name="camp_scan_qr_subtitle">Fastest way to connect this device to camp network</string>
     <string name="camp_manual_url_title">Or enter hub URL manually</string>
-    <string name="pwr_by_text" translatable="false">Powered by\n <b>Piramal Foundation</b></string>
+    <string name="pwr_by_text" translatable="false">Powered by\n <b>STOP TB</b></string>
     <string name="login_diff_user">You are previously logged in with Username: @username as @asha, Do you want to Log in with another User?</string>
     <string name="unsync_record_count">Hello! there are @count un-sync records, please wait till all records are synced.</string>
     <string name="account_deactivated_title">Account Deactivated</string>

@@ -2,20 +2,30 @@ package org.piramalswasthya.stoptb.repositories
 
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.TBDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Konstants
+import org.piramalswasthya.stoptb.model.GeneralOpdCache
 import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
+import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.network.AmritApiService
+import org.piramalswasthya.stoptb.network.GeneralOpdRequestDTO
+import org.piramalswasthya.stoptb.network.GeneralOpdSaveRequest
 import org.piramalswasthya.stoptb.network.GetDataPaginatedRequest
+import org.piramalswasthya.stoptb.network.StopTbVillageRequest
 import org.piramalswasthya.stoptb.network.TBConfirmedRequestDTO
+import org.piramalswasthya.stoptb.network.TBDiagnosticsRequestDTO
+import org.piramalswasthya.stoptb.network.TBDiagnosticsSaveRequest
 import org.piramalswasthya.stoptb.network.TBScreeningRequestDTO
+import org.piramalswasthya.stoptb.network.TBScreeningSaveRequest
 import org.piramalswasthya.stoptb.network.TBSuspectedRequestDTO
 import timber.log.Timber
 import java.net.SocketTimeoutException
@@ -40,6 +50,34 @@ class TBRepo @Inject constructor(
     suspend fun saveTBScreening(tbScreeningCache: TBScreeningCache) {
         withContext(Dispatchers.IO) {
             tbDao.saveTbScreening(tbScreeningCache)
+        }
+    }
+
+    suspend fun getGeneralOpd(benId: Long): GeneralOpdCache? {
+        return withContext(Dispatchers.IO) {
+            tbDao.getGeneralOpd(benId)
+        }
+    }
+
+    val tbScreeningBenIds: Flow<List<Long>> = tbDao.getAllTbScreeningBenIds()
+
+    val generalOpdBenIds: Flow<List<Long>> = tbDao.getAllGeneralOpdBenIds()
+
+    suspend fun saveGeneralOpd(generalOpdCache: GeneralOpdCache) {
+        withContext(Dispatchers.IO) {
+            tbDao.saveGeneralOpd(generalOpdCache)
+        }
+    }
+
+    suspend fun getTBDiagnostics(benId: Long): TBDiagnosticsCache? {
+        return withContext(Dispatchers.IO) {
+            tbDao.getTbDiagnostics(benId)
+        }
+    }
+
+    suspend fun saveTBDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache) {
+        withContext(Dispatchers.IO) {
+            tbDao.saveTbDiagnostics(tbDiagnosticsCache)
         }
     }
 
@@ -79,14 +117,12 @@ class TBRepo @Inject constructor(
             val user =
                 preferenceDao.getLoggedInUser()
                     ?: throw IllegalStateException("No user logged in!!")
-            val lastTimeStamp = preferenceDao.getLastSyncedTimeStamp()
+            val villageId = preferenceDao.getLocationRecord()?.village?.id ?: return@withContext 0
             try {
                 val response = tmcNetworkApiService.getTBScreeningData(
-                    GetDataPaginatedRequest(
-                        ashaId = user.userId,
-                        pageNo = 0,
-                        fromDate = BenRepo.getCurrentDate(Konstants.defaultTimeStamp),
-                        toDate = getCurrentDate()
+                    StopTbVillageRequest(
+                        providerServiceMapID = user.serviceMapId,
+                        villageID = villageId
                     )
                 )
                 val statusCode = response.code()
@@ -94,15 +130,13 @@ class TBRepo @Inject constructor(
                     val responseString = response.body()?.string()
                     if (responseString != null) {
                         val jsonObj = JSONObject(responseString)
-
-                        val errorMessage = jsonObj.getString("errorMessage")
-                        val responseStatusCode = jsonObj.getInt("statusCode")
+                        val errorMessage = jsonObj.optString("errorMessage")
+                        val responseStatusCode = jsonObj.optInt("statusCode")
                         Timber.d("Pull from amrit tb screening data : $responseStatusCode")
                         when (responseStatusCode) {
                             200 -> {
                                 try {
-                                    val dataObj = jsonObj.getString("data")
-                                    saveTBScreeningCacheFromResponse(dataObj)
+                                    saveTBScreeningCacheFromNewResponse(jsonObj)
                                 } catch (e: Exception) {
                                     Timber.d("TB Screening entries not synced $e")
                                     return@withContext 0
@@ -153,14 +187,288 @@ class TBRepo @Inject constructor(
                         getLongFromDate(tbScreeningDTO.visitDate),
                         getLongFromDate(tbScreeningDTO.visitDate) - 19_800_000
                     )
-                if (tbScreeningCache == null) {
+                val cache = tbScreeningDTO.toCache()
+                if (shouldApplyServerRecord(
+                        tbScreeningCache?.syncState,
+                        tbScreeningCache?.serverUpdatedDate,
+                        cache.serverUpdatedDate ?: 0L
+                    )
+                ) {
                     benDao.getBen(tbScreeningDTO.benId)?.let {
-                        tbDao.saveTbScreening(tbScreeningDTO.toCache())
+                        tbDao.saveTbScreening(cache)
                     }
                 }
             }
         }
         return tbScreeningList
+    }
+
+    suspend fun getGeneralOpdDetailsFromServer(): Int {
+        return withContext(Dispatchers.IO) {
+            val user =
+                preferenceDao.getLoggedInUser()
+                    ?: throw IllegalStateException("No user logged in!!")
+            try {
+                val response = tmcNetworkApiService.getGeneralOpdData(
+                    StopTbVillageRequest(
+                        providerServiceMapID = user.serviceMapId,
+                        villageID = preferenceDao.getLocationRecord()?.village?.id ?: return@withContext 0
+                    )
+                )
+                val statusCode = response.code()
+                if (statusCode == 200) {
+                    val responseString = response.body()?.string()
+                    if (responseString != null) {
+                        val jsonObj = JSONObject(responseString)
+                        val errorMessage = jsonObj.optString("errorMessage")
+                        when (val responseStatusCode = jsonObj.getInt("statusCode")) {
+                            200 -> {
+                                try {
+                                    saveGeneralOpdCacheFromNewResponse(jsonObj)
+                                } catch (e: Exception) {
+                                    Timber.d("General OPD entries not synced $e")
+                                    return@withContext 0
+                                }
+                                return@withContext 1
+                            }
+
+                            401, 5002 -> {
+                                if (userRepo.refreshTokenTmc(
+                                        user.userName,
+                                        user.password
+                                    )
+                                ) throw SocketTimeoutException("Refreshed Token!")
+                                else throw IllegalStateException("User Logged out!!")
+                            }
+
+                            5000 -> {
+                                if (errorMessage == "No record found") return@withContext 0
+                            }
+
+                            else -> {
+                                throw IllegalStateException("$responseStatusCode received, dont know what todo!?")
+                            }
+                        }
+                    }
+                }
+            } catch (e: SocketTimeoutException) {
+                Timber.e("get_general_opd error : $e")
+                return@withContext -2
+            } catch (e: IllegalStateException) {
+                Timber.e("get_general_opd error : $e")
+                return@withContext -1
+            }
+            -1
+        }
+    }
+
+    private suspend fun saveTBScreeningCacheFromNewResponse(jsonObj: JSONObject): MutableList<TBScreeningCache> {
+        val tbScreeningList = mutableListOf<TBScreeningCache>()
+        val records = when (val data = jsonObj.opt("data")) {
+            is org.json.JSONArray -> data
+            is JSONObject -> data.optJSONArray("data") ?: org.json.JSONArray()
+            else -> org.json.JSONArray()
+        }
+        for (index in 0 until records.length()) {
+            val item = records.optJSONObject(index) ?: continue
+            val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { it > 0 } ?: continue
+            val ben = benDao.getBenByRegId(benRegId) ?: continue
+            val visitDate = getLongFromDateMultipleSupport(item.optString("visitDate"))
+            val existing = tbDao.getTbScreening(ben.beneficiaryId)
+            val serverUpdatedDate = getServerUpdatedDate(item)
+            if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
+                continue
+            }
+            val cache = (existing ?: TBScreeningCache(benId = ben.beneficiaryId)).copy(
+                visitDate = visitDate,
+                coughMoreThan2Weeks = item.optNullableBoolean("coughMoreThan2Weeks"),
+                bloodInSputum = item.optNullableBoolean("bloodInSputum"),
+                feverMoreThan2Weeks = item.optNullableBoolean("feverMoreThan2Weeks"),
+                lossOfWeight = item.optNullableBoolean("lossOfWeight"),
+                nightSweats = item.optNullableBoolean("nightSweats"),
+                historyOfTb = item.optNullableBoolean("historyOfTb"),
+                takingAntiTBDrugs = item.optNullableBoolean("takingAntiTBDrugs"),
+                familySufferingFromTB = item.optNullableBoolean("familySufferingFromTB"),
+                riseOfFever = item.optNullableBoolean("riseOfFever"),
+                lossOfAppetite = item.optNullableBoolean("lossOfAppetite"),
+                referredForDigitalChestXray = item.optNullableBoolean("referredForDigitalChestXray"),
+                referredForSputumCollection = item.optNullableBoolean("referredForSputumCollection"),
+                sputumSampleSubmittedAt = item.optStringOrNull("sputumSampleSubmittedAt"),
+                recommendedForTruenatTest = item.optNullableBoolean("recommendedForTruenat"),
+                recommendedForLiquidCultureTest = item.optNullableBoolean("recommendedForLiquidCulture"),
+                reasonForDenialForGettingTested = item.optStringListOrNull("testDenialReasons"),
+                serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
+                syncState = SyncState.SYNCED
+            )
+            tbDao.saveTbScreening(cache)
+            tbScreeningList.add(cache)
+        }
+        return tbScreeningList
+    }
+
+    private suspend fun saveGeneralOpdCacheFromResponse(dataObj: String): MutableList<GeneralOpdCache> {
+        val generalOpdList = mutableListOf<GeneralOpdCache>()
+        val requestDTO = Gson().fromJson(dataObj, GeneralOpdRequestDTO::class.java)
+        requestDTO?.generalOpdList?.forEach { generalOpdDTO ->
+            val existing = tbDao.getGeneralOpd(generalOpdDTO.benId)
+            val cache = generalOpdDTO.toCache()
+            if (shouldApplyServerRecord(
+                    existing?.syncState,
+                    existing?.serverUpdatedDate,
+                    cache.serverUpdatedDate ?: 0L
+                )
+            ) {
+                benDao.getBen(generalOpdDTO.benId)?.let {
+                    tbDao.saveGeneralOpd(cache)
+                    generalOpdList.add(cache)
+                }
+            }
+        }
+        return generalOpdList
+    }
+
+    private suspend fun saveGeneralOpdCacheFromNewResponse(jsonObj: JSONObject): MutableList<GeneralOpdCache> {
+        val generalOpdList = mutableListOf<GeneralOpdCache>()
+        val records = getStopTbDataArray(jsonObj)
+        for (index in 0 until records.length()) {
+            val item = records.optJSONObject(index) ?: continue
+            val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { it > 0 } ?: continue
+            val ben = benDao.getBenByRegId(benRegId) ?: continue
+            val existing = tbDao.getGeneralOpd(ben.beneficiaryId)
+            val serverUpdatedDate = getServerUpdatedDate(item)
+            if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
+                continue
+            }
+            val cache = (existing ?: GeneralOpdCache(benId = ben.beneficiaryId)).copy(
+                chiefComplaints = item.optStringListOrNull("chiefComplaint"),
+                medications = item.optStringOrNull("medication")?.let { listOf(it) },
+                dosage = item.optStringOrNull("dosage"),
+                frequency = item.optStringOrNull("frequency"),
+                duration = item.optStringOrNull("duration"),
+                notes = item.optStringOrNull("notes"),
+                serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
+                syncState = SyncState.SYNCED
+            )
+            tbDao.saveGeneralOpd(cache)
+            generalOpdList.add(cache)
+        }
+        return generalOpdList
+    }
+
+    suspend fun getTbDiagnosticsDetailsFromServer(): Int {
+        return withContext(Dispatchers.IO) {
+            val user =
+                preferenceDao.getLoggedInUser()
+                    ?: throw IllegalStateException("No user logged in!!")
+            try {
+                val response = tmcNetworkApiService.getTBDiagnosticsData(
+                    StopTbVillageRequest(
+                        providerServiceMapID = user.serviceMapId,
+                        villageID = preferenceDao.getLocationRecord()?.village?.id ?: return@withContext 0
+                    )
+                )
+                if (response.code() == 200) {
+                    val responseString = response.body()?.string()
+                    if (responseString != null) {
+                        val jsonObj = JSONObject(responseString)
+                        val errorMessage = jsonObj.optString("errorMessage")
+                        when (val responseStatusCode = jsonObj.getInt("statusCode")) {
+                            200 -> {
+                                try {
+                                    saveTBDiagnosticsCacheFromNewResponse(jsonObj)
+                                } catch (e: Exception) {
+                                    Timber.d("TB Diagnostics entries not synced $e")
+                                    return@withContext 0
+                                }
+                                return@withContext 1
+                            }
+
+                            401, 5002 -> {
+                                if (userRepo.refreshTokenTmc(user.userName, user.password)) {
+                                    throw SocketTimeoutException("Refreshed Token!")
+                                } else {
+                                    throw IllegalStateException("User Logged out!!")
+                                }
+                            }
+
+                            5000 -> {
+                                if (errorMessage == "No record found") return@withContext 0
+                            }
+
+                            else -> {
+                                throw IllegalStateException("$responseStatusCode received, don't know what todo!?")
+                            }
+                        }
+                    }
+                }
+            } catch (e: SocketTimeoutException) {
+                Timber.e("get_tb_diagnostics error : $e")
+                return@withContext -2
+            } catch (e: IllegalStateException) {
+                Timber.e("get_tb_diagnostics error : $e")
+                return@withContext -1
+            }
+            -1
+        }
+    }
+
+    private suspend fun saveTBDiagnosticsCacheFromResponse(dataObj: String): MutableList<TBDiagnosticsCache> {
+        val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
+        val requestDTO = Gson().fromJson(dataObj, TBDiagnosticsRequestDTO::class.java)
+        requestDTO?.tbDiagnosticsList?.forEach { tbDiagnosticsDTO ->
+            tbDiagnosticsDTO.visitDate?.let {
+                val tbDiagnosticsCache: TBDiagnosticsCache? =
+                    tbDao.getTbDiagnostics(
+                        tbDiagnosticsDTO.benId,
+                        getLongFromDate(tbDiagnosticsDTO.visitDate),
+                        getLongFromDate(tbDiagnosticsDTO.visitDate) - 19_800_000
+                    )
+                val cache = tbDiagnosticsDTO.toCache()
+                if (shouldApplyServerRecord(
+                        tbDiagnosticsCache?.syncState,
+                        tbDiagnosticsCache?.serverUpdatedDate,
+                        cache.serverUpdatedDate ?: 0L
+                    )
+                ) {
+                    benDao.getBen(tbDiagnosticsDTO.benId)?.let {
+                        tbDao.saveTbDiagnostics(cache)
+                        tbDiagnosticsList.add(cache)
+                    }
+                }
+            }
+        }
+        return tbDiagnosticsList
+    }
+
+    private suspend fun saveTBDiagnosticsCacheFromNewResponse(jsonObj: JSONObject): MutableList<TBDiagnosticsCache> {
+        val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
+        val records = getStopTbDataArray(jsonObj)
+        for (index in 0 until records.length()) {
+            val item = records.optJSONObject(index) ?: continue
+            val benRegId = item.optLong("benRegID", 0L).takeIf { it > 0 } ?: continue
+            val ben = benDao.getBenByRegId(benRegId) ?: continue
+            val visitDate = getLongFromDateMultipleSupport(item.optString("visitDate"))
+            val existing = tbDao.getTbDiagnostics(ben.beneficiaryId)
+            val serverUpdatedDate = getServerUpdatedDate(item)
+            if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
+                continue
+            }
+            val cache = (existing ?: TBDiagnosticsCache(benId = ben.beneficiaryId)).copy(
+                visitDate = visitDate,
+                nikshayId = item.optStringOrNull("nikshayId"),
+                isChestXRayDone = item.optNullableBoolean("isDigitalChestXrayConducted"),
+                chestXRayResult = item.optStringOrNull("digitalChestXrayResult"),
+                isNaatConducted = item.optNullableBoolean("isTruenatConducted"),
+                naatResult = item.optStringOrNull("truenatResult"),
+                recommendedForLiquidCultureTest = item.optNullableBoolean("recommendedForLiquidCulture"),
+                liquidCultureResult = item.optStringOrNull("liquidCultureResult"),
+                serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
+                syncState = SyncState.SYNCED
+            )
+            tbDao.saveTbDiagnostics(cache)
+            tbDiagnosticsList.add(cache)
+        }
+        return tbDiagnosticsList
     }
 
     suspend fun getTbSuspectedDetailsFromServer(): Int {
@@ -242,7 +550,12 @@ class TBRepo @Inject constructor(
                         getLongFromDate(tbSuspectedDTO.visitDate),
                         getLongFromDate(tbSuspectedDTO.visitDate) - 19_800_000
                     )
-                if (tbSuspectedCache == null) {
+                if (shouldApplyServerRecord(
+                        tbSuspectedCache?.syncState,
+                        tbSuspectedCache?.serverUpdatedDate,
+                        tbSuspectedDTO.toCache().serverUpdatedDate ?: 0L
+                    )
+                ) {
                     benDao.getBen(tbSuspectedDTO.benId)?.let {
                         tbDao.saveTbSuspected(tbSuspectedDTO.toCache())
                     }
@@ -339,11 +652,16 @@ class TBRepo @Inject constructor(
 
                 try {
                     val cache = tbConfirmedDTO.toCache()
-
-                    tbDao.saveTbConfirmed(cache)
-
-
-                    tbConfirmedList.add(cache)
+                    val existing = tbDao.getTbConfirmed(cache.benId)
+                    if (shouldApplyServerRecord(
+                            existing?.syncState,
+                            existing?.serverUpdatedDate,
+                            cache.serverUpdatedDate ?: 0L
+                        )
+                    ) {
+                        tbDao.saveTbConfirmed(cache)
+                        tbConfirmedList.add(cache)
+                    }
 
                 } catch (e: Exception) {
                 }
@@ -364,9 +682,11 @@ class TBRepo @Inject constructor(
     // could cause the worker to be marked as failed.
     suspend fun pushUnSyncedRecords(): Boolean {
         val screeningResult = pushUnSyncedRecordsTBScreening()
+        val generalOpdResult = pushUnSyncedRecordsGeneralOpd()
+        val diagnosticsResult = pushUnSyncedRecordsTBDiagnostics()
         val suspectedResult = pushUnSyncedRecordsTBSuspected()
         val confirmedResult = pushUnSyncedRecordsTBConfirmed()
-        Timber.d("TB push results: screening=$screeningResult, suspected=$suspectedResult, confirmed=$confirmedResult")
+        Timber.d("TB push results: screening=$screeningResult, generalOpd=$generalOpdResult, diagnostics=$diagnosticsResult, suspected=$suspectedResult, confirmed=$confirmedResult")
         // Worker succeeds — failed records stay UNSYNCED for next cycle
         return true
     }
@@ -393,20 +713,24 @@ class TBRepo @Inject constructor(
 
             if (tbsnList.isEmpty()) return@withContext 1
 
-            // Chunk records to prevent all-or-nothing batch failure
-            val CHUNK_SIZE = 20
-            val chunks = tbsnList.chunked(CHUNK_SIZE)
             var successCount = 0
             var failCount = 0
 
-            for (chunk in chunks) {
+            for (screening in tbsnList) {
                 try {
-                    val chunkDtos = chunk.map { it.toDTO() }
-
+                    val beneficiaryRegID = benDao.getBen(screening.benId)?.benRegId
+                    if (beneficiaryRegID == null || beneficiaryRegID <= 0L) {
+                        failCount += 1
+                        continue
+                    }
                     val response = tmcNetworkApiService.saveTBScreeningData(
-                        TBScreeningRequestDTO(
-                            userId = user.userId,
-                            tbScreeningList = chunkDtos
+                        listOf(
+                            TBScreeningSaveRequest.from(
+                                cache = screening,
+                                beneficiaryRegID = beneficiaryRegID,
+                                providerServiceMapID = user.serviceMapId,
+                                createdBy = user.userName
+                            )
                         )
                     )
                     val statusCode = response.code()
@@ -415,39 +739,184 @@ class TBRepo @Inject constructor(
                         if (responseString != null) {
                             val jsonObj = JSONObject(responseString)
                             val responseStatusCode = jsonObj.getInt("statusCode")
-                            Timber.d("Push to Amrit TB Screening chunk: $responseStatusCode")
+                            Timber.d("Push to Amrit TB Screening record: $responseStatusCode")
                             when (responseStatusCode) {
                                 200 -> {
-                                    updateSyncStatusScreening(chunk)
-                                    successCount += chunk.size
+                                    updateSyncStatusScreening(listOf(screening))
+                                    successCount += 1
                                 }
 
                                 401, 5002 -> {
                                     // Token expired — try refreshing for subsequent chunks
                                     if (userRepo.refreshTokenTmc(user.userName, user.password)) {
-                                        Timber.d("Token refreshed, TB Screening chunk will retry next cycle")
+                                        Timber.d("Token refreshed, TB Screening record will retry next cycle")
                                     }
-                                    failCount += chunk.size
+                                    failCount += 1
                                 }
 
                                 else -> {
-                                    Timber.e("TB Screening chunk failed with statusCode: $responseStatusCode")
-                                    failCount += chunk.size
+                                    Timber.e("TB Screening record failed with statusCode: $responseStatusCode")
+                                    failCount += 1
                                 }
                             }
                         }
                     } else {
-                        Timber.e("TB Screening chunk HTTP error: $statusCode")
-                        failCount += chunk.size
+                        Timber.e("TB Screening record HTTP error: $statusCode")
+                        failCount += 1
                     }
                 } catch (e: Exception) {
-                    Timber.e(e, "TB Screening chunk push failed: ${chunk.size} records")
-                    failCount += chunk.size
+                    Timber.e(e, "TB Screening record push failed for benId=${screening.benId}")
+                    failCount += 1
                 }
             }
 
             Timber.d("TB Screening push complete: $successCount succeeded, $failCount failed out of ${tbsnList.size}")
             // Worker succeeds — failed records stay UNSYNCED for next cycle
+            return@withContext 1
+        }
+    }
+
+    private suspend fun pushUnSyncedRecordsGeneralOpd(): Int {
+        return withContext(Dispatchers.IO) {
+            val user =
+                preferenceDao.getLoggedInUser()
+                    ?: throw IllegalStateException("No user logged in!!")
+
+            val opdList: List<GeneralOpdCache> = tbDao.getGeneralOpd(SyncState.UNSYNCED)
+            if (opdList.isEmpty()) return@withContext 1
+
+            val chunks = opdList.chunked(20)
+            var successCount = 0
+            var failCount = 0
+
+            for (chunk in chunks) {
+                try {
+                    val request = chunk.mapNotNull { opd ->
+                        val benRegId = benDao.getBen(opd.benId)?.benRegId?.takeIf { it > 0L }
+                        benRegId?.let {
+                            GeneralOpdSaveRequest.from(
+                                cache = opd,
+                                beneficiaryRegID = it,
+                                providerServiceMapID = user.serviceMapId,
+                                createdBy = user.userName
+                            )
+                        }
+                    }
+                    if (request.isEmpty()) {
+                        failCount += chunk.size
+                        continue
+                    }
+                    val response = tmcNetworkApiService.saveGeneralOpdData(
+                        request
+                    )
+                    val statusCode = response.code()
+                    if (statusCode == 200) {
+                        val responseString = response.body()?.string()
+                        if (responseString != null) {
+                            val jsonObj = JSONObject(responseString)
+                            when (val responseStatusCode = jsonObj.getInt("statusCode")) {
+                                200 -> {
+                                    updateSyncStatusGeneralOpd(chunk)
+                                    successCount += chunk.size
+                                }
+
+                                401, 5002 -> {
+                                    if (userRepo.refreshTokenTmc(user.userName, user.password)) {
+                                        Timber.d("Token refreshed, General OPD chunk will retry next cycle")
+                                    }
+                                    failCount += chunk.size
+                                }
+
+                                else -> {
+                                    Timber.e("General OPD chunk failed with statusCode: $responseStatusCode")
+                                    failCount += chunk.size
+                                }
+                            }
+                        }
+                    } else {
+                        Timber.e("General OPD chunk HTTP error: $statusCode")
+                        failCount += chunk.size
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "General OPD chunk push failed: ${chunk.size} records")
+                    failCount += chunk.size
+                }
+            }
+
+            Timber.d("General OPD push complete: $successCount succeeded, $failCount failed out of ${opdList.size}")
+            return@withContext 1
+        }
+    }
+
+    private suspend fun pushUnSyncedRecordsTBDiagnostics(): Int {
+        return withContext(Dispatchers.IO) {
+            val user =
+                preferenceDao.getLoggedInUser()
+                    ?: throw IllegalStateException("No user logged in!!")
+
+            val diagnosticsList: List<TBDiagnosticsCache> =
+                tbDao.getTbDiagnostics(SyncState.UNSYNCED)
+            if (diagnosticsList.isEmpty()) return@withContext 1
+
+            val chunks = diagnosticsList.chunked(20)
+            var successCount = 0
+            var failCount = 0
+
+            for (chunk in chunks) {
+                try {
+                    val request = chunk.mapNotNull { diagnostics ->
+                        val benRegId = benDao.getBen(diagnostics.benId)?.benRegId?.takeIf { it > 0L }
+                        benRegId?.let {
+                            TBDiagnosticsSaveRequest.from(
+                                cache = diagnostics,
+                                benRegID = it,
+                                providerServiceMapID = user.serviceMapId,
+                                createdBy = user.userName
+                            )
+                        }
+                    }
+                    if (request.isEmpty()) {
+                        failCount += chunk.size
+                        continue
+                    }
+                    val response = tmcNetworkApiService.saveTBDiagnosticsData(
+                        request
+                    )
+                    val statusCode = response.code()
+                    if (statusCode == 200) {
+                        val responseString = response.body()?.string()
+                        if (responseString != null) {
+                            val jsonObj = JSONObject(responseString)
+                            when (val responseStatusCode = jsonObj.getInt("statusCode")) {
+                                200 -> {
+                                    updateSyncStatusDiagnostics(chunk)
+                                    successCount += chunk.size
+                                }
+
+                                401, 5002 -> {
+                                    if (userRepo.refreshTokenTmc(user.userName, user.password)) {
+                                        Timber.d("Token refreshed, TB Diagnostics chunk will retry next cycle")
+                                    }
+                                    failCount += chunk.size
+                                }
+
+                                else -> {
+                                    Timber.e("TB Diagnostics chunk failed with statusCode: $responseStatusCode")
+                                    failCount += chunk.size
+                                }
+                            }
+                        }
+                    } else {
+                        Timber.e("TB Diagnostics chunk HTTP error: $statusCode")
+                        failCount += chunk.size
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "TB Diagnostics chunk push failed: ${chunk.size} records")
+                    failCount += chunk.size
+                }
+            }
+
+            Timber.d("TB Diagnostics push complete: $successCount succeeded, $failCount failed out of ${diagnosticsList.size}")
             return@withContext 1
         }
     }
@@ -596,6 +1065,20 @@ class TBRepo @Inject constructor(
         }
     }
 
+    private suspend fun updateSyncStatusGeneralOpd(opdList: List<GeneralOpdCache>) {
+        opdList.forEach {
+            it.syncState = SyncState.SYNCED
+            tbDao.saveGeneralOpd(it)
+        }
+    }
+
+    private suspend fun updateSyncStatusDiagnostics(diagnosticsList: List<TBDiagnosticsCache>) {
+        diagnosticsList.forEach {
+            it.syncState = SyncState.SYNCED
+            tbDao.saveTbDiagnostics(it)
+        }
+    }
+
     private suspend fun updateSyncStatusSuspected(tbspList: List<TBSuspectedCache>) {
         tbspList.forEach {
             it.syncState = SyncState.SYNCED
@@ -624,6 +1107,89 @@ class TBRepo @Inject constructor(
             val f = SimpleDateFormat("MMM d, yyyy h:mm:ss a", Locale.ENGLISH)
             val date = f.parse(dateString)
             return date?.time ?: throw IllegalStateException("Invalid date for dateReg")
+        }
+
+        private fun getLongFromDateMultipleSupport(dateString: String?): Long {
+            if (dateString.isNullOrBlank() || dateString.equals("null", ignoreCase = true)) {
+                return System.currentTimeMillis()
+            }
+            val patterns = listOf(
+                "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+                "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+                "MMM d, yyyy h:mm:ss a"
+            )
+            patterns.forEach { pattern ->
+                runCatching {
+                    SimpleDateFormat(pattern, Locale.ENGLISH).parse(dateString)?.time
+                }.getOrNull()?.let { return it }
+            }
+            return System.currentTimeMillis()
+        }
+
+        private fun getServerUpdatedDate(jsonObject: JSONObject): Long {
+            return parseServerUpdateDate(
+                jsonObject.optStringOrNull("updateDate")
+                    ?: jsonObject.optStringOrNull("updatedDate")
+            )
+        }
+
+        private fun parseServerUpdateDate(dateString: String?): Long {
+            if (dateString.isNullOrBlank() || dateString.equals("null", ignoreCase = true)) return 0L
+            val patterns = listOf(
+                "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+                "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+                "MMM dd, yyyy h:mm:ss a",
+                "MMM d, yyyy h:mm:ss a"
+            )
+            patterns.forEach { pattern ->
+                runCatching {
+                    SimpleDateFormat(pattern, Locale.ENGLISH).parse(dateString)?.time
+                }.getOrNull()?.let { return it }
+            }
+            return 0L
+        }
+
+        private fun shouldApplyServerRecord(
+            existingSyncState: SyncState?,
+            savedServerUpdatedDate: Long?,
+            serverUpdatedDate: Long
+        ): Boolean {
+            if (existingSyncState != null && existingSyncState != SyncState.SYNCED) return false
+            if (serverUpdatedDate <= 0L) return true
+            return serverUpdatedDate > (savedServerUpdatedDate ?: 0L)
+        }
+
+        private fun JSONObject.optNullableBoolean(name: String): Boolean? {
+            if (!has(name) || isNull(name)) return null
+            return optBoolean(name)
+        }
+
+        private fun JSONObject.optStringOrNull(name: String): String? {
+            if (!has(name) || isNull(name)) return null
+            return optString(name).takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+        }
+
+        private fun JSONObject.optStringListOrNull(name: String): List<String>? {
+            if (!has(name) || isNull(name)) return null
+            val value = opt(name)
+            return when (value) {
+                is JSONArray -> List(value.length()) { index -> value.optString(index) }
+                    .filter { it.isNotBlank() }
+                is String -> runCatching {
+                    val jsonArray = JSONArray(value)
+                    List(jsonArray.length()) { index -> jsonArray.optString(index) }
+                        .filter { it.isNotBlank() }
+                }.getOrNull()
+                else -> null
+            }
+        }
+
+        private fun getStopTbDataArray(jsonObj: JSONObject): JSONArray {
+            return when (val data = jsonObj.opt("data")) {
+                is JSONArray -> data
+                is JSONObject -> data.optJSONArray("data") ?: JSONArray()
+                else -> JSONArray()
+            }
         }
     }
 

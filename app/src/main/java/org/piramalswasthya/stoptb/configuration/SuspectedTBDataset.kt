@@ -7,6 +7,7 @@ import org.piramalswasthya.stoptb.model.AgeUnit
 import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.FormElement
 import org.piramalswasthya.stoptb.model.InputType
+import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
 
@@ -20,6 +21,7 @@ class SuspectedTBDataset(
     private val positiveNegativeEntries get() = resources.getStringArray(R.array.tb_test_result)
     private var benCache: BenRegCache? = null
     private var screeningCache: TBScreeningCache? = null
+    private var diagnosticsCache: TBDiagnosticsCache? = null
     private var savedCache: TBSuspectedCache? = null
     private var isQuickPrefillLockActive: Boolean = false
 
@@ -127,10 +129,12 @@ class SuspectedTBDataset(
     suspend fun setUpPage(
         ben: BenRegCache?,
         screening: TBScreeningCache?,
+        diagnostics: TBDiagnosticsCache?,
         saved: TBSuspectedCache?
     ) {
         benCache = ben
         screeningCache = screening
+        diagnosticsCache = diagnostics
         savedCache = saved
         isQuickPrefillLockActive = saved?.visitLabel.isNullOrBlank() && saved != null
         ben?.let {
@@ -139,6 +143,7 @@ class SuspectedTBDataset(
 
         if (saved == null) {
             dateOfVisit.value = getDateFromLong(System.currentTimeMillis())
+            prefillFromDiagnostics(diagnostics)
         } else {
             dateOfVisit.value = getDateFromLong(saved.visitDate)
             sputumCollected.value = boolToYesNo(saved.isSputumCollected)
@@ -154,6 +159,9 @@ class SuspectedTBDataset(
             liquidCultureConducted.value = boolToYesNo(saved.isLiquidCultureConducted)
             liquidCultureResult.value = getLocalValueInArray(R.array.tb_test_result, saved.liquidCultureResult)
             nikshayId.value = saved.nikshayId
+            if (saved.visitLabel.isNullOrBlank()) {
+                prefillMissingFromDiagnostics(diagnostics)
+            }
         }
 
         syncFieldStates()
@@ -345,6 +353,10 @@ class SuspectedTBDataset(
         }
     }
     private fun syncFieldStates() {
+        if (isChestXRayPositive() && naatConducted.value.isNullOrBlank()) {
+            naatConducted.value = yesValue
+        }
+
         syncReferralDrivenField(
             radioField = digitalChestXRayConducted,
             referralEnabled =  isDigitalChestXRayReferralEnabled(),
@@ -407,25 +419,25 @@ class SuspectedTBDataset(
     }
 
     private fun shouldLockDigitalChestXRayConducted(): Boolean =
-        isQuickPrefillLockActive && savedCache?.isChestXRayDone != null
+        isQuickPrefillLockActive && (savedCache?.isChestXRayDone != null || diagnosticsCache?.isChestXRayDone != null)
 
     private fun shouldLockDigitalChestXRayResult(): Boolean =
-        isQuickPrefillLockActive && !savedCache?.chestXRayResult.isNullOrBlank()
+        isQuickPrefillLockActive && (!savedCache?.chestXRayResult.isNullOrBlank() || !diagnosticsCache?.chestXRayResult.isNullOrBlank())
 
     private fun shouldLockSputumCollected(): Boolean =
-        isQuickPrefillLockActive && savedCache?.isSputumCollected != null
+        isQuickPrefillLockActive && (savedCache?.isSputumCollected != null || diagnosticsCache?.isSputumCollected != null)
 
     private fun shouldLockTrueNatConducted(): Boolean =
-        isQuickPrefillLockActive && savedCache?.isNaatConducted != null
+        isQuickPrefillLockActive && (savedCache?.isNaatConducted != null || diagnosticsCache?.isNaatConducted != null)
 
     private fun shouldLockTrueNatResult(): Boolean =
-        isQuickPrefillLockActive && !savedCache?.naatResult.isNullOrBlank()
+        isQuickPrefillLockActive && (!savedCache?.naatResult.isNullOrBlank() || !diagnosticsCache?.naatResult.isNullOrBlank())
 
     private fun shouldLockLiquidCultureConducted(): Boolean =
-        isQuickPrefillLockActive && savedCache?.isLiquidCultureConducted != null
+        isQuickPrefillLockActive && (savedCache?.isLiquidCultureConducted != null || diagnosticsCache?.isLiquidCultureConducted != null)
 
     private fun shouldLockLiquidCultureResult(): Boolean =
-        isQuickPrefillLockActive && !savedCache?.liquidCultureResult.isNullOrBlank()
+        isQuickPrefillLockActive && (!savedCache?.liquidCultureResult.isNullOrBlank() || !diagnosticsCache?.liquidCultureResult.isNullOrBlank())
 
     private fun shouldEnableNikshayId(): Boolean =
         isYes(sputumCollected) ||
@@ -440,22 +452,24 @@ class SuspectedTBDataset(
 
     private fun isSputumReferralEnabled(): Boolean =
         isChestXRayPositive() ||
+            diagnosticsCache?.isSputumCollected == true ||
             screeningCache?.historyOfTb == true ||
             isPregnant() ||
             screeningCache?.takingAntiTBDrugs == true ||
             savedCache?.isSputumCollected != null
 
     private fun isDigitalChestXRayReferralEnabled(): Boolean =
-        !isPregnant()
+        !isPregnant() || diagnosticsCache?.isChestXRayDone != null || savedCache?.isChestXRayDone != null
 
     private fun isNaatReferralEnabled(): Boolean =
         isChestXRayPositive() ||
             isYes(sputumCollected) ||
+            diagnosticsCache?.isNaatConducted != null ||
             savedCache?.isNaatConducted != null
 
     private fun isLiquidCultureReferralEnabled(): Boolean =
-        screeningCache?.historyOfTb == true ||
-            screeningCache?.takingAntiTBDrugs == true ||
+        (screeningCache?.historyOfTb == true && screeningCache?.takingAntiTBDrugs == true) ||
+            diagnosticsCache?.isLiquidCultureConducted != null ||
             savedCache?.isLiquidCultureConducted != null
 
     private fun isChestXRayPositive(): Boolean =
@@ -481,14 +495,73 @@ class SuspectedTBDataset(
         formElement.errorText = null
     }
 
+    private fun prefillFromDiagnostics(diagnostics: TBDiagnosticsCache?) {
+        diagnostics ?: return
+        sputumCollected.value = boolToYesNo(diagnostics.isSputumCollected)
+        sputumSubmittedAt.value = getLocalValueInArray(
+            R.array.tb_suspected_sample_submitted_at,
+            diagnostics.sputumSubmittedAt
+        )
+        digitalChestXRayConducted.value = boolToYesNo(diagnostics.isChestXRayDone)
+        digitalChestXRayResult.value = getLocalValueInArray(R.array.tb_test_result, diagnostics.chestXRayResult)
+        naatConducted.value = boolToYesNo(
+            diagnostics.isNaatConducted ?: diagnostics.chestXRayResult.isPositiveTestResult()
+                .takeIf { it }
+        )
+        naatResult.value = getLocalValueInArray(R.array.tb_test_result, diagnostics.naatResult)
+        liquidCultureConducted.value = boolToYesNo(
+            diagnostics.isLiquidCultureConducted ?: diagnostics.recommendedForLiquidCultureTest
+        )
+        liquidCultureResult.value = getLocalValueInArray(R.array.tb_test_result, diagnostics.liquidCultureResult)
+        nikshayId.value = diagnostics.nikshayId
+    }
+
+    private fun prefillMissingFromDiagnostics(diagnostics: TBDiagnosticsCache?) {
+        diagnostics ?: return
+        if (sputumCollected.value.isNullOrBlank()) sputumCollected.value = boolToYesNo(diagnostics.isSputumCollected)
+        if (sputumSubmittedAt.value.isNullOrBlank()) {
+            sputumSubmittedAt.value = getLocalValueInArray(
+                R.array.tb_suspected_sample_submitted_at,
+                diagnostics.sputumSubmittedAt
+            )
+        }
+        if (digitalChestXRayConducted.value.isNullOrBlank()) {
+            digitalChestXRayConducted.value = boolToYesNo(diagnostics.isChestXRayDone)
+        }
+        if (digitalChestXRayResult.value.isNullOrBlank()) {
+            digitalChestXRayResult.value = getLocalValueInArray(R.array.tb_test_result, diagnostics.chestXRayResult)
+        }
+        if (naatConducted.value.isNullOrBlank()) {
+            naatConducted.value = boolToYesNo(
+                diagnostics.isNaatConducted ?: diagnostics.chestXRayResult.isPositiveTestResult()
+                    .takeIf { it }
+            )
+        }
+        if (naatResult.value.isNullOrBlank()) {
+            naatResult.value = getLocalValueInArray(R.array.tb_test_result, diagnostics.naatResult)
+        }
+        if (liquidCultureConducted.value.isNullOrBlank()) {
+            liquidCultureConducted.value = boolToYesNo(
+                diagnostics.isLiquidCultureConducted ?: diagnostics.recommendedForLiquidCultureTest
+            )
+        }
+        if (liquidCultureResult.value.isNullOrBlank()) {
+            liquidCultureResult.value = getLocalValueInArray(R.array.tb_test_result, diagnostics.liquidCultureResult)
+        }
+        if (nikshayId.value.isNullOrBlank()) nikshayId.value = diagnostics.nikshayId
+    }
+
     private fun boolToYesNo(value: Boolean?): String =
         when (value) {
             true -> yesValue
             false -> noValue
             null -> ""
-        }
+    }
 
     private fun isYes(formElement: FormElement): Boolean = formElement.value == yesValue
+
+    private fun String?.isPositiveTestResult(): Boolean =
+        !isNullOrBlank() && equals(englishResources.getStringArray(R.array.tb_test_result).firstOrNull(), ignoreCase = true)
 
     private fun updateNikshayVisibility() {
         val anchor = when {

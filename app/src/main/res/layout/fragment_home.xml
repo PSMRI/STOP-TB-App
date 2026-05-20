@@ -34,12 +34,56 @@
 
 
         <LinearLayout
+            android:id="@+id/ll_home_content"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:orientation="vertical"
             app:layout_constraintBottom_toTopOf="@+id/ll_full_load_progress"
             app:layout_constraintTop_toTopOf="parent">
 <!--            app:layout_constraintTop_toBottomOf="@+id/til_select_village">-->
+
+            <LinearLayout
+                android:id="@+id/ll_quick_refresh"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginEnd="16dp"
+                android:background="@drawable/bg_dashboard_chip"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="@dimen/padding_normal"
+                android:paddingTop="@dimen/padding_small"
+                android:paddingEnd="@dimen/padding_small"
+                android:paddingBottom="@dimen/padding_small"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <TextView
+                    android:id="@+id/tv_quick_refresh_status"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/roboto_medium"
+                    android:text="@string/quick_refresh_not_updated"
+                    android:textColor="?attr/colorPrimary"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/btn_quick_refresh"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_quick_refresh_button"
+                    android:fontFamily="@font/roboto_bold"
+                    android:gravity="center"
+                    android:minHeight="@dimen/_28sdp"
+                    android:minWidth="@dimen/_74sdp"
+                    android:paddingHorizontal="@dimen/padding_normal"
+                    android:text="@string/quick_refresh_action"
+                    android:textColor="@android:color/white"
+                    android:textSize="13sp" />
+
+            </LinearLayout>
 
             <com.google.android.material.tabs.TabLayout
                 android:id="@+id/tl_home_viewpager"

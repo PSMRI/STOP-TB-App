@@ -70,6 +70,8 @@ data class UserCache(
     @ColumnInfo(name = "user_type")
     val userType: String,
 
+    val serverUpdatedDate: Long? = null,
+
     @ColumnInfo(name = "logged_in")
     val loggedIn: Boolean
 ) {
@@ -258,6 +260,7 @@ data class User(
     val password: String,
     val role: String,
     val serviceMapId: Int,
+    val serverUpdatedDate: Long? = null,
     var vanId: Int = 4,
     val state: LocationEntity,
     val district: LocationEntity,
@@ -296,7 +299,8 @@ data class UserDetailsInResponse(
     val tuId: String? = null,
     val tuName: String? = null,
     val healthFacilityId: String? = null,
-    val healthFacilityName: String? = null
+    val healthFacilityName: String? = null,
+    val updateDate: String? = null
 ) {
     fun toUser(password: String, subCentre: String? = null): User {
         val healthFacilityList = getLocationEntityList(healthFacilityId, healthFacilityName)
@@ -307,8 +311,12 @@ data class UserDetailsInResponse(
             password = password,
             role = roleName,
             serviceMapId = providerServiceMapId,
+            serverUpdatedDate = updateDate?.let { parseServerUpdateDate(it) }?.takeIf { it > 0L },
             state = LocationEntity(id = stateId, name = stateName),
-            district = LocationEntity(id = 1, name = workingDistrictName.toString()),
+            district = LocationEntity(
+                id = workingDistrictId ?: 1,
+                name = workingDistrictName?.takeIf { it.isNotBlank() } ?: blockName
+            ),
             block = LocationEntity(id = blockId, name = blockName),
             tus = getLocationEntityList(tuId, tuName),
             healthFacilities = healthFacilityList.ifEmpty {
@@ -335,6 +343,21 @@ data class UserDetailsInResponse(
             }
         }
         return locationEntityList
+    }
+
+    private fun parseServerUpdateDate(dateString: String): Long {
+        val patterns = listOf(
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+            "MMM dd, yyyy h:mm:ss a",
+            "MMM d, yyyy h:mm:ss a"
+        )
+        patterns.forEach { pattern ->
+            runCatching {
+                java.text.SimpleDateFormat(pattern, java.util.Locale.ENGLISH).parse(dateString)?.time
+            }.getOrNull()?.let { return it }
+        }
+        return 0L
     }
 }
 

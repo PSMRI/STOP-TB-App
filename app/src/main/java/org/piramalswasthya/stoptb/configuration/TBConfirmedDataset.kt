@@ -8,6 +8,7 @@ import org.piramalswasthya.stoptb.model.FormElement
 import org.piramalswasthya.stoptb.model.InputType
 import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
+import org.piramalswasthya.stoptb.helpers.setToStartOfTheDay
 import java.util.Calendar
 
 class TBConfirmedDataset(
@@ -69,7 +70,7 @@ class TBConfirmedDataset(
     private val followUpDate = FormElement(
         id = 4,
         inputType = InputType.DATE_PICKER,
-        title = resources.getString(R.string.follow_up_date),
+        title = resources.getString(R.string.followupdate),
         required = true,
         max = System.currentTimeMillis(),
         min = System.currentTimeMillis() - (90L * 24 * 60 * 60 * 1000),
@@ -155,10 +156,10 @@ class TBConfirmedDataset(
 
     private val reasonForDeath = FormElement(
         id = 13,
-        inputType = InputType.TEXT_VIEW,
+        inputType = InputType.EDIT_TEXT,
         title = resources.getString(R.string.reason_for_death),
         required = false,
-        isEnabled = true
+        isEnabled = false
     )
 
     private val reasonForNotCompleting = FormElement(
@@ -209,8 +210,8 @@ class TBConfirmedDataset(
         } else {
             regimenType.value = getLocalValueInArray(R.array.tb_regimen_types, saved.regimenType)
             followUpDate.isEnabled = true
-            treatmentStartDateLong = saved.treatmentStartDate
-            lastFollowUpDateLong = saved.followUpDate ?: 0L
+            treatmentStartDateLong = millisAtStartOfDay(saved.treatmentStartDate)
+            lastFollowUpDateLong = saved.followUpDate?.let { millisAtStartOfDay(it) } ?: 0L
 
             if (!saved.regimenType.isNullOrBlank()) {
                 regimenType.isEnabled = false
@@ -237,7 +238,8 @@ class TBConfirmedDataset(
             reasonForDeath.value = saved.reasonForDeath
             reasonForNotCompleting.value = saved.reasonForNotCompleting
 
-            treatmentStartDateValue = saved.treatmentStartDate
+            treatmentStartDateValue =
+                if (saved.treatmentStartDate > 0) millisAtStartOfDay(saved.treatmentStartDate) else null
             regimenTypeValue = saved.regimenType
 
             baseList.addAll(
@@ -314,8 +316,7 @@ class TBConfirmedDataset(
 
             followUpDate.id -> {
                 val dateLong = getLongFromDate(followUpDate.value)
-                lastFollowUpDateLong = dateLong
-                updateMonthlyFollowUpCount()
+                updateMonthlyFollowUpCount(dateLong)
                 followUpDate.errorText = validateFollowUpDate(dateLong)
                 checkAndEnableTreatmentCompletion()
             }
@@ -511,8 +512,15 @@ class TBConfirmedDataset(
         }
     }
 
-    private fun updateMonthlyFollowUpCount() {
-        if (lastFollowUpDateLong == 0L || treatmentStartDateValue == null) {
+    private fun millisAtStartOfDay(timeMs: Long): Long {
+        if (timeMs <= 0L) return 0L
+        return Calendar.getInstance().apply {
+            timeInMillis = timeMs
+        }.setToStartOfTheDay().timeInMillis
+    }
+
+    private fun updateMonthlyFollowUpCount(followUpTimestamp: Long) {
+        if (followUpTimestamp == 0L || treatmentStartDateValue == null) {
             monthlyFollowUpDone.value = resources.getString(R.string.month_format, followUpCount)
             return
         }
@@ -521,7 +529,7 @@ class TBConfirmedDataset(
             timeInMillis = treatmentStartDateValue!!
         }
         val calendarFollowUp = Calendar.getInstance().apply {
-            timeInMillis = lastFollowUpDateLong
+            timeInMillis = followUpTimestamp
         }
 
         val yearDiff = calendarFollowUp.get(Calendar.YEAR) - calendarStart.get(Calendar.YEAR)

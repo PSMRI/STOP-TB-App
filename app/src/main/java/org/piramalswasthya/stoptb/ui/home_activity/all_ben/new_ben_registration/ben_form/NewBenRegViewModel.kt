@@ -10,6 +10,10 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -81,8 +85,11 @@ class NewBenRegViewModel @Inject constructor(
     private lateinit var ben:            BenRegCache
     private lateinit var locationRecord: LocationRecord
 
-    val dataset  = BenRegFormDataset(context, preferenceDao.getCurrentLanguage())
-    val formList = dataset.listFlow
+    private val dataset by lazy(LazyThreadSafetyMode.NONE) {
+        BenRegFormDataset(context, preferenceDao.getCurrentLanguage())
+    }
+    private val _formList = MutableStateFlow(emptyList<org.piramalswasthya.stoptb.model.FormElement>())
+    val formList: StateFlow<List<org.piramalswasthya.stoptb.model.FormElement>> = _formList.asStateFlow()
 
     private var lastImageFormId: Int = 0
     fun setCurrentImageFormId(id: Int) { lastImageFormId = id }
@@ -97,7 +104,10 @@ class NewBenRegViewModel @Inject constructor(
     private var isPageSetUp = false
 
     init {
-        viewModelScope.launch(Dispatchers.IO) { setUpPage() }
+        viewModelScope.launch(Dispatchers.IO) {
+            setUpPage()
+            dataset.listFlow.collectLatest { _formList.value = it }
+        }
     }
 
     suspend fun setUpPage() {
@@ -148,6 +158,9 @@ class NewBenRegViewModel @Inject constructor(
             dataset.setUpPage(
                 null,
                 household.family?.familyHeadPhoneNo,
+
+
+
                 locationRecord.village.name,
                 villageNames,
                 user.villages,
@@ -246,6 +259,7 @@ class NewBenRegViewModel @Inject constructor(
     }
 
     fun getIndexOfAgeAtMarriage()   = dataset.getIndexOfAgeAtMarriage()
+    fun getAgeAtMarriageLength(): Int = dataset.ageAtMarriage.value?.length ?: 0
     fun getIndexOfMaritalStatus()   = dataset.getIndexOfMaritalStatus()
     fun getIndexOfContactNumber()   = dataset.getIndexOfContactNumber()
     fun getIndexofTempraryNumber()  = dataset.getTempMobileNoStatus()

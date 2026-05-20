@@ -77,6 +77,7 @@ class TBSuspectedViewModel @Inject constructor(
                 )
             }
             val tbScreening = tbRepo.getTBScreening(benId)
+            val tbDiagnostics = tbRepo.getTBDiagnostics(benId)
 
             tbRepo.getTBSuspected(benId)?.let {
                 tbSuspected = it
@@ -88,6 +89,7 @@ class TBSuspectedViewModel @Inject constructor(
             dataset.setUpPage(
                 ben,
                 tbScreening,
+                tbDiagnostics,
                 if (::tbSuspected.isInitialized) tbSuspected else null
             )
 

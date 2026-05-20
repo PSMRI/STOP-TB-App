@@ -55,83 +55,33 @@
                 app:cardElevation="@dimen/padding_normal"
                 app:layout_constraintTop_toTopOf="parent">
 
-                <androidx.constraintlayout.widget.ConstraintLayout
-                    android:id="@+id/cl_patient_information"
+                <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
 
-                    <LinearLayout
-                        android:id="@+id/ll_patient_information_1"
-                        app:layout_constraintTop_toTopOf="@+id/cl_patient_information"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content">
+                    <TextView
+                        android:id="@+id/tv_ben_name"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="@android:color/white"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        tools:text="ROHIT P" />
 
-                        <!-- ben_id: hidden TextView — required by FragmentNewFormBinding (CbacFragment, NCDReferalFormFragment) -->
-                        <TextView
-                            android:id="@+id/ben_id"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:padding="@dimen/padding_normal"
-                            android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
-                            android:textColor="@android:color/white"
-                            android:visibility="gone" />
-
-                        <TextView
-                            android:id="@+id/tv_ben_name"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:gravity="center"
-                            android:padding="@dimen/padding_normal"
-                            android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
-                            android:textColor="@android:color/white"
-                            app:layout_constraintBottom_toBottomOf="parent"
-                            app:layout_constraintEnd_toStartOf="@+id/tv_age_gender"
-                            app:layout_constraintStart_toStartOf="parent"
-                            app:layout_constraintTop_toTopOf="parent" />
-
-                        <TextView
-                            android:id="@+id/tv_age_gender"
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:gravity="center"
-                            android:padding="@dimen/padding_normal"
-                            android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
-                            android:textColor="@android:color/white"
-                            app:layout_constraintEnd_toEndOf="parent" />
-                    </LinearLayout>
-
-                    <RelativeLayout
-                        android:id="@+id/child_count_ll"
-                        android:layout_width="match_parent"
-                        android:visibility="gone"
-                        app:layout_constraintTop_toBottomOf="@+id/ll_patient_information_1"
-                        android:layout_height="wrap_content">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:gravity="center"
-                            android:padding="@dimen/padding_normal"
-                            android:layout_alignParentStart="true"
-                            android:text="@string/ecrdset_no_live_child"
-                            android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
-                            android:textColor="@android:color/white" />
-                        <TextView
-                            android:id="@+id/tv_no_child"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:gravity="center"
-                            android:layout_marginEnd="@dimen/_44sdp"
-                            android:layout_alignParentEnd="true"
-                            android:padding="@dimen/padding_normal"
-                            android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
-                            android:textColor="@android:color/white"
-                            app:layout_constraintEnd_toEndOf="parent" />
-                    </RelativeLayout>
-
-                </androidx.constraintlayout.widget.ConstraintLayout>
+                    <TextView
+                        android:id="@+id/tv_age_gender"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@android:color/white"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        tools:text="30 YEARS | MALE" />
+                </LinearLayout>
             </androidx.cardview.widget.CardView>
-
             <androidx.core.widget.NestedScrollView
                 android:layout_width="0dp"
                 android:layout_height="0dp"
@@ -163,7 +113,7 @@
 
             </androidx.core.widget.NestedScrollView>
 
-            <!-- Submit + Cancel buttons row -->
+            <!-- Submit button row -->
             <LinearLayout
                 android:id="@+id/ll_buttons"
                 android:layout_width="0dp"
@@ -177,12 +127,11 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_cancel"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="@dimen/margin_small"
-                    android:text="@string/cancel"
-                    android:visibility="gone" />
+                    android:layout_marginEnd="@dimen/margin_big"
+                    android:visibility="gone"
+                    android:text="@string/cancel" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_submit"

@@ -9,7 +9,10 @@
     <string name="service_type_dd_block_text">उप जिला</string>
     <string name="service_type_dd_village_text">गांव</string>
     <string name="btn_continue_text">जारी रखें</string>
-
+    <string name="btn_submit_text">जमा करें</string>
+    <string name="missing_detail_title">विवरण अनुपलब्ध</string>
+    <string name="missing_detail_message">निम्न में से कम से कम एक मान अनुपलब्ध है:\n\n\tराज्य\n\tजिला\n\tब्लॉक\n\tटीयू\n\tस्वास्थ्य सुविधा\n\tगांव</string>
+    <string name="understood">समझ गया</string>
     <string name="menu_home">घर</string>
     <string name="menu_home_home">होम</string>
     <string name="menu_home_scheduler">डैशबोर्ड</string>
@@ -76,6 +79,7 @@
     <string name="icon_title_ect">लक्ष दंपत्ति ट्रैकिंग</string>
     <string name="icon_title_video_tutorial">वीडियो ट्यूटोरियल</string>
     <string name="icon_title_ncd_tb_screening">टीबी स्क्रीनिंग</string>
+    <string name="icon_title_ncd_tb">क्षय रोग</string>
     <string name="icon_title_ncd_tb_suspected">संदेहास्पद टीबी मामले</string>
     <string name="icon_title_hrp_pregnant">उच्च जोखिम\ गर्भवती महिलाएं</string>
     <string name="icon_title_hrp_non_pregnant">उच्च जोखिम\ गैर-गर्भवती महिलाएं</string>
@@ -143,6 +147,7 @@
     <string name="label_female">महिला: %d</string>
     <string name="label_children">बच्चे(&lt;15वर्ष): %d</string>
     <string name="label_others">अन्य: %d</string>
+    <string name="label_senior_citizen">आयु(60 या अधिक): %d</string>
     <string name="loading_form">फॉर्म लोड हो रहा है...</string>
     <string name="month_january">जनवरी</string>
     <string name="month_february">फरवरी</string>

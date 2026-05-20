@@ -18,6 +18,12 @@
             android:checkable="false"
             android:icon="@drawable/ic_synced"
             android:title="@string/sync_records" />
+        <item
+            android:id="@+id/menu_connect_camp_hub"
+            android:checkable="false"
+            android:icon="@drawable/ic_qr_code"
+            android:visible="false"
+            android:title="@string/camp_connect_title" />
     </group>
 
     <group android:checkableBehavior="single">

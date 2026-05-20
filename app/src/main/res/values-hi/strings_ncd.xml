@@ -262,11 +262,11 @@
     </string-array>
 
     <string-array name="tb_sputum_sample_submitted_at">
-        <item>एचडब्ल्यूसी</item>
-        <item>पीएचसी</item>
+        <item>डीएमसी</item>
+        <item>डीएच</item>
         <item>सीएचसी</item>
-        <item>जिला अस्पताल</item>
-        <item>सरकारी मेडिकल कॉलेज</item>
+        <item>पीएचसी</item>
+        <item>एससी</item>
     </string-array>
 
     <string name="cat_ncd">एनसीडी</string>

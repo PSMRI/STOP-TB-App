@@ -266,6 +266,8 @@ class NewBenRegG15Fragment : Fragment() {
 
                 28 -> notifyItemChanged(1)
 
+                1052 -> notifyDataSetChanged()
+
             }
         }
     }
@@ -326,16 +328,10 @@ class NewBenRegG15Fragment : Fragment() {
 
     private fun validateCurrentPage(): Boolean {
         val result = binding.inputForm.rvInputForm.adapter?.let {
-            (it as FormInputAdapter).validateInput(resources)
-        }
+            (it as FormInputAdapter).validateInput(resources, binding.inputForm.rvInputForm)
+        } ?: -1
         Timber.d("Validation : $result")
-        return if (result == -1) true
-        else {
-            if (result != null) {
-                binding.inputForm.rvInputForm.scrollToPosition(result)
-            }
-            false
-        }
+        return result == -1
     }
 
     override fun onDestroy() {

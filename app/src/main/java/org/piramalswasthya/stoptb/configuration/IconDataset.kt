@@ -4,6 +4,9 @@ import android.content.res.Resources
 import dagger.hilt.android.scopes.ActivityRetainedScoped
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
+import org.piramalswasthya.stoptb.helpers.isNurseRole
+import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.model.Icon
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import org.piramalswasthya.stoptb.ui.home_activity.communicable_diseases.CdFragmentDirections
@@ -22,21 +25,22 @@ class IconDataset @Inject constructor(
         MALARIA, KALA_AZAR, AES_JE, FILARIA, LEPROSY, DEWARMING
     }
 
-    fun getVolunteerIconDataset(resources: Resources) = listOf(
-        Icon(
-            R.drawable.ic__ben,
-            resources.getString(R.string.icon_title_ben),
-            resources.getString(R.string.home_card_all_ben_subtitle),
-            recordsRepo.allBenListCount,
-            VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment()
-        ),
-        Icon(
-            R.drawable.ic__ncd,
-            resources.getString(R.string.icon_title_ncd_tb_screening),
-            resources.getString(R.string.home_card_tb_subtitle),
-            null,
-            VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToTbFragment()
-        ),
+    fun getVolunteerIconDataset(resources: Resources): List<Icon> {
+        val iconList = mutableListOf(
+            Icon(
+                R.drawable.ic__ben,
+                resources.getString(R.string.icon_title_ben),
+                resources.getString(R.string.home_card_all_ben_subtitle),
+                recordsRepo.allBenListCount,
+                VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment()
+            ),
+            Icon(
+                R.drawable.ic__ncd,
+                resources.getString(R.string.tuberculosis),
+                resources.getString(R.string.home_card_tb_subtitle),
+                null,
+                VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToTbFragment()
+            ),
 //        Icon(
 //            R.drawable.ic__ncd,
 //            resources.getString(R.string.icon_title_ncd),
@@ -44,16 +48,30 @@ class IconDataset @Inject constructor(
 //            null,
 //            VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToNcdFragment()
 //        ),
-        Icon(
-            R.drawable.ic_ncd_noneligible,
-            resources.getString(R.string.ncd_refer_list),
-            resources.getString(R.string.home_card_referral_subtitle),
-            null,
-            VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToReferralIconsFragment()
+            Icon(
+                R.drawable.ic_ncd_noneligible,
+                resources.getString(R.string.ncd_refer_list),
+                resources.getString(R.string.home_card_referral_subtitle),
+                null,
+                VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToReferralIconsFragment()
+            )
         )
-    ).apply {
-        forEachIndexed { index, icon ->
-            icon.colorPrimary = index % 2 == 0
+
+        val role = preferenceDao.getLoggedInUser()?.role
+        when {
+            role.isRegistrationOfficerRole() -> iconList.removeAll {
+                it.title != resources.getString(R.string.icon_title_ben)
+            }
+            role.isCounsellingOfficerRole() -> iconList.removeAll {
+                it.title != resources.getString(R.string.icon_title_ncd_tb_screening) &&
+                        it.title != resources.getString(R.string.ncd_refer_list)
+            }
+        }
+
+        return iconList.apply {
+            forEachIndexed { index, icon ->
+                icon.colorPrimary = index % 2 == 0
+            }
         }
     }
 
@@ -119,32 +137,46 @@ class IconDataset @Inject constructor(
         }
     }
 
-    fun getCDDataset(resources: Resources) = listOf(
+    fun getCDDataset(resources: Resources): List<Icon> {
+        val tbScreeningTitle = resources.getString(R.string.icon_title_ncd_tb_screening)
+        val tbSuspectedTitle = resources.getString(R.string.icon_title_ncd_tb_suspected)
+        val tbConfirmedTitle = resources.getString(R.string.icon_title_ncd_tb_confirmed)
+        val role = preferenceDao.getLoggedInUser()?.role
+
+        return listOf(
         Icon(
             R.drawable.ic__ncd_eligibility,
-            resources.getString(R.string.icon_title_ncd_tb_screening),
+            tbScreeningTitle,
             resources.getString(R.string.home_card_tb_screening_subtitle),
             recordsRepo.tbScreeningListCount,
             CdFragmentDirections.actionCdFragmentToTBScreeningListFragment()
         ),
         Icon(
             R.drawable.ic__death,
-            resources.getString(R.string.icon_title_ncd_tb_suspected),
+            tbSuspectedTitle,
             resources.getString(R.string.home_card_tb_suspected_short_subtitle),
             recordsRepo.tbSuspectedListCount,
             CdFragmentDirections.actionCdFragmentToTBSuspectedListFragment()
         ),
         Icon(
             icon = R.drawable.ic__death,
-            title = resources.getString(R.string.icon_title_ncd_tb_confirmed),
+            title = tbConfirmedTitle,
             subtitle = resources.getString(R.string.home_card_tb_confirmed_short_subtitle),
             count = recordsRepo.tbConfirmedListCount,
             navAction = CdFragmentDirections.actionCdFragmentToTBConfirmedListFragment()
         )
-    ).apply {
+    ).filter { icon ->
+            when {
+                role.isRegistrationOfficerRole() -> false
+                role.isNurseRole() -> true
+                role.isCounsellingOfficerRole() -> icon.title == tbConfirmedTitle
+                else -> true
+            }
+        }.apply {
         forEachIndexed { index, icon ->
             icon.colorPrimary = index % 2 == 0
         }
+    }
     }
 
     fun getReferralDataset(resources: Resources) = listOf(

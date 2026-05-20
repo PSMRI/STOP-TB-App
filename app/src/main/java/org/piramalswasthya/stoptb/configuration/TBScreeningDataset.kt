@@ -6,6 +6,7 @@ import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.model.BenBasicCache
 import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.FormElement
+import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.InputType
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 
@@ -15,6 +16,8 @@ class TBScreeningDataset(
 ) : Dataset(context, currentLanguage) {
 
     private var benAgeYears: Int = 0
+    private var ben: BenRegCache? = null
+    private var hasPregnancyRiskFactor: Boolean = false
 
     private val yesValue get() = resources.getStringArray(R.array.yes_no)[0]
     private val noValue get() = resources.getStringArray(R.array.yes_no)[1]
@@ -181,24 +184,67 @@ class TBScreeningDataset(
         required = true
     )
 
-    private val referralRequired = FormElement(
-        id = 16,
+    private val referredForDigitalChestXray = FormElement(
+        id = 18,
         inputType = InputType.RADIO,
-        title = resources.getString(R.string.tb_referral_required),
+        title = resources.getString(R.string.referred_for_digital_chest_xray),
         entries = resources.getStringArray(R.array.yes_no),
         required = true,
         hasDependants = true
     )
 
-    private val referralFor = FormElement(
-        id = 17,
-        inputType = InputType.CHECKBOXES,
-        title = resources.getString(R.string.tb_referral_for),
-        entries = resources.getStringArray(R.array.tb_referral_tests),
+    private val referredForSputumCollection = FormElement(
+        id = 19,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.referred_for_sputum_collection),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = true,
+        hasDependants = true
+    )
+
+    private val sputumSampleSubmittedAt = FormElement(
+        id = 20,
+        inputType = InputType.DROPDOWN,
+        title = resources.getString(R.string.sputum_sample_submitted_at),
+        arrayId = R.array.tb_sputum_sample_submitted_at,
+        entries = resources.getStringArray(R.array.tb_sputum_sample_submitted_at),
         required = false
     )
 
-    suspend fun setUpPage(ben: BenRegCache?, saved: TBScreeningCache?) {
+    private val recommendedForTruenatTest = FormElement(
+        id = 21,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.recommended_for_truenat_test),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = true,
+        hasDependants = true
+    )
+
+    private val recommendedForLiquidCultureTest = FormElement(
+        id = 22,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.recommended_for_liquid_culture_test),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = true,
+        hasDependants = true
+    )
+
+    private val reasonForDenialForGettingTested = FormElement(
+        id = 23,
+        inputType = InputType.CHECKBOXES,
+        title = resources.getString(R.string.reason_for_denial_for_getting_tested),
+        arrayId = R.array.tb_reason_for_denial_testing,
+        entries = resources.getStringArray(R.array.tb_reason_for_denial_testing),
+        required = false
+    )
+
+    suspend fun setUpPage(
+        ben: BenRegCache?,
+        saved: TBScreeningCache?,
+        hasPregnancyRiskFactor: Boolean = false
+    ) {
+        this.ben = ben
+        this.hasPregnancyRiskFactor = hasPregnancyRiskFactor
         ben?.let {
             dateOfVisit.min = it.regDate
             benAgeYears = when {
@@ -221,13 +267,41 @@ class TBScreeningDataset(
             historyOfTB.value = boolToYesNo(saved.historyOfTb)
             currentlyTakingDrugs.value = boolToYesNo(saved.takingAntiTBDrugs)
             familyHistoryTB.value = boolToYesNo(saved.familySufferingFromTB)
+            referredForDigitalChestXray.value = boolToYesNo(saved.referredForDigitalChestXray)
+            referredForSputumCollection.value = boolToYesNo(saved.referredForSputumCollection)
+            sputumSampleSubmittedAt.value = getLocalValueInArray(
+                R.array.tb_sputum_sample_submitted_at,
+                saved.sputumSampleSubmittedAt
+            )
+            recommendedForTruenatTest.value = boolToYesNo(saved.recommendedForTruenatTest)
+            recommendedForLiquidCultureTest.value = boolToYesNo(saved.recommendedForLiquidCultureTest)
+            reasonForDenialForGettingTested.value =
+                englishValuesToSelectionIndexes(saved.reasonForDenialForGettingTested, R.array.tb_reason_for_denial_testing)
         }
 
+        applyReferralDefaults()
         setUpPage(buildFormList())
     }
 
     override suspend fun handleListOnValueChanged(formId: Int, index: Int): Int {
-        return getIndexOfElement(dateOfVisit)
+        when (formId) {
+            isCoughing.id -> isCoughing.value = yesNoFromIndex(index)
+            bloodInSputum.id -> bloodInSputum.value = yesNoFromIndex(index)
+            isFever.id -> isFever.value = yesNoFromIndex(index)
+            riseOfFever.id -> riseOfFever.value = yesNoFromIndex(index)
+            lossOfAppetite.id -> lossOfAppetite.value = yesNoFromIndex(index)
+            lossOfWeight.id -> lossOfWeight.value = yesNoFromIndex(index)
+            nightSweats.id -> nightSweats.value = yesNoFromIndex(index)
+            historyOfTB.id -> historyOfTB.value = yesNoFromIndex(index)
+            currentlyTakingDrugs.id -> currentlyTakingDrugs.value = yesNoFromIndex(index)
+            familyHistoryTB.id -> familyHistoryTB.value = yesNoFromIndex(index)
+            referredForDigitalChestXray.id -> referredForDigitalChestXray.value = yesNoFromIndex(index)
+            referredForSputumCollection.id -> referredForSputumCollection.value = yesNoFromIndex(index)
+            recommendedForTruenatTest.id -> recommendedForTruenatTest.value = yesNoFromIndex(index)
+            recommendedForLiquidCultureTest.id -> recommendedForLiquidCultureTest.value = yesNoFromIndex(index)
+        }
+        applyReferralDefaults()
+        return syncReferralFields()
     }
 
     override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
@@ -249,8 +323,22 @@ class TBScreeningDataset(
             form.contactWithTBPatient = null
             form.bmi = null
             form.historyOfTBInLastFiveYrs = null
-            form.referralRequired = null
-            form.referralFor = null
+            form.referredForDigitalChestXray =
+                if (shouldShowDigitalChestXrayReferral()) isYes(referredForDigitalChestXray) else null
+            form.referredForSputumCollection =
+                if (shouldShowSputumCollectionReferral()) isYes(referredForSputumCollection) else null
+            form.sputumSampleSubmittedAt =
+                if (shouldShowSputumCollectionReferral()) {
+                    getEnglishValueInArray(R.array.tb_sputum_sample_submitted_at, sputumSampleSubmittedAt.value)
+                } else null
+            form.recommendedForTruenatTest =
+                if (shouldShowTruenatRecommendation()) isYes(recommendedForTruenatTest) else null
+            form.recommendedForLiquidCultureTest =
+                if (shouldShowLiquidCultureRecommendation()) isYes(recommendedForLiquidCultureTest) else null
+            form.reasonForDenialForGettingTested =
+                if (shouldShowReasonForDenial()) {
+                    getSelectedEnglishValues(reasonForDenialForGettingTested, R.array.tb_reason_for_denial_testing)
+                } else null
             form.familyContactScreeningRequired = requiresFamilyContactScreening()
             form.sympotomatic = null
             form.asymptomatic = null
@@ -259,7 +347,7 @@ class TBScreeningDataset(
     }
 
     fun requiresFamilyContactScreening(): Boolean =
-        isYes(currentlyTakingDrugs) || isYes(familyHistoryTB)
+        isYes(familyHistoryTB)
 
     fun getFamilyContactAlert(): String? =
         if (requiresFamilyContactScreening()) resources.getString(R.string.tb_family_contact_screening_alert) else null
@@ -279,8 +367,106 @@ class TBScreeningDataset(
             historyOfTB,
             currentlyTakingDrugs,
             familyHistoryTB,
-        )
+        ).apply { addAll(buildReferralFields()) }
     }
+
+    private fun buildReferralFields(): List<FormElement> = buildList {
+        if (shouldShowDigitalChestXrayReferral()) {
+            add(referredForDigitalChestXray)
+        }
+        if (shouldShowSputumCollectionReferral()) {
+            add(referredForSputumCollection)
+            add(sputumSampleSubmittedAt)
+        }
+        if (shouldShowTruenatRecommendation()) {
+            add(recommendedForTruenatTest)
+        }
+        if (shouldShowLiquidCultureRecommendation()) {
+            add(recommendedForLiquidCultureTest)
+        }
+        if (shouldShowReasonForDenial()) {
+            add(reasonForDenialForGettingTested)
+        }
+    }
+
+    private fun syncReferralFields(): Int {
+        val allReferralFields = listOf(
+            referredForDigitalChestXray,
+            referredForSputumCollection,
+            sputumSampleSubmittedAt,
+            recommendedForTruenatTest,
+            recommendedForLiquidCultureTest,
+            reasonForDenialForGettingTested
+        )
+        val visibleFields = buildReferralFields()
+        val visibleValues = visibleFields.associateWith { it.value }
+        val insertPosition = listFlow.value.indexOf(familyHistoryTB)
+            .takeIf { it >= 0 }
+            ?.plus(1)
+            ?: -2
+
+        val updateIndex = triggerDependants(
+            source = familyHistoryTB,
+            removeItems = allReferralFields,
+            addItems = visibleFields,
+            position = insertPosition
+        )
+        visibleValues.forEach { (field, value) -> field.value = value }
+        return updateIndex
+    }
+
+    private fun applyReferralDefaults() {
+        if (shouldShowDigitalChestXrayReferral() && referredForDigitalChestXray.value.isNullOrBlank()) {
+            referredForDigitalChestXray.value = yesValue
+        }
+        if (shouldShowSputumCollectionReferral() && referredForSputumCollection.value.isNullOrBlank()) {
+            referredForSputumCollection.value = yesValue
+        }
+        if (shouldShowTruenatRecommendation() && recommendedForTruenatTest.value.isNullOrBlank()) {
+            recommendedForTruenatTest.value = yesValue
+        }
+        if (shouldShowLiquidCultureRecommendation() && recommendedForLiquidCultureTest.value.isNullOrBlank()) {
+            recommendedForLiquidCultureTest.value = yesValue
+        }
+        if (!shouldShowDigitalChestXrayReferral()) referredForDigitalChestXray.value = null
+        if (!shouldShowSputumCollectionReferral()) {
+            referredForSputumCollection.value = null
+            sputumSampleSubmittedAt.value = null
+        }
+        if (!shouldShowTruenatRecommendation()) recommendedForTruenatTest.value = null
+        if (!shouldShowLiquidCultureRecommendation()) recommendedForLiquidCultureTest.value = null
+        if (!shouldShowReasonForDenial()) reasonForDenialForGettingTested.value = null
+    }
+
+    private fun shouldShowDigitalChestXrayReferral(): Boolean =
+        !isPregnant()
+
+    private fun shouldShowSputumCollectionReferral(): Boolean =
+        isPregnant() || isYes(historyOfTB) || isYes(currentlyTakingDrugs) || hasPregnancyRiskFactor
+
+    private fun shouldShowTruenatRecommendation(): Boolean =
+        isYes(referredForSputumCollection)
+
+    private fun shouldShowLiquidCultureRecommendation(): Boolean =
+        isYes(referredForSputumCollection) && isYes(historyOfTB) && isYes(currentlyTakingDrugs)
+
+    private fun shouldShowReasonForDenial(): Boolean =
+        listOf(
+            referredForDigitalChestXray.takeIf { shouldShowDigitalChestXrayReferral() },
+            referredForSputumCollection.takeIf { shouldShowSputumCollectionReferral() },
+            recommendedForTruenatTest.takeIf { shouldShowTruenatRecommendation() },
+            recommendedForLiquidCultureTest.takeIf { shouldShowLiquidCultureRecommendation() }
+        ).any { it?.value == noValue }
+
+    private fun isPregnant(): Boolean {
+        if (ben?.gender != Gender.FEMALE) return false
+        val reproductiveStatus = ben?.genDetails?.reproductiveStatus
+        return ben?.genDetails?.reproductiveStatusId == 1 ||
+            reproductiveStatus.equals("Yes", ignoreCase = true)
+    }
+
+    private fun yesNoFromIndex(index: Int): String? =
+        if (index == 0) yesValue else noValue
 
     private fun getSelectedEnglishValues(formElement: FormElement, arrayId: Int): List<String> {
         val selectedIndexes = formElement.value
@@ -299,7 +485,11 @@ class TBScreeningDataset(
         return selectedIndexes.takeIf { it.isNotEmpty() }?.joinToString("|")
     }
 
-    private fun boolToYesNo(value: Boolean?): String = if (value == true) yesValue else noValue
+    private fun boolToYesNo(value: Boolean?): String = when (value) {
+        true -> yesValue
+        false -> noValue
+        null -> ""
+    }
 
     private fun isYes(formElement: FormElement): Boolean = formElement.value == yesValue
 }

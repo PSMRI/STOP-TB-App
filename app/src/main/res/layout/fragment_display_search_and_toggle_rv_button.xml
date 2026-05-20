@@ -115,6 +115,50 @@
 
     </LinearLayout>
 
+    <LinearLayout
+        android:id="@+id/ll_quick_refresh"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/margin_normal"
+        android:layout_marginTop="@dimen/margin_small"
+        android:layout_marginEnd="@dimen/margin_normal"
+        android:background="@drawable/bg_dashboard_chip"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/padding_normal"
+        android:paddingTop="@dimen/padding_small"
+        android:paddingEnd="@dimen/padding_small"
+        android:paddingBottom="@dimen/padding_small"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/filterText"
+        tools:visibility="visible">
+
+        <TextView
+            android:id="@+id/tv_quick_refresh_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/roboto_medium"
+            android:text="@string/quick_refresh_not_updated"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/btn_quick_refresh"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/margin_small"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:fontFamily="@font/roboto_bold"
+            android:minHeight="@dimen/_28sdp"
+            android:paddingHorizontal="@dimen/padding_small"
+            android:gravity="center"
+            android:text="@string/quick_refresh_action"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="13sp" />
+
+    </LinearLayout>
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_any"
         android:layout_width="match_parent"
@@ -122,7 +166,7 @@
         android:layout_marginTop="@dimen/margin_small"
         app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
         app:layout_constraintBottom_toTopOf="@id/btn_next_page"
-        app:layout_constraintTop_toBottomOf="@+id/filterText"
+        app:layout_constraintTop_toBottomOf="@+id/ll_quick_refresh"
         tools:itemCount="2"
         tools:listitem="@layout/rv_item_household" />
 
@@ -131,7 +175,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         app:layout_constraintBottom_toTopOf="@id/btn_next_page"
-        app:layout_constraintTop_toBottomOf="@+id/filterText">
+        app:layout_constraintTop_toBottomOf="@+id/ll_quick_refresh">
 
         <TextView
             android:id="@+id/tv_empty_content"

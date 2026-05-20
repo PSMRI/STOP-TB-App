@@ -64,6 +64,7 @@ import org.piramalswasthya.stoptb.helpers.TokenExpiryManager
 import org.piramalswasthya.stoptb.databinding.ActivityHomeBinding
 import org.piramalswasthya.stoptb.helpers.AnalyticsHelper
 import org.piramalswasthya.stoptb.helpers.ImageUtils
+import org.piramalswasthya.stoptb.helpers.AutoFlowBackNavigationHost
 import org.piramalswasthya.stoptb.helpers.InAppUpdateHelper
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
@@ -82,7 +83,9 @@ import javax.inject.Inject
 
 
 @AndroidEntryPoint
-class HomeActivity : AppCompatActivity(), MessageUpdate {
+class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationHost {
+
+    private var autoFlowBackNavigationBlocked: Boolean = false
 
     var isChatSupportEnabled : Boolean = false
     private lateinit var updateHelper: InAppUpdateHelper
@@ -259,6 +262,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
             openCampHubConnect()
         }
         refreshCampHubOfflineBanner()
+        refreshCampHubDrawerItem()
         WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
         viewModel.restoredProfilePicUri.observe(this) { uri ->
             uri?.let {
@@ -542,6 +546,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
     override fun onResume() {
         super.onResume()
         refreshCampHubOfflineBanner()
+        refreshCampHubDrawerItem()
         WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
         window.decorView.alpha = 1f
         if (isDeviceRootedOrEmulator()) {
@@ -610,6 +615,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
 
     private fun finishAndStartServiceLocationActivity() {
         val serviceLocationActivity = Intent(this, ServiceLocationActivity::class.java)
+            .putExtra(ServiceLocationActivity.EXTRA_FROM_HOME_SWITCH, true)
         finish()
         startActivity(serviceLocationActivity)
     }
@@ -676,7 +682,11 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
 
         NavigationUI.setupWithNavController(binding.toolbar, navController, appBarConfiguration)
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration)
-
+        // Fix toolbar title appearing beside back button
+        navController.addOnDestinationChangedListener { _, _, _ ->
+            binding.toolbar.title = ""
+            supportActionBar?.setDisplayShowTitleEnabled(false)
+        }
 
         binding.navView.menu.findItem(R.id.homeFragment).setOnMenuItemClickListener {
             navController.popBackStack(R.id.homeFragment, false)
@@ -700,6 +710,13 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
             true
 
         }
+
+        binding.navView.menu.findItem(R.id.menu_connect_camp_hub)?.setOnMenuItemClickListener {
+            binding.drawerLayout.close()
+            openCampHubConnect()
+            true
+        }
+        refreshCampHubDrawerItem()
 
         binding.navView.menu.findItem(R.id.syncDashboardFragment).setOnMenuItemClickListener {
             navController.navigate(R.id.syncDashboardFragment)
@@ -777,18 +794,35 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
     }
 
 
+//    fun updateActionBar(logoResource: Int, title: String? = null) {
+//        binding.ivToolbar.setImageResource(logoResource)
+////        binding.toolbar.setLogo(logoResource)
+//        title?.let {
+//            binding.toolbar.title = null
+//            binding.tvToolbar.text = it
+//        }
+//    }
+
+
     fun updateActionBar(logoResource: Int, title: String? = null) {
         binding.ivToolbar.setImageResource(logoResource)
-//        binding.toolbar.setLogo(logoResource)
-        title?.let {
-            binding.toolbar.title = null
-            binding.tvToolbar.text = it
-        }
+
+        // Hide default toolbar title beside back button
+        binding.toolbar.title = ""
+        supportActionBar?.setDisplayShowTitleEnabled(false)
+
+        // Show custom centered title
+        binding.tvToolbar.text = title ?: ""
     }
 
     private fun refreshCampHubOfflineBanner() {
         binding.tvCampHubOffline.visibility =
             if (pref.isCampModeEnabled() && !pref.isCampHubConnected()) View.VISIBLE else View.GONE
+    }
+
+    private fun refreshCampHubDrawerItem() {
+        binding.navView.menu.findItem(R.id.menu_connect_camp_hub)?.isVisible =
+            pref.isCampModeEnabled()
     }
 
     private fun openCampHubConnect() {
@@ -802,16 +836,40 @@ class HomeActivity : AppCompatActivity(), MessageUpdate {
         if (!::appBarConfiguration.isInitialized) return
         NavigationUI.setupWithNavController(binding.toolbar, navController, appBarConfiguration)
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration)
+
+        // Fix toolbar title appearing beside back button
+        navController.addOnDestinationChangedListener { _, _, _ ->
+            binding.toolbar.title = ""
+            supportActionBar?.setDisplayShowTitleEnabled(false)
+        }
+
+
     }
 
-    fun setToolbarNavigationVisible(visible: Boolean) {
-        if (visible) {
-            restoreToolbarNavigation()
-        } else {
+    override fun setAutoFlowBackNavigationBlocked(blocked: Boolean) {
+        autoFlowBackNavigationBlocked = blocked
+        if (blocked) {
             binding.toolbar.navigationIcon = null
             binding.toolbar.setNavigationOnClickListener(null)
             supportActionBar?.setDisplayHomeAsUpEnabled(false)
+        } else if (::appBarConfiguration.isInitialized) {
+            restoreToolbarNavigation()
         }
+    }
+
+    fun setToolbarNavigationVisible(visible: Boolean) {
+        if (!visible || autoFlowBackNavigationBlocked) {
+            binding.toolbar.navigationIcon = null
+            binding.toolbar.setNavigationOnClickListener(null)
+            supportActionBar?.setDisplayHomeAsUpEnabled(false)
+        } else {
+            restoreToolbarNavigation()
+        }
+    }
+
+    override fun onSupportNavigateUp(): Boolean {
+        if (autoFlowBackNavigationBlocked) return false
+        return navController.navigateUp() || super.onSupportNavigateUp()
     }
 
     @Deprecated("Deprecated in Java")

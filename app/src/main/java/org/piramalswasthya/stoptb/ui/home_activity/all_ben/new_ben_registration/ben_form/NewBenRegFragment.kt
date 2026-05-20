@@ -76,7 +76,6 @@ class NewBenRegFragment : Fragment() {
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
-        timber.log.Timber.d("BEN_FORM: onCreateView called, benId=${viewModel.benIdFromArgs}")
         _binding = FragmentNewFormBinding.inflate(layoutInflater, container, false)
         return binding.root
     }
@@ -84,17 +83,14 @@ class NewBenRegFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        timber.log.Timber.d("BEN_FORM: onResume called")
     }
 
     // ─── onViewCreated ───────────────────────────────────────────────────
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        timber.log.Timber.d("BEN_FORM: onViewCreated called")
 
-        // Show loading, hide content until form is ready
-        binding.llLoading.visibility = View.VISIBLE
-        binding.llContent.visibility = View.GONE
+        binding.llLoading.visibility = View.GONE
+        binding.llContent.visibility = View.VISIBLE
 
         // Back press — show discard dialog in edit mode
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner,
@@ -134,19 +130,7 @@ class NewBenRegFragment : Fragment() {
             }
         }
 
-        // Set action bar title once
-        activity?.let {
-            when (it) {
-                is HomeActivity -> it.updateActionBar(
-                    R.drawable.ic__ben,
-                    getString(R.string.frag_new_ben_reg_type_title)
-                )
-                is VolunteerActivity -> it.updateActionBar(
-                    R.drawable.ic__ben,
-                    getString(R.string.frag_new_ben_reg_type_title)
-                )
-            }
-        }
+
 
         // Capture geolocation silently
         captureGeolocation()
@@ -160,6 +144,9 @@ class NewBenRegFragment : Fragment() {
             }
         }
 
+        binding.btnCancel.setOnClickListener {
+            findNavController().popBackStack()
+        }
         // Cancel button hidden — discard handled by back press
 
         // Death badge visibility — only show fab if record exists AND not dead
@@ -195,31 +182,17 @@ class NewBenRegFragment : Fragment() {
         binding.form.rvInputForm.adapter = adapter
         binding.form.rvInputForm.itemAnimator = null
 
-        // Collect form list — show loading until ready
-        var formShown = false
+        // Collect form list without forcing a full-screen loading blink.
         lifecycleScope.launch {
             viewModel.formList.collect {
-                timber.log.Timber.d("BEN_FORM: formList collected, size=${it.size}")
                 if (it.isNotEmpty()) {
-                    adapter.submitList(it) {
-                        if (!formShown) {
-                            formShown = true
-                            // Wait for RecyclerView to fully layout before showing
-                            binding.form.rvInputForm.post {
-                                binding.form.rvInputForm.post {
-                                    binding.llLoading.visibility = View.GONE
-                                    binding.llContent.visibility = View.VISIBLE
-                                }
-                            }
-                        }
-                    }
+                    adapter.submitList(it)
                 }
             }
         }
 
         // Record exists observer — drives view/edit mode + consent
         viewModel.recordExists.observe(viewLifecycleOwner) { recordExists ->
-            timber.log.Timber.d("BEN_FORM: recordExists=$recordExists")
             binding.fabEdit.visibility  = if (recordExists) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (recordExists) View.GONE else View.VISIBLE
             // btnCancel hidden — discard via back press
@@ -245,7 +218,7 @@ class NewBenRegFragment : Fragment() {
                     try {
                         if (viewModel.benIdFromArgs == 0L) {
                             findNavController().navigate(
-                                R.id.TBScreeningFormFragment,
+                                R.id.anthropometryFragment,
                                 bundleOf(
                                     "benId" to viewModel.getCurrentBenId(),
                                     "autoFlow" to true
@@ -281,6 +254,14 @@ class NewBenRegFragment : Fragment() {
     // ─── onStart ───────────────────────────────────────────────────────────
     override fun onStart() {
         super.onStart()
+        activity?.let {
+            when (it) {
+                is HomeActivity -> it.updateActionBar(R.drawable.ic__ben, getString(R.string.frag_new_ben_reg_type_title))
+                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ben, getString(R.string.frag_new_ben_reg_type_title))
+            }
+        }
+
+
     }
 
     // ─── Consent popup ───────────────────────────────────────────────────
@@ -370,12 +351,9 @@ class NewBenRegFragment : Fragment() {
 
     // ─── Validation ──────────────────────────────────────────────────────
     private fun validateCurrentPage(): Boolean {
-        val result = (binding.form.rvInputForm.adapter as? FormInputAdapter)?.validateInput(resources)
-        return if (result == -1) true
-        else {
-            result?.let { binding.form.rvInputForm.scrollToPosition(it) }
-            false
-        }
+        val result = (binding.form.rvInputForm.adapter as? FormInputAdapter)
+            ?.validateInput(resources, binding.form.rvInputForm) ?: -1
+        return result == -1
     }
 
     // ─── Hard-coded adapter refresh for specific formIds ─────────────────
@@ -384,12 +362,13 @@ class NewBenRegFragment : Fragment() {
             when (formId) {
                 1008 -> notifyDataSetChanged()          // marital status
                 1012 -> {                               // age at marriage
-                    if ((viewModel.dataset.ageAtMarriage.value?.length ?: 0) >= 2)
+                    if (viewModel.getAgeAtMarriageLength() >= 2)
                         notifyDataSetChanged()
                 }
                 9    -> notifyDataSetChanged()          // gender
                 115  -> notifyDataSetChanged()          // age/dob
                 12   -> notifyDataSetChanged()          // mobile relation
+                1052 -> notifyDataSetChanged()          // mobile not available
             }
         }
     }
@@ -501,7 +480,7 @@ class NewBenRegFragment : Fragment() {
         ) {
             fetchLocation()
         } else {
-            requestLocationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            // Avoid permission prompt during screen open to keep navigation smooth.
         }
     }
 

@@ -17,6 +17,9 @@ interface BenDao {
     @Update
     suspend fun updateBen(ben: BenRegCache)
 
+    @Query("UPDATE BENEFICIARY SET nikshayId = :nikshayId WHERE beneficiaryId = :benId")
+    suspend fun updateNikshayId(benId: Long, nikshayId: String)
+
     @Query("UPDATE  BENEFICIARY SET syncState = :unsynced ,processed = :proccess , serverUpdatedStatus =:updateStatus WHERE householdId = :householdId")
     suspend fun updateBenToSync(
         householdId: Long,
@@ -201,6 +204,20 @@ interface BenDao {
     fun getAllBen(selectedVillage: Int): Flow<List<BenBasicCache>>
 
     @Query("""
+        SELECT beneficiaryId FROM BENEFICIARY
+        WHERE loc_village_id = :selectedVillage
+        AND isDeactivate = 0
+        AND isDraft = 0
+        AND (
+            height IS NOT NULL
+            OR weight IS NOT NULL
+            OR bmi IS NOT NULL
+            OR temperature IS NOT NULL
+        )
+    """)
+    fun getAnthropometryFilledBenIds(selectedVillage: Int): Flow<List<Long>>
+
+    @Query("""
         SELECT * FROM BEN_BASIC_CACHE
         WHERE villageId = :selectedVillage
         AND isDeactivate = 0
@@ -223,18 +240,36 @@ interface BenDao {
                    OR IFNULL(v.rbs, 0) < 60
                    OR IFNULL(v.rbs, 0) > 90
             ))
-            OR (:source = 6 AND isDeath = 0 AND benId IN (
-                SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE ts.isChestXRayDone IS NOT NULL
+            OR (:source = 6 AND isDeath = 0 AND (
+                benId IN (
+                    SELECT ts.benId FROM TB_SUSPECTED ts
+                    WHERE ts.isChestXRayDone IS NOT NULL
+                )
+                OR benId IN (
+                    SELECT tbs.benId FROM TB_SCREENING tbs
+                    WHERE tbs.referredForDigitalChestXray = 1
+                )
             ))
-            OR (:source = 7 AND isDeath = 0 AND benId IN (
-                SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE ts.isNaatConducted IS NOT NULL
-                   OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'
+            OR (:source = 7 AND isDeath = 0 AND (
+                benId IN (
+                    SELECT ts.benId FROM TB_SUSPECTED ts
+                    WHERE ts.isNaatConducted IS NOT NULL
+                       OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'
+                )
+                OR benId IN (
+                    SELECT tbs.benId FROM TB_SCREENING tbs
+                    WHERE tbs.recommendedForTruenatTest = 1
+                )
             ))
-            OR (:source = 8 AND isDeath = 0 AND benId IN (
-                SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE ts.isLiquidCultureConducted IS NOT NULL
+            OR (:source = 8 AND isDeath = 0 AND (
+                benId IN (
+                    SELECT ts.benId FROM TB_SUSPECTED ts
+                    WHERE ts.isLiquidCultureConducted IS NOT NULL
+                )
+                OR benId IN (
+                    SELECT tbs.benId FROM TB_SCREENING tbs
+                    WHERE tbs.recommendedForLiquidCultureTest = 1
+                )
             ))
         )
         AND (:filterType = 0
@@ -283,18 +318,36 @@ interface BenDao {
                    OR IFNULL(v.rbs, 0) < 60
                    OR IFNULL(v.rbs, 0) > 90
             ))
-            OR (:source = 6 AND isDeath = 0 AND benId IN (
-                SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE ts.isChestXRayDone IS NOT NULL
+            OR (:source = 6 AND isDeath = 0 AND (
+                benId IN (
+                    SELECT ts.benId FROM TB_SUSPECTED ts
+                    WHERE ts.isChestXRayDone IS NOT NULL
+                )
+                OR benId IN (
+                    SELECT tbs.benId FROM TB_SCREENING tbs
+                    WHERE tbs.referredForDigitalChestXray = 1
+                )
             ))
-            OR (:source = 7 AND isDeath = 0 AND benId IN (
-                SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE ts.isNaatConducted IS NOT NULL
-                   OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'
+            OR (:source = 7 AND isDeath = 0 AND (
+                benId IN (
+                    SELECT ts.benId FROM TB_SUSPECTED ts
+                    WHERE ts.isNaatConducted IS NOT NULL
+                       OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'
+                )
+                OR benId IN (
+                    SELECT tbs.benId FROM TB_SCREENING tbs
+                    WHERE tbs.recommendedForTruenatTest = 1
+                )
             ))
-            OR (:source = 8 AND isDeath = 0 AND benId IN (
-                SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE ts.isLiquidCultureConducted IS NOT NULL
+            OR (:source = 8 AND isDeath = 0 AND (
+                benId IN (
+                    SELECT ts.benId FROM TB_SUSPECTED ts
+                    WHERE ts.isLiquidCultureConducted IS NOT NULL
+                )
+                OR benId IN (
+                    SELECT tbs.benId FROM TB_SCREENING tbs
+                    WHERE tbs.recommendedForLiquidCultureTest = 1
+                )
             ))
         )
         AND (:filterType = 0
@@ -348,18 +401,36 @@ interface BenDao {
                    OR IFNULL(v.rbs, 0) < 60
                    OR IFNULL(v.rbs, 0) > 90
             ))
-            OR (:source = 6 AND isDeath = 0 AND benId IN (
-                SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE ts.isChestXRayDone IS NOT NULL
+            OR (:source = 6 AND isDeath = 0 AND (
+                benId IN (
+                    SELECT ts.benId FROM TB_SUSPECTED ts
+                    WHERE ts.isChestXRayDone IS NOT NULL
+                )
+                OR benId IN (
+                    SELECT tbs.benId FROM TB_SCREENING tbs
+                    WHERE tbs.referredForDigitalChestXray = 1
+                )
             ))
-            OR (:source = 7 AND isDeath = 0 AND benId IN (
-                SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE ts.isNaatConducted IS NOT NULL
-                   OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'
+            OR (:source = 7 AND isDeath = 0 AND (
+                benId IN (
+                    SELECT ts.benId FROM TB_SUSPECTED ts
+                    WHERE ts.isNaatConducted IS NOT NULL
+                       OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'
+                )
+                OR benId IN (
+                    SELECT tbs.benId FROM TB_SCREENING tbs
+                    WHERE tbs.recommendedForTruenatTest = 1
+                )
             ))
-            OR (:source = 8 AND isDeath = 0 AND benId IN (
-                SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE ts.isLiquidCultureConducted IS NOT NULL
+            OR (:source = 8 AND isDeath = 0 AND (
+                benId IN (
+                    SELECT ts.benId FROM TB_SUSPECTED ts
+                    WHERE ts.isLiquidCultureConducted IS NOT NULL
+                )
+                OR benId IN (
+                    SELECT tbs.benId FROM TB_SCREENING tbs
+                    WHERE tbs.recommendedForLiquidCultureTest = 1
+                )
             ))
         )
         AND (:filterType = 0
@@ -693,9 +764,15 @@ interface BenDao {
         WHERE villageId = :selectedVillage
           AND isDeactivate = 0
           AND isDeath = 0
-          AND benId IN (
-            SELECT ts.benId FROM TB_SUSPECTED ts
-            WHERE ts.isChestXRayDone IS NOT NULL
+          AND (
+            benId IN (
+              SELECT ts.benId FROM TB_SUSPECTED ts
+              WHERE ts.isChestXRayDone IS NOT NULL
+            )
+            OR benId IN (
+              SELECT tbs.benId FROM TB_SCREENING tbs
+              WHERE tbs.referredForDigitalChestXray = 1
+            )
           )
     """)
     fun getDigitalChestXRayBenCount(selectedVillage: Int): Flow<Int>
@@ -705,10 +782,16 @@ interface BenDao {
         WHERE villageId = :selectedVillage
           AND isDeactivate = 0
           AND isDeath = 0
-          AND benId IN (
-            SELECT ts.benId FROM TB_SUSPECTED ts
-            WHERE ts.isNaatConducted IS NOT NULL
-               OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'
+          AND (
+            benId IN (
+              SELECT ts.benId FROM TB_SUSPECTED ts
+              WHERE ts.isNaatConducted IS NOT NULL
+                 OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'
+            )
+            OR benId IN (
+              SELECT tbs.benId FROM TB_SCREENING tbs
+              WHERE tbs.recommendedForTruenatTest = 1
+            )
           )
     """)
     fun getTrueNatBenCount(selectedVillage: Int): Flow<Int>
@@ -718,9 +801,15 @@ interface BenDao {
         WHERE villageId = :selectedVillage
           AND isDeactivate = 0
           AND isDeath = 0
-          AND benId IN (
-            SELECT ts.benId FROM TB_SUSPECTED ts
-            WHERE ts.isLiquidCultureConducted IS NOT NULL
+          AND (
+            benId IN (
+              SELECT ts.benId FROM TB_SUSPECTED ts
+              WHERE ts.isLiquidCultureConducted IS NOT NULL
+            )
+            OR benId IN (
+              SELECT tbs.benId FROM TB_SCREENING tbs
+              WHERE tbs.recommendedForLiquidCultureTest = 1
+            )
           )
     """)
     fun getLiquidCultureBenCount(selectedVillage: Int): Flow<Int>
@@ -849,7 +938,7 @@ interface BenDao {
     fun getScreeningList(villageId: Int): Flow<List<BenBasicCache>>
 
     @Transaction
-    @Query("select b.* from BEN_BASIC_CACHE b inner join tb_screening t on b.benId = t.benId LEFT JOIN TB_SUSPECTED ts ON b.benId = ts.benId where villageId = :villageId and isDeactivate=0 and tbsnFilled = 1 and (\n" +
+    @Query("select b.* from BEN_BASIC_CACHE b inner join tb_screening t on b.benId = t.benId LEFT JOIN TB_SUSPECTED ts ON b.benId = ts.benId LEFT JOIN TB_DIAGNOSTICS td ON b.benId = td.benId where villageId = :villageId and isDeactivate=0 and tbsnFilled = 1 and (\n" +
             "            t.bloodInSputum = 1\n" +
             "            OR t.coughMoreThan2Weeks = 1\n" +
             "            OR t.feverMoreThan2Weeks = 1\n" +
@@ -862,6 +951,7 @@ interface BenDao {
 //            "            OR CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) <= 5\n" +
             "            OR b.reproductiveStatusId = 1\n" +
             "            OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'\n" +
+            "            OR UPPER(IFNULL(td.chestXRayResult, '')) = 'POSITIVE'\n" +
             "        ) AND (\n" +
             "            ts.benId IS NULL\n" +
             "            OR ts.isConfirmed = 0\n" +

@@ -41,7 +41,8 @@ data class TBConfirmedTreatmentCache(
     var reasonForNotCompleting: String? = null,
     var syncState: SyncState = SyncState.UNSYNCED,
     var createdAt: Long = System.currentTimeMillis(),
-    var updatedAt: Long = System.currentTimeMillis()
+    var updatedAt: Long = System.currentTimeMillis(),
+    var serverUpdatedDate: Long? = null
 ) : FormDataModel {
 
     fun toDTO(): TBConfirmedTreatmentDTO {

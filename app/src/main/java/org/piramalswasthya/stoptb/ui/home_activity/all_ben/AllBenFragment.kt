@@ -9,6 +9,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -26,9 +27,13 @@ import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertFilterBinding
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchAndToggleRvButtonBinding
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
+import org.piramalswasthya.stoptb.helpers.isNurseRole
+import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.utils.callPhoneNumber
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -124,12 +129,22 @@ class AllBenFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-//        val isVolunteer = prefDao.getLoggedInUser()?.role
-//            .equals(RoleConstants.ROLE_VOLUNTEER, true)
-        val isVolunteer = true
+        val roleName = prefDao.getLoggedInUser()?.role
+        val isRegistrar = roleName.isRegistrationOfficerRole()
+        val isNurse = roleName.isNurseRole()
+        val isCounsellor = roleName.isCounsellingOfficerRole()
+        val isKnownRestrictedRole = isRegistrar || isNurse || isCounsellor
+        val allowLegacyAccess = !isKnownRestrictedRole
         val isReadOnlyReferralList = args.source in READ_ONLY_REFERRAL_SOURCES
         val showResultButton = args.source == 6 || args.source == 7 || args.source == 8
-        if (isVolunteer) {
+        val showAddBeneficiary = (isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
+        val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
+        val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
+        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess) && !isReadOnlyReferralList
+        val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
+        binding.llQuickRefresh.visibility = View.GONE
+
+        if (showAddBeneficiary) {
             if (isReadOnlyReferralList) {
                 binding.btnNextPage.visibility = View.GONE
             } else {
@@ -168,10 +183,8 @@ class AllBenFragment : Fragment() {
                 { item, hhId, benId, relToHeadId ->
                     if (isReadOnlyReferralList) return@BenClickListener
                     val now = System.currentTimeMillis()
-                    timber.log.Timber.d("BEN_CLICK: clicked benId=$benId, hhId=$hhId, time=$now")
-                    if (now - lastClickTime > 1000) {
+                    if (now - lastClickTime > 800) {
                         lastClickTime = now
-                        timber.log.Timber.d("BEN_CLICK: navigating to form for benId=$benId")
                         val navOptions = NavOptions.Builder()
                             .setEnterAnim(0)
                             .setExitAnim(0)
@@ -199,7 +212,7 @@ class AllBenFragment : Fragment() {
                     checkAndGenerateABHA(benId)
                 },
                 { item, benId, hhId, isViewMode, isIFA -> },
-                { },
+                { ben -> callPhoneNumber(ben.mobileNo) },
                 { },
                 { item, benId, hhId ->
                     if (isReadOnlyReferralList) return@BenClickListener
@@ -208,7 +221,8 @@ class AllBenFragment : Fragment() {
                         findNavController().navigate(
                             AllBenFragmentDirections.actionAllBenFragmentToVitalScreenFragment(
                                 benId = benId,
-                                benRegId = benRegId
+                                benRegId = benRegId,
+                                autoFlow = isNurse
                             )
                         )
                     }
@@ -221,17 +235,40 @@ class AllBenFragment : Fragment() {
                             viewOnly = true
                         )
                     )
+                },
+                { item, benId, hhId, viewOnly ->
+                    if (isReadOnlyReferralList) return@BenClickListener
+                    findNavController().navigate(
+                        R.id.GeneralOpdFormFragment,
+                        bundleOf(
+                            "benId" to benId,
+                            "viewOnly" to viewOnly,
+                            "autoFlow" to false,
+                            "generalOpdFlow" to !viewOnly
+                        )
+                    )
+                },
+                { item, benId, hhId, viewOnly ->
+                    if (!showAnthropometryButton) return@BenClickListener
+                    findNavController().navigate(
+                        R.id.anthropometryFragment,
+                        bundleOf(
+                            "benId" to benId,
+                            "autoFlow" to false
+                        )
+                    )
                 }
             ),
             showBeneficiaries = true,
             showRegistrationDate = true,
             showSyncIcon = true,
-            showAbha = !isReadOnlyReferralList,
-            showCall = !isReadOnlyReferralList,
+            showAbha = showAbhaButton,
+            showCall = showCallButton,
             pref = prefDao,
             context = requireActivity(),
-            showActionButtons = !isReadOnlyReferralList,
-            showResultButton = showResultButton
+            showActionButtons = showBenActionButtons,
+            showResultButton = showResultButton,
+            showAnthropometryButton = showAnthropometryButton
         )
 
         binding.rvAny.adapter = benAdapter
@@ -252,8 +289,7 @@ class AllBenFragment : Fragment() {
                 val isEmpty = loadStates.refresh is LoadState.NotLoading
                         && benAdapter.itemCount == 0
                 binding.flEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
-                // Volunteer ke liye button hamesha visible rahega except read-only referral lists
-                if (isVolunteer && !isReadOnlyReferralList) {
+                if (showAddBeneficiary) {
                     binding.btnNextPage.visibility = View.VISIBLE
                 }
             }
@@ -268,6 +304,24 @@ class AllBenFragment : Fragment() {
         lifecycleScope.launch {
             viewModel.vitalBenIds.collectLatest { benIds ->
                 benAdapter.submitBenIds(benIds)
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.tbScreeningBenIds.collectLatest { benIds ->
+                benAdapter.submitTbScreeningBenIds(benIds)
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.generalOpdBenIds.collectLatest { benIds ->
+                benAdapter.submitGeneralOpdBenIds(benIds)
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.anthropometryFilledBenIds.collectLatest { benIds ->
+                benAdapter.submitAnthropometryBenIds(benIds)
             }
         }
 
@@ -325,6 +379,15 @@ class AllBenFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
+        updateToolbarTitle()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateToolbarTitle()
+    }
+
+    private fun updateToolbarTitle() {
         activity?.let {
             val title = if (args.source == 1) {
                 getString(R.string.icon_title_abhas)

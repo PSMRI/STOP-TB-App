@@ -14,6 +14,10 @@
     <string name="service_type_dd_health_facility_text">Health Facility</string>
     <string name="service_type_dd_village_text">Village</string>
     <string name="btn_continue_text">Continue</string>
+    <string name="btn_submit_text">Submit</string>
+    <string name="missing_detail_title">Missing Detail</string>
+    <string name="missing_detail_message">At least one of the following is missing value:\n\n\tState\n\tDistrict\n\tBlock\n\tTU\n\tHealth Facility\n\tVillage</string>
+    <string name="understood">Understood</string>
     <string name="menu_home">Home</string>
     <string name="menu_supervisor">ASHA Supervisor</string>
     <string name="menu_home_home">Home</string>
@@ -82,6 +86,8 @@
     <string name="icon_title_ncd_non_eligible_list">NCD Non-Priority List</string>
     <string name="icon_title_ncd_priority_list">NCD Priority List</string>
     <string name="icon_title_ncd_tb_screening">TB Screening</string>
+    <string name="icon_title_ncd_tb">Tuberculosis</string>
+
     <string name="icon_title_ncd_tb_suspected">Suspected TB cases</string>
     <string name="icon_title_ncd_tb_confirmed">Confirmed TB cases</string>
     <string name="icon_title_hrp_pregnant">High Risk\n Pregnant Women</string>

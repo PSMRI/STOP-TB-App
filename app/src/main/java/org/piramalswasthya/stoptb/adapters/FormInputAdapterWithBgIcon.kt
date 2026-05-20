@@ -30,7 +30,9 @@ import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.view.children
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.RecyclerView.ViewHolder
+import org.piramalswasthya.stoptb.utils.scrollToFormValidationError
 import com.google.android.material.button.MaterialButton
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.databinding.LayoutMultiFileUploadBinding
@@ -90,8 +92,12 @@ class FormInputAdapterWithBgIcon (
             oldItem.id == newItem.id
 
         override fun areContentsTheSame(oldItem: FormElement, newItem: FormElement): Boolean {
-            Timber.d("${oldItem.id}   ${oldItem.errorText} ${newItem.errorText}")
-            return oldItem.errorText == newItem.errorText
+            Timber.d("${oldItem.id} error:${oldItem.errorText} value:${oldItem.value}")
+            return oldItem.errorText == newItem.errorText &&
+                    oldItem.value == newItem.value &&
+                    oldItem.isEnabled == newItem.isEnabled &&
+                    oldItem.required == newItem.required &&
+                    oldItem.title == newItem.title
         }
     }
 
@@ -106,8 +112,10 @@ class FormInputAdapterWithBgIcon (
         }
 
         fun bind(item: FormElement, isEnabled: Boolean, formValueListener: FormValueListener?) {
-            Timber.d("binding triggered!!! $isEnabled ${item.id}")
-            if (!isEnabled) {
+            val effectiveEnabled = isEnabled && item.isEnabled
+            Timber.d("binding triggered!!! $effectiveEnabled ${item.id}")
+            if (!effectiveEnabled) {
+                binding.et.isEnabled = false
                 binding.et.isClickable = false
                 binding.et.isFocusable = false
                 handleHintLength(item)
@@ -116,6 +124,7 @@ class FormInputAdapterWithBgIcon (
                 binding.executePendingBindings()
                 return
             } else {
+                binding.et.isEnabled = true
                 binding.et.isClickable = true
                 binding.et.isFocusable = true
             }
@@ -664,51 +673,51 @@ class FormInputAdapterWithBgIcon (
         private lateinit var countDownTimer : CountDownTimer
         private var countdownTimers : HashMap<Int, CountDownTimer> = HashMap()
 
-    class MultiFileUploadInputViewHolder private constructor(private val binding: LayoutMultiFileUploadBinding) :
-        ViewHolder(binding.root) {
-        companion object {
-            fun from(parent: ViewGroup): ViewHolder {
-                val layoutInflater = LayoutInflater.from(parent.context)
-                val binding = LayoutMultiFileUploadBinding.inflate(layoutInflater, parent, false)
-                return MultiFileUploadInputViewHolder(binding)
+        class MultiFileUploadInputViewHolder private constructor(private val binding: LayoutMultiFileUploadBinding) :
+            ViewHolder(binding.root) {
+            companion object {
+                fun from(parent: ViewGroup): ViewHolder {
+                    val layoutInflater = LayoutInflater.from(parent.context)
+                    val binding = LayoutMultiFileUploadBinding.inflate(layoutInflater, parent, false)
+                    return MultiFileUploadInputViewHolder(binding)
+                }
             }
-        }
-        var selectedFiles = mutableListOf<Uri>()
+            var selectedFiles = mutableListOf<Uri>()
 
-        private lateinit var fileAdapter: FileListAdapter
+            private lateinit var fileAdapter: FileListAdapter
 
-        fun bind(
-            item: FormElement,
-            clickListener: SelectUploadImageClickListener?,
-            documentOnClick: ViewDocumentOnClick?,
-            isEnabled: Boolean
-        ) {
-            /* binding.form = item
-             binding.tvTitle.text = item.title
-             binding.clickListener = clickListener
-             binding.documentclickListener = documentOnClick
-             binding.btnView.visibility = if (item.value != null) View.VISIBLE else View.GONE
+            fun bind(
+                item: FormElement,
+                clickListener: SelectUploadImageClickListener?,
+                documentOnClick: ViewDocumentOnClick?,
+                isEnabled: Boolean
+            ) {
+                /* binding.form = item
+                 binding.tvTitle.text = item.title
+                 binding.clickListener = clickListener
+                 binding.documentclickListener = documentOnClick
+                 binding.btnView.visibility = if (item.value != null) View.VISIBLE else View.GONE
 
-             if (isEnabled) {
-                 binding.addFile.isEnabled = true
-                 binding.addFile.alpha = 1f
-             } else {
-                 binding.addFile.isEnabled = false
-                 binding.addFile.alpha = 0.5f
-             }*/
+                 if (isEnabled) {
+                     binding.addFile.isEnabled = true
+                     binding.addFile.alpha = 1f
+                 } else {
+                     binding.addFile.isEnabled = false
+                     binding.addFile.alpha = 0.5f
+                 }*/
 
-            fileAdapter = FileListAdapter(selectedFiles)
-            binding.rvFiles.adapter = fileAdapter
+                fileAdapter = FileListAdapter(selectedFiles)
+                binding.rvFiles.adapter = fileAdapter
 
-            binding.btnSelectFiles.isEnabled = isEnabled
-            binding.btnSelectFiles.alpha = if (isEnabled) 1f else 0.5f
+                binding.btnSelectFiles.isEnabled = isEnabled
+                binding.btnSelectFiles.alpha = if (isEnabled) 1f else 0.5f
 
-            binding.btnSelectFiles.setOnClickListener {
-                clickListener?.onSelectImageClick(item)
+                binding.btnSelectFiles.setOnClickListener {
+                    clickListener?.onSelectImageClick(item)
+                }
             }
-        }
 
-    }
+        }
         private fun formatTimeInSeconds(millis: Long) : String {
             val seconds = millis / 1000
             return "${seconds} sec"
@@ -1202,30 +1211,35 @@ class FormInputAdapterWithBgIcon (
     /**
      * Validation Result : -1 -> all good
      * else index of element creating trouble
+     *
+     * Required empty fields are always re-evaluated first (see [FormInputAdapter.validateInput]).
      */
-    fun validateInput(resources: Resources): Int {
-        var retVal = -1
-        if (!isEnabled) return retVal
-        currentList.forEachIndexed { index, it ->
-            Timber.d("Error text for ${it.title} ${it.errorText}")
-            if (it.inputType != TEXT_VIEW && it.errorText != null) {
-                retVal = index
-                return@forEachIndexed
-            }
-        }
-        Timber.d("Validation : $retVal")
-        if (retVal != -1) return retVal
+    fun validateInput(resources: Resources, formRecyclerView: RecyclerView? = null): Int {
+        if (!isEnabled) return -1
+        var firstEmptyRequired = -1
         currentList.forEachIndexed { index, it ->
             if (it.inputType != TEXT_VIEW && it.required) {
                 if (it.value.isNullOrBlank()) {
-                    Timber.d("validateInput called for item $it, with index ${index}")
+                    Timber.d("validateInput called for item $it, with index $index")
                     it.errorText = resources.getString(R.string.form_input_empty_error)
                     notifyItemChanged(index)
-                    if (retVal == -1) retVal = index
+                    if (firstEmptyRequired == -1) firstEmptyRequired = index
                 }
             }
         }
-        return retVal
+        if (firstEmptyRequired != -1) {
+            formRecyclerView?.scrollToFormValidationError(firstEmptyRequired)
+            return firstEmptyRequired
+        }
+        currentList.forEachIndexed { index, it ->
+            if (it.inputType != TEXT_VIEW && it.errorText != null) {
+                Timber.d("validateInput existing error for ${it.title} at $index")
+                notifyItemChanged(index)
+                formRecyclerView?.scrollToFormValidationError(index)
+                return index
+            }
+        }
+        return -1
     }
 
 

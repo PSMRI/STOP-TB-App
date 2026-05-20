@@ -54,6 +54,18 @@
         <argument android:name="isAddSpouse" app:argType="integer" android:defaultValue="0" />
     </fragment>
 
+    <fragment
+        android:id="@+id/anthropometryFragment"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.anthropometry.AnthropometryFragment"
+        android:label="@string/anthropometry_screen"
+        tools:layout="@layout/fragment_anthropometry">
+        <argument android:name="benId" app:argType="long" />
+        <argument
+            android:name="autoFlow"
+            android:defaultValue="true"
+            app:argType="boolean" />
+    </fragment>
+
     <!-- TB -->
     <fragment
         android:id="@+id/tbFragment"
@@ -99,6 +111,25 @@
         <action
             android:id="@+id/action_TBScreeningFormFragment_to_ncdReferForm"
             app:destination="@id/NCDReferalForm" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/GeneralOpdFormFragment"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.general_opd.GeneralOpdFormFragment"
+        android:label="@string/general_opd">
+        <argument android:name="benId" app:argType="long" />
+        <argument
+            android:name="viewOnly"
+            android:defaultValue="false"
+            app:argType="boolean" />
+        <argument
+            android:name="autoFlow"
+            android:defaultValue="false"
+            app:argType="boolean" />
+        <argument
+            android:name="generalOpdFlow"
+            android:defaultValue="false"
+            app:argType="boolean" />
     </fragment>
 
     <fragment
@@ -274,6 +305,10 @@
             app:argType="boolean" />
         <argument
             android:name="autoFlow"
+            android:defaultValue="false"
+            app:argType="boolean" />
+        <argument
+            android:name="generalOpdFlow"
             android:defaultValue="false"
             app:argType="boolean" />
     </fragment>

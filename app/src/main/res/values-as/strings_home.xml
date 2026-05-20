@@ -69,6 +69,7 @@
     <string name="icon_title_ect">যোগ্য দম্পতী অনুসৰণ</string>
     <string name="icon_title_video_tutorial">ভিডিঅ\' পাঠ্যক্ৰম</string>
     <string name="icon_title_ncd_tb_screening">টিবি স্ক্ৰিনিং</string>
+    <string name="icon_title_ncd_tb">ক্ষয় ৰোগ</string>
     <string name="icon_title_ncd_tb_suspected">সন্দেহাজনক টিবি ৰোগীৰ ঘটনা</string>
     <string name="icon_title_hrp_pregnant">উচ্চ ঝুঁকিপূর্ণ গৰ্ভৱতী মহিলাসকল</string>
     <string name="icon_title_hrp_non_pregnant">উচ্চ ঝুঁকিপূর্ণঅগৰ্ভবতী মহিলা</string>
@@ -112,6 +113,10 @@
     <string name="service_type_dd_block_text">ব্লক</string>
     <string name="service_type_dd_village_text">গাঁও</string>
     <string name="btn_continue_text">আগবাঢ়ক</string>
+    <string name="btn_submit_text">জমা দিয়ক</string>
+    <string name="missing_detail_title">বিৱৰণ অনুপস্থিত</string>
+    <string name="missing_detail_message">তলত দিয়া তথ্যসমূহৰ ভিতৰত কমেও এটা মান অনুপস্থিত আছে:\n\n\tৰাজ্য\n\tজিলা\n\tব্লক\n\tটিইউ\n\tস্বাস্থ্য সুবিধা\n\tগাঁও</string>
+    <string name="understood">বুজিলোঁ</string>
     <string name="til_hint_selected_village">বাছনি কৰা গাঁও</string>
 <string name="icon_title_abortion">গৰ্ভপাত তালিকা</string>
     <string name="icon_title_pmsma">e-PMSMA তালিকা</string>
@@ -132,6 +137,7 @@
     <string name="label_female">মহিলা: %d</string>
     <string name="label_children">শিশু(&lt;15বছৰ): %d</string>
     <string name="label_others">অন্যান্য: %d</string>
+    <string name="label_senior_citizen">বয়স (>=৬০): %d</string>
     <string name="filter_time_period">সময়সীমা</string>
     <string name="filter_village">গাওঁ / বস্তি</string>
     <string name="filter_all_villages">সকলো গাওঁ</string>

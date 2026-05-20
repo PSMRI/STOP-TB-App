@@ -10,6 +10,14 @@
     <string name="text_assamese" translatable="false">অসমীয়া</string>
     <string name="til_username_hint_text">ব্যৱহাৰকাৰীৰ নাম</string>
     <string name="til_password_hint_text">পাছৱৰ্ড</string>
+    <string name="error_login_username_required">ব্যৱহাৰকাৰীৰ নাম প্ৰয়োজন</string>
+    <string name="error_login_password_required">পাছৱৰ্ড প্ৰয়োজন</string>
+    <string name="error_login_failed">লগইন বিফল। অনুগ্ৰহ কৰি পুনৰ চেষ্টা কৰক।</string>
+    <string name="error_login_unable_to_reach_server">চাৰ্ভাৰৰ সৈতে সংযোগ কৰিব পৰা নাই।</string>
+    <string name="error_login_server_refused">চাৰ্ভাৰে সংযোগ অগ্ৰাহ্য কৰিলে।</string>
+    <string name="error_login_generic">কিবা ভুল হ\'ল। অনুগ্ৰহ কৰি পিছত পুনৰ চেষ্টা কৰক।</string>
+    <string name="error_login_invalid_password">অবৈধ পাছৱৰ্ড</string>
+    <string name="error_login_role_not_allowed">লগইন বিফল: কেৱল পঞ্জীয়ন বিষয়া, নাৰ্ছ বা পৰামৰ্শ বিষয়াক অনুমতি দিয়া হয়।</string>
     <string name="cb_login_remember_me_text">মোক মনত পেলাওক</string>
     <string name="btn_login_forgot_password_text">পাচৱৰ্ড পাহৰিলে??</string>
     <string name="btn_login_text">লগইন কৰক</string>
@@ -17,6 +25,10 @@
     <string name="camp_hub_checking">কেম্প হাব পৰীক্ষা কৰি আছে...</string>
     <string name="camp_hub_connected">কেম্প হাব সংযুক্ত</string>
     <string name="camp_hub_not_connected">কেম্প হাব সংযুক্ত নহয়</string>
+    <string name="camp_disconnect_title">কেম্প হাব বিচ্ছিন্ন কৰিবনে?</string>
+    <string name="camp_disconnect_message">আপুনি কেম্প হাবৰ পৰা বিচ্ছিন্ন হৈ নৰ্মেল মোডত আগবাঢ়িব বিচাৰেনে?</string>
+    <string name="camp_disconnect_positive">বিচ্ছিন্ন কৰক</string>
+    <string name="camp_disconnect_negative">সংযুক্ত ৰাখক</string>
     <string name="camp_hub_retry">পুনৰ চেষ্টা কৰক</string>
     <string name="camp_hub_login_blocked">কেম্প হাব সংযুক্ত নহয়। অনুগ্ৰহ কৰি কেম্প ৱাই-ফাইৰ সৈতে সংযোগ কৰি পুনৰ চেষ্টা কৰক।</string>
     <string name="login_diff_user">আপুনি আগতে ব্যৱহাৰকাৰীৰ নাম: @username ৰ সৈতে @asha হিচাপে লগ ইন কৰিছে, আপুনি আন এজন ব্যৱহাৰকাৰীৰ সৈতে লগ ইন কৰিব বিচাৰেনে?</string>
@@ -26,8 +38,7 @@
     <string name="session_expired_message">আপোনাৰ চেচন সমাপ্ত হৈছে। অনুগ্ৰহ কৰি পুনৰ লগ ইন কৰক।</string>
     <string name="cd_assam_nhm_logo">অসম NHM ল\'গ\'</string>
     <string name="cd_piramal">পীৰামল ল\'গ\'</string>
-    <string name="pwr_by_text">দ্বাৰা পৰিচালিত\n <b>পীৰামল ফাউণ্ডেচন</b></string>
-
+    <string name="pwr_by_text" translatable="false">চালিত\n <b>ষ্টপ টিবি</b></string>
     <string name="camp_hub_url_hint">কেম্প হাব URL</string>
     <string name="camp_connect_title">কেম্প হাব সংযোগ কৰক</string>
     <string name="camp_connect_subtitle">কেম্প মোড সক্ৰিয় কৰাৰ আগতে লেপটপ হাবৰ সৈতে সংযোগ কৰক।</string>

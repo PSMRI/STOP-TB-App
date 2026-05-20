@@ -7,6 +7,7 @@ import android.view.MotionEvent
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import org.piramalswasthya.stoptb.R
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -17,12 +18,15 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.ActivityServiceTypeBinding
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
 import org.piramalswasthya.stoptb.helpers.TapjackingProtectionHelper
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import timber.log.Timber
 
 @AndroidEntryPoint
 class ServiceLocationActivity : AppCompatActivity() {
+
+    companion object {
+        const val EXTRA_FROM_HOME_SWITCH = "fromHomeSwitch"
+    }
 
     @EntryPoint
     @InstallIn(SingletonComponent::class)
@@ -38,11 +42,13 @@ class ServiceLocationActivity : AppCompatActivity() {
     private val onBackPressedCallback by lazy {
         object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                if (intent.getBooleanExtra(EXTRA_FROM_HOME_SWITCH, false)) {
+                    finish()
+                    return
+                }
                 if (viewModel.isLocationSet()) {
                     finish()
-                    val targetClass = if (intent.getBooleanExtra("fromVolunteer", false))
-                        VolunteerActivity::class.java else HomeActivity::class.java
-                    startActivity(Intent(this@ServiceLocationActivity, targetClass))
+                    startActivity(Intent(this@ServiceLocationActivity, VolunteerActivity::class.java))
                 } else
                     if (!exitAlert.isShowing)
                         exitAlert.show()
@@ -52,9 +58,9 @@ class ServiceLocationActivity : AppCompatActivity() {
     }
     private val incompleteLocationAlert by lazy {
         MaterialAlertDialogBuilder(this)
-            .setTitle("Missing Detail")
-            .setMessage("At least one of the following is missing value:\n \n\tState\n\tDistrict\n\tBlock\n\tTU\n\tHealth Facility\n\tVillage")
-            .setPositiveButton("Understood") { dialog, _ ->
+            .setTitle(getString(R.string.missing_detail_title))
+            .setMessage(getString(R.string.missing_detail_message))
+            .setPositiveButton(getString(R.string.understood)) { dialog, _ ->
                 dialog.dismiss()
             }
             .create()
@@ -112,9 +118,7 @@ class ServiceLocationActivity : AppCompatActivity() {
             if (dataValid()) {
                 viewModel.saveCurrentLocation()
                 finish()
-                val targetClass = if (intent.getBooleanExtra("fromVolunteer", false))
-                    VolunteerActivity::class.java else VolunteerActivity ::class.java
-                startActivity(Intent(this@ServiceLocationActivity, targetClass))
+                startActivity(Intent(this@ServiceLocationActivity, VolunteerActivity::class.java))
             } else
                 incompleteLocationAlert.show()
         }
@@ -154,13 +158,14 @@ class ServiceLocationActivity : AppCompatActivity() {
                             }
                         }
                         binding.actvVillageDropdown.apply {
-                            setText(viewModel.selectedVillageName)
                             if (viewModel.villageList.size == 1) {
                                 setText(viewModel.villageList.first())
                                 viewModel.setVillage(0)
+                            } else {
+                                setText(viewModel.selectedVillageName.orEmpty())
                             }
-                            setOnItemClickListener { _, _, i, _ ->
-                                viewModel.setVillage(i)
+                            setOnItemClickListener { _, _, position, _ ->
+                                viewModel.setVillage(position)
                             }
                         }
                     }

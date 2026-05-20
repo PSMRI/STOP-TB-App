@@ -31,6 +31,7 @@ import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.utils.Log
 import org.piramalswasthya.stoptb.utils.dynamicFiledValidator.FieldValidator
+import org.piramalswasthya.stoptb.utils.scrollToFormValidationError
 import kotlin.collections.map
 
 @AndroidEntryPoint
@@ -237,7 +238,7 @@ class NCDReferalFormFragment : Fragment() {
             .firstOrNull { it.visible && !it.errorMessage.isNullOrBlank() }
             ?.fieldId
         val errorIndex = copiedFields.indexOfFirst { it.fieldId == firstErrorFieldId }
-        if (errorIndex >= 0) binding.recyclerView.scrollToPosition(errorIndex)
+        if (errorIndex >= 0) binding.recyclerView.scrollToFormValidationError(errorIndex)
 
         val hasErrors = currentSchema.sections.any { section ->
             section.fields.any { it.visible && !it.errorMessage.isNullOrBlank() }

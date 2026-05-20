@@ -30,6 +30,7 @@ class BenListAdapter(
     private val isSoftDeleteEnabled: Boolean = false,
     private val showActionButtons: Boolean = false,
     private val showResultButton: Boolean = false,
+    private val showAnthropometryButton: Boolean = false,
 ) :
     ListAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenDiffUtilCallBack) {
 
@@ -66,9 +67,13 @@ class BenListAdapter(
             pref: PreferenceDao?,
             context: FragmentActivity,
             benIdList: List<Long>,
+            tbScreeningBenIds: List<Long> = emptyList(),
+            generalOpdBenIds: List<Long> = emptyList(),
+            anthropometryBenIds: List<Long> = emptyList(),
             childCountMap: Map<Long, Int> = emptyMap(),
             showActionButtons: Boolean = true,
-            showResultButton: Boolean = false
+            showResultButton: Boolean = false,
+            showAnthropometryButton: Boolean = false
         ) {
 
             binding.btnAbha.visibility = View.VISIBLE
@@ -85,14 +90,19 @@ class BenListAdapter(
             binding.hasAbha = !item.abhaId.isNullOrEmpty()
             binding.role = role
 
-            if (showCall) {
-                binding.ivCall.visibility = View.VISIBLE
+            binding.ivCall.visibility = if (showCall && item.hasCallableMobileNo) {
+                View.VISIBLE
             } else {
-                binding.ivCall.visibility = View.GONE
+                View.GONE
             }
 
             val isMatched = benIdList.contains(item.benId)
             binding.isMatched = isMatched
+            val hasTbScreening = tbScreeningBenIds.contains(item.benId)
+            val hasGeneralOpd = generalOpdBenIds.contains(item.benId)
+            val hasAnthropometry = anthropometryBenIds.contains(item.benId)
+            binding.isGeneralOpdDone = hasGeneralOpd
+            binding.isAnthropometryDone = hasAnthropometry
 
             binding.btnAbove30.text = if (isMatched) {
                 binding.root.context.getString(R.string.view_edit_eye_surgery)
@@ -108,6 +118,18 @@ class BenListAdapter(
                 showActionButtons && !item.isDeath && !item.isDeactivate -> View.VISIBLE
                 else -> View.GONE
             }
+            binding.btnGeneralOpd.visibility = when {
+                showResultButton -> View.GONE
+                showActionButtons && hasTbScreening && !item.isDeath && !item.isDeactivate -> View.VISIBLE
+                else -> View.GONE
+            }
+            binding.llGeneralOpdRow.visibility = binding.btnGeneralOpd.visibility
+            binding.llGeneralOpdAction.visibility = binding.btnGeneralOpd.visibility
+            binding.btnAnthropometry.visibility = when {
+                showAnthropometryButton && !item.isDeath && !item.isDeactivate -> View.VISIBLE
+                else -> View.GONE
+            }
+            binding.llAnthropometryAction.visibility = binding.btnAnthropometry.visibility
             if (binding.btnVitalScreen.visibility == View.VISIBLE) {
                 if (showResultButton) {
                     binding.btnVitalScreen.text = binding.root.context.getString(R.string.result)
@@ -133,6 +155,29 @@ class BenListAdapter(
                         ContextCompat.getColor(binding.root.context, android.R.color.white)
                     )
                 }
+            }
+            if (binding.btnGeneralOpd.visibility == View.VISIBLE) {
+                binding.btnGeneralOpd.text = binding.root.context.getString(R.string.general_opd)
+                binding.btnGeneralOpd.setBackgroundTintList(
+                    ContextCompat.getColorStateList(
+                        binding.root.context,
+                        if (hasGeneralOpd) android.R.color.holo_green_dark else android.R.color.holo_red_dark
+                    )
+                )
+                binding.btnGeneralOpd.setTextColor(
+                    ContextCompat.getColor(binding.root.context, android.R.color.white)
+                )
+            }
+            if (binding.btnAnthropometry.visibility == View.VISIBLE) {
+                binding.btnAnthropometry.setBackgroundTintList(
+                    ContextCompat.getColorStateList(
+                        binding.root.context,
+                        if (hasAnthropometry) android.R.color.holo_green_dark else android.R.color.holo_red_dark
+                    )
+                )
+                binding.btnAnthropometry.setTextColor(
+                    ContextCompat.getColor(binding.root.context, android.R.color.white)
+                )
             }
             binding.llBenDetails4.visibility = View.GONE
             binding.btnAddSpouse.visibility = View.GONE
@@ -234,8 +279,12 @@ class BenListAdapter(
             pref,
             context,
             benIds,
+            emptyList(),
+            emptyList(),
+            emptyList(),
             showActionButtons = showActionButtons,
-            showResultButton = showResultButton
+            showResultButton = showResultButton,
+            showAnthropometryButton = showAnthropometryButton
         )
     }
 
@@ -266,7 +315,9 @@ class BenListAdapter(
         private val callBen: (ben: BenBasicDomain) -> Unit,
         private val softDeleteBen: (ben: BenBasicDomain) -> Unit,
         private val clickedVitalScreen: (item: BenBasicDomain, benId: Long, hhId: Long) -> Unit = { _, _, _ -> },
-        private val clickedResult: (item: BenBasicDomain, benId: Long, hhId: Long) -> Unit = { _, _, _ -> }
+        private val clickedResult: (item: BenBasicDomain, benId: Long, hhId: Long) -> Unit = { _, _, _ -> },
+        private val clickedGeneralOpd: (item: BenBasicDomain, benId: Long, hhId: Long, viewOnly: Boolean) -> Unit = { _, _, _, _ -> },
+        private val clickedAnthropometry: (item: BenBasicDomain, benId: Long, hhId: Long, viewOnly: Boolean) -> Unit = { _, _, _, _ -> }
     ) {
         fun onClickedBen(item: BenBasicDomain) = clickedBen(
             item,
@@ -306,6 +357,10 @@ class BenListAdapter(
             clickedVitalScreen(item, item.benId, item.hhId)
         fun onClickResult(item: BenBasicDomain) =
             clickedResult(item, item.benId, item.hhId)
+        fun onClickGeneralOpd(item: BenBasicDomain, viewOnly: Boolean) =
+            clickedGeneralOpd(item, item.benId, item.hhId, viewOnly)
+        fun onClickAnthropometry(item: BenBasicDomain, viewOnly: Boolean) =
+            clickedAnthropometry(item, item.benId, item.hhId, viewOnly)
 
         fun onClickedForCall(item: BenBasicDomain) = callBen(item)
         fun onClickSoftDeleteBen(item: BenBasicDomain) = softDeleteBen(item)

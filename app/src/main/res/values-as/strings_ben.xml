@@ -7,11 +7,13 @@
     <string name="relation_with_family_head">পৰিৱাৰ প্ৰধানৰ সৈতে সম্পৰ্ক</string>
     <string name="other_enter_relation_to_head">অন্য - পৰিৱাৰ প্ৰধানলৈ সম্পৰ্ক লিখক</string>
     <string name="community">সমুদায়</string>
+    <string name="caste">জাতি</string>
     <string name="religion">ধৰ্ম</string>
     <string name="other_enter_religion">অন্য - ধৰ্ম লিখক</string>
     <string name="has_aadhaar_number">আধাৰ নম্বৰ আছে</string>
     <string name="enter_aadhaar_number_ben">আধাৰ নম্বৰ লিখক</string>
-    <string name="reproductive_status">আপুনি গৰ্ভৱতী নেকি</string>
+    <string name="reproductive_status">আপুনি গৰ্ভৱতী নেকি?</string>
+
     <string name="birth_certificate_number">Birth Certificate No.</string>
     <string name="beneficiary_details">সুবিধা প্ৰাপ্তবোৰ বিৱৰণ</string>
     <string name="wife_s_name">বাইৰ নাম</string>
@@ -22,6 +24,14 @@
     <string name="mother_s_name">মাতৃৰ নাম</string>
     <string name="mobile_number_of">ৰ মোবাইল নম্বৰ</string>
     <string name="other_mobile_number_of">অন্যান্য - মোবাইল নম্বৰ</string>
+    <string-array name="nbr_residential_area_array">
+        <item>জনজাতীয় NPVTG</item>
+        <item>জনজাতীয়-PVTG</item>
+        <item>গ্ৰাম্য</item>
+        <item>নগৰ</item>
+        <item>নগৰীয়া বস্তি</item>
+        <item>অজ্ঞাত</item>
+    </string-array>
     <string name="form_name">ফৰ্মৰ নাম</string>
     <string name="rch_id_ben">RCH ID</string>
     <string name="nbr_age">বয়স</string>
@@ -29,7 +39,7 @@
     <string name="nbr_gender">লিংগ</string>
     <string name="nbr_image">ফটো</string>
     <string name="nbr_image_sub">কেমেৰা ব্যৱহাৰ কৰিবলৈ টিপক</string>
-    <string name="do_you_like_to_take_photo">আপুনি ফটো তুলিব বিচাৰে নেকি</string>
+    <string name="do_you_like_to_take_photo">আপুনি ফটো তুলিব বিচাৰে নেকি?</string>
     <string name="human_face_not_detected">মানুহৰ মুখ চিনাক্ত হোৱা নাই। অনুগ্ৰহ কৰি ফটো পুনৰ তুলক।</string>
     <string name="unable_to_validate_photo">ফটো যাচাই কৰিব পৰা নহল। অনুগ্ৰহ কৰি পুনৰ চেষ্টা কৰক।</string>
     <string name="retake">পুনৰ লওক</string>
@@ -43,6 +53,7 @@
     <string name="gps_is_not_enabled_do_you_want_to_go_to_settings_menu">জিপিএস সক্ষম নেই। আপনি কি সেটিংস মেনুতে যেতে চান?</string>
     <string name="settings">সেটিংস</string>
     <string name="cancel">বাতিল</string>
+    <string name="anthropometry_screen">মানৱমিতি স্ক্ৰীণ</string>
     <string name="please_tick_the_checkbox">দয়া করে চেকবক্স টিক করুন</string>
     <string name="incomplete_form_found">অসম্পূর্ণ ফর্ম পাওয়া গেল</string>
     <string name="do_you_want_to_continue_with_previous_form_or_create_a_new_form_and_discard_the_previous_form">আপনি কি পূর্ববর্তী ফর্ম সঙ্গে চালিয়ে যেতে চান, অথবা পূর্ববর্তী ফর্ম ত্যাগ করে নতুন ফর্ম তৈরি করতে চান?</string>
@@ -55,8 +66,9 @@
     <string name="frag_new_ben_type_adult_text">সাধারণ নিবন্ধন\n( 15 বছর এবং তার উপর )</string>
     <string name="frag_new_ben_type_select_text">সুবিধানুগতের ধরন নির্বাচন করুন</string>
     <string name="frag_new_ben_reg_type_title">সুবিধাভোগী পঞ্জীয়ন</string>
-    <string name="consent_text">সন্মতি:\n
-    ভলান্টিয়াৰ মোক বুজাইছে, যিটো উদ্দেশ্যৰ বাবে মোৰ পৰা তথ্য আৰু জোখ-মাখৰ তথ্য সংগ্ৰহ কৰা হৈছে, মই বুজি পোৱা ভাষাত আৰু মই মোৰ ব্যক্তিগত স্বাস্থ্য প্ৰফাইলত তথ্য আৰু জোখ-মাখৰ তথ্য সংগ্ৰহ কৰিবলৈ মোৰ সন্মতি দিছো।</string>
+<!--    <string name="consent_text">সন্মতি:\n-->
+<!--    ভলান্টিয়াৰ মোক বুজাইছে, যিটো উদ্দেশ্যৰ বাবে মোৰ পৰা তথ্য আৰু জোখ-মাখৰ তথ্য সংগ্ৰহ কৰা হৈছে, মই বুজি পোৱা ভাষাত আৰু মই মোৰ ব্যক্তিগত স্বাস্থ্য প্ৰফাইলত তথ্য আৰু জোখ-মাখৰ তথ্য সংগ্ৰহ কৰিবলৈ মোৰ সন্মতি দিছো।</string>-->
+    <string name="consent_text">সম্মতি:\nমোৰ পৰা যি উদ্দেশ্যে তথ্য আৰু ফলাফল সংগ্ৰহ কৰা হৈছে, সেই বিষয়ে মোক মই বুজি পোৱা ভাষাত বুজাই দিয়া হৈছে আৰু মই মোৰ ব্যক্তিগত স্বাস্থ্য প্ৰফাইলত তথ্য আৰু ফলাফল সংগ্ৰহ কৰাৰ বাবে মোৰ সম্মতি দিছোঁ।</string>
     <string name="disagree">অসম্মত</string>
     <string name="agree">সম্মত</string>
     <string name="name_ben">নাম</string>
@@ -68,6 +80,7 @@
         <item name="nbr_gender_1">পুৰুষ</item>
         <item name="nbr_gender_2">মহিলা</item>
         <item name="nbr_gender_3">ট্ৰান্সজেন্ডাৰ</item>
+        <item name="nbr_gender_4">ক\'বলৈ ইচ্ছা নাই</item>
     </string-array>
 
     <string-array name="nbr_reproductive_status_array1">
@@ -101,12 +114,23 @@
         <item>নহয়</item>
     </string-array>
 
+    <string-array name="person_from_array">
+        <item>সাৰ্বজনীন খণ্ড</item>
+        <item>বেচৰকাৰী খণ্ড</item>
+    </string-array>
+
+
+
+
+    <string-array name="type_of_case_finding_array">
+        <item>নিষ্ক্ৰিয় (নিয়মীয়া কাৰ্যসূচী)</item>
+        <item>সক্ৰিয় (সক্ৰিয় ৰোগী সন্ধান)</item>
+    </string-array>
+
     <string-array name="nbr_marital_status_male_array">
         <item>অবিবাহিত</item>
         <item>বিবাহিত</item>
-        <item>তালাকপ্ৰাপ্ত</item>
-        <item>পৃথিবীৰ সালুৱা</item>
-        <item>বিধবা</item>
+        <item>অজ্ঞাত</item>
     </string-array>
 
     <string-array name="place_of_vhsnc">
@@ -119,9 +143,7 @@
     <string-array name="nbr_marital_status_female_array">
         <item>অবিবাহিত</item>
         <item>বিবাহিত</item>
-        <item>তালাকপ্ৰাপ্ত</item>
-        <item>পৃথিবীৰ সালুৱা</item>
-        <item>বিধবা</item>
+        <item>অজ্ঞাত</item>
     </string-array>
 
     <string-array name="nbr_mobile_no_relation_array">
@@ -206,12 +228,9 @@
     </string-array>
 
     <string-array name="community_array">
-        <item>সাধাৰণ</item>
-        <item>এছি</item>
-        <item>এসটি</item>
-        <item>অবিচ</item>
-        <item>ওচি</item>
-        <item>দিয়া হোৱা নাই</item>
+        <item>SC</item>
+        <item>ST</item>
+        <item>অন্যান্য</item>
     </string-array>
 
     <string-array name="death_place_array">
@@ -226,6 +245,30 @@
         <item>মৃত্যুৰ অন্যান্য স্থান</item>
     </string-array>
 
+    <string-array name="reason_of_death_array">
+        <item>স্বাভাৱিক মৃত্যু</item>
+        <item>দুৰ্ঘটনা</item>
+        <item>সংক্ৰামক ৰোগ</item>
+        <item>পশুৰ কামোৰত মৃত্যু</item>
+        <item>আত্মহত্যা</item>
+        <item>অনিশ্চিত</item>
+    </string-array>
+
+    <string-array name="reason_of_death_array_with_maternal">
+        <item>স্বাভাৱিক মৃত্যু</item>
+        <item>দুৰ্ঘটনা</item>
+        <item>সংক্ৰামক ৰোগ</item>
+        <item>পশুৰ কামোৰত মৃত্যু</item>
+        <item>আত্মহত্যা</item>
+        <item>অনিশ্চিত</item>
+        <item>মাতৃ মৃত্যু</item>
+    </string-array>
+
+    <string-array name="beneficiary_status">
+        <item>জীৱিত</item>
+        <item>মৃত্যু</item>
+    </string-array>
+
     <string-array name="religion_array">
         <item>হিন্দু</item>
         <item>মুছলিম</item>
@@ -236,6 +279,21 @@
         <item>পার্সী</item>
         <item>অন্যান্য</item>
         <item>প্ৰকাশন হোৱা নাই</item>
+    </string-array>
+
+    <string-array name="occupation_array">
+        <item>অজ্ঞাত</item>
+        <item>ছাত্ৰ / ছাত্ৰী</item>
+        <item>নিয়োজিত নহয়</item>
+        <item>গৃহিণী</item>
+        <item>কৃষক</item>
+        <item>শ্ৰমিক / দৈনিক মজুৰি কৰ্মী</item>
+        <item>স্বনিয়োজিত / ব্যৱসায়</item>
+        <item>চৰকাৰী কৰ্মচাৰী</item>
+        <item>বেচৰকাৰী কৰ্মচাৰী</item>
+        <item>স্বাস্থ্য কৰ্মী</item>
+        <item>অৱসৰপ্ৰাপ্ত / পেঞ্চনভোগী</item>
+        <item>অন্যান্য</item>
     </string-array>
 
     <string-array name="yes_no_donno">
@@ -346,4 +404,20 @@
     </string-array>
 
     <string name="whose_mobile_number">কাৰ মোবাইল নম্বৰ</string>
+
+
+    <string name="person_from">ব্যক্তি কৰ পৰা</string>
+    <string name="type_of_case_finding">কেছ সন্ধানৰ ধৰণ</string>
+    <string name="mobile_number_not_available">মোবাইল নম্বৰ উপলব্ধ নহয়</string>
+    <string name="ben_reg_address">ঠিকনা</string>
+    <string name="ben_reg_state">ৰাজ্য</string>
+    <string name="ben_reg_tu">টিইউ</string>
+    <string name="ben_reg_health_facility">স্বাস্থ্য সুবিধা</string>
+
+    <string-array name="mobile_not_available_array">
+        <item>উপলব্ধ নহয়</item>
+    </string-array>
+
+
+
 </resources>

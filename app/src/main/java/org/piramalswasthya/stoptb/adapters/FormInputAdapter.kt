@@ -4,6 +4,7 @@ import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Context.INPUT_METHOD_SERVICE
+import android.content.DialogInterface
 import android.content.res.ColorStateList
 import android.content.res.Resources
 import android.graphics.Color
@@ -28,11 +29,14 @@ import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.view.children
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.RecyclerView.ViewHolder
+import org.piramalswasthya.stoptb.utils.scrollToFormValidationError
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
@@ -77,9 +81,30 @@ import org.piramalswasthya.stoptb.utils.HelperUtil.getDobFromAge
 import org.piramalswasthya.stoptb.utils.HelperUtil.getLongFromDate
 import org.piramalswasthya.stoptb.utils.HelperUtil.updateAgeDTO
 import timber.log.Timber
+import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
+private fun parseFormDate(value: String?): Calendar? {
+    if (value.isNullOrBlank()) return null
+    val parsedDate = runCatching {
+        SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).apply { isLenient = false }
+            .parse(value.trim())
+    }.getOrNull() ?: return null
+    return Calendar.getInstance().apply { time = parsedDate }
+}
+
+private fun DatePickerDialog.showOnlyOkButton() {
+    setOnShowListener {
+        getButton(DialogInterface.BUTTON_POSITIVE)?.apply {
+            visibility = View.VISIBLE
+            setText(android.R.string.ok)
+            setTextColor(Color.rgb(0, 121, 107))
+        }
+        getButton(DialogInterface.BUTTON_NEGATIVE)?.visibility = View.GONE
+        getButton(DialogInterface.BUTTON_NEUTRAL)?.visibility = View.GONE
+    }
+}
 
 class FormInputAdapter(
     private val imageClickListener: ImageClickListener? = null,
@@ -100,10 +125,10 @@ class FormInputAdapter(
         override fun areContentsTheSame(oldItem: FormElement, newItem: FormElement): Boolean {
             Timber.d("${oldItem.id} error:${oldItem.errorText} value:${oldItem.value}")
             return oldItem.errorText == newItem.errorText &&
-                oldItem.value == newItem.value &&
-                oldItem.isEnabled == newItem.isEnabled &&
-                oldItem.required == newItem.required &&
-                oldItem.title == newItem.title
+                    oldItem.value == newItem.value &&
+                    oldItem.isEnabled == newItem.isEnabled &&
+                    oldItem.required == newItem.required &&
+                    oldItem.title == newItem.title
         }
     }
 
@@ -119,19 +144,27 @@ class FormInputAdapter(
         }
 
         fun bind(item: FormElement, isEnabled: Boolean, formValueListener: FormValueListener?) {
-            Timber.d("binding triggered!!! $isEnabled ${item.id}")
-            if (!isEnabled) {
+            val effectiveEnabled = isEnabled && item.isEnabled
+            Timber.d("binding triggered!!! $effectiveEnabled ${item.id}")
+            if (!effectiveEnabled) {
+                binding.et.isEnabled = false
                 binding.et.isClickable = false
                 binding.et.isFocusable = false
+                binding.et.isFocusableInTouchMode = false
+                binding.et.isCursorVisible = false
+                binding.tilEditText.endIconDrawable = null
+                binding.tilEditText.setEndIconOnClickListener(null)
                 handleHintLength(item)
                 binding.form = item
                 binding.et.setText(item.value)
                 binding.executePendingBindings()
                 return
             } else {
+                binding.et.isEnabled = true
                 binding.et.isClickable = true
                 binding.et.isFocusable = true
                 binding.et.isFocusableInTouchMode = true
+                binding.et.isCursorVisible = true
             }
             if (isOtpVerified && item.id == 44 && item.title.equals("Contact Number")) {
                 binding.et.isClickable = false
@@ -194,6 +227,12 @@ class FormInputAdapter(
 //                            item.errorText = null
 //                    }
                     item.value = editable?.toString()
+                    val emptyError = binding.root.context.getString(R.string.form_input_empty_error)
+                    if (!item.value.isNullOrBlank() && item.errorText == emptyError) {
+                        item.errorText = null
+                        binding.tilEditText.isErrorEnabled = false
+                        binding.tilEditText.error = null
+                    }
                     Timber.d("editable : $editable Current value : ${item.value}  isNull: ${item.value == null} isEmpty: ${item.value == ""}")
                     formValueListener?.onValueChanged(item, -1)
                     if (item.errorText != binding.tilEditText.error) {
@@ -596,6 +635,15 @@ class FormInputAdapter(
                 ?.toMutableSet()
                 ?: mutableSetOf()
 
+            if (item.showAsMultiSelectDialog) {
+                bindMultiSelectDialog(item, effectiveEnabled, selectedIndexes, formValueListener)
+                return
+            }
+
+            binding.tvTitle.visibility = View.VISIBLE
+            binding.llChecks.visibility = View.VISIBLE
+            binding.tilMultiSelect.visibility = View.GONE
+
             item.entries?.forEachIndexed { index, text ->
 
                 val cbx = CheckBox(binding.root.context)
@@ -617,7 +665,8 @@ class FormInputAdapter(
                     item.errorText = null
                     binding.clRi.setBackgroundResource(0)
 
-                    formValueListener?.onValueChanged(item, index)
+                    val callbackIndex = if (isChecked) index else -(index + 1)
+                    formValueListener?.onValueChanged(item, callbackIndex)
                 }
 
                 binding.llChecks.addView(cbx)
@@ -625,6 +674,60 @@ class FormInputAdapter(
 
             binding.executePendingBindings()
         }
+
+        private fun bindMultiSelectDialog(
+            item: FormElement,
+            effectiveEnabled: Boolean,
+            selectedIndexes: MutableSet<Int>,
+            formValueListener: FormValueListener?
+        ) {
+            binding.tvTitle.visibility = View.GONE
+            binding.llChecks.visibility = View.GONE
+            binding.tilMultiSelect.visibility = View.VISIBLE
+            binding.tilMultiSelect.hint = item.title
+            binding.tilMultiSelect.isEnabled = effectiveEnabled
+            binding.etMultiSelect.isEnabled = effectiveEnabled
+            binding.etMultiSelect.isClickable = effectiveEnabled
+            binding.etMultiSelect.isFocusable = false
+            binding.etMultiSelect.setText(selectedIndexes.toDisplayText(item))
+            binding.tilMultiSelect.error = item.errorText
+
+            val showDialog = View.OnClickListener {
+                if (!effectiveEnabled) return@OnClickListener
+                val labels = item.entries ?: emptyArray()
+                val checkedItems = BooleanArray(labels.size) { index -> selectedIndexes.contains(index) }
+
+                AlertDialog.Builder(binding.root.context)
+                    .setTitle(item.title)
+                    .setMultiChoiceItems(labels, checkedItems) { _, which, isChecked ->
+                        checkedItems[which] = isChecked
+                    }
+                    .setPositiveButton(android.R.string.ok) { _, _ ->
+                        selectedIndexes.clear()
+                        checkedItems.forEachIndexed { index, checked ->
+                            if (checked) selectedIndexes.add(index)
+                        }
+                        item.value =
+                            if (selectedIndexes.isEmpty()) null
+                            else selectedIndexes.sorted().joinToString("|")
+                        item.errorText = null
+                        binding.tilMultiSelect.error = null
+                        binding.clRi.setBackgroundResource(0)
+                        binding.etMultiSelect.setText(selectedIndexes.toDisplayText(item))
+                        formValueListener?.onValueChanged(item, -1)
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }
+            binding.etMultiSelect.setOnClickListener(showDialog)
+            binding.tilMultiSelect.setEndIconOnClickListener(showDialog)
+            binding.executePendingBindings()
+        }
+
+        private fun Set<Int>.toDisplayText(item: FormElement): String =
+            sorted()
+                .mapNotNull { index -> item.entries?.getOrNull(index) }
+                .joinToString(", ")
 
     }
 
@@ -719,13 +822,13 @@ class FormInputAdapter(
                 val originalLocale = Locale.getDefault()
                 HelperUtil.setEnLocaleForDatePicker(activity)
 
-                item.value?.let { value ->
-                    thisYear = value.substring(6).toInt()
-                    thisMonth = value.substring(3, 5).trim().toInt() - 1
-                    thisDay = value.substring(0, 2).trim().toInt()
+                parseFormDate(item.value)?.let { selectedDate ->
+                    thisYear = selectedDate.get(Calendar.YEAR)
+                    thisMonth = selectedDate.get(Calendar.MONTH)
+                    thisDay = selectedDate.get(Calendar.DAY_OF_MONTH)
                 }
                 val datePickerDialog = DatePickerDialog(
-                    it.context, { _, year, month, day ->
+                    it.context, R.style.AppSpinnerDatePickerDialog, { _, year, month, day ->
                         val millis = Calendar.getInstance().apply {
                             set(Calendar.YEAR, year)
                             set(Calendar.MONTH, month)
@@ -741,10 +844,25 @@ class FormInputAdapter(
                         if (item.hasDependants) formValueListener?.onValueChanged(item, -1)
                     }, thisYear, thisMonth, thisDay
                 )
+                runCatching {
+                    datePickerDialog.datePicker.calendarViewShown = false
+                    datePickerDialog.datePicker.spinnersShown = true
+                }
+                datePickerDialog.showOnlyOkButton()
                 item.errorText = null
                 binding.tilEditText.error = null
-                item.min?.let { datePickerDialog.datePicker.minDate = it }
-                item.max?.let { datePickerDialog.datePicker.maxDate = it }
+                val effectiveMin = item.min
+                val effectiveMax = item.max
+                when {
+                    effectiveMin != null && effectiveMax != null && effectiveMin > effectiveMax -> {
+                        datePickerDialog.datePicker.minDate = effectiveMax
+                        datePickerDialog.datePicker.maxDate = effectiveMax
+                    }
+                    else -> {
+                        effectiveMin?.let { datePickerDialog.datePicker.minDate = it }
+                        effectiveMax?.let { datePickerDialog.datePicker.maxDate = it }
+                    }
+                }
                 if (item.showYearFirstInDatePicker)
                     datePickerDialog.datePicker.touchables[0].performClick()
                 datePickerDialog.show()
@@ -922,13 +1040,13 @@ class FormInputAdapter(
                 val originalLocale = Locale.getDefault()
                 HelperUtil.setEnLocaleForDatePicker(activity)
 
-                item.value?.let { value ->
-                    thisYear = value.substring(6).toInt()
-                    thisMonth = value.substring(3, 5).trim().toInt() - 1
-                    thisDay = value.substring(0, 2).trim().toInt()
+                parseFormDate(item.value)?.let { selectedDate ->
+                    thisYear = selectedDate.get(Calendar.YEAR)
+                    thisMonth = selectedDate.get(Calendar.MONTH)
+                    thisDay = selectedDate.get(Calendar.DAY_OF_MONTH)
                 }
                 val datePickerDialog = DatePickerDialog(
-                    it.context, { _, year, month, day ->
+                    it.context, R.style.AppSpinnerDatePickerDialog, { _, year, month, day ->
                         val millisCal = Calendar.getInstance().apply {
                             set(Calendar.YEAR, year)
                             set(Calendar.MONTH, month)
@@ -948,6 +1066,11 @@ class FormInputAdapter(
                         if (item.hasDependants) formValueListener?.onValueChanged(item, -1)
                     }, thisYear, thisMonth, thisDay
                 )
+                runCatching {
+                    datePickerDialog.datePicker.calendarViewShown = false
+                    datePickerDialog.datePicker.spinnersShown = true
+                }
+                datePickerDialog.showOnlyOkButton()
                 item.errorText = null
                 binding.tilEditTextDate.error = null
                 val effectiveMin = item.min
@@ -1360,34 +1483,37 @@ class FormInputAdapter(
     /**
      * Validation Result : -1 -> all good
      * else index of element creating trouble
+     *
+     * Required empty fields are always re-evaluated first. Previously, returning early on any
+     * existing [FormElement.errorText] skipped this pass — e.g. after DOB click cleared its error,
+     * another field could still hold stale errorText and submit would never re-set the DOB error.
      */
-    fun validateInput(resources: Resources): Int {
-        var retVal = -1
-        if (!isEnabled) return retVal
-        currentList.forEachIndexed { index, it ->
-            Timber.d("Error text for ${it.title} ${it.errorText}")
-            if (it.inputType != TEXT_VIEW && it.errorText != null) {
-                retVal = index
-                return@forEachIndexed
-            }
-        }
-        Timber.d("Validation : $retVal")
-        if (retVal != -1) return retVal
+    fun validateInput(resources: Resources, formRecyclerView: RecyclerView? = null): Int {
+        if (!isEnabled) return -1
+        var firstEmptyRequired = -1
         currentList.forEachIndexed { index, it ->
             if (it.inputType != TEXT_VIEW && it.required) {
                 if (it.value.isNullOrBlank()) {
-                    Timber.d("validateInput called for item $it, with index ${index}")
+                    Timber.d("validateInput called for item $it, with index $index")
                     it.errorText = resources.getString(R.string.form_input_empty_error)
                     notifyItemChanged(index)
-                    if (retVal == -1) retVal = index
+                    if (firstEmptyRequired == -1) firstEmptyRequired = index
                 }
             }
-            /*            if(it.regex!=null){
-                            Timber.d("Regex not null")
-                            retVal= false
-                        }*/
         }
-        return retVal
+        if (firstEmptyRequired != -1) {
+            formRecyclerView?.scrollToFormValidationError(firstEmptyRequired)
+            return firstEmptyRequired
+        }
+        currentList.forEachIndexed { index, it ->
+            if (it.inputType != TEXT_VIEW && it.errorText != null) {
+                Timber.d("validateInput existing error for ${it.title} at $index")
+                notifyItemChanged(index)
+                formRecyclerView?.scrollToFormValidationError(index)
+                return index
+            }
+        }
+        return -1
     }
 
 

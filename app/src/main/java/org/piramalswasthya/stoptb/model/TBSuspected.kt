@@ -42,6 +42,7 @@ data class TBSuspectedCache(
     var aiCoughAssessmentResult: String? = null,
     var isNaatConducted: Boolean? = null,
     var naatResult: String? = null,
+    var recommendedForLiquidCultureTest: Boolean? = null,
     var isLiquidCultureConducted: Boolean? = null,
     var liquidCultureResult: String? = null,
     var referralFacility: String? = null,
@@ -54,6 +55,7 @@ data class TBSuspectedCache(
     var address: String? = null,
     var referred: Boolean? = null,
     var followUps: String? = null,
+    var serverUpdatedDate: Long? = null,
     var syncState: SyncState = SyncState.UNSYNCED,
 ) : FormDataModel {
     fun toDTO(): TBSuspectedDTO {
@@ -77,6 +79,7 @@ data class TBSuspectedCache(
             aiCoughAssessmentResult = aiCoughAssessmentResult,
             isNaatConducted = isNaatConducted,
             naatResult = naatResult,
+            recommendedForLiquidCultureTest = recommendedForLiquidCultureTest,
             isLiquidCultureConducted = isLiquidCultureConducted,
             liquidCultureResult = liquidCultureResult,
             referralFacility = referralFacility,

@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.ui.volunteer
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -14,6 +15,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.text.HtmlCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.MenuProvider
@@ -31,6 +33,7 @@ import org.piramalswasthya.stoptb.BuildConfig
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.ActivityVolunteerBinding
+import org.piramalswasthya.stoptb.helpers.AutoFlowBackNavigationHost
 import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
@@ -45,7 +48,9 @@ import java.util.Locale
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class VolunteerActivity : AppCompatActivity() {
+class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
+
+    private var autoFlowBackNavigationBlocked: Boolean = false
 
     @EntryPoint
     @InstallIn(SingletonComponent::class)
@@ -155,6 +160,7 @@ class VolunteerActivity : AppCompatActivity() {
         setUpActionBar()
         setUpNavHeader()
         setUpMenu()
+        askForPermissions()
         binding.tvCampHubOffline.setOnClickListener {
             openCampHubConnect()
         }
@@ -185,6 +191,23 @@ class VolunteerActivity : AppCompatActivity() {
             WorkerUtils.triggerAmritPullWorker(this)
         }
         WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
+    }
+
+    private fun askForPermissions() {
+        val permissions = arrayOf(
+            Manifest.permission.CALL_PHONE,
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            Manifest.permission.INTERNET,
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.CAMERA
+        )
+
+        ActivityCompat.requestPermissions(
+            this,
+            permissions,
+            1010
+        )
     }
 
     private fun setUpMenu() {
@@ -243,6 +266,13 @@ class VolunteerActivity : AppCompatActivity() {
         NavigationUI.setupWithNavController(binding.toolbar, navController, appBarConfiguration)
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration)
 
+
+        // Fix toolbar title appearing beside back button
+        navController.addOnDestinationChangedListener { _, _, _ ->
+            binding.toolbar.title = ""
+            supportActionBar?.setDisplayShowTitleEnabled(false)
+        }
+
         // ── Logout ──────────────────────────────────────────────────────
         binding.navView.menu.findItem(R.id.menu_logout)?.setOnMenuItemClickListener {
             logoutAlert.show()
@@ -263,7 +293,15 @@ class VolunteerActivity : AppCompatActivity() {
             true
         }
 
+        binding.navView.menu.findItem(R.id.menu_connect_camp_hub)?.setOnMenuItemClickListener {
+            binding.drawerLayout.close()
+            openCampHubConnect()
+            true
+        }
+
         // ── Create ABHA ID ───────────────────────────────────────────────
+        refreshCampHubDrawerItem()
+
         binding.navView.menu.findItem(R.id.abha_id_activity)?.setOnMenuItemClickListener {
             startActivity(Intent(this, AbhaIdActivity::class.java))
             binding.drawerLayout.close()
@@ -294,6 +332,7 @@ class VolunteerActivity : AppCompatActivity() {
         binding.toolbar.title = ""
         supportActionBar?.setDisplayShowTitleEnabled(false)
         binding.tvToolbar.text = title
+
     }
 
     fun addClickListenerToHomepageActionBarTitle() {
@@ -307,6 +346,8 @@ class VolunteerActivity : AppCompatActivity() {
 
     private fun finishAndStartServiceLocationActivity() {
         val serviceLocationActivity = Intent(this, ServiceLocationActivity::class.java)
+            .putExtra("fromVolunteer", true)
+            .putExtra(ServiceLocationActivity.EXTRA_FROM_HOME_SWITCH, true)
         finish()
         startActivity(serviceLocationActivity)
     }
@@ -315,16 +356,38 @@ class VolunteerActivity : AppCompatActivity() {
         if (!::appBarConfiguration.isInitialized) return
         NavigationUI.setupWithNavController(binding.toolbar, navController, appBarConfiguration)
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration)
+
+        // Fix toolbar title appearing beside back button
+        navController.addOnDestinationChangedListener { _, _, _ ->
+            binding.toolbar.title = ""
+            supportActionBar?.setDisplayShowTitleEnabled(false)
+        }
     }
 
-    fun setToolbarNavigationVisible(visible: Boolean) {
-        if (visible) {
-            restoreToolbarNavigation()
-        } else {
+    override fun setAutoFlowBackNavigationBlocked(blocked: Boolean) {
+        autoFlowBackNavigationBlocked = blocked
+        if (blocked) {
             binding.toolbar.navigationIcon = null
             binding.toolbar.setNavigationOnClickListener(null)
             supportActionBar?.setDisplayHomeAsUpEnabled(false)
+        } else if (::appBarConfiguration.isInitialized) {
+            restoreToolbarNavigation()
         }
+    }
+
+    fun setToolbarNavigationVisible(visible: Boolean) {
+        if (!visible || autoFlowBackNavigationBlocked) {
+            binding.toolbar.navigationIcon = null
+            binding.toolbar.setNavigationOnClickListener(null)
+            supportActionBar?.setDisplayHomeAsUpEnabled(false)
+        } else {
+            restoreToolbarNavigation()
+        }
+    }
+
+    override fun onSupportNavigateUp(): Boolean {
+        if (autoFlowBackNavigationBlocked) return false
+        return navController.navigateUp() || super.onSupportNavigateUp()
     }
 
     override fun onPause() {
@@ -336,12 +399,18 @@ class VolunteerActivity : AppCompatActivity() {
         super.onResume()
         window.decorView.alpha = 1f
         refreshCampHubOfflineBanner()
+        refreshCampHubDrawerItem()
         WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
     }
 
     private fun refreshCampHubOfflineBanner() {
         binding.tvCampHubOffline.visibility =
             if (pref.isCampModeEnabled() && !pref.isCampHubConnected()) View.VISIBLE else View.GONE
+    }
+
+    private fun refreshCampHubDrawerItem() {
+        binding.navView.menu.findItem(R.id.menu_connect_camp_hub)?.isVisible =
+            pref.isCampModeEnabled()
     }
 
     private fun openCampHubConnect() {

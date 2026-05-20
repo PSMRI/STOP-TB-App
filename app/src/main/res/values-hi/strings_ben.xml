@@ -7,11 +7,13 @@
     <string name="relation_with_family_head">परिवार के मुखिया के साथ संबंध</string>
     <string name="other_enter_relation_to_head">अन्य - संबंध दर्ज करें</string>
     <string name="community">समुदाय</string>
+    <string name="caste">जाति</string>
     <string name="religion">धर्म</string>
     <string name="other_enter_religion">अन्य - धर्म दर्ज करें</string>
     <string name="has_aadhaar_number">आधार नंबर है</string>
     <string name="enter_aadhaar_number_ben">आधार नंबर दर्ज करें</string>
-    <string name="reproductive_status">क्या आप गर्भवती हैं</string>
+    <string name="reproductive_status">क्या आप गर्भवती हैं?</string>
+
     <string name="birth_certificate_number">Birth Certificate No.</string>
     <string name="beneficiary_details">लाभार्थी विवरण</string>
     <string name="wife_s_name">पत्नी का नाम</string>
@@ -22,6 +24,14 @@
     <string name="mother_s_name">मां का नाम</string>
     <string name="mobile_number_of">किसका मोबाइल नंबर</string>
     <string name="other_mobile_number_of">अन्य - मोबाइल नंबर किसका</string>
+    <string-array name="nbr_residential_area_array">
+        <item>जनजातीय NPVTG</item>
+        <item>जनजातीय-PVTG</item>
+        <item>ग्रामीण</item>
+        <item>शहरी</item>
+        <item>शहरी स्लम</item>
+        <item>अज्ञात</item>
+    </string-array>
     <string name="form_name">फ़ॉर्म का नाम</string>
     <string name="rch_id_ben">RCH आईडी</string>
     <string name="nbr_age">आयु</string>
@@ -29,7 +39,7 @@
     <string name="nbr_gender">लिंग</string>
     <string name="nbr_image">फ़ोटो</string>
     <string name="nbr_image_sub">कैमरा का उपयोग करने के लिए टैप करें</string>
-    <string name="do_you_like_to_take_photo">क्या आप फोटो लेना चाहते हैं</string>
+    <string name="do_you_like_to_take_photo">क्या आप फोटो लेना चाहते हैं?</string>
     <string name="human_face_not_detected">मानव चेहरा नहीं मिला। कृपया फोटो फिर से लें।</string>
     <string name="unable_to_validate_photo">फोटो सत्यापित नहीं हो सका। कृपया फिर से प्रयास करें।</string>
     <string name="retake">फिर से लें</string>
@@ -41,6 +51,7 @@
     <string name="icon_title_abortion">गर्भपात सूची</string>
     <string name="icon_title_pmsma">ई-पीएमएसएमए सूची</string>
     <string name="mother_rch_id">मां की RCH आईडी</string>
+
     <string-array name="anc_paiucd_done_by">
         <item>डॉक्टर</item>
         <item>नर्स</item>
@@ -50,6 +61,8 @@
         <item name="nbr_gender_1">पुरुष</item>
         <item name="nbr_gender_2">महिला</item>
         <item name="nbr_gender_3">ट्रांसजेंडर</item>
+        <item name="nbr_gender_4">बताना पसंद नहीं है</item>
+
     </string-array>
 
     <string-array name="nbr_reproductive_status_array1">
@@ -83,6 +96,19 @@
         <item>नहीं</item>
     </string-array>
 
+
+    <string-array name="person_from_array">
+        <item>सार्वजनिक क्षेत्र</item>
+        <item>निजी क्षेत्र</item>
+    </string-array>
+
+
+    <string-array name="type_of_case_finding_array">
+        <item>निष्क्रिय (सामान्य कार्यक्रम)</item>
+        <item>सक्रिय (सक्रिय केस खोज)</item>
+    </string-array>
+
+
     <string name="dd_ec">लक्ष्य दम्पति</string>
     <string name="dd_pw">गर्भवती महिला</string>
     <string name="dd_pm">प्रसवोत्तर माता</string>
@@ -93,9 +119,7 @@
     <string-array name="nbr_marital_status_male_array">
         <item>अविवाहित</item>
         <item>विवाहित</item>
-        <item>तलाकशुदा</item>
-        <item>अलग</item>
-        <item>विधुर</item>
+        <item>अज्ञात</item>
     </string-array>
 
     <string-array name="place_of_vhsnc">
@@ -108,9 +132,7 @@
     <string-array name="nbr_marital_status_female_array">
         <item>अविवाहित</item>
         <item>विवाहित</item>
-        <item>तलाकशुदा</item>
-        <item>अलग</item>
-        <item>विधवा</item>
+        <item>अज्ञात</item>
     </string-array>
 
     <string-array name="nbr_mobile_no_relation_array">
@@ -194,12 +216,9 @@
     </string-array>
 
     <string-array name="community_array">
-        <item>सामान्य (GEN)</item>
-        <item>अनुसूचित जाति (SC)</item>
-        <item>अनुसूचित जनजाति (ST)</item>
-        <item>अन्य पिछड़ा वर्ग (OBC)</item>
-        <item>अन्य वर्ग (OC)</item>
-        <item>नहीं दिया गया (NA)</item>
+        <item>SC</item>
+        <item>ST</item>
+        <item>अन्य</item>
     </string-array>
 
     <string-array name="religion_array">
@@ -214,6 +233,22 @@
         <item>अप्रकटित</item>
     </string-array>
 
+
+    <string-array name="occupation_array">
+        <item>अज्ञात</item>
+        <item>विद्यार्थी</item>
+        <item>बेरोजगार</item>
+        <item>गृहिणी</item>
+        <item>किसान</item>
+        <item>मजदूर / दैनिक वेतन कर्मी</item>
+        <item>स्वरोजगार / व्यवसाय</item>
+        <item>सरकारी कर्मचारी</item>
+        <item>निजी कर्मचारी</item>
+        <item>स्वास्थ्य कर्मी</item>
+        <item>सेवानिवृत्त / पेंशनभोगी</item>
+        <item>अन्य</item>
+    </string-array>
+
     <string-array name="death_place_array">
         <item>घर</item>
         <item>उप-केंद्र</item>
@@ -224,6 +259,30 @@
         <item>निजी अस्पताल</item>
         <item>यात्रा के दौरान</item>
         <item>अन्य मृत्यु स्थान</item>
+    </string-array>
+
+    <string-array name="reason_of_death_array">
+        <item>प्राकृतिक मृत्यु</item>
+        <item>दुर्घटना</item>
+        <item>संक्रामक रोग</item>
+        <item>पशु काटने से मृत्यु</item>
+        <item>आत्महत्या</item>
+        <item>अनिश्चित</item>
+    </string-array>
+
+    <string-array name="reason_of_death_array_with_maternal">
+        <item>प्राकृतिक मृत्यु</item>
+        <item>दुर्घटना</item>
+        <item>संक्रामक रोग</item>
+        <item>पशु काटने से मृत्यु</item>
+        <item>आत्महत्या</item>
+        <item>अनिश्चित</item>
+        <item>मातृ मृत्यु</item>
+    </string-array>
+
+    <string-array name="beneficiary_status">
+        <item>जीवित</item>
+        <item>मृत्यु</item>
     </string-array>
 
     <string-array name="yes_no_donno">
@@ -247,6 +306,7 @@
     <string name="gps_is_not_enabled_do_you_want_to_go_to_settings_menu">जीपीएस सक्षम नहीं है। क्या आप सेटिंग मेनू पर जाना चाहते हैं?</string>
     <string name="settings">सेटिंग्स</string>
     <string name="cancel">रद्द करें</string>
+    <string name="anthropometry_screen">मानवमिति स्क्रीन</string>
     <string name="please_tick_the_checkbox">कृपया चेकबॉक्स पर टिक करें</string>
     <string name="incomplete_form_found">अधूरा फॉर्म मिला</string>
     <string name="do_you_want_to_continue_with_previous_form_or_create_a_new_form_and_discard_the_previous_form">क्या आप पिछला फॉर्म जारी रखना चाहते हैं या नया फॉर्म बनाकर पुराना हटा देना चाहते हैं?</string>
@@ -332,7 +392,8 @@
     <string name="frag_new_ben_type_adult_text">सामान्य पंजीकरण \n( 15 वर्ष और उससे अधिक )</string>
     <string name="frag_new_ben_type_select_text">लाभार्थी प्रकार चुनें</string>
     <string name="frag_new_ben_reg_type_title">लाभार्थी पंजीकरण</string>
-    <string name="consent_text">सहमति:\nमुझे वॉलंटियर द्वारा समझाया गया है कि मेरे से जो जानकारी और माप एकत्र की जा रही है उसका उद्देश्य क्या है, एक ऐसी भाषा में जो मैं समझती/समझता हूँ और मैं अपनी व्यक्तिगत स्वास्थ्य प्रोफाइल पर जानकारी और माप एकत्र करने के लिए अपनी सहमति देती/देता हूँ।</string>
+<!--    <string name="consent_text">सहमति:\nमुझे वॉलंटियर द्वारा समझाया गया है कि मेरे से जो जानकारी और माप एकत्र की जा रही है उसका उद्देश्य क्या है, एक ऐसी भाषा में जो मैं समझती/समझता हूँ और मैं अपनी व्यक्तिगत स्वास्थ्य प्रोफाइल पर जानकारी और माप एकत्र करने के लिए अपनी सहमति देती/देता हूँ।</string>-->
+    <string name="consent_text">सहमति:\nमुझे उस उद्देश्य के बारे में समझाया गया है जिसके लिए मुझसे जानकारी और निष्कर्ष एकत्र किए जा रहे हैं, ऐसी भाषा में जिसे मैं समझता/समझती हूँ, और मैं अपनी व्यक्तिगत स्वास्थ्य प्रोफ़ाइल पर जानकारी और निष्कर्ष एकत्र करने के लिए अपनी सहमति देता/देती हूँ।</string>
     <string name="other_place_of_death">मृत्यु का अन्य स्थान</string>
     <string name="deworming_done">कृमि मुक्ति चक्र पूरा हुआ?</string>
     <string name="deworming_date">कृमि मुक्ति की तारीख</string>
@@ -388,4 +449,18 @@
     </string-array>
 
     <string name="whose_mobile_number">किसका मोबाइल नंबर</string>
+
+    <string name="person_from">व्यक्ति कहाँ से है</string>
+    <string name="type_of_case_finding">मामला खोजने का प्रकार</string>
+    <string name="mobile_number_not_available">मोबाइल नंबर उपलब्ध नहीं है</string>
+    <string name="ben_reg_address">पता</string>
+    <string name="ben_reg_state">राज्य</string>
+    <string name="ben_reg_tu">टीयू</string>
+    <string name="ben_reg_health_facility">स्वास्थ्य सुविधा</string>
+
+    <string-array name="mobile_not_available_array">
+        <item>उपलब्ध नहीं है</item>
+    </string-array>
+
+
 </resources>

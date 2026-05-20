@@ -12,12 +12,20 @@ import androidx.navigation.fragment.findNavController
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentSchedulerBinding
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
+import org.piramalswasthya.stoptb.helpers.isNurseRole
+import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.ui.home_activity.home.SchedulerViewModel.State.LOADED
 import org.piramalswasthya.stoptb.ui.home_activity.home.SchedulerViewModel.State.LOADING
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class SchedulerFragment : Fragment() {
+
+    @Inject
+    lateinit var prefDao: PreferenceDao
 
     private var _binding: FragmentSchedulerBinding? = null
     private val binding: FragmentSchedulerBinding
@@ -37,6 +45,7 @@ class SchedulerFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         setupHeader()
+        applyRoleVisibility()
 
         viewModel.state.observe(viewLifecycleOwner) {
             when (it) {
@@ -107,6 +116,36 @@ class SchedulerFragment : Fragment() {
 
         binding.cvRch.setOnClickListener {
             findNavController().navigate(HomeFragmentDirections.actionNavHomeToAllBenFragment(2))
+        }
+    }
+
+    private fun applyRoleVisibility() {
+        val role = prefDao.getLoggedInUser()?.role
+        when {
+            role.isRegistrationOfficerRole() -> {
+                binding.cvAllBen.visibility = View.VISIBLE
+                binding.cvTb.visibility = View.GONE
+                binding.cvNcd.visibility = View.GONE
+                binding.cvReferrals.visibility = View.GONE
+                binding.cvAbha.visibility = View.GONE
+                binding.cvRch.visibility = View.GONE
+            }
+            role.isNurseRole() -> {
+                binding.cvAllBen.visibility = View.VISIBLE
+                binding.cvTb.visibility = View.VISIBLE
+                binding.cvNcd.visibility = View.GONE
+                binding.cvReferrals.visibility = View.VISIBLE
+                binding.cvAbha.visibility = View.GONE
+                binding.cvRch.visibility = View.GONE
+            }
+            role.isCounsellingOfficerRole() -> {
+                binding.cvAllBen.visibility = View.GONE
+                binding.cvTb.visibility = View.VISIBLE
+                binding.cvNcd.visibility = View.GONE
+                binding.cvReferrals.visibility = View.VISIBLE
+                binding.cvAbha.visibility = View.GONE
+                binding.cvRch.visibility = View.GONE
+            }
         }
     }
 

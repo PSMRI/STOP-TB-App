@@ -37,7 +37,13 @@ interface AmritApiService {
     suspend fun submitRmnchDataAmrit(@Body sendingRMNCHData: SendingRMNCHData): Response<ResponseBody>
 
     @POST("flw-api/beneficiary/getBeneficiaryData")
-    suspend fun getBeneficiaries(@Body userDetail: GetDataPaginatedRequest): Response<ResponseBody>
+    suspend fun getBeneficiaries(@Body userDetail: GetDataPaginatedRequests): Response<ResponseBody>
+
+//    @POST("flw-api/stoptb/nurse/worklist")
+//    suspend fun getNurseWorklist(@Body request: NurseWorklistRequest): Response<ResponseBody>
+//
+//    @POST("flw-api/stoptb/registrar/worklist")
+//    suspend fun getRegistrarWorklist(@Body request: NurseWorklistRequest): Response<ResponseBody>
 
     @POST("common-api/beneficiaryConsent/sendConsent")
     suspend fun sendOtp(@Body sendOtpRequest: sendOtpRequest): Response<ResponseBody>
@@ -63,17 +69,26 @@ interface AmritApiService {
     @POST("hwc-api/NCD/save/referDetails")
     suspend fun postRefer(@Body list: ReferralRequest): Response<ResponseBody>
 
-    @POST("flw-api/tb/screening/getAll")
-    suspend fun getTBScreeningData(@Body userDetail: GetDataPaginatedRequest): Response<ResponseBody>
+    @POST("flw-api/stoptb/nurse/tbScreening/getAll")
+    suspend fun getTBScreeningData(@Body request: StopTbVillageRequest): Response<ResponseBody>
 
     @POST("flw-api/tb/suspected/getAll")
     suspend fun getTBSuspectedData(@Body userDetail: GetDataPaginatedRequest): Response<ResponseBody>
 
+    @POST("flw-api/stoptb/nurse/diagnostics/getAll")
+    suspend fun getTBDiagnosticsData(@Body request: StopTbVillageRequest): Response<ResponseBody>
+
     @GET("flw-api/tb/confirmed/getAll")
     suspend fun getTBConfirmedData(): Response<ResponseBody>
 
-    @POST("flw-api/tb/screening/saveAll")
-    suspend fun saveTBScreeningData(@Body tbScreeningRequestDTO: TBScreeningRequestDTO): Response<ResponseBody>
+    @POST("flw-api/stoptb/nurse/tbScreening/save")
+    suspend fun saveTBScreeningData(@Body request: List<TBScreeningSaveRequest>): Response<ResponseBody>
+
+    @POST("flw-api/stoptb/nurse/generalOpd/getAll")
+    suspend fun getGeneralOpdData(@Body request: StopTbVillageRequest): Response<ResponseBody>
+
+    @POST("flw-api/stoptb/nurse/generalOpd/save")
+    suspend fun saveGeneralOpdData(@Body request: List<GeneralOpdSaveRequest>): Response<ResponseBody>
 
     @POST("flw-api/disease/kalaAzar/saveAll")
     suspend fun saveKalaAzarScreeningData(@Body kalaAzarScreenRequestDTO: KalaAzarScreeningRequestDTO): Response<ResponseBody>
@@ -105,8 +120,17 @@ interface AmritApiService {
     @POST("flw-api/tb/suspected/saveAll")
     suspend fun saveTBSuspectedData(@Body tbSuspectedRequestDTO: TBSuspectedRequestDTO): Response<ResponseBody>
 
+    @POST("flw-api/stoptb/nurse/diagnostics/save")
+    suspend fun saveTBDiagnosticsData(@Body request: List<TBDiagnosticsSaveRequest>): Response<ResponseBody>
+
     @POST("flw-api/tb/confirmed/save")
     suspend fun saveTBConfirmedData(@Body tbConfirmedRequestDTO: TBConfirmedRequestDTO): Response<ResponseBody>
+
+    @POST("flw-api/stoptb/nurse/generalExamination/save")
+    suspend fun saveGeneralExamination(@Body request: List<GeneralExaminationSaveRequest>): Response<ResponseBody>
+
+    @POST("flw-api/stoptb/nurse/generalExamination/getAll")
+    suspend fun getGeneralExaminations(@Body request: GeneralExaminationGetRequest): Response<ResponseBody>
 
     @POST("/hwc-api/sync/generalOPDNurseFormDataToServer")
     suspend fun saveVitalNurseData(@Body patientVisitInfo: VitalNurseDataRequest): Response<ResponseBody>

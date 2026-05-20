@@ -24,6 +24,8 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
+import org.piramalswasthya.stoptb.helpers.applyAutoFlowBackPolicyOnResume
+import org.piramalswasthya.stoptb.helpers.blockBackNavigationInAutoFlow
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import timber.log.Timber
@@ -62,6 +64,8 @@ class TBScreeningFormFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        blockBackNavigationInAutoFlow(viewModel.autoFlow)
+        binding.btnCancel.visibility = View.GONE
         viewModel.recordExists.observe(viewLifecycleOwner) { notIt ->
             notIt?.let { recordExists ->
                 val adapter = FormInputAdapter(
@@ -70,7 +74,7 @@ class TBScreeningFormFragment : Fragment() {
                     }, isEnabled = !(recordExists || viewModel.viewOnly)
                 )
                 binding.btnSubmit.isEnabled = !(recordExists || viewModel.viewOnly)
-                binding.btnSubmit.visibility = if (viewModel.viewOnly) View.GONE else View.VISIBLE
+                binding.btnSubmit.visibility = if (recordExists || viewModel.viewOnly) View.GONE else View.VISIBLE
                 binding.form.rvInputForm.adapter = adapter
                 lifecycleScope.launch {
                     viewModel.formList.collect {
@@ -132,10 +136,9 @@ class TBScreeningFormFragment : Fragment() {
         ).show()
         if (viewModel.autoFlow) {
             findNavController().navigate(
-                R.id.vitalScreenFragment,
+                R.id.GeneralOpdFormFragment,
                 bundleOf(
                     "benId" to viewModel.benId,
-                    "benRegId" to viewModel.benRegId,
                     "autoFlow" to true
                 )
             )
@@ -146,16 +149,10 @@ class TBScreeningFormFragment : Fragment() {
 
     private fun validateCurrentPage(): Boolean {
         val result = binding.form.rvInputForm.adapter?.let {
-            (it as FormInputAdapter).validateInput(resources)
-        }
+            (it as FormInputAdapter).validateInput(resources, binding.form.rvInputForm)
+        } ?: -1
         Timber.d("Validation : $result")
-        return if (result == -1) true
-        else {
-            if (result != null) {
-                binding.form.rvInputForm.scrollToPosition(result)
-            }
-            false
-        }
+        return result == -1
     }
 
     private fun captureGeolocation() {
@@ -191,24 +188,37 @@ class TBScreeningFormFragment : Fragment() {
         super.onStart()
         activity?.let {
             when (it) {
+//                is HomeActivity -> it.updateActionBar(
+//                    R.drawable.ic__ncd,
+//                    getString(R.string.tb_screening_form)
+//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+//                is VolunteerActivity -> it.updateActionBar(
+//                    R.drawable.ic__ncd,
+//                    getString(R.string.tb_screening_form)
+//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+
                 is HomeActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.tb_screening_form)
-                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+                )
                 is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.tb_screening_form)
-                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+                )
             }
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        applyAutoFlowBackPolicyOnResume(
+            isAutoFlow = viewModel.autoFlow,
+            allowBack = !viewModel.autoFlow
+        )
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
-        if (viewModel.autoFlow) {
-            (activity as? HomeActivity)?.setToolbarNavigationVisible(true)
-            (activity as? VolunteerActivity)?.setToolbarNavigationVisible(true)
-        }
         _binding = null
     }
 
