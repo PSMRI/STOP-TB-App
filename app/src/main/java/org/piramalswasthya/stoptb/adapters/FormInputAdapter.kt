@@ -18,7 +18,6 @@ import android.text.SpannableString
 import android.text.TextWatcher
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
-import android.util.Log
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.LayoutInflater
@@ -1521,9 +1520,7 @@ class FormInputAdapter(
         var firstEmptyRequired = -1
         currentList.forEachIndexed { index, it ->
             if (it.inputType != TEXT_VIEW && it.required) {
-                Log.i("FormInputadapter", "validateInput: On submit click ${it.value} ${it.inputType}")
                 if (it.value.isNullOrBlank()) {
-                    Log.i("FormInputadapter", "validateInput: On submit click1 ${it.value} ${it.inputType}")
                     Timber.d("validateInput called for item $it, with index $index")
                     it.errorText = resources.getString(R.string.form_input_empty_error)
                     notifyItemChanged(index)
