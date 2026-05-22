@@ -344,12 +344,19 @@ fun ImageView.setSyncStateForBen(syncState: SyncState?) {
 fun ImageView.setBenImage(uriString: String?) {
     if (uriString == null) setImageResource(R.drawable.ic_person)
     else {
-        Glide.with(this).load(Uri.parse(uriString))
-            .signature(ObjectKey(System.currentTimeMillis() / 1000))
+        val uri = Uri.parse(uriString)
+        val request = Glide.with(this).load(uri)
             .skipMemoryCache(true)
             .diskCacheStrategy(DiskCacheStrategy.NONE)
-            .placeholder(R.drawable.ic_person).circleCrop()
-            .into(this)
+            .placeholder(R.drawable.ic_person)
+            .circleCrop()
+        val signatureKey = if (uri.scheme == "file") {
+            uri.path?.let { path -> java.io.File(path).takeIf { it.exists() }?.lastModified() }
+                ?: uriString
+        } else {
+            uriString
+        }
+        request.signature(ObjectKey(signatureKey)).into(this)
     }
 }
 

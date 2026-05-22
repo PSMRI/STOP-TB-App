@@ -115,6 +115,55 @@ object ImageUtils {
 
     }
 
+    /**
+     * Copies camera/gallery images into permanent app storage ({filesDir}/{benId}.jpeg).
+     * Temporary content/cache URIs are always saved. Existing filesDir images are only kept
+     * when they are already the canonical file for this beneficiary (no re-copy).
+     */
+    suspend fun persistBenImagePathIfNeeded(
+        context: Context,
+        imagePath: String?,
+        benId: Long
+    ): String? {
+        if (imagePath.isNullOrBlank()) return null
+
+        val canonicalFile = File(context.filesDir, "${benId}.jpeg")
+        val uri = Uri.parse(imagePath)
+        when (uri.scheme?.lowercase()) {
+            "content" -> return saveBenImageFromCameraToStorage(context, imagePath, benId)
+
+            "file" -> {
+                val file = File(uri.path ?: return saveBenImageFromCameraToStorage(context, imagePath, benId))
+                return when {
+                    file.absolutePath.startsWith(context.cacheDir.absolutePath) ->
+                        saveBenImageFromCameraToStorage(context, imagePath, benId)
+
+                    file.absolutePath.startsWith(context.filesDir.absolutePath) &&
+                            file.canonicalPath == canonicalFile.canonicalPath && file.exists() ->
+                        imagePath
+
+                    else -> saveBenImageFromCameraToStorage(context, imagePath, benId)
+                }
+            }
+        }
+
+        val file = File(imagePath)
+        return when {
+            file.exists() &&
+                    file.absolutePath.startsWith(context.filesDir.absolutePath) &&
+                    file.canonicalPath == canonicalFile.canonicalPath ->
+                Uri.fromFile(file).toString()
+
+            file.exists() && file.absolutePath.startsWith(context.cacheDir.absolutePath) ->
+                saveBenImageFromCameraToStorage(context, Uri.fromFile(file).toString(), benId)
+
+            else -> {
+                Timber.w("ImageUtils: Unrecognized image path, attempting save: $imagePath")
+                saveBenImageFromCameraToStorage(context, imagePath, benId)
+            }
+        }
+    }
+
     fun renameImage(context: Context, oldBenId: Long, newBenId: Long): String? {
         val originalFile = File(context.filesDir, "${oldBenId}.jpeg")
         if (!originalFile.exists())

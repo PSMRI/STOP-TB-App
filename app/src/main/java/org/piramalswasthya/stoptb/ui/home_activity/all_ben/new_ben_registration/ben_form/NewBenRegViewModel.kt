@@ -221,10 +221,12 @@ class NewBenRegViewModel @Inject constructor(
                     }
 
                     benRepo.persistRecord(ben, updateIfExists = benIdFromArgs != 0L)
+                    dataset.clearPendingPhotoUri()
                     _state.postValue(State.SAVE_SUCCESS)
 
                 } catch (e: Exception) {
                     Timber.e("saving Ben data failed!! $e")
+                    dataset.clearPendingPhotoUri()
                     _state.postValue(State.SAVE_FAILED)
                 }
             }
@@ -246,6 +248,14 @@ class NewBenRegViewModel @Inject constructor(
     fun getBenGender()  = if (this::ben.isInitialized) ben.gender else null
     fun getBenName()    = if (this::ben.isInitialized) "${ben.firstName} ${ben.lastName ?: ""}" else ""
     fun isHoFMarried()  = false  // StopTB has no HoF concept
+
+    fun setPendingPhotoUri(uri: Uri) {
+        dataset.setPendingPhotoUri(uri)
+    }
+
+    fun clearPendingPhotoUri() {
+        dataset.clearPendingPhotoUri()
+    }
 
     fun setImageUriToFormElement(dpUri: Uri) {
         dataset.setImageUriToFormElement(lastImageFormId, dpUri)

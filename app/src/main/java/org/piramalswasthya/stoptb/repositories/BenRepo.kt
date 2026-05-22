@@ -226,43 +226,15 @@ class BenRepo @Inject constructor(
         withContext(Dispatchers.IO) {
 
             val originalImagePath = ben.userImage
-            val finalImagePath = originalImagePath?.let { imagePath ->
-                val uri = Uri.parse(imagePath)
-                val filePath = uri.path
-                    ?: throw IllegalStateException("Invalid image URI: $imagePath")
+            val finalImagePath = ImageUtils.persistBenImagePathIfNeeded(
+                context = context,
+                imagePath = originalImagePath,
+                benId = ben.beneficiaryId
+            )
 
-                val file = File(filePath)
-
-                when {
-                    file.absolutePath.startsWith(context.cacheDir.absolutePath) -> {
-                        val savedPath = ImageUtils.saveBenImageFromCameraToStorage(
-                            context = context,
-                            uriString = imagePath,
-                            benId = ben.beneficiaryId
-                        )
-
-                        if (savedPath.isNullOrBlank()) {
-                            Timber.e("Image compression/save failed for beneficiaryId=${ben.beneficiaryId}")
-
-                            // Cleanup orphaned cache file
-                            runCatching { file.delete() }
-                                .onFailure { Timber.w(it, "Failed to delete orphaned cache image") }
-
-                            throw IllegalStateException("Failed to save beneficiary image")
-                        }
-
-                        savedPath
-                    }
-
-                    file.absolutePath.startsWith(context.filesDir.absolutePath) -> {
-                        imagePath
-                    }
-
-                    else -> {
-                        Timber.w("Unknown image path source: $imagePath")
-                        imagePath
-                    }
-                }
+            if (!originalImagePath.isNullOrBlank() && finalImagePath.isNullOrBlank()) {
+                Timber.e("Image compression/save failed for beneficiaryId=${ben.beneficiaryId}")
+                throw IllegalStateException("Failed to save beneficiary image")
             }
             ben.userImage = finalImagePath
             if (updateIfExists && benDao.getBen(ben.beneficiaryId) != null) {
@@ -1981,7 +1953,14 @@ class BenRepo @Inject constructor(
 
                             result.add(
                                 serverBen.copy(
-                                    userImage = serverBen.userImage ?: existingBen.userImage,
+                                    userImage = when {
+                                        existingBen.processed == "U" ||
+                                                existingBen.syncState != SyncState.SYNCED ||
+                                                (existingBen.updatedDate ?: 0L) > (serverBen.updatedDate ?: 0L) ->
+                                            existingBen.userImage
+
+                                        else -> serverBen.userImage ?: existingBen.userImage
+                                    },
                                     healthIdDetails = serverBen.healthIdDetails ?: existingBen.healthIdDetails,
                                     height = serverBen.height ?: existingBen.height,
                                     weight = serverBen.weight ?: existingBen.weight,

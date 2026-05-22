@@ -1025,7 +1025,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             ben.otherPlaceOfDeath = otherPlaceOfDeath.value
 
             // Basic info
-            ben.userImage  = pic.value
+            ben.userImage  = getPhotoUriForPersist()
             ben.regDate    = getLongFromDate(dateOfReg.value!!)
             ben.firstName  = firstName.value
             ben.lastName   = lastName.value
@@ -1180,12 +1180,27 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     fun getIndexOfBirthCertificateFrontPath() = -1 // not used in StopTB
     fun getIndexOfBirthCertificateBackPath()  = -1 // not used in StopTB
 
+    /** Latest camera capture (content URI), used on save even if [pic] still holds the old file path. */
+    private var pendingPhotoUri: String? = null
+
+    fun setPendingPhotoUri(uri: Uri) {
+        pendingPhotoUri = uri.toString()
+    }
+
+    fun clearPendingPhotoUri() {
+        pendingPhotoUri = null
+    }
+
+    fun getPhotoUriForPersist(): String? = pendingPhotoUri ?: pic.value
+
     fun setImageUriToFormElement(lastImageFormId: Int, dpUri: Uri) {
-        pic.value = dpUri.toString()
+        val uriString = dpUri.toString()
+        pic.value = uriString
+        pendingPhotoUri = uriString
         pic.errorText = null
     }
 
-    fun hasBeneficiaryPhoto(): Boolean = !pic.value.isNullOrBlank()
+    fun hasBeneficiaryPhoto(): Boolean = !getPhotoUriForPersist().isNullOrBlank()
 
     private fun calculateMarriageDate(marriageAge: Int, dob: Long): Long {
         val calendar = Calendar.getInstance()
