@@ -18,6 +18,7 @@ import android.text.SpannableString
 import android.text.TextWatcher
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
+import android.util.Log
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.LayoutInflater
@@ -31,6 +32,7 @@ import android.widget.RadioGroup
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.content.res.AppCompatResources
+import androidx.core.content.ContextCompat
 import androidx.core.view.children
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -890,6 +892,15 @@ class FormInputAdapter(
         ) {
             binding.form = item
             binding.et.isEnabled = isEnabled
+
+            binding.et.apply {
+                isFocusable = false           // Cannot focus manually
+                isFocusableInTouchMode = false
+                isClickable = true            // Still clickable for TimePicker
+                isCursorVisible = false       // Hide cursor
+                showSoftInputOnFocus = false  // Prevent keyboard on API 21+
+                setTextIsSelectable(false)    // No selection
+            }
             binding.et.setOnClickListener {
                 val hour: Int
                 val minute: Int
@@ -902,13 +913,30 @@ class FormInputAdapter(
                     minute = item.value!!.substringAfter(":").toInt()
                     Timber.d("Time picker hour min : $hour $minute")
                 }
-                val mTimePicker = TimePickerDialog(it.context, { _, hourOfDay, minuteOfHour ->
-                    item.value = "$hourOfDay:$minuteOfHour"
-                    binding.invalidateAll()
 
-                }, hour, minute, false)
+
+                val mTimePicker = TimePickerDialog(
+                    it.context,
+                    //android.R.style.Theme_Holo_Light_Dialog_NoActionBar,
+                    R.style.AppTimePickerTheme,
+                    { _, hourOfDay, minuteOfHour ->
+                        val hh = if (hourOfDay < 10) "0$hourOfDay" else "$hourOfDay"
+                        val mm = if (minuteOfHour < 10) "0$minuteOfHour" else "$minuteOfHour"
+                        item.value = "$hh:$mm"
+                        binding.invalidateAll()
+                    },
+                    hour,
+                    minute,
+                    false
+                )
+
+
+
                 mTimePicker.setTitle("Select Time")
                 mTimePicker.show()
+                val color = ContextCompat.getColor(it.context, R.color.md_theme_dark_inversePrimary) // your theme color
+                mTimePicker.getButton(TimePickerDialog.BUTTON_POSITIVE)?.setTextColor(color)
+                mTimePicker.getButton(TimePickerDialog.BUTTON_NEGATIVE)?.setTextColor(color)
             }
             binding.executePendingBindings()
 
@@ -1493,7 +1521,9 @@ class FormInputAdapter(
         var firstEmptyRequired = -1
         currentList.forEachIndexed { index, it ->
             if (it.inputType != TEXT_VIEW && it.required) {
+                Log.i("FormInputadapter", "validateInput: On submit click ${it.value} ${it.inputType}")
                 if (it.value.isNullOrBlank()) {
+                    Log.i("FormInputadapter", "validateInput: On submit click1 ${it.value} ${it.inputType}")
                     Timber.d("validateInput called for item $it, with index $index")
                     it.errorText = resources.getString(R.string.form_input_empty_error)
                     notifyItemChanged(index)

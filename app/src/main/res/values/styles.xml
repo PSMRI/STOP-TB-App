@@ -39,6 +39,15 @@
         <item name="android:calendarViewShown">false</item>
     </style>
 
+
+    <style name="AppTimePickerTheme" parent="Theme.AppCompat.Light.Dialog">
+        <item name="android:timePickerStyle">@style/SpinnerTimePicker</item>
+    </style>
+
+    <style name="SpinnerTimePicker" parent="android:Widget.Material.TimePicker">
+        <item name="android:timePickerMode">spinner</item>
+    </style>
+
     <style name="cbac_rl_risk_assessment">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
