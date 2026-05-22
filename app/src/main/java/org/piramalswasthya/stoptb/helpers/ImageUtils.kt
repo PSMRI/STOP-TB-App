@@ -5,7 +5,10 @@ import android.net.Uri
 import android.util.Base64
 import androidx.core.text.isDigitsOnly
 import id.zelory.compressor.Compressor
+import id.zelory.compressor.constraint.Compression
 import id.zelory.compressor.constraint.quality
+import id.zelory.compressor.constraint.resolution
+import id.zelory.compressor.constraint.size
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -15,6 +18,38 @@ import java.io.FileOutputStream
 
 
 object ImageUtils {
+
+    /** Max stored/uploaded file size; keeps JSON body under typical nginx 1MB limits. */
+    private const val BEN_IMAGE_MAX_BYTES = 200_000L
+
+    private fun Compression.benImageConstraints() {
+        resolution(640, 640)
+        quality(60)
+        size(BEN_IMAGE_MAX_BYTES)
+    }
+
+    private suspend fun compressBenImageFile(context: Context, targetFile: File): File? {
+        if (!targetFile.exists() || targetFile.length() == 0L) return null
+        return try {
+            val compressedFile = Compressor.compress(context, targetFile) {
+                benImageConstraints()
+            }
+            if (compressedFile.exists() && compressedFile.length() > 0) {
+                compressedFile.copyTo(targetFile, overwrite = true)
+                if (compressedFile.absolutePath != targetFile.absolutePath) {
+                    compressedFile.delete()
+                }
+                targetFile
+            } else {
+                Timber.e("ImageUtils: Compression produced invalid file")
+                null
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "ImageUtils: Failed to compress beneficiary image")
+            null
+        }
+    }
+
     suspend fun saveBenImageFromCameraToStorage(
         context: Context,
         uriString: String,
@@ -40,16 +75,10 @@ object ImageUtils {
                     return@withContext null
                 }
                 Timber.d("Uncompressed image: ${targetFile.absolutePath}, size=${targetFile.length()}")
-                val compressedFile = Compressor.compress(context, targetFile) {
-                    quality(80)
-                }
-
-                if (compressedFile.exists() && compressedFile.length() > 0) {
-                    compressedFile.copyTo(targetFile, overwrite = true)
-                } else {
-                    Timber.e("ImageUtils: Compression produced invalid file")
+                if (compressBenImageFile(context, targetFile) == null) {
                     return@withContext null
                 }
+                Timber.d("Compressed image: ${targetFile.absolutePath}, size=${targetFile.length()}")
                 removeAllTemporaryBenImages(context)
                 Uri.fromFile(targetFile).toString()
 
@@ -92,10 +121,7 @@ object ImageUtils {
                     it.write(inputByteArray)
                     it.flush()
                 }
-                val compressedFile = Compressor.compress(context, targetFile) {
-                    quality(80)
-                }
-                compressedFile.renameTo(targetFile)
+                compressBenImageFile(context, targetFile)
                 Timber.d("Compressed target file :->$targetFile ${targetFile.length()}")
                 Uri.fromFile(targetFile).toString()
 
@@ -106,19 +132,20 @@ object ImageUtils {
         }
     }
 
-    fun getEncodedStringForBenImage(context: Context, beneficiaryId: Long): String? {
-        return File(context.filesDir, "${beneficiaryId}.jpeg").takeIf { it.exists() }?.run {
-            val inputStream = FileInputStream(this)
-            val byteArray = inputStream.readBytes()
-            Base64.encodeToString(byteArray, Base64.DEFAULT)
+    suspend fun getEncodedStringForBenImage(context: Context, beneficiaryId: Long): String? {
+        return withContext(Dispatchers.IO) {
+            val file = File(context.filesDir, "${beneficiaryId}.jpeg")
+            if (!file.exists()) return@withContext null
+            compressBenImageFile(context, file) ?: return@withContext null
+            val byteArray = FileInputStream(file).use { it.readBytes() }
+            Timber.d("ImageUtils: Uploading ben image benId=$beneficiaryId, bytes=${byteArray.size}")
+            Base64.encodeToString(byteArray, Base64.NO_WRAP)
         }
-
     }
 
     /**
-     * Copies camera/gallery images into permanent app storage ({filesDir}/{benId}.jpeg).
-     * Temporary content/cache URIs are always saved. Existing filesDir images are only kept
-     * when they are already the canonical file for this beneficiary (no re-copy).
+     * Copies camera/gallery images from temporary content/cache URIs into permanent app storage
+     * ({filesDir}/{benId}.jpeg). Already-persisted filesDir paths are returned unchanged.
      */
     suspend fun persistBenImagePathIfNeeded(
         context: Context,
@@ -127,20 +154,20 @@ object ImageUtils {
     ): String? {
         if (imagePath.isNullOrBlank()) return null
 
-        val canonicalFile = File(context.filesDir, "${benId}.jpeg")
         val uri = Uri.parse(imagePath)
         when (uri.scheme?.lowercase()) {
-            "content" -> return saveBenImageFromCameraToStorage(context, imagePath, benId)
+            "content" -> {
+                return saveBenImageFromCameraToStorage(context, imagePath, benId)
+            }
 
             "file" -> {
                 val file = File(uri.path ?: return saveBenImageFromCameraToStorage(context, imagePath, benId))
                 return when {
+                    file.absolutePath.startsWith(context.filesDir.absolutePath) && file.exists() ->
+                        imagePath
+
                     file.absolutePath.startsWith(context.cacheDir.absolutePath) ->
                         saveBenImageFromCameraToStorage(context, imagePath, benId)
-
-                    file.absolutePath.startsWith(context.filesDir.absolutePath) &&
-                            file.canonicalPath == canonicalFile.canonicalPath && file.exists() ->
-                        imagePath
 
                     else -> saveBenImageFromCameraToStorage(context, imagePath, benId)
                 }
@@ -149,9 +176,7 @@ object ImageUtils {
 
         val file = File(imagePath)
         return when {
-            file.exists() &&
-                    file.absolutePath.startsWith(context.filesDir.absolutePath) &&
-                    file.canonicalPath == canonicalFile.canonicalPath ->
+            file.exists() && file.absolutePath.startsWith(context.filesDir.absolutePath) ->
                 Uri.fromFile(file).toString()
 
             file.exists() && file.absolutePath.startsWith(context.cacheDir.absolutePath) ->

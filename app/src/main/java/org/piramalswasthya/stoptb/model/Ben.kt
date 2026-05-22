@@ -1379,7 +1379,7 @@ data class BenRegCache(
 
 )  : FormDataModel {
 
-    fun asNetworkPostModel(context: Context, user: User): BenPost {
+    suspend fun asNetworkPostModel(context: Context, user: User): BenPost {
         return BenPost(
             householdId = householdId.toString(),
             benRegId = benRegId,

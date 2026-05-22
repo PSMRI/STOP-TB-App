@@ -479,11 +479,10 @@ class BenRepo @Inject constructor(
         retryCount: Int = 3,
     ): Boolean {
         val user = preferenceDao.getLoggedInUser() ?: throw IllegalStateException("No user logged in!!")
-        val benNetworkPostList: List<BenPost> =
-            benNetworkPostSet.map {
-                it.asNetworkPostModel(context, user)
-            }
-
+        val benNetworkPostList = mutableListOf<BenPost>()
+        benNetworkPostSet.forEach {
+            benNetworkPostList.add(it.asNetworkPostModel(context, user))
+        }
 
         val rmnchData = SendingRMNCHData(
             listOf(householdNetworkPostSet),
@@ -538,11 +537,10 @@ class BenRepo @Inject constructor(
         retryCount: Int = 3,
     ): Boolean {
         val user = preferenceDao.getLoggedInUser() ?: throw IllegalStateException("No user logged in!!")
-        val benNetworkPostList: List<BenPost> =
-            benNetworkPostSet.map {
-                it.asNetworkPostModel(context, user)
-            }
-
+        val benNetworkPostList = mutableListOf<BenPost>()
+        benNetworkPostSet.forEach {
+            benNetworkPostList.add(it.asNetworkPostModel(context, user))
+        }
 
         val rmnchData = SendingRMNCHData(
             //   listOf(householdNetworkPostSet),
@@ -1953,14 +1951,7 @@ class BenRepo @Inject constructor(
 
                             result.add(
                                 serverBen.copy(
-                                    userImage = when {
-                                        existingBen.processed == "U" ||
-                                                existingBen.syncState != SyncState.SYNCED ||
-                                                (existingBen.updatedDate ?: 0L) > (serverBen.updatedDate ?: 0L) ->
-                                            existingBen.userImage
-
-                                        else -> serverBen.userImage ?: existingBen.userImage
-                                    },
+                                    userImage = serverBen.userImage ?: existingBen.userImage,
                                     healthIdDetails = serverBen.healthIdDetails ?: existingBen.healthIdDetails,
                                     height = serverBen.height ?: existingBen.height,
                                     weight = serverBen.weight ?: existingBen.weight,

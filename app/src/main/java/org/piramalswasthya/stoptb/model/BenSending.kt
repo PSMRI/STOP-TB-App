@@ -352,7 +352,7 @@ data class BenPhoneMaps(
 
 )
 
-fun BenRegCache.asNetworkSendingModel(
+suspend fun BenRegCache.asNetworkSendingModel(
     user: User,
     locationRecord: LocationRecord,
     context: Context

@@ -65,7 +65,6 @@ class NewBenRegFragment : Fragment() {
     ) { success ->
         if (success) {
             latestTmpUri?.let { uri ->
-                viewModel.setPendingPhotoUri(uri)
                 validateFaceAndAcceptPhoto(uri)
             }
         } else {
@@ -427,7 +426,6 @@ class NewBenRegFragment : Fragment() {
         val image = runCatching { InputImage.fromFilePath(requireContext(), uri) }
             .getOrElse {
                 Timber.e(it, "Unable to read captured beneficiary photo")
-                viewModel.clearPendingPhotoUri()
                 Toast.makeText(
                     requireContext(),
                     getString(R.string.unable_to_validate_photo),
@@ -453,7 +451,6 @@ class NewBenRegFragment : Fragment() {
                         showPreview()
                     }
                 } else {
-                    viewModel.clearPendingPhotoUri()
                     val shouldContinueAfterRetake = continuePreviewAfterPhoto
                     continuePreviewAfterPhoto = false
                     showFaceNotDetectedDialog(shouldContinueAfterRetake)
@@ -461,7 +458,6 @@ class NewBenRegFragment : Fragment() {
             }
             .addOnFailureListener {
                 Timber.e(it, "Beneficiary face detection failed")
-                viewModel.clearPendingPhotoUri()
                 Toast.makeText(
                     requireContext(),
                     getString(R.string.unable_to_validate_photo),
