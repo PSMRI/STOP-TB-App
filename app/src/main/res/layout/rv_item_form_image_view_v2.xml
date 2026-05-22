@@ -36,9 +36,10 @@
         <TextView
             android:id="@+id/tv_sub_title"
             required="@{form.value==null}"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:gravity="center"
+            android:maxLines="2"
             android:text="@{form.subtitle}"
             android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
             app:drawableStartCompat="@drawable/ic_menu_camera"
