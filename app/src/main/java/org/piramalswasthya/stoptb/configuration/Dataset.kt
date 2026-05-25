@@ -36,10 +36,19 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
      */
     protected var resources: Resources
     protected var englishResources: Resources
+    private val hindiResources: Resources
+    private val assameseResources: Resources
 
     init {
-        englishResources = getLocalizedResources(context, Languages.ENGLISH)
-        resources = getLocalizedResources(context, currentLanguage)
+        val appContext = context.applicationContext
+        englishResources = getLocalizedResources(appContext, Languages.ENGLISH)
+        hindiResources = getLocalizedResources(appContext, Languages.HINDI)
+        assameseResources = getLocalizedResources(appContext, Languages.ASSAMESE)
+        resources = getLocalizedResources(appContext, currentLanguage)
+    }
+
+    fun updateLanguageResources(context: Context, language: Languages) {
+        resources = getLocalizedResources(context.applicationContext, language)
     }
 
     /**
@@ -47,6 +56,16 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
      */
 
      companion object {
+        private val REPRODUCTIVE_YES_LITERALS = setOf("हाँ", "हां", "হয়")
+        private val REPRODUCTIVE_NO_LITERALS = setOf("नहीं", "নহয়")
+        private val REPRODUCTIVE_YES_ENGLISH = setOf(
+            "yes", "women pregnant", "pregnant woman",
+        )
+        private val REPRODUCTIVE_NO_ENGLISH = setOf(
+            "no", "women not pregnant", "not applicable", "eligible couple",
+            "postnatal mother", "permanently sterilised", "permanently sterilized",
+        )
+
         fun getLongFromDate(dateString: String?): Long {
             if (dateString.isNullOrEmpty()) return 0L
             val f = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
@@ -1126,23 +1145,44 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
     fun getLocalValueInArray(arrayId: Int, entry: String?): String? {
         if (entry.isNullOrEmpty()) return null
 
-        val englishArray = englishResources.getStringArray(arrayId)
         val localizedArray = resources.getStringArray(arrayId)
-
-        // Try English lookup first (value was stored in English)
-        val englishIndex = englishArray.indexOf(entry)
-        if (englishIndex in englishArray.indices) {
-            return localizedArray[englishIndex]
-        }
-
-        // Fallback: value was stored in localized language, find it directly
-        val localIndex = localizedArray.indexOf(entry)
-        if (localIndex in localizedArray.indices) {
-            return localizedArray[localIndex]
+        val index = findEntryIndexAcrossLanguages(arrayId, entry)
+        if (index in localizedArray.indices) {
+            return localizedArray[index]
         }
 
         Log.w("Dataset", "Entry '$entry' not found in array for ID $arrayId")
         return null
+    }
+
+    private fun findEntryIndexAcrossLanguages(arrayId: Int, entry: String): Int {
+        val trimmed = entry.trim()
+        for (langResources in listOf(englishResources, resources, hindiResources, assameseResources)) {
+            val index = langResources.getStringArray(arrayId).indexOf(trimmed)
+            if (index >= 0) return index
+        }
+        return resolveSemanticArrayIndex(arrayId, trimmed)
+    }
+
+    private fun resolveSemanticArrayIndex(arrayId: Int, entry: String): Int {
+        if (arrayId != R.array.nbr_reproductive_status_married_women_array) return -1
+        return when {
+            isReproductiveYesValue(entry) -> 0
+            isReproductiveNoValue(entry) -> 1
+            else -> -1
+        }
+    }
+
+    private fun isReproductiveYesValue(entry: String): Boolean {
+        if (entry in REPRODUCTIVE_YES_LITERALS) return true
+        val lower = entry.lowercase(Locale.ENGLISH)
+        return lower in REPRODUCTIVE_YES_ENGLISH
+    }
+
+    private fun isReproductiveNoValue(entry: String): Boolean {
+        if (entry in REPRODUCTIVE_NO_LITERALS) return true
+        val lower = entry.lowercase(Locale.ENGLISH)
+        return lower in REPRODUCTIVE_NO_ENGLISH
     }
 
 
@@ -1159,11 +1199,9 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
     fun getEnglishValueInArray(arrayId: Int, entry: String?): String? {
         if (entry.isNullOrEmpty()) return null
 
-        val localizedArray = resources.getStringArray(arrayId)
         val englishArray = englishResources.getStringArray(arrayId)
-        val index = localizedArray.indexOf(entry)
-
-        return if (index in localizedArray.indices) {
+        val index = findEntryIndexAcrossLanguages(arrayId, entry)
+        return if (index in englishArray.indices) {
             englishArray[index]
         } else {
             Log.w("Dataset", "Entry '$entry' not found in localized array for ID $arrayId")

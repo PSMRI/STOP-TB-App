@@ -81,10 +81,6 @@ class NewBenRegFragment : Fragment() {
     }
 
 
-    override fun onResume() {
-        super.onResume()
-    }
-
     // ─── onViewCreated ───────────────────────────────────────────────────
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -269,6 +265,12 @@ class NewBenRegFragment : Fragment() {
     }
 
     // ─── onStart ───────────────────────────────────────────────────────────
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshFormForCurrentLanguage()
+        binding.form.rvInputForm.adapter?.notifyDataSetChanged()
+    }
+
     override fun onStart() {
         super.onStart()
         activity?.let {

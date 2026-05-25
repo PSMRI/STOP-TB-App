@@ -504,6 +504,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         setDefaultOccupationIfNeeded()
         setDefaultEconomicStatusIfNeeded()
         setDefaultResidentialAreaIfNeeded()
+        syncReproductiveStatusToCurrentLanguage()
 
         ben?.takeIf { !it.isDraft }?.let { saved ->
             // Beneficiary Status (death)
@@ -729,14 +730,21 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     }
 
     private fun normalizeReproductiveStatusForDisplay(savedValue: String): String {
-        val yesValue = resources.getStringArray(R.array.nbr_reproductive_status_married_women_array)[0]
-        val noValue = resources.getStringArray(R.array.nbr_reproductive_status_married_women_array)[1]
-        return when (savedValue.trim().lowercase(Locale.ENGLISH)) {
-            "pregnant woman", "women pregnant", "yes" -> yesValue
-            "eligible couple", "postnatal mother", "permanently sterilised", "not applicable",
-            "women not pregnant", "no" -> noValue
-            else -> savedValue
+        return getLocalValueInArray(R.array.nbr_reproductive_status_married_women_array, savedValue)
+            ?: savedValue
+    }
+
+    private fun syncReproductiveStatusToCurrentLanguage() {
+        reproductiveStatus.entries =
+            resources.getStringArray(R.array.nbr_reproductive_status_married_women_array)
+        reproductiveStatus.value = reproductiveStatus.value?.let {
+            getLocalValueInArray(R.array.nbr_reproductive_status_married_women_array, it)
         }
+    }
+
+    /** Re-map array-backed values after UI language changes (e.g. हाँ → Yes). */
+    fun refreshLocalizedFieldValues() {
+        syncReproductiveStatusToCurrentLanguage()
     }
 
 
@@ -1152,22 +1160,21 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             ben.genDetails?.marriageDate = 0
             ben.genDetails?.ageAtMarriage = 0
 
-            // Reproductive Status
+            // Reproductive Status — persist English label + id from selection index
             ben.genDetails?.let { gen ->
-                val selectedValue = reproductiveStatus.value?.trim() ?: ""
-                val reproductiveMap = mapOf(
-                    "Yes" to 1,
-                    "No" to 2,
-                    "Women Pregnant" to 1,
-                    "Women Not Pregnant" to 2,
-                    "Pregnant Woman" to 1,
-                    "Eligible Couple" to 2,
-                    "Postnatal Mother" to 2,
-                    "Permanently Sterilised" to 2,
-                    "Not Applicable" to 2
-                )
-                gen.reproductiveStatusId = reproductiveMap[selectedValue] ?: 0
-                gen.reproductiveStatus   = selectedValue
+                val englishValue = getEnglishValueInArray(
+                    R.array.nbr_reproductive_status_married_women_array,
+                    reproductiveStatus.value
+                ) ?: reproductiveStatus.value?.trim().orEmpty()
+                gen.reproductiveStatus = englishValue
+                gen.reproductiveStatusId = when (reproductiveStatus.getPosition()) {
+                    1 -> 1
+                    2 -> 2
+                    else -> when (englishValue.lowercase(Locale.ENGLISH)) {
+                        "yes", "women pregnant", "pregnant woman" -> 1
+                        else -> if (englishValue.isBlank()) 0 else 2
+                    }
+                }
             }
 
             // No kid details in StopTB
@@ -1222,12 +1229,13 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
     private fun updateReproductiveOptionsBasedOnAgeGender(formId: Int): Int {
         reproductiveStatus.arrayId = R.array.nbr_reproductive_status_married_women_array
-        reproductiveStatus.entries =
-            resources.getStringArray(R.array.nbr_reproductive_status_married_women_array)
         if (!shouldShowReproductiveStatus()) {
             reproductiveStatus.value = null
-        } else if (reproductiveStatus.value.isNullOrBlank()) {
-            reproductiveStatus.value = reproductiveStatus.entries?.getOrNull(1)
+        } else {
+            syncReproductiveStatusToCurrentLanguage()
+            if (reproductiveStatus.value.isNullOrBlank()) {
+                reproductiveStatus.value = reproductiveStatus.entries?.getOrNull(1)
+            }
         }
         return 1
     }
