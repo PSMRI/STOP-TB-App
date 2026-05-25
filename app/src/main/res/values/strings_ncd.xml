@@ -213,7 +213,7 @@
         <item>CHC</item>
         <item>PHC</item>
         <item>SC</item>
-
+        <item>TU</item>
     </string-array>
     <string-array name="cbac_age">
         <item>0-29 years</item>

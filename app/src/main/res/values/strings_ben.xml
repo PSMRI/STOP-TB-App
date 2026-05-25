@@ -404,6 +404,7 @@ personal health profile.</string>
         <item>Animal Bite Death</item>
         <item>Suicide</item>
         <item>Undetermined</item>
+        <item>TB (Tuberculosis)</item>
     </string-array>
     <string-array name="reason_of_death_array_with_maternal">
         <item>Natural Death</item>
