@@ -121,8 +121,21 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         id = 2, inputType = DATE_PICKER,
         title = resources.getString(R.string.nbr_dor),
         arrayId = -1, required = true,
-        min = getMinDateOfReg(), max = System.currentTimeMillis()
+        min = getMinDateOfReg(), max = getMaxDateOfReg()
     )
+
+    private fun configureDateOfReg(isNewOrDraftRegistration: Boolean) {
+        if (!isNewOrDraftRegistration) {
+            dateOfReg.isEnabled = false
+            return
+        }
+        dateOfReg.isEnabled = true
+        dateOfReg.min = getMinDateOfReg()
+        dateOfReg.max = getMaxDateOfReg()
+        if (dateOfReg.value.isNullOrBlank()) {
+            dateOfReg.value = getCurrentDateString()
+        }
+    }
 
     // 3. Beneficiary Status (Alive/Death)
     private val beneficiaryStatus = FormElement(
@@ -463,7 +476,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
         this.familyHeadPhoneNo = familyHeadPhoneNo?.toString()
 
-        if (dateOfReg.value == null) dateOfReg.value = getCurrentDateString()
+        val isRegistrationComplete = ben?.let { !it.isDraft } == true
+        configureDateOfReg(isNewOrDraftRegistration = !isRegistrationComplete)
         if (personFrom.value.isNullOrBlank()) personFrom.value = personFrom.entries?.firstOrNull()
         if (typeOfCaseFinding.value.isNullOrBlank()) typeOfCaseFinding.value = typeOfCaseFinding.entries?.firstOrNull()
         contactNumber.value = familyHeadPhoneNo?.toString()
@@ -1175,6 +1189,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     fun enableEditMode() {
         if (fatherName.inputType == TEXT_VIEW) fatherName.inputType = EDIT_TEXT
         if (motherName.inputType == TEXT_VIEW) motherName.inputType = EDIT_TEXT
+        dateOfReg.isEnabled = false
     }
     fun getTempMobileNoStatus()    = getIndexOfElement(contactNumber) // no temp contact in StopTB
     fun getIndexOfBirthCertificateFrontPath() = -1 // not used in StopTB

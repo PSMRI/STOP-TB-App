@@ -114,14 +114,14 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
             }
         }
 
+        /** Earliest selectable registration date: one calendar month before today (start of day). */
         fun getMinDateOfReg(): Long {
             return Calendar.getInstance().apply {
-                set(Calendar.YEAR, 2020)
-                set(Calendar.MONTH, 0)
-                set(Calendar.DAY_OF_MONTH, 1)
-            }.timeInMillis
-
+                add(Calendar.MONTH, -1)
+            }.setToStartOfTheDay().timeInMillis
         }
+
+        fun getMaxDateOfReg(): Long = System.currentTimeMillis()
     }
 
 
