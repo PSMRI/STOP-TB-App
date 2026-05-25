@@ -35,6 +35,13 @@ class IconDataset @Inject constructor(
                 VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment()
             ),
             Icon(
+                R.drawable.ic__hh,
+                resources.getString(R.string.icon_title_household),
+                resources.getString(R.string.home_card_household_subtitle),
+                recordsRepo.hhListCount,
+                VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllHouseholdFragment()
+            ),
+            Icon(
                 R.drawable.ic__ncd,
                 resources.getString(R.string.tuberculosis),
                 resources.getString(R.string.home_card_tb_subtitle),
@@ -60,11 +67,13 @@ class IconDataset @Inject constructor(
         val role = preferenceDao.getLoggedInUser()?.role
         when {
             role.isRegistrationOfficerRole() -> iconList.removeAll {
-                it.title != resources.getString(R.string.icon_title_ben)
+                it.title != resources.getString(R.string.icon_title_ben) &&
+                        it.title != resources.getString(R.string.icon_title_household)
             }
             role.isCounsellingOfficerRole() -> iconList.removeAll {
                 it.title != resources.getString(R.string.icon_title_ncd_tb_screening) &&
-                        it.title != resources.getString(R.string.ncd_refer_list)
+                        it.title != resources.getString(R.string.ncd_refer_list) &&
+                        it.title != resources.getString(R.string.icon_title_household)
             }
         }
 

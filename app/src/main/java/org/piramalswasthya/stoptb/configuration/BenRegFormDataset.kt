@@ -487,6 +487,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         setDefaultEconomicStatusIfNeeded()
         setDefaultResidentialAreaIfNeeded()
 
+        ben?.takeIf { it.isDraft }?.let { prefill ->
+            applyDraftPrefill(prefill)
+        }
+
         ben?.takeIf { !it.isDraft }?.let { saved ->
             // Beneficiary Status (death)
             list.add(list.indexOf(lastName) + 1, beneficiaryStatus)
@@ -617,7 +621,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
         addReproductiveStatusIfApplicable(list)
 
-        currentLocation = preferenceDao.getLocationRecord()
+        currentLocation = ben?.locationRecord ?: preferenceDao.getLocationRecord()
 
         currentLocation?.let {
             state.entries = arrayOf(it.state.name)
@@ -633,6 +637,28 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
 
         setUpPage(list)
+    }
+
+    private fun applyDraftPrefill(prefill: BenRegCache) {
+        prefill.firstName?.takeIf { it.isNotBlank() }?.let { firstName.value = it }
+        prefill.lastName?.takeIf { it.isNotBlank() }?.let { lastName.value = it }
+        prefill.genderId.takeIf { it > 0 }?.let { gender.value = gender.getStringFromPosition(it) }
+        prefill.fatherName?.takeIf { it.isNotBlank() }?.let { fatherName.value = it }
+        prefill.motherName?.takeIf { it.isNotBlank() }?.let { motherName.value = it }
+        prefill.contactNumber?.let { contactNumber.value = it.toString() }
+        prefill.address?.takeIf { it.isNotBlank() }?.let { address.value = it }
+        prefill.economicStatusId?.takeIf { it > 0 }?.let {
+            economicStatus.value = economicStatus.getStringFromPosition(it)
+        }
+        prefill.residentialAreaId?.takeIf { it > 0 }?.let {
+            residentialAreaType.value = getSavedResidentialAreaValue(prefill)
+        }
+        prefill.communityId.takeIf { it > 0 }?.let {
+            community.value = getSavedCommunityValue(prefill)
+        }
+        prefill.religionId.takeIf { it > 0 }?.let {
+            religion.value = religion.getStringFromPosition(it)
+        }
     }
 
     // Keep setFirstPageToRead as alias for backward compat with ViewModel

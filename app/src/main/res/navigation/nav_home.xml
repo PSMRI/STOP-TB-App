@@ -14,6 +14,9 @@
             android:id="@+id/action_nav_home_to_allBenFragment"
             app:destination="@id/allBenFragment" />
         <action
+            android:id="@+id/action_homeFragment_to_allHouseholdFragment"
+            app:destination="@id/allHouseholdFragment" />
+        <action
             android:id="@+id/action_nav_home_to_abhaBenFragment"
             app:destination="@id/abhaBenFragment" />
         <action
@@ -61,6 +64,56 @@
             android:name="source"
             android:defaultValue="0"
             app:argType="integer" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/allHouseholdFragment"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.all_household.AllHouseholdFragment"
+        android:label="@string/icon_title_household"
+        tools:layout="@layout/fragment_display_search_rv_button">
+        <action
+            android:id="@+id/action_allHouseholdFragment_to_newHouseholdFragment"
+            app:destination="@id/newHouseholdFragment" />
+        <action
+            android:id="@+id/action_allHouseholdFragment_to_householdMembersFragment"
+            app:destination="@id/householdMembersFragment" />
+        <action
+            android:id="@+id/action_allHouseholdFragment_to_newBenRegFragment"
+            app:destination="@id/newBenRegFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/newHouseholdFragment"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.new_household_registration.NewHouseholdFragment"
+        android:label="@string/frag_nhhr_title"
+        tools:layout="@layout/fragment_new_form">
+        <argument
+            android:name="hhId"
+            android:defaultValue="0L"
+            app:argType="long" />
+        <argument
+            android:name="isAshaFamily"
+            android:defaultValue="No"
+            app:argType="string" />
+        <action
+            android:id="@+id/action_newHouseholdFragment_to_newBenRegFragment"
+            app:destination="@id/newBenRegFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/householdMembersFragment"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.household_members.HouseholdMembersFragment"
+        android:label="@string/household_members"
+        tools:layout="@layout/fragment_household_members">
+        <argument
+            android:name="hhId"
+            app:argType="long" />
+        <action
+            android:id="@+id/action_householdMembersFragment_to_newBenRegFragment"
+            app:destination="@id/newBenRegFragment" />
+        <action
+            android:id="@+id/action_householdMembersFragment_to_newChildAsBenRegistrationFragment"
+            app:destination="@id/newChildAsBenRegistrationFragment" />
     </fragment>
 
     <fragment

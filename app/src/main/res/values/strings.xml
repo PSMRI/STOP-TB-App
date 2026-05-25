@@ -311,6 +311,7 @@
     <string name="home_quick_actions">Quick Actions</string>
     <string name="home_health_id_section">Health IDs</string>
     <string name="home_card_all_ben_subtitle">View and manage all beneficiaries</string>
+    <string name="home_card_household_subtitle">Register and manage households</string>
     <string name="home_card_tb_subtitle">Track screening and support TB cases</string>
     <string name="home_card_ncd_subtitle">Manage non-communicable disease workflows</string>
     <string name="home_card_referral_subtitle">Follow up on referred cases</string>

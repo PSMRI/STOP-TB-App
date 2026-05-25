@@ -51,6 +51,7 @@ class NewBenRegViewModel @Inject constructor(
     val hhId          = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).hhId
     val relToHeadId   = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).relToHeadId
     val benIdFromArgs = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
+    private val genderFromArgs = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).gender
 
     // StopTB has no HoF / spouse / child concept — kept for nav-graph compat
     val isHoF = false
@@ -155,13 +156,12 @@ class NewBenRegViewModel @Inject constructor(
         } else {
             val villageNames = user.villages.map { it.name }.toTypedArray()
             // New registration
+            val prefillBen = getHouseholdPrefillBen()
+            val prefillLocation = prefillBen?.locationRecord ?: locationRecord
             dataset.setUpPage(
-                null,
+                prefillBen,
                 household.family?.familyHeadPhoneNo,
-
-
-
-                locationRecord.village.name,
+                prefillLocation.village.name,
                 villageNames,
                 user.villages,
                 user.subCentre
@@ -170,6 +170,53 @@ class NewBenRegViewModel @Inject constructor(
     }
 
     // ─── Save ────────────────────────────────────────────────────────────
+    private fun getHouseholdPrefillBen(): BenRegCache? {
+        if (hhId <= 0L || household.householdId <= 0L) return null
+
+        val family = household.family
+        val details = household.details
+        val address = listOfNotNull(
+            family?.houseNo,
+            family?.mohallaName,
+            family?.wardName,
+            details?.street,
+            details?.colony
+        ).mapNotNull { value ->
+            value.trim().takeIf { it.isNotEmpty() && !it.equals("null", ignoreCase = true) }
+        }.joinToString(", ")
+
+        return BenRegCache(
+            ashaId = user.userId,
+            beneficiaryId = 0L,
+            isDeath = false,
+            isDeathValue = "",
+            dateOfDeath = "",
+            timeOfDeath = "",
+            reasonOfDeath = "",
+            reasonOfDeathId = -1,
+            placeOfDeath = "",
+            placeOfDeathId = -1,
+            otherPlaceOfDeath = "",
+            householdId = hhId,
+            isAdult = false,
+            isKid = false,
+            isDraft = true,
+            kidDetails = null,
+            genDetails = BenRegGen(),
+            syncState = SyncState.UNSYNCED,
+            locationRecord = household.locationRecord,
+            firstName = family?.familyHeadName?.takeIf { relToHeadId == 18 },
+            lastName = family?.familyName,
+            genderId = genderFromArgs,
+            contactNumber = family?.familyHeadPhoneNo,
+            address = address.ifBlank { null },
+            economicStatus = family?.povertyLine,
+            economicStatusId = family?.povertyLineId,
+            residentialArea = details?.residentialArea,
+            residentialAreaId = details?.residentialAreaId,
+        )
+    }
+
     fun saveForm() {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
@@ -190,7 +237,7 @@ class NewBenRegViewModel @Inject constructor(
                             placeOfDeath   = "",
                             placeOfDeathId = -1,
                             otherPlaceOfDeath = "",
-                            householdId    = 0L,
+                            householdId    = if (hhId > 0L) hhId else 0L,
                             isAdult        = false,
                             isKid          = false,
                             isDraft        = true,
@@ -209,6 +256,8 @@ class NewBenRegViewModel @Inject constructor(
                     ben.longitude = capturedLongitude
 
                     ben.apply {
+                        if (hhId > 0L) householdId = hhId
+                        if (relToHeadId > 0) familyHeadRelationPosition = relToHeadId
                         serverUpdatedStatus = if (beneficiaryId < 0L) 1 else 2
                         processed           = if (beneficiaryId < 0L) "N" else "U"
                         syncState           = SyncState.UNSYNCED

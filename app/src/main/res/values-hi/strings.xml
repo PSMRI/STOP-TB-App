@@ -578,6 +578,7 @@
     <string name="home_greeting_subtitle">आपके रोज़ के कामों का त्वरित एक्सेस</string>
     <string name="home_quick_actions">त्वरित कार्य</string>
     <string name="home_card_all_ben_subtitle">सभी लाभार्थियों को देखें और प्रबंधित करें</string>
+    <string name="home_card_household_subtitle">परिवार पंजीकरण और प्रबंधन करें</string>
     <string name="home_card_tb_subtitle">टीबी स्क्रीनिंग और सहायता को ट्रैक करें</string>
     <string name="home_card_ncd_subtitle">एनसीडी कार्यप्रवाह प्रबंधित करें</string>
     <string name="home_card_referral_subtitle">रेफर किए गए मामलों पर फॉलो-अप करें</string>

@@ -436,6 +436,7 @@
     <string name="home_greeting_subtitle">আপোনাৰ দৈনন্দিন কামৰ দ্ৰুত এক্সেছ</string>
     <string name="home_quick_actions">দ্ৰুত কাৰ্য</string>
     <string name="home_card_all_ben_subtitle">সকলো হিতাধিকাৰী চাওক আৰু ব্যৱস্থাপনা কৰক</string>
+    <string name="home_card_household_subtitle">পৰিয়াল পঞ্জীয়ন আৰু পৰিচালনা কৰক</string>
     <string name="home_card_tb_subtitle">টিবি স্ক্ৰিনিং আৰু সহায় অনুসৰণ কৰক</string>
     <string name="home_card_ncd_subtitle">এনচিডি কার্যপ্রবাহ পৰিচালনা কৰক</string>
     <string name="home_card_referral_subtitle">ৰেফাৰ কৰা কেছসমূহৰ অনুসৰণ কৰক</string>
