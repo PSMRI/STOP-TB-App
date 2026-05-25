@@ -934,7 +934,7 @@ class FormInputAdapter(
 
 
 
-                mTimePicker.setTitle("Select Time")
+                mTimePicker.setTitle(it.context.getString(R.string.select_time))
                 mTimePicker.show()
                 val color = ContextCompat.getColor(it.context, R.color.md_theme_dark_inversePrimary) // your theme color
                 mTimePicker.getButton(TimePickerDialog.BUTTON_POSITIVE)?.setTextColor(color)
