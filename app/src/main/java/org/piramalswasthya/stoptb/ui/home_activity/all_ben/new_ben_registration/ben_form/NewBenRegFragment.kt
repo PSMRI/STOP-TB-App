@@ -409,7 +409,9 @@ class NewBenRegFragment : Fragment() {
                 9 -> notifyDataSetChanged()          // gender
                 115 -> notifyDataSetChanged()          // age/dob
                 12 -> notifyDataSetChanged()          // mobile relation
-                1052 -> notifyDataSetChanged()          // mobile not available
+                1052 -> {
+                    notifyItemChanged(viewModel.getIndexOfContactNumber())
+                }
             }
         }
     }

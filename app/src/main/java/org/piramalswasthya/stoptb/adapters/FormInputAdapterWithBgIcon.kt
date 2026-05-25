@@ -121,6 +121,8 @@ class FormInputAdapterWithBgIcon (
                 handleHintLength(item)
                 binding.form = item
                 binding.et.setText(item.value)
+                binding.tilEditText.isErrorEnabled = item.errorText != null
+                binding.tilEditText.error = item.errorText
                 binding.executePendingBindings()
                 return
             } else {
@@ -991,14 +993,29 @@ class FormInputAdapterWithBgIcon (
             val calDob = Calendar.getInstance()
             val ageUnitDTO = AgeUnitDTO(0, 0, 0)
             val isOk = true
-            item.value?.let {
-                calDob.timeInMillis = getLongFromDate(it)
-                updateAgeDTO(ageUnitDTO, calDob)
-                binding.etNum.setText(getAgeStrFromAgeUnit(ageUnitDTO))
-
+            if (item.value.isNullOrBlank()) {
+                binding.etNum.setText("")
+            } else {
+                item.value?.let {
+                    calDob.timeInMillis = getLongFromDate(it)
+                    updateAgeDTO(ageUnitDTO, calDob)
+                    binding.etNum.setText(getAgeStrFromAgeUnit(ageUnitDTO))
+                }
             }
 
             if (isEnabled) {
+                agePicker.onAgeConfirmed = { confirmed ->
+                    ageUnitDTO.years = confirmed.years
+                    ageUnitDTO.months = confirmed.months
+                    ageUnitDTO.days = confirmed.days
+                    binding.etNum.setText(getAgeStrFromAgeUnit(ageUnitDTO))
+                    calDob.timeInMillis = getDobFromAge(ageUnitDTO)
+                    binding.etDate.setText(getDateString(calDob.timeInMillis))
+                    item.value = getDateString(calDob.timeInMillis)
+                    item.errorText = null
+                    applyAgePickerFieldErrorWithBg(binding, null)
+                    if (item.hasDependants) formValueListener?.onValueChanged(item, -1)
+                }
                 binding.etNum.setOnClickListener {
                     val calNow = Calendar.getInstance()
                     val calMin = Calendar.getInstance()
@@ -1021,14 +1038,6 @@ class FormInputAdapterWithBgIcon (
                         isOk
                     )
                 }
-                agePicker.setOnDismissListener {
-                    binding.etNum.setText(getAgeStrFromAgeUnit(ageUnitDTO))
-                    calDob.timeInMillis =
-                        getDobFromAge(ageUnitDTO)
-                    binding.etDate.setText(getDateString(calDob.timeInMillis))
-                    item.value = getDateString(calDob.timeInMillis)
-                    if (item.hasDependants) formValueListener?.onValueChanged(item, -1)
-                }
             }
 
 
@@ -1045,8 +1054,7 @@ class FormInputAdapterWithBgIcon (
             var thisMonth = today.get(Calendar.MONTH)
             var thisDay = today.get(Calendar.DAY_OF_MONTH)
 
-            item.errorText?.also { binding.tilEditTextDate.error = it }
-                ?: run { binding.tilEditTextDate.error = null }
+            applyAgePickerFieldErrorWithBg(binding, item.errorText)
             binding.etDate.setOnClickListener {
                 val activity = binding.etDate.context.findFragmentActivity()
                     ?: return@setOnClickListener
@@ -1075,12 +1083,14 @@ class FormInputAdapterWithBgIcon (
 
                         updateAgeDTO(ageUnitDTO, millisCal)
                         binding.etNum.setText(getAgeStrFromAgeUnit(ageUnitDTO))
+                        item.errorText = null
+                        applyAgePickerFieldErrorWithBg(binding, null)
                         binding.invalidateAll()
                         if (item.hasDependants) formValueListener?.onValueChanged(item, -1)
                     }, thisYear, thisMonth, thisDay
                 )
                 item.errorText = null
-                binding.tilEditTextDate.error = null
+                applyAgePickerFieldErrorWithBg(binding, null)
                 item.min?.let { datePickerDialog.datePicker.minDate = it }
                 item.max?.let { datePickerDialog.datePicker.maxDate = it }
                 if (item.showYearFirstInDatePicker)
@@ -1092,6 +1102,20 @@ class FormInputAdapterWithBgIcon (
             }
             binding.executePendingBindings()
 
+        }
+
+        private fun applyAgePickerFieldErrorWithBg(
+            binding: RvItemFormAgePickerViewV2Binding,
+            error: String?,
+        ) {
+            binding.tilEditTextDate.apply {
+                isErrorEnabled = error != null
+                this.error = error
+            }
+            binding.tilEditTextNum.apply {
+                isErrorEnabled = error != null
+                this.error = error
+            }
         }
 
     }
@@ -1217,13 +1241,26 @@ class FormInputAdapterWithBgIcon (
     fun validateInput(resources: Resources, formRecyclerView: RecyclerView? = null): Int {
         if (!isEnabled) return -1
         var firstEmptyRequired = -1
+        val emptyError = resources.getString(R.string.form_input_empty_error)
         currentList.forEachIndexed { index, it ->
             if (it.inputType != TEXT_VIEW && it.required) {
-                if (it.value.isNullOrBlank()) {
-                    Timber.d("validateInput called for item $it, with index $index")
-                    it.errorText = resources.getString(R.string.form_input_empty_error)
-                    notifyItemChanged(index)
-                    if (firstEmptyRequired == -1) firstEmptyRequired = index
+                when {
+                    !it.isEnabled && !it.value.isNullOrBlank() -> {
+                        if (it.errorText != null) {
+                            it.errorText = null
+                            notifyItemChanged(index)
+                        }
+                    }
+                    it.value.isNullOrBlank() -> {
+                        Timber.d("validateInput called for item $it, with index $index")
+                        it.errorText = emptyError
+                        notifyItemChanged(index)
+                        if (firstEmptyRequired == -1) firstEmptyRequired = index
+                    }
+                    it.errorText == emptyError -> {
+                        it.errorText = null
+                        notifyItemChanged(index)
+                    }
                 }
             }
         }

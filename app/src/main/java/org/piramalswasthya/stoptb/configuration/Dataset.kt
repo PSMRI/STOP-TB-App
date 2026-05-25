@@ -114,14 +114,14 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
             }
         }
 
+        /** Earliest selectable registration date: one calendar month before today (start of day). */
         fun getMinDateOfReg(): Long {
             return Calendar.getInstance().apply {
-                set(Calendar.YEAR, 2020)
-                set(Calendar.MONTH, 0)
-                set(Calendar.DAY_OF_MONTH, 1)
-            }.timeInMillis
-
+                add(Calendar.MONTH, -1)
+            }.setToStartOfTheDay().timeInMillis
         }
+
+        fun getMaxDateOfReg(): Long = System.currentTimeMillis()
     }
 
 
@@ -963,8 +963,8 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 
     protected fun validateMobileNumberOnEditText(formElement: FormElement): Int {
         formElement.errorText = formElement.value?.takeIf { it.isNotEmpty() }?.toLongOrNull()?.let {
-            if (it < 6_000_000_000L || it == 6666666666L || it == 7777777777L || it == 8888888888L
-
+            if (it == 9_999_999_999L) null
+            else if (it < 6_000_000_000L || it == 6666666666L || it == 7777777777L || it == 8888888888L
             ) resources.getString(R.string.form_input_error_invalid_mobile) else null
         }
         return -1
