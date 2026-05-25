@@ -963,8 +963,8 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 
     protected fun validateMobileNumberOnEditText(formElement: FormElement): Int {
         formElement.errorText = formElement.value?.takeIf { it.isNotEmpty() }?.toLongOrNull()?.let {
-            if (it < 6_000_000_000L || it == 6666666666L || it == 7777777777L || it == 8888888888L
-
+            if (it == 9_999_999_999L) null
+            else if (it < 6_000_000_000L || it == 6666666666L || it == 7777777777L || it == 8888888888L
             ) resources.getString(R.string.form_input_error_invalid_mobile) else null
         }
         return -1

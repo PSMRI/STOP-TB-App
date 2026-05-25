@@ -159,6 +159,8 @@ class FormInputAdapter(
                 handleHintLength(item)
                 binding.form = item
                 binding.et.setText(item.value)
+                binding.tilEditText.isErrorEnabled = item.errorText != null
+                binding.tilEditText.error = item.errorText
                 binding.executePendingBindings()
                 return
             } else {
@@ -1537,15 +1539,26 @@ class FormInputAdapter(
     fun validateInput(resources: Resources, formRecyclerView: RecyclerView? = null): Int {
         if (!isEnabled) return -1
         var firstEmptyRequired = -1
+        val emptyError = resources.getString(R.string.form_input_empty_error)
         currentList.forEachIndexed { index, it ->
             if (it.inputType != TEXT_VIEW && it.required) {
-                Log.i("FormInputadapter", "validateInput: On submit click ${it.value} ${it.inputType}")
-                if (it.value.isNullOrBlank()) {
-                    Log.i("FormInputadapter", "validateInput: On submit click1 ${it.value} ${it.inputType}")
-                    Timber.d("validateInput called for item $it, with index $index")
-                    it.errorText = resources.getString(R.string.form_input_empty_error)
-                    notifyItemChanged(index)
-                    if (firstEmptyRequired == -1) firstEmptyRequired = index
+                when {
+                    !it.isEnabled && !it.value.isNullOrBlank() -> {
+                        if (it.errorText != null) {
+                            it.errorText = null
+                            notifyItemChanged(index)
+                        }
+                    }
+                    it.value.isNullOrBlank() -> {
+                        Timber.d("validateInput called for item $it, with index $index")
+                        it.errorText = emptyError
+                        notifyItemChanged(index)
+                        if (firstEmptyRequired == -1) firstEmptyRequired = index
+                    }
+                    it.errorText == emptyError -> {
+                        it.errorText = null
+                        notifyItemChanged(index)
+                    }
                 }
             }
         }

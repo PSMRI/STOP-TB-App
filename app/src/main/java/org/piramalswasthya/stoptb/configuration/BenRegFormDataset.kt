@@ -946,8 +946,12 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             }
 
             contactNumber.id -> {
-                validateEmptyOnEditText(contactNumber)
-                validateMobileNumberOnEditText(contactNumber)
+                if (isMobileNotAvailableChecked()) {
+                    contactNumber.errorText = null
+                } else {
+                    validateEmptyOnEditText(contactNumber)
+                    validateMobileNumberOnEditText(contactNumber)
+                }
                 return -1
             }
             mobileNotAvailable.id -> {
@@ -958,15 +962,13 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                     contactNumber.value = "9999999999"
                     contactNumber.errorText = null
                     contactNumber.isEnabled = false
-
                 } else {
                     mobileNotAvailable.value = null
                     contactNumber.isEnabled = true
                     contactNumber.value = null
                     contactNumber.errorText = null
                 }
-
-                return 1
+                return getIndexOfElement(contactNumber)
             }
             address.id -> {
                 validateEmptyOnEditText(address)
