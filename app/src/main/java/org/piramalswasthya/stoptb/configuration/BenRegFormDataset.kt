@@ -453,7 +453,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             fatherName,
             motherName,
             community,
-            religion,
+           // religion,
 
             residentialAreaType,
             // occupation,
