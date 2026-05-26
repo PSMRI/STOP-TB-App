@@ -195,6 +195,8 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
         return true
     }
 
+    protected var requestListRefresh: Boolean = false
+
     suspend fun updateList(formId: Int, index: Int) {
         listMutex.withLock {
             list.find { it.id == formId }?.let {
@@ -203,7 +205,8 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
                 }
             }
             val updateIndex = handleListOnValueChanged(formId, index)
-            if (updateIndex != -1) {
+            if (updateIndex != -1 || requestListRefresh) {
+                requestListRefresh = false
                 val newList = list.toMutableList()
 //            if (updateUIForCurrentElement) {
 //                Timber.d("Updating UI element ...")
@@ -214,6 +217,12 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 //            _listFlow.emit(emptyList())
                 _listFlow.emit(newList)
             }
+        }
+    }
+
+    protected suspend fun emitListUpdate() {
+        listMutex.withLock {
+            _listFlow.emit(list.toMutableList())
         }
     }
 

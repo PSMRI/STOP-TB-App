@@ -313,6 +313,7 @@ class TBScreeningDataset(
         applyReferralDefaults()
         setUpPage(buildFormList())
         refreshAsymptomaticFormElementInList()
+        emitListUpdate()
     }
 
     override suspend fun handleListOnValueChanged(formId: Int, index: Int): Int {
@@ -333,9 +334,6 @@ class TBScreeningDataset(
             recommendedForLiquidCultureTest.id -> recommendedForLiquidCultureTest.value = yesNoFromIndex(index)
         }
         val asymptomaticChanged = applyAsymptomaticDefault()
-        if (asymptomaticChanged) {
-            refreshAsymptomaticFormElementInList()
-        }
         applyReferralDefaults()
         val referralUpdateIndex = syncReferralFields()
         if (formId in symptomaticQuestions.map { it.id } || asymptomaticChanged) {
@@ -468,14 +466,36 @@ class TBScreeningDataset(
 
     private fun applyAsymptomaticDefault(): Boolean {
         val previousValue = isBeneficiaryAsymptomatic.value
-        val newValue = when {
-            symptomaticQuestions.any { isYes(it) } -> noValue
-            symptomaticQuestions.all { it.value == noValue } -> yesValue
-            else -> null
+        // Default Yes (incl. when no symptom answered yet); switches to No if any symptom is Yes.
+        val newValue = if (symptomaticQuestions.any { isSymptomYes(it) }) {
+            noValue
+        } else {
+            yesValue
         }
         isBeneficiaryAsymptomatic.value = newValue
-        return previousValue != newValue
+        val changed = previousValue != newValue
+        if (changed) {
+            refreshAsymptomaticFormElementInList()
+            requestListRefresh = true
+        }
+        return changed
     }
+
+    private fun yesNoSelectionIndex(formElement: FormElement): Int? {
+        val value = formElement.value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        formElement.entries?.let { entries ->
+            entries.indexOfFirst { it == value }.takeIf { it >= 0 }?.let { return it }
+            entries.indexOfFirst { it.equals(value, ignoreCase = true) }.takeIf { it >= 0 }?.let { return it }
+        }
+        return when {
+            value.equals(yesValue, ignoreCase = true) -> 0
+            value.equals(noValue, ignoreCase = true) -> 1
+            else -> null
+        }
+    }
+
+    private fun isSymptomYes(formElement: FormElement): Boolean =
+        yesNoSelectionIndex(formElement) == 0
 
     private fun refreshAsymptomaticFormElementInList() {
         replaceFormElementById(isBeneficiaryAsymptomatic.id, isBeneficiaryAsymptomatic.copy())
@@ -531,8 +551,11 @@ class TBScreeningDataset(
             reproductiveStatus.equals("Yes", ignoreCase = true)
     }
 
-    private fun yesNoFromIndex(index: Int): String? =
-        if (index == 0) yesValue else noValue
+    private fun yesNoFromIndex(index: Int): String? = when (index) {
+        0 -> yesValue
+        1 -> noValue
+        else -> null
+    }
 
     private fun getSelectedEnglishValues(formElement: FormElement, arrayId: Int): List<String> {
         val selectedIndexes = formElement.value
@@ -557,5 +580,5 @@ class TBScreeningDataset(
         null -> ""
     }
 
-    private fun isYes(formElement: FormElement): Boolean = formElement.value == yesValue
+    private fun isYes(formElement: FormElement): Boolean = isSymptomYes(formElement)
 }
