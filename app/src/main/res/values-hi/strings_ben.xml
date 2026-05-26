@@ -326,7 +326,7 @@
     <string name="months">महीने</string>
     <string name="day">दिन</string>
     <string name="days">दिन</string>
-
+    <string name="select_time">समय चुनें</string>
     <string-array name="diet_plane">
         <item>क्या खाएं, क्या न खाएं, आहार विविधता का महत्व।</item>
 

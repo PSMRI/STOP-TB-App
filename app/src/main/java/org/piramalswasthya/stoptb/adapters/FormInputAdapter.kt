@@ -934,7 +934,7 @@ class FormInputAdapter(
 
 
 
-                mTimePicker.setTitle("Select Time")
+                mTimePicker.setTitle(it.context.getString(R.string.select_time))
                 mTimePicker.show()
                 val color = ContextCompat.getColor(it.context, R.color.md_theme_dark_inversePrimary) // your theme color
                 mTimePicker.getButton(TimePickerDialog.BUTTON_POSITIVE)?.setTextColor(color)
@@ -1538,43 +1538,47 @@ class FormInputAdapter(
      */
     fun validateInput(resources: Resources, formRecyclerView: RecyclerView? = null): Int {
         if (!isEnabled) return -1
-        var firstEmptyRequired = -1
         val emptyError = resources.getString(R.string.form_input_empty_error)
-        currentList.forEachIndexed { index, it ->
-            if (it.inputType != TEXT_VIEW && it.required) {
-                when {
-                    !it.isEnabled && !it.value.isNullOrBlank() -> {
-                        if (it.errorText != null) {
-                            it.errorText = null
-                            notifyItemChanged(index)
-                        }
-                    }
-                    it.value.isNullOrBlank() -> {
-                        Timber.d("validateInput called for item $it, with index $index")
-                        it.errorText = emptyError
-                        notifyItemChanged(index)
-                        if (firstEmptyRequired == -1) firstEmptyRequired = index
-                    }
-                    it.errorText == emptyError -> {
-                        it.errorText = null
-                        notifyItemChanged(index)
-                    }
+
+        // Pass 1: apply / clear required-empty errors
+        currentList.forEachIndexed { index, element ->
+            if (element.inputType == TEXT_VIEW) return@forEachIndexed
+            val filledWhileDisabled = !element.isEnabled && !element.value.isNullOrBlank()
+            when {
+                element.required && element.value.isNullOrBlank() && !filledWhileDisabled -> {
+                    element.errorText = emptyError
+                }
+                !element.value.isNullOrBlank() && element.errorText == emptyError -> {
+                    element.errorText = null
+                }
+                filledWhileDisabled && element.errorText != null -> {
+                    element.errorText = null
                 }
             }
         }
-        if (firstEmptyRequired != -1) {
-            formRecyclerView?.scrollToFormValidationError(firstEmptyRequired)
-            return firstEmptyRequired
+
+        // Pass 2: first invalid field from top (empty required, then other errors in form order)
+        var firstInvalidIndex = -1
+        currentList.forEachIndexed { index, element ->
+            if (element.inputType == TEXT_VIEW) return@forEachIndexed
+            if (!isInvalidForSubmit(element)) return@forEachIndexed
+            notifyItemChanged(index)
+            if (firstInvalidIndex == -1) firstInvalidIndex = index
         }
-        currentList.forEachIndexed { index, it ->
-            if (it.inputType != TEXT_VIEW && it.errorText != null) {
-                Timber.d("validateInput existing error for ${it.title} at $index")
-                notifyItemChanged(index)
-                formRecyclerView?.scrollToFormValidationError(index)
-                return index
+
+        if (firstInvalidIndex != -1) {
+            formRecyclerView?.post {
+                formRecyclerView.scrollToFormValidationError(firstInvalidIndex)
             }
+            return firstInvalidIndex
         }
         return -1
+    }
+
+    private fun isInvalidForSubmit(element: FormElement): Boolean {
+        if (!element.isEnabled && !element.value.isNullOrBlank()) return false
+        if (element.required && element.value.isNullOrBlank()) return true
+        return element.errorText != null
     }
 
 

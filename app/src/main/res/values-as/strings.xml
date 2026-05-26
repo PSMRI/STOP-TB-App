@@ -534,7 +534,7 @@
     <string name="diastolic_bp_mmhg">ডায়েষ্টোলিক ৰক্তচাপ (mm Hg)</string>
     <string name="vital_systolic">চিষ্টোলিক</string>
     <string name="vital_diastolic">ডায়েষ্টোলিক</string>
-    <string name="bp_mmhg">বিপি (মিমি পাৰা)</string>
+    <string name="bp_mmhg">বিপি (mm Hg)</string>
     <string name="random_blood_sugar">ৰেণ্ডম ব্লাড চুগাৰ</string>
     <string name="vital_referral_reason">ভাইটেল স্ক্ৰীণিং ৰেফাৰেল</string>
     <string name="tb_digital_chest_xray_conducted">ডিজিটেল চেষ্ট এক্স-ৰে কৰা হৈছে নে?</string>

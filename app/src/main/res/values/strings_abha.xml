@@ -14,6 +14,7 @@
     <!--    <string name="try_again">Try Again!</string>-->
     <string name="aadhaar">Aadhaar</string>
     <string name="asha">ASHA</string>
+    <string name="select_time">Select Time</string>
     <string name="ashaname">ASHA Name</string>
     <string name="gov">GOV</string>
     <string name="enter_aadhaar_number">Enter Aadhaar Number</string>
