@@ -171,5 +171,8 @@ class TBScreeningFormViewModel @Inject constructor(
     fun getIndexOfDate(): Int {
         return dataset.getIndexOfDate()
     }
+
+    fun getIndexOfBeneficiaryAsymptomatic(): Int =
+        dataset.getIndexOfBeneficiaryAsymptomatic()
 }
 

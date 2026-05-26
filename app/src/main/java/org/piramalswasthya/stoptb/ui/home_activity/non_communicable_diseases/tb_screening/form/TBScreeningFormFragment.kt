@@ -79,8 +79,13 @@ class TBScreeningFormFragment : Fragment() {
                 lifecycleScope.launch {
                     viewModel.formList.collect {
                         if (it.isNotEmpty()) {
-                            adapter.notifyItemChanged(viewModel.getIndexOfDate())
                             adapter.submitList(it)
+                            viewModel.getIndexOfDate()
+                                .takeIf { index -> index >= 0 }
+                                ?.let { index -> adapter.notifyItemChanged(index) }
+                            viewModel.getIndexOfBeneficiaryAsymptomatic()
+                                .takeIf { index -> index >= 0 }
+                                ?.let { index -> adapter.notifyItemChanged(index) }
                         }
 
                     }

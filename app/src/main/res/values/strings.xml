@@ -899,6 +899,7 @@
     <string name="symptomatic_tb_screening">Symptomatic TB Screening</string>
     <string name="check_if_the_person_has_any_of_these_symptoms">Check if the person has any of these Symptoms:</string>
     <string name="tb_asymptomatic_screening">Asymptomatic Screening</string>
+    <string name="tb_is_beneficiary_asymptomatic">Is beneficiary asymptomatic</string>
     <string name="tb_rise_of_fever">Rise of fever in evening</string>
     <string name="tb_loss_of_appetite">Loss of Appetite</string>
     <string name="tb_age_more_than_60">Age more than 60 years</string>

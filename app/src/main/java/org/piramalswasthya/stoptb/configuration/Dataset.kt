@@ -181,6 +181,20 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 
     abstract fun mapValues(cacheModel: FormDataModel, pageNumber: Int = 0)
     protected fun getIndexOfElement(element: FormElement) = list.indexOf(element)
+
+    protected fun indexOfFormElementById(formId: Int): Int =
+        list.indexOfFirst { it.id == formId }
+
+    protected fun findFormElementById(formId: Int): FormElement? =
+        list.find { it.id == formId }
+
+    protected fun replaceFormElementById(formId: Int, element: FormElement): Boolean {
+        val index = indexOfFormElementById(formId)
+        if (index < 0) return false
+        list[index] = element
+        return true
+    }
+
     suspend fun updateList(formId: Int, index: Int) {
         listMutex.withLock {
             list.find { it.id == formId }?.let {

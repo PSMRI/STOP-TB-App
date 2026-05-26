@@ -137,6 +137,29 @@ class TBScreeningDataset(
         hasDependants = true
     )
 
+    private val isBeneficiaryAsymptomatic = FormElement(
+        id = 16,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.tb_is_beneficiary_asymptomatic),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = true,
+        isEnabled = false,
+        hasDependants = true
+    )
+
+    private val symptomaticQuestions = listOf(
+        isCoughing,
+        bloodInSputum,
+        isFever,
+        riseOfFever,
+        lossOfAppetite,
+        lossOfWeight,
+        nightSweats,
+        historyOfTB,
+        currentlyTakingDrugs,
+        familyHistoryTB
+    )
+
     private val asymptomaticLabel = FormElement(
         id = 102,
         inputType = InputType.HEADLINE,
@@ -267,6 +290,13 @@ class TBScreeningDataset(
             historyOfTB.value = boolToYesNo(saved.historyOfTb)
             currentlyTakingDrugs.value = boolToYesNo(saved.takingAntiTBDrugs)
             familyHistoryTB.value = boolToYesNo(saved.familySufferingFromTB)
+            isBeneficiaryAsymptomatic.value = saved.asymptomatic?.let { savedValue ->
+                when (savedValue.trim().lowercase()) {
+                    "yes" -> yesValue
+                    "no" -> noValue
+                    else -> null
+                }
+            }
             referredForDigitalChestXray.value = boolToYesNo(saved.referredForDigitalChestXray)
             referredForSputumCollection.value = boolToYesNo(saved.referredForSputumCollection)
             sputumSampleSubmittedAt.value = getLocalValueInArray(
@@ -279,8 +309,10 @@ class TBScreeningDataset(
                 englishValuesToSelectionIndexes(saved.reasonForDenialForGettingTested, R.array.tb_reason_for_denial_testing)
         }
 
+        applyAsymptomaticDefault()
         applyReferralDefaults()
         setUpPage(buildFormList())
+        refreshAsymptomaticFormElementInList()
     }
 
     override suspend fun handleListOnValueChanged(formId: Int, index: Int): Int {
@@ -300,9 +332,21 @@ class TBScreeningDataset(
             recommendedForTruenatTest.id -> recommendedForTruenatTest.value = yesNoFromIndex(index)
             recommendedForLiquidCultureTest.id -> recommendedForLiquidCultureTest.value = yesNoFromIndex(index)
         }
+        val asymptomaticChanged = applyAsymptomaticDefault()
+        if (asymptomaticChanged) {
+            refreshAsymptomaticFormElementInList()
+        }
         applyReferralDefaults()
-        return syncReferralFields()
+        val referralUpdateIndex = syncReferralFields()
+        if (formId in symptomaticQuestions.map { it.id } || asymptomaticChanged) {
+            return indexOfFormElementById(isBeneficiaryAsymptomatic.id)
+                .takeIf { it >= 0 } ?: referralUpdateIndex
+        }
+        return referralUpdateIndex
     }
+
+    fun getIndexOfBeneficiaryAsymptomatic(): Int =
+        indexOfFormElementById(isBeneficiaryAsymptomatic.id)
 
     override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
         (cacheModel as TBScreeningCache).let { form ->
@@ -340,8 +384,12 @@ class TBScreeningDataset(
                     getSelectedEnglishValues(reasonForDenialForGettingTested, R.array.tb_reason_for_denial_testing)
                 } else null
             form.familyContactScreeningRequired = requiresFamilyContactScreening()
-            form.sympotomatic = null
-            form.asymptomatic = null
+            form.asymptomatic = isBeneficiaryAsymptomatic.value?.trim()?.takeIf { it.isNotBlank() }
+            form.sympotomatic = when (form.asymptomatic) {
+                yesValue -> noValue
+                noValue -> yesValue
+                else -> null
+            }
             form.recommandateTest = null
         }
     }
@@ -367,6 +415,7 @@ class TBScreeningDataset(
             historyOfTB,
             currentlyTakingDrugs,
             familyHistoryTB,
+            isBeneficiaryAsymptomatic,
         ).apply { addAll(buildReferralFields()) }
     }
 
@@ -400,19 +449,36 @@ class TBScreeningDataset(
         )
         val visibleFields = buildReferralFields()
         val visibleValues = visibleFields.associateWith { it.value }
-        val insertPosition = listFlow.value.indexOf(familyHistoryTB)
+        val asymptomaticInList = findFormElementById(isBeneficiaryAsymptomatic.id)
+            ?: isBeneficiaryAsymptomatic
+        val insertPosition = indexOfFormElementById(isBeneficiaryAsymptomatic.id)
             .takeIf { it >= 0 }
             ?.plus(1)
             ?: -2
 
         val updateIndex = triggerDependants(
-            source = familyHistoryTB,
+            source = asymptomaticInList,
             removeItems = allReferralFields,
             addItems = visibleFields,
             position = insertPosition
         )
         visibleValues.forEach { (field, value) -> field.value = value }
         return updateIndex
+    }
+
+    private fun applyAsymptomaticDefault(): Boolean {
+        val previousValue = isBeneficiaryAsymptomatic.value
+        val newValue = when {
+            symptomaticQuestions.any { isYes(it) } -> noValue
+            symptomaticQuestions.all { it.value == noValue } -> yesValue
+            else -> null
+        }
+        isBeneficiaryAsymptomatic.value = newValue
+        return previousValue != newValue
+    }
+
+    private fun refreshAsymptomaticFormElementInList() {
+        replaceFormElementById(isBeneficiaryAsymptomatic.id, isBeneficiaryAsymptomatic.copy())
     }
 
     private fun applyReferralDefaults() {

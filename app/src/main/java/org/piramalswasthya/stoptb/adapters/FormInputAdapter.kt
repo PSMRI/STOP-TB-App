@@ -537,7 +537,6 @@ class FormInputAdapter(
                         if (!effectiveEnabled) rdBtn.buttonTintList = colorStateList
                         rdBtn.text = it
                         addView(rdBtn)
-                        if (item.value == it) rdBtn.isChecked = true
                         rdBtn.setOnCheckedChangeListener { _, b ->
                             if (b) {
                                 binding.root.clearFocus()
@@ -561,14 +560,14 @@ class FormInputAdapter(
                             binding.llContent.setBackgroundResource(0)
                         }
                     }
-//                    item.value?.let { value ->
-//                        children.forEach {
-//                            if ((it as RadioButton).text == value) {
-//                                clearCheck()
-//                                check(it.id)
-//                            }
-//                        }
-//                    }
+                    item.value?.let { selected ->
+                        children.forEach { child ->
+                            val radio = child as? RadioButton ?: return@forEach
+                            if (radio.text.toString() == selected) {
+                                check(radio.id)
+                            }
+                        }
+                    }
                 }
             }
 
