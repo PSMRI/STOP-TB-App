@@ -106,9 +106,12 @@ class TBScreeningFormViewModel @Inject constructor(
 
     fun updateListOnValueChanged(formId: Int, index: Int) {
         viewModelScope.launch {
-            dataset.updateList(formId, index)
+            applyFormChange(formId, index)
         }
+    }
 
+    suspend fun applyFormChange(formId: Int, index: Int) {
+        dataset.updateList(formId, index)
     }
 
     fun getFamilyContactAlert(): String? = dataset.getFamilyContactAlert()

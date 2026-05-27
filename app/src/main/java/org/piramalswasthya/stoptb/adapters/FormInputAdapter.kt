@@ -539,6 +539,7 @@ class FormInputAdapter(
                         addView(rdBtn)
                     }
                     var applyingProgrammaticSelection = false
+                    clearCheck()
                     item.value?.let { selected ->
                         val selectedIndex = item.entries?.indexOfFirst { entry ->
                             entry == selected || entry.equals(selected, ignoreCase = true)
@@ -546,10 +547,8 @@ class FormInputAdapter(
                         if (selectedIndex in 0 until childCount) {
                             (getChildAt(selectedIndex) as? RadioButton)?.let { radio ->
                                 applyingProgrammaticSelection = true
-                                post {
-                                    check(radio.id)
-                                    applyingProgrammaticSelection = false
-                                }
+                                radio.isChecked = true
+                                applyingProgrammaticSelection = false
                             }
                         }
                     }

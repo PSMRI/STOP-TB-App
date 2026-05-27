@@ -160,6 +160,11 @@ class TBScreeningDataset(
         familyHistoryTB
     )
 
+    private val symptomaticQuestionIds = symptomaticQuestions.map { it.id }.toSet()
+
+    /** Latest radio index (0 = Yes, 1 = No) per symptomatic question — avoids string/locale mismatches. */
+    private val symptomaticAnswerIndexById = mutableMapOf<Int, Int>()
+
     private val asymptomaticLabel = FormElement(
         id = 102,
         inputType = InputType.HEADLINE,
@@ -276,6 +281,7 @@ class TBScreeningDataset(
             }
         }
 
+        symptomaticAnswerIndexById.clear()
         if (saved == null) {
             dateOfVisit.value = getDateFromLong(System.currentTimeMillis())
         } else {
@@ -312,31 +318,20 @@ class TBScreeningDataset(
         applyAsymptomaticDefault()
         applyReferralDefaults()
         setUpPage(buildFormList())
+        syncSymptomaticIndicesFromList()
         refreshAsymptomaticFormElementInList()
         emitListUpdate()
     }
 
     override suspend fun handleListOnValueChanged(formId: Int, index: Int): Int {
-        when (formId) {
-            isCoughing.id -> isCoughing.value = yesNoFromIndex(index)
-            bloodInSputum.id -> bloodInSputum.value = yesNoFromIndex(index)
-            isFever.id -> isFever.value = yesNoFromIndex(index)
-            riseOfFever.id -> riseOfFever.value = yesNoFromIndex(index)
-            lossOfAppetite.id -> lossOfAppetite.value = yesNoFromIndex(index)
-            lossOfWeight.id -> lossOfWeight.value = yesNoFromIndex(index)
-            nightSweats.id -> nightSweats.value = yesNoFromIndex(index)
-            historyOfTB.id -> historyOfTB.value = yesNoFromIndex(index)
-            currentlyTakingDrugs.id -> currentlyTakingDrugs.value = yesNoFromIndex(index)
-            familyHistoryTB.id -> familyHistoryTB.value = yesNoFromIndex(index)
-            referredForDigitalChestXray.id -> referredForDigitalChestXray.value = yesNoFromIndex(index)
-            referredForSputumCollection.id -> referredForSputumCollection.value = yesNoFromIndex(index)
-            recommendedForTruenatTest.id -> recommendedForTruenatTest.value = yesNoFromIndex(index)
-            recommendedForLiquidCultureTest.id -> recommendedForLiquidCultureTest.value = yesNoFromIndex(index)
+        if (formId in symptomaticQuestionIds) {
+            symptomaticAnswerIndexById[formId] = index
         }
+        setYesNoAnswer(formId, index)
         val asymptomaticChanged = applyAsymptomaticDefault()
         applyReferralDefaults()
         val referralUpdateIndex = syncReferralFields()
-        if (formId in symptomaticQuestions.map { it.id } || asymptomaticChanged) {
+        if (formId in symptomaticQuestionIds || asymptomaticChanged) {
             return indexOfFormElementById(isBeneficiaryAsymptomatic.id)
                 .takeIf { it >= 0 } ?: referralUpdateIndex
         }
@@ -382,7 +377,7 @@ class TBScreeningDataset(
                     getSelectedEnglishValues(reasonForDenialForGettingTested, R.array.tb_reason_for_denial_testing)
                 } else null
             form.familyContactScreeningRequired = requiresFamilyContactScreening()
-            form.asymptomatic = isBeneficiaryAsymptomatic.value?.trim()?.takeIf { it.isNotBlank() }
+            form.asymptomatic = asymptomaticElementInList().value?.trim()?.takeIf { it.isNotBlank() }
             form.sympotomatic = when (form.asymptomatic) {
                 yesValue -> noValue
                 noValue -> yesValue
@@ -465,33 +460,66 @@ class TBScreeningDataset(
     }
 
     private fun applyAsymptomaticDefault(): Boolean {
+        syncSymptomaticIndicesFromList()
+        val allSymptomsExplicitlyNo = symptomaticQuestions.all { question ->
+            symptomaticAnswerIndexById[question.id] == 1
+        }
+        val newValue = if (allSymptomsExplicitlyNo) yesValue else noValue
         val previousValue = isBeneficiaryAsymptomatic.value
-        val newValue = when {
-            symptomaticQuestions.all { isSymptomAnsweredNo(it) } -> yesValue
-            else -> noValue
-        }
         isBeneficiaryAsymptomatic.value = newValue
-        val changed = previousValue != newValue
-        if (changed) {
-            refreshAsymptomaticFormElementInList()
-            requestListRefresh = true
+        // Replace with a new instance so DiffUtil detects the change (in-place mutation
+        // on the same FormElement leaves old/new list snapshots identical for the adapter).
+        replaceFormElementById(
+            isBeneficiaryAsymptomatic.id,
+            isBeneficiaryAsymptomatic.copy(value = newValue, isEnabled = false)
+        )
+        requestListRefresh = true
+        return previousValue != newValue
+    }
+
+    private fun syncSymptomaticIndicesFromList() {
+        symptomaticQuestions.forEach { question ->
+            yesNoSelectionIndex(symptomElementInList(question))?.let { selectedIndex ->
+                symptomaticAnswerIndexById[question.id] = selectedIndex
+            }
         }
-        return changed
+    }
+
+    /** Uses the list-backed element so adapter selections are included in asymptomatic logic. */
+    private fun symptomElementInList(question: FormElement): FormElement =
+        findFormElementById(question.id) ?: question
+
+    private fun asymptomaticElementInList(): FormElement =
+        findFormElementById(isBeneficiaryAsymptomatic.id) ?: isBeneficiaryAsymptomatic
+
+    private fun setYesNoAnswer(formId: Int, index: Int) {
+        val answer = yesNoFromIndex(index) ?: return
+        findFormElementById(formId)?.value = answer
+        when (formId) {
+            isCoughing.id -> isCoughing.value = answer
+            bloodInSputum.id -> bloodInSputum.value = answer
+            isFever.id -> isFever.value = answer
+            riseOfFever.id -> riseOfFever.value = answer
+            lossOfAppetite.id -> lossOfAppetite.value = answer
+            lossOfWeight.id -> lossOfWeight.value = answer
+            nightSweats.id -> nightSweats.value = answer
+            historyOfTB.id -> historyOfTB.value = answer
+            currentlyTakingDrugs.id -> currentlyTakingDrugs.value = answer
+            familyHistoryTB.id -> familyHistoryTB.value = answer
+            referredForDigitalChestXray.id -> referredForDigitalChestXray.value = answer
+            referredForSputumCollection.id -> referredForSputumCollection.value = answer
+            recommendedForTruenatTest.id -> recommendedForTruenatTest.value = answer
+            recommendedForLiquidCultureTest.id -> recommendedForLiquidCultureTest.value = answer
+        }
     }
 
     /** Returns true only when the question has an explicit No answer. */
-    private fun isSymptomAnsweredNo(formElement: FormElement): Boolean {
-        val v = formElement.value?.trim() ?: return false
-        return v.equals(noValue, ignoreCase = true) ||
-            formElement.entries?.getOrNull(1)?.equals(v, ignoreCase = true) == true
-    }
+    private fun isSymptomAnsweredNo(formElement: FormElement): Boolean =
+        yesNoSelectionIndex(formElement) == 1
 
     /** Returns true only when the question has an explicit Yes answer. */
-    private fun isSymptomAnsweredYes(formElement: FormElement): Boolean {
-        val v = formElement.value?.trim() ?: return false
-        return v.equals(yesValue, ignoreCase = true) ||
-            formElement.entries?.getOrNull(0)?.equals(v, ignoreCase = true) == true
-    }
+    private fun isSymptomAnsweredYes(formElement: FormElement): Boolean =
+        yesNoSelectionIndex(formElement) == 0
 
     private fun yesNoSelectionIndex(formElement: FormElement): Int? {
         val value = formElement.value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
@@ -499,9 +527,12 @@ class TBScreeningDataset(
             entries.indexOfFirst { it == value }.takeIf { it >= 0 }?.let { return it }
             entries.indexOfFirst { it.equals(value, ignoreCase = true) }.takeIf { it >= 0 }?.let { return it }
         }
+        val englishYesNo = englishResources.getStringArray(R.array.yes_no)
         return when {
             value.equals(yesValue, ignoreCase = true) -> 0
             value.equals(noValue, ignoreCase = true) -> 1
+            value.equals(englishYesNo[0], ignoreCase = true) -> 0
+            value.equals(englishYesNo[1], ignoreCase = true) -> 1
             else -> null
         }
     }
@@ -510,7 +541,13 @@ class TBScreeningDataset(
         yesNoSelectionIndex(formElement) == 0
 
     private fun refreshAsymptomaticFormElementInList() {
-        replaceFormElementById(isBeneficiaryAsymptomatic.id, isBeneficiaryAsymptomatic.copy())
+        replaceFormElementById(
+            isBeneficiaryAsymptomatic.id,
+            isBeneficiaryAsymptomatic.copy(
+                value = isBeneficiaryAsymptomatic.value,
+                isEnabled = false
+            )
+        )
     }
 
     private fun applyReferralDefaults() {
