@@ -466,11 +466,9 @@ class TBScreeningDataset(
 
     private fun applyAsymptomaticDefault(): Boolean {
         val previousValue = isBeneficiaryAsymptomatic.value
-        // Default Yes (incl. when no symptom answered yet); switches to No if any symptom is Yes.
-        val newValue = if (symptomaticQuestions.any { isSymptomYes(it) }) {
-            noValue
-        } else {
-            yesValue
+        val newValue = when {
+            symptomaticQuestions.all { isSymptomAnsweredNo(it) } -> yesValue
+            else -> noValue
         }
         isBeneficiaryAsymptomatic.value = newValue
         val changed = previousValue != newValue
@@ -479,6 +477,20 @@ class TBScreeningDataset(
             requestListRefresh = true
         }
         return changed
+    }
+
+    /** Returns true only when the question has an explicit No answer. */
+    private fun isSymptomAnsweredNo(formElement: FormElement): Boolean {
+        val v = formElement.value?.trim() ?: return false
+        return v.equals(noValue, ignoreCase = true) ||
+            formElement.entries?.getOrNull(1)?.equals(v, ignoreCase = true) == true
+    }
+
+    /** Returns true only when the question has an explicit Yes answer. */
+    private fun isSymptomAnsweredYes(formElement: FormElement): Boolean {
+        val v = formElement.value?.trim() ?: return false
+        return v.equals(yesValue, ignoreCase = true) ||
+            formElement.entries?.getOrNull(0)?.equals(v, ignoreCase = true) == true
     }
 
     private fun yesNoSelectionIndex(formElement: FormElement): Int? {
@@ -580,5 +592,5 @@ class TBScreeningDataset(
         null -> ""
     }
 
-    private fun isYes(formElement: FormElement): Boolean = isSymptomYes(formElement)
+    private fun isYes(formElement: FormElement): Boolean = isSymptomAnsweredYes(formElement)
 }
