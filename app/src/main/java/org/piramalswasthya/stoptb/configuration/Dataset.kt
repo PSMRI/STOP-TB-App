@@ -181,6 +181,22 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 
     abstract fun mapValues(cacheModel: FormDataModel, pageNumber: Int = 0)
     protected fun getIndexOfElement(element: FormElement) = list.indexOf(element)
+
+    protected fun indexOfFormElementById(formId: Int): Int =
+        list.indexOfFirst { it.id == formId }
+
+    protected fun findFormElementById(formId: Int): FormElement? =
+        list.find { it.id == formId }
+
+    protected fun replaceFormElementById(formId: Int, element: FormElement): Boolean {
+        val index = indexOfFormElementById(formId)
+        if (index < 0) return false
+        list[index] = element
+        return true
+    }
+
+    protected var requestListRefresh: Boolean = false
+
     suspend fun updateList(formId: Int, index: Int) {
         listMutex.withLock {
             list.find { it.id == formId }?.let {
@@ -189,7 +205,8 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
                 }
             }
             val updateIndex = handleListOnValueChanged(formId, index)
-            if (updateIndex != -1) {
+            if (updateIndex != -1 || requestListRefresh) {
+                requestListRefresh = false
                 val newList = list.toMutableList()
 //            if (updateUIForCurrentElement) {
 //                Timber.d("Updating UI element ...")
@@ -200,6 +217,12 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 //            _listFlow.emit(emptyList())
                 _listFlow.emit(newList)
             }
+        }
+    }
+
+    protected suspend fun emitListUpdate() {
+        listMutex.withLock {
+            _listFlow.emit(list.toMutableList())
         }
     }
 

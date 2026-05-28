@@ -537,38 +537,43 @@ class FormInputAdapter(
                         if (!effectiveEnabled) rdBtn.buttonTintList = colorStateList
                         rdBtn.text = it
                         addView(rdBtn)
-                        if (item.value == it) rdBtn.isChecked = true
-                        rdBtn.setOnCheckedChangeListener { _, b ->
-                            if (b) {
-                                binding.root.clearFocus()
-                                val imm = binding.root.context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-                                imm.hideSoftInputFromWindow(binding.root.windowToken, 0)
-                                item.value = it
-                                if (item.hasDependants || item.hasAlertError) {
-                                    Timber.d(
-                                        "listener trigger : ${item.id} ${
-                                            item.entries!!.indexOf(
-                                                it
-                                            )
-                                        } $it"
-                                    )
-                                    formValueListener?.onValueChanged(
-                                        item, item.entries!!.indexOf(it)
-                                    )
+                    }
+                    var applyingProgrammaticSelection = false
+                    clearCheck()
+                    item.value?.let { selected ->
+                        val selectedIndex = item.entries?.indexOfFirst { entry ->
+                            entry == selected || entry.equals(selected, ignoreCase = true)
+                        } ?: -1
+                        if (selectedIndex in 0 until childCount) {
+                            (getChildAt(selectedIndex) as? RadioButton)?.let { radio ->
+                                applyingProgrammaticSelection = true
+                                radio.isChecked = true
+                                applyingProgrammaticSelection = false
+                            }
+                        }
+                    }
+                    children.forEach { child ->
+                        (child as? RadioButton)?.setOnCheckedChangeListener { _, isChecked ->
+                            if (!isChecked || applyingProgrammaticSelection) return@setOnCheckedChangeListener
+                            val selectedLabel = (child as RadioButton).text.toString()
+                            binding.root.clearFocus()
+                            val imm = binding.root.context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                            imm.hideSoftInputFromWindow(binding.root.windowToken, 0)
+                            item.value = selectedLabel
+                            if (!effectiveEnabled) return@setOnCheckedChangeListener
+                            if (item.hasDependants || item.hasAlertError) {
+                                val selectedIndex = item.entries?.indexOfFirst { entry ->
+                                    entry == selectedLabel || entry.equals(selectedLabel, ignoreCase = true)
+                                } ?: -1
+                                if (selectedIndex >= 0) {
+                                    Timber.d("listener trigger : ${item.id} $selectedIndex $selectedLabel")
+                                    formValueListener?.onValueChanged(item, selectedIndex)
                                 }
                             }
                             item.errorText = null
                             binding.llContent.setBackgroundResource(0)
                         }
                     }
-//                    item.value?.let { value ->
-//                        children.forEach {
-//                            if ((it as RadioButton).text == value) {
-//                                clearCheck()
-//                                check(it.id)
-//                            }
-//                        }
-//                    }
                 }
             }
 
