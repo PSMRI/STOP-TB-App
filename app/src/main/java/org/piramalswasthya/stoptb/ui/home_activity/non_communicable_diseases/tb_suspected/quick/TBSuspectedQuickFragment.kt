@@ -94,10 +94,16 @@ class TBSuspectedQuickFragment : Fragment() {
                     if (viewModel.viewOnly) {
                         findNavController().navigateUp()
                     } else {
+                        // Signal AllBenFragment to clear pendingExamineBenId so the
+                        // BottomSheet does NOT re-open after the flow is complete.
+                        try {
+                            findNavController()
+                                .getBackStackEntry(R.id.allBenFragment)
+                                .savedStateHandle["examine_flow_done"] = true
+                        } catch (_: Exception) { /* AllBenFragment not in stack — edge case */ }
+
                         // Pop all examine-flow forms off the back stack and return to the
                         // existing AllBenFragment instance (not a new one).
-                        // Using navigate+setPopUpTo here incorrectly pushed a NEW AllBenFragment
-                        // on top of the un-popped forms, so pressing back revealed those forms.
                         val returnedToList = findNavController().popBackStack(R.id.allBenFragment, false)
                         if (!returnedToList) {
                             // AllBenFragment not found in back stack (rare edge case)

@@ -240,9 +240,12 @@ class TBScreeningFormFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        // Always show back button — matches VitalScreen behaviour.
+        // autoFlow only controls the forward-chain (auto-navigate to General OPD
+        // after submit), not whether the user can go back.
         applyAutoFlowBackPolicyOnResume(
             isAutoFlow = viewModel.autoFlow,
-            allowBack = !viewModel.autoFlow
+            allowBack = true
         )
     }
 

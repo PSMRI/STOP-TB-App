@@ -62,6 +62,12 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // Show beneficiary name so the user knows whose forms are open
+        val tvBenName = view.findViewById<TextView>(R.id.tv_ben_name)
+        viewModel.benName.observe(viewLifecycleOwner) { name ->
+            tvBenName.text = name
+        }
+
         val benId = viewModel.benId
 
         // Map each included row (View) → form label + form index

@@ -481,9 +481,18 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     override fun onResume() {
         super.onResume()
         updateToolbarTitle()
-        // Re-show BottomSheet if we're still in an examine flow.
-        // Always without autoFlow — prevents the form from re-opening automatically
-        // when the user presses back without submitting.
+
+        // If TBSuspectedQuickFragment (Diagnosis) signalled that the examine flow
+        // is fully complete, clear pendingExamineBenId so the BottomSheet does NOT
+        // re-open — otherwise the back button would have to dismiss the BottomSheet
+        // before it could navigate away from this screen.
+        val sh = findNavController().currentBackStackEntry?.savedStateHandle
+        if (sh?.remove<Boolean>("examine_flow_done") == true) {
+            pendingExamineBenId = null
+        }
+
+        // Re-show BottomSheet only if we're still mid-flow (user pressed back
+        // without submitting a form, so they need to continue or cancel).
         val benId = pendingExamineBenId
         if (benId != null) {
             showExamineBottomSheet(benId)
