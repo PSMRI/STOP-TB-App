@@ -80,6 +80,7 @@ class TBScreeningFormFragment : Fragment() {
                 val adapter = FormInputAdapter(
                     formValueListener = FormInputAdapter.FormValueListener { formId, index ->
                         viewModel.updateListOnValueChanged(formId, index)
+                        hardCodedListUpdate(16)
                     }, isEnabled = !(recordExists || viewModel.viewOnly)
                 )
                 binding.btnSubmit.isEnabled = !(recordExists || viewModel.viewOnly)
@@ -155,6 +156,17 @@ class TBScreeningFormFragment : Fragment() {
     private fun submitTBScreeningForm() {
         if (validateCurrentPage()) {
             viewModel.saveForm()
+        }
+    }
+    private fun hardCodedListUpdate(formId: Int) {
+        binding.form.rvInputForm.adapter?.apply {
+            when (formId) {
+                1,2,3,4,5,6,7,8,9,10,11,16-> {
+                    notifyDataSetChanged()
+
+                }
+
+            }
         }
     }
 
