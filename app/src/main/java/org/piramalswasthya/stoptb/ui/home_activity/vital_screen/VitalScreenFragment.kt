@@ -39,6 +39,8 @@ class VitalScreenFragment : Fragment() {
     private var referralAlert: AlertDialog? = null
     private var riskFactorOptions: List<CodedOption> = emptyList()
     private var selectedRiskFactors = BooleanArray(0)
+    private var riskFactorsConfigured = false
+    private var pendingVitalRiskFactorSelection: Pair<List<Int>, List<String>>? = null
 
     private data class CodedOption(
         val id: Int,
@@ -79,6 +81,9 @@ class VitalScreenFragment : Fragment() {
         viewModel.benAgeGender.observe(viewLifecycleOwner) {
             binding.tvAgeGender.text = it
         }
+        viewModel.riskFactorUiState.observe(viewLifecycleOwner) { state ->
+            configureRiskFactorOptions(state)
+        }
         viewModel.existingVitals.observe(viewLifecycleOwner) { vital ->
             val hasExistingVitals = vital != null
             binding.btnSubmit.visibility = if (hasExistingVitals) View.GONE else View.VISIBLE
@@ -94,7 +99,14 @@ class VitalScreenFragment : Fragment() {
             setPresentAbsentRadioGroupValue(binding.rgClubbing, vital.clubbingId, vital.clubbing)
             setPresentAbsentRadioGroupValue(binding.rgLymphadenopathy, vital.lymphadenopathyId, vital.lymphadenopathy)
             setPresentAbsentRadioGroupValue(binding.rgOedema, vital.oedemaId, vital.oedema)
-            applyRiskFactorSelection(vital.keyPopulationRiskFactorIds.orEmpty(), vital.keyPopulationRiskFactors.orEmpty())
+            val savedRiskFactors = vital.keyPopulationRiskFactorIds.orEmpty() to
+                vital.keyPopulationRiskFactors.orEmpty()
+            if (riskFactorsConfigured) {
+                applyRiskFactorSelection(savedRiskFactors.first, savedRiskFactors.second)
+                viewModel.riskFactorUiState.value?.let { ensurePregnancyRiskFactorSelected(it) }
+            } else {
+                pendingVitalRiskFactorSelection = savedRiskFactors
+            }
             setHivStatusValue(vital.hivStatusId, vital.hivStatus)
         }
         viewModel.state.observe(viewLifecycleOwner) { state ->
@@ -190,6 +202,7 @@ class VitalScreenFragment : Fragment() {
     }
 
     private fun saveVitals() {
+        viewModel.riskFactorUiState.value?.let { ensurePregnancyRiskFactorSelected(it) }
         val pallor = getPresentAbsentSelection(binding.rgPallor)
         val icterus = getPresentAbsentSelection(binding.rgIcterus)
         val cyanosis = getPresentAbsentSelection(binding.rgCyanosis)
@@ -298,6 +311,7 @@ class VitalScreenFragment : Fragment() {
             isValid = false
         }
 
+        viewModel.riskFactorUiState.value?.let { ensurePregnancyRiskFactorSelected(it) }
         if (getSelectedRiskFactors().isEmpty()) {
             binding.tilRiskFactors.error = getString(R.string.risk_factor_required)
             isValid = false
@@ -381,8 +395,6 @@ class VitalScreenFragment : Fragment() {
     }
 
     private fun setupRiskFactorSelection() {
-        riskFactorOptions = getRiskFactorOptions()
-        selectedRiskFactors = BooleanArray(riskFactorOptions.size)
         binding.etRiskFactors.setOnClickListener {
             showRiskFactorDialog()
         }
@@ -391,16 +403,59 @@ class VitalScreenFragment : Fragment() {
         }
     }
 
+    private fun configureRiskFactorOptions(state: VitalScreenViewModel.RiskFactorUiState) {
+        val previouslySelectedCodes = getSelectedRiskFactorOptions().map { it.code }.toSet()
+        riskFactorOptions = getAllRiskFactorOptions().filterNot { option ->
+            state.isMale && option.code in FEMALE_ONLY_RISK_FACTOR_CODES
+        }
+        val allowedPrevious = previouslySelectedCodes.filterNot { code ->
+            state.isMale && code in FEMALE_ONLY_RISK_FACTOR_CODES
+        }
+        selectedRiskFactors = BooleanArray(riskFactorOptions.size) { index ->
+            riskFactorOptions[index].code in allowedPrevious
+        }
+        pendingVitalRiskFactorSelection?.let { (ids, values) ->
+            applyRiskFactorSelection(ids, values)
+            pendingVitalRiskFactorSelection = null
+        }
+        ensurePregnancyRiskFactorSelected(state)
+        riskFactorsConfigured = true
+        refreshRiskFactorText()
+    }
+
+    private fun ensurePregnancyRiskFactorSelected(state: VitalScreenViewModel.RiskFactorUiState) {
+        if (!state.isPregnant || state.isMale) return
+        val pregnancyIndex = riskFactorOptions.indexOfFirst { it.code == PREGNANCY_RISK_FACTOR_CODE }
+        if (pregnancyIndex >= 0) {
+            selectedRiskFactors[pregnancyIndex] = true
+            refreshRiskFactorText()
+        }
+    }
+
     private fun showRiskFactorDialog() {
+        if (!riskFactorsConfigured || riskFactorOptions.isEmpty()) return
         val labels = riskFactorOptions.map { it.label }.toTypedArray()
         val notApplicableIndex = riskFactorOptions.indexOfFirst { it.code == "NOT_APPLICABLE" }
-        AlertDialog.Builder(requireContext())
+        val pregnancyIndex = getPregnancyRiskFactorIndex()
+        val pregnancyLocked = isPregnancyRiskFactorLocked()
+        if (pregnancyLocked && pregnancyIndex >= 0) {
+            selectedRiskFactors[pregnancyIndex] = true
+        }
+        val alertDialog = AlertDialog.Builder(requireContext())
             .setTitle(getString(R.string.select_key_population_risk_factors))
             .setMultiChoiceItems(labels, selectedRiskFactors) { dialog, which, isChecked ->
+                if (pregnancyLocked && which == pregnancyIndex && !isChecked) {
+                    selectedRiskFactors[which] = true
+                    (dialog as? AlertDialog)?.listView?.setItemChecked(which, true)
+                    return@setMultiChoiceItems
+                }
                 selectedRiskFactors[which] = isChecked
                 if (isChecked && which == notApplicableIndex) {
                     selectedRiskFactors.indices
-                        .filter { it != notApplicableIndex }
+                        .filter { index ->
+                            index != notApplicableIndex &&
+                                !(pregnancyLocked && index == pregnancyIndex)
+                        }
                         .forEach { selectedRiskFactors[it] = false }
                 } else if (isChecked && notApplicableIndex >= 0) {
                     selectedRiskFactors[notApplicableIndex] = false
@@ -411,12 +466,39 @@ class VitalScreenFragment : Fragment() {
                 }
             }
             .setPositiveButton(android.R.string.ok) { dialog, _ ->
+                viewModel.riskFactorUiState.value?.let { ensurePregnancyRiskFactorSelected(it) }
                 refreshRiskFactorText()
                 dialog.dismiss()
             }
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .create()
+        alertDialog.setOnShowListener {
+            if (!pregnancyLocked || pregnancyIndex < 0) return@setOnShowListener
+            val listView = alertDialog.listView ?: return@setOnShowListener
+            listView.setItemChecked(pregnancyIndex, true)
+            listView.post { disablePregnancyRiskFactorListItem(listView, pregnancyIndex) }
+        }
+        alertDialog.show()
     }
+
+    private fun disablePregnancyRiskFactorListItem(listView: android.widget.ListView, pregnancyIndex: Int) {
+        val firstVisible = listView.firstVisiblePosition
+        val childIndex = pregnancyIndex - firstVisible
+        if (childIndex in 0 until listView.childCount) {
+            listView.getChildAt(childIndex)?.apply {
+                isEnabled = false
+                alpha = 0.55f
+            }
+        }
+    }
+
+    private fun isPregnancyRiskFactorLocked(): Boolean {
+        val state = viewModel.riskFactorUiState.value ?: return false
+        return state.isPregnant && !state.isMale
+    }
+
+    private fun getPregnancyRiskFactorIndex(): Int =
+        riskFactorOptions.indexOfFirst { it.code == PREGNANCY_RISK_FACTOR_CODE }
 
     private fun applyRiskFactorSelection(ids: List<Int>, values: List<String>) {
         if (riskFactorOptions.isEmpty()) return
@@ -523,7 +605,7 @@ class VitalScreenFragment : Fragment() {
         }
     }
 
-    private fun getRiskFactorOptions(): List<CodedOption> {
+    private fun getAllRiskFactorOptions(): List<CodedOption> {
         val labels = resources.getStringArray(R.array.key_population_risk_factor_options)
         val codes = listOf(
             "PREGNANCY",
@@ -630,6 +712,14 @@ class VitalScreenFragment : Fragment() {
 
     private fun Double.stripTrailingZeros(): String {
         return if (this % 1.0 == 0.0) toInt().toString() else toString()
+    }
+
+    companion object {
+        private const val PREGNANCY_RISK_FACTOR_CODE = "PREGNANCY"
+        private val FEMALE_ONLY_RISK_FACTOR_CODES = setOf(
+            PREGNANCY_RISK_FACTOR_CODE,
+            "LACTATING_MOTHER"
+        )
     }
 
 }

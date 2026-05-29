@@ -13,8 +13,10 @@ import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.database.shared_preferences.ReferralStatusManager
 import org.piramalswasthya.stoptb.model.BenRegCache
+import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.ReferalCache
 import org.piramalswasthya.stoptb.model.VitalCache
+import java.util.Locale
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.NcdReferalRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
@@ -39,6 +41,11 @@ class VitalScreenViewModel @Inject constructor(
         val shouldRefer: Boolean,
         val referredFor: List<String>,
         val triggers: List<String>
+    )
+
+    data class RiskFactorUiState(
+        val isMale: Boolean,
+        val isPregnant: Boolean
     )
 
     enum class State {
@@ -69,6 +76,10 @@ class VitalScreenViewModel @Inject constructor(
     val state: LiveData<State>
         get() = _state
 
+    private val _riskFactorUiState = MutableLiveData<RiskFactorUiState>()
+    val riskFactorUiState: LiveData<RiskFactorUiState>
+        get() = _riskFactorUiState
+
     private var benCache: BenRegCache? = null
 
     init {
@@ -78,6 +89,12 @@ class VitalScreenViewModel @Inject constructor(
                 _benName.value = listOfNotNull(ben.firstName, ben.lastName).joinToString(" ")
                 _benAgeGender.value = "${ben.age} ${ben.ageUnit?.name} | ${ben.gender?.name}"
                 _referredFor.value = getDefaultReferralTests(ben).joinToString(", ")
+                _riskFactorUiState.value = RiskFactorUiState(
+                    isMale = ben.gender == Gender.MALE,
+                    isPregnant = isBeneficiaryPregnant(ben)
+                )
+            } ?: run {
+                _riskFactorUiState.value = RiskFactorUiState(isMale = false, isPregnant = false)
             }
             _existingVitals.value = vitalRepo.getVitals(benId)
         }
@@ -377,13 +394,21 @@ class VitalScreenViewModel @Inject constructor(
     }
 
     private fun getDefaultReferralTests(ben: BenRegCache?): List<String> {
-        val reproductiveStatus = ben?.genDetails?.reproductiveStatus
-        val isPregnant = ben?.genDetails?.reproductiveStatusId == 1 ||
-                reproductiveStatus.equals("Yes", ignoreCase = true)
-        return if (isPregnant) {
+        return if (ben != null && isBeneficiaryPregnant(ben)) {
             listOf("True NAT")
         } else {
             listOf("Digital Chest X-ray")
+        }
+    }
+
+    companion object {
+        fun isBeneficiaryPregnant(ben: BenRegCache): Boolean {
+            val gen = ben.genDetails ?: return false
+            if (gen.reproductiveStatusId == 1) return true
+            val status = gen.reproductiveStatus?.trim()?.lowercase(Locale.ENGLISH).orEmpty()
+            return status == "yes" ||
+                status == "pregnant woman" ||
+                status == "women pregnant"
         }
     }
 

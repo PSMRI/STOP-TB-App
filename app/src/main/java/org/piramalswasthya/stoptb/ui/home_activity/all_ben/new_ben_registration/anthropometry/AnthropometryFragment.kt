@@ -50,6 +50,8 @@ class AnthropometryFragment : Fragment() {
     private val viewModel: AnthropometryViewModel by viewModels()
     private var highTemperatureAlertShown = false
 
+    private var isFormLocked = false
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -75,12 +77,13 @@ class AnthropometryFragment : Fragment() {
         viewModel.existingAnthropometry.observe(viewLifecycleOwner) { ben ->
             ben ?: return@observe
             binding.tvAgeGender.text = formatAgeGender(ben)
+            lockFormIfExistingData(ben)
+
             binding.etWeight.setText(ben.weight?.formatOneDecimal().orEmpty())
             binding.etHeight.setText(ben.height?.formatOneDecimal().orEmpty())
             binding.etBmi.setText(ben.bmi?.formatOneDecimal().orEmpty())
             binding.etTemperature.setText(ben.temperature?.formatOneDecimal().orEmpty())
             selectTemperatureRange(ben.temperature)
-            lockFormIfExistingData(ben)
         }
 
         binding.etWeight.doAfterTextChanged { updateBmi() }
@@ -111,39 +114,28 @@ class AnthropometryFragment : Fragment() {
 
         viewModel.state.observe(viewLifecycleOwner) { state ->
             when (state) {
-                AnthropometryViewModel.State.SAVING -> binding.loadingOverlay.visibility = View.VISIBLE
+                AnthropometryViewModel.State.SAVING -> binding.loadingOverlay.visibility =
+                    View.VISIBLE
+
                 AnthropometryViewModel.State.SAVE_SUCCESS -> {
                     binding.loadingOverlay.visibility = View.GONE
-                    WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
-                    Toast.makeText(requireContext(), R.string.save_successful, Toast.LENGTH_SHORT).show()
-                    when {
-                        viewModel.examineFlow -> {
-                            // Part of Examine flow — proceed to General Exam (VitalScreen)
-                            viewLifecycleOwner.lifecycleScope.launch {
-                                val benRegId = viewModel.getBenRegId()
-                                findNavController().navigate(
-                                    R.id.vitalScreenFragment,
-                                    bundleOf(
-                                        "benId" to viewModel.benId,
-                                        "benRegId" to benRegId,
-                                        "autoFlow" to true
-                                    )
-                                )
-                            }
-                        }
-                        viewModel.autoFlow -> {
-                            val returnedToList = findNavController().popBackStack(R.id.allBenFragment, false)
-                            if (!returnedToList) {
-                                findNavController().navigate(
-                                    R.id.allBenFragment,
-                                    bundleOf("source" to 0)
-                                )
-                            }
+                    WorkerUtils.triggerAmritPushWorker(requireContext())
+                    Toast.makeText(requireContext(), R.string.save_successful, Toast.LENGTH_SHORT)
+                        .show()
+                    if (viewModel.autoFlow) {
+                        val returnedToList =
+                            findNavController().popBackStack(R.id.allBenFragment, false)
+                        if (!returnedToList) {
+                            findNavController().navigate(
+                                R.id.allBenFragment,
+                                bundleOf("source" to 0)
+                            )
                         }
                         else -> findNavController().popBackStack()
                     }
                     viewModel.resetState()
                 }
+
                 AnthropometryViewModel.State.SAVE_FAILED -> {
                     binding.loadingOverlay.visibility = View.GONE
                     Toast.makeText(
@@ -153,6 +145,7 @@ class AnthropometryFragment : Fragment() {
                     ).show()
                     viewModel.resetState()
                 }
+
                 else -> binding.loadingOverlay.visibility = View.GONE
             }
         }
@@ -173,9 +166,15 @@ class AnthropometryFragment : Fragment() {
         binding.tilTemperature.error = null
 
         if (binding.etWeight.text.isNullOrBlank()) {
-            binding.tilWeight.error = getString(R.string.field_is_required, getString(R.string.weight_kgs))
+            binding.tilWeight.error =
+                getString(R.string.field_is_required, getString(R.string.weight_kgs))
             valid = false
-        } else if (!isWithinRange(binding.etWeight.text?.toString(), MIN_WEIGHT_KG, MAX_WEIGHT_KG)) {
+        } else if (!isWithinRange(
+                binding.etWeight.text?.toString(),
+                MIN_WEIGHT_KG,
+                MAX_WEIGHT_KG
+            )
+        ) {
             binding.tilWeight.error = getString(
                 R.string.enter_value_between,
                 getString(R.string.weight_kgs),
@@ -185,9 +184,15 @@ class AnthropometryFragment : Fragment() {
             valid = false
         }
         if (binding.etHeight.text.isNullOrBlank()) {
-            binding.tilHeight.error = getString(R.string.field_is_required, getString(R.string.height_cms))
+            binding.tilHeight.error =
+                getString(R.string.field_is_required, getString(R.string.height_cms))
             valid = false
-        } else if (!isWithinRange(binding.etHeight.text?.toString(), MIN_HEIGHT_CM, MAX_HEIGHT_CM)) {
+        } else if (!isWithinRange(
+                binding.etHeight.text?.toString(),
+                MIN_HEIGHT_CM,
+                MAX_HEIGHT_CM
+            )
+        ) {
             binding.tilHeight.error = getString(
                 R.string.enter_value_between,
                 getString(R.string.height_cms),
@@ -197,9 +202,17 @@ class AnthropometryFragment : Fragment() {
             valid = false
         }
         if (binding.etTemperature.text.isNullOrBlank()) {
-            binding.tilTemperature.error = getString(R.string.field_is_required, getString(R.string.temperature_degree_fahrenheit))
+            binding.tilTemperature.error = getString(
+                R.string.field_is_required,
+                getString(R.string.temperature_degree_fahrenheit)
+            )
             valid = false
-        } else if (!isWithinRange(binding.etTemperature.text?.toString(), MIN_TEMPERATURE_F, MAX_TEMPERATURE_F)) {
+        } else if (!isWithinRange(
+                binding.etTemperature.text?.toString(),
+                MIN_TEMPERATURE_F,
+                MAX_TEMPERATURE_F
+            )
+        ) {
             binding.tilTemperature.error = getString(
                 R.string.enter_value_between,
                 getString(R.string.temperature_degree_fahrenheit),
@@ -236,7 +249,7 @@ class AnthropometryFragment : Fragment() {
         (binding.etTemperature.text?.toString()?.toDoubleOrNull() ?: 0.0) >= 100.0
 
     private fun showHighTemperatureAlert() {
-        if (highTemperatureAlertShown) return
+        if (highTemperatureAlertShown || isFormLocked) return
         highTemperatureAlertShown = true
         AlertDialog.Builder(requireContext())
             .setMessage(R.string.refer_to_hwc_alert)
@@ -257,6 +270,7 @@ class AnthropometryFragment : Fragment() {
         val hasSavedAnthropometry =
             ben.weight != null || ben.height != null || ben.bmi != null || ben.temperature != null
         if (!hasSavedAnthropometry) return
+        isFormLocked = true
 
         binding.etWeight.isEnabled = false
         binding.etHeight.isEnabled = false
@@ -279,8 +293,8 @@ class AnthropometryFragment : Fragment() {
         return InputFilter { source: CharSequence, start: Int, end: Int, dest: Spanned, dstart: Int, dend: Int ->
             val current = dest.toString()
             val updated = current.substring(0, dstart) +
-                source.subSequence(start, end).toString() +
-                current.substring(dend)
+                    source.subSequence(start, end).toString() +
+                    current.substring(dend)
             if (updated.isEmpty() || regex.matches(updated)) null else ""
         }
     }
@@ -289,10 +303,21 @@ class AnthropometryFragment : Fragment() {
         super.onStart()
         activity?.let {
             when (it) {
+//                is HomeActivity -> it.updateActionBar(
+//                    R.drawable.ic__ncd,
+//                    getString(R.string.anthropometry_screen)
+//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+//
+//                is VolunteerActivity -> it.updateActionBar(
+//                    R.drawable.ic__ncd,
+//                    getString(R.string.anthropometry_screen)
+//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
+
                 is HomeActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.anthropometry_screen)
                 )
+
                 is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.anthropometry_screen)
@@ -314,4 +339,5 @@ class AnthropometryFragment : Fragment() {
 
     private fun Double.stripTrailingZero(): String =
         if (this % 1.0 == 0.0) this.toInt().toString() else this.toString()
+
 }
