@@ -14,7 +14,9 @@ import androidx.core.os.bundleOf
 import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import kotlinx.coroutines.launch
 import dagger.hilt.android.AndroidEntryPoint
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.databinding.FragmentAnthropometryBinding
@@ -23,10 +25,14 @@ import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.work.WorkerUtils
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class AnthropometryFragment : Fragment() {
+
+    @Inject lateinit var preferenceDao: PreferenceDao
 
     private companion object {
         const val MIN_WEIGHT_KG = 1.0
@@ -108,18 +114,33 @@ class AnthropometryFragment : Fragment() {
                 AnthropometryViewModel.State.SAVING -> binding.loadingOverlay.visibility = View.VISIBLE
                 AnthropometryViewModel.State.SAVE_SUCCESS -> {
                     binding.loadingOverlay.visibility = View.GONE
-                    WorkerUtils.triggerAmritPushWorker(requireContext())
+                    WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
                     Toast.makeText(requireContext(), R.string.save_successful, Toast.LENGTH_SHORT).show()
-                    if (viewModel.autoFlow) {
-                        val returnedToList = findNavController().popBackStack(R.id.allBenFragment, false)
-                        if (!returnedToList) {
-                            findNavController().navigate(
-                                R.id.allBenFragment,
-                                bundleOf("source" to 0)
-                            )
+                    when {
+                        viewModel.examineFlow -> {
+                            // Part of Examine flow — proceed to General Exam (VitalScreen)
+                            viewLifecycleOwner.lifecycleScope.launch {
+                                val benRegId = viewModel.getBenRegId()
+                                findNavController().navigate(
+                                    R.id.vitalScreenFragment,
+                                    bundleOf(
+                                        "benId" to viewModel.benId,
+                                        "benRegId" to benRegId,
+                                        "autoFlow" to true
+                                    )
+                                )
+                            }
                         }
-                    } else {
-                        findNavController().popBackStack()
+                        viewModel.autoFlow -> {
+                            val returnedToList = findNavController().popBackStack(R.id.allBenFragment, false)
+                            if (!returnedToList) {
+                                findNavController().navigate(
+                                    R.id.allBenFragment,
+                                    bundleOf("source" to 0)
+                                )
+                            }
+                        }
+                        else -> findNavController().popBackStack()
                     }
                     viewModel.resetState()
                 }
@@ -268,18 +289,14 @@ class AnthropometryFragment : Fragment() {
         super.onStart()
         activity?.let {
             when (it) {
-//                is HomeActivity -> it.updateActionBar(
-//                    R.drawable.ic__ncd,
-//                    getString(R.string.anthropometry_screen)
-//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
-//
-//                is VolunteerActivity -> it.updateActionBar(
-//                    R.drawable.ic__ncd,
-//                    getString(R.string.anthropometry_screen)
-//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
-
-                is HomeActivity -> it.updateActionBar(R.drawable.ic__ncd, getString(R.string.vital_screen))
-                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ncd, getString(R.string.vital_screen))
+                is HomeActivity -> it.updateActionBar(
+                    R.drawable.ic__ncd,
+                    getString(R.string.anthropometry_screen)
+                )
+                is VolunteerActivity -> it.updateActionBar(
+                    R.drawable.ic__ncd,
+                    getString(R.string.anthropometry_screen)
+                )
             }
         }
     }

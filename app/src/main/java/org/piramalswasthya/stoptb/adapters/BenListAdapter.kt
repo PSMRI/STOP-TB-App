@@ -70,10 +70,12 @@ class BenListAdapter(
             tbScreeningBenIds: List<Long> = emptyList(),
             generalOpdBenIds: List<Long> = emptyList(),
             anthropometryBenIds: List<Long> = emptyList(),
+            tbSuspectedBenIds: List<Long> = emptyList(),
             childCountMap: Map<Long, Int> = emptyMap(),
             showActionButtons: Boolean = true,
             showResultButton: Boolean = false,
-            showAnthropometryButton: Boolean = false
+            showAnthropometryButton: Boolean = false,
+            showExamineButton: Boolean = true
         ) {
 
             binding.btnAbha.visibility = View.VISIBLE
@@ -84,8 +86,6 @@ class BenListAdapter(
             binding.showActionButtons = showActionButtons
             binding.showRegistrationDate = showRegistrationDate
             binding.registrationDate.visibility =
-                if (showRegistrationDate) View.VISIBLE else View.INVISIBLE
-            binding.blankSpace.visibility =
                 if (showRegistrationDate) View.VISIBLE else View.INVISIBLE
             binding.hasAbha = !item.abhaId.isNullOrEmpty()
             binding.role = role
@@ -101,6 +101,7 @@ class BenListAdapter(
             val hasTbScreening = tbScreeningBenIds.contains(item.benId)
             val hasGeneralOpd = generalOpdBenIds.contains(item.benId)
             val hasAnthropometry = anthropometryBenIds.contains(item.benId)
+            val hasDiagnosis = tbSuspectedBenIds.contains(item.benId)
             binding.isGeneralOpdDone = hasGeneralOpd
             binding.isAnthropometryDone = hasAnthropometry
 
@@ -110,7 +111,7 @@ class BenListAdapter(
                 binding.root.context.getString(R.string.add_eye_surgery)
             }
 
-            // Hide unused UI elements upfront (no spouse/children/eye surgery buttons in StopTB)
+            // Hide unused UI elements upfront (no eye surgery / children buttons in StopTB)
             binding.HOF.visibility = View.GONE
             binding.btnAbove30.visibility = View.GONE
             binding.btnVitalScreen.visibility = when {
@@ -179,10 +180,53 @@ class BenListAdapter(
                     ContextCompat.getColor(binding.root.context, android.R.color.white)
                 )
             }
+            // Examine button — show filled count X/5 + color (red=0, green=≥1)
+            val examineFilledCount = listOf(
+                hasAnthropometry,
+                isMatched,        // vitals/general exam
+                hasTbScreening,
+                hasGeneralOpd,
+                hasDiagnosis
+            ).count { it }
+            binding.btnExamine.text = binding.root.context.getString(R.string.btn_examine_count, examineFilledCount)
+            binding.btnExamine.backgroundTintList = ContextCompat.getColorStateList(
+                binding.root.context,
+                if (examineFilledCount > 0) android.R.color.holo_green_dark
+                else android.R.color.holo_red_dark
+            )
+            binding.btnExamine.setTextColor(
+                ContextCompat.getColor(binding.root.context, android.R.color.white)
+            )
+            binding.btnExamine.visibility = if (showExamineButton) View.VISIBLE else View.GONE
+
             binding.llBenDetails4.visibility = View.GONE
-            binding.btnAddSpouse.visibility = View.GONE
             binding.btnAddChildren.visibility = View.GONE
-            binding.llAddSpouseBtn.visibility = View.GONE
+
+            // Register Wife / Register Husband — show for married members without spouse registered
+            when {
+                item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
+                        && !item.isDeath && !item.isDeactivate -> {
+                    binding.llAddSpouseBtn.visibility = View.VISIBLE
+                    binding.btnAddSpouse.visibility = View.VISIBLE
+                    binding.btnAddSpouse.text = context.getString(R.string.add_wife)
+                    binding.btnAddSpouse.setOnClickListener {
+                        clickListener?.onClickedWifeBen(item)
+                    }
+                }
+                item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
+                        && !item.isDeath && !item.isDeactivate -> {
+                    binding.llAddSpouseBtn.visibility = View.VISIBLE
+                    binding.btnAddSpouse.visibility = View.VISIBLE
+                    binding.btnAddSpouse.text = context.getString(R.string.add_husband)
+                    binding.btnAddSpouse.setOnClickListener {
+                        clickListener?.onClickedHusbandBen(item)
+                    }
+                }
+                else -> {
+                    binding.llAddSpouseBtn.visibility = View.GONE
+                    binding.btnAddSpouse.visibility = View.GONE
+                }
+            }
             binding.ivSoftDelete.visibility = View.GONE
             binding.tvTitleDuplicaterecord.visibility = View.GONE
 
@@ -263,7 +307,11 @@ class BenListAdapter(
         parent: ViewGroup, viewType: Int
     ) = BenViewHolder.from(parent)
 
-    private val benIds = mutableListOf<Long>()
+    private val benIds            = mutableListOf<Long>()
+    private val tbScreeningIds    = mutableListOf<Long>()
+    private val generalOpdIds     = mutableListOf<Long>()
+    private val anthropometryIds  = mutableListOf<Long>()
+    private val diagnosisIds      = mutableListOf<Long>()
 
     override fun onBindViewHolder(holder: BenViewHolder, position: Int) {
         holder.bind(
@@ -279,29 +327,36 @@ class BenListAdapter(
             pref,
             context,
             benIds,
-            emptyList(),
-            emptyList(),
-            emptyList(),
+            tbScreeningIds,
+            generalOpdIds,
+            anthropometryIds,
+            diagnosisIds,
             showActionButtons = showActionButtons,
             showResultButton = showResultButton,
             showAnthropometryButton = showAnthropometryButton
         )
     }
 
-    fun submitBenIds(list: List<Long>) {
-        val oldIds = benIds.toSet()
-        benIds.clear()
-        benIds.addAll(list)
-        val newIds = benIds.toSet()
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private fun applyIdList(target: MutableList<Long>, source: List<Long>) {
+        val oldIds = target.toSet()
+        target.clear()
+        target.addAll(source)
+        val newIds = target.toSet()
         val changed = (oldIds - newIds) + (newIds - oldIds)
         if (changed.isNotEmpty()) {
             currentList.forEachIndexed { index, item ->
-                if (item.benId in changed) {
-                    notifyItemChanged(index)
-                }
+                if (item.benId in changed) notifyItemChanged(index)
             }
         }
     }
+
+    fun submitBenIds(list: List<Long>)           = applyIdList(benIds, list)
+    fun submitTbScreeningBenIds(list: List<Long>) = applyIdList(tbScreeningIds, list)
+    fun submitGeneralOpdBenIds(list: List<Long>)  = applyIdList(generalOpdIds, list)
+    fun submitAnthropometryBenIds(list: List<Long>) = applyIdList(anthropometryIds, list)
+    fun submitDiagnosisBenIds(list: List<Long>)   = applyIdList(diagnosisIds, list)
 
 
     class BenClickListener(
@@ -317,7 +372,8 @@ class BenListAdapter(
         private val clickedVitalScreen: (item: BenBasicDomain, benId: Long, hhId: Long) -> Unit = { _, _, _ -> },
         private val clickedResult: (item: BenBasicDomain, benId: Long, hhId: Long) -> Unit = { _, _, _ -> },
         private val clickedGeneralOpd: (item: BenBasicDomain, benId: Long, hhId: Long, viewOnly: Boolean) -> Unit = { _, _, _, _ -> },
-        private val clickedAnthropometry: (item: BenBasicDomain, benId: Long, hhId: Long, viewOnly: Boolean) -> Unit = { _, _, _, _ -> }
+        private val clickedAnthropometry: (item: BenBasicDomain, benId: Long, hhId: Long, viewOnly: Boolean) -> Unit = { _, _, _, _ -> },
+        private val clickedExamine: (item: BenBasicDomain, benId: Long) -> Unit = { _, _ -> }
     ) {
         fun onClickedBen(item: BenBasicDomain) = clickedBen(
             item,
@@ -364,5 +420,6 @@ class BenListAdapter(
 
         fun onClickedForCall(item: BenBasicDomain) = callBen(item)
         fun onClickSoftDeleteBen(item: BenBasicDomain) = softDeleteBen(item)
+        fun onClickExamine(item: BenBasicDomain) = clickedExamine(item, item.benId)
     }
 }

@@ -19,12 +19,15 @@ import org.piramalswasthya.stoptb.adapters.TBFollowUpDatesAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentLeprosyFromBinding
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class TBConfirmedFormFragment : Fragment() {
 
+    @Inject lateinit var preferenceDao: PreferenceDao
 
     private var _binding: FragmentLeprosyFromBinding? = null
     private val binding: FragmentLeprosyFromBinding
@@ -96,7 +99,7 @@ class TBConfirmedFormFragment : Fragment() {
                         requireContext(),
                         resources.getString(R.string.tb_tracking_submitted), Toast.LENGTH_SHORT
                     ).show()
-                    WorkerUtils.triggerAmritPushWorker(requireContext())
+                    WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
                     findNavController().navigateUp()
                 }
 

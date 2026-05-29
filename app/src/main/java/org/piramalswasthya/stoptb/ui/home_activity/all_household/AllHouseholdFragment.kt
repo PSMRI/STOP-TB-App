@@ -27,7 +27,7 @@ import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchRvButtonBindi
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.HouseHoldBasicDomain
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
+import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -78,7 +78,7 @@ class AllHouseholdFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
-        (activity as? HomeActivity)?.updateActionBar(
+        (activity as? VolunteerActivity)?.updateActionBar(
             R.drawable.ic__hh,
             getString(R.string.icon_title_household)
         )
@@ -90,8 +90,7 @@ class AllHouseholdFragment : Fragment() {
 
         binding.tvEmptyContent.text = getString(R.string.no_records_found_hh)
         binding.btnNextPage.text = getString(R.string.btn_text_frag_home_nhhr)
-        binding.btnNextPage.visibility =
-            if (prefDao.getLoggedInUser()?.role.isRegistrationOfficerRole()) View.VISIBLE else View.GONE
+        binding.btnNextPage.visibility = View.VISIBLE
 
         val householdAdapter = HouseHoldListAdapter(
             diseaseType = "",

@@ -407,6 +407,8 @@ class BenRepo @Inject constructor(
             Timber.d("YTR 419 $benList")
 
             val benNetworkPostList = mutableSetOf<BenPost>()
+            val householdNetworkPostList = mutableSetOf<HouseholdNetwork>()
+            val kidNetworkPostList = mutableSetOf<BenRegKidNetwork>()
 
             benList.forEach {
                 createBenIdAtServerByBeneficiarySending(it, user, it.locationRecord)
@@ -417,16 +419,26 @@ class BenRepo @Inject constructor(
             updateBenList.forEach {
                 benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.SYNCING)
                 benNetworkPostList.add(it.asNetworkPostModel(context, user))
+                householdNetworkPostList.add(
+                    householdDao.getHousehold(it.householdId)!!.asNetworkModel(user)
+                )
+                try {
+                    if (it.ageUnitId != 3 || it.age < 15) kidNetworkPostList.add(
+                        it.asKidNetworkModel(user)
+                    )
+                } catch (e: Exception) {
+                    Timber.e("caught error in adding kidDetails : $e")
+                }
             }
 
-            val uploadDone = postDataToAmritServer(benNetworkPostList)
+            val uploadDone = postDataToAmritServer(benNetworkPostList, householdNetworkPostList, kidNetworkPostList)
             if (!uploadDone) {
                 benNetworkPostList.takeIf { it.isNotEmpty() }?.map { it.benId }?.let {
                     benDao.benSyncWithServerFailed(*it.toLongArray())
                 }
-                Timber.e("Beneficiary batch push FAILED: ${benNetworkPostList.size} ben records")
+                Timber.e("Beneficiary batch push FAILED: ${benNetworkPostList.size} ben records, ${householdNetworkPostList.size} household records")
             } else {
-                Timber.d("Beneficiary batch push succeeded: ${benNetworkPostList.size} ben records")
+                Timber.d("Beneficiary batch push succeeded: ${benNetworkPostList.size} ben records, ${householdNetworkPostList.size} household records")
             }
             return@withContext true
         }
@@ -434,16 +446,19 @@ class BenRepo @Inject constructor(
 
     private suspend fun postDataToAmritServer(
         benNetworkPostSet: MutableSet<BenPost>,
+        householdNetworkPostSet: MutableSet<HouseholdNetwork>,
+        kidNetworkPostSet: MutableSet<BenRegKidNetwork>,
         retryCount: Int = 3,
     ): Boolean {
-        if (benNetworkPostSet.isEmpty()) return true
+        if (benNetworkPostSet.isEmpty() && householdNetworkPostSet.isEmpty() && kidNetworkPostSet.isEmpty()) return true
         val benIds = benNetworkPostSet.map { it.benId }
-        Timber.d("Amrit push syncDataToAmrit: sending ${benNetworkPostSet.size} ben(s) $benIds")
+        val hhIds = householdNetworkPostSet.map { it.householdId }
+        Timber.d("Amrit push syncDataToAmrit: sending ${benNetworkPostSet.size} ben(s) $benIds, ${householdNetworkPostSet.size} hh(s) $hhIds, ${kidNetworkPostSet.size} kid(s)")
         val rmnchData = SendingRMNCHData(
-            houseHoldRegistrationData = null,
+            houseHoldRegistrationData = householdNetworkPostSet.toList(),
             benficieryRegistrationData = benNetworkPostSet.toList(),
             cbacData = null,
-            birthDetails = null
+            birthDetails = kidNetworkPostSet.toList()
         )
         try {
             val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
@@ -462,13 +477,16 @@ class BenRepo @Inject constructor(
                         val benToUpdateList =
                             benNetworkPostSet.takeIf { it.isNotEmpty() }?.map { it.benId }
                                 ?.toTypedArray()?.toLongArray()
-                        Timber.d("Amrit push syncDataToAmrit marking synced: benIds=${benToUpdateList?.toList()}")
+                        val hhToUpdateList = householdNetworkPostSet.takeIf { it.isNotEmpty() }
+                            ?.map { it.householdId.toLong() }?.toTypedArray()?.toLongArray()
+                        Timber.d("Amrit push syncDataToAmrit marking synced: benIds=${benToUpdateList?.toList()}, hhIds=${hhToUpdateList?.toList()}")
                         benToUpdateList?.let {
                             benDao.benSyncedWithServer(*it)
                             Timber.d("Amrit push syncDataToAmrit DB updated: benIds=${it.toList()}")
                         }
+                        hhToUpdateList?.let { householdDao.householdSyncedWithServer(*it) }
                         return true
-                    } else if (responseStatusCode == 5002 || responseStatusCode ==401)  {
+                    } else if (responseStatusCode == 5002 || responseStatusCode == 401) {
                         val user = preferenceDao.getLoggedInUser()
                             ?: throw IllegalStateException("User not logged in according to db")
                         if (userRepo.refreshTokenTmc(
@@ -487,7 +505,7 @@ class BenRepo @Inject constructor(
         } catch (e: SocketTimeoutException) {
             Timber.e("Amrit push syncDataToAmrit timeout: benIds=$benIds, error=$e")
             if (retryCount > 0) return postDataToAmritServer(
-                benNetworkPostSet, retryCount - 1
+                benNetworkPostSet, householdNetworkPostSet, kidNetworkPostSet, retryCount - 1
             )
             Timber.e("Amrit push syncDataToAmrit: max retries exhausted")
             return false

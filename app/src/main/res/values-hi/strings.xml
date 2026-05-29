@@ -349,6 +349,7 @@
     <string name="check_if_the_person_has_any_of_these_symptoms">जांचें कि व्यक्ति में इनमें से कोई लक्षण है या नहीं</string>
     <string name="symptomatic_tb_screening">टीबी के लक्षणों की जांच</string>
     <string name="tb_asymptomatic_symptoms">बिना लक्षण वाले लोगों की टीबी जांच</string>
+    <string name="tb_is_beneficiary_asymptomatic">क्या लाभार्थी बिना लक्षण वाला है</string>
     <string name="tb_rise_of_fever">रोजाना शाम को तेज बुखार आता है?</string>
     <string name="tb_loss_of_appetite">भूख कम लगना</string>
     <string name="tb_age_more_than_60">उम्र 60 वर्ष से अधिक</string>
@@ -834,6 +835,98 @@
     <string name="quick_refresh_failed">अपडेट विफल। फिर कोशिश करें</string>
     <string name="quick_refresh_action">रिफ्रेश</string>
     <string name="quick_refresh_camp_disconnected">कैंप हब जुड़ा नहीं है। पहले दोबारा कनेक्ट करें।</string>
+
+    <!-- Examine flow -->
+    <string name="btn_examine">जांचें</string>
+    <string name="btn_examine_count">जांचें %1$d/5</string>
+    <string name="examine_bottomsheet_title">परीक्षण फॉर्म</string>
+    <string name="examine_btn_fill">भरें</string>
+    <string name="examine_btn_view">देखें</string>
+    <string name="diagnosis_locked_msg">कृपया पहले टीबी स्क्रीनिंग फॉर्म भरें</string>
+    <string name="tb_screening_legend_xray_sputum">* डिजिटल छाती एक्स-रे या थूक संग्रह के लिए रेफर करें</string>
+    <string name="tb_screening_legend_family_members">** सभी परिवार के सदस्यों की जांच की सलाह दें</string>
+
+    <!-- Diagnostics form — referral + denial / not-conducted strings -->
+    <string name="tb_referred_for_digital_chest_xray">डिजिटल छाती एक्स-रे के लिए रेफर किया गया?</string>
+    <string name="tb_reason_for_denial_chest_xray">डिजिटल छाती एक्स-रे से इनकार का कारण</string>
+    <string name="tb_reason_for_denial_chest_xray_other">इनकार का अन्य कारण बताएं (एक्स-रे)</string>
+    <string name="tb_reason_not_conducted_xray">एक्स-रे न होने का कारण</string>
+    <string name="tb_reason_not_conducted_xray_other">अन्य कारण बताएं (एक्स-रे नहीं हुआ)</string>
+    <string name="tb_referred_for_sputum_collection">थूक संग्रह के लिए रेफर किया गया?</string>
+    <string name="tb_reason_for_denial_sputum">थूक संग्रह से इनकार का कारण</string>
+    <string name="tb_reason_for_denial_sputum_other">इनकार का अन्य कारण बताएं (थूक)</string>
+    <string name="tb_sputum_submitted_at">थूक सैंपल कहाँ जमा किया</string>
+    <string name="tb_reason_not_conducted_naat">True NAT न होने का कारण</string>
+    <string name="tb_reason_not_conducted_naat_other">अन्य कारण बताएं (True NAT नहीं हुआ)</string>
+
+    <string-array name="tb_reason_for_denial_xray">
+        <item>रोगी ने मना किया</item>
+        <item>शिविर में लंबी प्रतीक्षा</item>
+        <item>दैनिक मजदूरी का नुकसान</item>
+        <item>सरकारी कार्यक्रमों या शिविर आयोजकों पर भरोसे की कमी</item>
+        <item>हाल ही में जांच हो चुकी है</item>
+        <item>लंबी प्रतीक्षा</item>
+        <item>भय/चिंता</item>
+        <item>चिकित्सकीय रूप से अस्थिर</item>
+        <item>भय और चिंता</item>
+        <item>भ्रांतियां</item>
+        <item>सामाजिक कलंक</item>
+        <item>सांस्कृतिक और लैंगिक बाधाएं</item>
+        <item>स्वास्थ्यकर्मियों के साथ पुराने बुरे अनुभव</item>
+        <item>गोपनीयता की चिंता</item>
+        <item>अन्य</item>
+    </string-array>
+
+    <string-array name="tb_reason_not_conducted_xray">
+        <item>एक्स-रे मशीन उपलब्ध नहीं</item>
+        <item>बिजली की समस्या</item>
+        <item>कनेक्टिविटी समस्या</item>
+        <item>मरीज अनुपस्थित</item>
+        <item>मरीज ने मना किया</item>
+        <item>तकनीकी खराबी</item>
+        <item>रेडियोग्राफर उपलब्ध नहीं</item>
+        <item>अत्यधिक प्रतीक्षा समय</item>
+        <item>अन्य</item>
+    </string-array>
+
+    <string-array name="tb_reason_for_denial_sputum">
+        <item>रोगी ने मना किया</item>
+        <item>थूक नहीं निकाल सका</item>
+        <item>दैनिक मजदूरी का नुकसान</item>
+        <item>सरकारी कार्यक्रमों या शिविर आयोजकों पर भरोसे की कमी</item>
+        <item>हाल ही में जांच हो चुकी है</item>
+        <item>लंबी प्रतीक्षा</item>
+        <item>भय/चिंता</item>
+        <item>चिकित्सकीय रूप से अस्थिर</item>
+        <item>भय और चिंता</item>
+        <item>भ्रांतियां</item>
+        <item>सामाजिक कलंक</item>
+        <item>सांस्कृतिक और लैंगिक बाधाएं</item>
+        <item>स्वास्थ्यकर्मियों के साथ पुराने बुरे अनुभव</item>
+        <item>गोपनीयता की चिंता</item>
+        <item>अन्य</item>
+    </string-array>
+
+    <string-array name="tb_reason_not_conducted_naat">
+        <item>मशीन उपलब्ध नहीं</item>
+        <item>कार्ट्रिज उपलब्ध नहीं</item>
+        <item>नमूना अस्वीकार</item>
+        <item>मरीज ने मना किया</item>
+        <item>कनेक्टिविटी समस्या</item>
+        <item>तकनीकी समस्या</item>
+        <item>मरीज अनुपस्थित</item>
+        <item>अत्यधिक प्रतीक्षा समय</item>
+        <item>अन्य</item>
+    </string-array>
+
+    <string-array name="tb_diagnostics_sputum_submitted_at">
+        <item>टीबी स्क्रीनिंग शिविर</item>
+        <item>DMC</item>
+        <item>TU</item>
+        <item>DH</item>
+        <item>CHC</item>
+        <item>PHC</item>
+    </string-array>
 </resources>
 
 

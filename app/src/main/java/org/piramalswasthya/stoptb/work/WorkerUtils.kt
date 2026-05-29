@@ -13,7 +13,9 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.Operation
 import androidx.work.WorkContinuation
 import androidx.work.WorkManager
+import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceManager
 import org.piramalswasthya.stoptb.work.dynamicWoker.FormSyncWorker
 import org.piramalswasthya.stoptb.work.dynamicWoker.NCDFollowUpSyncWorker
 import org.piramalswasthya.stoptb.work.dynamicWoker.NDCFollowUpPushWorker
@@ -36,6 +38,13 @@ object WorkerUtils {
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
 
     fun triggerAmritPushWorker(context: Context) {
+        // Block all data push until camp mode is active AND hub is connected
+        val prefs = PreferenceManager.getInstance(context)
+        val campKey = context.getString(R.string.PREF_camp_mode_enabled)
+        if (!prefs.getBoolean(campKey, false)) return
+        val hubConnectedKey = context.getString(R.string.PREF_camp_hub_connected)
+        if (!prefs.getBoolean(hubConnectedKey, false)) return
+
         val workManager = WorkManager.getInstance(context)
 
         val registration = syncRequestBuilder<PushToAmritWorker>()
@@ -105,6 +114,23 @@ object WorkerUtils {
         WorkContinuation.combine(listOf(chainA, chainB, chainE))
             .then(setSyncCompleteWorker)
             .enqueue()
+    }
+
+    /** Convenience alias — camp check is already inside [triggerAmritPushWorker]. */
+    fun triggerCampAwarePushWorker(context: Context, preferenceDao: PreferenceDao) {
+        triggerAmritPushWorker(context)
+    }
+
+    /**
+     * ABHA push — does NOT require camp mode, only needs internet.
+     * Use this from ABHA creation flow.
+     */
+    fun triggerAbhaPushWorker(context: Context) {
+        val workRequest = syncRequestBuilder<PushMapAbhatoBenficiaryWorker>()
+            .addTag("push_group9_digital_health").build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "PUSH-ABHA-TO-AMRIT", ExistingWorkPolicy.APPEND_OR_REPLACE, workRequest
+        )
     }
 
     fun triggerCampQuickPullIfConnected(

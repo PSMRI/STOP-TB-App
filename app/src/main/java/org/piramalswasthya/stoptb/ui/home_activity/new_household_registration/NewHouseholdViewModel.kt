@@ -107,6 +107,10 @@ class NewHouseholdViewModel @Inject constructor(
 
     fun getHoFName() = "${household.family?.familyHeadName.orEmpty()} ${household.family?.familyName.orEmpty()}".trim()
 
+    fun resetState() {
+        _state.value = State.IDLE
+    }
+
     fun updateListOnValueChanged(formId: Int, index: Int) {
         viewModelScope.launch {
             dataset.updateList(formId, index)

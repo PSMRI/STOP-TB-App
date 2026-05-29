@@ -148,8 +148,8 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             firstNameHeadOfFamily.value = saved.familyHeadName
             lastNameHeadOfFamily.value = saved.familyName
             mobileNoHeadOfFamily.value = saved.familyHeadPhoneNo.toString()
-            saved.familyHeadName.takeIf { it!!.isNotEmpty() }?.let { firstNameHeadOfFamily.inputType = TEXT_VIEW }
-            saved.familyName.takeIf { it!!.isNotEmpty() }?.let { lastNameHeadOfFamily.inputType = TEXT_VIEW }
+            saved.familyHeadName?.takeIf { it.isNotEmpty() }?.let { firstNameHeadOfFamily.inputType = TEXT_VIEW }
+            saved.familyName?.takeIf { it.isNotEmpty() }?.let { lastNameHeadOfFamily.inputType = TEXT_VIEW }
             saved.familyHeadPhoneNo.takeIf { it != null }?.let { mobileNoHeadOfFamily.inputType = TEXT_VIEW }
             houseNo.value = saved.houseNo
             wardNo.value = saved.wardNo
@@ -170,7 +170,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             typeOfHouse.value = typeOfHouse.getStringFromPosition(saved.houseTypeId)
             houseOwnership.value = houseOwnership.getStringFromPosition(saved.isHouseOwnedId)
         }
-        if (residentialArea.value == residentialArea.entries!![3]) {
+        if (residentialArea.value == residentialArea.entries!!.last()) {
             list.add(list.indexOf(residentialArea) + 1, otherResidentialArea)
         }
         val thirdPage =
@@ -458,7 +458,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             residentialArea.id -> triggerDependants(
                 source = residentialArea,
                 passedIndex = index,
-                triggerIndex = residentialArea.entries!!.size - 2,
+                triggerIndex = residentialArea.entries!!.size - 1,
                 target = otherResidentialArea
             )
 

@@ -17,7 +17,7 @@ import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
 import org.piramalswasthya.stoptb.helpers.Konstants
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
+import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.ui.home_activity.new_household_registration.NewHouseholdViewModel.State
 import timber.log.Timber
 
@@ -73,7 +73,8 @@ class NewHouseholdFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
-        (activity as? HomeActivity)?.updateActionBar(
+        // Title will be set dynamically in readRecord observer
+        (activity as? VolunteerActivity)?.updateActionBar(
             R.drawable.ic__hh,
             getString(R.string.frag_nhhr_title)
         )
@@ -84,6 +85,14 @@ class NewHouseholdFragment : Fragment() {
         binding.cvPatientInformation.visibility = View.GONE
 
         viewModel.readRecord.observe(viewLifecycleOwner) { recordExists ->
+            // Change toolbar title based on mode: view vs new registration
+            (activity as? VolunteerActivity)?.updateActionBar(
+                R.drawable.ic__hh,
+                if (recordExists)
+                    getString(R.string.view_household_information)
+                else
+                    getString(R.string.frag_nhhr_title)
+            )
             binding.fabEdit.visibility = if (recordExists) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (!recordExists) View.VISIBLE else View.GONE
 
@@ -129,10 +138,14 @@ class NewHouseholdFragment : Fragment() {
                     Toast.makeText(context, getString(R.string.save_successful), Toast.LENGTH_LONG)
                         .show()
                     if (!editMode) {
+                        // Lock form into view mode so that on back-navigation from ben registration
+                        // the form doesn't reappear as editable/submittable
+                        viewModel.setRecordExists(true)
                         nextScreenAlert.setMessage(
                             getString(R.string.add_head_of_family_message, viewModel.getHoFName())
                         )
                         nextScreenAlert.show()
+                        viewModel.resetState()  // reset so dialog doesn't reappear on back navigation
                     } else {
                         findNavController().navigateUp()
                     }

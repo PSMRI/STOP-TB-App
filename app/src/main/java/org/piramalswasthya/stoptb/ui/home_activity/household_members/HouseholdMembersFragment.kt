@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import androidx.appcompat.app.AlertDialog
+import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -21,11 +22,12 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertNewBenBinding
 import org.piramalswasthya.stoptb.databinding.FragmentHouseholdMembersBinding
 import org.piramalswasthya.stoptb.model.Gender
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
+import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
+import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class HouseholdMembersFragment : Fragment() {
+class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     @Inject
     lateinit var prefDao: PreferenceDao
@@ -37,6 +39,7 @@ class HouseholdMembersFragment : Fragment() {
     private var addBenAlert: AlertDialog? = null
     private var addBenAlertBinding: AlertNewBenBinding? = null
     private var selectedRelationIndex = -1
+    private var pendingExamineBenId: Long? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -49,7 +52,7 @@ class HouseholdMembersFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
-        (activity as? HomeActivity)?.updateActionBar(
+        (activity as? VolunteerActivity)?.updateActionBar(
             R.drawable.ic__hh,
             getString(R.string.household_members)
         )
@@ -64,11 +67,29 @@ class HouseholdMembersFragment : Fragment() {
                 clickedBen = { _, hhId, benId, relToHeadId ->
                     openMemberForm(hhId, benId, relToHeadId)
                 },
-                clickedWifeBen = { _, hhId, benId, relToHeadId ->
-                    openMemberForm(hhId, benId, relToHeadId)
+                clickedWifeBen = { _, hhId, benId, _ ->
+                    // "Register Wife" button — navigate to new ben reg as Wife (index 4 = Wife)
+                    findNavController().navigate(
+                        HouseholdMembersFragmentDirections.actionHouseholdMembersFragmentToNewBenRegFragment(
+                            hhId = hhId,
+                            relToHeadId = 4,        // "Wife" index in nbr_relationship_to_head_src
+                            gender = 2,             // Female
+                            selectedBenId = benId,  // original member's ID → mark isSpouseAdded after save
+                            isAddSpouse = 1
+                        )
+                    )
                 },
-                clickedHusbandBen = { _, hhId, benId, relToHeadId ->
-                    openMemberForm(hhId, benId, relToHeadId)
+                clickedHusbandBen = { _, hhId, benId, _ ->
+                    // "Register Husband" button — navigate to new ben reg as Husband (index 5 = Husband)
+                    findNavController().navigate(
+                        HouseholdMembersFragmentDirections.actionHouseholdMembersFragmentToNewBenRegFragment(
+                            hhId = hhId,
+                            relToHeadId = 5,        // "Husband" index in nbr_relationship_to_head_src
+                            gender = 1,             // Male
+                            selectedBenId = benId,  // original member's ID → mark isSpouseAdded after save
+                            isAddSpouse = 1
+                        )
+                    )
                 },
                 clickedChildben = { _, hhId, benId, relToHeadId ->
                     openMemberForm(hhId, benId, relToHeadId)
@@ -77,7 +98,10 @@ class HouseholdMembersFragment : Fragment() {
                 clickedABHA = { _, _, _ -> },
                 clickedAddAllBenBtn = { _, _, _, _, _ -> },
                 callBen = {},
-                softDeleteBen = {}
+                softDeleteBen = {},
+                clickedExamine = { _, benId ->
+                    showExamineBottomSheet(benId)
+                }
             ),
             showBeneficiaries = true,
             showRegistrationDate = true,
@@ -96,9 +120,100 @@ class HouseholdMembersFragment : Fragment() {
             }
         }
 
+        // Examine count — same data as AllBenFragment so buttons show correct fill status
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.vitalBenIds.collect { benAdapter.submitBenIds(it) }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.tbScreeningBenIds.collect { benAdapter.submitTbScreeningBenIds(it) }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.generalOpdBenIds.collect { benAdapter.submitGeneralOpdBenIds(it) }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.anthropometryBenIds.collect { benAdapter.submitAnthropometryBenIds(it) }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.diagnosisBenIds.collect { benAdapter.submitDiagnosisBenIds(it) }
+            }
+        }
+
         binding.fabAddMember.setOnClickListener {
             addBenAlert?.show()
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val benId = pendingExamineBenId
+        if (benId != null) {
+            // Always without autoFlow — prevents form re-opening when back is pressed
+            showExamineBottomSheet(benId)
+        }
+    }
+
+    private fun showExamineBottomSheet(benId: Long) {
+        val existing = childFragmentManager.findFragmentByTag(ExamineBottomSheetFragment.TAG)
+        if (existing != null) return
+        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false)
+            .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
+    }
+
+    override fun onNavigateToExamineForm(benId: Long, formIndex: Int, viewOnly: Boolean) {
+        pendingExamineBenId = benId
+        when (formIndex) {
+            ExamineBottomSheetFragment.FORM_ANTHROPOMETRY -> {
+                findNavController().navigate(
+                    R.id.anthropometryFragment,
+                    bundleOf("benId" to benId, "autoFlow" to false, "examineFlow" to !viewOnly)
+                )
+            }
+            ExamineBottomSheetFragment.FORM_GENERAL_EXAM -> {
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val benRegId = viewModel.getBenRegId(benId)
+                    findNavController().navigate(
+                        R.id.vitalScreenFragment,
+                        bundleOf("benId" to benId, "benRegId" to benRegId, "autoFlow" to !viewOnly)
+                    )
+                }
+            }
+            ExamineBottomSheetFragment.FORM_TB_SCREENING -> {
+                findNavController().navigate(
+                    R.id.TBScreeningFormFragment,
+                    bundleOf("benId" to benId, "autoFlow" to !viewOnly)
+                )
+            }
+            ExamineBottomSheetFragment.FORM_GENERAL_OPD -> {
+                findNavController().navigate(
+                    R.id.GeneralOpdFormFragment,
+                    bundleOf(
+                        "benId" to benId,
+                        "viewOnly" to viewOnly,
+                        "autoFlow" to !viewOnly,
+                        "generalOpdFlow" to !viewOnly
+                    )
+                )
+            }
+            ExamineBottomSheetFragment.FORM_DIAGNOSIS -> {
+                findNavController().navigate(
+                    R.id.TBSuspectedQuickFragment,
+                    bundleOf("benId" to benId, "viewOnly" to viewOnly)
+                )
+            }
+        }
+    }
+
+    override fun onExamineDismissed() {
+        pendingExamineBenId = null
     }
 
     private fun openMemberForm(hhId: Long, benId: Long, relToHeadId: Int) {

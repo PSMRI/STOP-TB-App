@@ -63,6 +63,11 @@ class TBRepo @Inject constructor(
 
     val generalOpdBenIds: Flow<List<Long>> = tbDao.getAllGeneralOpdBenIds()
 
+    val tbSuspectedBenIds: Flow<List<Long>> = tbDao.getAllTbSuspectedBenIds()
+
+    /** benIds that have a record in TB_DIAGNOSTICS (new diagnostics table) */
+    val tbDiagnosticsBenIds: Flow<List<Long>> = tbDao.getAllTbDiagnosticsBenIds()
+
     suspend fun saveGeneralOpd(generalOpdCache: GeneralOpdCache) {
         withContext(Dispatchers.IO) {
             tbDao.saveGeneralOpd(generalOpdCache)
