@@ -22,9 +22,14 @@ import org.piramalswasthya.stoptb.helpers.applyAutoFlowBackPolicyOnResume
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.utils.scrollToFormValidationField
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.work.WorkerUtils
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class VitalScreenFragment : Fragment() {
+
+    @Inject lateinit var preferenceDao: PreferenceDao
 
     private var _binding: FragmentVitalScreenBinding? = null
     private val binding: FragmentVitalScreenBinding
@@ -117,6 +122,7 @@ class VitalScreenFragment : Fragment() {
                         getString(R.string.vitals_saved_successfully),
                         Toast.LENGTH_SHORT
                     ).show()
+                    WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
                     navigateAfterVitals()
                 }
                 VitalScreenViewModel.State.SAVE_FAILED -> {

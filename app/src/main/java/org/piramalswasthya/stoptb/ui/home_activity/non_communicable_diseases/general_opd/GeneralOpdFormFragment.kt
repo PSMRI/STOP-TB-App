@@ -20,10 +20,15 @@ import org.piramalswasthya.stoptb.helpers.blockBackNavigationInManagedFlow
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.utils.scrollToFormValidationError
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class GeneralOpdFormFragment : Fragment() {
+
+    @Inject lateinit var preferenceDao: PreferenceDao
 
     private var _binding: FragmentNewFormBinding? = null
     private val binding: FragmentNewFormBinding
@@ -95,6 +100,7 @@ class GeneralOpdFormFragment : Fragment() {
 //                        getString(R.string.general_opd_submitted),
 //                        Toast.LENGTH_SHORT
 //                    ).show()
+                    WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
                     navigateToDiagnostics()
                 }
 

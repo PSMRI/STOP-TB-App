@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import androidx.work.WorkQuery
 import com.google.android.material.tabs.TabLayoutMediator
 import dagger.hilt.android.AndroidEntryPoint
 import org.piramalswasthya.stoptb.R
@@ -65,7 +66,7 @@ class VolunteerHomeFragment : Fragment() {
 
         binding.btnQuickRefresh.setOnClickListener {
             if (manualHomeRefreshRequested || !binding.btnQuickRefresh.isEnabled) return@setOnClickListener
-            if (pref.isCampModeEnabled() && !pref.isCampHubConnected()) {
+            if (!pref.isCampHubConnected()) {
                 binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_camp_disconnected)
                 setQuickRefreshButtonEnabled(true)
                 return@setOnClickListener
@@ -78,7 +79,12 @@ class VolunteerHomeFragment : Fragment() {
         }
 
         WorkManager.getInstance(requireContext().applicationContext)
-            .getWorkInfosForUniqueWorkLiveData(WorkerUtils.pullWorkerUniqueName)
+            .getWorkInfosLiveData(
+                WorkQuery.fromUniqueWorkNames(
+                    WorkerUtils.pushWorkerUniqueName,
+                    WorkerUtils.pullWorkerUniqueName
+                )
+            )
             .observe(viewLifecycleOwner) { workInfos ->
                 if (!manualHomeRefreshRequested || workInfos.isNullOrEmpty()) return@observe
 

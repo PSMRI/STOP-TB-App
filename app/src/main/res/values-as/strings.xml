@@ -424,6 +424,7 @@
     <string name="symptomatic_tb_screening">লক্ষণযুক্ত TB স্ক্ৰিনিং</string>
     <string name="check_if_the_person_has_any_of_these_symptoms">ব্যক্তিজনৰ এই লক্ষণসমূহৰ যিকোনো এটা আছে নে নাই পৰীক্ষা কৰক:</string>
     <string name="tb_asymptomatic_symptoms">লক্ষণবিহীন TB স্ক্ৰিনিং</string>
+    <string name="tb_is_beneficiary_asymptomatic">লাভাৰ্থী জন লক্ষণবিহীন নেকি</string>
     <string name="tb_rise_of_fever">সন্ধিয়া সময়ত জ্বৰ বৃদ্ধি পায়</string>
     <string name="tb_loss_of_appetite">ভোক কমি যোৱা</string>
     <string name="tb_age_more_than_60">বয়স ৬০ বছৰৰ অধিক</string>
@@ -438,6 +439,7 @@
     <string name="home_greeting_subtitle">আপোনাৰ দৈনন্দিন কামৰ দ্ৰুত এক্সেছ</string>
     <string name="home_quick_actions">দ্ৰুত কাৰ্য</string>
     <string name="home_card_all_ben_subtitle">সকলো হিতাধিকাৰী চাওক আৰু ব্যৱস্থাপনা কৰক</string>
+    <string name="home_card_household_subtitle">পৰিয়াল পঞ্জীয়ন আৰু পৰিচালনা কৰক</string>
     <string name="home_card_tb_subtitle">টিবি স্ক্ৰিনিং আৰু সহায় অনুসৰণ কৰক</string>
     <string name="home_card_ncd_subtitle">এনচিডি কার্যপ্রবাহ পৰিচালনা কৰক</string>
     <string name="home_card_referral_subtitle">ৰেফাৰ কৰা কেছসমূহৰ অনুসৰণ কৰক</string>
@@ -693,6 +695,98 @@
     <string name="quick_refresh_failed">আপডেট বিফল। পুনৰ চেষ্টা কৰক</string>
     <string name="quick_refresh_action">ৰিফ্ৰেছ</string>
     <string name="quick_refresh_camp_disconnected">কেম্প হাব সংযুক্ত নহয়। প্ৰথমে পুনৰ সংযোগ কৰক।</string>
+
+    <!-- Examine flow -->
+    <string name="btn_examine">পৰীক্ষা কৰক</string>
+    <string name="btn_examine_count">পৰীক্ষা কৰক %1$d/5</string>
+    <string name="examine_bottomsheet_title">পৰীক্ষণ ফৰ্ম</string>
+    <string name="examine_btn_fill">পূৰণ কৰক</string>
+    <string name="examine_btn_view">চাওক</string>
+    <string name="diagnosis_locked_msg">অনুগ্ৰহ কৰি প্ৰথমে টিবি স্ক্ৰীনিং ফৰ্ম পূৰণ কৰক</string>
+    <string name="tb_screening_legend_xray_sputum">* ডিজিটেল চেষ্ট এক্স-ৰে বা থুকনি সংগ্ৰহৰ বাবে পাঠাওক</string>
+    <string name="tb_screening_legend_family_members">** পৰিয়ালৰ সকলো সদস্যৰ পৰীক্ষা কৰোৱাৰ পৰামৰ্শ দিয়ক</string>
+
+    <!-- Diagnostics form — referral + denial / not-conducted strings -->
+    <string name="tb_referred_for_digital_chest_xray">ডিজিটেল চেষ্ট এক্স-ৰেৰ বাবে পাঠোৱা হৈছে নে?</string>
+    <string name="tb_reason_for_denial_chest_xray">ডিজিটেল চেষ্ট এক্স-ৰে অস্বীকাৰৰ কাৰণ</string>
+    <string name="tb_reason_for_denial_chest_xray_other">অস্বীকাৰৰ অন্য কাৰণ উল্লেখ কৰক (এক্স-ৰে)</string>
+    <string name="tb_reason_not_conducted_xray">এক্স-ৰে নোহোৱাৰ কাৰণ</string>
+    <string name="tb_reason_not_conducted_xray_other">অন্য কাৰণ উল্লেখ কৰক (এক্স-ৰে নহ\'ল)</string>
+    <string name="tb_referred_for_sputum_collection">থুকনি সংগ্ৰহৰ বাবে পাঠোৱা হৈছে নে?</string>
+    <string name="tb_reason_for_denial_sputum">থুকনি সংগ্ৰহ অস্বীকাৰৰ কাৰণ</string>
+    <string name="tb_reason_for_denial_sputum_other">অস্বীকাৰৰ অন্য কাৰণ উল্লেখ কৰক (থুকনি)</string>
+    <string name="tb_sputum_submitted_at">থুকনিৰ নমুনা দিয়া স্থান</string>
+    <string name="tb_reason_not_conducted_naat">True NAT নোহোৱাৰ কাৰণ</string>
+    <string name="tb_reason_not_conducted_naat_other">অন্য কাৰণ উল্লেখ কৰক (True NAT নহ\'ল)</string>
+
+    <string-array name="tb_reason_for_denial_xray">
+        <item>ৰোগীয়ে অস্বীকাৰ কৰিছে</item>
+        <item>শিবিৰত দীঘলীয়া অপেক্ষা</item>
+        <item>দৈনিক মজুৰিৰ ক্ষতি</item>
+        <item>চৰকাৰী কাৰ্যসূচী বা শিবিৰ আয়োজকৰ প্ৰতি আস্থাৰ অভাৱ</item>
+        <item>শেহতীয়াকৈ পৰীক্ষা হৈছে</item>
+        <item>দীঘলীয়া অপেক্ষা</item>
+        <item>ভয়/উদ্বেগ</item>
+        <item>চিকিৎসাগতভাৱে অস্থিৰ</item>
+        <item>ভয় আৰু উদ্বেগ</item>
+        <item>ভুল ধাৰণা</item>
+        <item>সামাজিক কলঙ্ক</item>
+        <item>সাংস্কৃতিক আৰু লিংগ-সম্পৰ্কীয় বাধা</item>
+        <item>স্বাস্থ্যকৰ্মীৰ সৈতে আগৰ বেয়া অভিজ্ঞতা</item>
+        <item>গোপনীয়তাৰ উদ্বেগ</item>
+        <item>অন্য</item>
+    </string-array>
+
+    <string-array name="tb_reason_not_conducted_xray">
+        <item>এক্স-ৰে মেচিন উপলব্ধ নহয়</item>
+        <item>বিদ্যুৎ সমস্যা</item>
+        <item>সংযোগ সমস্যা</item>
+        <item>ৰোগী অনুপস্থিত</item>
+        <item>ৰোগীয়ে অস্বীকাৰ কৰিছে</item>
+        <item>প্ৰযুক্তিগত বিফলতা</item>
+        <item>ৰেডিঅ\'গ্ৰাফাৰ উপলব্ধ নহয়</item>
+        <item>অতিৰিক্ত অপেক্ষাৰ সময়</item>
+        <item>অন্য</item>
+    </string-array>
+
+    <string-array name="tb_reason_for_denial_sputum">
+        <item>ৰোগীয়ে অস্বীকাৰ কৰিছে</item>
+        <item>কফ উৎপাদন কৰিব পৰা নাই</item>
+        <item>দৈনিক মজুৰিৰ ক্ষতি</item>
+        <item>চৰকাৰী কাৰ্যসূচী বা শিবিৰ আয়োজকৰ প্ৰতি আস্থাৰ অভাৱ</item>
+        <item>শেহতীয়াকৈ পৰীক্ষা হৈছে</item>
+        <item>দীঘলীয়া অপেক্ষা</item>
+        <item>ভয়/উদ্বেগ</item>
+        <item>চিকিৎসাগতভাৱে অস্থিৰ</item>
+        <item>ভয় আৰু উদ্বেগ</item>
+        <item>ভুল ধাৰণা</item>
+        <item>সামাজিক কলঙ্ক</item>
+        <item>সাংস্কৃতিক আৰু লিংগ-সম্পৰ্কীয় বাধা</item>
+        <item>স্বাস্থ্যকৰ্মীৰ সৈতে আগৰ বেয়া অভিজ্ঞতা</item>
+        <item>গোপনীয়তাৰ উদ্বেগ</item>
+        <item>অন্য</item>
+    </string-array>
+
+    <string-array name="tb_reason_not_conducted_naat">
+        <item>মেচিন উপলব্ধ নহয়</item>
+        <item>কাৰ্টৰিজ উপলব্ধ নহয়</item>
+        <item>নমুনা প্ৰত্যাখ্যাত</item>
+        <item>ৰোগীয়ে অস্বীকাৰ কৰিছে</item>
+        <item>সংযোগ সমস্যা</item>
+        <item>প্ৰযুক্তিগত সমস্যা</item>
+        <item>ৰোগী অনুপস্থিত</item>
+        <item>অতিৰিক্ত অপেক্ষাৰ সময়</item>
+        <item>অন্য</item>
+    </string-array>
+
+    <string-array name="tb_diagnostics_sputum_submitted_at">
+        <item>টিবি স্ক্ৰিনিং শিবিৰ</item>
+        <item>DMC</item>
+        <item>TU</item>
+        <item>DH</item>
+        <item>CHC</item>
+        <item>PHC</item>
+    </string-array>
 </resources>
 
 

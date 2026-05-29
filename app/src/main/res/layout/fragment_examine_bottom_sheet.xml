@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingBottom="24dp">
+
+    <!-- Handle bar -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_tab_strip"
+        android:backgroundTint="?attr/colorOnSurface" />
+
+    <!-- Title -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="16dp"
+        android:text="@string/examine_bottomsheet_title"
+        android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+        android:textColor="?attr/colorPrimary"
+        android:fontFamily="@font/roboto_bold" />
+
+    <!-- Divider -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginBottom="8dp"
+        android:background="?attr/colorOutlineVariant" />
+
+    <!-- 1. Anthropometric -->
+    <include
+        android:id="@+id/row_anthropometry"
+        layout="@layout/rv_item_examine_form"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <!-- 2. General Exam -->
+    <include
+        android:id="@+id/row_general_exam"
+        layout="@layout/rv_item_examine_form"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <!-- 3. TB Screening -->
+    <include
+        android:id="@+id/row_tb_screening"
+        layout="@layout/rv_item_examine_form"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <!-- 4. General OPD -->
+    <include
+        android:id="@+id/row_general_opd"
+        layout="@layout/rv_item_examine_form"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <!-- 5. Diagnosis -->
+    <include
+        android:id="@+id/row_diagnosis"
+        layout="@layout/rv_item_examine_form"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+</LinearLayout>

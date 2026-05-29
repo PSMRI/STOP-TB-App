@@ -34,6 +34,7 @@ class AnthropometryViewModel @Inject constructor(
 
     val benId = AnthropometryFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
     val autoFlow = AnthropometryFragmentArgs.fromSavedStateHandle(savedStateHandle).autoFlow
+    val examineFlow: Boolean = savedStateHandle["examineFlow"] ?: false
 
     private val _benName = MutableLiveData<String>()
     val benName: LiveData<String> = _benName
@@ -117,6 +118,10 @@ class AnthropometryViewModel @Inject constructor(
     fun resetState() {
         _state.value = State.IDLE
     }
+
+    /** Returns the server-side benRegId for the current ben (needed for VitalScreen navigation). */
+    suspend fun getBenRegId(): Long =
+        benRepo.getBenFromId(benId)?.benRegId ?: 0L
 
     private fun buildHwcReferral(ben: BenRegCache): ReferalCache? {
         val user = preferenceDao.getLoggedInUser() ?: return null

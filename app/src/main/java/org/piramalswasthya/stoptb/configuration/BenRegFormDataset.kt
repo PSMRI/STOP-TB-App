@@ -227,6 +227,16 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         required = true, hasDependants = true
     )
 
+    // 7b. Relation to Head of Family (shown only when registering inside a household)
+    private val relationToHead = FormElement(
+        id = 15, inputType = TEXT_VIEW,
+        title = resources.getString(R.string.relation_with_family_head),
+        arrayId = R.array.nbr_relationship_to_head_src,
+        entries = resources.getStringArray(R.array.nbr_relationship_to_head_src),
+        required = false,
+        isEnabled = false,
+    )
+
     // 8. Mobile Number
     val mobileNoOfRelation = FormElement(
         id = 12, inputType = DROPDOWN,
@@ -412,11 +422,11 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
 
     val occupationDrop = FormElement(
-        id = 18, inputType = DROPDOWN,
+        id = 1043, inputType = DROPDOWN,
         title = resources.getString(R.string.nbr_occupation),
         arrayId = R.array.occupation_array,
         entries = resources.getStringArray(R.array.occupation_array),
-        required = true, hasDependants = true
+        required = true, hasDependants = false
     )
 
     // 18. RCH ID
@@ -443,7 +453,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     /**
      * Setup page for NEW beneficiary registration
      */
-    suspend fun setUpPage(ben: BenRegCache?, familyHeadPhoneNo: Long?, villageName: String? = null, villageNames: Array<String>? = null, villageEntityList: List<LocationEntity> = emptyList(), subCentreName: String? = null) {
+    suspend fun setUpPage(ben: BenRegCache?, familyHeadPhoneNo: Long?, villageName: String? = null, villageNames: Array<String>? = null, villageEntityList: List<LocationEntity> = emptyList(), subCentreName: String? = null, relToHeadId: Int = -1) {
         val list = mutableListOf(
             pic,
             dateOfReg,
@@ -505,6 +515,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         setDefaultEconomicStatusIfNeeded()
         setDefaultResidentialAreaIfNeeded()
         syncReproductiveStatusToCurrentLanguage()
+
+        ben?.takeIf { it.isDraft }?.let { prefill ->
+            applyDraftPrefill(prefill)
+        }
 
         ben?.takeIf { !it.isDraft }?.let { saved ->
             // Beneficiary Status (death)
@@ -578,7 +592,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                 }
             }
             fatherName.value = saved.fatherName
+            saved.fatherName?.takeIf { it.isNotEmpty() }?.let { fatherName.inputType = TEXT_VIEW }
             motherName.value = saved.motherName
+            saved.motherName?.takeIf { it.isNotEmpty() }?.let { motherName.inputType = TEXT_VIEW }
             subCentre.value = saved.locationRecord.block.name
 
             mobileNoOfRelation.value = mobileNoOfRelation.getStringFromPosition(saved.mobileNoOfRelationId)
@@ -632,6 +648,51 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             }
         }
 
+        // For spouse registration (Wife=4 / Husband=5): force Married + lock gender/marital/spouse fields
+        if (relToHeadId == 4 || relToHeadId == 5) {
+            // Lock gender — pre-filled from nav args, not changeable
+            gender.inputType = TEXT_VIEW
+
+            // Minimum age 15 for wife/husband — restrict DOB picker upper bound
+            val maxDobForSpouse = Calendar.getInstance()
+                .apply { add(Calendar.YEAR, -Konstants.minAgeForGenBen) }.timeInMillis
+            agePopup.max = maxDobForSpouse
+
+            // Force marital status = Married and lock it
+            val genderId = ben?.genderId ?: 0
+            maritalStatus.entries = if (genderId == 2) maritalStatusFemale else maritalStatusMale
+            maritalStatus.arrayId = if (genderId == 2) R.array.nbr_marital_status_female_array else R.array.nbr_marital_status_male_array
+            maritalStatus.value = maritalStatus.getStringFromPosition(2) // "Married"
+            maritalStatus.inputType = TEXT_VIEW
+            if (!list.contains(maritalStatus)) {
+                val insertAfter = list.indexOf(relationToHead).takeIf { it >= 0 }
+                    ?: list.indexOf(gender).takeIf { it >= 0 }
+                val insertIdx = if (insertAfter != null && insertAfter >= 0) insertAfter + 1 else list.size
+                list.add(insertIdx, maritalStatus)
+            }
+
+            // Add and lock spouse name field with HoF's name pre-filled
+            val hofName = ben?.genDetails?.spouseName.orEmpty()
+            val spouseNameField = when (relToHeadId) {
+                4 -> husbandName   // wife being registered → HoF is husband
+                5 -> wifeName      // husband being registered → HoF is wife
+                else -> null
+            }
+            spouseNameField?.let { field ->
+                if (hofName.isNotBlank()) field.value = hofName
+                field.inputType = TEXT_VIEW
+                val maritalIdx = list.indexOf(maritalStatus)
+                if (maritalIdx >= 0 && !list.contains(field)) {
+                    list.add(maritalIdx + 1, field)
+                }
+            }
+
+            // Lock firstName if pre-filled (wife's/husband's name from DB)
+            if (!firstName.value.isNullOrBlank()) {
+                firstName.inputType = TEXT_VIEW
+            }
+        }
+
         // Mobile other
         val mobileIndex = list.indexOf(mobileNoOfRelation)
         if (mobileNoOfRelation.value == mobileNoOfRelation.entries!!.last() && mobileIndex >= 0) {
@@ -646,7 +707,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
         addReproductiveStatusIfApplicable(list)
 
-        currentLocation = preferenceDao.getLocationRecord()
+        currentLocation = ben?.locationRecord ?: preferenceDao.getLocationRecord()
 
         currentLocation?.let {
             state.entries = arrayOf(it.state.name)
@@ -664,9 +725,31 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         setUpPage(list)
     }
 
+    private fun applyDraftPrefill(prefill: BenRegCache) {
+        prefill.firstName?.takeIf { it.isNotBlank() }?.let { firstName.value = it }
+        prefill.lastName?.takeIf { it.isNotBlank() }?.let { lastName.value = it }
+        prefill.genderId.takeIf { it > 0 }?.let { gender.value = gender.getStringFromPosition(it) }
+        prefill.fatherName?.takeIf { it.isNotBlank() }?.let { fatherName.value = it }
+        prefill.motherName?.takeIf { it.isNotBlank() }?.let { motherName.value = it }
+        prefill.contactNumber?.let { contactNumber.value = it.toString() }
+        prefill.address?.takeIf { it.isNotBlank() }?.let { address.value = it }
+        prefill.economicStatusId?.takeIf { it > 0 }?.let {
+            economicStatus.value = economicStatus.getStringFromPosition(it)
+        }
+        prefill.residentialAreaId?.takeIf { it > 0 }?.let {
+            residentialAreaType.value = getSavedResidentialAreaValue(prefill)
+        }
+        prefill.communityId.takeIf { it > 0 }?.let {
+            community.value = getSavedCommunityValue(prefill)
+        }
+        prefill.religionId.takeIf { it > 0 }?.let {
+            religion.value = religion.getStringFromPosition(it)
+        }
+    }
+
     // Keep setFirstPageToRead as alias for backward compat with ViewModel
-    suspend fun setFirstPageToRead(ben: BenRegCache?, familyHeadPhoneNo: Long?, villageName: String? = null, villageNames: Array<String>? = null, villageEntityList: List<LocationEntity> = emptyList(), subCentreName: String? = null) =
-        setUpPage(ben, familyHeadPhoneNo, villageName, villageNames, villageEntityList, subCentreName)
+    suspend fun setFirstPageToRead(ben: BenRegCache?, familyHeadPhoneNo: Long?, villageName: String? = null, villageNames: Array<String>? = null, villageEntityList: List<LocationEntity> = emptyList(), subCentreName: String? = null, relToHeadId: Int = -1) =
+        setUpPage(ben, familyHeadPhoneNo, villageName, villageNames, villageEntityList, subCentreName, relToHeadId)
 
 
     private var familyHeadPhoneNo: String? = null
@@ -793,32 +876,77 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             agePopup.id -> {
                 val age = try { getAgeFromDob(getLongFromDate(agePopup.value)) } catch (_: Exception) { 0 }
 
-                // Hide marital status + dependants for age < 15 (PRD: Not Applicable for age 0-14)
-                val maritalFields = listOf(
-                    maritalStatus, husbandName, wifeName, spouseName,
-                    ageAtMarriage, dateOfMarriage, reproductiveStatus
-                )
+                // Spouse sub-fields (depend on marital status)
+                val spouseFields = listOf(husbandName, wifeName, spouseName, ageAtMarriage, dateOfMarriage, reproductiveStatus)
+
                 if (age < Konstants.minAgeForGenBen) {
+                    // Under 15: hide maritalStatus + all sub-fields
                     triggerDependants(
                         source = villageHamlet,
-                        removeItems = maritalFields,
+                        removeItems = listOf(maritalStatus) + spouseFields,
                         addItems = emptyList()
                     )
                 } else {
-                    triggerDependants(
-                        source = villageHamlet,
-                        removeItems = maritalFields,
-                        addItems = listOf(maritalStatus)
-                    )
-                    maritalStatus.entries = when (index) {
-                        1 -> maritalStatusFemale
-                        else -> maritalStatusMale
+                    // Save current values BEFORE any reset
+                    val savedMarital = maritalStatus.value
+                    val savedHusband = husbandName.value
+                    val savedWife    = wifeName.value
+                    val savedSpouse  = spouseName.value
+
+                    // isMaritalLocked = true means wife/husband registration (maritalStatus is TEXT_VIEW locked)
+                    val isMaritalLocked = maritalStatus.inputType == TEXT_VIEW
+
+                    if (isMaritalLocked) {
+                        // Locked case (e.g. wife/husband registration):
+                        // Keep maritalStatus in its current position — only remove sub-fields
+                        triggerDependants(
+                            source = maritalStatus,
+                            removeItems = spouseFields,
+                            addItems = emptyList()
+                        )
+                    } else {
+                        // Normal case: remove all marital fields and re-add maritalStatus after villageHamlet
+                        triggerDependants(
+                            source = villageHamlet,
+                            removeItems = listOf(maritalStatus) + spouseFields,
+                            addItems = listOf(maritalStatus)
+                        )
                     }
-                    maritalStatus.arrayId = when (index) {
-                        1 -> R.array.nbr_marital_status_female_array
-                        else -> R.array.nbr_marital_status_male_array
+
+                    // Set correct entries using gender.value (index = -1 for AGE_PICKER)
+                    val isFemale = gender.value == gender.entries?.getOrNull(1)
+                    maritalStatus.entries = if (isFemale) maritalStatusFemale else maritalStatusMale
+                    maritalStatus.arrayId = if (isFemale) R.array.nbr_marital_status_female_array
+                                           else           R.array.nbr_marital_status_male_array
+
+                    if (!isMaritalLocked) {
+                        // Normal: restore previous selection or set default
+                        maritalStatus.value = savedMarital
+                        setDefaultMaritalStatusIfNeeded()
                     }
-                    setDefaultMaritalStatusIfNeeded()
+                    // Locked: maritalStatus.value was not in removeItems → still "Married" ✓
+
+                    // Re-add spouse + reproductive fields if Married
+                    val isMarried = maritalStatus.value == maritalStatus.entries?.getOrNull(1)
+                    if (isMarried) {
+                        val spouseField = when (gender.value) {
+                            gender.entries?.getOrNull(0) -> wifeName.also    { it.value = savedWife }
+                            gender.entries?.getOrNull(1) -> husbandName.also { it.value = savedHusband }
+                            gender.entries?.getOrNull(2) -> spouseName.also  { it.value = savedSpouse }
+                            else -> null
+                        }
+                        val fieldsToAdd = mutableListOf<FormElement>()
+                        if (isFemale) fieldsToAdd.add(reproductiveStatus) // "Are you pregnant?" before spouse name
+                        spouseField?.let { fieldsToAdd.add(it) }
+
+                        if (fieldsToAdd.isNotEmpty()) {
+                            triggerDependants(
+                                source = maritalStatus,
+                                removeItems = emptyList(),
+                                addItems = fieldsToAdd
+                            )
+                        }
+                    }
                 }
                 updateMaritalStatusRequirement()
 
@@ -1080,9 +1208,14 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             ben.mobileNumberAvailable = !isMobileNotAvailableChecked()
             ben.address = address.value
 
-            // No relation to head in StopTB — set to default
-            ben.familyHeadRelationPosition = 19
-            ben.familyHeadRelation = null
+            val relPos = relationToHead.getPosition()
+            if (relPos >= 0) {
+                ben.familyHeadRelationPosition = relPos
+                ben.familyHeadRelation = relationToHead.getEnglishStringFromPosition(relPos)
+            } else {
+                ben.familyHeadRelationPosition = 19
+                ben.familyHeadRelation = null
+            }
             ben.familyHeadRelationOther = null
 
             // Mobile

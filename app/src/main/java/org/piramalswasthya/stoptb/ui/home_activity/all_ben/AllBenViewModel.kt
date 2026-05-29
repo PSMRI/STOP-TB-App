@@ -69,6 +69,12 @@ class AllBenViewModel @Inject constructor(
     val generalOpdBenIds: Flow<List<Long>> = tbRepo.generalOpdBenIds
     val anthropometryFilledBenIds: Flow<List<Long>> = recordsRepo.anthropometryFilledBenIds
 
+    /** Diagnosis = TB_DIAGNOSTICS (new saves) OR TB_SUSPECTED (legacy saves) */
+    val diagnosisBenIds: Flow<List<Long>> = combine(
+        tbRepo.tbDiagnosticsBenIds,
+        tbRepo.tbSuspectedBenIds
+    ) { diagnostics, suspected -> (diagnostics + suspected).distinct() }
+
     private val _abha = MutableLiveData<String?>()
     val abha: LiveData<String?>
         get() = _abha

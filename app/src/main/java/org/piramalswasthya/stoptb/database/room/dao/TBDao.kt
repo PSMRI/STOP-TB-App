@@ -33,6 +33,12 @@ interface TBDao {
     @Query("SELECT benId FROM GENERAL_OPD")
     fun getAllGeneralOpdBenIds(): Flow<List<Long>>
 
+    @Query("SELECT benId FROM TB_SUSPECTED")
+    fun getAllTbSuspectedBenIds(): Flow<List<Long>>
+
+    @Query("SELECT benId FROM TB_DIAGNOSTICS")
+    fun getAllTbDiagnosticsBenIds(): Flow<List<Long>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveGeneralOpd(generalOpdCache: GeneralOpdCache)
 

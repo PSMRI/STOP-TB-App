@@ -97,6 +97,31 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
+                    <!-- Optional title shown above form questions (e.g. TB Screening) -->
+                    <TextView
+                        android:id="@+id/tv_form_title"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginBottom="2dp"
+                        android:paddingHorizontal="4dp"
+                        android:textStyle="bold"
+                        android:textSize="15sp"
+                        android:textColor="?attr/colorOnSurface"
+                        android:visibility="gone" />
+
+                    <!-- Optional legend shown just below title, above form questions (e.g. TB Screening) -->
+                    <TextView
+                        android:id="@+id/tv_form_footer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="6dp"
+                        android:paddingHorizontal="4dp"
+                        android:textSize="13sp"
+                        android:textColor="?attr/colorOnSurface"
+                        android:lineSpacingExtra="3dp"
+                        android:visibility="gone" />
+
                     <FrameLayout
                         android:layout_width="match_parent"
                         android:layout_height="0dp"

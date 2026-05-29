@@ -20,6 +20,7 @@ class BenPagingAdapter(
     private val showActionButtons: Boolean = false,
     private val showResultButton: Boolean = false,
     private val showAnthropometryButton: Boolean = false,
+    private val showExamineButton: Boolean = true,
 ) :
     PagingDataAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenListAdapter.BenDiffUtilCallBack) {
 
@@ -27,6 +28,7 @@ class BenPagingAdapter(
     private val tbScreeningBenIds = mutableListOf<Long>()
     private val generalOpdBenIds = mutableListOf<Long>()
     private val anthropometryBenIds = mutableListOf<Long>()
+    private val diagnosisIds = mutableListOf<Long>()
     private val childCountMap = mutableMapOf<Long, Int>()
 
     override fun onCreateViewHolder(
@@ -51,10 +53,12 @@ class BenPagingAdapter(
             tbScreeningBenIds,
             generalOpdBenIds,
             anthropometryBenIds,
+            diagnosisIds,
             childCountMap,
             showActionButtons = showActionButtons,
             showResultButton = showResultButton,
-            showAnthropometryButton = showAnthropometryButton
+            showAnthropometryButton = showAnthropometryButton,
+            showExamineButton = showExamineButton
         )
     }
 
@@ -93,6 +97,13 @@ class BenPagingAdapter(
         anthropometryBenIds.clear()
         anthropometryBenIds.addAll(list)
         notifyChangedIds(oldIds, anthropometryBenIds.toSet())
+    }
+
+    fun submitDiagnosisBenIds(list: List<Long>) {
+        val oldIds = diagnosisIds.toSet()
+        diagnosisIds.clear()
+        diagnosisIds.addAll(list)
+        notifyChangedIds(oldIds, diagnosisIds.toSet())
     }
 
     private fun notifyChangedIds(oldIds: Set<Long>, newIds: Set<Long>) {

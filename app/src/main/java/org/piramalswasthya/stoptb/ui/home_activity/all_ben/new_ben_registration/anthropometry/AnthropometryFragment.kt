@@ -14,7 +14,9 @@ import androidx.core.os.bundleOf
 import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import kotlinx.coroutines.launch
 import dagger.hilt.android.AndroidEntryPoint
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.databinding.FragmentAnthropometryBinding
@@ -23,10 +25,14 @@ import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.work.WorkerUtils
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class AnthropometryFragment : Fragment() {
+
+    @Inject lateinit var preferenceDao: PreferenceDao
 
     private companion object {
         const val MIN_WEIGHT_KG = 1.0
@@ -125,8 +131,7 @@ class AnthropometryFragment : Fragment() {
                                 bundleOf("source" to 0)
                             )
                         }
-                    } else {
-                        findNavController().popBackStack()
+                        else -> findNavController().popBackStack()
                     }
                     viewModel.resetState()
                 }
