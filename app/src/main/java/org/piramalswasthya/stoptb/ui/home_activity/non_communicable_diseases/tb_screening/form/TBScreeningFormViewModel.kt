@@ -103,9 +103,12 @@ class TBScreeningFormViewModel @Inject constructor(
 
     fun updateListOnValueChanged(formId: Int, index: Int) {
         viewModelScope.launch {
-            dataset.updateList(formId, index)
+            applyFormChange(formId, index)
         }
+    }
 
+    suspend fun applyFormChange(formId: Int, index: Int) {
+        dataset.updateList(formId, index)
     }
 
     fun getFamilyContactAlert(): String? = dataset.getFamilyContactAlert()
@@ -165,7 +168,11 @@ class TBScreeningFormViewModel @Inject constructor(
         _state.value = State.IDLE
     }
 
-    fun getIndexOfDate(): Int        = dataset.getIndexOfDate()
-    fun getIndexOfAsymptomatic(): Int = dataset.getIndexOfAsymptomatic()
+    fun getIndexOfDate(): Int {
+        return dataset.getIndexOfDate()
+    }
+
+    fun getIndexOfBeneficiaryAsymptomatic(): Int =
+        dataset.getIndexOfBeneficiaryAsymptomatic()
 }
 

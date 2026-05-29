@@ -77,17 +77,33 @@ class TBScreeningFormFragment : Fragment() {
         binding.btnCancel.visibility = View.GONE
         viewModel.recordExists.observe(viewLifecycleOwner) { notIt ->
             notIt?.let { recordExists ->
-                val adapter = FormInputAdapter(
+                lateinit var formAdapter: FormInputAdapter
+                formAdapter = FormInputAdapter(
                     formValueListener = FormInputAdapter.FormValueListener { formId, index ->
-                        viewModel.updateListOnValueChanged(formId, index)
+                        lifecycleScope.launch {
+                            viewModel.applyFormChange(formId, index)
+                            viewModel.getIndexOfBeneficiaryAsymptomatic()
+                                .takeIf { asymptomaticIndex -> asymptomaticIndex >= 0 }
+                                ?.let { asymptomaticIndex ->
+                                    formAdapter.notifyItemChanged(asymptomaticIndex)
+                                }
+                        }
                     }, isEnabled = !(recordExists || viewModel.viewOnly)
                 )
                 binding.btnSubmit.isEnabled = !(recordExists || viewModel.viewOnly)
                 binding.btnSubmit.visibility = if (recordExists || viewModel.viewOnly) View.GONE else View.VISIBLE
-                binding.form.rvInputForm.adapter = adapter
+                binding.form.rvInputForm.adapter = formAdapter
                 lifecycleScope.launch {
                     viewModel.formList.collect {
                         if (it.isNotEmpty()) {
+                            formAdapter.submitList(it) {
+                                viewModel.getIndexOfDate()
+                                    .takeIf { index -> index >= 0 }
+                                    ?.let { index -> formAdapter.notifyItemChanged(index) }
+                                viewModel.getIndexOfBeneficiaryAsymptomatic()
+                                    .takeIf { index -> index >= 0 }
+                                    ?.let { index -> formAdapter.notifyItemChanged(index) }
+                            }
                             adapter.notifyItemChanged(viewModel.getIndexOfDate())
                             // isAsymptomatic is auto-computed in-place (same object ref),
                             // DiffUtil won't detect the change — force-rebind it directly.

@@ -10,6 +10,16 @@
         <item>নেগেটিভ</item>
     </string-array>
 
+    <string-array name="tb_sputum_sample_submitted_at">
+        <item>ডিএমচি</item>
+        <item>ডিএইচ</item>
+        <item>চিএইচচি</item>
+        <item>পিএইচচি</item>
+        <item>এছচি</item>
+        <item>টিইউ</item>
+    </string-array>
+
+
     <string-array name="cbac_age">
         <item>0-29 বছৰ</item>
         <item>30-39 বছৰ</item>

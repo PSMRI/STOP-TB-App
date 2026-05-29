@@ -81,10 +81,6 @@ class NewBenRegFragment : Fragment() {
     }
 
 
-    override fun onResume() {
-        super.onResume()
-    }
-
     // ─── onViewCreated ───────────────────────────────────────────────────
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -93,7 +89,8 @@ class NewBenRegFragment : Fragment() {
         binding.llContent.visibility = View.VISIBLE
 
         // Back press — show discard dialog in edit mode
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner,
+        requireActivity().onBackPressedDispatcher.addCallback(
+            viewLifecycleOwner,
             object : androidx.activity.OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
                     val isEditMode = viewModel.recordExists.value == false
@@ -193,7 +190,7 @@ class NewBenRegFragment : Fragment() {
 
         // Record exists observer — drives view/edit mode + consent
         viewModel.recordExists.observe(viewLifecycleOwner) { recordExists ->
-            binding.fabEdit.visibility  = if (recordExists) View.VISIBLE else View.GONE
+            binding.fabEdit.visibility = if (recordExists) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (recordExists) View.GONE else View.VISIBLE
             // btnCancel hidden — discard via back press
             adapter.isEnabled = !recordExists
@@ -208,13 +205,23 @@ class NewBenRegFragment : Fragment() {
 
                 State.SAVING -> {
                     binding.llContent.visibility = View.GONE
-                    binding.pbForm.visibility    = View.VISIBLE
+                    binding.pbForm.visibility = View.VISIBLE
                 }
 
                 State.SAVE_SUCCESS -> {
                     binding.llContent.visibility = View.VISIBLE
-                    binding.pbForm.visibility    = View.GONE
-                    Toast.makeText(context, resources.getString(R.string.save_successful), Toast.LENGTH_LONG).show()
+                    binding.pbForm.visibility = View.GONE
+                    val message = if (viewModel.benIdFromArgs != 0L) {
+                        getString(R.string.patient_update_successful)
+                    } else {
+                        getString(R.string.patient_save_successful)
+                    }
+
+                        Toast.makeText(
+                            context,
+                            message,
+                            Toast.LENGTH_LONG
+                        ).show()
                     try {
                         WorkerUtils.triggerAmritPushWorker(requireContext())
                         findNavController().navigateUp()
@@ -223,8 +230,12 @@ class NewBenRegFragment : Fragment() {
 
                 State.SAVE_FAILED -> {
                     binding.llContent.visibility = View.VISIBLE
-                    binding.pbForm.visibility    = View.GONE
-                    Toast.makeText(context, resources.getString(R.string.something_wend_wong_contact_testing), Toast.LENGTH_LONG).show()
+                    binding.pbForm.visibility = View.GONE
+                    Toast.makeText(
+                        context,
+                        resources.getString(R.string.something_wend_wong_contact_testing),
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
         }
@@ -242,6 +253,12 @@ class NewBenRegFragment : Fragment() {
     }
 
     // ─── onStart ───────────────────────────────────────────────────────────
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshFormForCurrentLanguage()
+        binding.form.rvInputForm.adapter?.notifyDataSetChanged()
+    }
+
     override fun onStart() {
         super.onStart()
         val title = when {
@@ -261,7 +278,7 @@ class NewBenRegFragment : Fragment() {
     // ─── Consent popup ───────────────────────────────────────────────────
     private val consentAlert by lazy {
         val alertBinding = AlertConsentBinding.inflate(layoutInflater, binding.root, false)
-        alertBinding.textView4.text    = resources.getString(R.string.consent_alert_title)
+        alertBinding.textView4.text = resources.getString(R.string.consent_alert_title)
         alertBinding.scrollableText.text = resources.getString(R.string.consent_text)
         alertBinding.scrollableText.movementMethod = android.text.method.ScrollingMovementMethod()
 
@@ -275,14 +292,22 @@ class NewBenRegFragment : Fragment() {
         }
         alertBinding.btnNegative.setOnClickListener {
             alertDialog.dismiss()
-            try { findNavController().navigateUp() } catch (e: Exception) { alertDialog.dismiss() }
+            try {
+                findNavController().navigateUp()
+            } catch (e: Exception) {
+                alertDialog.dismiss()
+            }
         }
         alertBinding.btnPositive.setOnClickListener {
             if (alertBinding.checkBox.isChecked) {
                 viewModel.setConsentAgreed()
                 alertDialog.dismiss()
             } else {
-                Toast.makeText(context, resources.getString(R.string.please_tick_the_checkbox), Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    resources.getString(R.string.please_tick_the_checkbox),
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
         alertDialog
@@ -296,7 +321,11 @@ class NewBenRegFragment : Fragment() {
             .setCancelable(false)
             .setPositiveButton(getString(R.string.discard)) { dialog, _ ->
                 dialog.dismiss()
-                try { findNavController().navigateUp() } catch (e: Exception) { Timber.e(e) }
+                try {
+                    findNavController().navigateUp()
+                } catch (e: Exception) {
+                    Timber.e(e)
+                }
             }
             .setNegativeButton(getString(R.string.stay)) { dialog, _ ->
                 dialog.dismiss()
@@ -310,13 +339,17 @@ class NewBenRegFragment : Fragment() {
             val previewItems = try {
                 viewModel.getFormPreviewData()
             } catch (e: Exception) {
-                Toast.makeText(requireContext(), getString(R.string.something_wend_wong_contact_testing), Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    requireContext(),
+                    getString(R.string.something_wend_wong_contact_testing),
+                    Toast.LENGTH_SHORT
+                ).show()
                 return@launch
             }
             val sheet = PreviewBottomSheet()
             sheet.setData(previewItems)
             sheet.setCallbacks(
-                onEdit   = { },
+                onEdit = { },
                 onSubmit = { if (validateCurrentPage()) viewModel.saveForm() }
             )
             sheet.show(parentFragmentManager, "ben_preview_sheet")
@@ -359,10 +392,13 @@ class NewBenRegFragment : Fragment() {
                     if (viewModel.getAgeAtMarriageLength() >= 2)
                         notifyDataSetChanged()
                 }
-                9    -> notifyDataSetChanged()          // gender
-                115  -> notifyDataSetChanged()          // age/dob
-                12   -> notifyDataSetChanged()          // mobile relation
-                1052 -> notifyDataSetChanged()          // mobile not available
+
+                9 -> notifyDataSetChanged()          // gender
+                115 -> notifyDataSetChanged()          // age/dob
+                12 -> notifyDataSetChanged()          // mobile relation
+                1052 -> {
+                    notifyItemChanged(viewModel.getIndexOfContactNumber())
+                }
             }
         }
     }
