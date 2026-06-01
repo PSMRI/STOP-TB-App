@@ -176,13 +176,9 @@ class TBScreeningFormFragment : Fragment() {
             resources.getString(R.string.tb_screening_submitted), Toast.LENGTH_SHORT
         ).show()
         if (viewModel.autoFlow) {
-            findNavController().navigate(
-                R.id.GeneralOpdFormFragment,
-                bundleOf(
-                    "benId" to viewModel.benId,
-                    "autoFlow" to true
-                )
-            )
+            // Examine flow — return to AllBenFragment so user picks the next form
+            val popped = findNavController().popBackStack(R.id.allBenFragment, false)
+            if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
         } else {
             findNavController().navigateUp()
         }

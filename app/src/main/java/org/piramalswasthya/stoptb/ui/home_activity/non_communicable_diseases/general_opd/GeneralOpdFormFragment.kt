@@ -144,14 +144,20 @@ class GeneralOpdFormFragment : Fragment() {
     }
 
     private fun navigateToDiagnostics() {
-        findNavController().navigate(
-            R.id.TBSuspectedQuickFragment,
-            bundleOf(
-                "benId" to viewModel.benId,
-                "autoFlow" to viewModel.autoFlow,
-                "generalOpdFlow" to viewModel.generalOpdFlow
+        if (isManagedFlow) {
+            // Examine flow — return to AllBenFragment so user picks the next form
+            val popped = findNavController().popBackStack(R.id.allBenFragment, false)
+            if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
+        } else {
+            findNavController().navigate(
+                R.id.TBSuspectedQuickFragment,
+                bundleOf(
+                    "benId" to viewModel.benId,
+                    "autoFlow" to viewModel.autoFlow,
+                    "generalOpdFlow" to viewModel.generalOpdFlow
+                )
             )
-        )
+        }
     }
 
     override fun onStart() {

@@ -228,16 +228,18 @@ interface BenDao {
             OR (:source = 4 AND gender = 'Female' AND isDeath = 0
                 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
                 AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
-            OR (:source = 5 AND isDeath = 0 AND tbsnFilled = 1 AND benId IN (
+            OR (:source = 5 AND isDeath = 0 AND benId IN (
+                SELECT b2.beneficiaryId FROM BENEFICIARY b2
+                WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
+                UNION
                 SELECT v.benId FROM BEN_VITALS v
-                WHERE IFNULL(v.temperature, 0) >= 100
-                   OR IFNULL(v.pulseRate, 0) < 60
-                   OR IFNULL(v.pulseRate, 0) > 90
-                   OR IFNULL(v.bpSystolic, 0) < 90
-                   OR IFNULL(v.bpSystolic, 0) >= 140
-                   OR IFNULL(v.bpDiastolic, 0) < 60
-                   OR IFNULL(v.bpDiastolic, 0) >= 90
-                   OR IFNULL(v.rbs, 0) >= 100
+                WHERE (v.pulseRate IS NOT NULL AND v.pulseRate < 60)
+                   OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
+                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic < 90)
+                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
+                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
+                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
+                   OR (v.rbs IS NOT NULL AND v.rbs >= 100)
             ))
             OR (:source = 6 AND isDeath = 0 AND (
                 benId IN (
@@ -318,16 +320,18 @@ interface BenDao {
             OR (:source = 4 AND gender = 'Female' AND isDeath = 0
                 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
                 AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
-            OR (:source = 5 AND isDeath = 0 AND tbsnFilled = 1 AND benId IN (
+            OR (:source = 5 AND isDeath = 0 AND benId IN (
+                SELECT b2.beneficiaryId FROM BENEFICIARY b2
+                WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
+                UNION
                 SELECT v.benId FROM BEN_VITALS v
-                WHERE IFNULL(v.temperature, 0) >= 100
-                   OR IFNULL(v.pulseRate, 0) < 60
-                   OR IFNULL(v.pulseRate, 0) > 90
-                   OR IFNULL(v.bpSystolic, 0) < 90
-                   OR IFNULL(v.bpSystolic, 0) >= 140
-                   OR IFNULL(v.bpDiastolic, 0) < 60
-                   OR IFNULL(v.bpDiastolic, 0) >= 90
-                   OR IFNULL(v.rbs, 0) >= 100
+                WHERE (v.pulseRate IS NOT NULL AND v.pulseRate < 60)
+                   OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
+                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic < 90)
+                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
+                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
+                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
+                   OR (v.rbs IS NOT NULL AND v.rbs >= 100)
             ))
             OR (:source = 6 AND isDeath = 0 AND (
                 benId IN (
@@ -413,16 +417,18 @@ interface BenDao {
             OR (:source = 4 AND gender = 'Female' AND isDeath = 0
                 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
                 AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
-            OR (:source = 5 AND isDeath = 0 AND tbsnFilled = 1 AND benId IN (
+            OR (:source = 5 AND isDeath = 0 AND benId IN (
+                SELECT b2.beneficiaryId FROM BENEFICIARY b2
+                WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
+                UNION
                 SELECT v.benId FROM BEN_VITALS v
-                WHERE IFNULL(v.temperature, 0) >= 100
-                   OR IFNULL(v.pulseRate, 0) < 60
-                   OR IFNULL(v.pulseRate, 0) > 90
-                   OR IFNULL(v.bpSystolic, 0) < 90
-                   OR IFNULL(v.bpSystolic, 0) >= 140
-                   OR IFNULL(v.bpDiastolic, 0) < 60
-                   OR IFNULL(v.bpDiastolic, 0) >= 90
-                   OR IFNULL(v.rbs, 0) >= 100
+                WHERE (v.pulseRate IS NOT NULL AND v.pulseRate < 60)
+                   OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
+                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic < 90)
+                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
+                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
+                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
+                   OR (v.rbs IS NOT NULL AND v.rbs >= 100)
             ))
             OR (:source = 6 AND isDeath = 0 AND (
                 benId IN (
@@ -787,17 +793,18 @@ interface BenDao {
         WHERE villageId = :selectedVillage
           AND isDeactivate = 0
           AND isDeath = 0
-          AND tbsnFilled = 1
           AND benId IN (
+            SELECT b2.beneficiaryId FROM BENEFICIARY b2
+            WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
+            UNION
             SELECT v.benId FROM BEN_VITALS v
-            WHERE IFNULL(v.temperature, 0) >= 100
-               OR IFNULL(v.pulseRate, 0) < 60
-               OR IFNULL(v.pulseRate, 0) > 90
-               OR IFNULL(v.bpSystolic, 0) < 90
-               OR IFNULL(v.bpSystolic, 0) >= 140
-               OR IFNULL(v.bpDiastolic, 0) < 60
-               OR IFNULL(v.bpDiastolic, 0) >= 90
-               OR IFNULL(v.rbs, 0) >= 100
+            WHERE (v.pulseRate IS NOT NULL AND v.pulseRate < 60)
+               OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
+               OR (v.bpSystolic IS NOT NULL AND v.bpSystolic < 90)
+               OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
+               OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
+               OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
+               OR (v.rbs IS NOT NULL AND v.rbs >= 100)
           )
     """)
     fun getHwcBenDataCount(selectedVillage: Int): Flow<Int>

@@ -16,7 +16,7 @@
     <string name="btn_continue_text">Continue</string>
     <string name="btn_submit_text">Submit</string>
     <string name="missing_detail_title">Missing Detail</string>
-    <string name="missing_detail_message">At least one of the following is missing value:\n\n\tState\n\tDistrict\n\tBlock\n\tTU\n\tHealth Facility\n\tVillage</string>
+    <string name="missing_detail_message">At least one of the following is missing value:\n\n\tState\n\tDistrict\n\tBlock\n\tVillage</string>
     <string name="understood">Understood</string>
     <string name="menu_home">Home</string>
     <string name="menu_supervisor">ASHA Supervisor</string>

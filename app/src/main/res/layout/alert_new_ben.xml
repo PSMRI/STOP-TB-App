@@ -117,6 +117,7 @@
         android:enabled="false"
         android:text="@string/ok"
         android:textColor="?attr/colorOnPrimary"
+        app:backgroundTint="@color/btn_ok_tint"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toEndOf="@+id/btn_cancel"

@@ -2,6 +2,8 @@ package org.piramalswasthya.stoptb.ui.home_activity.vital_screen
 
 import android.os.Bundle
 import android.text.InputFilter
+import androidx.core.os.bundleOf
+import androidx.core.widget.doAfterTextChanged
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -70,6 +72,12 @@ class VitalScreenFragment : Fragment() {
         binding.etBpSystolic.filters = arrayOf(InputFilter.LengthFilter(3))
         binding.etBpDiastolic.filters = arrayOf(InputFilter.LengthFilter(3))
         binding.etRbs.filters = arrayOf(InputFilter.LengthFilter(6))
+
+        // Clear validation error as soon as user starts correcting the field
+        binding.etPulseRate.doAfterTextChanged   { binding.tilPulseRate.error = null }
+        binding.etBpSystolic.doAfterTextChanged  { binding.tilBpSystolic.error = null }
+        binding.etBpDiastolic.doAfterTextChanged { binding.tilBpDiastolic.error = null }
+        binding.etRbs.doAfterTextChanged         { binding.tilRbs.error = null }
     }
 
     private fun observeUi() {
@@ -242,13 +250,9 @@ class VitalScreenFragment : Fragment() {
             findNavController().navigateUp()
             return
         }
-        findNavController().navigate(
-            R.id.TBScreeningFormFragment,
-            Bundle().apply {
-                putLong("benId", viewModel.benId)
-                putBoolean("autoFlow", true)
-            }
-        )
+        // Examine flow — return to AllBenFragment so user picks the next form
+        val popped = findNavController().popBackStack(R.id.allBenFragment, false)
+        if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
     }
 
     private fun validateFields(): Boolean {

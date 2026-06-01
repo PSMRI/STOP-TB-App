@@ -472,6 +472,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         if (relToHeadId >= 0) {
             list.add(list.indexOf(gender) + 1, relationToHead)
             relationToHead.value = resources.getStringArray(R.array.nbr_relationship_to_head_src).getOrNull(relToHeadId)
+            // Gender was selected in Add HoF Member dialog — lock it in the form
+            gender.inputType = TEXT_VIEW
         }
 
         if (dateOfReg.value == null) dateOfReg.value = getCurrentDateString()
@@ -531,6 +533,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
             pic.value        = saved.userImage
             dateOfReg.value  = getDateFromLong(saved.regDate)
+            dateOfReg.isEnabled = false          // edit mode — registration date not changeable
             personFrom.value = saved.personFromId?.let { personFrom.getStringFromPosition(it) }
                 ?: saved.personFrom
                 ?: personFrom.entries?.firstOrNull()
@@ -541,6 +544,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             lastName.value   = saved.lastName
             agePopup.value   = getDateFromLong(saved.dob)
             gender.value     = gender.getStringFromPosition(saved.genderId)
+            gender.inputType = TEXT_VIEW         // edit mode — gender not changeable
 
             maritalStatus.entries = when (saved.gender) {
                 MALE -> maritalStatusMale
