@@ -217,7 +217,13 @@ class NewBenRegFragment : Fragment() {
                     Toast.makeText(context, resources.getString(R.string.save_successful), Toast.LENGTH_LONG).show()
                     try {
                         WorkerUtils.triggerAmritPushWorker(requireContext())
-                        findNavController().navigateUp()
+                        if (viewModel.relToHeadId == 18) {
+                            // HoF registration — go directly to All Household list
+                            val popped = findNavController().popBackStack(R.id.allHouseholdFragment, false)
+                            if (!popped) findNavController().navigateUp()
+                        } else {
+                            findNavController().navigateUp()
+                        }
                     } catch (e: Exception) { Timber.e(e) }
                 }
 

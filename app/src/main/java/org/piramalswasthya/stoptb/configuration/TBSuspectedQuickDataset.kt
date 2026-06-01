@@ -459,6 +459,7 @@ class TBSuspectedQuickDataset(
                 syncFieldStates()
                 if (index == 0) {
                     // Yes: show submitted-at (default to TB Screening Camp if blank), remove denial
+                    sputumSampleSubmittedAt.isEnabled = !referralMode  // explicitly enable when first shown
                     if (sputumSampleSubmittedAt.value.isNullOrBlank()) {
                         sputumSampleSubmittedAt.value = sputumSampleSubmittedAt.entries?.firstOrNull()
                     }

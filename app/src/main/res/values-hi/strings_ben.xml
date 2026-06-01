@@ -269,6 +269,7 @@
         <item>पशु काटने से मृत्यु</item>
         <item>आत्महत्या</item>
         <item>अनिश्चित</item>
+        <item>तपेदिक</item>
     </string-array>
 
     <string-array name="reason_of_death_array_with_maternal">
@@ -278,6 +279,7 @@
         <item>पशु काटने से मृत्यु</item>
         <item>आत्महत्या</item>
         <item>अनिश्चित</item>
+        <item>तपेदिक</item>
         <item>मातृ मृत्यु</item>
     </string-array>
 

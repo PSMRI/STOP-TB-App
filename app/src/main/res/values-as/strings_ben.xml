@@ -252,6 +252,7 @@
         <item>পশুৰ কামোৰত মৃত্যু</item>
         <item>আত্মহত্যা</item>
         <item>অনিশ্চিত</item>
+        <item>যক্ষ্মা</item>
     </string-array>
 
     <string-array name="reason_of_death_array_with_maternal">
@@ -261,6 +262,7 @@
         <item>পশুৰ কামোৰত মৃত্যু</item>
         <item>আত্মহত্যা</item>
         <item>অনিশ্চিত</item>
+        <item>যক্ষ্মা</item>
         <item>মাতৃ মৃত্যু</item>
     </string-array>
 

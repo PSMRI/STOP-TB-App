@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.widget.doAfterTextChanged
 import androidx.activity.OnBackPressedCallback
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -75,6 +76,20 @@ class CampModeConnectFragment : Fragment() {
         applyStatusBarInsetsToHeader()
 
         binding.etCampHubUrl.setText(viewModel.getCampHubUrl())
+
+        // Auto-scroll to URL field when keyboard opens
+        binding.etCampHubUrl.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                binding.svConnect.post {
+                    binding.svConnect.smoothScrollTo(0, binding.tilCampHubUrl.top)
+                }
+            }
+        }
+        // Clear error when user starts typing
+        binding.etCampHubUrl.doAfterTextChanged {
+            binding.tilCampHubUrl.error = null
+        }
+
         binding.ibBack.setOnClickListener {
             closeConnectScreen(refreshSignIn = false)
         }
@@ -93,6 +108,12 @@ class CampModeConnectFragment : Fragment() {
 
         binding.btnConnect.setOnClickListener {
             val campHubUrl = binding.etCampHubUrl.text?.toString().orEmpty()
+            if (campHubUrl.isBlank()) {
+                binding.tilCampHubUrl.error = getString(R.string.camp_hub_url_required)
+                binding.svConnect.smoothScrollTo(0, binding.tilCampHubUrl.top)
+                return@setOnClickListener
+            }
+            binding.tilCampHubUrl.error = null
             Log.d(TAG, "Connect button tapped from UI. url=$campHubUrl")
             viewModel.connectToCampHub(campHubUrl)
         }

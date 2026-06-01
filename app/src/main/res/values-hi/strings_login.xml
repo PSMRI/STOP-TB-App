@@ -48,6 +48,7 @@
     <string name="camp_connect_subtitle">कैंप मोड चालू करने से पहले लैपटॉप हब से कनेक्ट करें।</string>
     <string name="camp_hub_scan">QR स्कैन करें</string>
     <string name="camp_hub_connect">कनेक्ट करें</string>
+    <string name="camp_hub_url_required">कृपया कैंप हब URL दर्ज करें</string>
     <string name="camp_hub_scan_failed">QR कोड पढ़ा नहीं जा सका। कृपया फिर से प्रयास करें या URL मैन्युअल दर्ज करें।</string>
     <string name="camp_hub_scan_empty">QR कोड नहीं मिला। कृपया फिर से प्रयास करें।</string>
     <string name="camp_back">वापस</string>

@@ -92,10 +92,12 @@ class AnthropometryFragment : Fragment() {
         }
 
         binding.rgTemperature.setOnCheckedChangeListener { _, checkedId ->
+            // isFormLocked = true when loading existing data in view mode —
+            // don't overwrite the actual saved temperature value in that case
             when (checkedId) {
-                R.id.rbTempNormal -> binding.etTemperature.setText("98.0")
+                R.id.rbTempNormal -> if (!isFormLocked) binding.etTemperature.setText("98.0")
                 R.id.rbTempHigh -> {
-                    binding.etTemperature.setText("100.0")
+                    if (!isFormLocked) binding.etTemperature.setText("100.0")
                     showHighTemperatureAlert()
                 }
             }

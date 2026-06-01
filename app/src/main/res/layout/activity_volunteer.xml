@@ -52,6 +52,8 @@
                         android:fontFamily="@font/opensans_semibold"
                         android:textColor="@color/md_theme_light_onPrimary"
                         android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                        android:maxLines="1"
+                        android:ellipsize="end"
                         tools:text="Volunteer"/>
 
                 </LinearLayout>

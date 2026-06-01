@@ -87,6 +87,11 @@ class DashboardFragment : Fragment() {
         val savedPeriod = viewModel.selectedTimePeriod.value ?: viewModel.timePeriodOptions[0]
         val savedPeriodIndex = viewModel.timePeriodOptions.indexOf(savedPeriod).coerceAtLeast(0)
         binding.actvTimePeriod.setText(timePeriodLabels[savedPeriodIndex], false)
+        // Show ALL items when dropdown opens (prevent AutoCompleteTextView from filtering by selected text)
+        binding.actvTimePeriod.setOnClickListener {
+            timePeriodAdapter?.filter?.filter("")
+            binding.actvTimePeriod.showDropDown()
+        }
         binding.actvTimePeriod.setOnItemClickListener { _, _, position, _ ->
             viewModel.setTimePeriod(viewModel.timePeriodOptions[position])
             binding.actvTimePeriod.setText(timePeriodLabels[position], false)
@@ -105,6 +110,11 @@ class DashboardFragment : Fragment() {
         binding.actvVillage.setAdapter(villageAdapter)
         // Restore previously selected village (ViewModel persists across view recreation)
         binding.actvVillage.setText(viewModel.selectedVillageName.value ?: villageNames[0], false)
+        // Show ALL items when dropdown opens
+        binding.actvVillage.setOnClickListener {
+            villageAdapter?.filter?.filter("")
+            binding.actvVillage.showDropDown()
+        }
         binding.actvVillage.setOnItemClickListener { _, _, position, _ ->
             if (position == 0) {
                 viewModel.clearVillageFilter()
