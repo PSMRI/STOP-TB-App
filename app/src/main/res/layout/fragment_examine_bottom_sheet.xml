@@ -22,11 +22,25 @@
         android:layout_height="wrap_content"
         android:paddingHorizontal="20dp"
         android:paddingTop="8dp"
-        android:paddingBottom="16dp"
+        android:paddingBottom="4dp"
         android:text="@string/examine_bottomsheet_title"
         android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
         android:textColor="?attr/colorPrimary"
         android:fontFamily="@font/roboto_bold" />
+
+    <!-- Beneficiary name -->
+    <TextView
+        android:id="@+id/tv_ben_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="20dp"
+        android:paddingBottom="12dp"
+        android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+        android:textColor="?attr/colorOnSurface"
+        android:ellipsize="end"
+        android:maxLines="1"
+        tools:text="DEEPSHIKA VERMA"
+        xmlns:tools="http://schemas.android.com/tools"/>
 
     <!-- Divider -->
     <View

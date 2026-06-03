@@ -364,6 +364,8 @@
     //................VHND........................
 
     <string name="save_successful">Save Successful</string>
+    <string name="patient_save_successful">Patient Registered Succesfully</string>
+    <string name="patient_update_successful">Patient Updated Succesfully</string>
     <string name="otp_resent">OTP Resent</string>
     <string name="something_wend_wong_contact_testing">Something wend wong! Contact testing!</string>
     <string name="error_input">Error Input</string>
@@ -450,6 +452,10 @@
         <item>HRP Track</item>
         <item>HR NonPreg. Assess</item>
         <item>HR NonPreg Track</item>
+        <item>Anthropometric</item>
+        <item>General Examination</item>
+        <item>OPD</item>
+        <item>Diagnosis</item>
     </string-array>
 
     <string-array name="place_array">
@@ -1199,6 +1205,7 @@
     <!-- Examine flow -->
     <string name="btn_examine">Examine</string>
     <string name="btn_examine_count">Examine %1$d/5</string>
+    <string name="btn_examine_count_of">Examine %1$d/%2$d</string>
     <string name="examine_bottomsheet_title">Examination Forms</string>
     <string name="examine_btn_fill">Fill</string>
     <string name="examine_btn_view">View</string>

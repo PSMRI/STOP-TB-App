@@ -11,8 +11,11 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
@@ -23,6 +26,9 @@ import timber.log.Timber
 
 @AndroidEntryPoint
 class NewHouseholdFragment : Fragment() {
+
+    @Inject
+    lateinit var prefDao: PreferenceDao
 
     private var _binding: FragmentNewFormBinding? = null
     private val binding: FragmentNewFormBinding get() = _binding!!
@@ -93,7 +99,9 @@ class NewHouseholdFragment : Fragment() {
                 else
                     getString(R.string.frag_nhhr_title)
             )
-            binding.fabEdit.visibility = if (recordExists) View.VISIBLE else View.GONE
+            // Nurse role: edit not allowed — hide fab
+            val isNurse = prefDao.getLoggedInUser()?.role.isNurseRole()
+            binding.fabEdit.visibility = if (recordExists && !isNurse) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (!recordExists) View.VISIBLE else View.GONE
 
             val adapter = FormInputAdapter(

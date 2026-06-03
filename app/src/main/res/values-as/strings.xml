@@ -53,6 +53,8 @@
     <string name="tracking_date">দৰমাহাৰ তাৰিখ</string>
 
     <string name="save_successful">সংরক্ষণ সফল</string>
+    <string name="patient_save_successful">ৰোগী সফলভাৱে পঞ্জীয়ন কৰা হৈছে</string>
+    <string name="patient_update_successful">ৰোগীৰ ৰেকৰ্ড সুধাৰ কৰা হৈছে</string>
     <string name="something_wend_wong_contact_testing">কিবা অশুদ্ধ! পৰীক্ষণ কৰক!</string>
     <string name="error_input">ভুল ইনপুট</string>
     <string name="exit_application">অ্যাপ্লিকেশন প্ৰস্থান কৰক</string>
@@ -534,7 +536,7 @@
     <string name="diastolic_bp_mmhg">ডায়েষ্টোলিক ৰক্তচাপ (mm Hg)</string>
     <string name="vital_systolic">চিষ্টোলিক</string>
     <string name="vital_diastolic">ডায়েষ্টোলিক</string>
-    <string name="bp_mmhg">বিপি (মিমি পাৰা)</string>
+    <string name="bp_mmhg">বিপি (mm Hg)</string>
     <string name="random_blood_sugar">ৰেণ্ডম ব্লাড চুগাৰ</string>
     <string name="vital_referral_reason">ভাইটেল স্ক্ৰীণিং ৰেফাৰেল</string>
     <string name="tb_digital_chest_xray_conducted">ডিজিটেল চেষ্ট এক্স-ৰে কৰা হৈছে নে?</string>

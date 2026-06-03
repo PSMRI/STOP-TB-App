@@ -250,8 +250,11 @@ class BenRepo @Inject constructor(
                         savedPath
                     }
 
-                    file.absolutePath.startsWith(context.filesDir.absolutePath) -> {
-                        imagePath
+                    if (savedPath.isNullOrBlank()) {
+                        Timber.e(
+                            "Image compression/save failed for beneficiaryId=${ben.beneficiaryId}, uri=$imagePath"
+                        )
+                        throw IllegalStateException("Failed to save beneficiary image")
                     }
 
                     else -> {
@@ -1629,8 +1632,13 @@ class BenRepo @Inject constructor(
                     try {
                         val serverBen =
                             BenRegCache(
-                                householdId = if (jsonObject.has("houseoldId"))
-                                    jsonObject.getLong("houseoldId") else -1L,
+                                householdId = run {
+                                    // Server sends key with typo ("houseoldId") or correct ("householdId") — check both
+                                    val fromTypo = if (jsonObject.has("houseoldId")) jsonObject.getLong("houseoldId").takeIf { it > 0L } else null
+                                    val fromCorrect = if (jsonObject.has("householdId")) jsonObject.getLong("householdId").takeIf { it > 0L } else null
+                                    // Prefer server value; fall back to existing local value (helps non-reinstall flow); last resort -1L
+                                    fromTypo ?: fromCorrect ?: existingBen?.householdId?.takeIf { it > 0L } ?: -1L
+                                },
 
                                 beneficiaryId = jsonObject.getLong("benficieryid"),
 
@@ -2031,8 +2039,12 @@ class BenRepo @Inject constructor(
                     val jsonObject = jsonArray.getJSONObject(i)
                     val benId =
                         if (jsonObject.has("benficieryid")) jsonObject.getLong("benficieryid") else -1L
-                    val hhId =
-                        if (jsonObject.has("houseoldId")) jsonObject.getLong("houseoldId") else -1L
+                    val hhId = run {
+                        // Check both typo and correct spelling; treat 0 as invalid
+                        val fromTypo = if (jsonObject.has("houseoldId")) jsonObject.getLong("houseoldId").takeIf { it > 0L } else null
+                        val fromCorrect = if (jsonObject.has("householdId")) jsonObject.getLong("householdId").takeIf { it > 0L } else null
+                        fromTypo ?: fromCorrect ?: -1L
+                    }
                     if (benId == -1L || hhId == -1L) continue
                     val houseDataObj = jsonObject.getJSONObject("householdDetails")
                     val benDataObj = jsonObject.getJSONObject("beneficiaryDetails")
@@ -2048,7 +2060,7 @@ class BenRepo @Inject constructor(
                     try {
                         result.add(
                             HouseholdCache(
-                                householdId = jsonObject.getLong("houseoldId"),
+                                householdId = hhId,  // already resolved from both spellings above
                                 ashaId = jsonObject.getInt("ashaId"),
                                 benId = jsonObject.getLong("benficieryid"),
                                 family = HouseholdFamily(

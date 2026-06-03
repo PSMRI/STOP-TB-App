@@ -14,7 +14,6 @@ import org.piramalswasthya.stoptb.model.BenBasicCache.Companion.getAgeFromDob
 import org.piramalswasthya.stoptb.model.BenBasicCache.Companion.getYearsFromDate
 import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.BenRegGen
-import org.piramalswasthya.stoptb.model.BenStatus
 import org.piramalswasthya.stoptb.model.FormElement
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.Gender.FEMALE
@@ -43,6 +42,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
 
     companion object {
+        private const val BENEFICIARY_STATUS_ALIVE_INDEX = 0
+        private const val BENEFICIARY_STATUS_DEATH_INDEX = 1
+        private const val BENEFICIARY_STATUS_DEATH_POSITION = 2
+
         private fun getCurrentDateString(): String {
             val calendar = Calendar.getInstance()
             val mdFormat = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
@@ -118,8 +121,21 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         id = 2, inputType = DATE_PICKER,
         title = resources.getString(R.string.nbr_dor),
         arrayId = -1, required = true,
-        min = getMinDateOfReg(), max = System.currentTimeMillis()
+        min = getMinDateOfReg(), max = getMaxDateOfReg()
     )
+
+    private fun configureDateOfReg(isNewOrDraftRegistration: Boolean) {
+        if (!isNewOrDraftRegistration) {
+            dateOfReg.isEnabled = false
+            return
+        }
+        dateOfReg.isEnabled = true
+        dateOfReg.min = getMinDateOfReg()
+        dateOfReg.max = getMaxDateOfReg()
+        if (dateOfReg.value.isNullOrBlank()) {
+            dateOfReg.value = getCurrentDateString()
+        }
+    }
 
     // 3. Beneficiary Status (Alive/Death)
     private val beneficiaryStatus = FormElement(
@@ -178,7 +194,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         id = 3, inputType = EDIT_TEXT,
         title = resources.getString(R.string.nbr_nb_first_name),
         arrayId = -1, required = true, allCaps = true, hasSpeechToText = true,
-        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+
     )
 
     // 5. Last Name
@@ -186,7 +203,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         id = 4, inputType = EDIT_TEXT,
         title = resources.getString(R.string.nbr_nb_last_name),
         arrayId = -1, required = true, allCaps = true, hasSpeechToText = true,
-        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
     )
 
     // 6. Age / DOB
@@ -196,7 +213,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         subtitle = resources.getString(R.string.nbr_dob),
         arrayId = -1, required = true, allCaps = true, hasSpeechToText = true,
         hasDependants = true,
-        etInputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL,
+        etInputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL ,
         max = System.currentTimeMillis(),
         min = getMinDobMillis()
     )
@@ -288,19 +305,19 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         id = 1009, inputType = EDIT_TEXT,
         title = resources.getString(R.string.husband_s_name),
         arrayId = -1, required = false, allCaps = true, hasSpeechToText = true,
-        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
     )
     private val wifeName = FormElement(
         id = 1010, inputType = EDIT_TEXT,
         title = resources.getString(R.string.wife_s_name),
         arrayId = -1, required = false, allCaps = true, hasSpeechToText = true,
-        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
     )
     private val spouseName = FormElement(
         id = 1011, inputType = EDIT_TEXT,
         title = resources.getString(R.string.spouse_s_name),
         arrayId = -1, required = false, allCaps = true, hasSpeechToText = true,
-        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
     )
     var ageAtMarriage = FormElement(
         id = 1012, inputType = EDIT_TEXT,
@@ -321,7 +338,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         id = 10, inputType = EDIT_TEXT,
         title = resources.getString(R.string.nbr_father_name),
         arrayId = -1, required = false, allCaps = true, hasSpeechToText = true,
-        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
     )
 
     // 11. Mother Name
@@ -329,7 +346,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         id = 11, inputType = EDIT_TEXT,
         title = resources.getString(R.string.nbr_mother_name),
         arrayId = -1, required = false, allCaps = true, hasSpeechToText = true,
-        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
     )
 
     // 12. Community
@@ -400,7 +417,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         entries = resources.getStringArray(R.array.occupation_array),
         required = true,
 
-    )
+        )
 
 
 
@@ -450,8 +467,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             contactNumber,
             mobileNoOfRelation,
             address,
-            state,
-            district,
+//            state,
+//            district,
 //            tu,
 //            healthFacility,
             villageHamlet,
@@ -462,7 +479,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
           //  religion,
 
             residentialAreaType,
-           // occupation,
+            // occupation,
             occupationDrop,
             economicStatus,
         )
@@ -472,11 +489,17 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         if (relToHeadId >= 0) {
             list.add(list.indexOf(gender) + 1, relationToHead)
             relationToHead.value = resources.getStringArray(R.array.nbr_relationship_to_head_src).getOrNull(relToHeadId)
+            // Lock gender only when it was pre-selected from Add HoF Member dialog (not for HoF/Self)
+            // relToHeadId=18 = Self (Head of Family) — gender must be selectable
+            if (!gender.value.isNullOrBlank()) {
+                gender.inputType = TEXT_VIEW
+            }
         }
 
         if (dateOfReg.value == null) dateOfReg.value = getCurrentDateString()
         if (personFrom.value.isNullOrBlank()) personFrom.value = personFrom.entries?.firstOrNull()
-        if (typeOfCaseFinding.value.isNullOrBlank()) typeOfCaseFinding.value = typeOfCaseFinding.entries?.firstOrNull()
+        // PRD: default = "Active (Active Case Finding)" = index 1 in type_of_case_finding_array
+        if (typeOfCaseFinding.value.isNullOrBlank()) typeOfCaseFinding.value = typeOfCaseFinding.entries?.getOrNull(1) ?: typeOfCaseFinding.entries?.firstOrNull()
         contactNumber.value = familyHeadPhoneNo?.toString()
         contactNumber.isEnabled = true
         mobileNotAvailable.value = null
@@ -501,6 +524,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         setDefaultOccupationIfNeeded()
         setDefaultEconomicStatusIfNeeded()
         setDefaultResidentialAreaIfNeeded()
+        syncReproductiveStatusToCurrentLanguage()
 
         ben?.takeIf { it.isDraft }?.let { prefill ->
             applyDraftPrefill(prefill)
@@ -514,33 +538,35 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                 list.add(list.indexOf(dateOfDeath) + 1, timeOfDeath)
                 list.add(list.indexOf(timeOfDeath) + 1, reasonOfDeath)
                 list.add(list.indexOf(reasonOfDeath) + 1, placeOfDeath)
-                if (placeOfDeath.entries?.indexOf(saved.placeOfDeath)?.takeIf { it >= 0 } == 8) {
+                if (getLocalValueInArray(R.array.death_place_array, saved.placeOfDeath)
+                        ?.let { placeOfDeath.entries?.indexOf(it) } == 8
+                ) {
                     list.add(list.indexOf(placeOfDeath) + 1, otherPlaceOfDeath)
                 }
             }
-            beneficiaryStatus.value = when (saved.isDeath) {
-                true -> BenStatus.Death.name
-                false -> BenStatus.Alive.name
-                null -> null
-            }
+            beneficiaryStatus.value = getBeneficiaryStatusValue(saved.isDeath)
             dateOfDeath.value    = saved.dateOfDeath
             timeOfDeath.value    = saved.timeOfDeath
-            reasonOfDeath.value  = saved.reasonOfDeath
-            placeOfDeath.value   = saved.placeOfDeath
+            reasonOfDeath.value  = getLocalValueInArray(reasonOfDeath.arrayId, saved.reasonOfDeath)
+                ?: saved.reasonOfDeath
+            placeOfDeath.value   = getLocalValueInArray(R.array.death_place_array, saved.placeOfDeath)
+                ?: saved.placeOfDeath
             otherPlaceOfDeath.value = saved.otherPlaceOfDeath
 
             pic.value        = saved.userImage
             dateOfReg.value  = getDateFromLong(saved.regDate)
+            dateOfReg.isEnabled = false          // edit mode — registration date not changeable
             personFrom.value = saved.personFromId?.let { personFrom.getStringFromPosition(it) }
                 ?: saved.personFrom
-                ?: personFrom.entries?.firstOrNull()
+                        ?: personFrom.entries?.firstOrNull()
             typeOfCaseFinding.value = saved.typeOfCaseFindingId?.let { typeOfCaseFinding.getStringFromPosition(it) }
                 ?: saved.typeOfCaseFinding
-                ?: typeOfCaseFinding.entries?.firstOrNull()
+                ?: typeOfCaseFinding.entries?.getOrNull(1) ?: typeOfCaseFinding.entries?.firstOrNull()
             firstName.value  = saved.firstName
             lastName.value   = saved.lastName
             agePopup.value   = getDateFromLong(saved.dob)
             gender.value     = gender.getStringFromPosition(saved.genderId)
+            gender.inputType = TEXT_VIEW         // edit mode — gender not changeable
 
             maritalStatus.entries = when (saved.gender) {
                 MALE -> maritalStatusMale
@@ -789,14 +815,21 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     }
 
     private fun normalizeReproductiveStatusForDisplay(savedValue: String): String {
-        val yesValue = resources.getStringArray(R.array.nbr_reproductive_status_married_women_array)[0]
-        val noValue = resources.getStringArray(R.array.nbr_reproductive_status_married_women_array)[1]
-        return when (savedValue.trim().lowercase(Locale.ENGLISH)) {
-            "pregnant woman", "women pregnant", "yes" -> yesValue
-            "eligible couple", "postnatal mother", "permanently sterilised", "not applicable",
-            "women not pregnant", "no" -> noValue
-            else -> savedValue
+        return getLocalValueInArray(R.array.nbr_reproductive_status_married_women_array, savedValue)
+            ?: savedValue
+    }
+
+    private fun syncReproductiveStatusToCurrentLanguage() {
+        reproductiveStatus.entries =
+            resources.getStringArray(R.array.nbr_reproductive_status_married_women_array)
+        reproductiveStatus.value = reproductiveStatus.value?.let {
+            getLocalValueInArray(R.array.nbr_reproductive_status_married_women_array, it)
         }
+    }
+
+    /** Re-map array-backed values after UI language changes (e.g. हाँ → Yes). */
+    fun refreshLocalizedFieldValues() {
+        syncReproductiveStatusToCurrentLanguage()
     }
 
 
@@ -816,14 +849,15 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             }
 
             beneficiaryStatus.id -> {
-                val isDeath = beneficiaryStatus.value == BenStatus.Death.name
+                val isDeath = getBeneficiaryStatusIndex(index) == BENEFICIARY_STATUS_DEATH_INDEX
                 if (isDeath) {
                     dateOfDeath.min = getMinDateFromRegistration(dateOfReg.value!!)
                     val showMaternal = shouldShowMaternalDeath(gender.value, agePopup.value)
-                    reasonOfDeath.entries = if (showMaternal)
-                        resources.getStringArray(R.array.reason_of_death_array_with_maternal)
+                    reasonOfDeath.arrayId = if (showMaternal)
+                        R.array.reason_of_death_array_with_maternal
                     else
-                        resources.getStringArray(R.array.reason_of_death_array)
+                        R.array.reason_of_death_array
+                    reasonOfDeath.entries = resources.getStringArray(reasonOfDeath.arrayId)
                 }
                 triggerDependants(
                     source = beneficiaryStatus,
@@ -1028,7 +1062,11 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             mobileNoOfRelation.id -> {
                 when (index) {
                     4 -> {
-                        contactNumber.value = familyHeadPhoneNo
+                        if (!familyHeadPhoneNo.isNullOrBlank()) {
+                            contactNumber.value = familyHeadPhoneNo
+                            contactNumber.errorText = null
+                        }
+                        //  contactNumber.value = familyHeadPhoneNo
                         triggerDependants(source = mobileNoOfRelation, removeItems = listOf(otherMobileNoOfRelation), addItems = emptyList())
                     }
                     in 0..3 -> triggerDependants(source = mobileNoOfRelation, removeItems = listOf(otherMobileNoOfRelation), addItems = emptyList())
@@ -1046,8 +1084,12 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             }
 
             contactNumber.id -> {
-                validateEmptyOnEditText(contactNumber)
-                validateMobileNumberOnEditText(contactNumber)
+                if (isMobileNotAvailableChecked()) {
+                    contactNumber.errorText = null
+                } else {
+                    validateEmptyOnEditText(contactNumber)
+                    validateMobileNumberOnEditText(contactNumber)
+                }
                 return -1
             }
             mobileNotAvailable.id -> {
@@ -1064,7 +1106,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                     contactNumber.value = null
                     contactNumber.errorText = null
                 }
-                return 1
+                return getIndexOfElement(contactNumber)
             }
             address.id -> {
                 validateEmptyOnEditText(address)
@@ -1125,13 +1167,14 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         (cacheModel as BenRegCache).let { ben ->
 
             // Death fields
-            ben.isDeathValue = beneficiaryStatus.value
-            ben.isDeath = beneficiaryStatus.entries?.indexOf(beneficiaryStatus.value ?: "") == 1
+            val beneficiaryStatusPosition = beneficiaryStatus.getPosition()
+            ben.isDeathValue = beneficiaryStatus.getEnglishStringFromPosition(beneficiaryStatusPosition)
+            ben.isDeath = beneficiaryStatusPosition == BENEFICIARY_STATUS_DEATH_POSITION
             ben.dateOfDeath   = dateOfDeath.value
             ben.timeOfDeath   = timeOfDeath.value
-            ben.reasonOfDeath = reasonOfDeath.value
+            ben.reasonOfDeath = getEnglishValueInArray(reasonOfDeath.arrayId, reasonOfDeath.value)
             ben.reasonOfDeathId = reasonOfDeath.entries?.indexOf(reasonOfDeath.value ?: "")?.takeIf { it != -1 } ?: -1
-            ben.placeOfDeath  = placeOfDeath.value
+            ben.placeOfDeath  = getEnglishValueInArray(R.array.death_place_array, placeOfDeath.value)
             ben.placeOfDeathId = placeOfDeath.entries?.indexOf(placeOfDeath.value ?: "")?.takeIf { it != -1 } ?: -1
             ben.otherPlaceOfDeath = otherPlaceOfDeath.value
 
@@ -1252,22 +1295,21 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             ben.genDetails?.marriageDate = 0
             ben.genDetails?.ageAtMarriage = 0
 
-            // Reproductive Status
+            // Reproductive Status — persist English label + id from selection index
             ben.genDetails?.let { gen ->
-                val selectedValue = reproductiveStatus.value?.trim() ?: ""
-                val reproductiveMap = mapOf(
-                    "Yes" to 1,
-                    "No" to 2,
-                    "Women Pregnant" to 1,
-                    "Women Not Pregnant" to 2,
-                    "Pregnant Woman" to 1,
-                    "Eligible Couple" to 2,
-                    "Postnatal Mother" to 2,
-                    "Permanently Sterilised" to 2,
-                    "Not Applicable" to 2
-                )
-                gen.reproductiveStatusId = reproductiveMap[selectedValue] ?: 0
-                gen.reproductiveStatus   = selectedValue
+                val englishValue = getEnglishValueInArray(
+                    R.array.nbr_reproductive_status_married_women_array,
+                    reproductiveStatus.value
+                ) ?: reproductiveStatus.value?.trim().orEmpty()
+                gen.reproductiveStatus = englishValue
+                gen.reproductiveStatusId = when (reproductiveStatus.getPosition()) {
+                    1 -> 1
+                    2 -> 2
+                    else -> when (englishValue.lowercase(Locale.ENGLISH)) {
+                        "yes", "women pregnant", "pregnant woman" -> 1
+                        else -> if (englishValue.isBlank()) 0 else 2
+                    }
+                }
             }
 
             // No kid details in StopTB
@@ -1275,8 +1317,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
             ben.isDraft        = false
             ben.isConsent      = isOtpVerified
-            ben.isSpouseAdded  = false
-            ben.isChildrenAdded = false
+            // NOTE: isSpouseAdded / isChildrenAdded are managed by spouse/child registration flows.
+            // Do NOT reset them here — in edit mode the existing value must be preserved.
+            // For brand-new bens the model defaults both to false anyway.
             ben.isMarried      = (maritalStatus.getPosition() == 2)
             ben.doYouHavechildren = false
         }
@@ -1291,6 +1334,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     fun enableEditMode() {
         if (fatherName.inputType == TEXT_VIEW) fatherName.inputType = EDIT_TEXT
         if (motherName.inputType == TEXT_VIEW) motherName.inputType = EDIT_TEXT
+        dateOfReg.isEnabled = false
     }
     fun getTempMobileNoStatus()    = getIndexOfElement(contactNumber) // no temp contact in StopTB
     fun getIndexOfBirthCertificateFrontPath() = -1 // not used in StopTB
@@ -1321,18 +1365,33 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
     private fun updateReproductiveOptionsBasedOnAgeGender(formId: Int): Int {
         reproductiveStatus.arrayId = R.array.nbr_reproductive_status_married_women_array
-        reproductiveStatus.entries =
-            resources.getStringArray(R.array.nbr_reproductive_status_married_women_array)
         if (!shouldShowReproductiveStatus()) {
             reproductiveStatus.value = null
-        } else if (reproductiveStatus.value.isNullOrBlank()) {
-            reproductiveStatus.value = reproductiveStatus.entries?.getOrNull(1)
+        } else {
+            syncReproductiveStatusToCurrentLanguage()
+            if (reproductiveStatus.value.isNullOrBlank()) {
+                reproductiveStatus.value = reproductiveStatus.entries?.getOrNull(1)
+            }
         }
         return 1
     }
 
+    private fun getBeneficiaryStatusIndex(index: Int = -1): Int {
+        return index.takeIf { it >= 0 }
+            ?: beneficiaryStatus.entries?.indexOf(beneficiaryStatus.value ?: "")
+            ?: -1
+    }
+
+    private fun getBeneficiaryStatusValue(isDeath: Boolean?): String? {
+        return beneficiaryStatus.entries?.getOrNull(
+            if (isDeath == true) BENEFICIARY_STATUS_DEATH_INDEX else BENEFICIARY_STATUS_ALIVE_INDEX
+        )
+    }
+
     private fun shouldShowMaternalDeath(gender: String?, dob: String?): Boolean {
-        if (gender != "Female") return false
+        // Use language-independent check: compare against current locale's Female label (index 1 in nbr_gender_array)
+        val femaleLabel = resources.getStringArray(R.array.nbr_gender_array).getOrNull(1) ?: "Female"
+        if (gender != femaleLabel) return false
         return try {
             val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
             val dobMillis = sdf.parse(dob ?: return false)?.time ?: return false
@@ -1349,4 +1408,5 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             0L
         }
     }
+
 }

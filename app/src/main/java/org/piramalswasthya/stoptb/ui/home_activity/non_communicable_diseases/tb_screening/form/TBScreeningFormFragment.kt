@@ -77,23 +77,27 @@ class TBScreeningFormFragment : Fragment() {
         binding.btnCancel.visibility = View.GONE
         viewModel.recordExists.observe(viewLifecycleOwner) { notIt ->
             notIt?.let { recordExists ->
-                val adapter = FormInputAdapter(
+                lateinit var formAdapter: FormInputAdapter
+                formAdapter = FormInputAdapter(
                     formValueListener = FormInputAdapter.FormValueListener { formId, index ->
                         viewModel.updateListOnValueChanged(formId, index)
+                        hardCodedListUpdate(16)
                     }, isEnabled = !(recordExists || viewModel.viewOnly)
                 )
                 binding.btnSubmit.isEnabled = !(recordExists || viewModel.viewOnly)
                 binding.btnSubmit.visibility = if (recordExists || viewModel.viewOnly) View.GONE else View.VISIBLE
-                binding.form.rvInputForm.adapter = adapter
+                binding.form.rvInputForm.adapter = formAdapter
                 lifecycleScope.launch {
                     viewModel.formList.collect {
                         if (it.isNotEmpty()) {
-                            adapter.notifyItemChanged(viewModel.getIndexOfDate())
-                            // isAsymptomatic is auto-computed in-place (same object ref),
-                            // DiffUtil won't detect the change — force-rebind it directly.
-                            val asymptomaticIdx = viewModel.getIndexOfAsymptomatic()
-                            if (asymptomaticIdx >= 0) adapter.notifyItemChanged(asymptomaticIdx)
-                            adapter.submitList(it)
+                            formAdapter.submitList(it) {
+                                viewModel.getIndexOfDate()
+                                    .takeIf { index -> index >= 0 }
+                                    ?.let { index -> formAdapter.notifyItemChanged(index) }
+                                viewModel.getIndexOfBeneficiaryAsymptomatic()
+                                    .takeIf { index -> index >= 0 }
+                                    ?.let { index -> formAdapter.notifyItemChanged(index) }
+                            }
                         }
 
                     }
@@ -157,6 +161,17 @@ class TBScreeningFormFragment : Fragment() {
             viewModel.saveForm()
         }
     }
+    private fun hardCodedListUpdate(formId: Int) {
+        binding.form.rvInputForm.adapter?.apply {
+            when (formId) {
+                1,2,3,4,5,6,7,8,9,10,11,16-> {
+                    notifyDataSetChanged()
+
+                }
+
+            }
+        }
+    }
 
     private fun handleSaveSuccessNavigation() {
         Toast.makeText(
@@ -164,13 +179,9 @@ class TBScreeningFormFragment : Fragment() {
             resources.getString(R.string.tb_screening_submitted), Toast.LENGTH_SHORT
         ).show()
         if (viewModel.autoFlow) {
-            findNavController().navigate(
-                R.id.GeneralOpdFormFragment,
-                bundleOf(
-                    "benId" to viewModel.benId,
-                    "autoFlow" to true
-                )
-            )
+            // Examine flow — return to AllBenFragment so user picks the next form
+            val popped = findNavController().popBackStack(R.id.allBenFragment, false)
+            if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
         } else {
             findNavController().navigateUp()
         }
@@ -240,9 +251,12 @@ class TBScreeningFormFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        // Always show back button — matches VitalScreen behaviour.
+        // autoFlow only controls the forward-chain (auto-navigate to General OPD
+        // after submit), not whether the user can go back.
         applyAutoFlowBackPolicyOnResume(
             isAutoFlow = viewModel.autoFlow,
-            allowBack = !viewModel.autoFlow
+            allowBack = true
         )
     }
 

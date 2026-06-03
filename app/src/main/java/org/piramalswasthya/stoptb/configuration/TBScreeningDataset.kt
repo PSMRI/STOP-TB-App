@@ -8,6 +8,7 @@ import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.FormElement
 import org.piramalswasthya.stoptb.model.InputType
 import org.piramalswasthya.stoptb.model.TBScreeningCache
+import org.piramalswasthya.stoptb.utils.Log
 
 class TBScreeningDataset(
     context: Context,
@@ -122,14 +123,56 @@ class TBScreeningDataset(
         hasDependants = true
     )
 
-    /** Auto-computed from the 10 symptom answers — not editable by user */
-    private val isAsymptomatic = FormElement(
+    private val isBeneficiaryAsymptomatic = FormElement(
         id = 16,
         inputType = InputType.RADIO,
         title = resources.getString(R.string.tb_is_beneficiary_asymptomatic),
         entries = resources.getStringArray(R.array.yes_no),
+        required = true,
+        isEnabled = false,
+        hasDependants = true
+    )
+
+    private val symptomaticQuestions = listOf(
+        isCoughing,
+        bloodInSputum,
+        isFever,
+        riseOfFever,
+        lossOfAppetite,
+        lossOfWeight,
+        nightSweats,
+        historyOfTB,
+        currentlyTakingDrugs,
+        familyHistoryTB
+    )
+
+    private val symptomaticQuestionIds = symptomaticQuestions.map { it.id }.toSet()
+
+    /** Latest radio index (0 = Yes, 1 = No) per symptomatic question — avoids string/locale mismatches. */
+    private val symptomaticAnswerIndexById = mutableMapOf<Int, Int>()
+
+    private val asymptomaticLabel = FormElement(
+        id = 102,
+        inputType = InputType.HEADLINE,
+        title = resources.getString(R.string.tb_asymptomatic_screening),
+        required = false
+    )
+
+    private val checkSymptomsLabel1 = FormElement(
+        id = 103,
+        inputType = InputType.HEADLINE,
+        title = resources.getString(R.string.check_if_the_person_has_any_of_these_symptoms),
+        required = false
+    )
+
+    private val age = FormElement(
+        id = 12,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.tb_is_beneficiary_asymptomatic),
+        entries = resources.getStringArray(R.array.yes_no),
         required = false,
-        isEnabled = false
+        isEnabled = false,
+        hasDependants = true
     )
 
     // ── Asymptomatic logic ───────────────────────────────────────────────────
@@ -155,7 +198,7 @@ class TBScreeningDataset(
         )
         return when {
             fields.any  { isYes(it) }                  -> noValue   // any Yes  → Not asymptomatic
-            fields.all  { !it.value.isNullOrBlank() }  -> yesValue  // all No   → Asymptomatic
+            fields.all { it.value == noValue } -> yesValue  // all No   → Asymptomatic
             else                                        -> null      // still answering → blank
         }
     }
@@ -168,6 +211,7 @@ class TBScreeningDataset(
             benAgeYears = if (it.dob > 0L) BenBasicCache.getAgeFromDob(it.dob) else it.age
         }
 
+        symptomaticAnswerIndexById.clear()
         if (saved == null) {
             dateOfVisit.value = getDateFromLong(System.currentTimeMillis())
         } else {
@@ -181,38 +225,50 @@ class TBScreeningDataset(
             nightSweats.value        = boolToYesNo(saved.nightSweats)
             historyOfTB.value        = boolToYesNo(saved.historyOfTb)
             currentlyTakingDrugs.value = boolToYesNo(saved.takingAntiTBDrugs)
-            familyHistoryTB.value    = boolToYesNo(saved.familySufferingFromTB)
-            // Restore saved asymptomatic; fall back to computed if null
-            isAsymptomatic.value     = saved.asymptomatic ?: computeAsymptomatic()
+            familyHistoryTB.value = boolToYesNo(saved.familySufferingFromTB)
+            isBeneficiaryAsymptomatic.value = saved.asymptomatic?.let { savedValue ->
+                when (savedValue.trim().lowercase()) {
+                    "yes" -> yesValue
+                    "no" -> noValue
+                    else -> null
+                }
+            }
+            referredForDigitalChestXray.value = boolToYesNo(saved.referredForDigitalChestXray)
+            referredForSputumCollection.value = boolToYesNo(saved.referredForSputumCollection)
+            sputumSampleSubmittedAt.value = getLocalValueInArray(
+                R.array.tb_sputum_sample_submitted_at,
+                saved.sputumSampleSubmittedAt
+            )
+            recommendedForTruenatTest.value = boolToYesNo(saved.recommendedForTruenatTest)
+            recommendedForLiquidCultureTest.value = boolToYesNo(saved.recommendedForLiquidCultureTest)
+            reasonForDenialForGettingTested.value =
+                englishValuesToSelectionIndexes(saved.reasonForDenialForGettingTested, R.array.tb_reason_for_denial_testing)
         }
 
+
         setUpPage(buildFormList())
+        syncSymptomaticIndicesFromList()
+        refreshAsymptomaticFormElementInList()
+        emitListUpdate()
     }
 
     // ── Value change handling ────────────────────────────────────────────────
 
     override suspend fun handleListOnValueChanged(formId: Int, index: Int): Int {
-        when (formId) {
-            isCoughing.id           -> isCoughing.value           = yesNoFromIndex(index)
-            bloodInSputum.id        -> bloodInSputum.value        = yesNoFromIndex(index)
-            isFever.id              -> isFever.value              = yesNoFromIndex(index)
-            riseOfFever.id          -> riseOfFever.value          = yesNoFromIndex(index)
-            lossOfAppetite.id       -> lossOfAppetite.value       = yesNoFromIndex(index)
-            lossOfWeight.id         -> lossOfWeight.value         = yesNoFromIndex(index)
-            nightSweats.id          -> nightSweats.value          = yesNoFromIndex(index)
-            historyOfTB.id          -> historyOfTB.value          = yesNoFromIndex(index)
-            currentlyTakingDrugs.id -> currentlyTakingDrugs.value = yesNoFromIndex(index)
-            familyHistoryTB.id      -> familyHistoryTB.value      = yesNoFromIndex(index)
+        if (formId in symptomaticQuestionIds) {
+            symptomaticAnswerIndexById[formId] = index
         }
         // If a symptom question was answered, recompute asymptomatic and signal a
         // list refresh so the fragment can force-rebind the auto-computed field.
         return if (formId in symptomQuestionIds) {
             isAsymptomatic.value = computeAsymptomatic()
+            Log.d("ASYM_TEST", "Computed = ${isAsymptomatic.value}")
             listFlow.value.indexOf(isAsymptomatic).takeIf { it >= 0 } ?: -1
         } else -1
     }
 
-    // ── Saving ───────────────────────────────────────────────────────────────
+    fun getIndexOfBeneficiaryAsymptomatic(): Int =
+        indexOfFormElementById(isBeneficiaryAsymptomatic.id)
 
     override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
         (cacheModel as TBScreeningCache).let { form ->
@@ -229,25 +285,190 @@ class TBScreeningDataset(
             form.familySufferingFromTB = isYes(familyHistoryTB)
             form.asymptomatic          = isAsymptomatic.value?.takeIf { it.isNotBlank() }
             form.familyContactScreeningRequired = requiresFamilyContactScreening()
-            // Fields no longer collected in TB Screening — clear them
-            form.age                             = null
-            form.diabetic                        = null
-            form.tobaccoUser                     = null
-            form.contactWithTBPatient            = null
-            form.bmi                             = null
-            form.historyOfTBInLastFiveYrs        = null
-            form.sympotomatic                    = null
-            form.recommandateTest                = null
-            form.referredForDigitalChestXray     = null
-            form.referredForSputumCollection     = null
-            form.sputumSampleSubmittedAt         = null
-            form.recommendedForTruenatTest       = null
-            form.recommendedForLiquidCultureTest = null
-            form.reasonForDenialForGettingTested = null
+            form.asymptomatic = asymptomaticElementInList().value?.trim()?.takeIf { it.isNotBlank() }
+            form.sympotomatic = when (form.asymptomatic) {
+                yesValue -> noValue
+                noValue -> yesValue
+                else -> null
+            }
+            form.recommandateTest = null
         }
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    fun requiresFamilyContactScreening(): Boolean =
+        isYes(familyHistoryTB)
+
+    fun getFamilyContactAlert(): String? =
+        if (requiresFamilyContactScreening()) resources.getString(R.string.tb_family_contact_screening_alert) else null
+
+    fun getIndexOfDate(): Int = listFlow.value.indexOf(dateOfVisit)
+
+    private fun buildFormList(): MutableList<FormElement> {
+        return mutableListOf(
+            dateOfVisit,
+            isCoughing,
+            bloodInSputum,
+            isFever,
+            riseOfFever,
+            lossOfAppetite,
+            lossOfWeight,
+            nightSweats,
+            historyOfTB,
+            currentlyTakingDrugs,
+            familyHistoryTB,
+            isBeneficiaryAsymptomatic,
+        ).apply { addAll(buildReferralFields()) }
+    }
+
+    private fun buildReferralFields(): List<FormElement> = buildList {
+        if (shouldShowDigitalChestXrayReferral()) {
+            add(referredForDigitalChestXray)
+        }
+        if (shouldShowSputumCollectionReferral()) {
+            add(referredForSputumCollection)
+            add(sputumSampleSubmittedAt)
+        }
+        if (shouldShowTruenatRecommendation()) {
+            add(recommendedForTruenatTest)
+        }
+        if (shouldShowLiquidCultureRecommendation()) {
+            add(recommendedForLiquidCultureTest)
+        }
+        if (shouldShowReasonForDenial()) {
+            add(reasonForDenialForGettingTested)
+        }
+    }
+
+    private fun syncReferralFields(): Int {
+        val allReferralFields = listOf(
+            referredForDigitalChestXray,
+            referredForSputumCollection,
+            sputumSampleSubmittedAt,
+            recommendedForTruenatTest,
+            recommendedForLiquidCultureTest,
+            reasonForDenialForGettingTested
+        )
+        val visibleFields = buildReferralFields()
+        val visibleValues = visibleFields.associateWith { it.value }
+        val asymptomaticInList = findFormElementById(isBeneficiaryAsymptomatic.id)
+            ?: isBeneficiaryAsymptomatic
+        val insertPosition = indexOfFormElementById(isBeneficiaryAsymptomatic.id)
+            .takeIf { it >= 0 }
+            ?.plus(1)
+            ?: -2
+
+        val updateIndex = triggerDependants(
+            source = asymptomaticInList,
+            removeItems = allReferralFields,
+            addItems = visibleFields,
+            position = insertPosition
+        )
+        visibleValues.forEach { (field, value) -> field.value = value }
+        return updateIndex
+    }
+
+    private fun applyAsymptomaticDefault(): Boolean {
+        syncSymptomaticIndicesFromList()
+        val allSymptomsExplicitlyNo = symptomaticQuestions.all { question ->
+            symptomaticAnswerIndexById[question.id] == 1
+        }
+        val newValue = if (allSymptomsExplicitlyNo) yesValue else noValue
+        val previousValue = isBeneficiaryAsymptomatic.value
+        isBeneficiaryAsymptomatic.value = newValue
+        // Replace with a new instance so DiffUtil detects the change (in-place mutation
+        // on the same FormElement leaves old/new list snapshots identical for the adapter).
+        replaceFormElementById(
+            isBeneficiaryAsymptomatic.id,
+            isBeneficiaryAsymptomatic.copy(value = newValue, isEnabled = false)
+        )
+        requestListRefresh = true
+        return previousValue != newValue
+    }
+
+    private fun syncSymptomaticIndicesFromList() {
+        symptomaticQuestions.forEach { question ->
+            yesNoSelectionIndex(symptomElementInList(question))?.let { selectedIndex ->
+                symptomaticAnswerIndexById[question.id] = selectedIndex
+            }
+        }
+    }
+
+    /** Uses the list-backed element so adapter selections are included in asymptomatic logic. */
+    private fun symptomElementInList(question: FormElement): FormElement =
+        findFormElementById(question.id) ?: question
+
+    private fun asymptomaticElementInList(): FormElement =
+        findFormElementById(isBeneficiaryAsymptomatic.id) ?: isBeneficiaryAsymptomatic
+
+    private fun setYesNoAnswer(formId: Int, index: Int) {
+        val answer = yesNoFromIndex(index) ?: return
+        findFormElementById(formId)?.value = answer
+        when (formId) {
+            isCoughing.id -> isCoughing.value = answer
+            bloodInSputum.id -> bloodInSputum.value = answer
+            isFever.id -> isFever.value = answer
+            riseOfFever.id -> riseOfFever.value = answer
+            lossOfAppetite.id -> lossOfAppetite.value = answer
+            lossOfWeight.id -> lossOfWeight.value = answer
+            nightSweats.id -> nightSweats.value = answer
+            historyOfTB.id -> historyOfTB.value = answer
+            currentlyTakingDrugs.id -> currentlyTakingDrugs.value = answer
+            familyHistoryTB.id -> familyHistoryTB.value = answer
+            referredForDigitalChestXray.id -> referredForDigitalChestXray.value = answer
+            referredForSputumCollection.id -> referredForSputumCollection.value = answer
+            recommendedForTruenatTest.id -> recommendedForTruenatTest.value = answer
+            recommendedForLiquidCultureTest.id -> recommendedForLiquidCultureTest.value = answer
+        }
+    }
+
+    /** Returns true only when the question has an explicit No answer. */
+    private fun isSymptomAnsweredNo(formElement: FormElement): Boolean =
+        yesNoSelectionIndex(formElement) == 1
+
+    /** Returns true only when the question has an explicit Yes answer. */
+    private fun isSymptomAnsweredYes(formElement: FormElement): Boolean =
+        yesNoSelectionIndex(formElement) == 0
+
+    private fun yesNoSelectionIndex(formElement: FormElement): Int? {
+        val value = formElement.value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        formElement.entries?.let { entries ->
+            entries.indexOfFirst { it == value }.takeIf { it >= 0 }?.let { return it }
+            entries.indexOfFirst { it.equals(value, ignoreCase = true) }.takeIf { it >= 0 }?.let { return it }
+        }
+        val englishYesNo = englishResources.getStringArray(R.array.yes_no)
+        return when {
+            value.equals(yesValue, ignoreCase = true) -> 0
+            value.equals(noValue, ignoreCase = true) -> 1
+            value.equals(englishYesNo[0], ignoreCase = true) -> 0
+            value.equals(englishYesNo[1], ignoreCase = true) -> 1
+            else -> null
+        }
+    }
+
+    private fun isSymptomYes(formElement: FormElement): Boolean =
+        yesNoSelectionIndex(formElement) == 0
+
+    private fun refreshAsymptomaticFormElementInList() {
+        replaceFormElementById(
+            isBeneficiaryAsymptomatic.id,
+            isBeneficiaryAsymptomatic.copy(
+                value = isBeneficiaryAsymptomatic.value,
+                isEnabled = false
+            )
+        )
+    }
+
+    private fun applyReferralDefaults() {
+        if (shouldShowDigitalChestXrayReferral() && referredForDigitalChestXray.value.isNullOrBlank()) {
+            referredForDigitalChestXray.value = yesValue
+        }
+    }
+
+    private fun yesNoFromIndex(index: Int): String? = when (index) {
+        0 -> yesValue
+        1 -> noValue
+        else -> null
+    }
 
     fun requiresFamilyContactScreening(): Boolean = isYes(familyHistoryTB)
 
@@ -282,5 +503,5 @@ class TBScreeningDataset(
         null  -> ""
     }
 
-    private fun isYes(formElement: FormElement): Boolean = formElement.value == yesValue
+    private fun isYes(formElement: FormElement): Boolean = isSymptomAnsweredYes(formElement)
 }

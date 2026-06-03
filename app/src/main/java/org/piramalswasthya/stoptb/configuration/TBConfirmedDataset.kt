@@ -1,6 +1,7 @@
 package org.piramalswasthya.stoptb.configuration
 
 import android.content.Context
+import android.widget.Toast
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.model.BenRegCache
@@ -193,6 +194,8 @@ class TBConfirmedDataset(
                     anyDiscomfort
                 )
             )
+
+
 
             treatmentStartDate.max = System.currentTimeMillis()
             treatmentStartDate.min = suspectedTb?.visitDate?.takeIf { it > 0 } ?: getOneYearBeforeCurrentDate()

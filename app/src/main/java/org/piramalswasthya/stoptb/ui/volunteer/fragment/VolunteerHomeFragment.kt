@@ -36,6 +36,26 @@ class VolunteerHomeFragment : Fragment() {
 
     private var manualHomeRefreshRequested = false
 
+    /**
+     * Resets the "Refreshing..." state immediately when the camp hub connection
+     * drops (the interceptor flips the preference on an IO thread).
+     */
+    private val campHubPrefListener =
+        android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == pref.getCampHubConnectedKey() && !pref.isCampHubConnected()
+                && manualHomeRefreshRequested
+            ) {
+                activity?.runOnUiThread {
+                    manualHomeRefreshRequested = false
+                    setQuickRefreshButtonEnabled(true)
+                    if (_binding != null) {
+                        binding.tvQuickRefreshStatus.text =
+                            getString(R.string.quick_refresh_camp_disconnected)
+                    }
+                }
+            }
+        }
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
@@ -87,6 +107,15 @@ class VolunteerHomeFragment : Fragment() {
             )
             .observe(viewLifecycleOwner) { workInfos ->
                 if (!manualHomeRefreshRequested || workInfos.isNullOrEmpty()) return@observe
+
+                // If camp hub disconnected while a refresh was running, abort immediately
+                // (the worker may stay BLOCKED forever waiting for connectivity).
+                if (!pref.isCampHubConnected()) {
+                    manualHomeRefreshRequested = false
+                    setQuickRefreshButtonEnabled(true)
+                    binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_camp_disconnected)
+                    return@observe
+                }
 
                 val isRunning = workInfos.any {
                     it.state == WorkInfo.State.ENQUEUED ||
@@ -151,6 +180,7 @@ class VolunteerHomeFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
+        pref.addOnPreferenceChangeListener(campHubPrefListener)
         activity?.let {
             (it as VolunteerActivity).updateActionBar(
                 R.drawable.ic_home,
@@ -171,6 +201,7 @@ class VolunteerHomeFragment : Fragment() {
     }
 
     override fun onStop() {
+        pref.removeOnPreferenceChangeListener(campHubPrefListener)
         activity?.let {
             (it as VolunteerActivity).removeClickListenerToHomepageActionBarTitle()
         }

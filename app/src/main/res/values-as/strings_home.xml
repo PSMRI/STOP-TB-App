@@ -115,7 +115,7 @@
     <string name="btn_continue_text">আগবাঢ়ক</string>
     <string name="btn_submit_text">জমা দিয়ক</string>
     <string name="missing_detail_title">বিৱৰণ অনুপস্থিত</string>
-    <string name="missing_detail_message">তলত দিয়া তথ্যসমূহৰ ভিতৰত কমেও এটা মান অনুপস্থিত আছে:\n\n\tৰাজ্য\n\tজিলা\n\tব্লক\n\tটিইউ\n\tস্বাস্থ্য সুবিধা\n\tগাঁও</string>
+    <string name="missing_detail_message">তলত দিয়া তথ্যসমূহৰ ভিতৰত কমেও এটা মান অনুপস্থিত আছে:\n\n\tৰাজ্য\n\tজিলা\n\tব্লক\n\tগাঁও</string>
     <string name="understood">বুজিলোঁ</string>
     <string name="til_hint_selected_village">বাছনি কৰা গাঁও</string>
 <string name="icon_title_abortion">গৰ্ভপাত তালিকা</string>

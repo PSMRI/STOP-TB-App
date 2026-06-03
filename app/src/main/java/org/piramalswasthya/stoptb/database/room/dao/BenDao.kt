@@ -228,22 +228,27 @@ interface BenDao {
             OR (:source = 4 AND gender = 'Female' AND isDeath = 0
                 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
                 AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
-            OR (:source = 5 AND isDeath = 0 AND tbsnFilled = 1 AND benId IN (
+            OR (:source = 5 AND isDeath = 0 AND benId IN (
+                SELECT b2.beneficiaryId FROM BENEFICIARY b2
+                WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
+                UNION
                 SELECT v.benId FROM BEN_VITALS v
-                WHERE IFNULL(v.temperature, 0) >= 100
-                   OR IFNULL(v.pulseRate, 0) < 60
-                   OR IFNULL(v.pulseRate, 0) > 90
-                   OR IFNULL(v.bpSystolic, 0) < 90
-                   OR IFNULL(v.bpSystolic, 0) > 140
-                   OR IFNULL(v.bpDiastolic, 0) < 60
-                   OR IFNULL(v.bpDiastolic, 0) > 90
-                   OR IFNULL(v.rbs, 0) < 60
-                   OR IFNULL(v.rbs, 0) > 90
+                WHERE (v.pulseRate IS NOT NULL AND v.pulseRate < 60)
+                   OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
+                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic < 90)
+                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
+                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
+                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
+                   OR (v.rbs IS NOT NULL AND v.rbs >= 100)
             ))
             OR (:source = 6 AND isDeath = 0 AND (
                 benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isChestXRayDone IS NOT NULL
+                )
+                OR benId IN (
+                    SELECT td.benId FROM TB_DIAGNOSTICS td
+                    WHERE td.isChestXRayDone IS NOT NULL
                 )
                 OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
@@ -257,6 +262,11 @@ interface BenDao {
                        OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'
                 )
                 OR benId IN (
+                    SELECT td.benId FROM TB_DIAGNOSTICS td
+                    WHERE td.isNaatConducted IS NOT NULL
+                       OR UPPER(IFNULL(td.chestXRayResult, '')) = 'POSITIVE'
+                )
+                OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
                     WHERE tbs.recommendedForTruenatTest = 1
                 )
@@ -265,6 +275,10 @@ interface BenDao {
                 benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isLiquidCultureConducted IS NOT NULL
+                )
+                OR benId IN (
+                    SELECT td.benId FROM TB_DIAGNOSTICS td
+                    WHERE td.isLiquidCultureConducted IS NOT NULL
                 )
                 OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
@@ -306,22 +320,27 @@ interface BenDao {
             OR (:source = 4 AND gender = 'Female' AND isDeath = 0
                 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
                 AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
-            OR (:source = 5 AND isDeath = 0 AND tbsnFilled = 1 AND benId IN (
+            OR (:source = 5 AND isDeath = 0 AND benId IN (
+                SELECT b2.beneficiaryId FROM BENEFICIARY b2
+                WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
+                UNION
                 SELECT v.benId FROM BEN_VITALS v
-                WHERE IFNULL(v.temperature, 0) >= 100
-                   OR IFNULL(v.pulseRate, 0) < 60
-                   OR IFNULL(v.pulseRate, 0) > 90
-                   OR IFNULL(v.bpSystolic, 0) < 90
-                   OR IFNULL(v.bpSystolic, 0) > 140
-                   OR IFNULL(v.bpDiastolic, 0) < 60
-                   OR IFNULL(v.bpDiastolic, 0) > 90
-                   OR IFNULL(v.rbs, 0) < 60
-                   OR IFNULL(v.rbs, 0) > 90
+                WHERE (v.pulseRate IS NOT NULL AND v.pulseRate < 60)
+                   OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
+                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic < 90)
+                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
+                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
+                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
+                   OR (v.rbs IS NOT NULL AND v.rbs >= 100)
             ))
             OR (:source = 6 AND isDeath = 0 AND (
                 benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isChestXRayDone IS NOT NULL
+                )
+                OR benId IN (
+                    SELECT td.benId FROM TB_DIAGNOSTICS td
+                    WHERE td.isChestXRayDone IS NOT NULL
                 )
                 OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
@@ -335,6 +354,11 @@ interface BenDao {
                        OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'
                 )
                 OR benId IN (
+                    SELECT td.benId FROM TB_DIAGNOSTICS td
+                    WHERE td.isNaatConducted IS NOT NULL
+                       OR UPPER(IFNULL(td.chestXRayResult, '')) = 'POSITIVE'
+                )
+                OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
                     WHERE tbs.recommendedForTruenatTest = 1
                 )
@@ -343,6 +367,10 @@ interface BenDao {
                 benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isLiquidCultureConducted IS NOT NULL
+                )
+                OR benId IN (
+                    SELECT td.benId FROM TB_DIAGNOSTICS td
+                    WHERE td.isLiquidCultureConducted IS NOT NULL
                 )
                 OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
@@ -389,22 +417,27 @@ interface BenDao {
             OR (:source = 4 AND gender = 'Female' AND isDeath = 0
                 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
                 AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
-            OR (:source = 5 AND isDeath = 0 AND tbsnFilled = 1 AND benId IN (
+            OR (:source = 5 AND isDeath = 0 AND benId IN (
+                SELECT b2.beneficiaryId FROM BENEFICIARY b2
+                WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
+                UNION
                 SELECT v.benId FROM BEN_VITALS v
-                WHERE IFNULL(v.temperature, 0) >= 100
-                   OR IFNULL(v.pulseRate, 0) < 60
-                   OR IFNULL(v.pulseRate, 0) > 90
-                   OR IFNULL(v.bpSystolic, 0) < 90
-                   OR IFNULL(v.bpSystolic, 0) > 140
-                   OR IFNULL(v.bpDiastolic, 0) < 60
-                   OR IFNULL(v.bpDiastolic, 0) > 90
-                   OR IFNULL(v.rbs, 0) < 60
-                   OR IFNULL(v.rbs, 0) > 90
+                WHERE (v.pulseRate IS NOT NULL AND v.pulseRate < 60)
+                   OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
+                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic < 90)
+                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
+                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
+                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
+                   OR (v.rbs IS NOT NULL AND v.rbs >= 100)
             ))
             OR (:source = 6 AND isDeath = 0 AND (
                 benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isChestXRayDone IS NOT NULL
+                )
+                OR benId IN (
+                    SELECT td.benId FROM TB_DIAGNOSTICS td
+                    WHERE td.isChestXRayDone IS NOT NULL
                 )
                 OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
@@ -418,6 +451,11 @@ interface BenDao {
                        OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'
                 )
                 OR benId IN (
+                    SELECT td.benId FROM TB_DIAGNOSTICS td
+                    WHERE td.isNaatConducted IS NOT NULL
+                       OR UPPER(IFNULL(td.chestXRayResult, '')) = 'POSITIVE'
+                )
+                OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
                     WHERE tbs.recommendedForTruenatTest = 1
                 )
@@ -426,6 +464,10 @@ interface BenDao {
                 benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isLiquidCultureConducted IS NOT NULL
+                )
+                OR benId IN (
+                    SELECT td.benId FROM TB_DIAGNOSTICS td
+                    WHERE td.isLiquidCultureConducted IS NOT NULL
                 )
                 OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
@@ -493,6 +535,14 @@ interface BenDao {
 
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0 and tbsnFilled = 1")
     fun getPendingTbScreeningCount(selectedVillage: Int): Flow<Int>
+
+    /** Count of beneficiaries who have a TB_SCREENING record (directly from TB_SCREENING table — reliable for both local and server-synced data) */
+    @Query("""
+        SELECT COUNT(DISTINCT ts.benId) FROM TB_SCREENING ts
+        INNER JOIN BEN_BASIC_CACHE b ON b.benId = ts.benId
+        WHERE b.villageId = :selectedVillage AND b.isDeactivate = 0
+    """)
+    fun getTbScreenedBenCount(selectedVillage: Int): Flow<Int>
 
     @Transaction
     @Query("SELECT * FROM BEN_BASIC_CACHE where villageId = :selectedVillage and hhId = :hhId  and isDeactivate=0")
@@ -743,18 +793,18 @@ interface BenDao {
         WHERE villageId = :selectedVillage
           AND isDeactivate = 0
           AND isDeath = 0
-          AND tbsnFilled = 1
           AND benId IN (
+            SELECT b2.beneficiaryId FROM BENEFICIARY b2
+            WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
+            UNION
             SELECT v.benId FROM BEN_VITALS v
-            WHERE IFNULL(v.temperature, 0) >= 100
-               OR IFNULL(v.pulseRate, 0) < 60
-               OR IFNULL(v.pulseRate, 0) > 90
-               OR IFNULL(v.bpSystolic, 0) < 90
-               OR IFNULL(v.bpSystolic, 0) > 140
-               OR IFNULL(v.bpDiastolic, 0) < 60
-               OR IFNULL(v.bpDiastolic, 0) > 90
-               OR IFNULL(v.rbs, 0) < 60
-               OR IFNULL(v.rbs, 0) > 90
+            WHERE (v.pulseRate IS NOT NULL AND v.pulseRate < 60)
+               OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
+               OR (v.bpSystolic IS NOT NULL AND v.bpSystolic < 90)
+               OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
+               OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
+               OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
+               OR (v.rbs IS NOT NULL AND v.rbs >= 100)
           )
     """)
     fun getHwcBenDataCount(selectedVillage: Int): Flow<Int>
@@ -768,6 +818,10 @@ interface BenDao {
             benId IN (
               SELECT ts.benId FROM TB_SUSPECTED ts
               WHERE ts.isChestXRayDone IS NOT NULL
+            )
+            OR benId IN (
+              SELECT td.benId FROM TB_DIAGNOSTICS td
+              WHERE td.isChestXRayDone IS NOT NULL
             )
             OR benId IN (
               SELECT tbs.benId FROM TB_SCREENING tbs
@@ -789,6 +843,11 @@ interface BenDao {
                  OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'
             )
             OR benId IN (
+              SELECT td.benId FROM TB_DIAGNOSTICS td
+              WHERE td.isNaatConducted IS NOT NULL
+                 OR UPPER(IFNULL(td.chestXRayResult, '')) = 'POSITIVE'
+            )
+            OR benId IN (
               SELECT tbs.benId FROM TB_SCREENING tbs
               WHERE tbs.recommendedForTruenatTest = 1
             )
@@ -805,6 +864,10 @@ interface BenDao {
             benId IN (
               SELECT ts.benId FROM TB_SUSPECTED ts
               WHERE ts.isLiquidCultureConducted IS NOT NULL
+            )
+            OR benId IN (
+              SELECT td.benId FROM TB_DIAGNOSTICS td
+              WHERE td.isLiquidCultureConducted IS NOT NULL
             )
             OR benId IN (
               SELECT tbs.benId FROM TB_SCREENING tbs

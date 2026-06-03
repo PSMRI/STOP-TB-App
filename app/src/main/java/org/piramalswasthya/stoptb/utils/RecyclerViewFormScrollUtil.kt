@@ -30,31 +30,36 @@ fun View.scrollToFormValidationField() {
 
 fun RecyclerView.scrollToFormValidationError(position: Int) {
     if (position < 0) return
+    val layoutManager = layoutManager as? LinearLayoutManager ?: return
     val topOffsetPx = (16 * resources.displayMetrics.density).toInt()
     stopScroll()
-    post {
-        (layoutManager as? LinearLayoutManager)?.scrollToPositionWithOffset(position, topOffsetPx)
-        post { revealFormValidationRow(position, topOffsetPx) }
-    }
+    post { revealFormValidationRow(layoutManager, position, topOffsetPx, attempt = 0) }
 }
 
-private fun RecyclerView.revealFormValidationRow(position: Int, topOffsetPx: Int) {
-    val layoutManager = layoutManager as? LinearLayoutManager ?: return
-    val immediateView = layoutManager.findViewByPosition(position)
+private fun RecyclerView.revealFormValidationRow(
+    layoutManager: LinearLayoutManager,
+    position: Int,
+    topOffsetPx: Int,
+    attempt: Int,
+) {
+    layoutManager.scrollToPositionWithOffset(position, topOffsetPx)
+    val rowView = layoutManager.findViewByPosition(position)
         ?: findViewHolderForAdapterPosition(position)?.itemView
 
-    if (immediateView == null) {
-        smoothScrollToPosition(position)
-        postDelayed({
-            val resolvedView = layoutManager.findViewByPosition(position)
-                ?: findViewHolderForAdapterPosition(position)?.itemView
-            if (resolvedView != null) {
-                revealFormField(resolvedView, topOffsetPx)
-            }
-        }, 150)
+    if (rowView != null) {
+        revealFormField(rowView, topOffsetPx)
         return
     }
-    revealFormField(immediateView, topOffsetPx)
+    if (attempt < 6) {
+        postDelayed({ revealFormValidationRow(layoutManager, position, topOffsetPx, attempt + 1) }, 50L)
+        return
+    }
+    smoothScrollToPosition(position)
+    postDelayed({
+        val resolvedView = layoutManager.findViewByPosition(position)
+            ?: findViewHolderForAdapterPosition(position)?.itemView
+        if (resolvedView != null) revealFormField(resolvedView, topOffsetPx)
+    }, 200)
 }
 
 private fun revealFormField(itemView: View, topOffsetPx: Int) {

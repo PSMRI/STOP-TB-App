@@ -36,10 +36,19 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
      */
     protected var resources: Resources
     protected var englishResources: Resources
+    private val hindiResources: Resources
+    private val assameseResources: Resources
 
     init {
-        englishResources = getLocalizedResources(context, Languages.ENGLISH)
-        resources = getLocalizedResources(context, currentLanguage)
+        val appContext = context.applicationContext
+        englishResources = getLocalizedResources(appContext, Languages.ENGLISH)
+        hindiResources = getLocalizedResources(appContext, Languages.HINDI)
+        assameseResources = getLocalizedResources(appContext, Languages.ASSAMESE)
+        resources = getLocalizedResources(appContext, currentLanguage)
+    }
+
+    fun updateLanguageResources(context: Context, language: Languages) {
+        resources = getLocalizedResources(context.applicationContext, language)
     }
 
     /**
@@ -47,6 +56,16 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
      */
 
      companion object {
+        private val REPRODUCTIVE_YES_LITERALS = setOf("हाँ", "हां", "হয়")
+        private val REPRODUCTIVE_NO_LITERALS = setOf("नहीं", "নহয়")
+        private val REPRODUCTIVE_YES_ENGLISH = setOf(
+            "yes", "women pregnant", "pregnant woman",
+        )
+        private val REPRODUCTIVE_NO_ENGLISH = setOf(
+            "no", "women not pregnant", "not applicable", "eligible couple",
+            "postnatal mother", "permanently sterilised", "permanently sterilized",
+        )
+
         fun getLongFromDate(dateString: String?): Long {
             if (dateString.isNullOrEmpty()) return 0L
             val f = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
@@ -114,14 +133,14 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
             }
         }
 
+        /** Earliest selectable registration date: one calendar month before today (start of day). */
         fun getMinDateOfReg(): Long {
             return Calendar.getInstance().apply {
-                set(Calendar.YEAR, 2020)
-                set(Calendar.MONTH, 0)
-                set(Calendar.DAY_OF_MONTH, 1)
-            }.timeInMillis
-
+                add(Calendar.MONTH, -1)
+            }.setToStartOfTheDay().timeInMillis
         }
+
+        fun getMaxDateOfReg(): Long = System.currentTimeMillis()
     }
 
 
@@ -162,6 +181,22 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 
     abstract fun mapValues(cacheModel: FormDataModel, pageNumber: Int = 0)
     protected fun getIndexOfElement(element: FormElement) = list.indexOf(element)
+
+    protected fun indexOfFormElementById(formId: Int): Int =
+        list.indexOfFirst { it.id == formId }
+
+    protected fun findFormElementById(formId: Int): FormElement? =
+        list.find { it.id == formId }
+
+    protected fun replaceFormElementById(formId: Int, element: FormElement): Boolean {
+        val index = indexOfFormElementById(formId)
+        if (index < 0) return false
+        list[index] = element
+        return true
+    }
+
+    protected var requestListRefresh: Boolean = false
+
     suspend fun updateList(formId: Int, index: Int) {
         listMutex.withLock {
             list.find { it.id == formId }?.let {
@@ -170,7 +205,8 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
                 }
             }
             val updateIndex = handleListOnValueChanged(formId, index)
-            if (updateIndex != -1) {
+            if (updateIndex != -1 || requestListRefresh) {
+                requestListRefresh = false
                 val newList = list.toMutableList()
 //            if (updateUIForCurrentElement) {
 //                Timber.d("Updating UI element ...")
@@ -181,6 +217,12 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 //            _listFlow.emit(emptyList())
                 _listFlow.emit(newList)
             }
+        }
+    }
+
+    protected suspend fun emitListUpdate() {
+        listMutex.withLock {
+            _listFlow.emit(list.toMutableList())
         }
     }
 
@@ -606,6 +648,47 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
         return -1
     }
 
+//    protected fun validateAllCapsOrSpaceOnEditTextWithHindiEnabled(formElement: FormElement): Int {
+//        val value = formElement.value.orEmpty().trim()
+//
+//        // Function to check if a character is Hindi or Assamese
+//        fun Char.isHindiOrAssamese(): Boolean {
+//            return this in '\u0900'..'\u097F' || this in '\u0980'..'\u09FF'
+//        }
+//
+//        // Function to check if a string contains only uppercase English letters or spaces
+//        fun String.isAllUppercaseOrSpace(): Boolean {
+//            return this.all { it.isUpperCase() || it.isWhitespace() || it.isHindiOrAssamese() }
+//        }
+//
+//        if (formElement.allCaps) {
+//            when {
+//                value.isEmpty() -> {
+//                    if (formElement.required) {
+//                        formElement.errorText = resources.getString(R.string.form_input_empty_error)
+//                    } else {
+//                        formElement.errorText = null
+//                    }
+//                    return -1
+//                }
+//                !value.isAllUppercaseOrSpace() -> {
+//                    formElement.errorText = resources.getString(R.string.form_input_upper_case_error)
+//                    return -1
+//                }
+//            }
+//
+//            // Convert only English letters to uppercase, keep Hindi/Assamese as is
+//            val transformedValue = value.map {
+//                if (it.isLowerCase() && !it.isHindiOrAssamese()) it.uppercaseChar() else it
+//            }.joinToString("")
+//
+//            formElement.value = transformedValue
+//        }
+//
+//        return -1
+//    }
+
+
     protected fun validateAllCapsOrSpaceOnEditTextWithHindiEnabled(formElement: FormElement): Int {
         val value = formElement.value.orEmpty().trim()
 
@@ -616,22 +699,34 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 
         // Function to check if a string contains only uppercase English letters or spaces
         fun String.isAllUppercaseOrSpace(): Boolean {
-            return this.all { it.isUpperCase() || it.isWhitespace() || it.isHindiOrAssamese() }
+            return this.all {
+                it.isUpperCase() || it.isWhitespace() || it.isHindiOrAssamese()
+            }
         }
 
         if (formElement.allCaps) {
+
             when {
+
                 value.isEmpty() -> {
-                    if (formElement.required) {
-                        formElement.errorText = resources.getString(R.string.form_input_empty_error)
-                    } else {
-                        formElement.errorText = null
-                    }
+                    formElement.errorText =
+                        if (formElement.required) {
+                            resources.getString(R.string.form_input_empty_error)
+                        } else {
+                            null
+                        }
                     return -1
                 }
+
                 !value.isAllUppercaseOrSpace() -> {
-                    formElement.errorText = resources.getString(R.string.form_input_upper_case_error)
+                    formElement.errorText =
+                        resources.getString(R.string.form_input_upper_case_error)
                     return -1
+                }
+
+                // VALID CASE
+                else -> {
+                    formElement.errorText = null
                 }
             }
 
@@ -639,7 +734,11 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 
             // Convert only English letters to uppercase, keep Hindi/Assamese as is
             val transformedValue = value.map {
-                if (it.isLowerCase() && !it.isHindiOrAssamese()) it.uppercaseChar() else it
+                if (it.isLowerCase() && !it.isHindiOrAssamese()) {
+                    it.uppercaseChar()
+                } else {
+                    it
+                }
             }.joinToString("")
 
             formElement.value = transformedValue
@@ -647,7 +746,6 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 
         return -1
     }
-
     protected fun validateEditTextFullLengthOccupied(formElement: FormElement): Int {
 
         formElement.value?.takeIf { it.isNotEmpty() }?.let {
@@ -909,8 +1007,8 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 
     protected fun validateMobileNumberOnEditText(formElement: FormElement): Int {
         formElement.errorText = formElement.value?.takeIf { it.isNotEmpty() }?.toLongOrNull()?.let {
-            if (it < 6_000_000_000L || it == 6666666666L || it == 7777777777L || it == 8888888888L
-                || it == 9999999999L
+            if (it == 9_999_999_999L) null
+            else if (it < 6_000_000_000L || it == 6666666666L || it == 7777777777L || it == 8888888888L
             ) resources.getString(R.string.form_input_error_invalid_mobile) else null
         }
         return -1
@@ -1072,23 +1170,44 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
     fun getLocalValueInArray(arrayId: Int, entry: String?): String? {
         if (entry.isNullOrEmpty()) return null
 
-        val englishArray = englishResources.getStringArray(arrayId)
         val localizedArray = resources.getStringArray(arrayId)
-
-        // Try English lookup first (value was stored in English)
-        val englishIndex = englishArray.indexOf(entry)
-        if (englishIndex in englishArray.indices) {
-            return localizedArray[englishIndex]
-        }
-
-        // Fallback: value was stored in localized language, find it directly
-        val localIndex = localizedArray.indexOf(entry)
-        if (localIndex in localizedArray.indices) {
-            return localizedArray[localIndex]
+        val index = findEntryIndexAcrossLanguages(arrayId, entry)
+        if (index in localizedArray.indices) {
+            return localizedArray[index]
         }
 
         Log.w("Dataset", "Entry '$entry' not found in array for ID $arrayId")
         return null
+    }
+
+    private fun findEntryIndexAcrossLanguages(arrayId: Int, entry: String): Int {
+        val trimmed = entry.trim()
+        for (langResources in listOf(englishResources, resources, hindiResources, assameseResources)) {
+            val index = langResources.getStringArray(arrayId).indexOf(trimmed)
+            if (index >= 0) return index
+        }
+        return resolveSemanticArrayIndex(arrayId, trimmed)
+    }
+
+    private fun resolveSemanticArrayIndex(arrayId: Int, entry: String): Int {
+        if (arrayId != R.array.nbr_reproductive_status_married_women_array) return -1
+        return when {
+            isReproductiveYesValue(entry) -> 0
+            isReproductiveNoValue(entry) -> 1
+            else -> -1
+        }
+    }
+
+    private fun isReproductiveYesValue(entry: String): Boolean {
+        if (entry in REPRODUCTIVE_YES_LITERALS) return true
+        val lower = entry.lowercase(Locale.ENGLISH)
+        return lower in REPRODUCTIVE_YES_ENGLISH
+    }
+
+    private fun isReproductiveNoValue(entry: String): Boolean {
+        if (entry in REPRODUCTIVE_NO_LITERALS) return true
+        val lower = entry.lowercase(Locale.ENGLISH)
+        return lower in REPRODUCTIVE_NO_ENGLISH
     }
 
 
@@ -1105,11 +1224,9 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
     fun getEnglishValueInArray(arrayId: Int, entry: String?): String? {
         if (entry.isNullOrEmpty()) return null
 
-        val localizedArray = resources.getStringArray(arrayId)
         val englishArray = englishResources.getStringArray(arrayId)
-        val index = localizedArray.indexOf(entry)
-
-        return if (index in localizedArray.indices) {
+        val index = findEntryIndexAcrossLanguages(arrayId, entry)
+        return if (index in englishArray.indices) {
             englishArray[index]
         } else {
             Log.w("Dataset", "Entry '$entry' not found in localized array for ID $arrayId")
