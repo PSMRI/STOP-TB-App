@@ -78,7 +78,7 @@ class GeneralOpdDataset(
                 englishValuesToSelectionIndexes(it.chiefComplaints, R.array.general_opd_chief_complaint_array)
             medication.value =
                 englishValuesToSelectionIndexes(it.medications, R.array.general_opd_medication_array)
-            dosage.value = it.dosage
+          //  dosage.value = it.dosage
             frequency.value = getLocalValueInArray(R.array.general_opd_frequency_array, it.frequency)
             duration.value = getLocalValueInArray(R.array.general_opd_duration_array, it.duration)
             notes.value = it.notes

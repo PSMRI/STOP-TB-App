@@ -35,7 +35,7 @@ import javax.inject.Inject
 class NewBenRegViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val preferenceDao: PreferenceDao,
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
     private val benRepo: BenRepo,
 ) : ViewModel() {
 
@@ -396,6 +396,15 @@ class NewBenRegViewModel @Inject constructor(
     }
 
     fun resetListUpdateState() { _listUpdateState.value = ListUpdateState.Idle }
+
+    fun refreshFormForCurrentLanguage() {
+        dataset.updateLanguageResources(context, preferenceDao.getCurrentLanguage())
+        dataset.refreshLocalizedFieldValues()
+        viewModelScope.launch {
+            val current = dataset.listFlow.value
+            if (current.isNotEmpty()) _formList.value = current
+        }
+    }
 
     // ─── Helpers ─────────────────────────────────────────────────────────
     fun getBenGender()  = if (this::ben.isInitialized) ben.gender else null

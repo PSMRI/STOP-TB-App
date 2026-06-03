@@ -33,6 +33,7 @@
         <item>অজ্ঞাত</item>
     </string-array>
     <string name="form_name">ফৰ্মৰ নাম</string>
+    <string name="select_time">সময় বাছনি কৰক</string>
     <string name="rch_id_ben">RCH ID</string>
     <string name="nbr_age">বয়স</string>
     <string name="nbr_dob">জন্মৰ তাৰিখ</string>
@@ -228,8 +229,8 @@
     </string-array>
 
     <string-array name="community_array">
-        <item>SC</item>
-        <item>ST</item>
+        <item>এছচি</item>
+        <item>এছটি</item>
         <item>অন্যান্য</item>
     </string-array>
 

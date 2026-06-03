@@ -27,6 +27,9 @@ class AgePickerDialog(context: Context) : AlertDialog(context) {
     private var monthsMax: Int = 0
     private var daysMin: Int = 0
     private var daysMax: Int = 0
+
+    var onAgeConfirmed: ((AgeUnitDTO) -> Unit)? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         _binding = AlertAgePickerBinding.inflate(layoutInflater, null, false)
         setContentView(binding.root)
@@ -105,6 +108,7 @@ class AgePickerDialog(context: Context) : AlertDialog(context) {
                     Resources.getSystem().getIdentifier("numberpicker_input", "id", "android")
                 )
                 ageUnitDTO.days = mInputTextDays.text.toString().toInt()
+                onAgeConfirmed?.invoke(ageUnitDTO)
                 dismiss()
             }
 

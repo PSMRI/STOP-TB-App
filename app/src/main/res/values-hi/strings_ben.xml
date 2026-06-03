@@ -217,8 +217,8 @@
     </string-array>
 
     <string-array name="community_array">
-        <item>SC</item>
-        <item>ST</item>
+        <item>एससी</item>
+        <item>एसटी</item>
         <item>अन्य</item>
     </string-array>
 
@@ -328,7 +328,7 @@
     <string name="months">महीने</string>
     <string name="day">दिन</string>
     <string name="days">दिन</string>
-
+    <string name="select_time">समय चुनें</string>
     <string-array name="diet_plane">
         <item>क्या खाएं, क्या न खाएं, आहार विविधता का महत्व।</item>
 
