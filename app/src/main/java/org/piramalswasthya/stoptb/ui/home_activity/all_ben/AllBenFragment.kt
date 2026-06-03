@@ -155,17 +155,16 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // Add Ben button hidden — ben registration only via Household flow
         binding.btnNextPage.visibility = View.GONE
 
+        // Download and Filter icons hidden for now
+        binding.ibFilter.visibility = View.GONE
+        binding.ibDownload.visibility = View.GONE
+
         binding.ibFilter.setOnClickListener {
             filterAlert.show()
         }
 
         binding.ibDownload.setOnClickListener {
             viewModel.downloadCsv(requireContext())
-        }
-
-        if (args.source == 1 || args.source == 2 || args.source == 3 || args.source == 4 || args.source == 5 || args.source == 6 || args.source == 7 || args.source == 8) {
-            binding.ibFilter.visibility = View.GONE
-            binding.ibDownload.visibility = View.VISIBLE
         }
 
         var lastClickTime = 0L

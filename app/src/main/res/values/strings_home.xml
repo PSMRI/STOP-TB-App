@@ -23,9 +23,9 @@
     <string name="menu_home_home">Home</string>
     <string name="menu_home_scheduler">Dashboard</string>
     <string name="til_hint_selected_village">Selected Village</string>
-    <string name="icon_title_household">All\nHousehold</string>
-    <string name="icon_title_ben">All\nBeneficiaries</string>
-    <string name="icon_title_ec">Eligible\nCouple List</string>
+    <string name="icon_title_household">All Household</string>
+    <string name="icon_title_ben">All Beneficiaries</string>
+    <string name="icon_title_ec">Eligible Couple List</string>
     <string name="icon_title_mc">Maternal Health</string>
     <string name="icon_title_cc">Child Care</string>
     <string name="icon_title_ncd">NCD</string>

@@ -1203,6 +1203,7 @@
     <!-- Examine flow -->
     <string name="btn_examine">Examine</string>
     <string name="btn_examine_count">Examine %1$d/5</string>
+    <string name="btn_examine_count_of">Examine %1$d/%2$d</string>
     <string name="examine_bottomsheet_title">Examination Forms</string>
     <string name="examine_btn_fill">Fill</string>
     <string name="examine_btn_view">View</string>

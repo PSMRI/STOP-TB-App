@@ -13,10 +13,13 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.button.MaterialButton
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 
 @AndroidEntryPoint
 class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
@@ -42,10 +45,17 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
         fun onExamineDismissed()
     }
 
+    @Inject
+    lateinit var prefDao: PreferenceDao
+
     private val viewModel: ExamineViewModel by viewModels()
 
     // Set to true when we dismiss programmatically for navigation (not user swipe)
     private var isDismissingForNavigation = false
+
+    /** True when logged-in user is Registrar — only Anthropometry form shown */
+    private val isRegistrar: Boolean
+        get() = prefDao.getLoggedInUser()?.role.isRegistrationOfficerRole()
 
     private val autoFlow: Boolean
         get() = arguments?.getBoolean("autoFlow", false) ?: false
@@ -90,6 +100,12 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
         )
 
         rows.forEachIndexed { index, (rowView, formName, formIndex) ->
+            // Registrar role: show ONLY Anthropometry (index 0); Nurse: show all 5
+            if (isRegistrar && formIndex != FORM_ANTHROPOMETRY) {
+                rowView.visibility = View.GONE
+                return@forEachIndexed
+            }
+            rowView.visibility = View.VISIBLE
             rowView.findViewById<TextView>(R.id.tv_form_name).text = formName
             val btn = rowView.findViewById<MaterialButton>(R.id.btn_form_action)
             observeFormStatus(fillStatusFlows[index], btn, benId, formIndex)
