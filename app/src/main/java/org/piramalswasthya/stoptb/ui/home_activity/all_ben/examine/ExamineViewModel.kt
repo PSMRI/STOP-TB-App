@@ -1,11 +1,16 @@
 package org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine
 
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
@@ -16,10 +21,24 @@ class ExamineViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val recordsRepo: RecordsRepo,
     private val vitalRepo: VitalRepo,
-    private val tbRepo: TBRepo
+    private val tbRepo: TBRepo,
+    private val benRepo: BenRepo
 ) : ViewModel() {
 
     val benId: Long = savedStateHandle["benId"] ?: -1L
+
+    private val _benName = MutableLiveData<String>()
+    val benName: LiveData<String> get() = _benName
+
+    init {
+        viewModelScope.launch {
+            benRepo.getBenFromId(benId)?.let { ben ->
+                _benName.value = listOfNotNull(ben.firstName, ben.lastName)
+                    .filter { it.isNotBlank() }
+                    .joinToString(" ")
+            }
+        }
+    }
 
     /** 1. Anthropometric — height/weight stored directly in BENEFICIARY table */
     val isAnthropometryFilled: Flow<Boolean> =

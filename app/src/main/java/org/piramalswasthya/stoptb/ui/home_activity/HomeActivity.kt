@@ -87,6 +87,18 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
 
     private var autoFlowBackNavigationBlocked: Boolean = false
 
+    /**
+     * Listens for the camp-hub-connected preference being flipped to false by the
+     * [CampModeUrlInterceptor] (on the OkHttp IO thread) so the offline banner
+     * appears immediately — without waiting for the next onResume().
+     */
+    private val campHubPrefListener =
+        android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == pref.getCampHubConnectedKey()) {
+                runOnUiThread { refreshCampHubOfflineBanner() }
+            }
+        }
+
     var isChatSupportEnabled : Boolean = false
     private lateinit var updateHelper: InAppUpdateHelper
     @Inject lateinit var analyticsHelper: AnalyticsHelper
@@ -540,11 +552,13 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
 
     override fun onPause() {
         super.onPause()
+        pref.removeOnPreferenceChangeListener(campHubPrefListener)
         window.decorView.alpha = 0f
     }
 
     override fun onResume() {
         super.onResume()
+        pref.addOnPreferenceChangeListener(campHubPrefListener)
         refreshCampHubOfflineBanner()
         refreshCampHubDrawerItem()
         WorkerUtils.triggerCampQuickPullIfConnected(this, pref)

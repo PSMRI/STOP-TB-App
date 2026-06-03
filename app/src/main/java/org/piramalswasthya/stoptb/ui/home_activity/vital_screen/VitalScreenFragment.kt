@@ -2,6 +2,8 @@ package org.piramalswasthya.stoptb.ui.home_activity.vital_screen
 
 import android.os.Bundle
 import android.text.InputFilter
+import androidx.core.os.bundleOf
+import androidx.core.widget.doAfterTextChanged
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -72,6 +74,12 @@ class VitalScreenFragment : Fragment() {
         binding.etBpSystolic.filters = arrayOf(InputFilter.LengthFilter(3))
         binding.etBpDiastolic.filters = arrayOf(InputFilter.LengthFilter(3))
         binding.etRbs.filters = arrayOf(InputFilter.LengthFilter(6))
+
+        // Clear validation error as soon as user starts correcting the field
+        binding.etPulseRate.doAfterTextChanged   { binding.tilPulseRate.error = null }
+        binding.etBpSystolic.doAfterTextChanged  { binding.tilBpSystolic.error = null }
+        binding.etBpDiastolic.doAfterTextChanged { binding.tilBpDiastolic.error = null }
+        binding.etRbs.doAfterTextChanged         { binding.tilRbs.error = null }
     }
 
     private fun observeUi() {
@@ -88,7 +96,18 @@ class VitalScreenFragment : Fragment() {
             val hasExistingVitals = vital != null
             binding.btnSubmit.visibility = if (hasExistingVitals) View.GONE else View.VISIBLE
             setFormEditable(!hasExistingVitals)
-            vital ?: return@observe
+
+            // benCache is set before existingVitals is posted, so isMale / isPregnant are
+            // reliable here. Re-build the options list (may filter PREGNANCY / LACTATING_MOTHER
+            // for male beneficiaries) and reset the selection array.
+            riskFactorOptions = getRiskFactorOptions()
+            selectedRiskFactors = BooleanArray(riskFactorOptions.size)
+
+            if (vital == null) {
+                // New form — auto-select Pregnancy when ben registration says "Yes"
+                autoSelectPregnancyIfApplicable()
+                return@observe
+            }
             binding.etPulseRate.setText(viewModel.getPulseDisplayValue(vital.pulseRate))
             binding.etBpSystolic.setText(vital.bpSystolic?.toString().orEmpty())
             binding.etBpDiastolic.setText(vital.bpDiastolic?.toString().orEmpty())
@@ -244,13 +263,9 @@ class VitalScreenFragment : Fragment() {
             findNavController().navigateUp()
             return
         }
-        findNavController().navigate(
-            R.id.TBScreeningFormFragment,
-            Bundle().apply {
-                putLong("benId", viewModel.benId)
-                putBoolean("autoFlow", true)
-            }
-        )
+        // Examine flow — return to AllBenFragment so user picks the next form
+        val popped = findNavController().popBackStack(R.id.allBenFragment, false)
+        if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
     }
 
     private fun validateFields(): Boolean {
@@ -436,15 +451,13 @@ class VitalScreenFragment : Fragment() {
         if (!riskFactorsConfigured || riskFactorOptions.isEmpty()) return
         val labels = riskFactorOptions.map { it.label }.toTypedArray()
         val notApplicableIndex = riskFactorOptions.indexOfFirst { it.code == "NOT_APPLICABLE" }
-        val pregnancyIndex = getPregnancyRiskFactorIndex()
-        val pregnancyLocked = isPregnancyRiskFactorLocked()
-        if (pregnancyLocked && pregnancyIndex >= 0) {
-            selectedRiskFactors[pregnancyIndex] = true
-        }
-        val alertDialog = AlertDialog.Builder(requireContext())
+        val pregnancyIndex = riskFactorOptions.indexOfFirst { it.code == "PREGNANCY" }
+        AlertDialog.Builder(requireContext())
             .setTitle(getString(R.string.select_key_population_risk_factors))
             .setMultiChoiceItems(labels, selectedRiskFactors) { dialog, which, isChecked ->
-                if (pregnancyLocked && which == pregnancyIndex && !isChecked) {
+                // "Pregnancy" is locked when it was auto-populated from ben registration —
+                // the user cannot uncheck it here.
+                if (!isChecked && which == pregnancyIndex && viewModel.isPregnant) {
                     selectedRiskFactors[which] = true
                     (dialog as? AlertDialog)?.listView?.setItemChecked(which, true)
                     return@setMultiChoiceItems
@@ -510,6 +523,20 @@ class VitalScreenFragment : Fragment() {
             }
         }
         refreshRiskFactorText()
+    }
+
+    /**
+     * Pre-selects the "Pregnancy" risk-factor option when the beneficiary's ben-registration
+     * answer to "Are you Pregnant?" is Yes.  No-op for male beneficiaries (PREGNANCY is not
+     * in [riskFactorOptions] for them) or when the ben is not pregnant.
+     */
+    private fun autoSelectPregnancyIfApplicable() {
+        if (!viewModel.isPregnant) return
+        val pregnancyIndex = riskFactorOptions.indexOfFirst { it.code == "PREGNANCY" }
+        if (pregnancyIndex >= 0) {
+            selectedRiskFactors[pregnancyIndex] = true
+            refreshRiskFactorText()
+        }
     }
 
     private fun refreshRiskFactorText() {
@@ -648,8 +675,14 @@ class VitalScreenFragment : Fragment() {
             "OTHER",
             "NOT_APPLICABLE"
         )
-        return labels.mapIndexed { index, label ->
+        val all = labels.mapIndexed { index, label ->
             CodedOption(index + 1, codes.getOrElse(index) { label.uppercase().replace(" ", "_") }, label)
+        }
+        // Hide pregnancy-specific options for male beneficiaries
+        return if (viewModel.isMale) {
+            all.filter { it.code != "PREGNANCY" && it.code != "LACTATING_MOTHER" }
+        } else {
+            all
         }
     }
 

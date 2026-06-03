@@ -277,6 +277,22 @@ class VitalScreenViewModel @Inject constructor(
         _state.value = State.IDLE
     }
 
+    /**
+     * True when the beneficiary's ben-registration answer to "Are you Pregnant?" is Yes.
+     * Evaluated lazily from benCache (loaded asynchronously in init).
+     */
+    val isPregnant: Boolean
+        get() = benCache?.let { ben ->
+            val rs = ben.genDetails?.reproductiveStatus
+            ben.genDetails?.reproductiveStatusId == 1 ||
+                rs.equals("Yes", ignoreCase = true) ||
+                rs?.trim()?.lowercase()?.contains("pregnant") == true
+        } ?: false
+
+    /** True when the beneficiary's registered gender is Male. */
+    val isMale: Boolean
+        get() = benCache?.gender == Gender.MALE
+
     fun getTemperatureDisplayValue(value: Double?): String? {
         return when {
             value == null -> null

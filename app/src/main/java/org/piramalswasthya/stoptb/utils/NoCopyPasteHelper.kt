@@ -34,7 +34,8 @@ object NoCopyPasteHelper {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
             }
-            inputType = InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            // OR with existing inputType to preserve password masking (textPassword) on password fields
+            inputType = inputType or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         }
 
         // Additional paste block (some devices bypass actionMode)

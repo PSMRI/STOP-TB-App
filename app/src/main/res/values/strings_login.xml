@@ -40,6 +40,7 @@
     <string name="camp_connect_subtitle">Connect to the laptop hub before enabling Camp Mode.</string>
     <string name="camp_hub_scan">Scan QR</string>
     <string name="camp_hub_connect">Connect</string>
+    <string name="camp_hub_url_required">Please enter the Camp Hub URL</string>
     <string name="camp_hub_scan_failed">Unable to read QR code. Please try again or enter URL manually.</string>
     <string name="camp_hub_scan_empty">No QR code found. Please try again.</string>
     <string name="camp_back">Back</string>

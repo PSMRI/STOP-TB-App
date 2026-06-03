@@ -3,6 +3,10 @@ package org.piramalswasthya.stoptb.ui.volunteer
 import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
@@ -19,6 +23,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.text.HtmlCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.MenuProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.NavigationUI
@@ -46,11 +51,58 @@ import org.piramalswasthya.stoptb.ui.volunteer.fragment.VolunteerViewModel
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import java.util.Locale
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
 
     private var autoFlowBackNavigationBlocked: Boolean = false
+
+    /** Mirrors the same listener in HomeActivity — see comments there. */
+    private val campHubPrefListener =
+        android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == pref.getCampHubConnectedKey()) {
+                runOnUiThread { refreshCampHubOfflineBanner() }
+            }
+        }
+
+    // ── WiFi / NetworkCallback ────────────────────────────────────────────────
+
+    private var isNetworkCallbackRegistered = false
+
+    private val connectivityManager: ConnectivityManager by lazy {
+        getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    }
+
+    /**
+     * Detects WiFi loss/availability at OS level — fires instantly when WiFi
+     * disconnects even if no HTTP request has been made to the camp hub.
+     *
+     * onLost  → mark camp hub disconnected + show banner immediately
+     * onAvailable → ping camp hub; reconnect only if it responds
+     */
+    private val wifiNetworkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onLost(network: Network) {
+            // WiFi dropped — if camp mode was active, mark disconnected at once
+            if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
+                pref.setCampHubConnected(false)
+                runOnUiThread { refreshCampHubOfflineBanner() }
+            }
+        }
+
+        override fun onAvailable(network: Network) {
+            // WiFi came back — only try to reconnect if we're not already connected
+            if (!pref.isCampModeEnabled() || pref.isCampHubConnected()) return
+            lifecycleScope.launch(Dispatchers.IO) {
+                val reached = pingCampHub()
+                if (pref.isCampModeEnabled()) {           // double-check after IO
+                    pref.setCampHubConnected(reached)
+                    runOnUiThread { refreshCampHubOfflineBanner() }
+                }
+            }
+        }
+    }
 
     @EntryPoint
     @InstallIn(SingletonComponent::class)
@@ -392,11 +444,39 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
 
     override fun onPause() {
         super.onPause()
+        pref.removeOnPreferenceChangeListener(campHubPrefListener)
+        if (isNetworkCallbackRegistered) {
+            try {
+                connectivityManager.unregisterNetworkCallback(wifiNetworkCallback)
+            } catch (_: Exception) { }
+            isNetworkCallbackRegistered = false
+        }
         window.decorView.alpha = 0f
     }
 
     override fun onResume() {
         super.onResume()
+        pref.addOnPreferenceChangeListener(campHubPrefListener)
+
+        // If WiFi was lost while the app was in the background, the NetworkCallback
+        // couldn't fire (it was unregistered). Catch that case here on resume.
+        if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
+            val hasWifi = connectivityManager.activeNetwork?.let {
+                connectivityManager.getNetworkCapabilities(it)
+                    ?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+            } ?: false
+            if (!hasWifi) pref.setCampHubConnected(false)
+        }
+
+        // Register WiFi callback (guard against double-registration)
+        if (!isNetworkCallbackRegistered) {
+            val request = NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .build()
+            connectivityManager.registerNetworkCallback(request, wifiNetworkCallback)
+            isNetworkCallbackRegistered = true
+        }
+
         window.decorView.alpha = 1f
         refreshCampHubOfflineBanner()
         refreshCampHubDrawerItem()
@@ -418,6 +498,27 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             Intent(this, LoginActivity::class.java)
                 .putExtra(LoginActivity.EXTRA_OPEN_CAMP_CONNECT, true)
         )
+    }
+
+    /**
+     * Tries to reach the camp hub URL over HTTP (3 s timeout).
+     * Any HTTP response (even 4xx) means the server is up.
+     * Must be called from a background thread.
+     */
+    private fun pingCampHub(): Boolean {
+        return try {
+            val url = java.net.URL(pref.getCampHubUrl())
+            val conn = url.openConnection() as java.net.HttpURLConnection
+            conn.connectTimeout = 3000
+            conn.readTimeout = 3000
+            conn.requestMethod = "GET"
+            conn.connect()
+            val code = conn.responseCode
+            conn.disconnect()
+            code in 100..499
+        } catch (e: Exception) {
+            false
+        }
     }
 
     @Deprecated("Deprecated in Java")

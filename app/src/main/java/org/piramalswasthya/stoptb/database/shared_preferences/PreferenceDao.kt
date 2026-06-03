@@ -226,6 +226,23 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         return pref.getBoolean(key, false)
     }
 
+    /** Raw preference key for the camp-hub-connected flag (needed for change listeners). */
+    fun getCampHubConnectedKey(): String = context.getString(R.string.PREF_camp_hub_connected)
+
+    /**
+     * Register a listener that is notified whenever any preference changes.
+     * Use [getCampHubConnectedKey] to filter for the camp-hub-connected flag.
+     * The callback may be invoked on a background thread — always marshal UI
+     * updates with runOnUiThread.
+     */
+    fun addOnPreferenceChangeListener(listener: android.content.SharedPreferences.OnSharedPreferenceChangeListener) {
+        pref.registerOnSharedPreferenceChangeListener(listener)
+    }
+
+    fun removeOnPreferenceChangeListener(listener: android.content.SharedPreferences.OnSharedPreferenceChangeListener) {
+        pref.unregisterOnSharedPreferenceChangeListener(listener)
+    }
+
     fun savePublicKeyForAbha(publicKey: String) {
         val key = "AUTH_CERT"
         val editor = pref.edit()

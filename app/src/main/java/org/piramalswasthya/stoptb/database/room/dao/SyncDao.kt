@@ -63,6 +63,27 @@ interface SyncDao {
                 "    FROM TB_SUSPECTED tbsp " +
                 "    INNER JOIN beneficiary b ON b.beneficiaryId = tbsp.benId AND b.loc_village_id = :selectedVillage " +
 
+                "    UNION ALL " +
+                "    SELECT 20 as id, 'Anthropometric' as name, b2.syncState as syncState " +
+                "    FROM beneficiary b2 " +
+                "    WHERE b2.isDeactivate = 0 AND b2.isDraft = 0 AND b2.loc_village_id = :selectedVillage " +
+                "      AND (b2.height IS NOT NULL OR b2.weight IS NOT NULL) " +
+
+                "    UNION ALL " +
+                "    SELECT 21 as id, 'General Examination' as name, v.syncState as syncState " +
+                "    FROM BEN_VITALS v " +
+                "    INNER JOIN beneficiary b ON b.beneficiaryId = v.benId AND b.loc_village_id = :selectedVillage " +
+
+                "    UNION ALL " +
+                "    SELECT 22 as id, 'OPD' as name, opd.syncState as syncState " +
+                "    FROM GENERAL_OPD opd " +
+                "    INNER JOIN beneficiary b ON b.beneficiaryId = opd.benId AND b.loc_village_id = :selectedVillage " +
+
+                "    UNION ALL " +
+                "    SELECT 23 as id, 'Diagnosis' as name, diag.syncState as syncState " +
+                "    FROM TB_DIAGNOSTICS diag " +
+                "    INNER JOIN beneficiary b ON b.beneficiaryId = diag.benId AND b.loc_village_id = :selectedVillage " +
+
                 // ❌ NCD Refer removed
 //            "    UNION ALL " +
 //            "    SELECT 13 as id, 'NCD Refer' as name, ref.syncState as syncState " +

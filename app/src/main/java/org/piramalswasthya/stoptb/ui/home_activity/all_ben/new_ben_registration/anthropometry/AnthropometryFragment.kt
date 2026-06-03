@@ -49,6 +49,7 @@ class AnthropometryFragment : Fragment() {
 
     private val viewModel: AnthropometryViewModel by viewModels()
     private var highTemperatureAlertShown = false
+    private var isFormLocked = false
 
     private var isFormLocked = false
 
@@ -76,6 +77,8 @@ class AnthropometryFragment : Fragment() {
         }
         viewModel.existingAnthropometry.observe(viewLifecycleOwner) { ben ->
             ben ?: return@observe
+            // Lock form FIRST so that setText below does not trigger the HWC alert in view mode
+            lockFormIfExistingData(ben)
             binding.tvAgeGender.text = formatAgeGender(ben)
             lockFormIfExistingData(ben)
 
@@ -93,10 +96,12 @@ class AnthropometryFragment : Fragment() {
         }
 
         binding.rgTemperature.setOnCheckedChangeListener { _, checkedId ->
+            // isFormLocked = true when loading existing data in view mode —
+            // don't overwrite the actual saved temperature value in that case
             when (checkedId) {
-                R.id.rbTempNormal -> binding.etTemperature.setText("98.0")
+                R.id.rbTempNormal -> if (!isFormLocked) binding.etTemperature.setText("98.0")
                 R.id.rbTempHigh -> {
-                    binding.etTemperature.setText("100.0")
+                    if (!isFormLocked) binding.etTemperature.setText("100.0")
                     showHighTemperatureAlert()
                 }
             }
@@ -119,17 +124,22 @@ class AnthropometryFragment : Fragment() {
 
                 AnthropometryViewModel.State.SAVE_SUCCESS -> {
                     binding.loadingOverlay.visibility = View.GONE
-                    WorkerUtils.triggerAmritPushWorker(requireContext())
-                    Toast.makeText(requireContext(), R.string.save_successful, Toast.LENGTH_SHORT)
-                        .show()
-                    if (viewModel.autoFlow) {
-                        val returnedToList =
-                            findNavController().popBackStack(R.id.allBenFragment, false)
-                        if (!returnedToList) {
-                            findNavController().navigate(
-                                R.id.allBenFragment,
-                                bundleOf("source" to 0)
-                            )
+                    WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
+                    Toast.makeText(requireContext(), R.string.save_successful, Toast.LENGTH_SHORT).show()
+                    when {
+                        viewModel.examineFlow -> {
+                            // Examine flow — return to AllBenFragment so user picks the next form
+                            val popped = findNavController().popBackStack(R.id.allBenFragment, false)
+                            if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
+                        }
+                        viewModel.autoFlow -> {
+                            val returnedToList = findNavController().popBackStack(R.id.allBenFragment, false)
+                            if (!returnedToList) {
+                                findNavController().navigate(
+                                    R.id.allBenFragment,
+                                    bundleOf("source" to 0)
+                                )
+                            }
                         }
                         else -> findNavController().popBackStack()
                     }
@@ -249,7 +259,8 @@ class AnthropometryFragment : Fragment() {
         (binding.etTemperature.text?.toString()?.toDoubleOrNull() ?: 0.0) >= 100.0
 
     private fun showHighTemperatureAlert() {
-        if (highTemperatureAlertShown || isFormLocked) return
+        if (highTemperatureAlertShown) return
+        if (isFormLocked) return  // view mode — don't show alert for already-referred beneficiary
         highTemperatureAlertShown = true
         AlertDialog.Builder(requireContext())
             .setMessage(R.string.refer_to_hwc_alert)
@@ -272,6 +283,7 @@ class AnthropometryFragment : Fragment() {
         if (!hasSavedAnthropometry) return
         isFormLocked = true
 
+        isFormLocked = true  // set before any setText triggers doAfterTextChanged
         binding.etWeight.isEnabled = false
         binding.etHeight.isEnabled = false
         binding.etTemperature.isEnabled = false

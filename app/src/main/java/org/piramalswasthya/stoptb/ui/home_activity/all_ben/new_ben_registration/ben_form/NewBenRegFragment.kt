@@ -25,8 +25,11 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.databinding.AlertConsentBinding
@@ -42,6 +45,9 @@ import java.io.File
 
 @AndroidEntryPoint
 class NewBenRegFragment : Fragment() {
+
+    @Inject
+    lateinit var prefDao: PreferenceDao
 
     private var _binding: FragmentNewFormBinding? = null
     private val binding get() = _binding!!
@@ -145,10 +151,11 @@ class NewBenRegFragment : Fragment() {
         }
         // Cancel button hidden — discard handled by back press
 
-        // Death badge visibility — only show fab if record exists AND not dead
+        // Death badge visibility — only show fab if record exists AND not dead AND not Nurse role
+        val isNurse = prefDao.getLoggedInUser()?.role.isNurseRole()
         viewModel.isDeath.observe(viewLifecycleOwner) { isDeath ->
             val recordExists = viewModel.recordExists.value ?: false
-            binding.fabEdit.visibility = if (isDeath || !recordExists) View.GONE else View.VISIBLE
+            binding.fabEdit.visibility = if (isDeath || !recordExists || isNurse) View.GONE else View.VISIBLE
         }
 
         // Set up adapter once
@@ -190,7 +197,8 @@ class NewBenRegFragment : Fragment() {
 
         // Record exists observer — drives view/edit mode + consent
         viewModel.recordExists.observe(viewLifecycleOwner) { recordExists ->
-            binding.fabEdit.visibility = if (recordExists) View.VISIBLE else View.GONE
+            // Nurse role: edit not allowed — hide fab
+            binding.fabEdit.visibility = if (recordExists && !isNurse) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (recordExists) View.GONE else View.VISIBLE
             // btnCancel hidden — discard via back press
             adapter.isEnabled = !recordExists
@@ -223,21 +231,15 @@ class NewBenRegFragment : Fragment() {
                             Toast.LENGTH_LONG
                         ).show()
                     try {
-                        if (viewModel.benIdFromArgs == 0L) {
-                            findNavController().navigate(
-                                R.id.anthropometryFragment,
-                                bundleOf(
-                                    "benId" to viewModel.getCurrentBenId(),
-                                    "autoFlow" to true
-                                )
-                            )
+                        WorkerUtils.triggerAmritPushWorker(requireContext())
+                        if (viewModel.relToHeadId == 18) {
+                            // HoF registration — go directly to All Household list
+                            val popped = findNavController().popBackStack(R.id.allHouseholdFragment, false)
+                            if (!popped) findNavController().navigateUp()
                         } else {
-                            WorkerUtils.triggerAmritPushWorker(requireContext())
                             findNavController().navigateUp()
                         }
-                    } catch (e: Exception) {
-                        Timber.e(e)
-                    }
+                    } catch (e: Exception) { Timber.e(e) }
                 }
 
                 State.SAVE_FAILED -> {

@@ -8,6 +8,7 @@ import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.FormElement
 import org.piramalswasthya.stoptb.model.InputType
 import org.piramalswasthya.stoptb.model.TBScreeningCache
+import org.piramalswasthya.stoptb.utils.Log
 
 class TBScreeningDataset(
     context: Context,
@@ -170,7 +171,8 @@ class TBScreeningDataset(
         title = resources.getString(R.string.tb_is_beneficiary_asymptomatic),
         entries = resources.getStringArray(R.array.yes_no),
         required = false,
-        isEnabled = false
+        isEnabled = false,
+        hasDependants = true
     )
 
     // ── Asymptomatic logic ───────────────────────────────────────────────────
@@ -196,7 +198,7 @@ class TBScreeningDataset(
         )
         return when {
             fields.any  { isYes(it) }                  -> noValue   // any Yes  → Not asymptomatic
-            fields.all  { !it.value.isNullOrBlank() }  -> yesValue  // all No   → Asymptomatic
+            fields.all { it.value == noValue } -> yesValue  // all No   → Asymptomatic
             else                                        -> null      // still answering → blank
         }
     }
@@ -243,8 +245,7 @@ class TBScreeningDataset(
                 englishValuesToSelectionIndexes(saved.reasonForDenialForGettingTested, R.array.tb_reason_for_denial_testing)
         }
 
-        applyAsymptomaticDefault()
-        applyReferralDefaults()
+
         setUpPage(buildFormList())
         syncSymptomaticIndicesFromList()
         refreshAsymptomaticFormElementInList()
@@ -257,15 +258,13 @@ class TBScreeningDataset(
         if (formId in symptomaticQuestionIds) {
             symptomaticAnswerIndexById[formId] = index
         }
-        setYesNoAnswer(formId, index)
-        val asymptomaticChanged = applyAsymptomaticDefault()
-        applyReferralDefaults()
-        val referralUpdateIndex = syncReferralFields()
-        if (formId in symptomaticQuestionIds || asymptomaticChanged) {
-            return indexOfFormElementById(isBeneficiaryAsymptomatic.id)
-                .takeIf { it >= 0 } ?: referralUpdateIndex
-        }
-        return referralUpdateIndex
+        // If a symptom question was answered, recompute asymptomatic and signal a
+        // list refresh so the fragment can force-rebind the auto-computed field.
+        return if (formId in symptomQuestionIds) {
+            isAsymptomatic.value = computeAsymptomatic()
+            Log.d("ASYM_TEST", "Computed = ${isAsymptomatic.value}")
+            listFlow.value.indexOf(isAsymptomatic).takeIf { it >= 0 } ?: -1
+        } else -1
     }
 
     fun getIndexOfBeneficiaryAsymptomatic(): Int =

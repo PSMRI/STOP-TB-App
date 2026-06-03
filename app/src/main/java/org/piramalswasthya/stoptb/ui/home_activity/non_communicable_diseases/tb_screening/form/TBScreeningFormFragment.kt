@@ -80,14 +80,8 @@ class TBScreeningFormFragment : Fragment() {
                 lateinit var formAdapter: FormInputAdapter
                 formAdapter = FormInputAdapter(
                     formValueListener = FormInputAdapter.FormValueListener { formId, index ->
-                        lifecycleScope.launch {
-                            viewModel.applyFormChange(formId, index)
-                            viewModel.getIndexOfBeneficiaryAsymptomatic()
-                                .takeIf { asymptomaticIndex -> asymptomaticIndex >= 0 }
-                                ?.let { asymptomaticIndex ->
-                                    formAdapter.notifyItemChanged(asymptomaticIndex)
-                                }
-                        }
+                        viewModel.updateListOnValueChanged(formId, index)
+                        hardCodedListUpdate(16)
                     }, isEnabled = !(recordExists || viewModel.viewOnly)
                 )
                 binding.btnSubmit.isEnabled = !(recordExists || viewModel.viewOnly)
@@ -167,6 +161,17 @@ class TBScreeningFormFragment : Fragment() {
             viewModel.saveForm()
         }
     }
+    private fun hardCodedListUpdate(formId: Int) {
+        binding.form.rvInputForm.adapter?.apply {
+            when (formId) {
+                1,2,3,4,5,6,7,8,9,10,11,16-> {
+                    notifyDataSetChanged()
+
+                }
+
+            }
+        }
+    }
 
     private fun handleSaveSuccessNavigation() {
         Toast.makeText(
@@ -174,13 +179,9 @@ class TBScreeningFormFragment : Fragment() {
             resources.getString(R.string.tb_screening_submitted), Toast.LENGTH_SHORT
         ).show()
         if (viewModel.autoFlow) {
-            findNavController().navigate(
-                R.id.GeneralOpdFormFragment,
-                bundleOf(
-                    "benId" to viewModel.benId,
-                    "autoFlow" to true
-                )
-            )
+            // Examine flow — return to AllBenFragment so user picks the next form
+            val popped = findNavController().popBackStack(R.id.allBenFragment, false)
+            if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
         } else {
             findNavController().navigateUp()
         }
@@ -250,9 +251,12 @@ class TBScreeningFormFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        // Always show back button — matches VitalScreen behaviour.
+        // autoFlow only controls the forward-chain (auto-navigate to General OPD
+        // after submit), not whether the user can go back.
         applyAutoFlowBackPolicyOnResume(
             isAutoFlow = viewModel.autoFlow,
-            allowBack = !viewModel.autoFlow
+            allowBack = true
         )
     }
 

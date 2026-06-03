@@ -21,6 +21,14 @@ class HouseHoldListAdapter(private val diseaseType: String, private var isDiseas
         HouseHoldDiffUtilCallBack
     ) {
 
+    /** Controls visibility of "Add Member" button — hidden for Nurse role */
+    private var showAddMember: Boolean = true
+
+    fun setAddMemberVisible(visible: Boolean) {
+        showAddMember = visible
+        notifyDataSetChanged()
+    }
+
     private object HouseHoldDiffUtilCallBack : DiffUtil.ItemCallback<HouseHoldBasicDomain>() {
         override fun areItemsTheSame(
             oldItem: HouseHoldBasicDomain,
@@ -50,7 +58,8 @@ class HouseHoldListAdapter(private val diseaseType: String, private var isDiseas
             isDisease: Boolean,
             pref: PreferenceDao,
             diseaseType: String,
-            isSoftDeleteEnabled: Boolean
+            isSoftDeleteEnabled: Boolean,
+            showAddMember: Boolean = true
         ) {
             binding.household = item
             binding.clickListener = clickListener
@@ -66,7 +75,9 @@ class HouseHoldListAdapter(private val diseaseType: String, private var isDiseas
                     binding.btnMda.visibility = View.GONE
                 }
             } else if (!isDisease) {
-                binding.button4.visibility = View.VISIBLE
+                // Nurse role: invisible (takes space but not visible/clickable)
+                binding.button4.visibility = if (showAddMember) View.VISIBLE else View.INVISIBLE
+                binding.button4.isEnabled = showAddMember
                 binding.btnMda.visibility = View.GONE
             } else {
                 binding.button4.visibility = View.GONE
@@ -113,7 +124,7 @@ class HouseHoldListAdapter(private val diseaseType: String, private var isDiseas
     }
 
     override fun onBindViewHolder(holder: HouseHoldViewHolder, position: Int) {
-        holder.bind(getItem(position), clickListener,isDisease, pref, diseaseType,isSoftDeleteEnabled)
+        holder.bind(getItem(position), clickListener, isDisease, pref, diseaseType, isSoftDeleteEnabled, showAddMember)
     }
 
 

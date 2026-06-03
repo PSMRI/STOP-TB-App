@@ -17,6 +17,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
+import org.piramalswasthya.stoptb.repositories.VitalRepo
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -26,7 +27,8 @@ class TBSuspectedQuickViewModel @Inject constructor(
     preferenceDao: PreferenceDao,
     @ApplicationContext context: Context,
     private val tbRepo: TBRepo,
-    private val benRepo: BenRepo
+    private val benRepo: BenRepo,
+    private val vitalRepo: VitalRepo
 ) : ViewModel() {
 
     enum class State {
@@ -64,6 +66,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                 tbDiagnostics = TBDiagnosticsCache(benId = beneficiary.beneficiaryId)
             }
             val tbScreening = tbRepo.getTBScreening(benId)
+            val vital = vitalRepo.getVitals(benId)
             tbRepo.getTBDiagnostics(benId)?.let {
                 tbDiagnostics = it
             } ?: tbRepo.getTBSuspected(benId)?.let { legacySuspected ->
@@ -93,6 +96,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                 ben,
                 tbScreening,
                 if (::tbDiagnostics.isInitialized) tbDiagnostics else null,
+                vital = vital,
                 referralMode = viewOnly
             )
             _showSubmit.value = dataset.shouldShowSubmit()

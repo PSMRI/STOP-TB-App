@@ -44,6 +44,7 @@
     <string name="camp_connect_subtitle">কেম্প মোড সক্ৰিয় কৰাৰ আগতে লেপটপ হাবৰ সৈতে সংযোগ কৰক।</string>
     <string name="camp_hub_scan">QR স্কেন কৰক</string>
     <string name="camp_hub_connect">সংযোগ কৰক</string>
+    <string name="camp_hub_url_required">অনুগ্ৰহ কৰি কেম্প হাব URL দিয়ক</string>
     <string name="camp_hub_scan_failed">QR কোড পঢ়িব পৰা নহল। পুনৰ চেষ্টা কৰক বা URL মেনুৱেলি লিখক।</string>
     <string name="camp_hub_scan_empty">QR কোড পোৱা নহল। পুনৰ চেষ্টা কৰক।</string>
     <string name="camp_back">পিছলৈ</string>

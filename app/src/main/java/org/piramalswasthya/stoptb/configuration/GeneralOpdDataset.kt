@@ -84,7 +84,8 @@ class GeneralOpdDataset(
             notes.value = it.notes
         }
         syncRequiredFlags()
-        setUpPage(listOf(chiefComplaint, medication,  frequency, duration, notes))
+//        setUpPage(listOf(chiefComplaint, medication, dosage, frequency, duration, notes))
+        setUpPage(listOf(chiefComplaint, medication, frequency, duration, notes))
     }
 
     override suspend fun handleListOnValueChanged(formId: Int, index: Int): Int {
