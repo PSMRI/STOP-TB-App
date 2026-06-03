@@ -12,6 +12,7 @@ import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.android.material.textfield.TextInputLayout
 import androidx.appcompat.app.AlertDialog
 import android.widget.Toast
+import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
@@ -59,6 +60,7 @@ class VitalScreenFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupInputLimits()
         setupDropdowns()
+        setupValidationClearers()
         observeUi()
         binding.btnSubmit.setOnClickListener {
             submitVitals()
@@ -71,6 +73,83 @@ class VitalScreenFragment : Fragment() {
         binding.etBpDiastolic.filters = arrayOf(InputFilter.LengthFilter(3))
         binding.etRbs.filters = arrayOf(InputFilter.LengthFilter(6))
     }
+
+    private fun setupValidationClearers() {
+
+        binding.etPulseRate.doAfterTextChanged {
+            val value = parsePulse(it.toString())
+
+            binding.tilPulseRate.error =
+                if (it.isNullOrBlank() || (value != null && value in 40..220))
+                    null
+                else
+                    "Enter pulse rate between 40 and 220"
+        }
+
+        binding.etBpSystolic.doAfterTextChanged {
+            validateBpFieldsLive()
+        }
+
+        binding.etBpDiastolic.doAfterTextChanged {
+            validateBpFieldsLive()
+        }
+
+        binding.etRbs.doAfterTextChanged {
+            val value = it.toString().toDoubleOrNull()
+
+            binding.tilRbs.error =
+                if (it.isNullOrBlank() || (value != null && value in 20.0..600.0))
+                    null
+                else
+                    "Enter Random Blood Sugar between 20 and 600"
+        }
+
+        binding.etHivStatus.doAfterTextChanged {
+            binding.tilHivStatus.error =
+                if (it.isNullOrBlank())
+                    getString(R.string.hiv_status_required)
+                else
+                    null
+        }
+    }
+
+    private fun validateBpFieldsLive() {
+
+        val systolicText = binding.etBpSystolic.text?.toString()?.trim().orEmpty()
+        val diastolicText = binding.etBpDiastolic.text?.toString()?.trim().orEmpty()
+
+        binding.tilBpSystolic.error = null
+        binding.tilBpDiastolic.error = null
+
+        val systolic = systolicText.toIntOrNull()
+        val diastolic = diastolicText.toIntOrNull()
+
+        if (systolicText.isNotEmpty() &&
+            (systolic == null || systolic !in 40..320)
+        ) {
+            binding.tilBpSystolic.error =
+                "Enter Systolic BP between 40 and 320"
+        }
+
+        if (diastolicText.isNotEmpty() &&
+            (diastolic == null || diastolic !in 10..180)
+        ) {
+            binding.tilBpDiastolic.error =
+                "Enter Diastolic BP between 10 and 180"
+        }
+
+        if (systolic != null &&
+            diastolic != null &&
+            systolic <= diastolic
+        ) {
+            binding.tilBpSystolic.error =
+                "Systolic BP must be greater than diastolic BP"
+
+            binding.tilBpDiastolic.error =
+                "Diastolic BP must be less than systolic BP"
+        }
+    }
+
 
     private fun observeUi() {
         viewModel.benName.observe(viewLifecycleOwner) {
