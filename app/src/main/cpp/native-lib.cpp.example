@@ -1,0 +1,82 @@
+/**
+ * native-lib.cpp — JNI implementation for KeyUtils
+ *
+ * SETUP INSTRUCTIONS:
+ * 1. Copy this file to native-lib.cpp
+ * 2. Replace all placeholder values with actual values
+ * 3. NEVER commit native-lib.cpp to version control (it's in .gitignore)
+ *
+ * This file provides secure access to sensitive config via native code.
+ */
+
+#include <jni.h>
+#include <string>
+#include <android/log.h>
+#define LOG_TAG "JNI_KEYS"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+
+
+// ================== Development Constants ================== //
+#ifdef IS_DEVELOPMENT
+const char* M_ENCRYPTED_PASS_KEY = "YOUR_ENCRYPTED_PASS_KEY_HERE";
+const char* M_ABHA_CLIENT_SECRET = "YOUR_ABHA_CLIENT_SECRET_HERE";
+const char* M_ABHA_CLIENT_ID     = "YOUR_ABHA_CLIENT_ID_HERE";
+const char* M_BASE_TMC_URL       = "https://your-amrit-server.example.com/";
+const char* M_BASE_ABHA_URL      = "https://your-abha-base-url.example.com/";
+const char* M_ABHA_TOKEN_URL     = "https://your-abha-token-url.example.com/";
+const char* M_ABHA_AUTH_URL      = "https://your-abha-auth-url.example.com/";
+const char* M_CHAT_URL           = "https://your-chat-server.example.com/";
+
+// ================== Production Constants (from CMake flags) ================== //
+#else
+const char* M_ENCRYPTED_PASS_KEY = ENCRYPTED_PASS_KEY;
+const char* M_ABHA_CLIENT_SECRET = ABHA_CLIENT_SECRET;
+const char* M_ABHA_CLIENT_ID     = ABHA_CLIENT_ID;
+const char* M_BASE_TMC_URL       = BASE_TMC_URL;
+const char* M_BASE_ABHA_URL      = BASE_ABHA_URL;
+const char* M_ABHA_TOKEN_URL     = ABHA_TOKEN_URL;
+const char* M_ABHA_AUTH_URL      = ABHA_AUTH_URL;
+const char* M_CHAT_URL           = CHAT_URL;
+#endif
+
+// =================================================================== //
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_org_piramalswasthya_stoptb_utils_KeyUtils_encryptedPassKey(JNIEnv* env, jobject thiz) {
+    return env->NewStringUTF(M_ENCRYPTED_PASS_KEY);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_org_piramalswasthya_stoptb_utils_KeyUtils_abhaClientSecret(JNIEnv* env, jobject thiz) {
+    return env->NewStringUTF(M_ABHA_CLIENT_SECRET);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_org_piramalswasthya_stoptb_utils_KeyUtils_abhaClientID(JNIEnv* env, jobject thiz) {
+    return env->NewStringUTF(M_ABHA_CLIENT_ID);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_org_piramalswasthya_stoptb_utils_KeyUtils_baseTMCUrl(JNIEnv* env, jobject thiz) {
+    return env->NewStringUTF(M_BASE_TMC_URL);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_org_piramalswasthya_stoptb_utils_KeyUtils_baseAbhaUrl(JNIEnv* env, jobject thiz) {
+    return env->NewStringUTF(M_BASE_ABHA_URL);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_org_piramalswasthya_stoptb_utils_KeyUtils_abhaTokenUrl(JNIEnv* env, jobject thiz) {
+    return env->NewStringUTF(M_ABHA_TOKEN_URL);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_org_piramalswasthya_stoptb_utils_KeyUtils_abhaAuthUrl(JNIEnv* env, jobject thiz) {
+    return env->NewStringUTF(M_ABHA_AUTH_URL);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_org_piramalswasthya_stoptb_utils_KeyUtils_chatUrl(JNIEnv* env, jobject thiz) {
+    return env->NewStringUTF(M_CHAT_URL);
+}
