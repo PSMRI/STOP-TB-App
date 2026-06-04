@@ -26,10 +26,12 @@ import androidx.navigation.fragment.findNavController
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
+import androidx.activity.OnBackPressedCallback
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
 import org.piramalswasthya.stoptb.helpers.applyAutoFlowBackPolicyOnResume
 import org.piramalswasthya.stoptb.helpers.blockBackNavigationInAutoFlow
+import org.piramalswasthya.stoptb.helpers.setAutoFlowBackNavigationBlocked
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -73,7 +75,16 @@ class TBScreeningFormFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        blockBackNavigationInAutoFlow(viewModel.autoFlow)
+        // Explicit back callback — ensures back works regardless of autoFlowBackNavigationBlocked state
+        setAutoFlowBackNavigationBlocked(false)
+        requireActivity().onBackPressedDispatcher.addCallback(
+            viewLifecycleOwner,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    findNavController().navigateUp()
+                }
+            }
+        )
         binding.btnCancel.visibility = View.GONE
         viewModel.recordExists.observe(viewLifecycleOwner) { notIt ->
             notIt?.let { recordExists ->

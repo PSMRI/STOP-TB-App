@@ -54,14 +54,16 @@ interface AmritApiService {
     @POST("common-api/beneficiaryConsent/validateConsent")
     suspend fun validateOtp(@Body validateOtp: ValidateOtpRequest): Response<ResponseBody>
 
-    @POST("flw-api/cbac/getAll")
-    suspend fun getCbacs(@Body userDetail: GetDataPaginatedRequest): Response<ResponseBody>
+    // Unused — CBAC pull not used in StopTB flow
+//    @POST("flw-api/cbac/getAll")
+//    suspend fun getCbacs(@Body userDetail: GetDataPaginatedRequest): Response<ResponseBody>
 
     @POST("/hwc-api/NCD/getByUserCbacDetails")
     suspend fun getCbacData(@Body getcbacRequest: GetCBACRequest): Response<ResponseBody>
 
-    @POST("/hwc-api/common/getBenReferDetailsByCreatedBy")
-    suspend fun getCbacReferData(@Body getcbacRequest: GetCBACRequest): Response<ResponseBody>
+    // Unused — referral pull not needed in StopTB
+//    @POST("/hwc-api/common/getBenReferDetailsByCreatedBy")
+//    suspend fun getCbacReferData(@Body getcbacRequest: GetCBACRequest): Response<ResponseBody>
 
     @POST("hwc-api/NCD/save/nurseData")
     suspend fun postCbacs(@Body list: CbacRequest): Response<ResponseBody>
@@ -132,8 +134,9 @@ interface AmritApiService {
     @POST("flw-api/stoptb/nurse/generalExamination/getAll")
     suspend fun getGeneralExaminations(@Body request: GeneralExaminationGetRequest): Response<ResponseBody>
 
-    @POST("/hwc-api/sync/generalOPDNurseFormDataToServer")
-    suspend fun saveVitalNurseData(@Body patientVisitInfo: VitalNurseDataRequest): Response<ResponseBody>
+    // Unused — no caller found in codebase
+//    @POST("/hwc-api/sync/generalOPDNurseFormDataToServer")
+//    suspend fun saveVitalNurseData(@Body patientVisitInfo: VitalNurseDataRequest): Response<ResponseBody>
 
     @POST("flw-api/follow-up/save")
     suspend fun saveMalariaConfirmedData(@Body malariaConfirmedRequestDTO: MalariaConfirmedRequestDTO): Response<ResponseBody>
@@ -141,8 +144,9 @@ interface AmritApiService {
     @POST("flw-api/follow-up/get")
     suspend fun getMalariaConfirmedData(@Body malariaConfirmedRequestDTO: GetDataPaginatedRequestForDisease): Response<ResponseBody>
 
-    @POST("identity-api/id/getByBenId")
-    suspend fun getBeneficiaryWithId(@Query("benId") benId: Long): Response<ResponseBody>
+    // Unused — BenRepo.getBeneficiaryWithId() calls getBenHealthID instead
+//    @POST("identity-api/id/getByBenId")
+//    suspend fun getBeneficiaryWithId(@Query("benId") benId: Long): Response<ResponseBody>
 
     @POST("fhir-api/healthIDWithUID/createHealthIDWithUID")
     suspend fun createHid(@Body createHealthIdRequest: CreateHealthIdRequest): Response<ResponseBody>
@@ -183,16 +187,17 @@ interface AmritApiService {
         @Body request: HBNCVisitRequest
     ): Response<NCDFollowUpResponse>
 
-    @POST("flw-api/disease/{formName}/saveAll")
-    suspend fun submitDiseaseMosquitoForm(
-        @Path("formName") formName: String,
-        @Body request: List<FormSubmitRequest>
-    ): Response<Unit>
-
-    @POST("flw-api/disease/{formName}/getAll")
-    suspend fun getAllDiseaseMosquitoFormVisits(
-        @Path("formName") formName: String,
-        @Body request: HBNCVisitRequest
-    ): Response<HBNCVisitListResponse>
+    // Unused — disease mosquito form APIs not used in StopTB flow
+//    @POST("flw-api/disease/{formName}/saveAll")
+//    suspend fun submitDiseaseMosquitoForm(
+//        @Path("formName") formName: String,
+//        @Body request: List<FormSubmitRequest>
+//    ): Response<Unit>
+//
+//    @POST("flw-api/disease/{formName}/getAll")
+//    suspend fun getAllDiseaseMosquitoFormVisits(
+//        @Path("formName") formName: String,
+//        @Body request: HBNCVisitRequest
+//    ): Response<HBNCVisitListResponse>
 
 }

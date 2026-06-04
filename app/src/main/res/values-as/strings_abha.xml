@@ -98,7 +98,7 @@
     <string name="history_of_mda_form_campaign">Filaria MDA Campaign History</string>
     <string name="history_of_mda_form_campaign_title">Annual Mass Drug Administration (MDA) campaign for cases of Lymphatic Filariasis (LF)</string>
     <string name="verify_aadhaar_otp">আধাৰ OTP সত্যাপন কৰক</string>
-<!--    <string name="no_records_found_hh">কোনো পৰিয়ালৰ তথ্য পোৱা নগ\'ল। অনুগ্ৰহ কৰি তলৰ বুটামত ক্লিক কৰি পৰিয়াল পঞ্জীয়ন আৰম্ভ কৰক।</string>-->
+    <string name="no_records_found_hh">কোনো পৰিয়ালৰ তথ্য পোৱা নগ\'ল।</string>
     <string name="ashaname">আশাৰ নাম</string>
     <string name="verified">সত্যাপিত</string>
     <string name="send_otp">OTP প্ৰেৰণ কৰক</string>

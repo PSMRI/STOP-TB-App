@@ -89,7 +89,7 @@
     <string name="str_abha_otp_number">OTP ABHA से जुड़े मोबाइल संख्या (@mobileNumber पर समाप्त) पर भेजा गया</string>
     <string name="str_otp_number_message">OTP मोबाइल संख्या (@mobileNumber पर समाप्त) पर भेजा गया</string>
     <string name="verify_aadhaar_otp">आधार OTP सत्यापित करें</string>
-    <string name="no_records_found_hh">कोई घरेलू रिकॉर्ड नहीं मिला। कृपया नीचे दिए गए बटन पर क्लिक करके घरेलू पंजीकरण शुरू करें।</string>
+    <string name="no_records_found_hh">कोई घरेलू रिकॉर्ड नहीं मिला।</string>
     <string name="something_went_wrong_nunable_to_connect_to_server_ntry_again_later">कुछ गलत हो गया!\nसर्वर से कनेक्ट करने में असमर्थ!\nबाद में पुनः प्रयास करें!</string>
     <string name="try_again">पुनः प्रयास करें!</string>
     <string name="ashaname">आशा का नाम</string>

@@ -57,36 +57,30 @@ class NcdReferalRepo@Inject constructor(
             }
         }
 
-    suspend fun pullAndPersistReferRecord(page: Int = 0): Int {
-        val userName = preferenceDao.getLoggedInUser()?.userName!!
-        val cbacRequest = GetCBACRequest(userName)
-
-        val response = tmcNetworkApiService.getCbacReferData(
-            cbacRequest
-        )
-        val body = response.body()?.string()?.let { JSONObject(it) }
-        body?.getInt("statusCode")?.takeIf { it == 5002 }?.let {
-            val user = preferenceDao.getLoggedInUser()!!
-            userRepo.refreshTokenTmc(user.userName, user.password)
-            pullAndPersistReferRecord(page)
-        }
-        val dataArray = body?.optJSONArray("data")
-
-        if (dataArray != null && dataArray.length() > 0) {
-            val gson = Gson()
-            val cbacEntities = mutableListOf<ReferalCache>()
-
-            for (i in 0 until dataArray.length()) {
-                val item = dataArray.getJSONObject(i)
-                val dto = gson.fromJson(item.toString(), NCDReferalDTO::class.java)
-                cbacEntities.add(dto.toCache())
-            }
-            referalDao.insertAll(cbacEntities)
-
-
-        }
-        return 0
-    }
+    // Unused — getBenReferDetailsByCreatedBy API not needed in StopTB
+//    suspend fun pullAndPersistReferRecord(page: Int = 0): Int {
+//        val userName = preferenceDao.getLoggedInUser()?.userName!!
+//        val cbacRequest = GetCBACRequest(userName)
+//        val response = tmcNetworkApiService.getCbacReferData(cbacRequest)
+//        val body = response.body()?.string()?.let { JSONObject(it) }
+//        body?.getInt("statusCode")?.takeIf { it == 5002 }?.let {
+//            val user = preferenceDao.getLoggedInUser()!!
+//            userRepo.refreshTokenTmc(user.userName, user.password)
+//            pullAndPersistReferRecord(page)
+//        }
+//        val dataArray = body?.optJSONArray("data")
+//        if (dataArray != null && dataArray.length() > 0) {
+//            val gson = Gson()
+//            val cbacEntities = mutableListOf<ReferalCache>()
+//            for (i in 0 until dataArray.length()) {
+//                val item = dataArray.getJSONObject(i)
+//                val dto = gson.fromJson(item.toString(), NCDReferalDTO::class.java)
+//                cbacEntities.add(dto.toCache())
+//            }
+//            referalDao.insertAll(cbacEntities)
+//        }
+//        return 0
+//    }
 
 
 

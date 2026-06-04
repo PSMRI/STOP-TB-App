@@ -48,7 +48,8 @@ class TBSuspectedQuickFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: android.os.Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        blockBackNavigationInManagedFlow(isManagedFlow, allowBack = false)
+        // Back navigation allowed — each form now returns to AllBenFragment independently
+        // blockBackNavigationInManagedFlow(isManagedFlow, allowBack = false)
         val adapter = FormInputAdapter(
             formValueListener = FormInputAdapter.FormValueListener { formId, index ->
                 viewModel.updateListOnValueChanged(formId, index)

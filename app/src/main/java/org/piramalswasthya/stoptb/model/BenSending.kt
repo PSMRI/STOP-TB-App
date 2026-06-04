@@ -122,7 +122,7 @@ data class BeneficiaryDataSending(
     val maritalStatusID: String? = null,
 
     @Json(name = "vanID")
-    val vanID: Int = 4,
+    val vanID: Int = 0,
 
 
     @Json(name = "accountNo")
