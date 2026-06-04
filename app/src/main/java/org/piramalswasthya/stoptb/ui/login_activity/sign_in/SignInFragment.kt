@@ -485,13 +485,12 @@ class SignInFragment : Fragment() {
      */
     private fun setLoginButtonReady(ready: Boolean) {
         binding.btnLogin.alpha = if (ready) 1f else 0.45f
-        binding.btnLogin.backgroundTintList = if (ready) {
-            null  // use original theme color
-        } else {
-            android.content.res.ColorStateList.valueOf(
-                ContextCompat.getColor(requireContext(), android.R.color.darker_gray)
+        binding.btnLogin.backgroundTintList = android.content.res.ColorStateList.valueOf(
+            ContextCompat.getColor(
+                requireContext(),
+                if (ready) R.color.md_theme_light_primary else android.R.color.darker_gray
             )
-        }
+        )
     }
 
     private fun clearLoginFieldErrors() {

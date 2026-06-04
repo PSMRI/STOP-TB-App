@@ -191,7 +191,7 @@ class DashboardViewModel @Inject constructor(
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbScreeningCount(village, startTime, endTime, "TRANSGENDER", 0,0).collect { others ->
+            tbDao.getDashboardTbScreeningCount(village, startTime, endTime, "OTHERS", 0,0).collect { others ->
                 val current = _tbScreening.value ?: TbGenderBreakdown()
                 _tbScreening.value = current.copy(others = others)
             }
@@ -230,7 +230,7 @@ class DashboardViewModel @Inject constructor(
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbSuspectedCount(village, startTime, endTime, "TRANSGENDER", 0,0).collect { others ->
+            tbDao.getDashboardTbSuspectedCount(village, startTime, endTime, "OTHERS", 0,0).collect { others ->
                 val current = _tbSuspected.value ?: TbGenderBreakdown()
                 _tbSuspected.value = current.copy(others = others)
             }
@@ -269,7 +269,7 @@ class DashboardViewModel @Inject constructor(
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbConfirmedCount(village, startTime, endTime, "TRANSGENDER", 0,0).collect { others ->
+            tbDao.getDashboardTbConfirmedCount(village, startTime, endTime, "OTHERS", 0,0).collect { others ->
                 val current = _tbConfirmed.value ?: TbGenderBreakdown()
                 _tbConfirmed.value = current.copy(others = others)
             }
@@ -290,7 +290,7 @@ class DashboardViewModel @Inject constructor(
             maleQuery = { tbDao.getDashboardDigitalChestXRayCount(village, startTime, endTime, "MALE", 0,0) },
             femaleQuery = { tbDao.getDashboardDigitalChestXRayCount(village, startTime, endTime, "FEMALE", 0,0) },
             childrenQuery = { tbDao.getDashboardDigitalChestXRayCount(village, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardDigitalChestXRayCount(village, startTime, endTime, "TRANSGENDER", 0,0) },
+            othersQuery = { tbDao.getDashboardDigitalChestXRayCount(village, startTime, endTime, "OTHERS", 0,0) },
             seniorCitizenQuery = { tbDao.getDashboardDigitalChestXRayCount(village, startTime, endTime, "", 0,1) }
 
             )
@@ -301,7 +301,7 @@ class DashboardViewModel @Inject constructor(
             maleQuery = { tbDao.getDashboardSputumCollectionCount(village, startTime, endTime, "MALE", 0,0) },
             femaleQuery = { tbDao.getDashboardSputumCollectionCount(village, startTime, endTime, "FEMALE", 0,0) },
             childrenQuery = { tbDao.getDashboardSputumCollectionCount(village, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardSputumCollectionCount(village, startTime, endTime, "TRANSGENDER", 0,0) },
+            othersQuery = { tbDao.getDashboardSputumCollectionCount(village, startTime, endTime, "OTHERS", 0,0) },
             seniorCitizenQuery = { tbDao.getDashboardSputumCollectionCount(village, startTime, endTime, "", 0,1) }
 
             )
@@ -312,7 +312,7 @@ class DashboardViewModel @Inject constructor(
             maleQuery = { tbDao.getDashboardTrueNatCount(village, startTime, endTime, "MALE", 0,0) },
             femaleQuery = { tbDao.getDashboardTrueNatCount(village, startTime, endTime, "FEMALE", 0,0) },
             childrenQuery = { tbDao.getDashboardTrueNatCount(village, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardTrueNatCount(village, startTime, endTime, "TRANSGENDER", 0,0) },
+            othersQuery = { tbDao.getDashboardTrueNatCount(village, startTime, endTime, "OTHERS", 0,0) },
             seniorCitizenQuery = { tbDao.getDashboardTrueNatCount(village, startTime, endTime, "", 0,1) }
 
             )
@@ -323,7 +323,7 @@ class DashboardViewModel @Inject constructor(
             maleQuery = { tbDao.getDashboardLiquidCultureCount(village, startTime, endTime, "MALE", 0,0) },
             femaleQuery = { tbDao.getDashboardLiquidCultureCount(village, startTime, endTime, "FEMALE", 0,0) },
             childrenQuery = { tbDao.getDashboardLiquidCultureCount(village, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardLiquidCultureCount(village, startTime, endTime, "TRANSGENDER", 0,0) },
+            othersQuery = { tbDao.getDashboardLiquidCultureCount(village, startTime, endTime, "OTHERS", 0,0) },
             seniorCitizenQuery = { tbDao.getDashboardLiquidCultureCount(village, startTime, endTime, "", 0,1) },
 
             )
@@ -334,7 +334,7 @@ class DashboardViewModel @Inject constructor(
             maleQuery = { tbDao.getDashboardHwcReferralCount(village, startTime, endTime, "MALE", 0,0) },
             femaleQuery = { tbDao.getDashboardHwcReferralCount(village, startTime, endTime, "FEMALE", 0,0) },
             childrenQuery = { tbDao.getDashboardHwcReferralCount(village, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardHwcReferralCount(village, startTime, endTime, "TRANSGENDER", 0,0) },
+            othersQuery = { tbDao.getDashboardHwcReferralCount(village, startTime, endTime, "OTHERS", 0,0) },
             seniorCitizenQuery = { tbDao.getDashboardHwcReferralCount(village, startTime, endTime, "", 0,1) }
 
             )

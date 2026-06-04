@@ -13,6 +13,8 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.RvItemBenBinding
 import org.piramalswasthya.stoptb.helpers.getDateFromLong
 import org.piramalswasthya.stoptb.helpers.getPatientTypeByAge
+import org.piramalswasthya.stoptb.helpers.isNurseRole
+import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.Gender
 
@@ -180,15 +182,25 @@ class BenListAdapter(
                     ContextCompat.getColor(binding.root.context, android.R.color.white)
                 )
             }
-            // Examine button — show filled count X/5 + color (red=0, green=≥1)
-            val examineFilledCount = listOf(
-                hasAnthropometry,
-                isMatched,        // vitals/general exam
-                hasTbScreening,
-                hasGeneralOpd,
-                hasDiagnosis
-            ).count { it }
-            binding.btnExamine.text = binding.root.context.getString(R.string.btn_examine_count, examineFilledCount)
+            // Examine button — show filled count X/total
+            // Registrar role: only Anthropometry counts (total=1)
+            // Nurse/others: all 5 forms count (total=5)
+            val isRegistrar = pref?.getLoggedInUser()?.role.isRegistrationOfficerRole()
+            val (examineFilledCount, examineTotal) = if (isRegistrar) {
+                Pair(if (hasAnthropometry) 1 else 0, 1)
+            } else {
+                val filled = listOf(
+                    hasAnthropometry,
+                    isMatched,        // vitals/general exam
+                    hasTbScreening,
+                    hasGeneralOpd,
+                    hasDiagnosis
+                ).count { it }
+                Pair(filled, 5)
+            }
+            binding.btnExamine.text = binding.root.context.getString(
+                R.string.btn_examine_count_of, examineFilledCount, examineTotal
+            )
             binding.btnExamine.backgroundTintList = ContextCompat.getColorStateList(
                 binding.root.context,
                 if (examineFilledCount > 0) android.R.color.holo_green_dark
@@ -202,9 +214,10 @@ class BenListAdapter(
             binding.llBenDetails4.visibility = View.GONE
             binding.btnAddChildren.visibility = View.GONE
 
-            // Register Wife / Register Husband — show for married members without spouse registered
+            // Register Wife / Register Husband — Registrar only (hidden for Nurse)
+            val isNurseRole = pref?.getLoggedInUser()?.role.isNurseRole()
             when {
-                item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
+                !isNurseRole && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
                         && !item.isDeath && !item.isDeactivate -> {
                     binding.llAddSpouseBtn.visibility = View.VISIBLE
                     binding.btnAddSpouse.visibility = View.VISIBLE
@@ -213,7 +226,7 @@ class BenListAdapter(
                         clickListener?.onClickedWifeBen(item)
                     }
                 }
-                item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
+                !isNurseRole && item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
                         && !item.isDeath && !item.isDeactivate -> {
                     binding.llAddSpouseBtn.visibility = View.VISIBLE
                     binding.btnAddSpouse.visibility = View.VISIBLE

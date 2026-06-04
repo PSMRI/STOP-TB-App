@@ -9,6 +9,7 @@ import org.piramalswasthya.stoptb.model.FormElement
 import org.piramalswasthya.stoptb.model.InputType
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
+import org.piramalswasthya.stoptb.model.VitalCache
 
 class TBSuspectedQuickDataset(
     context: Context,
@@ -21,6 +22,7 @@ class TBSuspectedQuickDataset(
 
     private var benCache: BenRegCache? = null
     private var screeningCache: TBScreeningCache? = null
+    private var vitalCache: VitalCache? = null
     private var referralMode = false
 
     private var lockDigitalChestXray = false
@@ -208,10 +210,12 @@ class TBSuspectedQuickDataset(
         ben: BenRegCache?,
         screening: TBScreeningCache?,
         saved: TBDiagnosticsCache?,
+        vital: VitalCache? = null,
         referralMode: Boolean = false
     ) {
         benCache = ben
         screeningCache = screening
+        vitalCache = vital
         this.referralMode = referralMode
 
         // NikshayId
@@ -262,12 +266,12 @@ class TBSuspectedQuickDataset(
         )
 
         // ── Apply defaults for new/blank forms ────────────────────────────
-        // Referral for X-Ray defaults to Yes
-        if (referredForDigitalChestXray.value.isNullOrBlank()) {
+        // Referral for X-Ray defaults to Yes (not applicable for pregnant women)
+        if (!isPregnant() && referredForDigitalChestXray.value.isNullOrBlank()) {
             referredForDigitalChestXray.value = yesValue
         }
         // Denial reason defaults to index 0 (Patient refused) when shown
-        if (isNo(referredForDigitalChestXray) && reasonForDenialChestXray.value.isNullOrBlank()) {
+        if (!isPregnant() && isNo(referredForDigitalChestXray) && reasonForDenialChestXray.value.isNullOrBlank()) {
             reasonForDenialChestXray.value = "0"
         }
         // Sputum referral defaults to Yes when the section should be shown
@@ -455,6 +459,7 @@ class TBSuspectedQuickDataset(
                 syncFieldStates()
                 if (index == 0) {
                     // Yes: show submitted-at (default to TB Screening Camp if blank), remove denial
+                    sputumSampleSubmittedAt.isEnabled = !referralMode  // explicitly enable when first shown
                     if (sputumSampleSubmittedAt.value.isNullOrBlank()) {
                         sputumSampleSubmittedAt.value = sputumSampleSubmittedAt.entries?.firstOrNull()
                     }
@@ -575,14 +580,15 @@ class TBSuspectedQuickDataset(
 
     override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
         (cacheModel as TBDiagnosticsCache).let { form ->
-            // Digital Chest X-Ray
-            form.isReferredForDigitalChestXray = isYes(referredForDigitalChestXray)
+            // Digital Chest X-Ray (entire section is not applicable for pregnant women)
+            form.isReferredForDigitalChestXray =
+                if (!isPregnant()) isYes(referredForDigitalChestXray) else null
             form.reasonForDenialChestXray =
-                if (!isYes(referredForDigitalChestXray))
+                if (!isPregnant() && !isYes(referredForDigitalChestXray))
                     indexPipeToEnglishPipe(reasonForDenialChestXray, R.array.tb_reason_for_denial_xray)
                 else null
             form.reasonForDenialChestXrayOther =
-                if (!isYes(referredForDigitalChestXray))
+                if (!isPregnant() && !isYes(referredForDigitalChestXray))
                     reasonForDenialChestXrayOther.value?.takeIf { it.isNotBlank() }
                 else null
             form.isChestXRayDone =
@@ -666,24 +672,26 @@ class TBSuspectedQuickDataset(
     private fun buildFormList(): List<FormElement> = buildList {
         add(nikshayId)
 
-        // Digital Chest X-Ray section
-        add(referredForDigitalChestXray)
-        if (isYes(referredForDigitalChestXray)) {
-            if (shouldShowDigitalChestXray()) {
-                add(digitalChestXrayConducted)
-                if (isYes(digitalChestXrayConducted)) {
-                    add(digitalChestXrayResult)
-                } else if (!digitalChestXrayConducted.value.isNullOrBlank()) {
-                    add(reasonNotConductedChestXray)
-                    if (isLastItemSelectedDropdown(reasonNotConductedChestXray, R.array.tb_reason_not_conducted_xray)) {
-                        add(reasonNotConductedChestXrayOther)
+        // Digital Chest X-Ray section — hidden entirely for pregnant women
+        if (!isPregnant()) {
+            add(referredForDigitalChestXray)
+            if (isYes(referredForDigitalChestXray)) {
+                if (shouldShowDigitalChestXray()) {
+                    add(digitalChestXrayConducted)
+                    if (isYes(digitalChestXrayConducted)) {
+                        add(digitalChestXrayResult)
+                    } else if (!digitalChestXrayConducted.value.isNullOrBlank()) {
+                        add(reasonNotConductedChestXray)
+                        if (isLastItemSelectedDropdown(reasonNotConductedChestXray, R.array.tb_reason_not_conducted_xray)) {
+                            add(reasonNotConductedChestXrayOther)
+                        }
                     }
                 }
-            }
-        } else if (isNo(referredForDigitalChestXray)) {
-            add(reasonForDenialChestXray)
-            if (isLastItemSelected(reasonForDenialChestXray, R.array.tb_reason_for_denial_xray)) {
-                add(reasonForDenialChestXrayOther)
+            } else if (isNo(referredForDigitalChestXray)) {
+                add(reasonForDenialChestXray)
+                if (isLastItemSelected(reasonForDenialChestXray, R.array.tb_reason_for_denial_xray)) {
+                    add(reasonForDenialChestXrayOther)
+                }
             }
         }
 
@@ -739,9 +747,9 @@ class TBSuspectedQuickDataset(
     // ── Field state sync ──────────────────────────────────────────────────────
 
     private fun syncFieldStates() {
-        // Referral for X-Ray — always editable (unless referralMode lock)
-        referredForDigitalChestXray.isEnabled = !lockDigitalChestXray
-        referredForDigitalChestXray.required = true
+        // Referral for X-Ray — not shown for pregnant women
+        referredForDigitalChestXray.isEnabled = !lockDigitalChestXray && !isPregnant()
+        referredForDigitalChestXray.required = !isPregnant()
 
         // Denial reason for X-Ray
         val xrayReferred = isYes(referredForDigitalChestXray)
@@ -990,8 +998,15 @@ class TBSuspectedQuickDataset(
     }
 
     private fun isPregnant(): Boolean {
+        // Source 1: Ben registration reproductive status
         val reproductiveStatus = benCache?.genDetails?.reproductiveStatus
-        return benCache?.genDetails?.reproductiveStatusId == 1 ||
+        val pregnantFromBen = benCache?.genDetails?.reproductiveStatusId == 1 ||
             reproductiveStatus.equals("Yes", ignoreCase = true)
+
+        // Source 2: Vital Screen → Key Population / Risk Factors = "PREGNANCY" (stored as code, language-independent)
+        val pregnantFromVital = vitalCache?.keyPopulationRiskFactors
+            ?.any { it.equals("PREGNANCY", ignoreCase = true) } == true
+
+        return pregnantFromBen || pregnantFromVital
     }
 }

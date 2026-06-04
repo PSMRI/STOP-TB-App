@@ -39,9 +39,11 @@ class GeneralOpdFormFragment : Fragment() {
     private val isManagedFlow: Boolean
         get() = viewModel.autoFlow || viewModel.generalOpdFlow
 
-    /** First screen in General OPD flow; nurse auto-flow blocks back on this step. */
+    /** Always allow back — matches VitalScreen behaviour.
+     *  autoFlow / generalOpdFlow only controls the forward-chain (auto-navigate to
+     *  Diagnostics after submit), not whether the user can go back. */
     private val allowBackNavigation: Boolean
-        get() = viewModel.generalOpdFlow && !viewModel.autoFlow
+        get() = true
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -142,14 +144,20 @@ class GeneralOpdFormFragment : Fragment() {
     }
 
     private fun navigateToDiagnostics() {
-        findNavController().navigate(
-            R.id.TBSuspectedQuickFragment,
-            bundleOf(
-                "benId" to viewModel.benId,
-                "autoFlow" to viewModel.autoFlow,
-                "generalOpdFlow" to viewModel.generalOpdFlow
+        if (isManagedFlow) {
+            // Examine flow — return to AllBenFragment so user picks the next form
+            val popped = findNavController().popBackStack(R.id.allBenFragment, false)
+            if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
+        } else {
+            findNavController().navigate(
+                R.id.TBSuspectedQuickFragment,
+                bundleOf(
+                    "benId" to viewModel.benId,
+                    "autoFlow" to viewModel.autoFlow,
+                    "generalOpdFlow" to viewModel.generalOpdFlow
+                )
             )
-        )
+        }
     }
 
     override fun onStart() {

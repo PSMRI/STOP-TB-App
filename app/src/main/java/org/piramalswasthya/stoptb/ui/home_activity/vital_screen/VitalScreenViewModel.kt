@@ -13,6 +13,7 @@ import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.database.shared_preferences.ReferralStatusManager
 import org.piramalswasthya.stoptb.model.BenRegCache
+import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.ReferalCache
 import org.piramalswasthya.stoptb.model.VitalCache
 import org.piramalswasthya.stoptb.repositories.BenRepo
@@ -259,6 +260,22 @@ class VitalScreenViewModel @Inject constructor(
     fun resetState() {
         _state.value = State.IDLE
     }
+
+    /**
+     * True when the beneficiary's ben-registration answer to "Are you Pregnant?" is Yes.
+     * Evaluated lazily from benCache (loaded asynchronously in init).
+     */
+    val isPregnant: Boolean
+        get() = benCache?.let { ben ->
+            val rs = ben.genDetails?.reproductiveStatus
+            ben.genDetails?.reproductiveStatusId == 1 ||
+                rs.equals("Yes", ignoreCase = true) ||
+                rs?.trim()?.lowercase()?.contains("pregnant") == true
+        } ?: false
+
+    /** True when the beneficiary's registered gender is Male. */
+    val isMale: Boolean
+        get() = benCache?.gender == Gender.MALE
 
     fun getTemperatureDisplayValue(value: Double?): String? {
         return when {

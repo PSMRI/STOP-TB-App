@@ -9,6 +9,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.sqlite.db.SupportSQLiteDatabase
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
+import org.piramalswasthya.stoptb.database.converters.GenderConverter
 import org.piramalswasthya.stoptb.database.converters.LocationEntityListConverter
 import org.piramalswasthya.stoptb.database.converters.StringListConverter
 import org.piramalswasthya.stoptb.database.converters.SyncStateConverter
@@ -85,7 +86,8 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.NCDReferalFormResponseJson
 @TypeConverters(
     LocationEntityListConverter::class,
     SyncStateConverter::class,
-    StringListConverter::class
+    StringListConverter::class,
+    GenderConverter::class
 )
 abstract class InAppDb : RoomDatabase() {
 

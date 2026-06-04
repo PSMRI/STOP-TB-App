@@ -49,6 +49,7 @@ class AnthropometryFragment : Fragment() {
 
     private val viewModel: AnthropometryViewModel by viewModels()
     private var highTemperatureAlertShown = false
+    private var isFormLocked = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -74,13 +75,14 @@ class AnthropometryFragment : Fragment() {
         }
         viewModel.existingAnthropometry.observe(viewLifecycleOwner) { ben ->
             ben ?: return@observe
+            // Lock form FIRST so that setText below does not trigger the HWC alert in view mode
+            lockFormIfExistingData(ben)
             binding.tvAgeGender.text = formatAgeGender(ben)
             binding.etWeight.setText(ben.weight?.formatOneDecimal().orEmpty())
             binding.etHeight.setText(ben.height?.formatOneDecimal().orEmpty())
             binding.etBmi.setText(ben.bmi?.formatOneDecimal().orEmpty())
             binding.etTemperature.setText(ben.temperature?.formatOneDecimal().orEmpty())
             selectTemperatureRange(ben.temperature)
-            lockFormIfExistingData(ben)
         }
 
         binding.etWeight.doAfterTextChanged { updateBmi() }
@@ -90,10 +92,12 @@ class AnthropometryFragment : Fragment() {
         }
 
         binding.rgTemperature.setOnCheckedChangeListener { _, checkedId ->
+            // isFormLocked = true when loading existing data in view mode —
+            // don't overwrite the actual saved temperature value in that case
             when (checkedId) {
-                R.id.rbTempNormal -> binding.etTemperature.setText("98.0")
+                R.id.rbTempNormal -> if (!isFormLocked) binding.etTemperature.setText("98.0")
                 R.id.rbTempHigh -> {
-                    binding.etTemperature.setText("100.0")
+                    if (!isFormLocked) binding.etTemperature.setText("100.0")
                     showHighTemperatureAlert()
                 }
             }
@@ -118,18 +122,9 @@ class AnthropometryFragment : Fragment() {
                     Toast.makeText(requireContext(), R.string.save_successful, Toast.LENGTH_SHORT).show()
                     when {
                         viewModel.examineFlow -> {
-                            // Part of Examine flow — proceed to General Exam (VitalScreen)
-                            viewLifecycleOwner.lifecycleScope.launch {
-                                val benRegId = viewModel.getBenRegId()
-                                findNavController().navigate(
-                                    R.id.vitalScreenFragment,
-                                    bundleOf(
-                                        "benId" to viewModel.benId,
-                                        "benRegId" to benRegId,
-                                        "autoFlow" to true
-                                    )
-                                )
-                            }
+                            // Examine flow — return to AllBenFragment so user picks the next form
+                            val popped = findNavController().popBackStack(R.id.allBenFragment, false)
+                            if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
                         }
                         viewModel.autoFlow -> {
                             val returnedToList = findNavController().popBackStack(R.id.allBenFragment, false)
@@ -237,6 +232,7 @@ class AnthropometryFragment : Fragment() {
 
     private fun showHighTemperatureAlert() {
         if (highTemperatureAlertShown) return
+        if (isFormLocked) return  // view mode — don't show alert for already-referred beneficiary
         highTemperatureAlertShown = true
         AlertDialog.Builder(requireContext())
             .setMessage(R.string.refer_to_hwc_alert)
@@ -258,6 +254,7 @@ class AnthropometryFragment : Fragment() {
             ben.weight != null || ben.height != null || ben.bmi != null || ben.temperature != null
         if (!hasSavedAnthropometry) return
 
+        isFormLocked = true  // set before any setText triggers doAfterTextChanged
         binding.etWeight.isEnabled = false
         binding.etHeight.isEnabled = false
         binding.etTemperature.isEnabled = false

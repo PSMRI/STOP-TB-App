@@ -155,17 +155,16 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // Add Ben button hidden — ben registration only via Household flow
         binding.btnNextPage.visibility = View.GONE
 
+        // Download and Filter icons hidden for now
+        binding.ibFilter.visibility = View.GONE
+        binding.ibDownload.visibility = View.GONE
+
         binding.ibFilter.setOnClickListener {
             filterAlert.show()
         }
 
         binding.ibDownload.setOnClickListener {
             viewModel.downloadCsv(requireContext())
-        }
-
-        if (args.source == 1 || args.source == 2 || args.source == 3 || args.source == 4 || args.source == 5 || args.source == 6 || args.source == 7 || args.source == 8) {
-            binding.ibFilter.visibility = View.GONE
-            binding.ibDownload.visibility = View.VISIBLE
         }
 
         var lastClickTime = 0L
@@ -481,9 +480,18 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     override fun onResume() {
         super.onResume()
         updateToolbarTitle()
-        // Re-show BottomSheet if we're still in an examine flow.
-        // Always without autoFlow — prevents the form from re-opening automatically
-        // when the user presses back without submitting.
+
+        // If TBSuspectedQuickFragment (Diagnosis) signalled that the examine flow
+        // is fully complete, clear pendingExamineBenId so the BottomSheet does NOT
+        // re-open — otherwise the back button would have to dismiss the BottomSheet
+        // before it could navigate away from this screen.
+        val sh = findNavController().currentBackStackEntry?.savedStateHandle
+        if (sh?.remove<Boolean>("examine_flow_done") == true) {
+            pendingExamineBenId = null
+        }
+
+        // Re-show BottomSheet only if we're still mid-flow (user pressed back
+        // without submitting a form, so they need to continue or cancel).
         val benId = pendingExamineBenId
         if (benId != null) {
             showExamineBottomSheet(benId)

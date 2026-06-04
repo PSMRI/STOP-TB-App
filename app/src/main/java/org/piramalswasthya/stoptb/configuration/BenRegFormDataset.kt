@@ -450,8 +450,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             contactNumber,
             mobileNoOfRelation,
             address,
-            state,
-            district,
+//            state,
+//            district,
 //            tu,
 //            healthFacility,
             villageHamlet,
@@ -472,11 +472,17 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         if (relToHeadId >= 0) {
             list.add(list.indexOf(gender) + 1, relationToHead)
             relationToHead.value = resources.getStringArray(R.array.nbr_relationship_to_head_src).getOrNull(relToHeadId)
+            // Lock gender only when it was pre-selected from Add HoF Member dialog (not for HoF/Self)
+            // relToHeadId=18 = Self (Head of Family) — gender must be selectable
+            if (!gender.value.isNullOrBlank()) {
+                gender.inputType = TEXT_VIEW
+            }
         }
 
         if (dateOfReg.value == null) dateOfReg.value = getCurrentDateString()
         if (personFrom.value.isNullOrBlank()) personFrom.value = personFrom.entries?.firstOrNull()
-        if (typeOfCaseFinding.value.isNullOrBlank()) typeOfCaseFinding.value = typeOfCaseFinding.entries?.firstOrNull()
+        // PRD: default = "Active (Active Case Finding)" = index 1 in type_of_case_finding_array
+        if (typeOfCaseFinding.value.isNullOrBlank()) typeOfCaseFinding.value = typeOfCaseFinding.entries?.getOrNull(1) ?: typeOfCaseFinding.entries?.firstOrNull()
         contactNumber.value = familyHeadPhoneNo?.toString()
         contactNumber.isEnabled = true
         mobileNotAvailable.value = null
@@ -531,16 +537,18 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
             pic.value        = saved.userImage
             dateOfReg.value  = getDateFromLong(saved.regDate)
+            dateOfReg.isEnabled = false          // edit mode — registration date not changeable
             personFrom.value = saved.personFromId?.let { personFrom.getStringFromPosition(it) }
                 ?: saved.personFrom
                 ?: personFrom.entries?.firstOrNull()
             typeOfCaseFinding.value = saved.typeOfCaseFindingId?.let { typeOfCaseFinding.getStringFromPosition(it) }
                 ?: saved.typeOfCaseFinding
-                ?: typeOfCaseFinding.entries?.firstOrNull()
+                ?: typeOfCaseFinding.entries?.getOrNull(1) ?: typeOfCaseFinding.entries?.firstOrNull()
             firstName.value  = saved.firstName
             lastName.value   = saved.lastName
             agePopup.value   = getDateFromLong(saved.dob)
             gender.value     = gender.getStringFromPosition(saved.genderId)
+            gender.inputType = TEXT_VIEW         // edit mode — gender not changeable
 
             maritalStatus.entries = when (saved.gender) {
                 MALE -> maritalStatusMale
@@ -1275,8 +1283,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
             ben.isDraft        = false
             ben.isConsent      = isOtpVerified
-            ben.isSpouseAdded  = false
-            ben.isChildrenAdded = false
+            // NOTE: isSpouseAdded / isChildrenAdded are managed by spouse/child registration flows.
+            // Do NOT reset them here — in edit mode the existing value must be preserved.
+            // For brand-new bens the model defaults both to false anyway.
             ben.isMarried      = (maritalStatus.getPosition() == 2)
             ben.doYouHavechildren = false
         }
@@ -1332,7 +1341,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     }
 
     private fun shouldShowMaternalDeath(gender: String?, dob: String?): Boolean {
-        if (gender != "Female") return false
+        // Use language-independent check: compare against current locale's Female label (index 1 in nbr_gender_array)
+        val femaleLabel = resources.getStringArray(R.array.nbr_gender_array).getOrNull(1) ?: "Female"
+        if (gender != femaleLabel) return false
         return try {
             val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
             val dobMillis = sdf.parse(dob ?: return false)?.time ?: return false

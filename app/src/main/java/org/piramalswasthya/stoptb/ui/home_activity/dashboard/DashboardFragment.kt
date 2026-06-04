@@ -26,6 +26,11 @@ class DashboardFragment : Fragment() {
 
     private val viewModel: DashboardViewModel by viewModels()
 
+    // Kept as fields so onResume can re-apply them after Android state restoration
+    // resets AutoCompleteTextView filtering (causing dropdown to show only 1 item).
+    private var timePeriodAdapter: ArrayAdapter<String>? = null
+    private var villageAdapter: ArrayAdapter<String>? = null
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
@@ -39,6 +44,20 @@ class DashboardFragment : Fragment() {
 
         setupFilters()
         observeData()
+    }
+
+    /**
+     * Re-apply adapters every time the fragment becomes visible.
+     *
+     * Android's view-state restoration calls AutoCompleteTextView.setText() with
+     * filter=true, which hides all dropdown options except the one matching the
+     * saved text ("Today" / "All Villages"). Re-setting the adapter in onResume
+     * (which runs AFTER onViewStateRestored) clears the stale filter state.
+     */
+    override fun onResume() {
+        super.onResume()
+        timePeriodAdapter?.let { binding.actvTimePeriod.setAdapter(it) }
+        villageAdapter?.let { binding.actvVillage.setAdapter(it) }
     }
 
     private fun setupFilters() {
@@ -58,13 +77,21 @@ class DashboardFragment : Fragment() {
             getString(R.string.month_november),
             getString(R.string.month_december),
         )
-        val timePeriodAdapter = ArrayAdapter(
+        timePeriodAdapter = ArrayAdapter(
             requireContext(),
             android.R.layout.simple_dropdown_item_1line,
             timePeriodLabels
         )
         binding.actvTimePeriod.setAdapter(timePeriodAdapter)
-        binding.actvTimePeriod.setText(timePeriodLabels[0], false)
+        // Restore previously selected time period (ViewModel persists across view recreation)
+        val savedPeriod = viewModel.selectedTimePeriod.value ?: viewModel.timePeriodOptions[0]
+        val savedPeriodIndex = viewModel.timePeriodOptions.indexOf(savedPeriod).coerceAtLeast(0)
+        binding.actvTimePeriod.setText(timePeriodLabels[savedPeriodIndex], false)
+        // Show ALL items when dropdown opens (prevent AutoCompleteTextView from filtering by selected text)
+        binding.actvTimePeriod.setOnClickListener {
+            timePeriodAdapter?.filter?.filter("")
+            binding.actvTimePeriod.showDropDown()
+        }
         binding.actvTimePeriod.setOnItemClickListener { _, _, position, _ ->
             viewModel.setTimePeriod(viewModel.timePeriodOptions[position])
             binding.actvTimePeriod.setText(timePeriodLabels[position], false)
@@ -75,13 +102,19 @@ class DashboardFragment : Fragment() {
         val villageNames = mutableListOf(getString(R.string.filter_all_villages))
         villageNames.addAll(villages.map { it.name })
 
-        val villageAdapter = ArrayAdapter(
+        villageAdapter = ArrayAdapter(
             requireContext(),
             android.R.layout.simple_dropdown_item_1line,
             villageNames
         )
         binding.actvVillage.setAdapter(villageAdapter)
-        binding.actvVillage.setText(villageNames[0], false)
+        // Restore previously selected village (ViewModel persists across view recreation)
+        binding.actvVillage.setText(viewModel.selectedVillageName.value ?: villageNames[0], false)
+        // Show ALL items when dropdown opens
+        binding.actvVillage.setOnClickListener {
+            villageAdapter?.filter?.filter("")
+            binding.actvVillage.showDropDown()
+        }
         binding.actvVillage.setOnItemClickListener { _, _, position, _ ->
             if (position == 0) {
                 viewModel.clearVillageFilter()

@@ -9,6 +9,7 @@ import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import org.piramalswasthya.stoptb.ui.home_activity.communicable_diseases.CdFragmentDirections
 import org.piramalswasthya.stoptb.ui.home_activity.home.ReferralIconsFragmentDirections
 import org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.NcdFragmentDirections
+import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.ui.volunteer.fragment.VolunteerHomeFragmentDirections
 import javax.inject.Inject
 
@@ -62,18 +63,14 @@ class IconDataset @Inject constructor(
             )
         )
 
-//        val role = preferenceDao.getLoggedInUser()?.role
-//        when {
-//            role.isRegistrationOfficerRole() -> iconList.removeAll {
-//                it.title != resources.getString(R.string.icon_title_ben) &&
-//                        it.title != resources.getString(R.string.icon_title_household)
-//            }
-//            role.isCounsellingOfficerRole() -> iconList.removeAll {
-//                it.title != resources.getString(R.string.icon_title_ncd_tb_screening) &&
-//                        it.title != resources.getString(R.string.ncd_refer_list) &&
-//                        it.title != resources.getString(R.string.icon_title_household)
-//            }
-//        }
+        // Registrar role: show only All Beneficiaries + All Household (no TB / Referrals)
+        val role = preferenceDao.getLoggedInUser()?.role
+        if (role.isRegistrationOfficerRole()) {
+            iconList.removeAll { icon ->
+                icon.title != resources.getString(R.string.icon_title_ben) &&
+                icon.title != resources.getString(R.string.icon_title_household)
+            }
+        }
 
         return iconList.apply {
             forEachIndexed { index, icon ->
