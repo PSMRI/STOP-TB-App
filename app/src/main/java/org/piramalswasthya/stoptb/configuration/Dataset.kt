@@ -635,6 +635,8 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
                 }
             }
 
+            formElement.errorText = null
+
             // Convert only English letters to uppercase, keep Hindi/Assamese as is
             val transformedValue = value.map {
                 if (it.isLowerCase() && !it.isHindiOrAssamese()) it.uppercaseChar() else it

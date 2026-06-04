@@ -1015,14 +1015,25 @@ interface BenDao {
             "            OR b.reproductiveStatusId = 1\n" +
             "            OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'\n" +
             "            OR UPPER(IFNULL(td.chestXRayResult, '')) = 'POSITIVE'\n" +
-            "        ) AND (\n" +
-            "            ts.benId IS NULL\n" +
-            "            OR ts.isConfirmed = 0\n" +
-            "        ) GROUP BY b.benId")
+            "        ) AND NOT (\n" +
+            "            UPPER(IFNULL(td.naatResult, '')) = 'POSITIVE'\n" +
+            "            OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'\n" +
+            "        )")
     fun getTbScreeningList(villageId: Int): Flow<List<BenWithTbSuspectedCache>>
 
     @Transaction
-    @Query("select b.* from BEN_BASIC_CACHE b inner join TB_SUSPECTED t on b.benID = t.benId and t.isConfirmed =1 where villageId = :villageId and isDeactivate=0 GROUP BY b.benId")
+    @Query("""
+            SELECT b.*
+            FROM BEN_BASIC_CACHE b
+            INNER JOIN TB_DIAGNOSTICS td
+                ON b.benId = td.benId
+            WHERE b.villageId = :villageId
+              AND b.isDeactivate = 0
+              AND (
+                    UPPER(IFNULL(td.naatResult, '')) = 'POSITIVE'
+                    OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
+            """)
     fun getTbConfirmedList(villageId: Int): Flow<List<BenWithTbSuspectedCache>>
 
     @Transaction
@@ -1056,19 +1067,19 @@ interface BenDao {
 
 
     @Query("""
-  SELECT COUNT(b.benId)
-    FROM BEN_BASIC_CACHE b
-    INNER JOIN NCD_REFER r ON b.benId = r.benId
-      AND b.villageId = :selectedVillage
-      AND b.isDeactivate=0
-      AND (
-        r.type = "TB"
-        OR (
-          CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= :min
-          AND b.reproductiveStatusId != 2
-        )
-      )
-""")
+      SELECT COUNT(b.benId)
+        FROM BEN_BASIC_CACHE b
+        INNER JOIN NCD_REFER r ON b.benId = r.benId
+          AND b.villageId = :selectedVillage
+          AND b.isDeactivate=0
+          AND (
+            r.type = "TB"
+            OR (
+              CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= :min
+              AND b.reproductiveStatusId != 2
+            )
+          )
+    """)
     fun getReferredBenCount(
         selectedVillage: Int,
         min: Int = Konstants.minAgeForNcd

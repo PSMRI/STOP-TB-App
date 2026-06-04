@@ -15,6 +15,7 @@ import org.piramalswasthya.stoptb.model.InputType.EDIT_TEXT
 import org.piramalswasthya.stoptb.model.InputType.HEADLINE
 import org.piramalswasthya.stoptb.model.InputType.RADIO
 import org.piramalswasthya.stoptb.model.InputType.TEXT_VIEW
+import timber.log.Timber
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -446,9 +447,11 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             *
             * */
             lastNameHeadOfFamily.id ->{
+                Timber.d("LastName validation triggered")
                 validateEmptyOnEditText(lastNameHeadOfFamily)
             // validateAllCapsOrSpaceOnEditText(lastNameHeadOfFamily)
                 validateAllCapsOrSpaceOnEditTextWithHindiEnabled(lastNameHeadOfFamily)
+            
             }
             mobileNoHeadOfFamily.id -> {
                 validateEmptyOnEditText(mobileNoHeadOfFamily)

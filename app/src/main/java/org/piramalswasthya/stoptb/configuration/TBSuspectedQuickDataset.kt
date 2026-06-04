@@ -755,7 +755,21 @@ class TBSuspectedQuickDataset(
         val xrayReferred = isYes(referredForDigitalChestXray)
         val xrayDenied = isNo(referredForDigitalChestXray)
         reasonForDenialChestXray.isEnabled = xrayDenied && !lockDigitalChestXray
-        reasonForDenialChestXrayOther.isEnabled = xrayDenied && !lockDigitalChestXray
+        reasonForDenialChestXray.required = xrayDenied && !lockDigitalChestXray
+        if (!xrayDenied) {
+            reasonForDenialChestXray.errorText = null
+        }
+
+        reasonForDenialChestXrayOther.isEnabled =
+            xrayDenied &&
+                    isLastItemSelected(reasonForDenialChestXray, R.array.tb_reason_for_denial_xray)
+
+        reasonForDenialChestXrayOther.required =
+            reasonForDenialChestXrayOther.isEnabled
+
+        if (!reasonForDenialChestXrayOther.isEnabled) {
+            reasonForDenialChestXrayOther.errorText = null
+        }
 
         // Conducted
         digitalChestXrayConducted.isEnabled = shouldShowDigitalChestXray() && !lockDigitalChestXray
@@ -763,10 +777,33 @@ class TBSuspectedQuickDataset(
         if (!shouldShowDigitalChestXray()) resetField(digitalChestXrayConducted)
 
         // Not-conducted reason for X-Ray
-        val xrayConductedNo = xrayReferred && !isYes(digitalChestXrayConducted) &&
-            !digitalChestXrayConducted.value.isNullOrBlank()
-        reasonNotConductedChestXray.isEnabled = xrayConductedNo && !lockDigitalChestXray
-        reasonNotConductedChestXrayOther.isEnabled = xrayConductedNo && !lockDigitalChestXray
+        val xrayConductedNo = xrayReferred &&
+                !isYes(digitalChestXrayConducted) &&
+                !digitalChestXrayConducted.value.isNullOrBlank()
+
+        reasonNotConductedChestXray.isEnabled =
+            xrayConductedNo && !lockDigitalChestXray
+
+        reasonNotConductedChestXray.required =
+            xrayConductedNo && !lockDigitalChestXray
+
+        if (!xrayConductedNo) {
+            reasonNotConductedChestXray.errorText = null
+        }
+
+        reasonNotConductedChestXrayOther.isEnabled =
+            xrayConductedNo &&
+                    isLastItemSelectedDropdown(
+                        reasonNotConductedChestXray,
+                        R.array.tb_reason_not_conducted_xray
+                    )
+
+        reasonNotConductedChestXrayOther.required =
+            reasonNotConductedChestXrayOther.isEnabled
+
+        if (!reasonNotConductedChestXrayOther.isEnabled) {
+            reasonNotConductedChestXrayOther.errorText = null
+        }
 
         // X-Ray result
         digitalChestXrayResult.isEnabled =
@@ -782,9 +819,27 @@ class TBSuspectedQuickDataset(
 
         val sputumReferred = isYes(referredForSputumCollection)
         val sputumDenied = isNo(referredForSputumCollection)
-        sputumSampleSubmittedAt.isEnabled = sputumReferred && !referralMode
-        reasonForDenialSputum.isEnabled = sputumDenied && !referralMode
-        reasonForDenialSputumOther.isEnabled = sputumDenied && !referralMode
+        sputumSampleSubmittedAt.isEnabled = true
+        reasonForDenialSputum.isEnabled = true
+        reasonForDenialSputum.required =true
+
+        if (!sputumDenied) {
+            reasonForDenialSputum.errorText = null
+        }
+
+        reasonForDenialSputumOther.isEnabled =
+            sputumDenied &&
+                    isLastItemSelected(
+                        reasonForDenialSputum,
+                        R.array.tb_reason_for_denial_sputum
+                    )
+
+        reasonForDenialSputumOther.required =
+            reasonForDenialSputumOther.isEnabled
+
+        if (!reasonForDenialSputumOther.isEnabled) {
+            reasonForDenialSputumOther.errorText = null
+        }
 
         // TrueNAT
         trueNatConducted.isEnabled = shouldShowTrueNatConducted() && !lockTrueNat
@@ -793,7 +848,26 @@ class TBSuspectedQuickDataset(
 
         val naatConductedNo = !trueNatConducted.value.isNullOrBlank() && !isYes(trueNatConducted)
         reasonNotConductedNaat.isEnabled = naatConductedNo && !lockTrueNat
-        reasonNotConductedNaatOther.isEnabled = naatConductedNo && !lockTrueNat
+        reasonNotConductedNaat.required =
+            naatConductedNo && !lockTrueNat
+
+        if (!naatConductedNo) {
+            reasonNotConductedNaat.errorText = null
+        }
+
+        reasonNotConductedNaatOther.isEnabled =
+            naatConductedNo &&
+                    isLastItemSelectedDropdown(
+                        reasonNotConductedNaat,
+                        R.array.tb_reason_not_conducted_naat
+                    )
+
+        reasonNotConductedNaatOther.required =
+            reasonNotConductedNaatOther.isEnabled
+
+        if (!reasonNotConductedNaatOther.isEnabled) {
+            reasonNotConductedNaatOther.errorText = null
+        }
 
         trueNatResult.isEnabled =
             shouldShowTrueNatConducted() && isYes(trueNatConducted) && !lockTrueNat

@@ -234,7 +234,9 @@ class BenRepo @Inject constructor(
                 val file = File(filePath)
 
                 when {
-                    file.absolutePath.startsWith(context.cacheDir.absolutePath) -> {
+                    uri.scheme == "content" -> {
+                        Timber.d("IMAGE_DEBUG Copying content uri to permanent storage")
+
                         val savedPath = ImageUtils.saveBenImageFromCameraToStorage(
                             context = context,
                             uriString = imagePath,
@@ -242,12 +244,6 @@ class BenRepo @Inject constructor(
                         )
 
                         if (savedPath.isNullOrBlank()) {
-                            Timber.e("Image compression/save failed for beneficiaryId=${ben.beneficiaryId}")
-
-                            // Cleanup orphaned cache file
-                            runCatching { file.delete() }
-                                .onFailure { Timber.w(it, "Failed to delete orphaned cache image") }
-
                             throw IllegalStateException("Failed to save beneficiary image")
                         }
 
@@ -259,7 +255,6 @@ class BenRepo @Inject constructor(
                     }
 
                     else -> {
-                        Timber.w("Unknown image path source: $imagePath")
                         imagePath
                     }
                 }
@@ -269,6 +264,7 @@ class BenRepo @Inject constructor(
                 benDao.updateBen(ben)
             } else {
                 benDao.upsert(ben)
+                Timber.d("IMAGE_DEBUG Saved in DB benId=${ben.beneficiaryId} image=${ben.userImage}")
             }
         }
     }
