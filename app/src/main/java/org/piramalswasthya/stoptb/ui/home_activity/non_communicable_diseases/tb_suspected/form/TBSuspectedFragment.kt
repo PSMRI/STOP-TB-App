@@ -45,7 +45,17 @@ class TBSuspectedFragment : Fragment() {
         AlertDialog.Builder(requireContext())
             .setTitle(resources.getString(R.string.tb_suspected_sputum_test))
             .setMessage("it")
-            .setPositiveButton(resources.getString(R.string.ok)) { dialog, _ -> dialog.dismiss() }
+            .setPositiveButton(resources.getString(R.string.ok)) { dialog, _ ->
+
+                viewModel.markAsConfirmed()
+
+                // Open Confirmed TB screen here
+//                findNavController().navigate(
+//                    R.id.tbConfirmedTreatmentFragment
+//                )
+
+                dialog.dismiss()
+            }
             .create()
     }
 

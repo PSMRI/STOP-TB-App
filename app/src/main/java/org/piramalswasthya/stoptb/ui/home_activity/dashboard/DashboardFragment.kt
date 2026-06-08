@@ -56,8 +56,8 @@ class DashboardFragment : Fragment() {
      */
     override fun onResume() {
         super.onResume()
-        timePeriodAdapter?.let { binding.actvTimePeriod.setAdapter(it) }
-        villageAdapter?.let { binding.actvVillage.setAdapter(it) }
+       // timePeriodAdapter?.let { binding.actvTimePeriod.setAdapter(it) }
+      //  villageAdapter?.let { binding.actvVillage.setAdapter(it) }
     }
 
     private fun setupFilters() {
@@ -88,9 +88,13 @@ class DashboardFragment : Fragment() {
         val savedPeriodIndex = viewModel.timePeriodOptions.indexOf(savedPeriod).coerceAtLeast(0)
         binding.actvTimePeriod.setText(timePeriodLabels[savedPeriodIndex], false)
         // Show ALL items when dropdown opens (prevent AutoCompleteTextView from filtering by selected text)
-        binding.actvTimePeriod.setOnClickListener {
-            timePeriodAdapter?.filter?.filter("")
-            binding.actvTimePeriod.showDropDown()
+        binding.actvTimePeriod.apply {
+            threshold = 0
+
+            setOnClickListener {
+                setText("", false)
+                showDropDown()
+            }
         }
         binding.actvTimePeriod.setOnItemClickListener { _, _, position, _ ->
             viewModel.setTimePeriod(viewModel.timePeriodOptions[position])
@@ -111,9 +115,20 @@ class DashboardFragment : Fragment() {
         // Restore previously selected village (ViewModel persists across view recreation)
         binding.actvVillage.setText(viewModel.selectedVillageName.value ?: villageNames[0], false)
         // Show ALL items when dropdown opens
-        binding.actvVillage.setOnClickListener {
-            villageAdapter?.filter?.filter("")
-            binding.actvVillage.showDropDown()
+        binding.actvVillage.apply {
+            threshold = 0
+
+            setOnClickListener {
+                setText("", false)
+                showDropDown()
+            }
+
+            setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) {
+                    setText("", false)
+                    showDropDown()
+                }
+            }
         }
         binding.actvVillage.setOnItemClickListener { _, _, position, _ ->
             if (position == 0) {
