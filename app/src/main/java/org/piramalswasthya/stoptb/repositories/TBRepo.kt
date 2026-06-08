@@ -80,6 +80,13 @@ class TBRepo @Inject constructor(
         }
     }
 
+    /** Returns latest TB_DIAGNOSTICS record by benId — used to get existing id before save */
+    suspend fun getTBDiagnosticsById(benId: Long): TBDiagnosticsCache? {
+        return withContext(Dispatchers.IO) {
+            tbDao.getTbDiagnosticsByBenId(benId)
+        }
+    }
+
     suspend fun saveTBDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache) {
         withContext(Dispatchers.IO) {
             tbDao.saveTbDiagnostics(tbDiagnosticsCache)

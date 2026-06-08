@@ -15,6 +15,7 @@ import com.google.android.material.button.MaterialButton
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
@@ -108,7 +109,56 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
             rowView.visibility = View.VISIBLE
             rowView.findViewById<TextView>(R.id.tv_form_name).text = formName
             val btn = rowView.findViewById<MaterialButton>(R.id.btn_form_action)
-            observeFormStatus(fillStatusFlows[index], btn, benId, formIndex)
+
+            if (formIndex == FORM_DIAGNOSIS) {
+                // Diagnosis is only enabled after TB Screening is completed
+                viewLifecycleOwner.lifecycleScope.launch {
+                    combine(
+                        viewModel.isTbScreeningFilled,
+                        fillStatusFlows[index]
+                    ) { tbScreeningDone, diagnosisFilled ->
+                        Pair(tbScreeningDone, diagnosisFilled)
+                    }.collect { (tbScreeningDone, diagnosisFilled) ->
+                        if (!tbScreeningDone) {
+                            // TB Screening not done — show grey button, toast on click
+                            btn.text = getString(R.string.examine_btn_fill)
+                            btn.isEnabled = false
+                            btn.alpha = 1f
+                            btn.backgroundTintList = ContextCompat.getColorStateList(
+                                requireContext(), android.R.color.darker_gray
+                            )
+                            // Allow tap to show hint message even when disabled
+                            btn.isEnabled = true
+                            btn.setOnClickListener {
+                                android.widget.Toast.makeText(
+                                    requireContext(),
+                                    getString(R.string.diagnosis_locked_msg),
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        } else {
+                            // TB Screening done — normal behavior
+                            btn.isEnabled = true
+                            btn.alpha = 1f
+                            if (diagnosisFilled) {
+                                btn.text = getString(R.string.examine_btn_view)
+                                btn.backgroundTintList = ContextCompat.getColorStateList(
+                                    requireContext(), android.R.color.holo_green_dark
+                                )
+                                btn.setOnClickListener { navigateToForm(benId, formIndex, viewOnly = true) }
+                            } else {
+                                btn.text = getString(R.string.examine_btn_fill)
+                                btn.backgroundTintList = ContextCompat.getColorStateList(
+                                    requireContext(), android.R.color.holo_red_dark
+                                )
+                                btn.setOnClickListener { navigateToForm(benId, formIndex, viewOnly = false) }
+                            }
+                        }
+                    }
+                }
+            } else {
+                observeFormStatus(fillStatusFlows[index], btn, benId, formIndex)
+            }
         }
 
         // Auto-flow: if opened with autoFlow=true, immediately navigate to next unfilled form

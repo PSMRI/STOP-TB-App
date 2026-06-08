@@ -5,6 +5,7 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.core.widget.doAfterTextChanged
 import androidx.activity.OnBackPressedCallback
@@ -77,12 +78,13 @@ class CampModeConnectFragment : Fragment() {
 
         binding.etCampHubUrl.setText(viewModel.getCampHubUrl())
 
-        // Auto-scroll to URL field when keyboard opens
+        // Scroll to bottom after keyboard fully animates open (~300ms)
+        // so Connect button is visible above keyboard
         binding.etCampHubUrl.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) {
-                binding.svConnect.post {
-                    binding.svConnect.smoothScrollTo(0, binding.tilCampHubUrl.top)
-                }
+                binding.svConnect.postDelayed({
+                    binding.svConnect.fullScroll(View.FOCUS_DOWN)
+                }, 300)
             }
         }
         // Clear error when user starts typing
@@ -110,7 +112,7 @@ class CampModeConnectFragment : Fragment() {
             val campHubUrl = binding.etCampHubUrl.text?.toString().orEmpty()
             if (campHubUrl.isBlank()) {
                 binding.tilCampHubUrl.error = getString(R.string.camp_hub_url_required)
-                binding.svConnect.smoothScrollTo(0, binding.tilCampHubUrl.top)
+                binding.svConnect.post { binding.svConnect.fullScroll(View.FOCUS_DOWN) }
                 return@setOnClickListener
             }
             binding.tilCampHubUrl.error = null
@@ -192,6 +194,21 @@ class CampModeConnectFragment : Fragment() {
                 )
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Pan screen up when keyboard opens — URL field stays visible above keyboard
+        activity?.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Restore adjustResize for other screens
+        activity?.window?.setSoftInputMode(
+            WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN or
+            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        )
     }
 
     override fun onDestroyView() {

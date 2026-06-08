@@ -30,22 +30,8 @@ class ReferPullFromAmritWorker @AssistedInject constructor(
     override suspend fun getForegroundInfo(): ForegroundInfo = createForegroundInfo()
 
     override suspend fun doWork(): Result {
-        setForeground(getForegroundInfo())
-
-        return withContext(Dispatchers.IO) {
-            return@withContext try {
-                val getNumPages: Int = referalRepo.pullAndPersistReferRecord()
-                if (getNumPages > 0) {
-                    (1..getNumPages).forEach {
-                        referalRepo.pullAndPersistReferRecord(it)
-                    }
-                }
-                Result.success()
-            } catch (e: Exception) {
-                Timber.e("refer pull failed : $e")
-                Result.failure(workDataOf("worker_name" to "ReferPullFromAmritWorker", "error" to (e.message ?: "Unknown error")))
-            }
-        }
+        // Unused — getBenReferDetailsByCreatedBy API removed from StopTB
+        return Result.success()
     }
 
     private fun createForegroundInfo(): ForegroundInfo {

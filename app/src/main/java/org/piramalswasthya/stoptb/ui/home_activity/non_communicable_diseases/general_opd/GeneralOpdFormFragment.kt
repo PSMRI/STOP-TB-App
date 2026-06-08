@@ -56,7 +56,8 @@ class GeneralOpdFormFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        blockBackNavigationInManagedFlow(isManagedFlow, allowBackNavigation)
+        // Back navigation allowed — each form now returns to AllBenFragment independently
+        // blockBackNavigationInManagedFlow(isManagedFlow, allowBackNavigation)
 
         viewModel.recordExists.observe(viewLifecycleOwner) { exists ->
             exists?.let { recordExists ->

@@ -109,6 +109,10 @@ class TBSuspectedQuickViewModel @Inject constructor(
                 try {
                     _state.postValue(State.SAVING)
                     dataset.mapValues(tbDiagnostics, 1)
+                    // Load existing row's id to UPDATE instead of INSERT new row
+                    // (TBDiagnosticsCache.id defaults to 0 → REPLACE inserts new row each time)
+                    val existingId = tbRepo.getTBDiagnosticsById(benId)?.id ?: 0
+                    if (existingId > 0) tbDiagnostics = tbDiagnostics.copy(id = existingId)
                     tbDiagnostics.syncState = SyncState.UNSYNCED
                     tbRepo.saveTBDiagnostics(tbDiagnostics)
                     _state.postValue(State.SAVE_SUCCESS)

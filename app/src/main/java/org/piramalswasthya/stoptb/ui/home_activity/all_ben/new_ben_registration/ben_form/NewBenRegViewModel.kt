@@ -311,7 +311,10 @@ class NewBenRegViewModel @Inject constructor(
                             kidDetails     = null,
                             genDetails     = BenRegGen(),
                             syncState      = SyncState.UNSYNCED,
-                            locationRecord = locationRecord,
+                            // Use household's locationRecord when registering from household flow
+                            // to ensure ben's loc_village_id matches household's village
+                            locationRecord = if (hhId > 0L && household.householdId > 0L)
+                                household.locationRecord else locationRecord,
                             isConsent      = isOtpVerified,
                         )
                     }

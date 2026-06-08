@@ -1211,9 +1211,15 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             ben.otherResidentialArea = null
 
             // Village — update locationRecord if user changed village
+            // Prefer matching by both name AND existing ID (preserves correct village when
+            // two sub-villages share the same display name, e.g. both named "Adarsha Gaon")
             villageHamlet.value?.let { selectedName ->
-                villageEntities.find { it.name == selectedName }?.let { selectedVillage ->
-                    ben.locationRecord = ben.locationRecord.copy(village = selectedVillage)
+                val existingId = ben.locationRecord.village.id
+                val selectedVillage =
+                    villageEntities.find { it.name == selectedName && it.id == existingId }
+                        ?: villageEntities.find { it.name == selectedName }
+                selectedVillage?.let {
+                    ben.locationRecord = ben.locationRecord.copy(village = it)
                 }
             }
             state.value?.takeIf { it.isNotBlank() }?.let {

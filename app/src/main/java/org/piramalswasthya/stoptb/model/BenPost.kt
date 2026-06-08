@@ -41,7 +41,7 @@ data class BenPost(
     @Json(name = "ProviderServiceMapID")
     val providerServiceMapID: Int = 0,
     @Json(name = "VanID")
-    val vanID: Int = 4,
+    val vanID: Int = 0,
     @Json(name = "aadhaNo")
     val aadhaNo: String,
     @Json(name = "aadha_no")
