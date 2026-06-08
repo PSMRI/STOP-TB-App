@@ -1023,19 +1023,24 @@ interface BenDao {
 
     @Transaction
     @Query("""
-            SELECT b.*
-            FROM BEN_BASIC_CACHE b
-            INNER JOIN TB_DIAGNOSTICS td
-                ON b.benId = td.benId
-            WHERE b.villageId = :villageId
-              AND b.isDeactivate = 0
-              AND (
-                    UPPER(IFNULL(td.naatResult, '')) = 'POSITIVE'
-                    OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
-                  )
-            """)
-    fun getTbConfirmedList(villageId: Int): Flow<List<BenWithTbSuspectedCache>>
-
+    SELECT DISTINCT b.*
+    FROM BEN_BASIC_CACHE b
+    LEFT JOIN TB_SUSPECTED ts
+        ON b.benId = ts.benId
+    LEFT JOIN TB_DIAGNOSTICS td
+        ON b.benId = td.benId
+    WHERE b.villageId = :villageId
+      AND b.isDeactivate = 0
+      AND (
+            ts.isTbConfirmed = 1
+            OR td.isTbConfirmed = 1
+            OR UPPER(IFNULL(td.naatResult, '')) = 'POSITIVE'
+            OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+          )
+""")
+    fun getTbConfirmedList(
+        villageId: Int
+    ): Flow<List<BenWithTbSuspectedCache>>
     @Transaction
     @Query("SELECT * FROM BEN_BASIC_CACHE b where CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER)  >= :min and b.reproductiveStatusId!=2 and b.isDeactivate=0 and b.villageId=:selectedVillage group by b.benId order by b.regDate desc")
     fun getBenWithCbac(
