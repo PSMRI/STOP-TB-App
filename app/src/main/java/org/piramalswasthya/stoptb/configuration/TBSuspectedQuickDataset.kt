@@ -819,7 +819,7 @@ class TBSuspectedQuickDataset(
 
         val sputumReferred = isYes(referredForSputumCollection)
         val sputumDenied = isNo(referredForSputumCollection)
-        sputumSampleSubmittedAt.isEnabled = true
+        sputumSampleSubmittedAt.isEnabled = !referralMode  // not editable when Submit is hidden (view mode)
         reasonForDenialSputum.isEnabled = true
         reasonForDenialSputum.required =true
 

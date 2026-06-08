@@ -218,7 +218,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         }
         refreshCampHubOfflineBanner()
 
-        binding.versionName.text = "APK Version ${BuildConfig.VERSION_NAME}"
+        binding.versionName.text = "App Version ${BuildConfig.VERSION_NAME}"
 
 
         viewModel.navigateToLoginPage.observe(this) {

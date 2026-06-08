@@ -48,6 +48,10 @@ interface TBDao {
     @Query("SELECT * FROM TB_DIAGNOSTICS WHERE benId =:benId and (visitDate = :visitDate or visitDate = :visitDateGMT) limit 1")
     suspend fun getTbDiagnostics(benId: Long, visitDate: Long, visitDateGMT: Long): TBDiagnosticsCache?
 
+    /** Get latest TB_DIAGNOSTICS record for ben — used to retrieve existing id before save */
+    @Query("SELECT * FROM TB_DIAGNOSTICS WHERE benId = :benId ORDER BY id DESC LIMIT 1")
+    suspend fun getTbDiagnosticsByBenId(benId: Long): TBDiagnosticsCache?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveTbDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache)
 

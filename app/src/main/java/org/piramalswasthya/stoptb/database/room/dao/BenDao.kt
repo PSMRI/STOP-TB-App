@@ -1018,7 +1018,7 @@ interface BenDao {
             "        ) AND NOT (\n" +
             "            UPPER(IFNULL(td.naatResult, '')) = 'POSITIVE'\n" +
             "            OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'\n" +
-            "        )")
+            "        ) GROUP BY b.benId")
     fun getTbScreeningList(villageId: Int): Flow<List<BenWithTbSuspectedCache>>
 
     @Transaction
