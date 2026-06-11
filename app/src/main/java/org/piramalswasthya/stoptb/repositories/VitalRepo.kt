@@ -58,6 +58,36 @@ class VitalRepo @Inject constructor(
         }
     }
 
+    suspend fun pushUnSyncedVitals(): Boolean {
+        return withContext(Dispatchers.IO) {
+            val vitals = vitalDao.getVitals(SyncState.UNSYNCED)
+            if (vitals.isEmpty()) return@withContext true
+
+            var successCount = 0
+            var failCount = 0
+
+            vitals.forEach { vital ->
+                val synced = pushSingleVital(vital)
+                if (synced) {
+                    vitalDao.saveVitals(vital.copy(syncState = SyncState.SYNCED))
+                    successCount += 1
+                } else {
+                    failCount += 1
+                }
+            }
+
+            Timber.d(
+                "General Examination push complete: %s succeeded, %s failed out of %s",
+                successCount,
+                failCount,
+                vitals.size
+            )
+
+            // Keep the worker successful so failed records remain UNSYNCED for the next refresh.
+            true
+        }
+    }
+
     suspend fun fetchGeneralExaminationsFromApi(
         request: GeneralExaminationGetRequest
     ): List<GeneralExaminationRecord> {
@@ -110,8 +140,14 @@ class VitalRepo @Inject constructor(
                     val benRegId = record.beneficiaryRegID ?: beneficiary?.benRegId ?: return@forEach
 
                     val existing = vitalDao.getVitals(benId)
-                    val serverUpdatedDate = parseServerUpdateDate(record.updateDate)
-                    if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
+                    val serverUpdatedDate = parseServerUpdateDate(record.updateDate ?: record.createdDate)
+                    if (!shouldApplyServerRecord(
+                            existing?.syncState,
+                            existing?.serverUpdatedDate,
+                            existing?.capturedAt,
+                            serverUpdatedDate
+                        )
+                    ) {
                         return@forEach
                     }
                     vitalDao.saveVitals(
@@ -303,9 +339,14 @@ class VitalRepo @Inject constructor(
     private fun shouldApplyServerRecord(
         existingSyncState: SyncState?,
         savedServerUpdatedDate: Long?,
+        localCapturedAt: Long?,
         serverUpdatedDate: Long
     ): Boolean {
-        if (existingSyncState != null && existingSyncState != SyncState.SYNCED) return false
+        if (existingSyncState != null && existingSyncState != SyncState.SYNCED) {
+            val localTime = localCapturedAt ?: 0L
+            val clockSkewToleranceMs = 5 * 60 * 1000L
+            return serverUpdatedDate > 0L && serverUpdatedDate + clockSkewToleranceMs >= localTime
+        }
         if (serverUpdatedDate <= 0L) return true
         return serverUpdatedDate > (savedServerUpdatedDate ?: 0L)
     }

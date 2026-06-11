@@ -86,7 +86,7 @@ class VolunteerHomeFragment : Fragment() {
 
         binding.btnQuickRefresh.setOnClickListener {
             if (manualHomeRefreshRequested || !binding.btnQuickRefresh.isEnabled) return@setOnClickListener
-            if (!pref.isCampHubConnected()) {
+            if (!pref.isCampModeEnabled() || !pref.isCampHubConnected()) {
                 binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_camp_disconnected)
                 setQuickRefreshButtonEnabled(true)
                 return@setOnClickListener
@@ -110,7 +110,7 @@ class VolunteerHomeFragment : Fragment() {
 
                 // If camp hub disconnected while a refresh was running, abort immediately
                 // (the worker may stay BLOCKED forever waiting for connectivity).
-                if (!pref.isCampHubConnected()) {
+                if (!pref.isCampModeEnabled() || !pref.isCampHubConnected()) {
                     manualHomeRefreshRequested = false
                     setQuickRefreshButtonEnabled(true)
                     binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_camp_disconnected)

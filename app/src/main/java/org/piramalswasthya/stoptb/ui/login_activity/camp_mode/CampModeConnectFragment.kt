@@ -179,9 +179,8 @@ class CampModeConnectFragment : Fragment() {
                 binding.tvStatus.setTextColor(
                     ContextCompat.getColor(requireContext(), R.color.md_theme_light_primary)
                 )
-                if (openedFromOfflineChip) {
-                    WorkerUtils.triggerCampQuickPullIfConnected(requireContext(), pref, force = true)
-                }
+                WorkerUtils.triggerAmritPushWorker(requireContext().applicationContext)
+                WorkerUtils.triggerCampQuickPullIfConnected(requireContext().applicationContext, pref, force = true)
                 closeConnectScreen(refreshSignIn = true)
             }
 

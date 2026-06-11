@@ -1015,6 +1015,9 @@ interface BenDao {
             "            OR b.reproductiveStatusId = 1\n" +
             "            OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'\n" +
             "            OR UPPER(IFNULL(td.chestXRayResult, '')) = 'POSITIVE'\n" +
+            "        ) AND IFNULL(ts.isConfirmed, 0) = 0\n" +
+            "        AND NOT EXISTS (\n" +
+            "            SELECT 1 FROM TB_CONFIRMED_TREATMENT tc WHERE tc.benId = b.benId\n" +
             "        ) AND NOT (\n" +
             "            UPPER(IFNULL(td.naatResult, '')) = 'POSITIVE'\n" +
             "            OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'\n" +

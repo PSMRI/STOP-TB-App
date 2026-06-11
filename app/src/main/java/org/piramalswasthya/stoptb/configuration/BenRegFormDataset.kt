@@ -436,7 +436,16 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     /**
      * Setup page for NEW beneficiary registration
      */
-    suspend fun setUpPage(ben: BenRegCache?, familyHeadPhoneNo: Long?, villageName: String? = null, villageNames: Array<String>? = null, villageEntityList: List<LocationEntity> = emptyList(), subCentreName: String? = null, relToHeadId: Int = -1) {
+    suspend fun setUpPage(
+        ben: BenRegCache?,
+        familyHeadPhoneNo: Long?,
+        villageName: String? = null,
+        villageNames: Array<String>? = null,
+        villageEntityList: List<LocationEntity> = emptyList(),
+        subCentreName: String? = null,
+        relToHeadId: Int = -1,
+        spouseRegistrationRelToHeadId: Int = -1
+    ) {
         val list = mutableListOf(
             pic,
             dateOfReg,
@@ -633,7 +642,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         }
 
         // For spouse registration (Wife=4 / Husband=5): force Married + lock gender/marital/spouse fields
-        if (relToHeadId == 4 || relToHeadId == 5) {
+        if (spouseRegistrationRelToHeadId == 4 || spouseRegistrationRelToHeadId == 5) {
             // Lock gender — pre-filled from nav args, not changeable
             gender.inputType = TEXT_VIEW
 
@@ -657,7 +666,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
             // Add and lock spouse name field with HoF's name pre-filled
             val hofName = ben?.genDetails?.spouseName.orEmpty()
-            val spouseNameField = when (relToHeadId) {
+            val spouseNameField = when (spouseRegistrationRelToHeadId) {
                 4 -> husbandName   // wife being registered → HoF is husband
                 5 -> wifeName      // husband being registered → HoF is wife
                 else -> null

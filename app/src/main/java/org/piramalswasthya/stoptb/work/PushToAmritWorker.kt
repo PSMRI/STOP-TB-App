@@ -8,6 +8,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.repositories.BenRepo
+import org.piramalswasthya.stoptb.repositories.VitalRepo
 import timber.log.Timber
 
 @HiltWorker
@@ -15,6 +16,7 @@ class PushToAmritWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted params: WorkerParameters,
     private val benRepo: BenRepo,
+    private val vitalRepo: VitalRepo,
     override val preferenceDao: PreferenceDao,
 ) : BasePushWorker(appContext, params) {
     companion object {
@@ -24,7 +26,9 @@ class PushToAmritWorker @AssistedInject constructor(
     override val workerName = name
 
     override suspend fun doSyncWork(): Result {
-        val workerResult = benRepo.processNewBen()
+        val benWorkerResult = benRepo.processNewBen()
+        val vitalWorkerResult = vitalRepo.pushUnSyncedVitals()
+        val workerResult = benWorkerResult && vitalWorkerResult
         return if (workerResult /*&& workerResult1 && workerResult2*/) {
             Timber.d("Worker completed")
             Result.success()

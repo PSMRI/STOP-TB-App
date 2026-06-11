@@ -748,20 +748,21 @@ class TBSuspectedQuickDataset(
 
     private fun syncFieldStates() {
         // Referral for X-Ray — not shown for pregnant women
-        referredForDigitalChestXray.isEnabled = !lockDigitalChestXray && !isPregnant()
-        referredForDigitalChestXray.required = !isPregnant()
+        referredForDigitalChestXray.isEnabled = !lockDigitalChestXray && !isPregnant() && !referralMode
+        referredForDigitalChestXray.required = !isPregnant() && !referralMode
 
         // Denial reason for X-Ray
         val xrayReferred = isYes(referredForDigitalChestXray)
         val xrayDenied = isNo(referredForDigitalChestXray)
-        reasonForDenialChestXray.isEnabled = xrayDenied && !lockDigitalChestXray
-        reasonForDenialChestXray.required = xrayDenied && !lockDigitalChestXray
+        reasonForDenialChestXray.isEnabled = xrayDenied && !lockDigitalChestXray && !referralMode
+        reasonForDenialChestXray.required = xrayDenied && !lockDigitalChestXray && !referralMode
         if (!xrayDenied) {
             reasonForDenialChestXray.errorText = null
         }
 
         reasonForDenialChestXrayOther.isEnabled =
             xrayDenied &&
+                    !referralMode &&
                     isLastItemSelected(reasonForDenialChestXray, R.array.tb_reason_for_denial_xray)
 
         reasonForDenialChestXrayOther.required =

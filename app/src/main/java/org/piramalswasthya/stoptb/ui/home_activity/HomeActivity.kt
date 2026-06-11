@@ -95,7 +95,13 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
     private val campHubPrefListener =
         android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == pref.getCampHubConnectedKey()) {
-                runOnUiThread { refreshCampHubOfflineBanner() }
+                runOnUiThread {
+                    refreshCampHubOfflineBanner()
+                    if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
+                        WorkerUtils.triggerAmritPushWorker(applicationContext)
+                        WorkerUtils.triggerCampQuickPullIfConnected(applicationContext, pref, force = true)
+                    }
+                }
             }
         }
 

@@ -161,7 +161,16 @@ class NewBenRegViewModel @Inject constructor(
             val villageNames = user.villages.map { it.name }.toTypedArray()
             // New registration
             // For wife/husband: look up spouse's first name from the matching member's stored spouseName
-            val spouseFirstName: String? = when (relToHeadId) {
+            val selectedSpouseMember =
+                if (relToHeadId == 4 || relToHeadId == 5)
+                    benRepo.getBeneficiaryRecord(selectedBenIdFromArgs, hhId)
+                else null
+            val selectedMemberSpouseName =
+                selectedSpouseMember
+                    ?.genDetails
+                    ?.spouseName
+                    ?.takeIf { it.isNotBlank() }
+            val spouseFirstName: String? = selectedMemberSpouseName ?: if (selectedBenIdFromArgs == 0L) when (relToHeadId) {
                 4 -> benRepo.getBenListFromHousehold(hhId)          // wife reg → get male member's stored wife name
                         .filter { it.genderId == 1 }
                         .mapNotNull { it.genDetails?.spouseName }
@@ -171,7 +180,10 @@ class NewBenRegViewModel @Inject constructor(
                         .mapNotNull { it.genDetails?.spouseName }
                         .firstOrNull { it.isNotBlank() }
                 else -> null
-            }
+            } else null
+            val selectedSpouseMemberName = selectedSpouseMember?.fullName()
+            val effectiveRelToHeadId =
+                getSpouseRegistrationRelationToHeadId(relToHeadId, selectedSpouseMember)
 
             // For Son (8) / Daughter (9): pre-fill Father's Name and Mother's Name
             // Logic matches FLW2.9: use HoF as primary parent; spouse record (relPos 5/6) as the other parent;
@@ -211,7 +223,12 @@ class NewBenRegViewModel @Inject constructor(
                 Pair(null, null)
             }
 
-            val prefillBen = getHouseholdPrefillBen(spouseFirstName, prefillFatherName, prefillMotherName)
+            val prefillBen = getHouseholdPrefillBen(
+                spouseFirstName,
+                prefillFatherName,
+                prefillMotherName,
+                selectedSpouseMemberName
+            )
             val prefillLocation = prefillBen?.locationRecord ?: locationRecord
             dataset.setUpPage(
                 prefillBen,
@@ -220,16 +237,48 @@ class NewBenRegViewModel @Inject constructor(
                 villageNames,
                 user.villages,
                 user.subCentre,
-                relToHeadId = relToHeadId
+                relToHeadId = effectiveRelToHeadId,
+                spouseRegistrationRelToHeadId = relToHeadId
             )
         }
     }
 
     // ─── Save ────────────────────────────────────────────────────────────
+    private fun getSpouseRegistrationRelationToHeadId(
+        spouseRegistrationRelToHeadId: Int,
+        selectedMember: BenRegCache?
+    ): Int {
+        val selectedRelationPosition = selectedMember?.familyHeadRelationPosition
+            ?: return spouseRegistrationRelToHeadId
+        return when (spouseRegistrationRelToHeadId) {
+            4 -> when (selectedRelationPosition) {
+                19 -> 4
+                2 -> 0
+                3 -> 19
+                9 -> 17
+                else -> 20
+            }
+            5 -> when (selectedRelationPosition) {
+                19 -> 5
+                1 -> 1
+                10 -> 16
+                else -> 20
+            }
+            else -> spouseRegistrationRelToHeadId
+        }
+    }
+
+    private fun BenRegCache.fullName(): String? =
+        listOfNotNull(firstName?.trim(), lastName?.trim())
+            .filter { it.isNotBlank() }
+            .joinToString(" ")
+            .takeIf { it.isNotBlank() }
+
     private fun getHouseholdPrefillBen(
         overrideFirstName: String? = null,
         prefillFatherName: String? = null,
-        prefillMotherName: String? = null
+        prefillMotherName: String? = null,
+        spouseNameOverride: String? = null
     ): BenRegCache? {
         if (hhId <= 0L || household.householdId <= 0L) return null
 
@@ -264,7 +313,10 @@ class NewBenRegViewModel @Inject constructor(
             kidDetails = null,
             genDetails = when (relToHeadId) {
                 // Wife (4) or Husband (5): pre-fill Married + HoF name as spouse
-                4, 5 -> BenRegGen(maritalStatusId = 2, spouseName = family?.familyHeadName)
+                4, 5 -> BenRegGen(
+                    maritalStatusId = 2,
+                    spouseName = spouseNameOverride ?: family?.familyHeadName
+                )
                 else -> BenRegGen()
             },
             syncState = SyncState.UNSYNCED,
