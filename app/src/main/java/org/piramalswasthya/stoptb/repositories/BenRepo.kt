@@ -79,7 +79,15 @@ class BenRepo @Inject constructor(
     }
     suspend fun updateBeneficiarySpouseAdded(householdId: Long,benID: Long,unsynced: SyncState) {
         withContext(Dispatchers.IO) {
-            benDao.updateBeneficiarySpouseAdded(householdId = householdId, benId = benID,unsynced,"U",2)
+            val processState = if (benID < 0L) "N" else "U"
+            val updateStatus = if (benID < 0L) 1 else 2
+            benDao.updateBeneficiarySpouseAdded(
+                householdId = householdId,
+                benId = benID,
+                unsynced,
+                processState,
+                updateStatus
+            )
         }
     }
 

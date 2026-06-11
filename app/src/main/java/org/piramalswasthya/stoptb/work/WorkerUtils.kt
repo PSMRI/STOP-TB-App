@@ -19,6 +19,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceManager
 import org.piramalswasthya.stoptb.work.dynamicWoker.FormSyncWorker
 import org.piramalswasthya.stoptb.work.dynamicWoker.NCDFollowUpSyncWorker
 import org.piramalswasthya.stoptb.work.dynamicWoker.NDCFollowUpPushWorker
+import timber.log.Timber
 import java.util.concurrent.TimeUnit
 
 object WorkerUtils {
@@ -41,9 +42,15 @@ object WorkerUtils {
         // Block all data push until camp mode is active AND hub is connected
         val prefs = PreferenceManager.getInstance(context)
         val campKey = context.getString(R.string.PREF_camp_mode_enabled)
-        if (!prefs.getBoolean(campKey, false)) return
+        if (!prefs.getBoolean(campKey, false)) {
+            Timber.d("Push worker skipped: camp mode is disabled")
+            return
+        }
         val hubConnectedKey = context.getString(R.string.PREF_camp_hub_connected)
-        if (!prefs.getBoolean(hubConnectedKey, false)) return
+        if (!prefs.getBoolean(hubConnectedKey, false)) {
+            Timber.d("Push worker skipped: camp hub is disconnected")
+            return
+        }
 
         val workManager = WorkManager.getInstance(context)
 

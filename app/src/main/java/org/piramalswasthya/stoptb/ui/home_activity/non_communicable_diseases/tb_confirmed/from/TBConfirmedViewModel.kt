@@ -144,6 +144,12 @@ class TBConfirmedViewModel @Inject constructor(
                         }
                     }
                     tbRepo.saveTBConfirmed(tbConfirmedTreatmentCache!!)
+                    tbSuspected?.let {
+                        it.isConfirmed = true
+                        it.isTBConfirmed = true
+                        it.syncState = SyncState.UNSYNCED
+                        tbRepo.saveTBSuspected(it)
+                    }
                     _state.postValue(State.SAVE_SUCCESS)
                 } catch (e: Exception) {
                     Timber.d("saving TB Suspected data failed due to $e")
