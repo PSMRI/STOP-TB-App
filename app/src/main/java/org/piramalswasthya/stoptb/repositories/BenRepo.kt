@@ -79,7 +79,15 @@ class BenRepo @Inject constructor(
     }
     suspend fun updateBeneficiarySpouseAdded(householdId: Long,benID: Long,unsynced: SyncState) {
         withContext(Dispatchers.IO) {
-            benDao.updateBeneficiarySpouseAdded(householdId = householdId, benId = benID,unsynced,"U",2)
+            val processState = if (benID < 0L) "N" else "U"
+            val updateStatus = if (benID < 0L) 1 else 2
+            benDao.updateBeneficiarySpouseAdded(
+                householdId = householdId,
+                benId = benID,
+                unsynced,
+                processState,
+                updateStatus
+            )
         }
     }
 
@@ -234,7 +242,9 @@ class BenRepo @Inject constructor(
                 val file = File(filePath)
 
                 when {
-                    file.absolutePath.startsWith(context.cacheDir.absolutePath) -> {
+                    uri.scheme == "content" -> {
+                        Timber.d("IMAGE_DEBUG Copying content uri to permanent storage")
+
                         val savedPath = ImageUtils.saveBenImageFromCameraToStorage(
                             context = context,
                             uriString = imagePath,
@@ -242,12 +252,6 @@ class BenRepo @Inject constructor(
                         )
 
                         if (savedPath.isNullOrBlank()) {
-                            Timber.e("Image compression/save failed for beneficiaryId=${ben.beneficiaryId}")
-
-                            // Cleanup orphaned cache file
-                            runCatching { file.delete() }
-                                .onFailure { Timber.w(it, "Failed to delete orphaned cache image") }
-
                             throw IllegalStateException("Failed to save beneficiary image")
                         }
 
@@ -259,7 +263,6 @@ class BenRepo @Inject constructor(
                     }
 
                     else -> {
-                        Timber.w("Unknown image path source: $imagePath")
                         imagePath
                     }
                 }
@@ -269,6 +272,7 @@ class BenRepo @Inject constructor(
                 benDao.updateBen(ben)
             } else {
                 benDao.upsert(ben)
+                Timber.d("IMAGE_DEBUG Saved in DB benId=${ben.beneficiaryId} image=${ben.userImage}")
             }
         }
     }
@@ -407,6 +411,8 @@ class BenRepo @Inject constructor(
             Timber.d("YTR 419 $benList")
 
             val benNetworkPostList = mutableSetOf<BenPost>()
+            val householdNetworkPostList = mutableSetOf<HouseholdNetwork>()
+            val kidNetworkPostList = mutableSetOf<BenRegKidNetwork>()
 
             benList.forEach {
                 createBenIdAtServerByBeneficiarySending(it, user, it.locationRecord)
@@ -417,16 +423,26 @@ class BenRepo @Inject constructor(
             updateBenList.forEach {
                 benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.SYNCING)
                 benNetworkPostList.add(it.asNetworkPostModel(context, user))
+                householdNetworkPostList.add(
+                    householdDao.getHousehold(it.householdId)!!.asNetworkModel(user)
+                )
+                try {
+                    if (it.ageUnitId != 3 || it.age < 15) kidNetworkPostList.add(
+                        it.asKidNetworkModel(user)
+                    )
+                } catch (e: Exception) {
+                    Timber.e("caught error in adding kidDetails : $e")
+                }
             }
 
-            val uploadDone = postDataToAmritServer(benNetworkPostList)
+            val uploadDone = postDataToAmritServer(benNetworkPostList, householdNetworkPostList, kidNetworkPostList)
             if (!uploadDone) {
                 benNetworkPostList.takeIf { it.isNotEmpty() }?.map { it.benId }?.let {
                     benDao.benSyncWithServerFailed(*it.toLongArray())
                 }
-                Timber.e("Beneficiary batch push FAILED: ${benNetworkPostList.size} ben records")
+                Timber.e("Beneficiary batch push FAILED: ${benNetworkPostList.size} ben records, ${householdNetworkPostList.size} household records")
             } else {
-                Timber.d("Beneficiary batch push succeeded: ${benNetworkPostList.size} ben records")
+                Timber.d("Beneficiary batch push succeeded: ${benNetworkPostList.size} ben records, ${householdNetworkPostList.size} household records")
             }
             return@withContext true
         }
@@ -434,16 +450,19 @@ class BenRepo @Inject constructor(
 
     private suspend fun postDataToAmritServer(
         benNetworkPostSet: MutableSet<BenPost>,
+        householdNetworkPostSet: MutableSet<HouseholdNetwork>,
+        kidNetworkPostSet: MutableSet<BenRegKidNetwork>,
         retryCount: Int = 3,
     ): Boolean {
-        if (benNetworkPostSet.isEmpty()) return true
+        if (benNetworkPostSet.isEmpty() && householdNetworkPostSet.isEmpty() && kidNetworkPostSet.isEmpty()) return true
         val benIds = benNetworkPostSet.map { it.benId }
-        Timber.d("Amrit push syncDataToAmrit: sending ${benNetworkPostSet.size} ben(s) $benIds")
+        val hhIds = householdNetworkPostSet.map { it.householdId }
+        Timber.d("Amrit push syncDataToAmrit: sending ${benNetworkPostSet.size} ben(s) $benIds, ${householdNetworkPostSet.size} hh(s) $hhIds, ${kidNetworkPostSet.size} kid(s)")
         val rmnchData = SendingRMNCHData(
-            houseHoldRegistrationData = null,
+            houseHoldRegistrationData = householdNetworkPostSet.toList(),
             benficieryRegistrationData = benNetworkPostSet.toList(),
             cbacData = null,
-            birthDetails = null
+            birthDetails = kidNetworkPostSet.toList()
         )
         try {
             val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
@@ -462,13 +481,16 @@ class BenRepo @Inject constructor(
                         val benToUpdateList =
                             benNetworkPostSet.takeIf { it.isNotEmpty() }?.map { it.benId }
                                 ?.toTypedArray()?.toLongArray()
-                        Timber.d("Amrit push syncDataToAmrit marking synced: benIds=${benToUpdateList?.toList()}")
+                        val hhToUpdateList = householdNetworkPostSet.takeIf { it.isNotEmpty() }
+                            ?.map { it.householdId.toLong() }?.toTypedArray()?.toLongArray()
+                        Timber.d("Amrit push syncDataToAmrit marking synced: benIds=${benToUpdateList?.toList()}, hhIds=${hhToUpdateList?.toList()}")
                         benToUpdateList?.let {
                             benDao.benSyncedWithServer(*it)
                             Timber.d("Amrit push syncDataToAmrit DB updated: benIds=${it.toList()}")
                         }
+                        hhToUpdateList?.let { householdDao.householdSyncedWithServer(*it) }
                         return true
-                    } else if (responseStatusCode == 5002 || responseStatusCode ==401)  {
+                    } else if (responseStatusCode == 5002 || responseStatusCode == 401) {
                         val user = preferenceDao.getLoggedInUser()
                             ?: throw IllegalStateException("User not logged in according to db")
                         if (userRepo.refreshTokenTmc(
@@ -487,7 +509,7 @@ class BenRepo @Inject constructor(
         } catch (e: SocketTimeoutException) {
             Timber.e("Amrit push syncDataToAmrit timeout: benIds=$benIds, error=$e")
             if (retryCount > 0) return postDataToAmritServer(
-                benNetworkPostSet, retryCount - 1
+                benNetworkPostSet, householdNetworkPostSet, kidNetworkPostSet, retryCount - 1
             )
             Timber.e("Amrit push syncDataToAmrit: max retries exhausted")
             return false
@@ -1615,8 +1637,13 @@ class BenRepo @Inject constructor(
                     try {
                         val serverBen =
                             BenRegCache(
-                                householdId = if (jsonObject.has("houseoldId"))
-                                    jsonObject.getLong("houseoldId") else -1L,
+                                householdId = run {
+                                    // Server sends key with typo ("houseoldId") or correct ("householdId") — check both
+                                    val fromTypo = if (jsonObject.has("houseoldId")) jsonObject.getLong("houseoldId").takeIf { it > 0L } else null
+                                    val fromCorrect = if (jsonObject.has("householdId")) jsonObject.getLong("householdId").takeIf { it > 0L } else null
+                                    // Prefer server value; fall back to existing local value (helps non-reinstall flow); last resort -1L
+                                    fromTypo ?: fromCorrect ?: existingBen?.householdId?.takeIf { it > 0L } ?: -1L
+                                },
 
                                 beneficiaryId = jsonObject.getLong("benficieryid"),
 
@@ -2017,8 +2044,12 @@ class BenRepo @Inject constructor(
                     val jsonObject = jsonArray.getJSONObject(i)
                     val benId =
                         if (jsonObject.has("benficieryid")) jsonObject.getLong("benficieryid") else -1L
-                    val hhId =
-                        if (jsonObject.has("houseoldId")) jsonObject.getLong("houseoldId") else -1L
+                    val hhId = run {
+                        // Check both typo and correct spelling; treat 0 as invalid
+                        val fromTypo = if (jsonObject.has("houseoldId")) jsonObject.getLong("houseoldId").takeIf { it > 0L } else null
+                        val fromCorrect = if (jsonObject.has("householdId")) jsonObject.getLong("householdId").takeIf { it > 0L } else null
+                        fromTypo ?: fromCorrect ?: -1L
+                    }
                     if (benId == -1L || hhId == -1L) continue
                     val houseDataObj = jsonObject.getJSONObject("householdDetails")
                     val benDataObj = jsonObject.getJSONObject("beneficiaryDetails")
@@ -2034,7 +2065,7 @@ class BenRepo @Inject constructor(
                     try {
                         result.add(
                             HouseholdCache(
-                                householdId = jsonObject.getLong("houseoldId"),
+                                householdId = hhId,  // already resolved from both spellings above
                                 ashaId = jsonObject.getInt("ashaId"),
                                 benId = jsonObject.getLong("benficieryid"),
                                 family = HouseholdFamily(

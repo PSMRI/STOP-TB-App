@@ -134,5 +134,12 @@ class TBSuspectedViewModel @Inject constructor(
         return !cache.visitLabel.isNullOrBlank()
     }
 
+    fun markAsConfirmed() {
+        viewModelScope.launch {
+            tbSuspected.isConfirmed = true
+            tbRepo.saveTBSuspected(tbSuspected)
+        }
+    }
+
 }
 

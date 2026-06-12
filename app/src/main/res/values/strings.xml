@@ -311,6 +311,7 @@
     <string name="home_quick_actions">Quick Actions</string>
     <string name="home_health_id_section">Health IDs</string>
     <string name="home_card_all_ben_subtitle">View and manage all beneficiaries</string>
+    <string name="home_card_household_subtitle">Register and manage households</string>
     <string name="home_card_tb_subtitle">Track screening and support TB cases</string>
     <string name="home_card_ncd_subtitle">Manage non-communicable disease workflows</string>
     <string name="home_card_referral_subtitle">Follow up on referred cases</string>
@@ -332,6 +333,8 @@
     <string name="dashboard_nikshay_subtitle">Linked beneficiary treatment IDs</string>
     <string name="dashboard_abha_subtitle">Beneficiaries with digital health IDs</string>
     <string name="total_tb_screenings">Total TB Screenings</string>
+    <string name="total_past_history_tb">Total beneficiaries with Past History of TB</string>
+    <string name="total_currently_on_anti_tb_drugs">Total beneficiaries Currently on Anti-TB Drugs</string>
     <string name="total_tb_suspected">Total TB Suspected Cases</string>
     <string name="total_tb_confirmed">Total TB Confirmed Cases</string>
     <string name="total_digital_chest_xrays">Total Digital Chest X-Rays conducted</string>
@@ -345,6 +348,10 @@
     <string name="label_children">Children(&lt;15y): %d</string>
     <string name="label_others">Others: %d</string>
     <string name="label_senior_citizen">Age(>=60): %d</string>
+    <string name="dashboard_row_male_pos_neg">Male: Positive %1$d / Negative %2$d</string>
+    <string name="dashboard_row_female_pos_neg">Female: Positive %1$d / Negative %2$d</string>
+    <string name="dashboard_row_children_pos_neg">Children (&lt;15 yrs): Positive %1$d / Negative %2$d</string>
+    <string name="dashboard_row_others_pos_neg">Others: Positive %1$d / Negative %2$d</string>
     <string name="month_january">January</string>
     <string name="month_february">February</string>
     <string name="month_march">March</string>
@@ -449,6 +456,10 @@
         <item>HRP Track</item>
         <item>HR NonPreg. Assess</item>
         <item>HR NonPreg Track</item>
+        <item>Anthropometric</item>
+        <item>General Examination</item>
+        <item>OPD</item>
+        <item>Diagnosis</item>
     </string-array>
 
     <string-array name="place_array">
@@ -885,7 +896,7 @@
     <string name="sync_dashboard_export_logs">Export Logs</string>
     <string name="sync_dashboard_no_log_files">No log files to export</string>
     <string name="form_name">Form Name</string>
-    <string name="no_records_found_hh">No Household records found. Please start registering households by clicking on the button below.</string>
+    <string name="no_records_found_hh">No Household records found.</string>
     <string name="something_went_wrong_nunable_to_connect_to_server_ntry_again_later">Something went wrong !\nUnable to connect to server !\nTry again later!</string>
     <string name="try_again">Try Again!</string>
 
@@ -897,6 +908,7 @@
     <string name="symptomatic_tb_screening">Symptomatic TB Screening</string>
     <string name="check_if_the_person_has_any_of_these_symptoms">Check if the person has any of these Symptoms:</string>
     <string name="tb_asymptomatic_screening">Asymptomatic Screening</string>
+    <string name="tb_is_beneficiary_asymptomatic">Is beneficiary asymptomatic</string>
     <string name="tb_rise_of_fever">Rise of fever in evening</string>
     <string name="tb_loss_of_appetite">Loss of Appetite</string>
     <string name="tb_age_more_than_60">Age more than 60 years</string>
@@ -1192,6 +1204,99 @@
         <item>3 days</item>
         <item>5 days</item>
         <item>7 days</item>
+    </string-array>
+
+    <!-- Examine flow -->
+    <string name="btn_examine">Examine</string>
+    <string name="btn_examine_count">Examine %1$d/5</string>
+    <string name="btn_examine_count_of">Examine %1$d/%2$d</string>
+    <string name="examine_bottomsheet_title">Examination Forms</string>
+    <string name="examine_btn_fill">Fill</string>
+    <string name="examine_btn_view">View</string>
+    <string name="diagnosis_locked_msg">Please fill TB Screening form first</string>
+    <string name="tb_screening_legend_xray_sputum">* Refer for Digital Chest X-Ray or for Sputum Collection</string>
+    <string name="tb_screening_legend_family_members">** Advise for screening of all family members</string>
+
+    <!-- Diagnostics form — referral + denial / not-conducted strings -->
+    <string name="tb_referred_for_digital_chest_xray">Referred for Digital Chest X-Ray?</string>
+    <string name="tb_reason_for_denial_chest_xray">Reason for Denial of Digital Chest X-Ray</string>
+    <string name="tb_reason_for_denial_chest_xray_other">Specify other reason for denial (X-Ray)</string>
+    <string name="tb_reason_not_conducted_xray">Reason Digital Chest X-Ray not conducted</string>
+    <string name="tb_reason_not_conducted_xray_other">Specify other reason (X-Ray not conducted)</string>
+    <string name="tb_referred_for_sputum_collection">Referred for Sputum Collection?</string>
+    <string name="tb_reason_for_denial_sputum">Reason for Denial of Sputum Collection</string>
+    <string name="tb_reason_for_denial_sputum_other">Specify other reason for denial (Sputum)</string>
+    <string name="tb_sputum_submitted_at">Sputum sample submitted at</string>
+    <string name="tb_reason_not_conducted_naat">Reason True NAT not conducted</string>
+    <string name="tb_reason_not_conducted_naat_other">Specify other reason (True NAT not conducted)</string>
+
+    <string-array name="tb_reason_for_denial_xray">
+        <item>Patient refused</item>
+        <item>Long waiting times at the camp</item>
+        <item>Loss of daily wages</item>
+        <item>Lack of trust in government programs or camp organizers</item>
+        <item>Already tested recently</item>
+        <item>Long waiting time</item>
+        <item>Fear/anxiety</item>
+        <item>Clinically unstable</item>
+        <item>Fear and anxiety</item>
+        <item>Misconceptions</item>
+        <item>Social stigma</item>
+        <item>Cultural and gender-related barriers</item>
+        <item>Prior negative experiences with healthcare staff</item>
+        <item>Privacy concerns</item>
+        <item>Others</item>
+    </string-array>
+
+    <string-array name="tb_reason_not_conducted_xray">
+        <item>X-ray Machine unavailable</item>
+        <item>Power issue</item>
+        <item>Connectivity issue</item>
+        <item>Patient absent</item>
+        <item>Patient refused</item>
+        <item>Technical failure</item>
+        <item>Radiographer unavailable</item>
+        <item>Excessive waiting time</item>
+        <item>Other</item>
+    </string-array>
+
+    <string-array name="tb_reason_for_denial_sputum">
+        <item>Patient refused</item>
+        <item>Unable to produce sputum</item>
+        <item>Loss of daily wages</item>
+        <item>Lack of trust in government programs or camp organizers</item>
+        <item>Already tested recently</item>
+        <item>Long waiting time</item>
+        <item>Fear/anxiety</item>
+        <item>Clinically unstable</item>
+        <item>Fear and anxiety</item>
+        <item>Misconceptions</item>
+        <item>Social stigma</item>
+        <item>Cultural and gender-related barriers</item>
+        <item>Prior negative experiences with healthcare staff</item>
+        <item>Privacy concerns</item>
+        <item>Others</item>
+    </string-array>
+
+    <string-array name="tb_reason_not_conducted_naat">
+        <item>Machine unavailable</item>
+        <item>Cartridge unavailable</item>
+        <item>Sample rejected</item>
+        <item>Patient refused</item>
+        <item>Connectivity issue</item>
+        <item>Technical issue</item>
+        <item>Patient absent</item>
+        <item>Excessive waiting time</item>
+        <item>Other</item>
+    </string-array>
+
+    <string-array name="tb_diagnostics_sputum_submitted_at">
+        <item>TB Screening Camp</item>
+        <item>DMC</item>
+        <item>TU</item>
+        <item>DH</item>
+        <item>CHC</item>
+        <item>PHC</item>
     </string-array>
 </resources>
 

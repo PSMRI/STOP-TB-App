@@ -13,10 +13,14 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.Operation
 import androidx.work.WorkContinuation
 import androidx.work.WorkManager
+import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceManager
 import org.piramalswasthya.stoptb.work.dynamicWoker.FormSyncWorker
 import org.piramalswasthya.stoptb.work.dynamicWoker.NCDFollowUpSyncWorker
 import org.piramalswasthya.stoptb.work.dynamicWoker.NDCFollowUpPushWorker
+import timber.log.Timber
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 object WorkerUtils {
@@ -35,76 +39,84 @@ object WorkerUtils {
             .setConstraints(networkOnlyConstraint)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
 
-    fun triggerAmritPushWorker(context: Context) {
+    fun triggerAmritPushWorker(context: Context): Set<UUID> {
+        // Block all data push until camp mode is active AND hub is connected
+        val prefs = PreferenceManager.getInstance(context)
+        val campKey = context.getString(R.string.PREF_camp_mode_enabled)
+        if (!prefs.getBoolean(campKey, false)) {
+            Timber.d("Push worker skipped: camp mode is disabled")
+            return emptySet()
+        }
+        val hubConnectedKey = context.getString(R.string.PREF_camp_hub_connected)
+        if (!prefs.getBoolean(hubConnectedKey, false)) {
+            Timber.d("Push worker skipped: camp hub is disconnected")
+            return emptySet()
+        }
+
         val workManager = WorkManager.getInstance(context)
 
+        // StopTB push chain:
+        // Registration → NCD Referrals + TB data + ABHA
         val registration = syncRequestBuilder<PushToAmritWorker>()
             .addTag("push_group1_registration").build()
 
         val afterRegistration = workManager.beginUniqueWork(
             pushWorkerUniqueName, ExistingWorkPolicy.APPEND_OR_REPLACE, registration)
 
-        val group2Screening = listOf(
-            syncRequestBuilder<CbacPushToAmritWorker>().addTag("push_group2_screening").build(),
-            syncRequestBuilder<NCDReferPushtoAmritWorker>().addTag("push_group2_screening").build(),
-            syncRequestBuilder<NDCFollowUpPushWorker>().addTag("push_group2_screening").build(),
+        val groupTB = listOf(
+            syncRequestBuilder<PushTBToAmritWorker>().addTag("push_group5_tb").build(),
         )
 
-        val group5CommDisease = listOf(
-            syncRequestBuilder<PushTBToAmritWorker>().addTag("push_group5_comm_disease").build(),
-            syncRequestBuilder<PushMalariaAmritWorker>().addTag("push_group5_comm_disease").build(),
-            syncRequestBuilder<pushAesAmritWorker>().addTag("push_group5_comm_disease").build(),
-            syncRequestBuilder<pushKalaAzarAmritWorker>().addTag("push_group5_comm_disease").build(),
-            syncRequestBuilder<pushLeprosyAmritWorker>().addTag("push_group5_comm_disease").build(),
-            syncRequestBuilder<PushLeprosyFollowUpAmritWorker>().addTag("push_group5_comm_disease").build(),
-            syncRequestBuilder<PushFilariaAmritWorker>().addTag("push_group5_comm_disease").build(),
-        )
-
-        val group9Abha = syncRequestBuilder<PushMapAbhatoBenficiaryWorker>()
+        val groupAbha = syncRequestBuilder<PushMapAbhatoBenficiaryWorker>()
             .addTag("push_group9_digital_health").build()
 
-        val chainB = afterRegistration.then(group2Screening)
-        val chainC = afterRegistration.then(group5CommDisease)
-        val chainE = afterRegistration.then(group9Abha)
+        val chainTB = afterRegistration.then(groupTB)
+        val chainAbha = afterRegistration.then(listOf(groupAbha))
 
-        WorkContinuation.combine(listOf(chainB, chainC, chainE)).enqueue()
+        WorkContinuation.combine(listOf(chainTB, chainAbha)).enqueue()
+
+        return setOf(registration.id, groupTB.first().id, groupAbha.id)
     }
 
-    fun triggerAmritPullWorker(context: Context) {
+    fun triggerAmritPullWorker(context: Context): Set<UUID> {
         val workManager = WorkManager.getInstance(context)
 
+        // StopTB pull chain:
+        // Beneficiaries → Referrals + TB data → Mark complete
         val pullWorkRequest = syncRequestBuilder<PullFromAmritWorker>()
             .addTag("pull_phase1_foundation").build()
 
         val afterFoundation = workManager.beginUniqueWork(
             pullWorkerUniqueName, ExistingWorkPolicy.KEEP, pullWorkRequest)
 
-        val group1Forms = listOf(
-            syncRequestBuilder<FormSyncWorker>().addTag("pull_group1_forms").build(),
-            syncRequestBuilder<NCDFollowUpSyncWorker>().addTag("pull_group1_forms").build(),
-        )
-
-        val group2Screening = listOf(
-            syncRequestBuilder<CbacPullFromAmritWorker>().addTag("pull_group2_screening").build(),
-            syncRequestBuilder<ReferPullFromAmritWorker>().addTag("pull_group2_screening").build(),
-        )
-
-        val group5CommDisease = listOf(
-            syncRequestBuilder<PullTBFromAmritWorker>().addTag("pull_group5_comm_disease").build(),
-            syncRequestBuilder<PullMalariaFromAmritWorker>().addTag("pull_group5_comm_disease").build(),
-            syncRequestBuilder<pullAesFormAmritWorker>().addTag("pull_group5_comm_disease").build(),
-            syncRequestBuilder<PullFilariaFromAmritWorker>().addTag("pull_group5_comm_disease").build(),
+        val groupTB = listOf(
+            syncRequestBuilder<PullTBFromAmritWorker>().addTag("pull_group5_tb").build(),
         )
 
         val setSyncCompleteWorker = OneTimeWorkRequestBuilder<UpdatePrefForPullCompleteWorker>().build()
 
-        val chainA = afterFoundation.then(group1Forms)
-        val chainB = afterFoundation.then(group2Screening)
-        val chainE = afterFoundation.then(group5CommDisease)
+        val chainTB = afterFoundation.then(groupTB)
 
-        WorkContinuation.combine(listOf(chainA, chainB, chainE))
-            .then(setSyncCompleteWorker)
-            .enqueue()
+        chainTB.then(setSyncCompleteWorker).enqueue()
+
+        return setOf(pullWorkRequest.id, groupTB.first().id, setSyncCompleteWorker.id)
+    }
+
+    /** Convenience alias — camp check is already inside [triggerAmritPushWorker]. */
+    fun triggerCampAwarePushWorker(context: Context, preferenceDao: PreferenceDao) {
+        triggerAmritPushWorker(context)
+    }
+
+    /**
+     * ABHA push — does NOT require camp mode, only needs internet.
+     * Use this from ABHA creation flow.
+     */
+    fun triggerAbhaPushWorker(context: Context) {
+        val workRequest = syncRequestBuilder<PushMapAbhatoBenficiaryWorker>()
+            .addTag("push_group9_digital_health").build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "PUSH-ABHA-TO-AMRIT", ExistingWorkPolicy.APPEND_OR_REPLACE, workRequest
+        )
     }
 
     fun triggerCampQuickPullIfConnected(

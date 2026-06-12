@@ -18,7 +18,6 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
-import org.piramalswasthya.stoptb.repositories.VitalRepo
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -28,8 +27,7 @@ class TBScreeningFormViewModel @Inject constructor(
     private val preferenceDao: PreferenceDao,
     @ApplicationContext context: Context,
     private val tbRepo: TBRepo,
-    private val benRepo: BenRepo,
-    private val vitalRepo: VitalRepo
+    private val benRepo: BenRepo
 ) : ViewModel() {
     val benId =
         TBScreeningFormFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
@@ -98,8 +96,7 @@ class TBScreeningFormViewModel @Inject constructor(
 
             dataset.setUpPage(
                 ben,
-                if (recordExists.value == true) tbScreeningCache else null,
-                vitalRepo.getVitals(benId)?.keyPopulationRiskFactors?.contains("PREGNANCY") == true
+                if (recordExists.value == true) tbScreeningCache else null
             )
         }
     }
@@ -168,8 +165,7 @@ class TBScreeningFormViewModel @Inject constructor(
         _state.value = State.IDLE
     }
 
-    fun getIndexOfDate(): Int {
-        return dataset.getIndexOfDate()
-    }
+    fun getIndexOfDate(): Int        = dataset.getIndexOfDate()
+    fun getIndexOfAsymptomatic(): Int = dataset.getIndexOfAsymptomatic()
 }
 

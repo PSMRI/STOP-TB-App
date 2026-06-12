@@ -92,11 +92,15 @@ object ImageUtils {
                     it.write(inputByteArray)
                     it.flush()
                 }
-                val compressedFile = Compressor.compress(context, targetFile) {
-                    quality(80)
+                try {
+                    val compressedFile = Compressor.compress(context, targetFile) {
+                        quality(80)
+                    }
+                    compressedFile.renameTo(targetFile)
+                    Timber.d("Compressed target file :->$targetFile ${targetFile.length()}")
+                } catch (e: java.lang.Exception) {
+                    Timber.d("Compress failed, using original image $e ${e.localizedMessage} ${e.stackTrace}")
                 }
-                compressedFile.renameTo(targetFile)
-                Timber.d("Compressed target file :->$targetFile ${targetFile.length()}")
                 Uri.fromFile(targetFile).toString()
 
             } catch (e: java.lang.Exception) {

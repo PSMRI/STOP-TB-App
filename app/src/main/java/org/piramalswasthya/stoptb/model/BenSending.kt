@@ -122,7 +122,7 @@ data class BeneficiaryDataSending(
     val maritalStatusID: String? = null,
 
     @Json(name = "vanID")
-    val vanID: Int = 4,
+    val vanID: Int = 0,
 
 
     @Json(name = "accountNo")
@@ -394,12 +394,14 @@ fun BenRegCache.asNetworkSendingModel(
         accountNo = bankAccount,
         ageAtMarriage = genDetails?.ageAtMarriage?.takeIf { it > 0 },
         marriageDate = genDetails?.marriageDate?.takeIf { it > 0 }?.let { getDateTimeStringFromLong(it) },
-        genderID = genderId,
+        // Server gender table only supports 1=Male, 2=Female, 3=Transgender.
+        // Map PREFER_NOT_TO_SAY (local genderId=4) to 3 (Transgender) for server compatibility.
+        genderID = if (genderId == 4) 3 else genderId,
         genderName = when (gender) {
             MALE -> "Male"
             FEMALE -> "Female"
             TRANSGENDER -> "Transgender"
-            PREFER_NOT_TO_SAY -> "Prefer not to say"
+            PREFER_NOT_TO_SAY -> "Transgender"  // mapped to server-accepted value
             null -> "NA"
         },
         maritalStatusID = if (isKid) null else genDetails?.maritalStatusId?.takeIf { it > 0 }?.toString(),

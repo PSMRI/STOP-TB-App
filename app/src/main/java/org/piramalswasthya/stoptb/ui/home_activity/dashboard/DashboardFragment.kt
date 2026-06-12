@@ -26,6 +26,11 @@ class DashboardFragment : Fragment() {
 
     private val viewModel: DashboardViewModel by viewModels()
 
+    // Kept as fields so onResume can re-apply them after Android state restoration
+    // resets AutoCompleteTextView filtering (causing dropdown to show only 1 item).
+    private var timePeriodAdapter: ArrayAdapter<String>? = null
+    private var villageAdapter: ArrayAdapter<String>? = null
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
@@ -39,6 +44,20 @@ class DashboardFragment : Fragment() {
 
         setupFilters()
         observeData()
+    }
+
+    /**
+     * Re-apply adapters every time the fragment becomes visible.
+     *
+     * Android's view-state restoration calls AutoCompleteTextView.setText() with
+     * filter=true, which hides all dropdown options except the one matching the
+     * saved text ("Today" / "All Villages"). Re-setting the adapter in onResume
+     * (which runs AFTER onViewStateRestored) clears the stale filter state.
+     */
+    override fun onResume() {
+        super.onResume()
+       // timePeriodAdapter?.let { binding.actvTimePeriod.setAdapter(it) }
+      //  villageAdapter?.let { binding.actvVillage.setAdapter(it) }
     }
 
     private fun setupFilters() {
@@ -58,13 +77,25 @@ class DashboardFragment : Fragment() {
             getString(R.string.month_november),
             getString(R.string.month_december),
         )
-        val timePeriodAdapter = ArrayAdapter(
+        timePeriodAdapter = ArrayAdapter(
             requireContext(),
             android.R.layout.simple_dropdown_item_1line,
             timePeriodLabels
         )
         binding.actvTimePeriod.setAdapter(timePeriodAdapter)
-        binding.actvTimePeriod.setText(timePeriodLabels[0], false)
+        // Restore previously selected time period (ViewModel persists across view recreation)
+        val savedPeriod = viewModel.selectedTimePeriod.value ?: viewModel.timePeriodOptions[0]
+        val savedPeriodIndex = viewModel.timePeriodOptions.indexOf(savedPeriod).coerceAtLeast(0)
+        binding.actvTimePeriod.setText(timePeriodLabels[savedPeriodIndex], false)
+        // Show ALL items when dropdown opens (prevent AutoCompleteTextView from filtering by selected text)
+        binding.actvTimePeriod.apply {
+            threshold = 0
+
+            setOnClickListener {
+                setText("", false)
+                showDropDown()
+            }
+        }
         binding.actvTimePeriod.setOnItemClickListener { _, _, position, _ ->
             viewModel.setTimePeriod(viewModel.timePeriodOptions[position])
             binding.actvTimePeriod.setText(timePeriodLabels[position], false)
@@ -75,13 +106,30 @@ class DashboardFragment : Fragment() {
         val villageNames = mutableListOf(getString(R.string.filter_all_villages))
         villageNames.addAll(villages.map { it.name })
 
-        val villageAdapter = ArrayAdapter(
+        villageAdapter = ArrayAdapter(
             requireContext(),
             android.R.layout.simple_dropdown_item_1line,
             villageNames
         )
         binding.actvVillage.setAdapter(villageAdapter)
-        binding.actvVillage.setText(villageNames[0], false)
+        // Restore previously selected village (ViewModel persists across view recreation)
+        binding.actvVillage.setText(viewModel.selectedVillageName.value ?: villageNames[0], false)
+        // Show ALL items when dropdown opens
+        binding.actvVillage.apply {
+            threshold = 0
+
+            setOnClickListener {
+                setText("", false)
+                showDropDown()
+            }
+
+            setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) {
+                    setText("", false)
+                    showDropDown()
+                }
+            }
+        }
         binding.actvVillage.setOnItemClickListener { _, _, position, _ ->
             if (position == 0) {
                 viewModel.clearVillageFilter()
@@ -103,6 +151,54 @@ class DashboardFragment : Fragment() {
             binding.tvTbScreeningChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
             binding.tvTbScreeningOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
 
+        }
+
+        viewModel.pastHistoryTb.observe(viewLifecycleOwner) { data ->
+            binding.tvPastHistoryTbTotal.text = data.total.total.toString()
+            binding.tvPastHistoryTbMale.text = getString(
+                R.string.dashboard_row_male_pos_neg,
+                data.male.positive,
+                data.male.negative
+            )
+            binding.tvPastHistoryTbFemale.text = getString(
+                R.string.dashboard_row_female_pos_neg,
+                data.female.positive,
+                data.female.negative
+            )
+            binding.tvPastHistoryTbChildren.text = getString(
+                R.string.dashboard_row_children_pos_neg,
+                data.children.positive,
+                data.children.negative
+            )
+            binding.tvPastHistoryTbOthers.text = getString(
+                R.string.dashboard_row_others_pos_neg,
+                data.others.positive,
+                data.others.negative
+            )
+        }
+
+        viewModel.antiTbDrugs.observe(viewLifecycleOwner) { data ->
+            binding.tvAntiTbDrugsTotal.text = data.total.total.toString()
+            binding.tvAntiTbDrugsMale.text = getString(
+                R.string.dashboard_row_male_pos_neg,
+                data.male.positive,
+                data.male.negative
+            )
+            binding.tvAntiTbDrugsFemale.text = getString(
+                R.string.dashboard_row_female_pos_neg,
+                data.female.positive,
+                data.female.negative
+            )
+            binding.tvAntiTbDrugsChildren.text = getString(
+                R.string.dashboard_row_children_pos_neg,
+                data.children.positive,
+                data.children.negative
+            )
+            binding.tvAntiTbDrugsOthers.text = getString(
+                R.string.dashboard_row_others_pos_neg,
+                data.others.positive,
+                data.others.negative
+            )
         }
 
         // TB Suspected card

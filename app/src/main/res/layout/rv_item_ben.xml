@@ -553,78 +553,6 @@
                                 android:textColor="?attr/colorOnPrimary"
                                 tools:text="" />
                         </LinearLayout>
-
-                        <LinearLayout
-                            android:id="@+id/blank_space"
-                            showLayout="@{showAbha? !hasAbha : showAbha}"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
-                            android:padding="@dimen/padding_small"/>
-
-                        <LinearLayout
-                            showLayout="@{showAbha? !hasAbha : showAbha}"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="0"
-                            android:gravity="end"
-                            android:orientation="vertical">
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btn_abha"
-                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="@dimen/margin_small"
-                                android:backgroundTint="@android:color/holo_green_dark"
-                                android:minWidth="120dp"
-                                android:onClick="@{()-> clickListener.onClickABHA(ben)}"
-                                android:singleLine="true"
-                                android:text="@string/abha"
-                                android:visibility="@{ben.isDeath == true ? View.GONE : View.VISIBLE}"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                android:textColor="?attr/colorOnPrimary"
-                                app:cornerRadius="@dimen/padding_normal"
-                                app:strokeColor="?attr/colorPrimary" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            showLayout="@{showAbha? hasAbha: showAbha}"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="2"
-                            android:orientation="vertical"
-                            android:padding="@dimen/padding_small">
-
-                            <LinearLayout
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:orientation="horizontal">
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="@string/abha_number"
-                                    android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                                    android:textColor="?attr/colorOnPrimary" />
-
-                                <ImageView
-                                    android:id="@+id/tvIsNewAbha"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="@dimen/_5sdp"
-                                    android:src='@{ben.isNewAbha ? @drawable/ic_new_abha : @drawable/ic_existing_abha}' />
-
-                            </LinearLayout>
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@{ben.abhaId}"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                android:textColor="?attr/colorOnPrimary"
-                                tools:text="0123456789"/>
-                        </LinearLayout>
                         <TextView
                             android:id="@+id/tvTitleDuplicaterecord"
                             android:layout_width="wrap_content"
@@ -677,6 +605,108 @@
                             app:strokeWidth="1dp" />
                     </LinearLayout>
                 </LinearLayout>
+            <!-- Examine + ABHA row — side by side, visible when ben is not dead/deactivated -->
+            <LinearLayout
+                android:id="@+id/ll_examine_action"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginHorizontal="@dimen/padding_normal"
+                android:layout_marginTop="@dimen/margin_small"
+                android:layout_marginBottom="@dimen/margin_small"
+                android:visibility="@{(ben.isDeath == true || ben.isDeactivate == true) ? View.GONE : View.VISIBLE}"
+                app:layout_constraintTop_toBottomOf="@id/ll_general_opd_row">
+
+                <!-- Examine button — left half -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_examine"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:backgroundTint="?attr/colorPrimary"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:singleLine="true"
+                    android:onClick="@{()-> clickListener.onClickExamine(ben)}"
+                    android:paddingHorizontal="@dimen/padding_normal"
+                    android:text="@string/btn_examine"
+                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                    android:textColor="@android:color/white"
+                    android:textSize="14sp"
+                    app:cornerRadius="@dimen/padding_normal"
+                    app:strokeColor="?attr/colorPrimary"
+                    app:strokeWidth="1dp" />
+
+                <!-- ABHA button (no ABHA linked) — right half -->
+                <LinearLayout
+                    showLayout="@{showAbha? !hasAbha : showAbha}"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:gravity="end"
+                    android:orientation="vertical">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_abha"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:backgroundTint="@android:color/holo_green_dark"
+                        android:onClick="@{()-> clickListener.onClickABHA(ben)}"
+                        android:singleLine="true"
+                        android:text="@string/abha"
+                        android:visibility="@{ben.isDeath == true ? View.GONE : View.VISIBLE}"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorOnPrimary"
+                        app:cornerRadius="@dimen/padding_normal"
+                        app:strokeColor="?attr/colorPrimary" />
+                </LinearLayout>
+
+                <!-- ABHA number display (ABHA already linked) — right half -->
+                <LinearLayout
+                    showLayout="@{showAbha? hasAbha: showAbha}"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:orientation="vertical"
+                    android:padding="@dimen/padding_small">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/abha_number"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                            android:textColor="?attr/colorOnPrimary" />
+
+                        <ImageView
+                            android:id="@+id/tvIsNewAbha"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/_5sdp"
+                            android:src='@{ben.isNewAbha ? @drawable/ic_new_abha : @drawable/ic_existing_abha}' />
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@{ben.abhaId}"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorOnPrimary"
+                        tools:text="0123456789" />
+                </LinearLayout>
+
+            </LinearLayout>
+
             <LinearLayout
                 android:id="@+id/ll_ben_details_4"
                 android:layout_width="match_parent"
@@ -686,7 +716,7 @@
                 android:layout_marginHorizontal="@dimen/padding_normal"
                 android:layout_marginBottom="0dp"
                 android:visibility="gone"
-                app:layout_constraintTop_toBottomOf="@id/ll_general_opd_row">
+                app:layout_constraintTop_toBottomOf="@id/ll_examine_action">
 
                         <Button
                             style="@style/Widget.Material3.Button.TonalButton"
@@ -707,7 +737,8 @@
                 android:visibility="gone"
                 android:orientation="horizontal"
                 android:layout_marginHorizontal="@dimen/padding_normal"
-                app:layout_constraintTop_toBottomOf="@id/ll_ben_details_4">
+                app:layout_constraintTop_toBottomOf="@id/ll_ben_details_4"
+                app:layout_constraintBottom_toBottomOf="parent">
                 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btn_add_children"

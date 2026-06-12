@@ -9,6 +9,7 @@ import org.piramalswasthya.stoptb.model.FormElement
 import org.piramalswasthya.stoptb.model.InputType
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
+import org.piramalswasthya.stoptb.model.VitalCache
 
 class TBSuspectedQuickDataset(
     context: Context,
@@ -21,12 +22,52 @@ class TBSuspectedQuickDataset(
 
     private var benCache: BenRegCache? = null
     private var screeningCache: TBScreeningCache? = null
+    private var vitalCache: VitalCache? = null
     private var referralMode = false
 
     private var lockDigitalChestXray = false
     private var lockTrueNat = false
     private var lockLiquidCulture = false
     private val nikshayIdUnavailable = "N/A"
+
+    // ── Always visible ────────────────────────────────────────────────────────
+
+    private val nikshayId = FormElement(
+        id = 8,
+        inputType = InputType.TEXT_VIEW,
+        title = resources.getString(R.string.nikshay_id),
+        required = false
+    )
+
+    // ── Digital Chest X-Ray block ─────────────────────────────────────────────
+
+    private val referredForDigitalChestXray = FormElement(
+        id = 9,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.tb_referred_for_digital_chest_xray),
+        entries = yesNoEntries,
+        required = true,
+        hasDependants = true
+    )
+
+    private val reasonForDenialChestXray = FormElement(
+        id = 10,
+        inputType = InputType.CHECKBOXES,
+        title = resources.getString(R.string.tb_reason_for_denial_chest_xray),
+        arrayId = R.array.tb_reason_for_denial_xray,
+        entries = resources.getStringArray(R.array.tb_reason_for_denial_xray),
+        required = false,
+        hasDependants = true,
+        showAsMultiSelectDialog = true
+    )
+
+    private val reasonForDenialChestXrayOther = FormElement(
+        id = 11,
+        inputType = InputType.EDIT_TEXT,
+        title = resources.getString(R.string.tb_reason_for_denial_chest_xray_other),
+        required = false,
+        etMaxLength = 250
+    )
 
     private val digitalChestXrayConducted = FormElement(
         id = 1,
@@ -37,31 +78,22 @@ class TBSuspectedQuickDataset(
         hasDependants = true
     )
 
-    private val sputumCollected = FormElement(
-        id = 2,
-        inputType = InputType.RADIO,
-        title = resources.getString(R.string.tb_sputum_sample_collected),
-        entries = yesNoEntries,
-        required = true,
+    private val reasonNotConductedChestXray = FormElement(
+        id = 12,
+        inputType = InputType.DROPDOWN,
+        title = resources.getString(R.string.tb_reason_not_conducted_xray),
+        arrayId = R.array.tb_reason_not_conducted_xray,
+        entries = resources.getStringArray(R.array.tb_reason_not_conducted_xray),
+        required = false,
         hasDependants = true
     )
 
-    private val trueNatConducted = FormElement(
-        id = 3,
-        inputType = InputType.RADIO,
-        title = resources.getString(R.string.tb_naat_conducted),
-        entries = yesNoEntries,
-        required = true,
-        hasDependants = true
-    )
-
-    private val liquidCultureConducted = FormElement(
-        id = 4,
-        inputType = InputType.RADIO,
-        title = resources.getString(R.string.recommended_for_liquid_culture_test),
-        entries = yesNoEntries,
-        required = true,
-        hasDependants = true
+    private val reasonNotConductedChestXrayOther = FormElement(
+        id = 13,
+        inputType = InputType.EDIT_TEXT,
+        title = resources.getString(R.string.tb_reason_not_conducted_xray_other),
+        required = false,
+        etMaxLength = 250
     )
 
     private val digitalChestXrayResult = FormElement(
@@ -74,6 +106,75 @@ class TBSuspectedQuickDataset(
         hasDependants = true
     )
 
+    // ── Sputum Collection block ────────────────────────────────────────────────
+
+    private val referredForSputumCollection = FormElement(
+        id = 2,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.tb_referred_for_sputum_collection),
+        entries = yesNoEntries,
+        required = true,
+        hasDependants = true
+    )
+
+    private val reasonForDenialSputum = FormElement(
+        id = 14,
+        inputType = InputType.CHECKBOXES,
+        title = resources.getString(R.string.tb_reason_for_denial_sputum),
+        arrayId = R.array.tb_reason_for_denial_sputum,
+        entries = resources.getStringArray(R.array.tb_reason_for_denial_sputum),
+        required = false,
+        hasDependants = true,
+        showAsMultiSelectDialog = true
+    )
+
+    private val reasonForDenialSputumOther = FormElement(
+        id = 15,
+        inputType = InputType.EDIT_TEXT,
+        title = resources.getString(R.string.tb_reason_for_denial_sputum_other),
+        required = false,
+        etMaxLength = 250
+    )
+
+    private val sputumSampleSubmittedAt = FormElement(
+        id = 16,
+        inputType = InputType.DROPDOWN,
+        title = resources.getString(R.string.tb_sputum_submitted_at),
+        arrayId = R.array.tb_diagnostics_sputum_submitted_at,
+        entries = resources.getStringArray(R.array.tb_diagnostics_sputum_submitted_at),
+        required = false,
+        hasDependants = true
+    )
+
+    // ── NAAT / TrueNAT block ──────────────────────────────────────────────────
+
+    private val trueNatConducted = FormElement(
+        id = 3,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.tb_naat_conducted),
+        entries = yesNoEntries,
+        required = true,
+        hasDependants = true
+    )
+
+    private val reasonNotConductedNaat = FormElement(
+        id = 17,
+        inputType = InputType.DROPDOWN,
+        title = resources.getString(R.string.tb_reason_not_conducted_naat),
+        arrayId = R.array.tb_reason_not_conducted_naat,
+        entries = resources.getStringArray(R.array.tb_reason_not_conducted_naat),
+        required = false,
+        hasDependants = true
+    )
+
+    private val reasonNotConductedNaatOther = FormElement(
+        id = 18,
+        inputType = InputType.EDIT_TEXT,
+        title = resources.getString(R.string.tb_reason_not_conducted_naat_other),
+        required = false,
+        etMaxLength = 250
+    )
+
     private val trueNatResult = FormElement(
         id = 6,
         inputType = InputType.RADIO,
@@ -81,6 +182,17 @@ class TBSuspectedQuickDataset(
         arrayId = R.array.tb_test_result,
         entries = resources.getStringArray(R.array.tb_test_result),
         required = false
+    )
+
+    // ── Liquid Culture block ───────────────────────────────────────────────────
+
+    private val liquidCultureConducted = FormElement(
+        id = 4,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.recommended_for_liquid_culture_test),
+        entries = yesNoEntries,
+        required = true,
+        hasDependants = true
     )
 
     private val liquidCultureResult = FormElement(
@@ -92,96 +204,187 @@ class TBSuspectedQuickDataset(
         required = false
     )
 
-    private val nikshayId = FormElement(
-        id = 8,
-        inputType = InputType.TEXT_VIEW,
-        title = resources.getString(R.string.nikshay_id),
-        required = false
-    )
+    // ── Setup ─────────────────────────────────────────────────────────────────
 
     suspend fun setUpPage(
         ben: BenRegCache?,
         screening: TBScreeningCache?,
         saved: TBDiagnosticsCache?,
+        vital: VitalCache? = null,
         referralMode: Boolean = false
     ) {
         benCache = ben
         screeningCache = screening
+        vitalCache = vital
         this.referralMode = referralMode
 
-        digitalChestXrayConducted.value =
-            conductedValueFromScreening(
-                savedValue = saved?.isChestXRayDone,
-                shouldShow = shouldShowDigitalChestXray(),
-                screeningRecommended = screeningCache?.referredForDigitalChestXray
-            )
-        digitalChestXrayResult.value =
-            getLocalValueInArray(R.array.tb_test_result, saved?.chestXRayResult)
-        sputumCollected.value =
-            conductedValueFromScreening(
-                savedValue = saved?.isSputumCollected,
-                shouldShow = shouldShowSputumCollected(),
-                screeningRecommended = screeningCache?.referredForSputumCollection
-            )
-        trueNatConducted.value =
-            conductedValueFromScreening(
-                savedValue = saved?.isNaatConducted,
-                shouldShow = shouldShowTrueNatConducted(),
-                screeningRecommended = screeningCache?.recommendedForTruenatTest
-            )
-        trueNatResult.value =
-            getLocalValueInArray(R.array.tb_test_result, saved?.naatResult)
+        // NikshayId
         nikshayId.value = ben?.nikshayId?.takeIf { it.isNotBlank() }
             ?: saved?.nikshayId?.takeIf { it.isNotBlank() }
             ?: nikshayIdUnavailable
-        liquidCultureConducted.value =
-            conductedValueFromScreening(
-                savedValue = saved?.recommendedForLiquidCultureTest
-                    ?: saved?.isLiquidCultureConducted,
-                shouldShow = shouldShowLiquidCultureConducted(),
-                screeningRecommended = screeningCache?.recommendedForLiquidCultureTest
-            )
-        liquidCultureResult.value =
-            getLocalValueInArray(R.array.tb_test_result, saved?.liquidCultureResult)
+
+        // ── Digital Chest X-Ray ────────────────────────────────────────────
+        referredForDigitalChestXray.value = boolToYesNo(saved?.isReferredForDigitalChestXray)
+        reasonForDenialChestXray.value = englishPipeToIndexPipe(
+            saved?.reasonForDenialChestXray, R.array.tb_reason_for_denial_xray
+        )
+        reasonForDenialChestXrayOther.value = saved?.reasonForDenialChestXrayOther
+        digitalChestXrayConducted.value = boolToYesNo(saved?.isChestXRayDone)
+        reasonNotConductedChestXray.value = getLocalValueInArray(
+            R.array.tb_reason_not_conducted_xray, saved?.reasonNotConductedChestXray
+        )
+        reasonNotConductedChestXrayOther.value = saved?.reasonNotConductedChestXrayOther
+        digitalChestXrayResult.value = getLocalValueInArray(
+            R.array.tb_test_result, saved?.chestXRayResult
+        )
+
+        // ── Sputum Collection ──────────────────────────────────────────────
+        referredForSputumCollection.value = boolToYesNo(saved?.isSputumCollected)
+        reasonForDenialSputum.value = englishPipeToIndexPipe(
+            saved?.reasonForDenialSputum, R.array.tb_reason_for_denial_sputum
+        )
+        reasonForDenialSputumOther.value = saved?.reasonForDenialSputumOther
+        sputumSampleSubmittedAt.value = getLocalValueInArray(
+            R.array.tb_diagnostics_sputum_submitted_at, saved?.sputumSubmittedAt
+        )
+
+        // ── TrueNAT ───────────────────────────────────────────────────────
+        trueNatConducted.value = boolToYesNo(saved?.isNaatConducted)
+        reasonNotConductedNaat.value = getLocalValueInArray(
+            R.array.tb_reason_not_conducted_naat, saved?.reasonNotConductedNaat
+        )
+        reasonNotConductedNaatOther.value = saved?.reasonNotConductedNaatOther
+        trueNatResult.value = getLocalValueInArray(R.array.tb_test_result, saved?.naatResult)
+
+        // ── Liquid Culture ────────────────────────────────────────────────
+        liquidCultureConducted.value = conductedFromSaved(
+            savedValue = saved?.recommendedForLiquidCultureTest ?: saved?.isLiquidCultureConducted,
+            shouldShow = shouldShowLiquidCultureConducted()
+        )
+        liquidCultureResult.value = getLocalValueInArray(
+            R.array.tb_test_result, saved?.liquidCultureResult
+        )
+
+        // ── Apply defaults for new/blank forms ────────────────────────────
+        // Referral for X-Ray defaults to Yes (not applicable for pregnant women)
+        if (!isPregnant() && referredForDigitalChestXray.value.isNullOrBlank()) {
+            referredForDigitalChestXray.value = yesValue
+        }
+        // Denial reason defaults to index 0 (Patient refused) when shown
+        if (!isPregnant() && isNo(referredForDigitalChestXray) && reasonForDenialChestXray.value.isNullOrBlank()) {
+            reasonForDenialChestXray.value = "0"
+        }
+        // Sputum referral defaults to Yes when the section should be shown
+        if (shouldShowSputumCollected() && referredForSputumCollection.value.isNullOrBlank()) {
+            referredForSputumCollection.value = yesValue
+        }
+        // Sputum submitted-at defaults to TB Screening Camp when referred = Yes and blank
+        if (shouldShowSputumCollected() && isYes(referredForSputumCollection) &&
+            sputumSampleSubmittedAt.value.isNullOrBlank()
+        ) {
+            sputumSampleSubmittedAt.value = sputumSampleSubmittedAt.entries?.firstOrNull()
+        }
+        // Sputum denial reason defaults to index 0 (Patient refused) when shown
+        if (shouldShowSputumCollected() && isNo(referredForSputumCollection) &&
+            reasonForDenialSputum.value.isNullOrBlank()
+        ) {
+            reasonForDenialSputum.value = "0"
+        }
 
         configureReferralLocks(saved)
         syncFieldStates()
         setUpPage(buildFormList())
     }
 
+    // ── Value change handler ──────────────────────────────────────────────────
+
     override suspend fun handleListOnValueChanged(formId: Int, index: Int): Int {
         return when (formId) {
+
+            referredForDigitalChestXray.id -> {
+                referredForDigitalChestXray.value = if (index == 0) yesValue else noValue
+                syncFieldStates()
+                if (index == 0) {
+                    // Yes: remove denial, add conducted
+                    triggerDependants(
+                        source = referredForDigitalChestXray,
+                        removeItems = listOf(
+                            reasonForDenialChestXray,
+                            reasonForDenialChestXrayOther
+                        ),
+                        addItems = if (shouldShowDigitalChestXray()) listOf(digitalChestXrayConducted) else emptyList()
+                    )
+                } else {
+                    // No: remove conducted + children, add denial (default to Patient refused)
+                    if (reasonForDenialChestXray.value.isNullOrBlank()) {
+                        reasonForDenialChestXray.value = "0"
+                    }
+                    triggerDependants(
+                        source = referredForDigitalChestXray,
+                        removeItems = listOf(
+                            digitalChestXrayConducted,
+                            reasonNotConductedChestXray,
+                            reasonNotConductedChestXrayOther,
+                            digitalChestXrayResult,
+                            trueNatConducted,
+                            reasonNotConductedNaat,
+                            reasonNotConductedNaatOther,
+                            trueNatResult
+                        ),
+                        addItems = listOf(reasonForDenialChestXray)
+                    )
+                }
+            }
+
+            reasonForDenialChestXray.id -> {
+                // index is ignored for CHECKBOXES (value is already updated by adapter)
+                syncFieldStates()
+                val addOther = isLastItemSelected(reasonForDenialChestXray, R.array.tb_reason_for_denial_xray)
+                triggerDependants(
+                    source = reasonForDenialChestXray,
+                    removeItems = if (!addOther) listOf(reasonForDenialChestXrayOther) else emptyList(),
+                    addItems = if (addOther) listOf(reasonForDenialChestXrayOther) else emptyList()
+                )
+            }
+
             digitalChestXrayConducted.id -> {
                 digitalChestXrayConducted.value = if (index == 0) yesValue else noValue
                 syncFieldStates()
                 if (index == 0) {
-                    val updateIndex = triggerDependants(
+                    // Conducted = Yes → show result, remove not-conducted fields
+                    triggerDependants(
                         source = digitalChestXrayConducted,
-                        removeItems = emptyList(),
+                        removeItems = listOf(reasonNotConductedChestXray, reasonNotConductedChestXrayOther),
                         addItems = listOf(digitalChestXrayResult)
                     )
-                    val changedIndex = getChangedElementIndex(digitalChestXrayConducted)
-                    if (changedIndex != -1) changedIndex else updateIndex
                 } else {
-                    val removeItems = mutableListOf(
-                        digitalChestXrayResult,
-                        trueNatResult,
-                        trueNatConducted
-                    )
-                    val updateIndex = triggerDependants(
+                    // Conducted = No → remove result, show not-conducted reason
+                    triggerDependants(
                         source = digitalChestXrayConducted,
-                        removeItems = removeItems,
-                        addItems = emptyList()
+                        removeItems = listOf(
+                            digitalChestXrayResult,
+                            trueNatConducted,
+                            reasonNotConductedNaat,
+                            reasonNotConductedNaatOther,
+                            trueNatResult
+                        ),
+                        addItems = listOf(reasonNotConductedChestXray)
                     )
-                    val changedIndex = getChangedElementIndex(digitalChestXrayConducted)
-                    if (changedIndex != -1) changedIndex else updateIndex
                 }
             }
 
-            sputumCollected.id -> {
-                sputumCollected.value = if (index == 0) yesValue else noValue
+            reasonNotConductedChestXray.id -> {
+                reasonNotConductedChestXray.value =
+                    reasonNotConductedChestXray.entries?.getOrNull(index)
                 syncFieldStates()
-                getChangedElementIndex(sputumCollected)
+                val addOther = isLastItemSelectedDropdown(
+                    reasonNotConductedChestXray, R.array.tb_reason_not_conducted_xray
+                )
+                triggerDependants(
+                    source = reasonNotConductedChestXray,
+                    removeItems = if (!addOther) listOf(reasonNotConductedChestXrayOther) else emptyList(),
+                    addItems = if (addOther) listOf(reasonNotConductedChestXrayOther) else emptyList()
+                )
             }
 
             digitalChestXrayResult.id -> {
@@ -189,14 +392,131 @@ class TBSuspectedQuickDataset(
                 syncFieldStates()
                 val addItems = mutableListOf<FormElement>()
                 val removeItems = mutableListOf<FormElement>()
+
+                // Manage sputum section: add when xray becomes positive (and not already visible),
+                // remove when xray no longer positive and no other static sputum conditions met.
+                val sputumShouldShow = shouldShowSputumCollected()
+                val sputumInList = getIndexOfElement(referredForSputumCollection) >= 0
+
+                if (sputumShouldShow && !sputumInList) {
+                    // Xray just turned positive – set defaults and reveal sputum section
+                    if (referredForSputumCollection.value.isNullOrBlank()) {
+                        referredForSputumCollection.value = yesValue
+                    }
+                    addItems.add(referredForSputumCollection)
+                    if (isYes(referredForSputumCollection)) {
+                        if (sputumSampleSubmittedAt.value.isNullOrBlank()) {
+                            sputumSampleSubmittedAt.value = sputumSampleSubmittedAt.entries?.firstOrNull()
+                        }
+                        addItems.add(sputumSampleSubmittedAt)
+                    } else if (isNo(referredForSputumCollection)) {
+                        if (reasonForDenialSputum.value.isNullOrBlank()) {
+                            reasonForDenialSputum.value = "0"
+                        }
+                        addItems.add(reasonForDenialSputum)
+                        if (isLastItemSelected(reasonForDenialSputum, R.array.tb_reason_for_denial_sputum)) {
+                            addItems.add(reasonForDenialSputumOther)
+                        }
+                    }
+                } else if (!sputumShouldShow && sputumInList) {
+                    // Xray result no longer positive and no other static conditions – hide sputum section
+                    removeItems.addAll(listOf(
+                        referredForSputumCollection,
+                        reasonForDenialSputum,
+                        reasonForDenialSputumOther,
+                        sputumSampleSubmittedAt
+                    ))
+                }
+
+                // Manage NAAT
                 if (shouldShowTrueNatConducted()) {
-                    addItems.add(trueNatConducted)
-                    if (isYes(trueNatConducted)) addItems.add(trueNatResult)
+                    val naatInList = getIndexOfElement(trueNatConducted) >= 0
+                    if (!naatInList) {
+                        addItems.add(trueNatConducted)
+                        if (isYes(trueNatConducted)) {
+                            addItems.add(trueNatResult)
+                        } else if (!trueNatConducted.value.isNullOrBlank()) {
+                            addItems.add(reasonNotConductedNaat)
+                            if (isLastItemSelectedDropdown(reasonNotConductedNaat, R.array.tb_reason_not_conducted_naat)) {
+                                addItems.add(reasonNotConductedNaatOther)
+                            }
+                        }
+                    }
                 } else {
-                    removeItems.addAll(listOf(trueNatResult, trueNatConducted))
+                    removeItems.addAll(
+                        listOf(trueNatConducted, reasonNotConductedNaat, reasonNotConductedNaatOther, trueNatResult)
+                    )
                 }
                 triggerDependants(
                     source = digitalChestXrayResult,
+                    removeItems = removeItems,
+                    addItems = addItems
+                )
+            }
+
+            referredForSputumCollection.id -> {
+                referredForSputumCollection.value = if (index == 0) yesValue else noValue
+                syncFieldStates()
+                if (index == 0) {
+                    // Yes: show submitted-at (default to TB Screening Camp if blank), remove denial
+                    sputumSampleSubmittedAt.isEnabled = !referralMode  // explicitly enable when first shown
+                    if (sputumSampleSubmittedAt.value.isNullOrBlank()) {
+                        sputumSampleSubmittedAt.value = sputumSampleSubmittedAt.entries?.firstOrNull()
+                    }
+                    triggerDependants(
+                        source = referredForSputumCollection,
+                        removeItems = listOf(reasonForDenialSputum, reasonForDenialSputumOther),
+                        addItems = listOf(sputumSampleSubmittedAt)
+                    )
+                } else {
+                    // No: show denial (default to Patient refused if blank), conditionally remove NAAT
+                    if (reasonForDenialSputum.value.isNullOrBlank()) {
+                        reasonForDenialSputum.value = "0"
+                    }
+                    // Keep NAAT visible if xray positive, historyTB, antiTBDrugs, or pregnant still apply
+                    val keepNaat = shouldShowTrueNatConducted()
+                    triggerDependants(
+                        source = referredForSputumCollection,
+                        removeItems = buildList {
+                            add(sputumSampleSubmittedAt)
+                            if (!keepNaat) addAll(listOf(
+                                trueNatConducted,
+                                reasonNotConductedNaat,
+                                reasonNotConductedNaatOther,
+                                trueNatResult
+                            ))
+                        },
+                        addItems = listOf(reasonForDenialSputum)
+                    )
+                }
+            }
+
+            reasonForDenialSputum.id -> {
+                syncFieldStates()
+                val addOther = isLastItemSelected(reasonForDenialSputum, R.array.tb_reason_for_denial_sputum)
+                triggerDependants(
+                    source = reasonForDenialSputum,
+                    removeItems = if (!addOther) listOf(reasonForDenialSputumOther) else emptyList(),
+                    addItems = if (addOther) listOf(reasonForDenialSputumOther) else emptyList()
+                )
+            }
+
+            sputumSampleSubmittedAt.id -> {
+                sputumSampleSubmittedAt.value =
+                    sputumSampleSubmittedAt.entries?.getOrNull(index)
+                syncFieldStates()
+                // Show TrueNAT if applicable after sputum submission
+                val addItems = mutableListOf<FormElement>()
+                val removeItems = mutableListOf<FormElement>()
+                if (shouldShowTrueNatConducted()) {
+                    addItems.add(trueNatConducted)
+                } else {
+                    removeItems.addAll(
+                        listOf(trueNatConducted, reasonNotConductedNaat, reasonNotConductedNaatOther, trueNatResult)
+                    )
+                }
+                triggerDependants(
+                    source = sputumSampleSubmittedAt,
                     removeItems = removeItems,
                     addItems = addItems
                 )
@@ -206,23 +526,32 @@ class TBSuspectedQuickDataset(
                 trueNatConducted.value = if (index == 0) yesValue else noValue
                 syncFieldStates()
                 if (index == 0) {
-                    val updateIndex = triggerDependants(
+                    triggerDependants(
                         source = trueNatConducted,
-                        removeItems = emptyList(),
+                        removeItems = listOf(reasonNotConductedNaat, reasonNotConductedNaatOther),
                         addItems = listOf(trueNatResult)
                     )
-                    val changedIndex = getChangedElementIndex(trueNatConducted)
-                    if (changedIndex != -1) changedIndex else updateIndex
                 } else {
-                    val removeItems = mutableListOf(trueNatResult)
-                    val updateIndex = triggerDependants(
+                    triggerDependants(
                         source = trueNatConducted,
-                        removeItems = removeItems,
-                        addItems = emptyList()
+                        removeItems = listOf(trueNatResult),
+                        addItems = listOf(reasonNotConductedNaat)
                     )
-                    val changedIndex = getChangedElementIndex(trueNatConducted)
-                    if (changedIndex != -1) changedIndex else updateIndex
                 }
+            }
+
+            reasonNotConductedNaat.id -> {
+                reasonNotConductedNaat.value =
+                    reasonNotConductedNaat.entries?.getOrNull(index)
+                syncFieldStates()
+                val addOther = isLastItemSelectedDropdown(
+                    reasonNotConductedNaat, R.array.tb_reason_not_conducted_naat
+                )
+                triggerDependants(
+                    source = reasonNotConductedNaat,
+                    removeItems = if (!addOther) listOf(reasonNotConductedNaatOther) else emptyList(),
+                    addItems = if (addOther) listOf(reasonNotConductedNaatOther) else emptyList()
+                )
             }
 
             liquidCultureConducted.id -> {
@@ -247,38 +576,77 @@ class TBSuspectedQuickDataset(
         }
     }
 
+    // ── Save ──────────────────────────────────────────────────────────────────
+
     override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
         (cacheModel as TBDiagnosticsCache).let { form ->
+            // Digital Chest X-Ray (entire section is not applicable for pregnant women)
+            form.isReferredForDigitalChestXray =
+                if (!isPregnant()) isYes(referredForDigitalChestXray) else null
+            form.reasonForDenialChestXray =
+                if (!isPregnant() && !isYes(referredForDigitalChestXray))
+                    indexPipeToEnglishPipe(reasonForDenialChestXray, R.array.tb_reason_for_denial_xray)
+                else null
+            form.reasonForDenialChestXrayOther =
+                if (!isPregnant() && !isYes(referredForDigitalChestXray))
+                    reasonForDenialChestXrayOther.value?.takeIf { it.isNotBlank() }
+                else null
             form.isChestXRayDone =
                 if (shouldShowDigitalChestXray()) isYes(digitalChestXrayConducted) else null
+            form.reasonNotConductedChestXray =
+                if (shouldShowDigitalChestXray() && !isYes(digitalChestXrayConducted))
+                    getEnglishValueInArray(R.array.tb_reason_not_conducted_xray, reasonNotConductedChestXray.value)
+                else null
+            form.reasonNotConductedChestXrayOther =
+                if (shouldShowDigitalChestXray() && !isYes(digitalChestXrayConducted))
+                    reasonNotConductedChestXrayOther.value?.takeIf { it.isNotBlank() }
+                else null
             form.chestXRayResult =
-                if (isYes(digitalChestXrayConducted)) {
+                if (isYes(digitalChestXrayConducted))
                     getEnglishValueInArray(R.array.tb_test_result, digitalChestXrayResult.value)
-                } else {
-                    null
-                }
+                else null
+
+            // Sputum Collection
             form.isSputumCollected =
-                if (shouldShowSputumCollected()) isYes(sputumCollected) else null
+                if (shouldShowSputumCollected()) isYes(referredForSputumCollection) else null
+            form.reasonForDenialSputum =
+                if (shouldShowSputumCollected() && !isYes(referredForSputumCollection))
+                    indexPipeToEnglishPipe(reasonForDenialSputum, R.array.tb_reason_for_denial_sputum)
+                else null
+            form.reasonForDenialSputumOther =
+                if (shouldShowSputumCollected() && !isYes(referredForSputumCollection))
+                    reasonForDenialSputumOther.value?.takeIf { it.isNotBlank() }
+                else null
+            form.sputumSubmittedAt =
+                if (shouldShowSputumCollected() && isYes(referredForSputumCollection))
+                    getEnglishValueInArray(R.array.tb_diagnostics_sputum_submitted_at, sputumSampleSubmittedAt.value)
+                else null
+
+            // TrueNAT
             form.isNaatConducted =
                 if (shouldShowTrueNatConducted()) isYes(trueNatConducted) else null
+            form.reasonNotConductedNaat =
+                if (shouldShowTrueNatConducted() && !isYes(trueNatConducted))
+                    getEnglishValueInArray(R.array.tb_reason_not_conducted_naat, reasonNotConductedNaat.value)
+                else null
+            form.reasonNotConductedNaatOther =
+                if (shouldShowTrueNatConducted() && !isYes(trueNatConducted))
+                    reasonNotConductedNaatOther.value?.takeIf { it.isNotBlank() }
+                else null
             form.naatResult =
-                if (isYes(trueNatConducted)) {
+                if (isYes(trueNatConducted))
                     getEnglishValueInArray(R.array.tb_test_result, trueNatResult.value)
-                } else {
-                    null
-                }
-            form.nikshayId =
-                nikshayId.value?.trim()?.takeIf { it.isNotEmpty() && it != nikshayIdUnavailable }
+                else null
+
+            // Liquid Culture
             form.isLiquidCultureConducted =
                 if (shouldShowLiquidCultureConducted()) isYes(liquidCultureConducted) else null
             form.recommendedForLiquidCultureTest =
                 if (shouldShowLiquidCultureConducted()) isYes(liquidCultureConducted) else null
             form.liquidCultureResult =
-                if (isYes(liquidCultureConducted)) {
+                if (isYes(liquidCultureConducted))
                     getEnglishValueInArray(R.array.tb_test_result, liquidCultureResult.value)
-                } else {
-                    null
-                }
+                else null
 
             val isConfirmed = isPositive(form.chestXRayResult) ||
                 isPositive(form.naatResult) ||
@@ -287,6 +655,8 @@ class TBSuspectedQuickDataset(
             form.isConfirmed = isConfirmed
         }
     }
+
+    // ── Submit visibility ─────────────────────────────────────────────────────
 
     fun shouldShowSubmit(): Boolean {
         if (!referralMode) return true
@@ -297,27 +667,61 @@ class TBSuspectedQuickDataset(
         ).any { it }
     }
 
+    // ── Form list builder ─────────────────────────────────────────────────────
+
     private fun buildFormList(): List<FormElement> = buildList {
         add(nikshayId)
 
-        if (shouldShowDigitalChestXray()) {
-            add(digitalChestXrayConducted)
-            if (isYes(digitalChestXrayConducted)) {
-                add(digitalChestXrayResult)
+        // Digital Chest X-Ray section — hidden entirely for pregnant women
+        if (!isPregnant()) {
+            add(referredForDigitalChestXray)
+            if (isYes(referredForDigitalChestXray)) {
+                if (shouldShowDigitalChestXray()) {
+                    add(digitalChestXrayConducted)
+                    if (isYes(digitalChestXrayConducted)) {
+                        add(digitalChestXrayResult)
+                    } else if (!digitalChestXrayConducted.value.isNullOrBlank()) {
+                        add(reasonNotConductedChestXray)
+                        if (isLastItemSelectedDropdown(reasonNotConductedChestXray, R.array.tb_reason_not_conducted_xray)) {
+                            add(reasonNotConductedChestXrayOther)
+                        }
+                    }
+                }
+            } else if (isNo(referredForDigitalChestXray)) {
+                add(reasonForDenialChestXray)
+                if (isLastItemSelected(reasonForDenialChestXray, R.array.tb_reason_for_denial_xray)) {
+                    add(reasonForDenialChestXrayOther)
+                }
             }
         }
 
+        // Sputum Collection section
         if (shouldShowSputumCollected()) {
-            add(sputumCollected)
+            add(referredForSputumCollection)
+            if (isYes(referredForSputumCollection)) {
+                add(sputumSampleSubmittedAt)
+            } else if (isNo(referredForSputumCollection)) {
+                add(reasonForDenialSputum)
+                if (isLastItemSelected(reasonForDenialSputum, R.array.tb_reason_for_denial_sputum)) {
+                    add(reasonForDenialSputumOther)
+                }
+            }
         }
 
+        // TrueNAT section
         if (shouldShowTrueNatConducted()) {
             add(trueNatConducted)
             if (isYes(trueNatConducted)) {
                 add(trueNatResult)
+            } else if (!trueNatConducted.value.isNullOrBlank()) {
+                add(reasonNotConductedNaat)
+                if (isLastItemSelectedDropdown(reasonNotConductedNaat, R.array.tb_reason_not_conducted_naat)) {
+                    add(reasonNotConductedNaatOther)
+                }
             }
         }
 
+        // Liquid Culture section
         if (shouldShowLiquidCultureConducted()) {
             add(liquidCultureConducted)
             if (isYes(liquidCultureConducted)) {
@@ -326,6 +730,8 @@ class TBSuspectedQuickDataset(
         }
     }
 
+    // ── Referral locks (view-only mode) ───────────────────────────────────────
+
     private fun configureReferralLocks(saved: TBDiagnosticsCache?) {
         if (!referralMode || saved == null) {
             lockDigitalChestXray = false
@@ -333,41 +739,147 @@ class TBSuspectedQuickDataset(
             lockLiquidCulture = false
             return
         }
-
         lockDigitalChestXray = !saved.chestXRayResult.isNullOrBlank()
         lockTrueNat = !saved.naatResult.isNullOrBlank()
         lockLiquidCulture = !saved.liquidCultureResult.isNullOrBlank()
     }
 
+    // ── Field state sync ──────────────────────────────────────────────────────
+
     private fun syncFieldStates() {
+        // Referral for X-Ray — not shown for pregnant women
+        referredForDigitalChestXray.isEnabled = !lockDigitalChestXray && !isPregnant() && !referralMode
+        referredForDigitalChestXray.required = !isPregnant() && !referralMode
+
+        // Denial reason for X-Ray
+        val xrayReferred = isYes(referredForDigitalChestXray)
+        val xrayDenied = isNo(referredForDigitalChestXray)
+        reasonForDenialChestXray.isEnabled = xrayDenied && !lockDigitalChestXray && !referralMode
+        reasonForDenialChestXray.required = xrayDenied && !lockDigitalChestXray && !referralMode
+        if (!xrayDenied) {
+            reasonForDenialChestXray.errorText = null
+        }
+
+        reasonForDenialChestXrayOther.isEnabled =
+            xrayDenied &&
+                    !referralMode &&
+                    isLastItemSelected(reasonForDenialChestXray, R.array.tb_reason_for_denial_xray)
+
+        reasonForDenialChestXrayOther.required =
+            reasonForDenialChestXrayOther.isEnabled
+
+        if (!reasonForDenialChestXrayOther.isEnabled) {
+            reasonForDenialChestXrayOther.errorText = null
+        }
+
+        // Conducted
         digitalChestXrayConducted.isEnabled = shouldShowDigitalChestXray() && !lockDigitalChestXray
         digitalChestXrayConducted.required = shouldShowDigitalChestXray() && !lockDigitalChestXray
         if (!shouldShowDigitalChestXray()) resetField(digitalChestXrayConducted)
 
+        // Not-conducted reason for X-Ray
+        val xrayConductedNo = xrayReferred &&
+                !isYes(digitalChestXrayConducted) &&
+                !digitalChestXrayConducted.value.isNullOrBlank()
+
+        reasonNotConductedChestXray.isEnabled =
+            xrayConductedNo && !lockDigitalChestXray
+
+        reasonNotConductedChestXray.required =
+            xrayConductedNo && !lockDigitalChestXray
+
+        if (!xrayConductedNo) {
+            reasonNotConductedChestXray.errorText = null
+        }
+
+        reasonNotConductedChestXrayOther.isEnabled =
+            xrayConductedNo &&
+                    isLastItemSelectedDropdown(
+                        reasonNotConductedChestXray,
+                        R.array.tb_reason_not_conducted_xray
+                    )
+
+        reasonNotConductedChestXrayOther.required =
+            reasonNotConductedChestXrayOther.isEnabled
+
+        if (!reasonNotConductedChestXrayOther.isEnabled) {
+            reasonNotConductedChestXrayOther.errorText = null
+        }
+
+        // X-Ray result
         digitalChestXrayResult.isEnabled =
             shouldShowDigitalChestXray() && isYes(digitalChestXrayConducted) && !lockDigitalChestXray
-//        digitalChestXrayResult.required = digitalChestXrayResult.isEnabled
         if (!shouldShowDigitalChestXray() || !isYes(digitalChestXrayConducted)) {
             resetField(digitalChestXrayResult)
         }
 
-        sputumCollected.isEnabled = !referralMode
-        sputumCollected.required = shouldShowSputumCollected() && !referralMode
-        if (!shouldShowSputumCollected()) resetField(sputumCollected)
+        // Sputum section
+        referredForSputumCollection.isEnabled = shouldShowSputumCollected() && !referralMode
+        referredForSputumCollection.required = shouldShowSputumCollected() && !referralMode
+        if (!shouldShowSputumCollected()) resetField(referredForSputumCollection)
 
+        val sputumReferred = isYes(referredForSputumCollection)
+        val sputumDenied = isNo(referredForSputumCollection)
+        sputumSampleSubmittedAt.isEnabled = !referralMode  // not editable when Submit is hidden (view mode)
+        reasonForDenialSputum.isEnabled = true
+        reasonForDenialSputum.required =true
+
+        if (!sputumDenied) {
+            reasonForDenialSputum.errorText = null
+        }
+
+        reasonForDenialSputumOther.isEnabled =
+            sputumDenied &&
+                    isLastItemSelected(
+                        reasonForDenialSputum,
+                        R.array.tb_reason_for_denial_sputum
+                    )
+
+        reasonForDenialSputumOther.required =
+            reasonForDenialSputumOther.isEnabled
+
+        if (!reasonForDenialSputumOther.isEnabled) {
+            reasonForDenialSputumOther.errorText = null
+        }
+
+        // TrueNAT
         trueNatConducted.isEnabled = shouldShowTrueNatConducted() && !lockTrueNat
         trueNatConducted.required = shouldShowTrueNatConducted() && !lockTrueNat
         if (!shouldShowTrueNatConducted()) resetField(trueNatConducted)
 
+        val naatConductedNo = !trueNatConducted.value.isNullOrBlank() && !isYes(trueNatConducted)
+        reasonNotConductedNaat.isEnabled = naatConductedNo && !lockTrueNat
+        reasonNotConductedNaat.required =
+            naatConductedNo && !lockTrueNat
+
+        if (!naatConductedNo) {
+            reasonNotConductedNaat.errorText = null
+        }
+
+        reasonNotConductedNaatOther.isEnabled =
+            naatConductedNo &&
+                    isLastItemSelectedDropdown(
+                        reasonNotConductedNaat,
+                        R.array.tb_reason_not_conducted_naat
+                    )
+
+        reasonNotConductedNaatOther.required =
+            reasonNotConductedNaatOther.isEnabled
+
+        if (!reasonNotConductedNaatOther.isEnabled) {
+            reasonNotConductedNaatOther.errorText = null
+        }
+
         trueNatResult.isEnabled =
             shouldShowTrueNatConducted() && isYes(trueNatConducted) && !lockTrueNat
-//        trueNatResult.required = trueNatResult.isEnabled
         if (!shouldShowTrueNatConducted() || !isYes(trueNatConducted)) {
             resetField(trueNatResult)
         }
 
+        // NikshayId
         nikshayId.isEnabled = false
 
+        // Liquid Culture
         liquidCultureConducted.isEnabled =
             shouldShowLiquidCultureConducted() && !lockLiquidCulture
         liquidCultureConducted.required =
@@ -376,53 +888,40 @@ class TBSuspectedQuickDataset(
 
         liquidCultureResult.isEnabled =
             shouldShowLiquidCultureConducted() && isYes(liquidCultureConducted) && !lockLiquidCulture
-//        liquidCultureResult.required = liquidCultureResult.isEnabled
         if (!shouldShowLiquidCultureConducted() || !isYes(liquidCultureConducted)) {
             resetField(liquidCultureResult)
         }
     }
 
+    // ── Show conditions ───────────────────────────────────────────────────────
+
+    /** X-Ray conducted question is shown when referred=Yes and not pregnant */
     private fun shouldShowDigitalChestXray(): Boolean =
-        screeningCache?.referredForDigitalChestXray ?: !isPregnant()
+        isYes(referredForDigitalChestXray) && !isPregnant()
 
+    /** Sputum section shown when patient has history/antiTB drugs/pregnant or X-Ray is positive */
     private fun shouldShowSputumCollected(): Boolean =
-        screeningCache?.referredForSputumCollection ?: (
-            screeningCache?.historyOfTb == true ||
-                isPregnant() ||
-                screeningCache?.takingAntiTBDrugs == true
-            )
-
-    private fun shouldShowTrueNatConducted(): Boolean =
-        screeningCache?.recommendedForTruenatTest == true ||
+        screeningCache?.historyOfTb == true ||
             isPregnant() ||
+            screeningCache?.takingAntiTBDrugs == true ||
             isPositive(getEnglishValueInArray(R.array.tb_test_result, digitalChestXrayResult.value))
 
+    /** TrueNAT shown when xray positive, sputum referred, history of TB, anti-TB drugs, or pregnant */
+    private fun shouldShowTrueNatConducted(): Boolean =
+        isPositive(getEnglishValueInArray(R.array.tb_test_result, digitalChestXrayResult.value)) ||
+            isYes(referredForSputumCollection) ||
+            screeningCache?.takingAntiTBDrugs == true ||
+            screeningCache?.historyOfTb == true ||
+            isPregnant()
+
+    /** Liquid Culture shown when both history of TB AND taking anti-TB drugs */
     private fun shouldShowLiquidCultureConducted(): Boolean =
-        screeningCache?.recommendedForLiquidCultureTest ?: (
-            screeningCache?.historyOfTb == true && screeningCache?.takingAntiTBDrugs == true
-            )
+        screeningCache?.historyOfTb == true && screeningCache?.takingAntiTBDrugs == true
 
-    private fun getChangedElementIndex(source: FormElement): Int = getIndexOfElement(source)
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private fun isUnderFive(): Boolean {
-        val ben = benCache ?: return false
-        return when (ben.ageUnit) {
-            AgeUnit.YEARS -> ben.age <= 5
-            AgeUnit.MONTHS, AgeUnit.DAYS -> true
-            else -> false
-        }
-    }
-
-    private fun isPregnant(): Boolean {
-        val reproductiveStatus = benCache?.genDetails?.reproductiveStatus
-        return benCache?.genDetails?.reproductiveStatusId == 1 ||
-            reproductiveStatus.equals("Yes", ignoreCase = true)
-    }
-
-    private fun resetField(formElement: FormElement) {
-        formElement.value = null
-        formElement.errorText = null
-    }
+    private fun isYes(formElement: FormElement): Boolean = formElement.value == yesValue
+    private fun isNo(formElement: FormElement): Boolean = formElement.value == noValue
 
     private fun isPositive(value: String?): Boolean {
         if (value.isNullOrBlank()) return false
@@ -436,18 +935,79 @@ class TBSuspectedQuickDataset(
         null -> ""
     }
 
-    private fun conductedValueFromScreening(
-        savedValue: Boolean?,
-        shouldShow: Boolean,
-        screeningRecommended: Boolean?
-    ): String {
+    private fun conductedFromSaved(savedValue: Boolean?, shouldShow: Boolean): String {
         if (!shouldShow) return ""
-        return when (savedValue) {
-            true -> yesValue
-            false -> noValue
-            null -> if (screeningRecommended == true) yesValue else ""
+        return boolToYesNo(savedValue)
+    }
+
+    private fun resetField(formElement: FormElement) {
+        formElement.value = null
+        formElement.errorText = null
+    }
+
+    /**
+     * Check if the last item (= "Others") is selected in a CHECKBOXES field.
+     * CHECKBOXES value is stored as pipe-separated 0-based indexes, e.g. "0|3|14".
+     */
+    private fun isLastItemSelected(field: FormElement, arrayId: Int): Boolean {
+        val lastIndex = resources.getStringArray(arrayId).size - 1
+        return field.value?.split("|")
+            ?.mapNotNull { it.trim().toIntOrNull() }
+            ?.contains(lastIndex) == true
+    }
+
+    /**
+     * Check if the last item (= "Others") is selected in a DROPDOWN field.
+     * DROPDOWN value is the localized display string.
+     */
+    private fun isLastItemSelectedDropdown(field: FormElement, arrayId: Int): Boolean {
+        val entries = resources.getStringArray(arrayId)
+        return field.value != null && field.value == entries.lastOrNull()
+    }
+
+    /**
+     * Convert pipe-separated English values (stored in DB) → pipe-separated 0-based indexes
+     * (needed for CHECKBOXES display).
+     */
+    private fun englishPipeToIndexPipe(value: String?, arrayId: Int): String? {
+        if (value.isNullOrBlank()) return null
+        val englishEntries = englishResources.getStringArray(arrayId)
+        val indexes = value.split("|")
+            .mapNotNull { v -> englishEntries.indexOf(v.trim()).takeIf { it >= 0 } }
+        return if (indexes.isEmpty()) null else indexes.joinToString("|")
+    }
+
+    /**
+     * Convert pipe-separated 0-based indexes (CHECKBOXES field value) → pipe-separated English
+     * values (for DB storage).
+     */
+    private fun indexPipeToEnglishPipe(field: FormElement, arrayId: Int): String? {
+        val value = field.value ?: return null
+        val englishEntries = englishResources.getStringArray(arrayId)
+        val values = value.split("|")
+            .mapNotNull { i -> i.trim().toIntOrNull()?.let { englishEntries.getOrNull(it) } }
+        return if (values.isEmpty()) null else values.joinToString("|")
+    }
+
+    private fun isUnderFive(): Boolean {
+        val ben = benCache ?: return false
+        return when (ben.ageUnit) {
+            AgeUnit.YEARS -> ben.age <= 5
+            AgeUnit.MONTHS, AgeUnit.DAYS -> true
+            else -> false
         }
     }
 
-    private fun isYes(formElement: FormElement): Boolean = formElement.value == yesValue
+    private fun isPregnant(): Boolean {
+        // Source 1: Ben registration reproductive status
+        val reproductiveStatus = benCache?.genDetails?.reproductiveStatus
+        val pregnantFromBen = benCache?.genDetails?.reproductiveStatusId == 1 ||
+            reproductiveStatus.equals("Yes", ignoreCase = true)
+
+        // Source 2: Vital Screen → Key Population / Risk Factors = "PREGNANCY" (stored as code, language-independent)
+        val pregnantFromVital = vitalCache?.keyPopulationRiskFactors
+            ?.any { it.equals("PREGNANCY", ignoreCase = true) } == true
+
+        return pregnantFromBen || pregnantFromVital
+    }
 }

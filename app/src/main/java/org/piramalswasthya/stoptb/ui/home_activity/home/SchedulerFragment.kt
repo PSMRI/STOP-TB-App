@@ -16,7 +16,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentSchedulerBinding
 import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.helpers.isNurseRole
-import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
+import org.piramalswasthya.stoptb.ui.setCountBadgeText
 import org.piramalswasthya.stoptb.ui.home_activity.home.SchedulerViewModel.State.LOADED
 import org.piramalswasthya.stoptb.ui.home_activity.home.SchedulerViewModel.State.LOADING
 import javax.inject.Inject
@@ -84,21 +84,29 @@ class SchedulerFragment : Fragment() {
 
         lifecycleScope.launch {
             viewModel.allBenCount.collect {
-                binding.tvAllBenCount.text = it.toString()
+                binding.tvAllBenCount.setCountBadgeText(it)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.householdCount.collect {
+                binding.tvHouseholdCount.setCountBadgeText(it)
             }
         }
         lifecycleScope.launch {
             viewModel.tbCount.collect {
-                binding.tvTbCount.text = it.toString()
+                binding.tvTbCount.setCountBadgeText(it)
             }
         }
         lifecycleScope.launch {
             viewModel.ncdCount.collect {
-                binding.tvNcdCount.text = it.toString()
+                binding.tvNcdCount.setCountBadgeText(it)
             }
         }
         binding.cvAllBen.setOnClickListener {
             findNavController().navigate(HomeFragmentDirections.actionNavHomeToAllBenFragment(0))
+        }
+        binding.cvHousehold.setOnClickListener {
+            findNavController().navigate(HomeFragmentDirections.actionHomeFragmentToAllHouseholdFragment())
         }
         binding.cvTb.setOnClickListener {
             findNavController().navigate(HomeFragmentDirections.actionHomeFragmentToCdFragment())
@@ -121,8 +129,9 @@ class SchedulerFragment : Fragment() {
 
     private fun applyRoleVisibility() {
         val role = prefDao.getLoggedInUser()?.role
+        binding.cvHousehold.visibility = View.VISIBLE
         when {
-            role.isRegistrationOfficerRole() -> {
+            role.isNullOrBlank() || (!role.isNurseRole() && !role.isCounsellingOfficerRole()) -> {
                 binding.cvAllBen.visibility = View.VISIBLE
                 binding.cvTb.visibility = View.GONE
                 binding.cvNcd.visibility = View.GONE

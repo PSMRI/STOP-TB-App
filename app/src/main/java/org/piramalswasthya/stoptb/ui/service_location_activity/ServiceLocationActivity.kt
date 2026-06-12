@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.MotionEvent
+import android.view.View
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -129,6 +130,10 @@ class ServiceLocationActivity : AppCompatActivity() {
                     ServiceTypeViewModel.State.LOADING -> {}//TODO()
                     ServiceTypeViewModel.State.SUCCESS -> {
                         binding.viewModel = viewModel
+
+                        binding.tilTuDropdown.visibility = View.GONE
+                        binding.tilHealthFacilityDropdown.visibility = View.GONE
+
                         binding.actvStateDropdown.apply {
                             isEnabled = false
                             setText(viewModel.stateList.first())
@@ -141,22 +146,22 @@ class ServiceLocationActivity : AppCompatActivity() {
                             isEnabled = false
                             setText(viewModel.blockList.first())
                         }
-                        binding.actvTuDropdown.apply {
-                            isEnabled = false
-                            setText(viewModel.selectedTuName)
-                            if (viewModel.tuList.size == 1) {
-                                setText(viewModel.tuList.first())
-                                viewModel.setTu(0)
-                            }
-                        }
-                        binding.actvHealthFacilityDropdown.apply {
-                            isEnabled = false
-                            setText(viewModel.selectedHealthFacilityName)
-                            if (viewModel.healthFacilityList.size == 1) {
-                                setText(viewModel.healthFacilityList.first())
-                                viewModel.setHealthFacility(0)
-                            }
-                        }
+//                        binding.actvTuDropdown.apply {
+//                            isEnabled = false
+//                            setText(viewModel.selectedTuName)
+//                            if (viewModel.tuList.size == 1) {
+//                                setText(viewModel.tuList.first())
+//                                viewModel.setTu(0)
+//                            }
+//                        }
+//                        binding.actvHealthFacilityDropdown.apply {
+//                            isEnabled = false
+//                            setText(viewModel.selectedHealthFacilityName)
+//                            if (viewModel.healthFacilityList.size == 1) {
+//                                setText(viewModel.healthFacilityList.first())
+//                                viewModel.setHealthFacility(0)
+//                            }
+//                        }
                         binding.actvVillageDropdown.apply {
                             if (viewModel.villageList.size == 1) {
                                 setText(viewModel.villageList.first())
@@ -178,8 +183,8 @@ class ServiceLocationActivity : AppCompatActivity() {
         return !(binding.actvStateDropdown.text.isNullOrBlank() ||
                 binding.actvDistrictDropdown.text.isNullOrBlank() ||
                 binding.actvBlockDropdown.text.isNullOrBlank() ||
-                (viewModel.isTuRequired() && binding.actvTuDropdown.text.isNullOrBlank()) ||
-                (viewModel.isHealthFacilityRequired() && binding.actvHealthFacilityDropdown.text.isNullOrBlank()) ||
+//                (viewModel.isTuRequired() && binding.actvTuDropdown.text.isNullOrBlank()) ||
+//                (viewModel.isHealthFacilityRequired() && binding.actvHealthFacilityDropdown.text.isNullOrBlank()) ||
                 binding.actvVillageDropdown.text.isNullOrBlank())
 
     }

@@ -261,7 +261,7 @@ data class User(
     val role: String,
     val serviceMapId: Int,
     val serverUpdatedDate: Long? = null,
-    var vanId: Int = 4,
+    var vanId: Int = 0,
     val state: LocationEntity,
     val district: LocationEntity,
     val block: LocationEntity,

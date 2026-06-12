@@ -4,10 +4,14 @@ import android.Manifest
 import android.app.AlertDialog
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
 import android.annotation.SuppressLint
+import android.text.SpannableStringBuilder
+import android.text.Spannable
+import android.text.style.ForegroundColorSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -22,16 +26,23 @@ import androidx.navigation.fragment.findNavController
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
+import androidx.activity.OnBackPressedCallback
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
 import org.piramalswasthya.stoptb.helpers.applyAutoFlowBackPolicyOnResume
 import org.piramalswasthya.stoptb.helpers.blockBackNavigationInAutoFlow
+import org.piramalswasthya.stoptb.helpers.setAutoFlowBackNavigationBlocked
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class TBScreeningFormFragment : Fragment() {
+
+    @Inject lateinit var preferenceDao: PreferenceDao
 
     private var _binding: FragmentNewFormBinding? = null
     private val binding: FragmentNewFormBinding
@@ -64,13 +75,23 @@ class TBScreeningFormFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        blockBackNavigationInAutoFlow(viewModel.autoFlow)
+        // Explicit back callback — ensures back works regardless of autoFlowBackNavigationBlocked state
+        setAutoFlowBackNavigationBlocked(false)
+        requireActivity().onBackPressedDispatcher.addCallback(
+            viewLifecycleOwner,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    findNavController().navigateUp()
+                }
+            }
+        )
         binding.btnCancel.visibility = View.GONE
         viewModel.recordExists.observe(viewLifecycleOwner) { notIt ->
             notIt?.let { recordExists ->
                 val adapter = FormInputAdapter(
                     formValueListener = FormInputAdapter.FormValueListener { formId, index ->
                         viewModel.updateListOnValueChanged(formId, index)
+                        hardCodedListUpdate(16)
                     }, isEnabled = !(recordExists || viewModel.viewOnly)
                 )
                 binding.btnSubmit.isEnabled = !(recordExists || viewModel.viewOnly)
@@ -80,6 +101,10 @@ class TBScreeningFormFragment : Fragment() {
                     viewModel.formList.collect {
                         if (it.isNotEmpty()) {
                             adapter.notifyItemChanged(viewModel.getIndexOfDate())
+                            // isAsymptomatic is auto-computed in-place (same object ref),
+                            // DiffUtil won't detect the change — force-rebind it directly.
+                            val asymptomaticIdx = viewModel.getIndexOfAsymptomatic()
+                            if (asymptomaticIdx >= 0) adapter.notifyItemChanged(asymptomaticIdx)
                             adapter.submitList(it)
                         }
 
@@ -93,6 +118,21 @@ class TBScreeningFormFragment : Fragment() {
         viewModel.benAgeGender.observe(viewLifecycleOwner) {
             binding.tvAgeGender.text = it
         }
+        // TB Screening: show title above questions and legend (with red * markers) just below title
+        binding.tvFormTitle.visibility = View.VISIBLE
+        binding.tvFormTitle.text = getString(R.string.check_if_the_person_has_any_of_these_symptoms)
+        binding.tvFormFooter.visibility = View.VISIBLE
+        val line1 = getString(R.string.tb_screening_legend_xray_sputum) // "* Refer..."
+        val line2 = getString(R.string.tb_screening_legend_family_members) // "** Advise..."
+        val legendSpan = SpannableStringBuilder("$line1\n$line2")
+        val starColor = Color.parseColor("#B00020")
+        // Color the leading "*" in line 1
+        legendSpan.setSpan(ForegroundColorSpan(starColor), 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        // Color the leading "**" in line 2
+        val line2Start = line1.length + 1 // +1 for \n
+        legendSpan.setSpan(ForegroundColorSpan(starColor), line2Start, line2Start + 2, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        binding.tvFormFooter.text = legendSpan
+
         captureGeolocation()
         binding.btnSubmit.setOnClickListener {
             submitTBScreeningForm()
@@ -101,6 +141,7 @@ class TBScreeningFormFragment : Fragment() {
         viewModel.state.observe(viewLifecycleOwner) {
             when (it) {
                 TBScreeningFormViewModel.State.SAVE_SUCCESS -> {
+                    WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
                     val alertMessage = viewModel.getFamilyContactAlert()
                     if (alertMessage.isNullOrBlank()) {
                         handleSaveSuccessNavigation()
@@ -128,6 +169,17 @@ class TBScreeningFormFragment : Fragment() {
             viewModel.saveForm()
         }
     }
+    private fun hardCodedListUpdate(formId: Int) {
+        binding.form.rvInputForm.adapter?.apply {
+            when (formId) {
+                1,2,3,4,5,6,7,8,9,10,11,16-> {
+                    notifyDataSetChanged()
+
+                }
+
+            }
+        }
+    }
 
     private fun handleSaveSuccessNavigation() {
         Toast.makeText(
@@ -135,13 +187,9 @@ class TBScreeningFormFragment : Fragment() {
             resources.getString(R.string.tb_screening_submitted), Toast.LENGTH_SHORT
         ).show()
         if (viewModel.autoFlow) {
-            findNavController().navigate(
-                R.id.GeneralOpdFormFragment,
-                bundleOf(
-                    "benId" to viewModel.benId,
-                    "autoFlow" to true
-                )
-            )
+            // Examine flow — return to AllBenFragment so user picks the next form
+            val popped = findNavController().popBackStack(R.id.allBenFragment, false)
+            if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
         } else {
             findNavController().navigateUp()
         }
@@ -211,9 +259,12 @@ class TBScreeningFormFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        // Always show back button — matches VitalScreen behaviour.
+        // autoFlow only controls the forward-chain (auto-navigate to General OPD
+        // after submit), not whether the user can go back.
         applyAutoFlowBackPolicyOnResume(
             isAutoFlow = viewModel.autoFlow,
-            allowBack = !viewModel.autoFlow
+            allowBack = true
         )
     }
 

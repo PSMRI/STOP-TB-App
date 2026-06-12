@@ -10,6 +10,7 @@ import org.piramalswasthya.stoptb.model.InputType
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
+import org.piramalswasthya.stoptb.utils.Log
 
 class SuspectedTBDataset(
     context: Context,
@@ -263,6 +264,7 @@ class SuspectedTBDataset(
     override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
         (cacheModel as TBSuspectedCache).let { form ->
             val confirmed = isMarkedConfirmed()
+            Log.d("checkValue",""+confirmed)
 
             form.visitDate = getLongFromDate(dateOfVisit.value)
             form.visitLabel = resources.getString(R.string.visit_format, 1)

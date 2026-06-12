@@ -87,6 +87,24 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
 
     private var autoFlowBackNavigationBlocked: Boolean = false
 
+    /**
+     * Listens for the camp-hub-connected preference being flipped to false by the
+     * [CampModeUrlInterceptor] (on the OkHttp IO thread) so the offline banner
+     * appears immediately — without waiting for the next onResume().
+     */
+    private val campHubPrefListener =
+        android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == pref.getCampHubConnectedKey()) {
+                runOnUiThread {
+                    refreshCampHubOfflineBanner()
+                    if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
+                        WorkerUtils.triggerAmritPushWorker(applicationContext)
+                        WorkerUtils.triggerCampQuickPullIfConnected(applicationContext, pref, force = true)
+                    }
+                }
+            }
+        }
+
     var isChatSupportEnabled : Boolean = false
     private lateinit var updateHelper: InAppUpdateHelper
     @Inject lateinit var analyticsHelper: AnalyticsHelper
@@ -540,11 +558,13 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
 
     override fun onPause() {
         super.onPause()
+        pref.removeOnPreferenceChangeListener(campHubPrefListener)
         window.decorView.alpha = 0f
     }
 
     override fun onResume() {
         super.onResume()
+        pref.addOnPreferenceChangeListener(campHubPrefListener)
         refreshCampHubOfflineBanner()
         refreshCampHubDrawerItem()
         WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
@@ -769,7 +789,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
         }
 
         binding.navView.menu.findItem(R.id.menu_support).setOnMenuItemClickListener {
-            var url = "https://forms.office.com/r/AqY1KqAz3v"
+            var url = "https://forms.cloud.microsoft/r/dBUUKz8jwx"
             if (url.isNotEmpty()){
                 val i = Intent(Intent.ACTION_VIEW)
                 i.setData(Uri.parse(url))

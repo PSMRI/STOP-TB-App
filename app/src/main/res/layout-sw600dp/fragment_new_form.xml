@@ -141,18 +141,49 @@
                 app:layout_constraintStart_toStartOf="@+id/cv_patient_information"
                 app:layout_constraintTop_toBottomOf="@+id/cv_patient_information">
 
-                <FrameLayout
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:orientation="vertical"
                     android:paddingTop="@dimen/padding_small"
                     android:paddingBottom="@dimen/padding_wide">
 
-                    <include
-                        android:id="@+id/form"
-                        layout="@layout/rv_input_form"
+                    <!-- Optional title shown above form questions (e.g. TB Screening) -->
+                    <TextView
+                        android:id="@+id/tv_form_title"
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent" />
-                </FrameLayout>
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginBottom="2dp"
+                        android:paddingHorizontal="4dp"
+                        android:textStyle="bold"
+                        android:textSize="15sp"
+                        android:textColor="?attr/colorOnSurface"
+                        android:visibility="gone" />
+
+                    <!-- Optional legend shown just below title, above form questions (e.g. TB Screening) -->
+                    <TextView
+                        android:id="@+id/tv_form_footer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="6dp"
+                        android:paddingHorizontal="4dp"
+                        android:textSize="13sp"
+                        android:textColor="?attr/colorOnSurface"
+                        android:lineSpacingExtra="3dp"
+                        android:visibility="gone" />
+
+                    <FrameLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
+                        <include
+                            android:id="@+id/form"
+                            layout="@layout/rv_input_form"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent" />
+                    </FrameLayout>
+
+                </LinearLayout>
 
             </androidx.core.widget.NestedScrollView>
 

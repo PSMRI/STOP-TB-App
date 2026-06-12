@@ -10,7 +10,17 @@ fun String?.normalizedRoleName(): String =
 
 fun String?.isRegistrationOfficerRole(): Boolean {
     val role = normalizedRoleName()
-    return role == "registrar" || role == "registrationofficer"
+    return role == "registrar" ||
+            role == "registrationofficer" ||
+            role == "registration" ||
+            role == "register" ||
+            role == "registar" ||
+            role == "registor" ||
+            role == "registerbeneficiary" ||
+            role == "registrationbeneficiary" ||
+            role == "beneficiaryregistration" ||
+            role.contains("registrar") ||
+            role.contains("registration")
 }
 
 fun String?.isNurseRole(): Boolean =

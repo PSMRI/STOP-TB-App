@@ -9,6 +9,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.sqlite.db.SupportSQLiteDatabase
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
+import org.piramalswasthya.stoptb.database.converters.GenderConverter
 import org.piramalswasthya.stoptb.database.converters.LocationEntityListConverter
 import org.piramalswasthya.stoptb.database.converters.StringListConverter
 import org.piramalswasthya.stoptb.database.converters.SyncStateConverter
@@ -80,12 +81,13 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.NCDReferalFormResponseJson
         TBDiagnosticsCache::class
     ],
     views = [BenBasicCache::class],
-    version = 15, exportSchema = false
+    version = 16, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
     SyncStateConverter::class,
-    StringListConverter::class
+    StringListConverter::class,
+    GenderConverter::class
 )
 abstract class InAppDb : RoomDatabase() {
 
@@ -356,6 +358,30 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val newColumns = listOf(
+                    "isReferredForDigitalChestXray INTEGER DEFAULT NULL",
+                    "reasonForDenialChestXray TEXT DEFAULT NULL",
+                    "reasonForDenialChestXrayOther TEXT DEFAULT NULL",
+                    "reasonNotConductedChestXray TEXT DEFAULT NULL",
+                    "reasonNotConductedChestXrayOther TEXT DEFAULT NULL",
+                    "reasonForDenialSputum TEXT DEFAULT NULL",
+                    "reasonForDenialSputumOther TEXT DEFAULT NULL",
+                    "reasonNotConductedNaat TEXT DEFAULT NULL",
+                    "reasonNotConductedNaatOther TEXT DEFAULT NULL"
+                )
+                newColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "TB_DIAGNOSTICS", columnName)) {
+                        database.execSQL(
+                            "ALTER TABLE TB_DIAGNOSTICS ADD COLUMN $columnDefinition"
+                        )
+                    }
+                }
+            }
+        }
+
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(
@@ -535,6 +561,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_12_13)
                         .addMigrations(MIGRATION_13_14)
                         .addMigrations(MIGRATION_14_15)
+                        .addMigrations(MIGRATION_15_16)
                         .build()
 
                     INSTANCE = instance

@@ -20,10 +20,15 @@ import org.piramalswasthya.stoptb.helpers.blockBackNavigationInManagedFlow
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.utils.scrollToFormValidationError
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class GeneralOpdFormFragment : Fragment() {
+
+    @Inject lateinit var preferenceDao: PreferenceDao
 
     private var _binding: FragmentNewFormBinding? = null
     private val binding: FragmentNewFormBinding
@@ -34,9 +39,11 @@ class GeneralOpdFormFragment : Fragment() {
     private val isManagedFlow: Boolean
         get() = viewModel.autoFlow || viewModel.generalOpdFlow
 
-    /** First screen in General OPD flow; nurse auto-flow blocks back on this step. */
+    /** Always allow back — matches VitalScreen behaviour.
+     *  autoFlow / generalOpdFlow only controls the forward-chain (auto-navigate to
+     *  Diagnostics after submit), not whether the user can go back. */
     private val allowBackNavigation: Boolean
-        get() = viewModel.generalOpdFlow && !viewModel.autoFlow
+        get() = true
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -49,7 +56,8 @@ class GeneralOpdFormFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        blockBackNavigationInManagedFlow(isManagedFlow, allowBackNavigation)
+        // Back navigation allowed — each form now returns to AllBenFragment independently
+        // blockBackNavigationInManagedFlow(isManagedFlow, allowBackNavigation)
 
         viewModel.recordExists.observe(viewLifecycleOwner) { exists ->
             exists?.let { recordExists ->
@@ -95,6 +103,7 @@ class GeneralOpdFormFragment : Fragment() {
 //                        getString(R.string.general_opd_submitted),
 //                        Toast.LENGTH_SHORT
 //                    ).show()
+                    WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
                     navigateToDiagnostics()
                 }
 
@@ -136,14 +145,20 @@ class GeneralOpdFormFragment : Fragment() {
     }
 
     private fun navigateToDiagnostics() {
-        findNavController().navigate(
-            R.id.TBSuspectedQuickFragment,
-            bundleOf(
-                "benId" to viewModel.benId,
-                "autoFlow" to viewModel.autoFlow,
-                "generalOpdFlow" to viewModel.generalOpdFlow
+        if (isManagedFlow) {
+            // Examine flow — return to AllBenFragment so user picks the next form
+            val popped = findNavController().popBackStack(R.id.allBenFragment, false)
+            if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
+        } else {
+            findNavController().navigate(
+                R.id.TBSuspectedQuickFragment,
+                bundleOf(
+                    "benId" to viewModel.benId,
+                    "autoFlow" to viewModel.autoFlow,
+                    "generalOpdFlow" to viewModel.generalOpdFlow
+                )
             )
-        )
+        }
     }
 
     override fun onStart() {

@@ -5,7 +5,9 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.Toast
+import androidx.core.widget.doAfterTextChanged
 import androidx.activity.OnBackPressedCallback
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -75,6 +77,21 @@ class CampModeConnectFragment : Fragment() {
         applyStatusBarInsetsToHeader()
 
         binding.etCampHubUrl.setText(viewModel.getCampHubUrl())
+
+        // Scroll to bottom after keyboard fully animates open (~300ms)
+        // so Connect button is visible above keyboard
+        binding.etCampHubUrl.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                binding.svConnect.postDelayed({
+                    binding.svConnect.fullScroll(View.FOCUS_DOWN)
+                }, 300)
+            }
+        }
+        // Clear error when user starts typing
+        binding.etCampHubUrl.doAfterTextChanged {
+            binding.tilCampHubUrl.error = null
+        }
+
         binding.ibBack.setOnClickListener {
             closeConnectScreen(refreshSignIn = false)
         }
@@ -93,6 +110,12 @@ class CampModeConnectFragment : Fragment() {
 
         binding.btnConnect.setOnClickListener {
             val campHubUrl = binding.etCampHubUrl.text?.toString().orEmpty()
+            if (campHubUrl.isBlank()) {
+                binding.tilCampHubUrl.error = getString(R.string.camp_hub_url_required)
+                binding.svConnect.post { binding.svConnect.fullScroll(View.FOCUS_DOWN) }
+                return@setOnClickListener
+            }
+            binding.tilCampHubUrl.error = null
             Log.d(TAG, "Connect button tapped from UI. url=$campHubUrl")
             viewModel.connectToCampHub(campHubUrl)
         }
@@ -156,9 +179,8 @@ class CampModeConnectFragment : Fragment() {
                 binding.tvStatus.setTextColor(
                     ContextCompat.getColor(requireContext(), R.color.md_theme_light_primary)
                 )
-                if (openedFromOfflineChip) {
-                    WorkerUtils.triggerCampQuickPullIfConnected(requireContext(), pref, force = true)
-                }
+                WorkerUtils.triggerAmritPushWorker(requireContext().applicationContext)
+                WorkerUtils.triggerCampQuickPullIfConnected(requireContext().applicationContext, pref, force = true)
                 closeConnectScreen(refreshSignIn = true)
             }
 
@@ -171,6 +193,21 @@ class CampModeConnectFragment : Fragment() {
                 )
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Pan screen up when keyboard opens — URL field stays visible above keyboard
+        activity?.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Restore adjustResize for other screens
+        activity?.window?.setSoftInputMode(
+            WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN or
+            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        )
     }
 
     override fun onDestroyView() {

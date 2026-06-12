@@ -126,10 +126,17 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
     }
 
     fun saveLocationRecord(locationRecord: LocationRecord) {
+        val oldVillageId = getLocationRecord()?.village?.id
+        val newVillageId = locationRecord.village.id
         val editor = pref.edit()
         val prefKey = context.getString(R.string.PREF_location_record_entry)
         val locationRecordJson = Gson().toJson(locationRecord)
         editor.putString(prefKey, locationRecordJson)
+        // Village changed — reset sync page counter so pull starts from page 0 for new village
+        if (oldVillageId != null && oldVillageId != newVillageId) {
+            editor.putInt(context.getString(R.string.PREF_first_pull_amrit_last_synced_page), 0)
+            editor.putLong(context.getString(R.string.PREF_full_load_pull_progress), Konstants.defaultTimeStamp)
+        }
         editor.apply()
     }
 
@@ -224,6 +231,23 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
     fun isCampHubConnected(): Boolean {
         val key = context.getString(R.string.PREF_camp_hub_connected)
         return pref.getBoolean(key, false)
+    }
+
+    /** Raw preference key for the camp-hub-connected flag (needed for change listeners). */
+    fun getCampHubConnectedKey(): String = context.getString(R.string.PREF_camp_hub_connected)
+
+    /**
+     * Register a listener that is notified whenever any preference changes.
+     * Use [getCampHubConnectedKey] to filter for the camp-hub-connected flag.
+     * The callback may be invoked on a background thread — always marshal UI
+     * updates with runOnUiThread.
+     */
+    fun addOnPreferenceChangeListener(listener: android.content.SharedPreferences.OnSharedPreferenceChangeListener) {
+        pref.registerOnSharedPreferenceChangeListener(listener)
+    }
+
+    fun removeOnPreferenceChangeListener(listener: android.content.SharedPreferences.OnSharedPreferenceChangeListener) {
+        pref.unregisterOnSharedPreferenceChangeListener(listener)
     }
 
     fun savePublicKeyForAbha(publicKey: String) {

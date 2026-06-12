@@ -31,12 +31,25 @@ local.properties
 app/.cxx/
 .cxx/
 
+# Native C++ secrets file (contains API URLs, keys, secrets — NEVER commit)
+app/src/main/cpp/native-lib.cpp
+
 # Google Services (contains API keys)
 google-services.json
+app/src/**/google-services.json
+
+# CI/CD secrets and service account files
+service-account*.json
+firebase-service-account*.json
+firebase-service-account*.json.enc
+secrets.properties
+.env
 
 # Keystore files
 *.jks
 *.keystore
+*.p12
+*.pem
 
 # OS files
 .DS_Store
@@ -55,7 +68,27 @@ fastlane/screenshots
 fastlane/test_output
 
 # Signing config
+keystore.properties
 signing-config-versions.json
 
 # Crashlytics
 app/build/
+
+# Build outputs and generated APKs
+outputs/
+app/stoptb/
+
+# Gradle user home cache
+.gradle-user-home/
+
+# Node / tools
+tools/node_modules/
+tools/*.xlsx
+tools/*.pdf
+
+# Native C++ secrets (contains API keys and URLs)
+app/src/main/cpp/native-lib.cpp
+
+# SSL certificates and registration keys
+app/src/main/res/raw/wildcard.crt
+app/src/main/assets/adi-registration.properties

@@ -25,17 +25,32 @@ data class TBDiagnosticsCache(
     val benId: Long,
     var visitDate: Long = System.currentTimeMillis(),
     var nikshayId: String? = null,
+    // ── Digital Chest X-Ray ──────────────────────────────────────────────────
+    var isReferredForDigitalChestXray: Boolean? = null,
+    var reasonForDenialChestXray: String? = null,       // pipe-sep English values
+    var reasonForDenialChestXrayOther: String? = null,
     var isChestXRayDone: Boolean? = null,
+    var reasonNotConductedChestXray: String? = null,
+    var reasonNotConductedChestXrayOther: String? = null,
     var chestXRayResult: String? = null,
-    var isSputumCollected: Boolean? = null,
+    // ── Sputum Collection ────────────────────────────────────────────────────
+    var isSputumCollected: Boolean? = null,             // used as "referred for sputum"
+    var reasonForDenialSputum: String? = null,          // pipe-sep English values
+    var reasonForDenialSputumOther: String? = null,
     var sputumSubmittedAt: String? = null,
+    // ── NAAT / TrueNAT ──────────────────────────────────────────────────────
     var isNaatConducted: Boolean? = null,
+    var reasonNotConductedNaat: String? = null,
+    var reasonNotConductedNaatOther: String? = null,
     var naatResult: String? = null,
+    // ── Liquid Culture ───────────────────────────────────────────────────────
     var recommendedForLiquidCultureTest: Boolean? = null,
     var isLiquidCultureConducted: Boolean? = null,
     var liquidCultureResult: String? = null,
+    // ── Outcome ─────────────────────────────────────────────────────────────
     var isTBConfirmed: Boolean? = null,
     var isConfirmed: Boolean = false,
+    // ── Meta ─────────────────────────────────────────────────────────────────
     var latitude: Double? = null,
     var longitude: Double? = null,
     var address: String? = null,
@@ -47,11 +62,20 @@ data class TBDiagnosticsCache(
         benId = benId,
         visitDate = getDateTimeStringFromLong(visitDate),
         nikshayId = nikshayId,
+        isReferredForDigitalChestXray = isReferredForDigitalChestXray,
+        reasonForDenialChestXray = reasonForDenialChestXray,
+        reasonForDenialChestXrayOther = reasonForDenialChestXrayOther,
         isChestXRayDone = isChestXRayDone,
+        reasonNotConductedChestXray = reasonNotConductedChestXray,
+        reasonNotConductedChestXrayOther = reasonNotConductedChestXrayOther,
         chestXRayResult = chestXRayResult,
         isSputumCollected = isSputumCollected,
+        reasonForDenialSputum = reasonForDenialSputum,
+        reasonForDenialSputumOther = reasonForDenialSputumOther,
         sputumSubmittedAt = sputumSubmittedAt,
         isNaatConducted = isNaatConducted,
+        reasonNotConductedNaat = reasonNotConductedNaat,
+        reasonNotConductedNaatOther = reasonNotConductedNaatOther,
         naatResult = naatResult,
         recommendedForLiquidCultureTest = recommendedForLiquidCultureTest,
         isLiquidCultureConducted = isLiquidCultureConducted,

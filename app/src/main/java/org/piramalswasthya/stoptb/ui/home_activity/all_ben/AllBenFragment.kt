@@ -32,17 +32,26 @@ import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
+import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.utils.callPhoneNumber
 import timber.log.Timber
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class AllBenFragment : Fragment() {
+class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     private companion object {
         val READ_ONLY_REFERRAL_SOURCES = setOf(5, 6, 7, 8)
     }
+
+    /**
+     * Tracks an in-progress Examine flow for a given benId.
+     * Set when user navigates to a form via the BottomSheet.
+     * Cleared when BottomSheet is manually dismissed (user swipes away).
+     * Non-null => show BottomSheet whenever AllBenFragment resumes.
+     */
+    private var pendingExamineBenId: Long? = null
 
     @Inject
     lateinit var prefDao: PreferenceDao
@@ -137,32 +146,18 @@ class AllBenFragment : Fragment() {
         val allowLegacyAccess = !isKnownRestrictedRole
         val isReadOnlyReferralList = args.source in READ_ONLY_REFERRAL_SOURCES
         val showResultButton = args.source == 6 || args.source == 7 || args.source == 8
-        val showAddBeneficiary = (isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
         val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
         val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
         val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess) && !isReadOnlyReferralList
         val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
         binding.llQuickRefresh.visibility = View.GONE
 
-        if (showAddBeneficiary) {
-            if (isReadOnlyReferralList) {
-                binding.btnNextPage.visibility = View.GONE
-            } else {
-                binding.btnNextPage.visibility = View.VISIBLE
-                binding.btnNextPage.text = getString(R.string.add_beneficiary)
-                binding.btnNextPage.setOnClickListener {
-                    findNavController().navigate(
-                        AllBenFragmentDirections.actionAllBenFragmentToNewBenRegFragment(
-                            hhId = 0L,
-                            relToHeadId = 18,
-                            gender = 0
-                        )
-                    )
-                }
-            }
-        } else {
-            binding.btnNextPage.visibility = View.GONE
-        }
+        // Add Ben button hidden — ben registration only via Household flow
+        binding.btnNextPage.visibility = View.GONE
+
+        // Download and Filter icons hidden for now
+        binding.ibFilter.visibility = View.GONE
+        binding.ibDownload.visibility = View.GONE
 
         binding.ibFilter.setOnClickListener {
             filterAlert.show()
@@ -170,11 +165,6 @@ class AllBenFragment : Fragment() {
 
         binding.ibDownload.setOnClickListener {
             viewModel.downloadCsv(requireContext())
-        }
-
-        if (args.source == 1 || args.source == 2 || args.source == 3 || args.source == 4 || args.source == 5 || args.source == 6 || args.source == 7 || args.source == 8) {
-            binding.ibFilter.visibility = View.GONE
-            binding.ibDownload.visibility = View.VISIBLE
         }
 
         var lastClickTime = 0L
@@ -204,8 +194,28 @@ class AllBenFragment : Fragment() {
                         )
                     }
                 },
-                clickedWifeBen = { item, hhId, benId, relToHeadId -> },
-                clickedHusbandBen = { item, hhId, benId, relToHeadId -> },
+                clickedWifeBen = { _, hhId, benId, _ ->
+                    findNavController().navigate(
+                        AllBenFragmentDirections.actionAllBenFragmentToNewBenRegFragment(
+                            hhId = hhId,
+                            relToHeadId = 4,       // Wife
+                            gender = 2,            // Female
+                            selectedBenId = benId, // husband's benId → mark isSpouseAdded after save
+                            isAddSpouse = 1
+                        )
+                    )
+                },
+                clickedHusbandBen = { _, hhId, benId, _ ->
+                    findNavController().navigate(
+                        AllBenFragmentDirections.actionAllBenFragmentToNewBenRegFragment(
+                            hhId = hhId,
+                            relToHeadId = 5,       // Husband
+                            gender = 1,            // Male
+                            selectedBenId = benId, // wife's benId → mark isSpouseAdded after save
+                            isAddSpouse = 1
+                        )
+                    )
+                },
                 clickedChildben = { item, hhId, benId, relToHeadId -> },
                 { item, hhid -> },
                 { item, benId, hhId ->
@@ -257,6 +267,10 @@ class AllBenFragment : Fragment() {
                             "autoFlow" to false
                         )
                     )
+                },
+                clickedExamine = { item, benId ->
+                    pendingExamineBenId = benId
+                    showExamineBottomSheet(benId)
                 }
             ),
             showBeneficiaries = true,
@@ -266,9 +280,10 @@ class AllBenFragment : Fragment() {
             showCall = showCallButton,
             pref = prefDao,
             context = requireActivity(),
-            showActionButtons = showBenActionButtons,
+            showActionButtons = false,
             showResultButton = showResultButton,
-            showAnthropometryButton = showAnthropometryButton
+            showAnthropometryButton = false,
+            showExamineButton = !isReadOnlyReferralList
         )
 
         binding.rvAny.adapter = benAdapter
@@ -289,9 +304,6 @@ class AllBenFragment : Fragment() {
                 val isEmpty = loadStates.refresh is LoadState.NotLoading
                         && benAdapter.itemCount == 0
                 binding.flEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
-                if (showAddBeneficiary) {
-                    binding.btnNextPage.visibility = View.VISIBLE
-                }
             }
         }
 
@@ -322,6 +334,12 @@ class AllBenFragment : Fragment() {
         lifecycleScope.launch {
             viewModel.anthropometryFilledBenIds.collectLatest { benIds ->
                 benAdapter.submitAnthropometryBenIds(benIds)
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.diagnosisBenIds.collectLatest { benIds ->
+                benAdapter.submitDiagnosisBenIds(benIds)
             }
         }
 
@@ -377,6 +395,83 @@ class AllBenFragment : Fragment() {
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Examine flow
+    // -------------------------------------------------------------------------
+
+    private fun showExamineBottomSheet(benId: Long) {
+        val existing = childFragmentManager.findFragmentByTag(ExamineBottomSheetFragment.TAG)
+        if (existing != null) return // already visible
+        // Always show without autoFlow — user decides whether to continue or close.
+        // autoFlow=true caused the form to re-open automatically when back was pressed.
+        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false)
+            .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
+    }
+
+    /** Navigate to the correct form based on [formIndex]. */
+    override fun onNavigateToExamineForm(benId: Long, formIndex: Int, viewOnly: Boolean) {
+        pendingExamineBenId = benId
+        when (formIndex) {
+            ExamineBottomSheetFragment.FORM_ANTHROPOMETRY -> {
+                findNavController().navigate(
+                    R.id.anthropometryFragment,
+                    bundleOf(
+                        "benId" to benId,
+                        "autoFlow" to false,
+                        "examineFlow" to !viewOnly
+                    )
+                )
+            }
+            ExamineBottomSheetFragment.FORM_GENERAL_EXAM -> {
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val benRegId = viewModel.getBenFromId(benId)
+                    findNavController().navigate(
+                        AllBenFragmentDirections.actionAllBenFragmentToVitalScreenFragment(
+                            benId = benId,
+                            benRegId = benRegId,
+                            autoFlow = !viewOnly
+                        )
+                    )
+                }
+            }
+            ExamineBottomSheetFragment.FORM_TB_SCREENING -> {
+                findNavController().navigate(
+                    R.id.TBScreeningFormFragment,
+                    bundleOf(
+                        "benId" to benId,
+                        "autoFlow" to !viewOnly
+                    )
+                )
+            }
+            ExamineBottomSheetFragment.FORM_GENERAL_OPD -> {
+                findNavController().navigate(
+                    R.id.GeneralOpdFormFragment,
+                    bundleOf(
+                        "benId" to benId,
+                        "viewOnly" to viewOnly,
+                        "autoFlow" to !viewOnly,
+                        "generalOpdFlow" to !viewOnly
+                    )
+                )
+            }
+            ExamineBottomSheetFragment.FORM_DIAGNOSIS -> {
+                findNavController().navigate(
+                    AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                        benId = benId,
+                        viewOnly = viewOnly
+                    )
+                )
+            }
+        }
+    }
+
+    /** User manually swiped/dismissed BottomSheet — clear examine flow state. */
+    override fun onExamineDismissed() {
+        pendingExamineBenId = null
+    }
+
+    // -------------------------------------------------------------------------
+
     override fun onStart() {
         super.onStart()
         updateToolbarTitle()
@@ -385,6 +480,22 @@ class AllBenFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         updateToolbarTitle()
+
+        // If TBSuspectedQuickFragment (Diagnosis) signalled that the examine flow
+        // is fully complete, clear pendingExamineBenId so the BottomSheet does NOT
+        // re-open — otherwise the back button would have to dismiss the BottomSheet
+        // before it could navigate away from this screen.
+        val sh = findNavController().currentBackStackEntry?.savedStateHandle
+        if (sh?.remove<Boolean>("examine_flow_done") == true) {
+            pendingExamineBenId = null
+        }
+
+        // Re-show BottomSheet only if we're still mid-flow (user pressed back
+        // without submitting a form, so they need to continue or cancel).
+        val benId = pendingExamineBenId
+        if (benId != null) {
+            showExamineBottomSheet(benId)
+        }
     }
 
     private fun updateToolbarTitle() {

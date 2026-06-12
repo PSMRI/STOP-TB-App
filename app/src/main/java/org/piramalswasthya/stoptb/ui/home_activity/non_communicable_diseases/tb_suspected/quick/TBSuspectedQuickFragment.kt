@@ -7,7 +7,6 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -19,11 +18,15 @@ import org.piramalswasthya.stoptb.helpers.blockBackNavigationInManagedFlow
 import org.piramalswasthya.stoptb.helpers.setAutoFlowBackNavigationBlocked
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class TBSuspectedQuickFragment : Fragment() {
+
+    @Inject lateinit var preferenceDao: PreferenceDao
 
     private var _binding: FragmentNewFormBinding? = null
     private val binding: FragmentNewFormBinding
@@ -45,7 +48,8 @@ class TBSuspectedQuickFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: android.os.Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        blockBackNavigationInManagedFlow(isManagedFlow, allowBack = false)
+        // Back navigation allowed — each form now returns to AllBenFragment independently
+        // blockBackNavigationInManagedFlow(isManagedFlow, allowBack = false)
         val adapter = FormInputAdapter(
             formValueListener = FormInputAdapter.FormValueListener { formId, index ->
                 viewModel.updateListOnValueChanged(formId, index)
@@ -86,18 +90,26 @@ class TBSuspectedQuickFragment : Fragment() {
                         Toast.LENGTH_SHORT
                     ).show()
                     if (!viewModel.viewOnly) {
-                        WorkerUtils.triggerAmritPushWorker(requireContext())
+                        WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
                     }
                     if (viewModel.viewOnly) {
                         findNavController().navigateUp()
                     } else {
-                        findNavController().navigate(
-                            R.id.allBenFragment,
-                            null,
-                            NavOptions.Builder()
-                                .setPopUpTo(R.id.allBenFragment, false)
-                                .build()
-                        )
+                        // Signal AllBenFragment to clear pendingExamineBenId so the
+                        // BottomSheet does NOT re-open after the flow is complete.
+                        try {
+                            findNavController()
+                                .getBackStackEntry(R.id.allBenFragment)
+                                .savedStateHandle["examine_flow_done"] = true
+                        } catch (_: Exception) { /* AllBenFragment not in stack — edge case */ }
+
+                        // Pop all examine-flow forms off the back stack and return to the
+                        // existing AllBenFragment instance (not a new one).
+                        val returnedToList = findNavController().popBackStack(R.id.allBenFragment, false)
+                        if (!returnedToList) {
+                            // AllBenFragment not found in back stack (rare edge case)
+                            findNavController().navigate(R.id.allBenFragment, null)
+                        }
                     }
                 }
 

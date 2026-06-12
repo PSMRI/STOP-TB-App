@@ -158,7 +158,7 @@ class SignInFragment : Fragment() {
                     activity?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
                 imm?.hideSoftInputFromWindow(view.windowToken, 0)
             }
-            if (viewModel.isCampModeEnabled() && !viewModel.isCampHubConnected()) {
+            if (!viewModel.isCampHubConnected()) {
                 binding.tvError.text = getString(R.string.camp_hub_login_blocked)
                 binding.tvError.visibility = View.VISIBLE
                 viewModel.checkCampHubConnection()
@@ -282,7 +282,7 @@ class SignInFragment : Fragment() {
                         hasRememberMePassword = true
                     } ?: binding.etPassword.text?.clear()
                     binding.cbRemember.isChecked = hasRememberMeUsername
-                    if (hasRememberMeUsername && hasRememberMePassword && !viewModel.isCampModeEnabled()) {
+                    if (hasRememberMeUsername && hasRememberMePassword && viewModel.isCampHubConnected()) {
                         validateInput()
                     }
                 }
@@ -459,24 +459,38 @@ class SignInFragment : Fragment() {
             CampHubStatus.IDLE -> {
                 binding.tvCampStatus.text = getString(R.string.camp_hub_not_connected)
                 binding.tvCampStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_theme_light_onSurfaceVariant))
-                binding.btnLogin.isEnabled = true
+                setLoginButtonReady(false)
             }
             CampHubStatus.CHECKING -> {
                 binding.tvCampStatus.text = getString(R.string.camp_hub_checking)
                 binding.tvCampStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_theme_light_onSurfaceVariant))
-                binding.btnLogin.isEnabled = false
+                setLoginButtonReady(false)
             }
             CampHubStatus.CONNECTED -> {
                 binding.tvCampStatus.text = getString(R.string.camp_hub_connected)
                 binding.tvCampStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_theme_light_primary))
-                binding.btnLogin.isEnabled = true
+                setLoginButtonReady(true)
             }
             CampHubStatus.NOT_CONNECTED -> {
                 binding.tvCampStatus.text = getString(R.string.camp_hub_not_connected)
                 binding.tvCampStatus.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.holo_red_dark))
-                binding.btnLogin.isEnabled = !viewModel.isCampModeEnabled()
+                setLoginButtonReady(false)
             }
         }
+    }
+
+    /**
+     * Visually enable/disable the login button while keeping it always clickable
+     * so the click listener can show an error message when hub is not connected.
+     */
+    private fun setLoginButtonReady(ready: Boolean) {
+        binding.btnLogin.alpha = if (ready) 1f else 0.45f
+        binding.btnLogin.backgroundTintList = android.content.res.ColorStateList.valueOf(
+            ContextCompat.getColor(
+                requireContext(),
+                if (ready) R.color.md_theme_light_primary else android.R.color.darker_gray
+            )
+        )
     }
 
     private fun clearLoginFieldErrors() {
@@ -513,12 +527,8 @@ class SignInFragment : Fragment() {
             return
         }
 
-        if (viewModel.isCampModeEnabled()) {
-            if (viewModel.isCampHubConnected()) {
-                viewModel.authUser(username, password)
-            } else {
-                viewModel.updateState(NetworkResponse.Error(getString(R.string.camp_hub_login_blocked)))
-            }
+        if (!viewModel.isCampHubConnected()) {
+            viewModel.updateState(NetworkResponse.Error(getString(R.string.camp_hub_login_blocked)))
             return
         }
 

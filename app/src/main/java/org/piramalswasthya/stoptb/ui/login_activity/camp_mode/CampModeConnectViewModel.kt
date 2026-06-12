@@ -66,7 +66,7 @@ class CampModeConnectViewModel @Inject constructor(
 
     private suspend fun pingCampHub(rawUrl: String): Boolean = withContext(Dispatchers.IO) {
         val baseUrl = rawUrl.trim().trimEnd('/')
-        val healthUrl = "$baseUrl/health"
+        val healthUrl = "$baseUrl/common-api/health"
         var connection: HttpURLConnection? = null
         runCatching {
             Log.d(TAG, "Health check started. url=$healthUrl")
