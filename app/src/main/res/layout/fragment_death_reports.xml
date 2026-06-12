@@ -107,11 +107,14 @@
                 </com.google.android.material.card.MaterialCardView>
 
                 <FrameLayout
-                    android:layout_width="40dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="40dp"
                     android:background="@drawable/bg_circular_1"
                     android:elevation="8dp"
+                    android:minWidth="40dp"
                     android:onClick="@{() -> clickListener.onClicked(generalIcon)}"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
                     app:layout_constraintBottom_toTopOf="@id/card_general_deaths"
                     app:layout_constraintEnd_toEndOf="@id/card_general_deaths"
                     app:layout_constraintStart_toStartOf="@id/card_general_deaths"
@@ -122,6 +125,9 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_gravity="center"
+                        android:includeFontPadding="false"
+                        android:maxLines="1"
+                        android:singleLine="true"
                         android:textColor="@android:color/white"
                         android:textSize="16sp"
                         android:textStyle="bold"
@@ -189,11 +195,14 @@
                 </com.google.android.material.card.MaterialCardView>
 
                 <FrameLayout
-                    android:layout_width="40dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="40dp"
                     android:background="@drawable/bg_circular_1"
                     android:elevation="8dp"
+                    android:minWidth="40dp"
                     android:onClick="@{() -> clickListener.onClicked(maternalIcon)}"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
                     app:layout_constraintBottom_toTopOf="@id/card_maternal_deaths"
                     app:layout_constraintEnd_toEndOf="@id/card_maternal_deaths"
                     app:layout_constraintStart_toStartOf="@id/card_maternal_deaths"
@@ -204,6 +213,9 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_gravity="center"
+                        android:includeFontPadding="false"
+                        android:maxLines="1"
+                        android:singleLine="true"
                         android:textColor="@android:color/white"
                         android:textSize="16sp"
                         android:textStyle="bold"
@@ -282,11 +294,14 @@
                 </com.google.android.material.card.MaterialCardView>
 
                 <FrameLayout
-                    android:layout_width="40dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="40dp"
                     android:background="@drawable/bg_circular_1"
                     android:elevation="8dp"
+                    android:minWidth="40dp"
                     android:onClick="@{() -> clickListener.onClicked(nonMaternalIcon)}"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
                     app:layout_constraintBottom_toTopOf="@id/card_non_maternal_deaths"
                     app:layout_constraintEnd_toEndOf="@id/card_non_maternal_deaths"
                     app:layout_constraintStart_toStartOf="@id/card_non_maternal_deaths"
@@ -297,6 +312,9 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_gravity="center"
+                        android:includeFontPadding="false"
+                        android:maxLines="1"
+                        android:singleLine="true"
                         android:textColor="@android:color/white"
                         android:textSize="16sp"
                         android:textStyle="bold"
@@ -364,11 +382,14 @@
                 </com.google.android.material.card.MaterialCardView>
 
                 <FrameLayout
-                    android:layout_width="40dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="40dp"
                     android:background="@drawable/bg_circular_1"
                     android:elevation="8dp"
+                    android:minWidth="40dp"
                     android:onClick="@{() -> clickListener.onClicked(childIcon)}"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
                     app:layout_constraintBottom_toTopOf="@id/card_child_deaths"
                     app:layout_constraintEnd_toEndOf="@id/card_child_deaths"
                     app:layout_constraintStart_toStartOf="@id/card_child_deaths"
@@ -379,6 +400,9 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_gravity="center"
+                        android:includeFontPadding="false"
+                        android:maxLines="1"
+                        android:singleLine="true"
                         android:textColor="@android:color/white"
                         android:textSize="16sp"
                         android:textStyle="bold"

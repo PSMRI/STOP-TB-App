@@ -6,6 +6,7 @@ import android.os.Build
 import android.provider.OpenableColumns
 import android.text.Html
 import android.text.InputType
+import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.Animation
@@ -81,7 +82,7 @@ fun TextView.setRecordCount(scope: CoroutineScope, count: Flow<Int>?) {
         scope.launch {
             try {
                 flow.collect {
-                    text = it.toString()
+                    setCountBadgeText(it)
                 }
             } catch (e: Exception) {
                 Timber.d("Exception at record count : $e collected")
@@ -92,6 +93,35 @@ fun TextView.setRecordCount(scope: CoroutineScope, count: Flow<Int>?) {
         text = null
     }
 }
+
+fun TextView.setCountBadgeText(count: Int) {
+    text = count.toString()
+    keepCountBadgeCircular(count.toString())
+}
+
+private fun TextView.keepCountBadgeCircular(value: String) {
+    post {
+        val minSize = maxOf(
+            layoutParams?.height?.takeIf { it > 0 } ?: 0,
+            minHeight,
+            minWidth,
+            30.dpToPx()
+        )
+        val requiredWidth = paint.measureText(value).toInt() + paddingLeft + paddingRight
+        val size = maxOf(minSize, requiredWidth)
+        layoutParams = layoutParams?.apply {
+            width = size
+            height = size
+        } ?: ViewGroup.LayoutParams(size, size)
+    }
+}
+
+private fun Int.dpToPx(): Int =
+    TypedValue.applyDimension(
+        TypedValue.COMPLEX_UNIT_DIP,
+        toFloat(),
+        android.content.res.Resources.getSystem().displayMetrics
+    ).toInt()
 
 @BindingAdapter("allowRedBorder", "scope", "recordCount")
 fun CardView.setRedBorder(allowRedBorder: Boolean, scope: CoroutineScope, count: Flow<Int>?) {

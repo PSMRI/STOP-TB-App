@@ -789,7 +789,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
         }
 
         binding.navView.menu.findItem(R.id.menu_support).setOnMenuItemClickListener {
-            var url = "https://forms.office.com/r/AqY1KqAz3v"
+            var url = "https://forms.cloud.microsoft/r/dBUUKz8jwx"
             if (url.isNotEmpty()){
                 val i = Intent(Intent.ACTION_VIEW)
                 i.setData(Uri.parse(url))

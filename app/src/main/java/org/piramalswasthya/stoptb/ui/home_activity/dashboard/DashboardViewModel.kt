@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.TBDao
@@ -23,6 +24,29 @@ data class TbGenderBreakdown(
     val seniorCitizen: Int = 0
 
     )
+
+data class PositiveNegativeCount(
+    val positive: Int = 0,
+    val negative: Int = 0,
+) {
+    val total: Int get() = positive + negative
+}
+
+data class TbPositiveNegativeBreakdown(
+    val total: PositiveNegativeCount = PositiveNegativeCount(),
+    val male: PositiveNegativeCount = PositiveNegativeCount(),
+    val female: PositiveNegativeCount = PositiveNegativeCount(),
+    val children: PositiveNegativeCount = PositiveNegativeCount(),
+    val others: PositiveNegativeCount = PositiveNegativeCount(),
+)
+
+private enum class PositiveNegativeGroup {
+    TOTAL,
+    MALE,
+    FEMALE,
+    CHILDREN,
+    OTHERS
+}
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
@@ -56,6 +80,12 @@ class DashboardViewModel @Inject constructor(
     // Dashboard data
     private val _tbScreening = MutableLiveData(TbGenderBreakdown())
     val tbScreening: LiveData<TbGenderBreakdown> get() = _tbScreening
+
+    private val _pastHistoryTb = MutableLiveData(TbPositiveNegativeBreakdown())
+    val pastHistoryTb: LiveData<TbPositiveNegativeBreakdown> get() = _pastHistoryTb
+
+    private val _antiTbDrugs = MutableLiveData(TbPositiveNegativeBreakdown())
+    val antiTbDrugs: LiveData<TbPositiveNegativeBreakdown> get() = _antiTbDrugs
 
     private val _tbSuspected = MutableLiveData(TbGenderBreakdown())
     val tbSuspected: LiveData<TbGenderBreakdown> get() = _tbSuspected
@@ -157,6 +187,8 @@ class DashboardViewModel @Inject constructor(
         val village = selectedVillageId
 
         _tbScreening.value = TbGenderBreakdown()
+        _pastHistoryTb.value = TbPositiveNegativeBreakdown()
+        _antiTbDrugs.value = TbPositiveNegativeBreakdown()
         _tbSuspected.value = TbGenderBreakdown()
         _tbConfirmed.value = TbGenderBreakdown()
         _digitalChestXray.value = TbGenderBreakdown()
@@ -203,6 +235,34 @@ class DashboardViewModel @Inject constructor(
                 _tbScreening.value = current.copy(seniorCitizen = seniorCitizen)
             }
         }
+
+        collectPositiveNegativeBreakdown(
+            target = _pastHistoryTb,
+            countQuery = { gender, isChild, positive ->
+                tbDao.getDashboardPastHistoryTbCount(
+                    village,
+                    startTime,
+                    endTime,
+                    gender,
+                    isChild,
+                    positive
+                )
+            }
+        )
+
+        collectPositiveNegativeBreakdown(
+            target = _antiTbDrugs,
+            countQuery = { gender, isChild, positive ->
+                tbDao.getDashboardAntiTbDrugsCount(
+                    village,
+                    startTime,
+                    endTime,
+                    gender,
+                    isChild,
+                    positive
+                )
+            }
+        )
 
         // TB Suspected breakdown
         collectJobs += viewModelScope.launch {
@@ -356,13 +416,13 @@ class DashboardViewModel @Inject constructor(
 
     private fun collectBreakdown(
         target: MutableLiveData<TbGenderBreakdown>,
-        totalQuery: () -> kotlinx.coroutines.flow.Flow<Int>,
-        maleQuery: () -> kotlinx.coroutines.flow.Flow<Int>,
-        femaleQuery: () -> kotlinx.coroutines.flow.Flow<Int>,
-        childrenQuery: () -> kotlinx.coroutines.flow.Flow<Int>,
+        totalQuery: () -> Flow<Int>,
+        maleQuery: () -> Flow<Int>,
+        femaleQuery: () -> Flow<Int>,
+        childrenQuery: () -> Flow<Int>,
 
-        othersQuery: () -> kotlinx.coroutines.flow.Flow<Int>,
-        seniorCitizenQuery: () -> kotlinx.coroutines.flow.Flow<Int>,
+        othersQuery: () -> Flow<Int>,
+        seniorCitizenQuery: () -> Flow<Int>,
     ) {
         collectJobs += viewModelScope.launch {
             totalQuery().collect { total ->
@@ -401,5 +461,49 @@ class DashboardViewModel @Inject constructor(
             }
         }
     }
+
+    private fun collectPositiveNegativeBreakdown(
+        target: MutableLiveData<TbPositiveNegativeBreakdown>,
+        countQuery: (gender: String, isChild: Int, positive: Int) -> Flow<Int>,
+    ) {
+        collectPositiveNegativeGroup(target, PositiveNegativeGroup.TOTAL, "", 0, countQuery)
+        collectPositiveNegativeGroup(target, PositiveNegativeGroup.MALE, "MALE", 0, countQuery)
+        collectPositiveNegativeGroup(target, PositiveNegativeGroup.FEMALE, "FEMALE", 0, countQuery)
+        collectPositiveNegativeGroup(target, PositiveNegativeGroup.CHILDREN, "", 1, countQuery)
+        collectPositiveNegativeGroup(target, PositiveNegativeGroup.OTHERS, "OTHERS", 0, countQuery)
+    }
+
+    private fun collectPositiveNegativeGroup(
+        target: MutableLiveData<TbPositiveNegativeBreakdown>,
+        group: PositiveNegativeGroup,
+        gender: String,
+        isChild: Int,
+        countQuery: (gender: String, isChild: Int, positive: Int) -> Flow<Int>,
+    ) {
+        collectJobs += viewModelScope.launch {
+            countQuery(gender, isChild, 1).collect { count ->
+                val current = target.value ?: TbPositiveNegativeBreakdown()
+                target.value = current.updateGroup(group) { it.copy(positive = count) }
+            }
+        }
+        collectJobs += viewModelScope.launch {
+            countQuery(gender, isChild, 0).collect { count ->
+                val current = target.value ?: TbPositiveNegativeBreakdown()
+                target.value = current.updateGroup(group) { it.copy(negative = count) }
+            }
+        }
+    }
+
+    private fun TbPositiveNegativeBreakdown.updateGroup(
+        group: PositiveNegativeGroup,
+        update: (PositiveNegativeCount) -> PositiveNegativeCount,
+    ): TbPositiveNegativeBreakdown =
+        when (group) {
+            PositiveNegativeGroup.TOTAL -> copy(total = update(total))
+            PositiveNegativeGroup.MALE -> copy(male = update(male))
+            PositiveNegativeGroup.FEMALE -> copy(female = update(female))
+            PositiveNegativeGroup.CHILDREN -> copy(children = update(children))
+            PositiveNegativeGroup.OTHERS -> copy(others = update(others))
+        }
 
 }
