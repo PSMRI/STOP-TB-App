@@ -9,7 +9,6 @@ import okhttp3.ResponseBody
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
-import org.piramalswasthya.stoptb.BuildConfig
 import org.piramalswasthya.stoptb.utils.KeyUtils
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.ABHAModel
@@ -72,14 +71,7 @@ class AbhaIdRepo @Inject constructor(
             try {
 
                 val response = abhaApiService.getToken(
-                    id = if (BuildConfig.FLAVOR.contains("stag", true) ||
-                        BuildConfig.FLAVOR.contains("uat", true) ||
-                        KeyUtils.abhaTokenUrl().contains("dev.abdm", true)
-                    ) {
-                        "sbx"
-                    } else {
-                        "abdm"
-                    },
+                    id = getCmIdForTokenUrl(),
                     requestId = generateUUID(),
                     timestamp = getCurrentTimestamp()
                 )
@@ -100,6 +92,17 @@ class AbhaIdRepo @Inject constructor(
                 e.printStackTrace()
                 NetworkResult.Error(-4, e.message ?: "Unknown Error")
             }
+        }
+    }
+
+    private fun getCmIdForTokenUrl(): String {
+        val tokenUrl = KeyUtils.abhaTokenUrl()
+        return if (tokenUrl.contains("dev.abdm", true) ||
+            tokenUrl.contains("sbx", true)
+        ) {
+            "sbx"
+        } else {
+            "abdm"
         }
     }
 

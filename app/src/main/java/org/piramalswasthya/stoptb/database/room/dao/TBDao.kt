@@ -134,6 +134,44 @@ interface TBDao {
     fun getDashboardTbScreeningCount(villageId: Int, startTime: Long, endTime: Long, gender: String, isChild: Int,    isSeniorCitizen: Int
     ): Flow<Int>
 
+    @Query("""
+        SELECT COUNT(*) FROM TB_SCREENING ts
+        INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
+        WHERE (:villageId = 0 OR b.loc_village_id = :villageId)
+        AND (:startTime = 0 OR ts.visitDate >= :startTime)
+        AND (:endTime = 0 OR ts.visitDate <= :endTime)
+        AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
+        AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+        AND ((:positive = 1 AND ts.historyOfTb = 1) OR (:positive = 0 AND ts.historyOfTb = 0))
+    """)
+    fun getDashboardPastHistoryTbCount(
+        villageId: Int,
+        startTime: Long,
+        endTime: Long,
+        gender: String,
+        isChild: Int,
+        positive: Int,
+    ): Flow<Int>
+
+    @Query("""
+        SELECT COUNT(*) FROM TB_SCREENING ts
+        INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
+        WHERE (:villageId = 0 OR b.loc_village_id = :villageId)
+        AND (:startTime = 0 OR ts.visitDate >= :startTime)
+        AND (:endTime = 0 OR ts.visitDate <= :endTime)
+        AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
+        AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+        AND ((:positive = 1 AND ts.takingAntiTBDrugs = 1) OR (:positive = 0 AND ts.takingAntiTBDrugs = 0))
+    """)
+    fun getDashboardAntiTbDrugsCount(
+        villageId: Int,
+        startTime: Long,
+        endTime: Long,
+        gender: String,
+        isChild: Int,
+        positive: Int,
+    ): Flow<Int>
+
     // Dashboard queries - TB Suspected count by gender with time + village filter
     @Query("""
         SELECT COUNT(*) FROM (

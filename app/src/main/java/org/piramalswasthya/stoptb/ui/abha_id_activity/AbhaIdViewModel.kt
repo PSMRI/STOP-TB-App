@@ -91,17 +91,14 @@ class AbhaIdViewModel @Inject constructor(
     }
 
     private fun generatePublicKey() {
-        val publicKey = prefDao.getPublicKeyForAbha()
-        if (publicKey == null) {
-            viewModelScope.launch {
-                when (val result = abhaIdRepo.getAuthCert()) {
-                    is NetworkResult.Success -> {
-                        prefDao.savePublicKeyForAbha(result.data)
-                    }
-
-                    is NetworkResult.Error -> {}
-                    is NetworkResult.NetworkError -> {}
+        viewModelScope.launch {
+            when (val result = abhaIdRepo.getAuthCert()) {
+                is NetworkResult.Success -> {
+                    prefDao.savePublicKeyForAbha(result.data)
                 }
+
+                is NetworkResult.Error -> {}
+                is NetworkResult.NetworkError -> {}
             }
         }
     }

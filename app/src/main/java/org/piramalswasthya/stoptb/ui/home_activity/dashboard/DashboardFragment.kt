@@ -153,6 +153,54 @@ class DashboardFragment : Fragment() {
 
         }
 
+        viewModel.pastHistoryTb.observe(viewLifecycleOwner) { data ->
+            binding.tvPastHistoryTbTotal.text = data.total.total.toString()
+            binding.tvPastHistoryTbMale.text = getString(
+                R.string.dashboard_row_male_pos_neg,
+                data.male.positive,
+                data.male.negative
+            )
+            binding.tvPastHistoryTbFemale.text = getString(
+                R.string.dashboard_row_female_pos_neg,
+                data.female.positive,
+                data.female.negative
+            )
+            binding.tvPastHistoryTbChildren.text = getString(
+                R.string.dashboard_row_children_pos_neg,
+                data.children.positive,
+                data.children.negative
+            )
+            binding.tvPastHistoryTbOthers.text = getString(
+                R.string.dashboard_row_others_pos_neg,
+                data.others.positive,
+                data.others.negative
+            )
+        }
+
+        viewModel.antiTbDrugs.observe(viewLifecycleOwner) { data ->
+            binding.tvAntiTbDrugsTotal.text = data.total.total.toString()
+            binding.tvAntiTbDrugsMale.text = getString(
+                R.string.dashboard_row_male_pos_neg,
+                data.male.positive,
+                data.male.negative
+            )
+            binding.tvAntiTbDrugsFemale.text = getString(
+                R.string.dashboard_row_female_pos_neg,
+                data.female.positive,
+                data.female.negative
+            )
+            binding.tvAntiTbDrugsChildren.text = getString(
+                R.string.dashboard_row_children_pos_neg,
+                data.children.positive,
+                data.children.negative
+            )
+            binding.tvAntiTbDrugsOthers.text = getString(
+                R.string.dashboard_row_others_pos_neg,
+                data.others.positive,
+                data.others.negative
+            )
+        }
+
         // TB Suspected card
         viewModel.tbSuspected.observe(viewLifecycleOwner) { data ->
             binding.tvTbSuspectedTotal.text = data.total.toString()

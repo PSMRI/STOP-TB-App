@@ -333,6 +333,8 @@
     <string name="dashboard_nikshay_subtitle">Linked beneficiary treatment IDs</string>
     <string name="dashboard_abha_subtitle">Beneficiaries with digital health IDs</string>
     <string name="total_tb_screenings">Total TB Screenings</string>
+    <string name="total_past_history_tb">Total beneficiaries with Past History of TB</string>
+    <string name="total_currently_on_anti_tb_drugs">Total beneficiaries Currently on Anti-TB Drugs</string>
     <string name="total_tb_suspected">Total TB Suspected Cases</string>
     <string name="total_tb_confirmed">Total TB Confirmed Cases</string>
     <string name="total_digital_chest_xrays">Total Digital Chest X-Rays conducted</string>
@@ -346,6 +348,10 @@
     <string name="label_children">Children(&lt;15y): %d</string>
     <string name="label_others">Others: %d</string>
     <string name="label_senior_citizen">Age(>=60): %d</string>
+    <string name="dashboard_row_male_pos_neg">Male: Positive %1$d / Negative %2$d</string>
+    <string name="dashboard_row_female_pos_neg">Female: Positive %1$d / Negative %2$d</string>
+    <string name="dashboard_row_children_pos_neg">Children (&lt;15 yrs): Positive %1$d / Negative %2$d</string>
+    <string name="dashboard_row_others_pos_neg">Others: Positive %1$d / Negative %2$d</string>
     <string name="month_january">January</string>
     <string name="month_february">February</string>
     <string name="month_march">March</string>

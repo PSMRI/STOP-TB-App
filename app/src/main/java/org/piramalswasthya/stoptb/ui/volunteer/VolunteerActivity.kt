@@ -368,7 +368,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
 
         // ── Support ──────────────────────────────────────────────────────
         binding.navView.menu.findItem(R.id.menu_support)?.setOnMenuItemClickListener {
-            val url = "https://forms.office.com/r/AqY1KqAz3v"
+            val url = "https://forms.cloud.microsoft/r/dBUUKz8jwx"
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
             binding.drawerLayout.close()
             true
