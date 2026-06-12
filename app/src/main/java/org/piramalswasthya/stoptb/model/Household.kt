@@ -68,6 +68,13 @@ data class HouseholdCache(
     @Embedded(prefix = "det_") var details: HouseholdDetails? = null,
     @Embedded(prefix = "amn_") var amenities: HouseholdAmenities? = null,
     @Embedded(prefix = "loc_") val locationRecord: LocationRecord,
+    // GPS location captured at registration time
+    var gpsLatitude: Double? = null,
+    var gpsLongitude: Double? = null,
+    var digipin: String? = null,
+    var gpsTimestamp: String? = null,
+    @ColumnInfo(defaultValue = "0") var isGpsUnavailable: Boolean = false,
+    var gpsUnavailableReason: String? = null,
     //Spam
     var registrationType: String? = null,
     var serverUpdatedStatus: Int = 0,
@@ -135,7 +142,13 @@ data class HouseholdCache(
             mohallaName = family?.mohallaName,
             rationCardDetails = family?.rationCardDetails,
             districtname = locationRecord.district.name,
-            isDeactivate = isDeactivate
+            isDeactivate = isDeactivate,
+            latitude = gpsLatitude,
+            longitude = gpsLongitude,
+            digipin = digipin,
+            gpsTimestamp = gpsTimestamp,
+            isGpsUnavailable = isGpsUnavailable,
+            gpsUnavailableReason = gpsUnavailableReason
         )
 
     }
@@ -254,7 +267,14 @@ data class HouseholdNetwork(
     @Json(name = "blockid") val blockid: Int = 0,
 
     @Json(name = "villageid") val villageid: Int = 0,
-    @Json(name = "isDeactivate")var isDeactivate: Boolean =false
+    @Json(name = "isDeactivate")var isDeactivate: Boolean =false,
+
+    @Json(name = "latitude") val latitude: Double? = null,
+    @Json(name = "longitude") val longitude: Double? = null,
+    @Json(name = "digipin") val digipin: String? = null,
+    @Json(name = "gpsTimestamp") val gpsTimestamp: String? = null,
+    @Json(name = "isGpsUnavailable") val isGpsUnavailable: Boolean? = null,
+    @Json(name = "gpsUnavailableReason") val gpsUnavailableReason: String? = null
 
     )
 

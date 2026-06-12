@@ -1251,6 +1251,14 @@ data class BenRegCache(
 
     var longitude: Double = 0.0,
 
+    // GPS location captured at registration time (standalone beneficiary only)
+    var gpsLatitude: Double? = null,
+    var gpsLongitude: Double? = null,
+    var digipin: String? = null,
+    var gpsTimestamp: String? = null,
+    @ColumnInfo(defaultValue = "0") var isGpsUnavailable: Boolean = false,
+    var gpsUnavailableReason: String? = null,
+
     ///////////////////////////Bank details Start///////////////////////////
     var hasAadhar: Boolean? = false,
 
@@ -1562,8 +1570,12 @@ data class BenRegCache(
                 residentialArea = residentialArea,
                 residentialAreaId = residentialAreaId,
                 otherResidentialArea = otherResidentialArea,
-                latitude = latitude,
-                longitude = longitude,
+                latitude = gpsLatitude ?: latitude,
+                longitude = gpsLongitude ?: longitude,
+                digipin = digipin,
+                gpsTimestamp = gpsTimestamp,
+                isGpsUnavailable = isGpsUnavailable,
+                gpsUnavailableReason = gpsUnavailableReason,
                 createdBy = user.userName,
             ),
             benPhoneMaps = arrayOf(
