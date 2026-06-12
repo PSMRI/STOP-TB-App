@@ -20,6 +20,7 @@ import org.piramalswasthya.stoptb.work.dynamicWoker.FormSyncWorker
 import org.piramalswasthya.stoptb.work.dynamicWoker.NCDFollowUpSyncWorker
 import org.piramalswasthya.stoptb.work.dynamicWoker.NDCFollowUpPushWorker
 import timber.log.Timber
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 object WorkerUtils {
@@ -38,18 +39,18 @@ object WorkerUtils {
             .setConstraints(networkOnlyConstraint)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
 
-    fun triggerAmritPushWorker(context: Context) {
+    fun triggerAmritPushWorker(context: Context): Set<UUID> {
         // Block all data push until camp mode is active AND hub is connected
         val prefs = PreferenceManager.getInstance(context)
         val campKey = context.getString(R.string.PREF_camp_mode_enabled)
         if (!prefs.getBoolean(campKey, false)) {
             Timber.d("Push worker skipped: camp mode is disabled")
-            return
+            return emptySet()
         }
         val hubConnectedKey = context.getString(R.string.PREF_camp_hub_connected)
         if (!prefs.getBoolean(hubConnectedKey, false)) {
             Timber.d("Push worker skipped: camp hub is disconnected")
-            return
+            return emptySet()
         }
 
         val workManager = WorkManager.getInstance(context)
@@ -73,9 +74,11 @@ object WorkerUtils {
         val chainAbha = afterRegistration.then(listOf(groupAbha))
 
         WorkContinuation.combine(listOf(chainTB, chainAbha)).enqueue()
+
+        return setOf(registration.id, groupTB.first().id, groupAbha.id)
     }
 
-    fun triggerAmritPullWorker(context: Context) {
+    fun triggerAmritPullWorker(context: Context): Set<UUID> {
         val workManager = WorkManager.getInstance(context)
 
         // StopTB pull chain:
@@ -95,6 +98,8 @@ object WorkerUtils {
         val chainTB = afterFoundation.then(groupTB)
 
         chainTB.then(setSyncCompleteWorker).enqueue()
+
+        return setOf(pullWorkRequest.id, groupTB.first().id, setSyncCompleteWorker.id)
     }
 
     /** Convenience alias — camp check is already inside [triggerAmritPushWorker]. */
