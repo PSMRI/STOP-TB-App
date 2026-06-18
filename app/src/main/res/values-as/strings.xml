@@ -24,7 +24,7 @@
     <string name="tv_ben_surname">উপকাৰীৰ বৰ্গীকৰণ</string>
     <string name="tv_gender_ph">লিংগ</string>
     <string name="tv_father_name_ph">পিতৃৰ নাম</string>
-    <string name="tv_family_head_name_ph">পৰিৱাৰৰ প্ৰধানৰ নাম</string>
+    <string name="tv_family_head_name_ph">Head of Family</string>
     <string name="tv_ben_id_ph">উপকাৰী আইডি</string>
     <string name="tv_mob_no_ph">"ম\'বাইল নম্বৰ</string>
     <string name="tv_age_ph">বয়স</string>
@@ -137,7 +137,7 @@
     <string name="high_risk_non_pregnant_women">উচ্চ ঝুঁকিপূৰ্ণ অগৰ্ভৱতী মহিলা</string>
     <string name="low_birth_weight_babies">কম ওজনৰ নবজাত শিশুসকল</string>
     <string name="relation_with_hof">গৃহমুৰব্বীৰ সৈতে সম্পৰ্ক</string>
-    <string name="add_family_member">পৰিয়ালৰ সদস্য যোগ কৰক</string>
+    <string name="add_family_member">পৰিয়াল সদস্য যোগ কৰক</string>
 
     <string name="male">পুৰুষ</string>
     <string name="female">মহিলা</string>
@@ -518,8 +518,9 @@
     <string name="weight_kgs">ওজন (কেজি)</string>
     <string name="height_cms">উচ্চতা (চে.মি.)</string>
     <string name="temperature_degree_fahrenheit">তাপমাত্ৰা (ডিগ্ৰী ফাৰেনহাইট)</string>
-    <string name="normal_temperature_range">সাধাৰণ সীমা: 97-99&#176;F</string>
-    <string name="temperature_100_or_more">&gt;= 100&#176;F</string>
+    <string name="temperature_hypothermia">&lt;97 - Hypothermia</string>
+    <string name="normal_temperature_range">97-99 - Normal</string>
+    <string name="temperature_100_or_more">&gt;99 - Fever</string>
     <string name="anthropometry_age_gender_format">%1$d %2$s | %3$s</string>
     <string name="age_unit_years">বছৰ</string>
     <string name="age_unit_months">মাহ</string>

@@ -457,18 +457,16 @@ class NewHouseholdFragment : Fragment() {
 
     private fun submitForm() {
         activity?.currentFocus?.clearFocus()
-        if (!validateFormPage()) return
+        if (!validateCurrentPage()) return
         if (!validateLocationSection()) return
         viewModel.saveForm()
     }
 
-    private fun validateFormPage(): Boolean {
-        val result = (binding.form.rvInputForm.adapter as? FormInputAdapter)?.validateInput(resources)
-        return if (result == -1) true
-        else {
-            result?.let { binding.form.rvInputForm.scrollToPosition(it) }
-            false
-        }
+    private fun validateCurrentPage(): Boolean {
+        val result = (binding.form.rvInputForm.adapter as? FormInputAdapter)
+            ?.validateInput(resources, binding.form.rvInputForm)
+        Timber.d("Validation : $result")
+        return result == -1
     }
 
     private fun validateLocationSection(): Boolean {

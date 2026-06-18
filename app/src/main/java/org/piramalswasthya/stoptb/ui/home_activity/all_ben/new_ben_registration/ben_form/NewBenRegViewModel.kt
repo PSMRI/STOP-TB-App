@@ -488,6 +488,11 @@ class NewBenRegViewModel @Inject constructor(
                         updatedBy   = user.userName
                     }
 
+                    val spouseLinkBenId = findExistingSpouseLinkForFamilyMember(ben)
+                    if (spouseLinkBenId != null) {
+                        ben.isSpouseAdded = true
+                    }
+
                     benRepo.persistRecord(ben, updateIfExists = benIdFromArgs != 0L)
 
                     // Mark both members' isSpouseAdded = true (hides "Register Wife/Husband" on both cards)
@@ -522,6 +527,9 @@ class NewBenRegViewModel @Inject constructor(
                             }
                         }
                     }
+                    spouseLinkBenId?.let { linkedBenId ->
+                        benRepo.updateBeneficiarySpouseAdded(hhId, linkedBenId, SyncState.UNSYNCED)
+                    }
 
                     _state.postValue(State.SAVE_SUCCESS)
 
@@ -549,6 +557,10 @@ class NewBenRegViewModel @Inject constructor(
     fun getBenName()    = if (this::ben.isInitialized) "${ben.firstName} ${ben.lastName ?: ""}" else ""
     fun isHoFMarried()  = false  // StopTB has no HoF concept
 
+    fun isDeathSelected(): Boolean {
+        return dataset.isDeathSelected()
+    }
+
     fun setImageUriToFormElement(dpUri: Uri) {
         dataset.setImageUriToFormElement(lastImageFormId, dpUri)
     }
@@ -569,6 +581,35 @@ class NewBenRegViewModel @Inject constructor(
 
     fun setRecordExist(b: Boolean) { _recordExists.value = b }
     fun enableEditMode() { dataset.enableEditMode() }
+
+    private suspend fun findExistingSpouseLinkForFamilyMember(newBen: BenRegCache): Long? {
+        if (isAddSpouseFromArgs == 1 || hhId <= 0L || benIdFromArgs != 0L) return null
+        if (relToHeadId != 4 && relToHeadId != 5) return null
+
+        val newFirstName = newBen.firstName.normalizeNameForMatch()
+        val newFullName = newBen.fullName().normalizeNameForMatch()
+        if (newFirstName.isBlank() && newFullName.isBlank()) return null
+
+        val expectedExistingGenderId = if (relToHeadId == 4) 1 else 2
+        val matches = benRepo.getBenListFromHousehold(hhId).filter { existing ->
+            existing.beneficiaryId != newBen.beneficiaryId &&
+                existing.genderId == expectedExistingGenderId &&
+                existing.isMarried &&
+                (relToHeadId == 4 || !existing.isSpouseAdded) &&
+                existing.genDetails?.spouseName.normalizeNameForMatch().let { spouseName ->
+                    spouseName.isNotBlank() &&
+                        (spouseName == newFirstName || spouseName == newFullName)
+                }
+        }
+
+        return matches.singleOrNull()?.beneficiaryId
+    }
+
+    private fun String?.normalizeNameForMatch(): String =
+        this?.trim()
+            ?.replace(Regex("\\s+"), " ")
+            ?.uppercase()
+            .orEmpty()
 
     // ─── Preview ─────────────────────────────────────────────────────────
     suspend fun getFormPreviewData(): List<PreviewItem> = withContext(Dispatchers.Default) {

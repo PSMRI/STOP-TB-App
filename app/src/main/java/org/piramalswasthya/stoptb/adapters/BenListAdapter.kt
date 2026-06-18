@@ -114,7 +114,12 @@ class BenListAdapter(
             }
 
             // Hide unused UI elements upfront (no eye surgery / children buttons in StopTB)
+            val isHeadOfFamily = item.relToHeadId == 19
+            val hasFamilyHeadName = item.familyHeadName.isNotBlank() && item.familyHeadName != "Not Available"
             binding.HOF.visibility = View.GONE
+            binding.ivIsHead.visibility = if (isHeadOfFamily) View.VISIBLE else View.GONE
+            binding.head.visibility = if (isHeadOfFamily) View.VISIBLE else View.GONE
+            binding.ncdHofName.visibility = if (!isHeadOfFamily && hasFamilyHeadName) View.VISIBLE else View.GONE
             binding.btnAbove30.visibility = View.GONE
             binding.btnVitalScreen.visibility = when {
                 showResultButton && !item.isDeath && !item.isDeactivate -> View.VISIBLE

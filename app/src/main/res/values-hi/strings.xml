@@ -21,7 +21,7 @@
     <string name="tv_ben_surname">लाभार्थी का उपनाम</string>
     <string name="tv_gender_ph">लिंग</string>
     <string name="tv_father_name_ph">पिता का नाम</string>
-    <string name="tv_family_head_name_ph">परिवार के मुखिया का नाम</string>
+    <string name="tv_family_head_name_ph">Head of Family</string>
     <string name="tv_ben_id_ph">लाभार्थी ID</string>
     <string name="tv_mob_no_ph">फोन नंबर</string>
     <string name="tv_age_ph">आयु</string>
@@ -167,7 +167,7 @@
     <string name="validate">मान्य करें</string>
     <string name="child_immunization">बाल टीकाकरण</string>
     <string name="relation_with_hof">"मुखिया" से सम्बन्ध</string>
-    <string name="add_family_member">परिवार के सदस्य जोड़ें</string>
+    <string name="add_family_member">परिवार सदस्य जोड़ें</string>
     <string name="non_pregnant_women_eligible_couple_section">गैर-गर्भवती महिलाएं (पात्र दंपत्ति) अनुभाग</string>
     <string name="about_us">पिरामल स्वास्थ्य सभी के लिए सार्वभौमिक स्वास्थ्य देखभाल को पूरा करने के लिए भारत सरकार के दृष्टिकोण को पूरक और संपूरित करके सार्वजनिक स्वास्थ्य सेवा के अंतराल को पाटने पर ध्यान केंद्रित कर रहा है। पिरामल स्वास्थ्य भारत में प्राथमिक सार्वजनिक स्वास्थ्य देखभाल क्षेत्र में मातृ स्वास्थ्य, बाल और किशोर स्वास्थ्य, गैर-संचारी रोगों पर ध्यान केंद्रित करने वाले सबसे बड़े गैर-लाभकारी संगठनों में से एक है। पिरामल स्वास्थ्य के पास कई स्वास्थ्य सेवा नवाचारों को बड़े पैमाने पर संचालित करने का एक दशक से अधिक का अनुभव है, जो पूरे भारत में सबसे कम सेवा प्राप्त और हाशिए पर रहने वाली आबादी की प्राथमिक स्वास्थ्य देखभाल जरूरतों को पूरा कर रहा है। पिरामल स्वास्थ्य भारत के 20 राज्यों में 35 नवीन सार्वजनिक स्वास्थ्य देखभाल वितरण कार्यक्रमों के माध्यम से कार्यरत है और अब तक 10.7 करोड़ से अधिक लाभार्थियों को सेवा प्रदान कर चुका है| पिरामल स्वास्थ्य में 250 चिकित्सकों सहित 2260 कर्मचारी कार्यरत हैं जो परिणामोन्मुखी दृष्टिकोण के माध्यम से सेवा भाव (लाभार्थी-केंद्रित) के मूल मूल्य पर काम करते हैं। पिछले बारह वर्षों में, फोकस निम्नलिखित पर रहा है, बड़े पैमाने पर स्थायी प्रभाव के लिए प्लेटफॉर्म का निर्माण, एक यात्रा के रूप में पैमाने पर नवाचार, नीति आयोग के ज्ञान और कार्यान्वयन भागीदार के रूप में नीतियों, शासन और सार्वजनिक स्वास्थ्य देखभाल प्रणाली की जवाबदेही को प्रभावित करना। हस्तक्षेप डिजाइन, मॉडलिंग, पायलटिंग और उन पायलटों को बढ़ाने के रूप में नवाचार पिरामल स्वास्थ्य में एक दृष्टिकोण रहा है। पिरामल स्वास्थ्य प्राथमिक स्वास्थ्य सेवा को न केवल सस्ती, सुलभ और सभी के लिए उपलब्ध बनाने के लिए प्रतिबद्ध है, बल्कि यह भी सुनिश्चित करता है कि यह पूर्ण, निरंतर और व्यापक हो।</string>
 
@@ -672,8 +672,9 @@
     <string name="weight_kgs">वज़न (किग्रा)</string>
     <string name="height_cms">लंबाई (सेमी)</string>
     <string name="temperature_degree_fahrenheit">तापमान (डिग्री फारेनहाइट)</string>
-    <string name="normal_temperature_range">सामान्य सीमा: 97-99&#176;F</string>
-    <string name="temperature_100_or_more">&gt;= 100&#176;F</string>
+    <string name="temperature_hypothermia">&lt;97 - Hypothermia</string>
+    <string name="normal_temperature_range">97-99 - Normal</string>
+    <string name="temperature_100_or_more">&gt;99 - Fever</string>
     <string name="anthropometry_age_gender_format">%1$d %2$s | %3$s</string>
     <string name="age_unit_years">वर्ष</string>
     <string name="age_unit_months">महीने</string>
