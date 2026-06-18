@@ -47,7 +47,7 @@ import org.piramalswasthya.stoptb.databinding.FragmentNewBenRegBinding
 import org.piramalswasthya.stoptb.databinding.LayoutViewMediaBinding
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
-import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel.LocationState
+import org.piramalswasthya.stoptb.model.LocationState
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel.State
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.work.WorkerUtils
@@ -104,8 +104,12 @@ class NewBenRegFragment : Fragment() {
         }
 
     private val resolveGpsSettings =
-        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
-            fetchLocationNow()
+        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+            if (result.resultCode == android.app.Activity.RESULT_OK) {
+                fetchLocationNow()
+            } else {
+                viewModel.onLocationFailed(LocationState.Failed.GpsDisabled)
+            }
         }
 
     // ─── Inflate ─────────────────────────────────────────────────────────
@@ -369,14 +373,15 @@ class NewBenRegFragment : Fragment() {
 
     // ─── Location UI updates ─────────────────────────────────────────────
     private fun updateLocationUI(state: LocationState) {
+        val isEditMode = viewModel.recordExists.value == false
         when (state) {
-            is LocationState.Idle -> setStatusText(getString(R.string.loc_status_fetching), "#FF9800")
+            is LocationState.Idle -> setStatusText("", "#FF9800")
             is LocationState.Fetching -> {
                 setStatusText(getString(R.string.loc_status_fetching), "#FF9800")
                 binding.btnRefreshLocation.isEnabled = false
             }
             is LocationState.Captured -> {
-                binding.btnRefreshLocation.isEnabled = true
+                binding.btnRefreshLocation.isEnabled = isEditMode
                 setStatusText(getString(R.string.loc_status_captured), "#4CAF50")
                 binding.etLatitude.setText(String.format(java.util.Locale.ENGLISH, "%.6f", state.lat))
                 binding.etLongitude.setText(String.format(java.util.Locale.ENGLISH, "%.6f", state.lon))
@@ -384,22 +389,22 @@ class NewBenRegFragment : Fragment() {
                 binding.etTimestamp.setText(state.timestamp)
             }
             is LocationState.Failed.PermissionDenied -> {
-                binding.btnRefreshLocation.isEnabled = true
-                setStatusText(getString(R.string.loc_status_failed), "#F44336")
+                binding.btnRefreshLocation.isEnabled = isEditMode
+                setStatusText(getString(R.string.loc_status_permission_denied), "#F44336")
                 clearLocationFields()
             }
             is LocationState.Failed.GpsDisabled -> {
-                binding.btnRefreshLocation.isEnabled = true
+                binding.btnRefreshLocation.isEnabled = isEditMode
                 setStatusText(getString(R.string.loc_status_gps_disabled), "#F44336")
                 clearLocationFields()
             }
             is LocationState.Failed.NoSignal -> {
-                binding.btnRefreshLocation.isEnabled = true
+                binding.btnRefreshLocation.isEnabled = isEditMode
                 setStatusText(getString(R.string.loc_status_failed), "#F44336")
                 clearLocationFields()
             }
             is LocationState.Failed.OutsideIndia -> {
-                binding.btnRefreshLocation.isEnabled = true
+                binding.btnRefreshLocation.isEnabled = isEditMode
                 setStatusText(getString(R.string.loc_status_failed), "#F44336")
                 clearLocationFields()
                 Toast.makeText(context, getString(R.string.loc_msg_outside_india), Toast.LENGTH_LONG).show()
@@ -447,6 +452,7 @@ class NewBenRegFragment : Fragment() {
     }
 
     private fun checkSettingsAndFetch() {
+        viewModel.setFetching()
         val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10_000L)
             .setWaitForAccurateLocation(false)
             .setMaxUpdates(1)

@@ -821,6 +821,8 @@
     <string name="dialog_cancel_message">আপুনি এই পঞ্জীয়ন বাতিল কৰি পিছলৈ যাব বিচাৰেনে?</string>
     <string name="dialog_yes">হয়</string>
     <string name="dialog_no">নহয়</string>
+    <string name="patient_registered_successfully">ৰোগীৰ পঞ্জীয়ন সফলতাৰে কৰা হ’ল।</string>
+    <string name="proceed_to_register_hof">আপুনি পৰিয়ালৰ প্ৰধানৰ পঞ্জীয়ন কৰিবলৈ আগবাঢ়িব বিচাৰেনে?</string>
 </resources>
 
 

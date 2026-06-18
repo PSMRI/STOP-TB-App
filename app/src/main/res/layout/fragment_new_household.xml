@@ -122,7 +122,8 @@
                                 android:background="@drawable/bg_status_chip"
                                 android:paddingHorizontal="10dp"
                                 android:paddingVertical="4dp"
-                                android:text="@string/loc_status_fetching"
+                                android:text=""
+                                tools:text="@string/loc_status_fetching"
                                 android:textSize="12sp" />
 
                             <!-- GPS Unavailable checkbox -->

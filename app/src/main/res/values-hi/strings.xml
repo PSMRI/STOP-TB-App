@@ -963,6 +963,8 @@
     <string name="dialog_cancel_message">क्या आप इस पंजीकरण को छोड़कर वापस जाना चाहते हैं?</string>
     <string name="dialog_yes">हाँ</string>
     <string name="dialog_no">नहीं</string>
+    <string name="patient_registered_successfully">रोगी का पंजीकरण सफलतापूर्वक हुआ।</string>
+    <string name="proceed_to_register_hof">क्या आप परिवार के मुखिया के पंजीकरण के साथ आगे बढ़ना चाहते हैं?</string>
 </resources>
 
 

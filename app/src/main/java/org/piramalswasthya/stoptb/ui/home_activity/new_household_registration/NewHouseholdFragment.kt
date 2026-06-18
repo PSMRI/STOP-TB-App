@@ -37,7 +37,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentNewHouseholdBinding
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.isNurseRole
-import org.piramalswasthya.stoptb.ui.home_activity.new_household_registration.NewHouseholdViewModel.LocationState
+import org.piramalswasthya.stoptb.model.LocationState
 import org.piramalswasthya.stoptb.ui.home_activity.new_household_registration.NewHouseholdViewModel.State
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import timber.log.Timber
@@ -83,7 +83,11 @@ class NewHouseholdFragment : Fragment() {
 
     private val resolveGpsSettings =
         registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-            fetchLocationNow()
+            if (result.resultCode == android.app.Activity.RESULT_OK) {
+                fetchLocationNow()
+            } else {
+                viewModel.onLocationFailed(LocationState.Failed.GpsDisabled)
+            }
         }
 
     override fun onCreateView(
@@ -333,7 +337,6 @@ class NewHouseholdFragment : Fragment() {
         if (hasLocationPermission()) {
             checkSettingsAndFetch()
         } else {
-            viewModel.onLocationFailed(LocationState.Failed.PermissionDenied)
             requestLocationPermission.launch(
                 arrayOf(
                     Manifest.permission.ACCESS_FINE_LOCATION,

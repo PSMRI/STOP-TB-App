@@ -17,10 +17,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
+import org.piramalswasthya.stoptb.model.LocationState
 import org.piramalswasthya.stoptb.helpers.DigiPinHelper
 import org.piramalswasthya.stoptb.configuration.BenRegFormDataset
 import org.piramalswasthya.stoptb.database.room.SyncState
@@ -46,22 +43,7 @@ class NewBenRegViewModel @Inject constructor(
 
     enum class State { IDLE, SAVING, SAVE_SUCCESS, SAVE_FAILED }
 
-    sealed class LocationState {
-        object Idle : LocationState()
-        object Fetching : LocationState()
-        data class Captured(
-            val lat: Double,
-            val lon: Double,
-            val digipin: String,
-            val timestamp: String
-        ) : LocationState()
-        sealed class Failed : LocationState() {
-            object PermissionDenied : Failed()
-            object GpsDisabled : Failed()
-            object NoSignal : Failed()
-            object OutsideIndia : Failed()
-        }
-    }
+
 
     sealed class ListUpdateState {
         object Idle    : ListUpdateState()

@@ -14,10 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
+import org.piramalswasthya.stoptb.model.LocationState
 import org.piramalswasthya.stoptb.configuration.HouseholdFormDataset
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -59,23 +56,6 @@ class NewHouseholdViewModel @Inject constructor(
 
     // ─── Location state ───────────────────────────────────────────────────────
 
-    sealed class LocationState {
-        object Idle : LocationState()
-        object Fetching : LocationState()
-        data class Captured(
-            val lat: Double,
-            val lon: Double,
-            val digipin: String,
-            val timestamp: String
-        ) : LocationState()
-        sealed class Failed : LocationState() {
-            object PermissionDenied : Failed()
-            object GpsDisabled : Failed()
-            object NoSignal : Failed()
-            object OutsideIndia : Failed()
-        }
-    }
-
     private val _locationState = MutableStateFlow<LocationState>(LocationState.Idle)
     val locationState: StateFlow<LocationState> = _locationState.asStateFlow()
 
@@ -108,7 +88,7 @@ class NewHouseholdViewModel @Inject constructor(
                     hh.isGpsUnavailable -> {
                         _isGpsUnavailable.emit(true)
                         _gpsUnavailableReason.emit(hh.gpsUnavailableReason)
-                        _locationState.emit(LocationState.Failed.GpsDisabled)
+                        _locationState.emit(LocationState.Idle)
                     }
                     hh.gpsLatitude != null && hh.gpsLongitude != null && hh.digipin != null -> {
                         _locationState.emit(
