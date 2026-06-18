@@ -1298,5 +1298,43 @@
         <item>CHC</item>
         <item>PHC</item>
     </string-array>
+
+    <!-- Location Details Section -->
+    <string name="loc_section_title">Location Details</string>
+    <string name="loc_btn_refresh">Refresh</string>
+    <string name="loc_status_fetching">Fetching Location…</string>
+    <string name="loc_status_captured">Location Captured</string>
+    <string name="loc_status_failed">Unable to Fetch Location</string>
+    <string name="loc_status_permission_denied">Please grant location permission to fetch latitude and longitude.</string>
+    <string name="loc_status_gps_unavailable">GPS Unavailable</string>
+    <string name="loc_status_gps_disabled">GPS is disabled on this device</string>
+    <string name="loc_label_latitude">Latitude</string>
+    <string name="loc_label_longitude">Longitude</string>
+    <string name="loc_label_digipin">DIGIPIN</string>
+    <string name="loc_label_timestamp">Captured At</string>
+    <string name="loc_cb_gps_unavailable">GPS Unavailable</string>
+    <string name="loc_label_reason">Reason for GPS Unavailability</string>
+    <string name="loc_hint_reason">Select reason</string>
+    <string name="loc_err_reason_required">Please select a reason</string>
+    <string name="loc_err_location_required">Please capture location or mark GPS Unavailable with a reason</string>
+    <string name="loc_msg_no_signal">Unable to determine current location. Please move to an open area and try again.</string>
+    <string name="loc_msg_outside_india">Location is outside supported India bounds. Please check your GPS signal.</string>
+    <string name="loc_msg_enable_gps">Location permission is required. Please grant it in Settings.</string>
+    <string name="loc_dialog_open_settings">Open Settings</string>
+    <string name="loc_permission_rationale">Location permission is needed to capture GPS coordinates for this household registration.</string>
+    <string name="loc_timeout_msg">Location timed out. Please move to an open area and tap Refresh.</string>
+    <string-array name="loc_gps_unavailable_reasons">
+        <item>No GPS Signal</item>
+        <item>Indoor Location</item>
+        <item>Underground</item>
+        <item>Device GPS Disabled</item>
+        <item>Other</item>
+    </string-array>
+    <string name="dialog_cancel_title">Are you Sure?</string>
+    <string name="dialog_cancel_message">Do you want to discard this registration and go back?</string>
+    <string name="dialog_yes">Yes</string>
+    <string name="dialog_no">No</string>
+    <string name="patient_registered_successfully">Patient Registered Successfully</string>
+    <string name="proceed_to_register_hof">Do you want to proceed with registration of Head of the Family?</string>
 </resources>
 
