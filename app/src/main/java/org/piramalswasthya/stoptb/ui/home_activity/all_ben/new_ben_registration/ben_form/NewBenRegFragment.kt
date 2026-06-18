@@ -338,6 +338,12 @@ class NewBenRegFragment : Fragment() {
     }
 
     private fun handlePhotoReminderBeforePreview() {
+
+        if (viewModel.isDeathSelected()) {
+            showPreview()
+            return
+        }
+
         if (viewModel.hasBeneficiaryPhoto()) {
             showPreview()
             return

@@ -29,6 +29,7 @@ import org.piramalswasthya.stoptb.model.InputType.RADIO
 import org.piramalswasthya.stoptb.model.InputType.TEXT_VIEW
 import org.piramalswasthya.stoptb.model.LocationRecord
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel.Companion.isOtpVerified
+import org.piramalswasthya.stoptb.utils.Log
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -537,7 +538,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
             pic.value        = saved.userImage
             dateOfReg.value  = getDateFromLong(saved.regDate)
-            dateOfReg.isEnabled = false          // edit mode — registration date not changeable
+            dateOfReg.isEnabled = true          // edit mode — registration date not changeable
             personFrom.value = saved.personFromId?.let { personFrom.getStringFromPosition(it) }
                 ?: saved.personFrom
                 ?: personFrom.entries?.firstOrNull()
@@ -611,8 +612,16 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             occupationDrop.value = getLocalValueInArray(R.array.occupation_array, saved.occupation)
             setDefaultOccupationIfNeeded()
 
-            reproductiveStatus.value = saved.genDetails?.reproductiveStatus?.let {
-                normalizeReproductiveStatusForDisplay(it)
+
+            saved.genDetails?.reproductiveStatusId?.let { id ->
+
+                val value = when (id) {
+                    1 -> reproductiveStatus.entries?.getOrNull(0)
+                    2 -> reproductiveStatus.entries?.getOrNull(1)
+                    else -> null
+                }
+
+                reproductiveStatus.value = value
             }
         }
 
@@ -850,7 +859,21 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             }
 
             agePopup.id -> {
+
                 val age = try { getAgeFromDob(getLongFromDate(agePopup.value)) } catch (_: Exception) { 0 }
+
+                // Refresh reason of death when age changes and beneficiary is already marked Death
+                if (beneficiaryStatus.value == BenStatus.Death.name) {
+                    val showMaternal = shouldShowMaternalDeath(gender.value, agePopup.value)
+
+                    reasonOfDeath.entries = if (showMaternal) {
+                        resources.getStringArray(R.array.reason_of_death_array_with_maternal)
+                    } else {
+                        resources.getStringArray(R.array.reason_of_death_array)
+                    }
+
+                    reasonOfDeath.value = null
+                }
 
                 // Spouse sub-fields (depend on marital status)
                 val spouseFields = listOf(husbandName, wifeName, spouseName, ageAtMarriage, dateOfMarriage, reproductiveStatus)
@@ -1272,6 +1295,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                 val reproductiveMap = mapOf(
                     "Yes" to 1,
                     "No" to 2,
+                    "हाँ" to 1,
+                    "नहीं" to 2,
                     "Women Pregnant" to 1,
                     "Women Not Pregnant" to 2,
                     "Pregnant Woman" to 1,
@@ -1280,6 +1305,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                     "Permanently Sterilised" to 2,
                     "Not Applicable" to 2
                 )
+
                 gen.reproductiveStatusId = reproductiveMap[selectedValue] ?: 0
                 gen.reproductiveStatus   = selectedValue
             }
@@ -1298,6 +1324,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     }
 
     // ─────────────────────────── HELPERS ───────────────────────────
+
+    fun isDeathSelected(): Boolean {
+        return beneficiaryStatus.value == BenStatus.Death.name
+    }
 
     fun getIndexOfAgeAtMarriage()  = -1
     fun getIndexOfContactNumber()  = getIndexOfElement(contactNumber)

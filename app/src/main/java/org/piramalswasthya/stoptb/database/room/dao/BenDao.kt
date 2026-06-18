@@ -297,6 +297,7 @@ interface BenDao {
         AND (:query = '' OR
             benName LIKE '%' || :query || '%'
             OR benSurname LIKE '%' || :query || '%'
+            OR (benName || ' ' || benSurname) LIKE '%' || :query || '%'
             OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
             OR REPLACE(IFNULL(abhaId, ''), '-', '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
             OR IFNULL(familyHeadName, '') LIKE '%' || :query || '%'
@@ -389,6 +390,7 @@ interface BenDao {
         AND (:query = '' OR
             benName LIKE '%' || :query || '%'
             OR benSurname LIKE '%' || :query || '%'
+            OR (benName || ' ' || benSurname) LIKE '%' || :query || '%'
             OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
             OR REPLACE(IFNULL(abhaId, ''), '-', '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
             OR IFNULL(familyHeadName, '') LIKE '%' || :query || '%'
@@ -486,6 +488,7 @@ interface BenDao {
         AND (:query = '' OR
             benName LIKE '%' || :query || '%'
             OR benSurname LIKE '%' || :query || '%'
+            OR (benName || ' ' || benSurname) LIKE '%' || :query || '%'
             OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
             OR REPLACE(IFNULL(abhaId, ''), '-', '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
             OR IFNULL(familyHeadName, '') LIKE '%' || :query || '%'
@@ -526,7 +529,7 @@ interface BenDao {
     fun getAllBenGenderCount(selectedVillage: Int, gender: String): Flow<Int>
 
     @Transaction
-    @Query("SELECT * FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0")
+    @Query("SELECT * FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeath = 0 and isDeactivate=0")
     fun getAllTbScreeningBen(selectedVillage: Int): Flow<List<BenWithTbScreeningCache>>
 
     @Transaction
@@ -540,7 +543,7 @@ interface BenDao {
     @Query("""
         SELECT COUNT(DISTINCT ts.benId) FROM TB_SCREENING ts
         INNER JOIN BEN_BASIC_CACHE b ON b.benId = ts.benId
-        WHERE b.villageId = :selectedVillage AND b.isDeactivate = 0
+        WHERE b.villageId = :selectedVillage AND b.isDeactivate = 0 AND b.isDeath = 0
     """)
     fun getTbScreenedBenCount(selectedVillage: Int): Flow<Int>
 
@@ -997,11 +1000,11 @@ interface BenDao {
     fun getAllMotherImmunizationList(selectedVillage: Int): Flow<List<BenBasicCache>>
 
 
-    @Query("select * from BEN_BASIC_CACHE b inner join tb_screening t on  b.benId = t.benId where villageId = :villageId and tbsnFilled = 1 and (t.bloodInSputum =1 or t.coughMoreThan2Weeks = 1 or feverMoreThan2Weeks = 1 or nightSweats = 1 or lossOfWeight = 1 or historyOfTb = 1)")
+    @Query("select * from BEN_BASIC_CACHE b inner join tb_screening t on  b.benId = t.benId where villageId = :villageId  and tbsnFilled = 1 and (t.bloodInSputum =1 or t.coughMoreThan2Weeks = 1 or feverMoreThan2Weeks = 1 or nightSweats = 1 or lossOfWeight = 1 or historyOfTb = 1)")
     fun getScreeningList(villageId: Int): Flow<List<BenBasicCache>>
 
     @Transaction
-    @Query("select b.* from BEN_BASIC_CACHE b inner join tb_screening t on b.benId = t.benId LEFT JOIN TB_SUSPECTED ts ON b.benId = ts.benId LEFT JOIN TB_DIAGNOSTICS td ON b.benId = td.benId where villageId = :villageId and isDeactivate=0 and tbsnFilled = 1 and (\n" +
+    @Query("select b.* from BEN_BASIC_CACHE b inner join tb_screening t on b.benId = t.benId LEFT JOIN TB_SUSPECTED ts ON b.benId = ts.benId LEFT JOIN TB_DIAGNOSTICS td ON b.benId = td.benId where villageId = :villageId and isDeactivate=0 and b.isDeath = 0  and tbsnFilled = 1 and (\n" +
             "            t.bloodInSputum = 1\n" +
             "            OR t.coughMoreThan2Weeks = 1\n" +
             "            OR t.feverMoreThan2Weeks = 1\n" +
@@ -1031,6 +1034,7 @@ interface BenDao {
         ON b.benId = td.benId
     WHERE b.villageId = :villageId
       AND b.isDeactivate = 0
+      AND b.isDeath = 0 
       AND (
             ts.isTbConfirmed = 1
             OR td.isTbConfirmed = 1

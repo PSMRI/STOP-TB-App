@@ -125,6 +125,8 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
     }
 
 
+
+
     private val listMutex = Mutex()
     private val list = mutableListOf<FormElement>()
 
@@ -605,6 +607,8 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
         }
         return -1
     }
+
+
 
     protected fun validateAllCapsOrSpaceOnEditTextWithHindiEnabled(formElement: FormElement): Int {
         val value = formElement.value.orEmpty().trim()
