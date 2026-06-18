@@ -24,4 +24,5 @@
     <dimen name="pv_pin_view_cursor_width">2dp</dimen>
 
     <dimen name="password_toggle_size">30dp</dimen>
+    <dimen name="nsv_counselling_padding_bottom">50dp</dimen>
 </resources>
