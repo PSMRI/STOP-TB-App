@@ -178,7 +178,7 @@ interface AmritApiService {
     ): Response<ApiResponse<FormSchemaDto>>
     
 
-    @GET("https://516f-182-76-226-218.ngrok-free.app/flw-api/dynamicForm/getAllForms")
+    @GET("flw-api/dynamicForm/getAllForms")
     suspend fun getAllForms(
         @Header("Authorization") authHeader: String,
     ): Response<ApiResponse<List<FormSchemaDto>>>
@@ -193,7 +193,7 @@ interface AmritApiService {
         @Body request: CounsellingSyncRequest
     ): Response<okhttp3.ResponseBody>
 
-    @POST("https://516f-182-76-226-218.ngrok-free.app/flw-api/dynamicForm/response/submitBulk")
+    @POST("flw-api/dynamicForm/response/submitBulk")
     suspend fun submitBulkCounselling(
         @Header("Authorization") authHeader: String,
         @Body request: List<CounsellingBulkSubmitRequest>
