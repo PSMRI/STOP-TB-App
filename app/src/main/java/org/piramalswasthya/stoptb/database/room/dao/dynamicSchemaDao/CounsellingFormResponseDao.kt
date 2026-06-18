@@ -29,6 +29,10 @@ interface CounsellingFormResponseDao {
     suspend fun getFormResponseForBeneficiary(beneficiaryId: Long): CompleteFormResponse?
 
     @Transaction
+    @Query("SELECT * FROM t_form_response WHERE beneficiaryId = :beneficiaryId LIMIT 1")
+    fun getFormResponseForBeneficiaryFlow(beneficiaryId: Long): kotlinx.coroutines.flow.Flow<CompleteFormResponse?>
+
+    @Transaction
     @Query("SELECT * FROM t_form_response WHERE responseId = :responseId LIMIT 1")
     suspend fun getFormResponseById(responseId: Long): CompleteFormResponse?
 

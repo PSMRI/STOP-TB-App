@@ -1,6 +1,5 @@
 package org.piramalswasthya.stoptb.repositories.dynamicRepo
 
-import androidx.paging.LOGGER
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -65,7 +64,10 @@ class CounsellingRepositoryImpl @Inject constructor(
     override suspend fun downloadAndStoreAllForms(): Boolean {
         return try {
             val jwt = preferenceDao.getJWTAmritToken()
-            val authHeader = jwt ?: ""
+            val authHeader = jwt ?: run {
+                Timber.w("downloadAndStoreAllForms: JWT token is null, API call will likely fail")
+                return false
+            }
             val response = amritApiService.getAllForms(authHeader)
             if (response.isSuccessful) {
                 val apiSchemas = response.body()?.data ?: return false
@@ -83,6 +85,7 @@ class CounsellingRepositoryImpl @Inject constructor(
                 false
             }
         } catch (e: Exception) {
+            Timber.e(e, "downloadAndStoreAllForms failed")
             false
         }
     }
@@ -249,7 +252,12 @@ class CounsellingRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun submitSectionE(responseId: Long, answers: List<QuestionResponseEntity>) {
+    private suspend fun submitSectionWithPhase(
+        responseId: Long,
+        answers: List<QuestionResponseEntity>,
+        phase: String,
+        status: String
+    ) {
         db.withTransaction {
             val formResponseWithDetails = responseDao.getFormResponseById(responseId)
                 ?: return@withTransaction
@@ -261,11 +269,15 @@ class CounsellingRepositoryImpl @Inject constructor(
             val activeVersion = formDef.versions.find { it.version.versionId == formVersionId }
                 ?: return@withTransaction
 
-            val sectionDef = activeVersion.sections
-                .filter { it.section.sectionPhase == "PRE_SUBMIT" }
-                .maxByOrNull { it.section.sectionOrder }
-                ?: activeVersion.sections.maxByOrNull { it.section.sectionOrder }
-                ?: return@withTransaction
+            val sectionDef = if (phase == "PRE_SUBMIT") {
+                activeVersion.sections
+                    .filter { it.section.sectionPhase == "PRE_SUBMIT" }
+                    .maxByOrNull { it.section.sectionOrder }
+            } else {
+                activeVersion.sections
+                    .find { it.section.sectionPhase == "POST_SUBMIT" }
+            } ?: activeVersion.sections.maxByOrNull { it.section.sectionOrder }
+              ?: return@withTransaction
 
             val sectionResponse = formResponseWithDetails.sectionResponses.find { it.sectionResponse.sectionId == sectionDef.section.sectionId }
                 ?: return@withTransaction
@@ -278,52 +290,24 @@ class CounsellingRepositoryImpl @Inject constructor(
 
             responseDao.updateFormResponse(
                 formResponseWithDetails.formResponse.copy(
-                    status = "SUBMITTED",
+                    status = status,
                     syncStatus = "UNSYNCED",
                     updatedAt = System.currentTimeMillis()
                 )
             )
         }
+    }
+
+    override suspend fun submitSectionE(responseId: Long, answers: List<QuestionResponseEntity>) {
+        submitSectionWithPhase(responseId, answers, "PRE_SUBMIT", "SUBMITTED")
     }
 
     override suspend fun submitSectionF(responseId: Long, answers: List<QuestionResponseEntity>) {
-        db.withTransaction {
-            val formResponseWithDetails = responseDao.getFormResponseById(responseId)
-                ?: return@withTransaction
-
-            val formVersionId = formResponseWithDetails.formResponse.formVersionId
-            val formDef = metadataDao.getFormDefinitionByVersionId(formVersionId)
-                ?: return@withTransaction
-
-            val activeVersion = formDef.versions.find { it.version.versionId == formVersionId }
-                ?: return@withTransaction
-
-            val sectionDef = activeVersion.sections
-                .find { it.section.sectionPhase == "POST_SUBMIT" }
-                ?: activeVersion.sections.maxByOrNull { it.section.sectionOrder }
-                ?: return@withTransaction
-
-            val sectionResponse = formResponseWithDetails.sectionResponses.find { it.sectionResponse.sectionId == sectionDef.section.sectionId }
-                ?: return@withTransaction
-
-            val secId = sectionResponse.sectionResponse.sectionResponseId
-            responseDao.deleteQuestionResponsesForSection(secId)
-
-            val mappedAnswers = answers.map { it.copy(sectionResponseId = secId) }
-            responseDao.insertQuestionResponses(mappedAnswers)
-
-            responseDao.updateFormResponse(
-                formResponseWithDetails.formResponse.copy(
-                    status = "COMPLETE",
-                    syncStatus = "UNSYNCED",
-                    updatedAt = System.currentTimeMillis()
-                )
-            )
-        }
+        submitSectionWithPhase(responseId, answers, "POST_SUBMIT", "COMPLETE")
     }
 
-    override suspend fun getCounsellingRecord(beneficiaryId: Long): Flow<CompleteFormResponse?> = flow {
-        emit(responseDao.getFormResponseForBeneficiary(beneficiaryId))
+    override suspend fun getCounsellingRecord(beneficiaryId: Long): Flow<CompleteFormResponse?> {
+        return responseDao.getFormResponseForBeneficiaryFlow(beneficiaryId)
     }
 
     override suspend fun syncUnsyncedRecords(): Boolean {
@@ -345,7 +329,7 @@ class CounsellingRepositoryImpl @Inject constructor(
         }
         if (unsynced.isEmpty()) return true
 
-        val officerId = preferenceDao.getLoggedInUser()?.userId?.toLong() ?: 501L
+        val officerId = preferenceDao.getLoggedInUser()?.userId?.toLong() ?: DEFAULT_OFFICER_ID
         val counsellingPayloadList = unsynced.map { response ->
             val formVersionId = response.formResponse.formVersionId
             val formDef = metadataDao.getFormDefinitionByVersionId(formVersionId)
@@ -399,5 +383,9 @@ class CounsellingRepositoryImpl @Inject constructor(
             Timber.e(e, "Amrit push submitBulk standalone error")
             false
         }
+    }
+
+    companion object {
+        private const val DEFAULT_OFFICER_ID = 501L
     }
 }

@@ -4,8 +4,26 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.*
 
 object PayloadBuilder {
 
+    private val sectionCodeMap = java.util.concurrent.ConcurrentHashMap<Int, String>()
+    private val questionCodeMap = java.util.concurrent.ConcurrentHashMap<Int, String>()
+
+    private fun populateMappings(formDef: CompleteFormDefinition) {
+        formDef.versions.forEach { version ->
+            version.sections.forEach { sec ->
+                sec.section.sectionUuid?.let { uuid ->
+                    sectionCodeMap[sec.section.sectionId] = uuid
+                }
+                sec.questions.forEach { qDetails ->
+                    qDetails.question.questionUuid?.let { uuid ->
+                        questionCodeMap[qDetails.question.questionId] = uuid
+                    }
+                }
+            }
+        }
+    }
+
     fun getSectionCode(sectionId: Int): String {
-        return when (sectionId) {
+        return sectionCodeMap[sectionId] ?: when (sectionId) {
             5 -> "section-awareness"
             6 -> "section-pre-submit-final"
             7 -> "section-awareness"
@@ -16,7 +34,7 @@ object PayloadBuilder {
     }
 
     fun getQuestionCode(questionId: Int): String {
-        return when (questionId) {
+        return questionCodeMap[questionId] ?: when (questionId) {
             9 -> "q-aware-tb"
             10 -> "q-treatment-history"
             11 -> "q-counselled"
@@ -36,6 +54,12 @@ object PayloadBuilder {
     ): CounsellingSyncRequest {
         val formVersionId = response.formResponse.formVersionId
         val formCode = formDef?.form?.formUuid ?: "counselling-form-v1"
+
+        if (formDef == null) {
+            timber.log.Timber.w("PayloadBuilder: formDef is null for formVersionId=$formVersionId, using fallback mappings")
+        } else {
+            populateMappings(formDef)
+        }
 
         val questionsMap = mutableMapOf<Int, String>() // questionId to questionType
         val optionsMap = mutableMapOf<Int, String>() // optionId to optionValue
@@ -115,6 +139,12 @@ object PayloadBuilder {
     ): CounsellingBulkSubmitRequest {
         val formVersionId = response.formResponse.formVersionId
         val formCode = formDef?.form?.formUuid ?: "counselling-form-v1"
+
+        if (formDef == null) {
+            timber.log.Timber.w("PayloadBuilder: formDef is null for formVersionId=$formVersionId, using fallback mappings")
+        } else {
+            populateMappings(formDef)
+        }
 
         val questionsMap = mutableMapOf<Int, String>()
         val optionsMap = mutableMapOf<Int, String>()

@@ -35,9 +35,13 @@ class ValidationEngine {
                     }
                 }
                 "REGEX" -> {
-                    val regex = validation.validationValue?.toRegex()
-                    if (valueStr != null && regex != null && !regex.matches(valueStr)) {
-                        return ValidationResult.Failure(validation.errorMessage)
+                    try {
+                        val regex = validation.validationValue?.toRegex()
+                        if (valueStr != null && regex != null && !regex.matches(valueStr)) {
+                            return ValidationResult.Failure(validation.errorMessage)
+                        }
+                    } catch (e: java.util.regex.PatternSyntaxException) {
+                        return ValidationResult.Failure("Invalid pattern configured: ${validation.errorMessage}")
                     }
                 }
                 "MAX_LENGTH" -> {

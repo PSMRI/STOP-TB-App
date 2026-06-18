@@ -38,18 +38,18 @@ object WorkerUtils {
             .setConstraints(networkOnlyConstraint)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
 
-    fun triggerAmritPushWorker(context: Context) {
+    fun triggerAmritPushWorker(context: Context): List<java.util.UUID> {
         // Block all data push until camp mode is active AND hub is connected
         val prefs = PreferenceManager.getInstance(context)
         val campKey = context.getString(R.string.PREF_camp_mode_enabled)
         if (!prefs.getBoolean(campKey, false)) {
             Timber.d("Push worker skipped: camp mode is disabled")
-            return
+            return emptyList()
         }
         val hubConnectedKey = context.getString(R.string.PREF_camp_hub_connected)
         if (!prefs.getBoolean(hubConnectedKey, false)) {
             Timber.d("Push worker skipped: camp hub is disconnected")
-            return
+            return emptyList()
         }
 
         val workManager = WorkManager.getInstance(context)
@@ -73,9 +73,10 @@ object WorkerUtils {
         val chainAbha = afterRegistration.then(listOf(groupAbha))
 
         WorkContinuation.combine(listOf(chainTB, chainAbha)).enqueue()
+        return listOf(registration.id, groupAbha.id) + groupTB.map { it.id }
     }
 
-    fun triggerAmritPullWorker(context: Context) {
+    fun triggerAmritPullWorker(context: Context): List<java.util.UUID> {
         val workManager = WorkManager.getInstance(context)
 
         // StopTB pull chain:
@@ -95,6 +96,7 @@ object WorkerUtils {
         val chainTB = afterFoundation.then(groupTB)
 
         chainTB.then(setSyncCompleteWorker).enqueue()
+        return listOf(pullWorkRequest.id, setSyncCompleteWorker.id) + groupTB.map { it.id }
     }
 
     /** Convenience alias — camp check is already inside [triggerAmritPushWorker]. */

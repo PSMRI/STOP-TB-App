@@ -13,6 +13,7 @@ import org.junit.runner.RunWith
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.model.dynamicEntity.*
 import org.piramalswasthya.stoptb.network.AmritApiService
+import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import java.lang.reflect.Proxy
 
 /**
@@ -57,7 +58,7 @@ class DynamicFormPersistDemo {
             "formId": 101,
             "formUuid": "TB_COUNSELLING_DEMO",
             "formName": "TB Counselling Demo Form",
-            "formType": "COUNSELLING",
+            "formType": "TB_COUNSELLING",
             "isActive": true,
             "versionNumber": 1,
             "sections": [
@@ -283,7 +284,7 @@ class DynamicFormPersistDemo {
         metadataDao.insertValidations(validationsList)
 
         // STEP 4: Verify Metadata Tables are Stored Correctly via CompleteFormDefinition Relation POJO
-        val completeDef = metadataDao.getFormDefinition("TB_COUNSELLING_DEMO")
+        val completeDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING)
         assertNotNull(completeDef)
         assertEquals(101, completeDef!!.form.formId)
         assertEquals("TB Counselling Demo Form", completeDef.form.formName)

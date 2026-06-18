@@ -67,9 +67,11 @@ object QuestionRenderer {
         }
         binding.etInput.addTextChangedListener(watcher)
         binding.etInput.tag = watcher
-        if(question.errorMessage !=null || question.errorMessage.toString().isNotEmpty()){
+        if (!question.errorMessage.isNullOrEmpty()) {
             binding.tvError.text = question.errorMessage
             binding.tvError.visibility = View.VISIBLE
+        } else {
+            binding.tvError.visibility = View.GONE
         }
     }
 
@@ -112,11 +114,13 @@ object QuestionRenderer {
                     onValueChanged(question)
                 }
             }
-            if(question.errorMessage !=null || question.errorMessage.toString().isNotEmpty()){
-                binding.tvError.text = question.errorMessage
-                binding.tvError.visibility = View.VISIBLE
-            }
             container.addView(rb)
+        }
+        if (!question.errorMessage.isNullOrEmpty()) {
+            binding.tvError.text = question.errorMessage
+            binding.tvError.visibility = View.VISIBLE
+        } else {
+            binding.tvError.visibility = View.GONE
         }
     }
 
@@ -150,9 +154,11 @@ object QuestionRenderer {
             }
             binding.llCheckboxes.addView(cb)
         }
-        if(question.errorMessage !=null || question.errorMessage.toString().isNotEmpty()){
+        if (!question.errorMessage.isNullOrEmpty()) {
             binding.tvError.text = question.errorMessage
             binding.tvError.visibility = View.VISIBLE
+        } else {
+            binding.tvError.visibility = View.GONE
         }
     }
 
@@ -228,9 +234,11 @@ object QuestionRenderer {
 
             dpd.show()
         }
-        if(question.errorMessage !=null || question.errorMessage.toString().isNotEmpty()){
+        if (!question.errorMessage.isNullOrEmpty()) {
             binding.tvError.text = question.errorMessage
             binding.tvError.visibility = View.VISIBLE
+        } else {
+            binding.tvError.visibility = View.GONE
         }
     }
 }

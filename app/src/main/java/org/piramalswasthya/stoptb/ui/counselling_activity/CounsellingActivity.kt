@@ -12,6 +12,7 @@ import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.databinding.ActivityCounsellingBinding
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import android.app.DatePickerDialog
+import android.widget.Toast
 import org.piramalswasthya.stoptb.model.CounsellingOverviewData
 import timber.log.Timber
 import java.text.SimpleDateFormat
@@ -158,8 +159,8 @@ class CounsellingActivity : AppCompatActivity() {
                 }
                 is NetworkResponse.Error -> {
                     Timber.e("Failed to load form schema: ${state.message}")
-                    showError(getString(R.string.counselling_data_load_error)) {
-                        showOverviewScreen()
+                    showError(state.message ?: getString(R.string.counselling_data_load_error)) {
+                        viewModel.retryLoadFormSchema()
                     }
                 }
             }
@@ -194,6 +195,13 @@ class CounsellingActivity : AppCompatActivity() {
 
             section?.let {
                 updateSectionTitle(step)
+            }
+        }
+
+        viewModel.saveError.observe(this) { errorMsg ->
+            if (errorMsg != null) {
+                Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show()
+                viewModel.resetSaveError()
             }
         }
     }
@@ -243,7 +251,10 @@ class CounsellingActivity : AppCompatActivity() {
         binding.nsvContent.visibility = View.GONE
         binding.navigationFooter.root.visibility = View.GONE
         binding.tvErrorMessage.text = message ?: getString(R.string.counselling_load_error)
-        binding.btnRetry.setOnClickListener { showLoading(); onRetry(); viewModel.loadFormSchema(SectionPhase.PRE_SUBMIT)}
+        binding.btnRetry.setOnClickListener {
+            showLoading()
+            onRetry()
+        }
         binding.llError.visibility = View.VISIBLE
     }
 

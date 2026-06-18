@@ -244,6 +244,7 @@ class CounsellingRepo @Inject constructor(
 
                 NetworkResponse.Success(schemaDto)
             } catch (e: Exception) {
+                Timber.e(e, "getFormSchema failed for benId=$benId, phase=$phase")
                 NetworkResponse.Error("Failed to load form schema")
             }
         }

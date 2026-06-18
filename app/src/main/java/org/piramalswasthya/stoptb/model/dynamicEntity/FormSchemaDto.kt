@@ -121,7 +121,7 @@ data class FormFieldDto(
         return list.map {
             when (it) {
                 is String -> it
-                is Map<*, *> -> (it["optionLabel"] ?: it["optionValue"] ?: "").toString()
+                is Map<*, *> -> (it["optionLabel"] ?: it["label"] ?: it["optionValue"] ?: it["value"] ?: "").toString()
                 else -> it.toString()
             }
         }
@@ -145,10 +145,12 @@ data class FormFieldDto(
                         } else null
                     } ?: emptyList()
 
+                    val labelFallback = it["optionLabel"] ?: it["label"] ?: ""
+                    val valueFallback = it["optionValue"] ?: it["value"] ?: ""
                     OptionItemDto(
                         optionId = (it["optionId"] as? Number)?.toInt() ?: (index + 1),
-                        optionLabel = (it["optionLabel"] ?: "").toString(),
-                        optionValue = (it["optionValue"] ?: "").toString(),
+                        optionLabel = labelFallback.toString(),
+                        optionValue = valueFallback.toString(),
                         displayOrder = (it["displayOrder"] as? Number)?.toInt() ?: (index + 1),
                         conditions = conds
                     )

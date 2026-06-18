@@ -570,8 +570,18 @@ abstract class InAppDb : RoomDatabase() {
 
         private val MIGRATION_17_18 = object : Migration(17, 18) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE t_form_section ADD COLUMN sectionUuid TEXT DEFAULT NULL")
-                database.execSQL("ALTER TABLE t_section_question ADD COLUMN questionUuid TEXT DEFAULT NULL")
+                if (!columnExists(database, "t_form_section", "sectionUuid")) {
+                    database.execSQL("ALTER TABLE t_form_section ADD COLUMN sectionUuid TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_section_question", "questionUuid")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN questionUuid TEXT DEFAULT NULL")
+                }
+            }
+        }
+
+        private val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Empty migration to avoid destructive migration from 18 to 19
             }
         }
 
@@ -757,6 +767,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_15_16)
                         .addMigrations(MIGRATION_16_17)
                         .addMigrations(MIGRATION_17_18)
+                        .addMigrations(MIGRATION_18_19)
                         .fallbackToDestructiveMigration()
                         .build()
 

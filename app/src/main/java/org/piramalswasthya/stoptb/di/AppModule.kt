@@ -180,20 +180,7 @@ object AppModule {
 
     private val campHubHostnameVerifier = javax.net.ssl.HostnameVerifier { hostname, session ->
         val defaultVerifier = javax.net.ssl.HttpsURLConnection.getDefaultHostnameVerifier()
-        if (defaultVerifier.verify(hostname, session)) {
-            true
-        } else {
-            runCatching {
-                val certs = session.peerCertificates
-                if (certs.isNotEmpty()) {
-                    val x509 = certs[0] as? java.security.cert.X509Certificate
-                    val subject = x509?.subjectX500Principal?.name ?: ""
-                    subject.contains("*.piramalswasthya.org") || subject.contains("piramalswasthya.org")
-                } else {
-                    false
-                }
-            }.getOrDefault(false)
-        }
+        defaultVerifier.verify(hostname, session)
     }
 
     private val baseClient =

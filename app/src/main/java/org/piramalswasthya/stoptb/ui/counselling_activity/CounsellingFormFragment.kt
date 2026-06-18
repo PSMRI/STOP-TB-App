@@ -48,7 +48,8 @@ class CounsellingFormFragment : Fragment() {
             section?.let {
                 // Determine letter from sectionCode, e.g. "SECTION_A" -> "A"
                 // Using safe calls because Gson might leave non-nullable fields as null if missing in JSON
-                val letter = ('A' + it.displayOrder - 1).toChar().toString()
+                val letter = if (it.sectionPhase == "POST_SUBMIT") "F"
+                else ('A' + it.displayOrder - 1).toChar().toString()
                 tvLetter.text = letter
                 tvName.text = it.sectionName
             }

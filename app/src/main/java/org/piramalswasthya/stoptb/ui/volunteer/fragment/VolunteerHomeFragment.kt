@@ -35,6 +35,7 @@ class VolunteerHomeFragment : Fragment() {
         get() = _binding!!
 
     private var manualHomeRefreshRequested = false
+    private val manualRefreshWorkIds = mutableListOf<java.util.UUID>()
 
     /**
      * Resets the "Refreshing..." state immediately when the camp hub connection
@@ -94,8 +95,11 @@ class VolunteerHomeFragment : Fragment() {
             manualHomeRefreshRequested = true
             setQuickRefreshButtonEnabled(false)
             binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_refreshing)
-            WorkerUtils.triggerAmritPushWorker(requireContext().applicationContext)
-            WorkerUtils.triggerAmritPullWorker(requireContext().applicationContext)
+            manualRefreshWorkIds.clear()
+            val pushIds = WorkerUtils.triggerAmritPushWorker(requireContext().applicationContext)
+            val pullIds = WorkerUtils.triggerAmritPullWorker(requireContext().applicationContext)
+            manualRefreshWorkIds.addAll(pushIds)
+            manualRefreshWorkIds.addAll(pullIds)
         }
 
         WorkManager.getInstance(requireContext().applicationContext)
@@ -117,15 +121,18 @@ class VolunteerHomeFragment : Fragment() {
                     return@observe
                 }
 
-                val isRunning = workInfos.any {
+                val filteredInfos = workInfos.filter { manualRefreshWorkIds.contains(it.id) }
+                if (filteredInfos.isEmpty()) return@observe
+
+                val isRunning = filteredInfos.any {
                     it.state == WorkInfo.State.ENQUEUED ||
                             it.state == WorkInfo.State.RUNNING ||
                             it.state == WorkInfo.State.BLOCKED
                 }
-                val isFailed = workInfos.any {
+                val isFailed = filteredInfos.any {
                     it.state == WorkInfo.State.FAILED || it.state == WorkInfo.State.CANCELLED
                 }
-                val isFinished = workInfos.all { it.state.isFinished }
+                val isFinished = filteredInfos.all { it.state.isFinished }
 
                 when {
                     isRunning -> {

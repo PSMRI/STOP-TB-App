@@ -10,7 +10,7 @@ class ConditionalLogicEngine(
         currentAnswers: Map<Int, List<QuestionResponseEntity>>
     ): Map<Int, FieldVisibilityState> {
         val visibilityMap = mutableMapOf<Int, FieldVisibilityState>()
-        val allQuestions = formDefinition.versions.firstOrNull()?.sections?.flatMap { it.questions } ?: emptyList()
+        val allQuestions = formDefinition.versions.find { it.version.isActive }?.sections?.flatMap { it.questions } ?: emptyList()
 
         // 1. Initialize visibility map with default schema configurations
         allQuestions.forEach { q ->
@@ -30,12 +30,15 @@ class ConditionalLogicEngine(
                         val targetId = cond.targetQuestionId
                         val currentState = visibilityMap[targetId] ?: FieldVisibilityState(visible = true, required = false)
 
+                        val isVisibleAction = cond.actionType == "VISIBLE" || cond.actionType == "SHOW"
+                        val isMandatoryAction = cond.actionType == "MANDATORY" || cond.actionType == "SHOW_QUESTION"
+
                         if (isSelected) {
-                            val newVisible = if (cond.actionType == "VISIBLE") cond.isFulfilledValue else currentState.visible
-                            val newRequired = if (cond.actionType == "MANDATORY") cond.isFulfilledValue else currentState.required
+                            val newVisible = if (isVisibleAction) cond.isFulfilledValue else currentState.visible
+                            val newRequired = if (isMandatoryAction) cond.isFulfilledValue else currentState.required
                             visibilityMap[targetId] = FieldVisibilityState(visible = newVisible, required = newRequired)
                         } else {
-                            if (cond.actionType == "VISIBLE" && cond.isFulfilledValue) {
+                            if (isVisibleAction && cond.isFulfilledValue) {
                                 visibilityMap[targetId] = currentState.copy(visible = false)
                             }
                         }

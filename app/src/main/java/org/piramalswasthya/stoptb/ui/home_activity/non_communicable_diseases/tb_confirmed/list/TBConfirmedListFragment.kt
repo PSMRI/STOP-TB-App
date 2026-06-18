@@ -81,7 +81,10 @@ class TBConfirmedListFragment : Fragment() {
                 clickedCounselling = { item ->
                     val regDateMillis = try {
                         SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).parse(item.ben.regDate)?.time
-                    } catch (e: Exception) { null } ?: System.currentTimeMillis()
+                    } catch (e: Exception) {
+                        timber.log.Timber.e(e, "Failed to parse registration date: ${item.ben.regDate}")
+                        null
+                    } ?: 0L
                     val overviewData = CounsellingOverviewData(
                         benId = item.ben.benId,
                         patientName = item.ben.benFullName,

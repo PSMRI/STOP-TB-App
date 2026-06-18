@@ -20,8 +20,13 @@ data class CounsellingFormSchemaDto(
     @SerializedName("sections") val sections: List<CounsellingSectionDto>
 ) {
     companion object {
-        fun fromJson(json: String): CounsellingFormSchemaDto =
-            Gson().fromJson(json, CounsellingApiResponse::class.java).data
+        fun fromJson(json: String): CounsellingFormSchemaDto {
+            val response = Gson().fromJson(json, CounsellingApiResponse::class.java)
+            if (!response.success) {
+                throw IllegalStateException("API error: ${response.message ?: "Unknown error"}")
+            }
+            return response.data
+        }
     }
 }
 

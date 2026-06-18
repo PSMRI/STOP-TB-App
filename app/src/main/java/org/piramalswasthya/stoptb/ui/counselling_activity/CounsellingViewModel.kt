@@ -49,6 +49,11 @@ class CounsellingViewModel @Inject constructor(
     private val _formSubmitted = MutableLiveData<Boolean>()
     val formSubmitted: LiveData<Boolean> get() = _formSubmitted
 
+    private val _saveError = MutableLiveData<String?>()
+    val saveError: LiveData<String?> get() = _saveError
+
+    private var lastRequestedPhase: SectionPhase = SectionPhase.PRE_SUBMIT
+
     var schemaData: CounsellingFormSchemaDto? = null
     private val disabledValidationSections = mutableSetOf<String>()
 
@@ -67,6 +72,7 @@ class CounsellingViewModel @Inject constructor(
     }
 
     fun loadFormSchema(phase: SectionPhase) {
+        lastRequestedPhase = phase
         viewModelScope.launch {
             _formSchema.value = NetworkResponse.Loading()
             val response = counsellingRepo.getFormSchema(benId, phase)
@@ -98,6 +104,14 @@ class CounsellingViewModel @Inject constructor(
                 _formSchema.value = response
             }
         }
+    }
+
+    fun retryLoadFormSchema() {
+        loadFormSchema(lastRequestedPhase)
+    }
+
+    fun resetSaveError() {
+        _saveError.value = null
     }
 
     fun startCounselling() {
@@ -343,6 +357,8 @@ class CounsellingViewModel @Inject constructor(
                 } else {
                     _formSubmitted.value = true
                 }
+            } else {
+                _saveError.value = "Failed to save section answers. Please try again."
             }
         }
     }
