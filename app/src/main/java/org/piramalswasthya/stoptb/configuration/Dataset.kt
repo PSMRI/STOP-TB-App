@@ -116,9 +116,13 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 
         fun getMinDateOfReg(): Long {
             return Calendar.getInstance().apply {
-                set(Calendar.YEAR, 2020)
-                set(Calendar.MONTH, 0)
+                set(Calendar.YEAR, 2026)
+                set(Calendar.MONTH, Calendar.JANUARY)
                 set(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
             }.timeInMillis
 
         }

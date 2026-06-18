@@ -449,8 +449,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         val list = mutableListOf(
             pic,
             dateOfReg,
-            personFrom,
-            typeOfCaseFinding,
+//            personFrom,
+//            typeOfCaseFinding,
             firstName,
             lastName,
             agePopup,
@@ -492,11 +492,17 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         if (personFrom.value.isNullOrBlank()) personFrom.value = personFrom.entries?.firstOrNull()
         // PRD: default = "Active (Active Case Finding)" = index 1 in type_of_case_finding_array
         if (typeOfCaseFinding.value.isNullOrBlank()) typeOfCaseFinding.value = typeOfCaseFinding.entries?.getOrNull(1) ?: typeOfCaseFinding.entries?.firstOrNull()
+        val hasFamilyHeadMobile = familyHeadPhoneNo != null
         contactNumber.value = familyHeadPhoneNo?.toString()
         contactNumber.isEnabled = true
         mobileNotAvailable.value = null
+        mobileNotAvailable.isEnabled = !hasFamilyHeadMobile
         if (mobileNoOfRelation.value.isNullOrBlank()) {
-            mobileNoOfRelation.value = mobileNoOfRelation.entries?.firstOrNull()
+            mobileNoOfRelation.value = if (hasFamilyHeadMobile) {
+                mobileNoOfRelation.entries?.getOrNull(4)
+            } else {
+                mobileNoOfRelation.entries?.firstOrNull()
+            }
         }
         if (address.value.isNullOrBlank()) address.value = ""
         state.entries = arrayOf(ben?.locationRecord?.state?.name ?: "")
@@ -596,6 +602,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             if (contactNumber.value == "9999999999") {
                 mobileNotAvailable.value = "0"
                 contactNumber.isEnabled = false
+                mobileNotAvailable.isEnabled = true
+            } else {
+                mobileNotAvailable.isEnabled = saved.mobileNoOfRelationId != 5
             }
             address.value = saved.address ?: ""
             state.entries = arrayOf(saved.locationRecord.state.name)
@@ -766,19 +775,12 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         maritalStatus.required = shouldRequireMaritalStatus()
     }
 
-    private fun setDefaultMaritalStatusIfNeeded() {
-        if (maritalStatus.value.isNullOrBlank()) {
-            maritalStatus.value = maritalStatus.entries?.getOrNull(2)
-        }
-    }
-
     private fun addMaritalStatusIfApplicable(list: MutableList<FormElement>) {
         if (!shouldShowMaritalStatus()) {
             maritalStatus.value = null
             return
         }
         updateMaritalStatusRequirement()
-        setDefaultMaritalStatusIfNeeded()
         if (list.contains(maritalStatus)) return
 
         val villageIndex = list.indexOf(villageHamlet)
@@ -905,9 +907,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                                            else           R.array.nbr_marital_status_male_array
 
                     if (!isMaritalLocked) {
-                        // Normal: restore previous selection or set default
+                        // Normal: restore previous selection, but do not default to Unknown.
                         maritalStatus.value = savedMarital
-                        setDefaultMaritalStatusIfNeeded()
                     }
                     // Locked: maritalStatus.value was not in removeItems → still "Married" ✓
 
@@ -921,8 +922,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                             else -> null
                         }
                         val fieldsToAdd = mutableListOf<FormElement>()
-                        if (isFemale) fieldsToAdd.add(reproductiveStatus) // "Are you pregnant?" before spouse name
                         spouseField?.let { fieldsToAdd.add(it) }
+                        if (isFemale) fieldsToAdd.add(reproductiveStatus)
 
                         if (fieldsToAdd.isNotEmpty()) {
                             triggerDependants(
@@ -979,7 +980,6 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                     1 -> R.array.nbr_marital_status_female_array
                     else -> R.array.nbr_marital_status_male_array
                 }
-                setDefaultMaritalStatusIfNeeded()
                 updateMaritalStatusRequirement()
 
                 triggerDependants(
@@ -1016,12 +1016,12 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                         if (gender.value == gender.entries!![1]) {
                             triggerDependants(
                                 source = maritalStatus,
-                                addItems = listOf(reproductiveStatus, husbandName),
+                                addItems = listOf(husbandName, reproductiveStatus),
                                 removeItems = listOf(wifeName, husbandName, spouseName, ageAtMarriage, dateOfMarriage, reproductiveStatus)
                             )
                         } else {
                             triggerDependants(
-                                source = motherName,
+                                source = maritalStatus,
                                 addItems = when (gender.value) {
                                     gender.entries!![0] -> listOf(wifeName)
                                     else -> listOf(spouseName)
@@ -1085,7 +1085,6 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             }
             address.id -> {
                 validateEmptyOnEditText(address)
-                validateAllAlphabetsSpaceOnEditText(address)
                 return -1
             }
             state.id -> {
