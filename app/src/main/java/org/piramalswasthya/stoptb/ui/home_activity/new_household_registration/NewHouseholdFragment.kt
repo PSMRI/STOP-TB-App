@@ -179,13 +179,10 @@ class NewHouseholdFragment : Fragment() {
     }
 
     private fun validateCurrentPage(): Boolean {
-        val result = (binding.form.rvInputForm.adapter as? FormInputAdapter)?.validateInput(resources)
+        val result = (binding.form.rvInputForm.adapter as? FormInputAdapter)
+            ?.validateInput(resources, binding.form.rvInputForm)
         Timber.d("Validation : $result")
-        return if (result == -1) true
-        else {
-            result?.let { binding.form.rvInputForm.scrollToPosition(it) }
-            false
-        }
+        return result == -1
     }
 
     override fun onDestroyView() {

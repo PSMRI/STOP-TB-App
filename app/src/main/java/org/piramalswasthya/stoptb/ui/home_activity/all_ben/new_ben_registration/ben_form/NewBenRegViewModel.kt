@@ -465,6 +465,10 @@ class NewBenRegViewModel @Inject constructor(
     fun getBenName()    = if (this::ben.isInitialized) "${ben.firstName} ${ben.lastName ?: ""}" else ""
     fun isHoFMarried()  = false  // StopTB has no HoF concept
 
+    fun isDeathSelected(): Boolean {
+        return dataset.isDeathSelected()
+    }
+
     fun setImageUriToFormElement(dpUri: Uri) {
         dataset.setImageUriToFormElement(lastImageFormId, dpUri)
     }
