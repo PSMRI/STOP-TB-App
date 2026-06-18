@@ -385,7 +385,6 @@ abstract class InAppDb : RoomDatabase() {
 
         private val MIGRATION_17_18 = object : Migration(17, 18) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                // GPS location fields for standalone beneficiary registration
                 val benColumns = listOf(
                     "gpsLatitude REAL DEFAULT NULL",
                     "gpsLongitude REAL DEFAULT NULL",
@@ -405,7 +404,6 @@ abstract class InAppDb : RoomDatabase() {
 
         private val MIGRATION_16_17 = object : Migration(16, 17) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                // GPS location fields for Household Registration Location Details section
                 val householdColumns = listOf(
                     "gpsLatitude REAL DEFAULT NULL",
                     "gpsLongitude REAL DEFAULT NULL",
@@ -447,8 +445,9 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_16_17 = object : Migration(16, 17) {
+        private val MIGRATION_18_19 = object : Migration(18, 19) {
             override fun migrate(database: SupportSQLiteDatabase) {
+
                 database.execSQL("""
                     CREATE TABLE IF NOT EXISTS `t_dynamic_form` (
                         `formId` INTEGER NOT NULL, 
@@ -605,23 +604,42 @@ abstract class InAppDb : RoomDatabase() {
                 database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_question_response_sectionResponseId` ON `t_question_response` (`sectionResponseId`)")
                 database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_question_response_questionId` ON `t_question_response` (`questionId`)")
                 database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_question_response_optionId` ON `t_question_response` (`optionId`)")
-            }
-        }
-
-        private val MIGRATION_17_18 = object : Migration(17, 18) {
-            override fun migrate(database: SupportSQLiteDatabase) {
                 if (!columnExists(database, "t_form_section", "sectionUuid")) {
                     database.execSQL("ALTER TABLE t_form_section ADD COLUMN sectionUuid TEXT DEFAULT NULL")
                 }
                 if (!columnExists(database, "t_section_question", "questionUuid")) {
                     database.execSQL("ALTER TABLE t_section_question ADD COLUMN questionUuid TEXT DEFAULT NULL")
                 }
-            }
-        }
+                val householdColumns = listOf(
+                    "gpsLatitude REAL DEFAULT NULL",
+                    "gpsLongitude REAL DEFAULT NULL",
+                    "digipin TEXT DEFAULT NULL",
+                    "gpsTimestamp TEXT DEFAULT NULL",
+                    "isGpsUnavailable INTEGER NOT NULL DEFAULT 0",
+                    "gpsUnavailableReason TEXT DEFAULT NULL"
+                )
+                householdColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "HOUSEHOLD", columnName)) {
+                        database.execSQL("ALTER TABLE HOUSEHOLD ADD COLUMN $columnDefinition")
+                    }
+                }
 
-        private val MIGRATION_18_19 = object : Migration(18, 19) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                // Empty migration to avoid destructive migration from 18 to 19
+
+                val benColumns = listOf(
+                    "gpsLatitude REAL DEFAULT NULL",
+                    "gpsLongitude REAL DEFAULT NULL",
+                    "digipin TEXT DEFAULT NULL",
+                    "gpsTimestamp TEXT DEFAULT NULL",
+                    "isGpsUnavailable INTEGER NOT NULL DEFAULT 0",
+                    "gpsUnavailableReason TEXT DEFAULT NULL"
+                )
+                benColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "BENEFICIARY", columnName)) {
+                        database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN $columnDefinition")
+                    }
+                }
             }
         }
 
@@ -748,25 +766,6 @@ abstract class InAppDb : RoomDatabase() {
         }
 
         fun getInstance(appContext: Context): InAppDb {
-
-            // =====================================================================
-            // HOW TO ADD MIGRATION IN FUTURE:
-            // Step 1: Increment version in @Database annotation (e.g., version = 2)
-            // Step 2: Add migration object below
-            // Step 3: Add migration to addMigrations() and remove fallbackToDestructiveMigration()
-            //
-            // Example:
-            // val MIGRATION_1_2 = object : Migration(1, 2) {
-            //     override fun migrate(database: SupportSQLiteDatabase) {
-            //         database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN newField TEXT DEFAULT NULL")
-            //     }
-            // }
-            //
-            // Then in builder:
-            // instance = builder
-            //     .addMigrations(MIGRATION_1_2)
-            //     .build()
-            // =====================================================================
 
             synchronized(this) {
                 var instance = INSTANCE
