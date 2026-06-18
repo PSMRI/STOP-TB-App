@@ -319,7 +319,7 @@ data class BenDemographics(
     var digipin: String? = null,
 
     @Json(name = "gpsTimestamp")
-    var gpsTimestamp: String? = null,
+    var gpsTimestamp: Long? = null,
 
     @Json(name = "isGpsUnavailable")
     var isGpsUnavailable: Boolean? = null,
@@ -458,7 +458,7 @@ fun BenRegCache.asNetworkSendingModel(
             latitude = gpsLatitude ?: latitude,
             longitude = gpsLongitude ?: longitude,
             digipin = digipin,
-            gpsTimestamp = gpsTimestamp,
+            gpsTimestamp = gpsTimestamp?.toLongOrNull(),
             isGpsUnavailable = isGpsUnavailable,
             gpsUnavailableReason = gpsUnavailableReason,
             createdBy = user.userName,

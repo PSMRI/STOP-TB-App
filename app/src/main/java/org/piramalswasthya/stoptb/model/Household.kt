@@ -146,7 +146,7 @@ data class HouseholdCache(
             latitude = gpsLatitude,
             longitude = gpsLongitude,
             digipin = digipin,
-            gpsTimestamp = gpsTimestamp,
+            gpsTimestamp = gpsTimestamp?.toLongOrNull(),
             isGpsUnavailable = isGpsUnavailable,
             gpsUnavailableReason = gpsUnavailableReason
         )
@@ -272,7 +272,7 @@ data class HouseholdNetwork(
     @Json(name = "latitude") val latitude: Double? = null,
     @Json(name = "longitude") val longitude: Double? = null,
     @Json(name = "digipin") val digipin: String? = null,
-    @Json(name = "gpsTimestamp") val gpsTimestamp: String? = null,
+    @Json(name = "gpsTimestamp") val gpsTimestamp: Long? = null,
     @Json(name = "isGpsUnavailable") val isGpsUnavailable: Boolean? = null,
     @Json(name = "gpsUnavailableReason") val gpsUnavailableReason: String? = null
 

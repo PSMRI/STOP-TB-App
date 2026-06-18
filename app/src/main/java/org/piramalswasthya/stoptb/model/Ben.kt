@@ -1573,7 +1573,7 @@ data class BenRegCache(
                 latitude = gpsLatitude ?: latitude,
                 longitude = gpsLongitude ?: longitude,
                 digipin = digipin,
-                gpsTimestamp = gpsTimestamp,
+                gpsTimestamp = gpsTimestamp?.toLongOrNull(),
                 isGpsUnavailable = isGpsUnavailable,
                 gpsUnavailableReason = gpsUnavailableReason,
                 createdBy = user.userName,
