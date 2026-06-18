@@ -1,55 +1,88 @@
 package org.piramalswasthya.stoptb.model.dynamicEntity
 
-import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 
 data class FormSchemaDto(
     @SerializedName("formId")
     val formId: String,
 
+    @SerializedName("formUuid")
+    val formUuid: String? = null,
+
     @SerializedName("formName")
     val formName: String,
 
-    @SerializedName("version")
+    @SerializedName("formType")
+    val formType: String? = null,
+
+    @SerializedName("isActive")
+    val isActive: Boolean = true,
+
+    @SerializedName("version", alternate = ["versionNumber"])
     val version: Int = 1,
-
-
 
     @SerializedName("sections")
     val sections: List<FormSectionDto> = emptyList()
 ) {
+    val versionNumber: Int
+        get() = version
+
     companion object {
-        fun fromJson(json: String): FormSchemaDto = Gson().fromJson(json, FormSchemaDto::class.java)
+        fun fromJson(json: String): FormSchemaDto = com.google.gson.Gson().fromJson(json, FormSchemaDto::class.java)
     }
 
-    fun toJson(): String = Gson().toJson(this)
+    fun toJson(): String = com.google.gson.Gson().toJson(this)
 }
 
 data class FormSectionDto(
     @SerializedName("sectionId")
     val sectionId: String = "",
 
-    @SerializedName("sectionTitle")
+    @SerializedName("sectionUuid")
+    val sectionUuid: String? = null,
+
+    @SerializedName("sectionTitle", alternate = ["sectionName"])
     val sectionTitle: String = "",
 
-    @SerializedName("fields")
+    @SerializedName("sectionPhase")
+    val sectionPhase: String? = null,
+
+    @SerializedName("isRequired")
+    val isRequired: Boolean? = null,
+
+    @SerializedName("displayOrder")
+    val displayOrder: Int? = null,
+
+    @SerializedName("hasSubmitButton")
+    val hasSubmitButton: Boolean? = null,
+
+    @SerializedName("fields", alternate = ["questions"])
     val fields: List<FormFieldDto> = emptyList()
-)
+) {
+    val sectionName: String
+        get() = sectionTitle
+
+    val questions: List<FormFieldDto>
+        get() = fields
+}
 
 data class FormFieldDto(
-    @SerializedName("fieldId")
+    @SerializedName("fieldId", alternate = ["questionUuid"])
     val fieldId: String = "",
 
-    @SerializedName("label")
+    @SerializedName("questionId")
+    val questionId: Int? = null,
+
+    @SerializedName("label", alternate = ["questionText"])
     val label: String = "",
 
-    @SerializedName("type")
+    @SerializedName("type", alternate = ["questionType"])
     val type: String = "",
 
     @SerializedName("options")
-    var options: List<String>? = null,
+    val options: List<Any>? = null,
 
-    @SerializedName("isRequired")
+    @SerializedName("isRequired", alternate = ["isMandatory"])
     val required: Boolean = false,
 
     @SerializedName("conditional")
@@ -57,6 +90,9 @@ data class FormFieldDto(
 
     @SerializedName("validation")
     val validation: FieldValidationDto? = null,
+
+    @SerializedName("validations")
+    val validations: List<ValidationItemDto> = emptyList(),
 
     @SerializedName("placeholder")
     val placeholder: String? = null,
@@ -70,10 +106,94 @@ data class FormFieldDto(
     @SerializedName("value")
     var value: Any? = null,
 
+    @SerializedName("displayOrder")
+    val displayOrder: Int? = null,
+
     @Transient var visible: Boolean = true,
     @Transient var errorMessage: String? = null,
     @Transient var isEditable: Boolean = true
-)
+) {
+    val isMandatory: Boolean
+        get() = required
+
+    fun getOptionStrings(): List<String> {
+        val list = options ?: return emptyList()
+        return list.map {
+            when (it) {
+                is String -> it
+                is Map<*, *> -> (it["optionLabel"] ?: it["optionValue"] ?: "").toString()
+                else -> it.toString()
+            }
+        }
+    }
+
+    fun getOptionItems(): List<OptionItemDto> {
+        val list = options ?: return emptyList()
+        return list.mapIndexed { index, it ->
+            when (it) {
+                is Map<*, *> -> {
+                    val conds = (it["conditions"] as? List<*>)?.mapNotNull { condMap ->
+                        if (condMap is Map<*, *>) {
+                            ConditionDto(
+                                conditionId = (condMap["conditionId"] as? Number)?.toInt() ?: 0,
+                                actionType = (condMap["actionType"] ?: "").toString(),
+                                targetQuestionId = (condMap["targetQuestionId"] as? Number)?.toInt(),
+                                targetSectionId = (condMap["targetSectionId"] as? Number)?.toInt(),
+                                targetQuestionUuid = condMap["targetQuestionUuid"]?.toString(),
+                                targetSectionUuid = condMap["targetSectionUuid"]?.toString()
+                            )
+                        } else null
+                    } ?: emptyList()
+
+                    OptionItemDto(
+                        optionId = (it["optionId"] as? Number)?.toInt() ?: (index + 1),
+                        optionLabel = (it["optionLabel"] ?: "").toString(),
+                        optionValue = (it["optionValue"] ?: "").toString(),
+                        displayOrder = (it["displayOrder"] as? Number)?.toInt() ?: (index + 1),
+                        conditions = conds
+                    )
+                }
+                else -> {
+                    OptionItemDto(
+                        optionId = index + 1,
+                        optionLabel = it.toString(),
+                        optionValue = it.toString(),
+                        displayOrder = index + 1,
+                        conditions = emptyList()
+                    )
+                }
+            }
+        }
+    }
+
+    fun getMergedValidation(): FieldValidationDto? {
+        if (validation != null) return validation
+        if (validations.isEmpty()) return null
+
+        var min: Float? = null
+        var max: Float? = null
+        var maxLengthVal: Int? = null
+        var regexVal: String? = null
+        var errMsg: String? = null
+
+        validations.forEach {
+            errMsg = it.errorMessage
+            when (it.validationType) {
+                "MIN" -> min = it.validationParam?.toFloatOrNull()
+                "MAX" -> max = it.validationParam?.toFloatOrNull()
+                "MAX_LENGTH" -> maxLengthVal = it.validationParam?.toIntOrNull()
+                "REGEX" -> regexVal = it.validationParam
+            }
+        }
+        return FieldValidationDto(
+            min = min,
+            max = max,
+            maxLength = maxLengthVal,
+            regex = regexVal,
+            errorMessage = errMsg ?: ""
+        )
+    }
+}
 
 data class ConditionalLogic(
     @SerializedName("dependsOn")
@@ -98,7 +218,32 @@ data class FieldValidationDto(
     val incremental: Boolean? = null
 )
 
+data class OptionItemDto(
+    val optionId: Int,
+    val optionLabel: String,
+    val optionValue: String,
+    val displayOrder: Int,
+    val conditions: List<ConditionDto>
+)
+
+data class ConditionDto(
+    val conditionId: Int,
+    val actionType: String,
+    val targetQuestionId: Int?,
+    val targetSectionId: Int?,
+    val targetQuestionUuid: String?,
+    val targetSectionUuid: String?
+)
+
+data class ValidationItemDto(
+    val validationId: Int,
+    val validationType: String,
+    val validationParam: String?,
+    val errorMessage: String
+)
+
 data class OptionItem(
     val label: String = "",
-    val value: String =  ""
+    val value: String = ""
 )
+

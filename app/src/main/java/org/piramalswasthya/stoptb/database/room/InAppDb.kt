@@ -54,6 +54,19 @@ import org.piramalswasthya.stoptb.model.VitalCache
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormResponseJsonEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormSchemaEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.NCDReferalFormResponseJsonEntity
+import org.piramalswasthya.stoptb.model.dynamicEntity.DynamicFormEntity
+import org.piramalswasthya.stoptb.model.dynamicEntity.FormVersionEntity
+import org.piramalswasthya.stoptb.model.dynamicEntity.FormSectionEntity
+import org.piramalswasthya.stoptb.model.dynamicEntity.SectionQuestionEntity
+import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionOptionEntity
+import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionValidationEntity
+import org.piramalswasthya.stoptb.model.dynamicEntity.OptionConditionEntity
+import org.piramalswasthya.stoptb.model.dynamicEntity.FormResponseEntity
+import org.piramalswasthya.stoptb.model.dynamicEntity.SectionResponseEntity
+import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionResponseEntity
+import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.DynamicFormMetadataDao
+import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.CounsellingFormResponseDao
+
 
 @Database(
     entities = [
@@ -78,10 +91,20 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.NCDReferalFormResponseJson
         TBConfirmedTreatmentCache::class,
         VitalCache::class,
         GeneralOpdCache::class,
-        TBDiagnosticsCache::class
+        TBDiagnosticsCache::class,
+        DynamicFormEntity::class,
+        FormVersionEntity::class,
+        FormSectionEntity::class,
+        SectionQuestionEntity::class,
+        QuestionOptionEntity::class,
+        QuestionValidationEntity::class,
+        OptionConditionEntity::class,
+        FormResponseEntity::class,
+        SectionResponseEntity::class,
+        QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class],
-    version = 16, exportSchema = false
+    version = 19, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -107,6 +130,8 @@ abstract class InAppDb : RoomDatabase() {
     abstract fun formResponseDao(): FormResponseDao
     abstract fun NCDReferalFormResponseJsonDao(): NCDReferalFormResponseJsonDao
     abstract fun formResponseJsonDao(): FormResponseJsonDao
+    abstract fun dynamicFormMetadataDao(): DynamicFormMetadataDao
+    abstract fun counsellingFormResponseDao(): CounsellingFormResponseDao
     abstract val syncDao: SyncDao
     abstract val vitalDao: VitalDao
 
@@ -382,6 +407,174 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `t_dynamic_form` (
+                        `formId` INTEGER NOT NULL, 
+                        `formUuid` TEXT NOT NULL, 
+                        `formName` TEXT NOT NULL, 
+                        `formType` TEXT NOT NULL, 
+                        `createdAt` INTEGER NOT NULL, 
+                        `updatedAt` INTEGER NOT NULL, 
+                        PRIMARY KEY(`formId`)
+                    )
+                """.trimIndent())
+                
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `t_form_version` (
+                        `versionId` INTEGER NOT NULL, 
+                        `formId` INTEGER NOT NULL, 
+                        `versionNumber` INTEGER NOT NULL, 
+                        `isActive` INTEGER NOT NULL, 
+                        `createdAt` INTEGER NOT NULL, 
+                        `updatedAt` INTEGER NOT NULL, 
+                        PRIMARY KEY(`versionId`), 
+                        FOREIGN KEY(`formId`) REFERENCES `t_dynamic_form`(`formId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_form_version_formId` ON `t_form_version` (`formId`)")
+
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `t_form_section` (
+                        `sectionId` INTEGER NOT NULL, 
+                        `versionId` INTEGER NOT NULL, 
+                        `sectionName` TEXT NOT NULL, 
+                        `sectionOrder` INTEGER NOT NULL, 
+                        `sectionPhase` TEXT NOT NULL, 
+                        `sectionUuid` TEXT, 
+                        `createdAt` INTEGER NOT NULL, 
+                        `updatedAt` INTEGER NOT NULL, 
+                        PRIMARY KEY(`sectionId`), 
+                        FOREIGN KEY(`versionId`) REFERENCES `t_form_version`(`versionId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_form_section_versionId` ON `t_form_section` (`versionId`)")
+
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `t_section_question` (
+                        `questionId` INTEGER NOT NULL, 
+                        `sectionId` INTEGER NOT NULL, 
+                        `questionText` TEXT NOT NULL, 
+                        `questionType` TEXT NOT NULL, 
+                        `questionOrder` INTEGER NOT NULL, 
+                        `isRequired` INTEGER NOT NULL, 
+                        `questionUuid` TEXT, 
+                        `createdAt` INTEGER NOT NULL, 
+                        `updatedAt` INTEGER NOT NULL, 
+                        PRIMARY KEY(`questionId`), 
+                        FOREIGN KEY(`sectionId`) REFERENCES `t_form_section`(`sectionId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_section_question_sectionId` ON `t_section_question` (`sectionId`)")
+
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `t_question_option` (
+                        `optionId` INTEGER NOT NULL, 
+                        `questionId` INTEGER NOT NULL, 
+                        `optionText` TEXT NOT NULL, 
+                        `optionValue` TEXT NOT NULL, 
+                        `optionOrder` INTEGER NOT NULL, 
+                        `createdAt` INTEGER NOT NULL, 
+                        `updatedAt` INTEGER NOT NULL, 
+                        PRIMARY KEY(`optionId`), 
+                        FOREIGN KEY(`questionId`) REFERENCES `t_section_question`(`questionId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_question_option_questionId` ON `t_question_option` (`questionId`)")
+
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `t_question_validation` (
+                        `validationId` INTEGER NOT NULL, 
+                        `questionId` INTEGER NOT NULL, 
+                        `validationType` TEXT NOT NULL, 
+                        `validationValue` TEXT, 
+                        `errorMessage` TEXT NOT NULL, 
+                        `createdAt` INTEGER NOT NULL, 
+                        `updatedAt` INTEGER NOT NULL, 
+                        PRIMARY KEY(`validationId`), 
+                        FOREIGN KEY(`questionId`) REFERENCES `t_section_question`(`questionId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_question_validation_questionId` ON `t_question_validation` (`questionId`)")
+
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `t_option_condition` (
+                        `conditionId` INTEGER NOT NULL, 
+                        `optionId` INTEGER NOT NULL, 
+                        `targetQuestionId` INTEGER NOT NULL, 
+                        `actionType` TEXT NOT NULL, 
+                        `isFulfilledValue` INTEGER NOT NULL, 
+                        `createdAt` INTEGER NOT NULL, 
+                        `updatedAt` INTEGER NOT NULL, 
+                        PRIMARY KEY(`conditionId`), 
+                        FOREIGN KEY(`optionId`) REFERENCES `t_question_option`(`optionId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
+                        FOREIGN KEY(`targetQuestionId`) REFERENCES `t_section_question`(`questionId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_option_condition_optionId` ON `t_option_condition` (`optionId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_option_condition_targetQuestionId` ON `t_option_condition` (`targetQuestionId`)")
+
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `t_form_response` (
+                        `responseId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
+                        `beneficiaryId` INTEGER NOT NULL, 
+                        `formVersionId` INTEGER NOT NULL, 
+                        `status` TEXT NOT NULL, 
+                        `lastVisitedSectionId` INTEGER, 
+                        `syncStatus` TEXT NOT NULL DEFAULT 'UNSYNCED', 
+                        `syncedAt` INTEGER, 
+                        `createdAt` INTEGER NOT NULL, 
+                        `updatedAt` INTEGER NOT NULL, 
+                        FOREIGN KEY(`formVersionId`) REFERENCES `t_form_version`(`versionId`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_t_form_response_beneficiaryId` ON `t_form_response` (`beneficiaryId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_form_response_formVersionId` ON `t_form_response` (`formVersionId`)")
+
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `t_section_response` (
+                        `sectionResponseId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
+                        `formResponseId` INTEGER NOT NULL, 
+                        `sectionId` INTEGER NOT NULL, 
+                        `completedAt` INTEGER, 
+                        `createdAt` INTEGER NOT NULL, 
+                        `updatedAt` INTEGER NOT NULL, 
+                        FOREIGN KEY(`formResponseId`) REFERENCES `t_form_response`(`responseId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
+                        FOREIGN KEY(`sectionId`) REFERENCES `t_form_section`(`sectionId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_section_response_formResponseId` ON `t_section_response` (`formResponseId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_section_response_sectionId` ON `t_section_response` (`sectionId`)")
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_t_section_response_formResponseId_sectionId` ON `t_section_response` (`formResponseId`, `sectionId`)")
+
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `t_question_response` (
+                        `questionResponseId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
+                        `sectionResponseId` INTEGER NOT NULL, 
+                        `questionId` INTEGER NOT NULL, 
+                        `optionId` INTEGER, 
+                        `answerText` TEXT, 
+                        `createdAt` INTEGER NOT NULL, 
+                        `updatedAt` INTEGER NOT NULL, 
+                        FOREIGN KEY(`sectionResponseId`) REFERENCES `t_section_response`(`sectionResponseId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
+                        FOREIGN KEY(`questionId`) REFERENCES `t_section_question`(`questionId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
+                        FOREIGN KEY(`optionId`) REFERENCES `t_question_option`(`optionId`) ON UPDATE NO ACTION ON DELETE SET NULL
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_question_response_sectionResponseId` ON `t_question_response` (`sectionResponseId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_question_response_questionId` ON `t_question_response` (`questionId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_question_response_optionId` ON `t_question_response` (`optionId`)")
+            }
+        }
+
+        private val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE t_form_section ADD COLUMN sectionUuid TEXT DEFAULT NULL")
+                database.execSQL("ALTER TABLE t_section_question ADD COLUMN questionUuid TEXT DEFAULT NULL")
+            }
+        }
+
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(
@@ -562,6 +755,9 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_13_14)
                         .addMigrations(MIGRATION_14_15)
                         .addMigrations(MIGRATION_15_16)
+                        .addMigrations(MIGRATION_16_17)
+                        .addMigrations(MIGRATION_17_18)
+                        .fallbackToDestructiveMigration()
                         .build()
 
                     INSTANCE = instance

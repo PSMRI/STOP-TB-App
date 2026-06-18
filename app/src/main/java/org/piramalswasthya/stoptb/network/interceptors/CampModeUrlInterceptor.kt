@@ -14,6 +14,10 @@ class CampModeUrlInterceptor @Inject constructor(
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
 
+        if (originalRequest.url.host.contains("ngrok")) {
+            return chain.proceed(originalRequest)
+        }
+
         if (!preferenceDao.isCampModeEnabled() || !preferenceDao.isCampHubConnected()) {
             return chain.proceed(originalRequest)
         }

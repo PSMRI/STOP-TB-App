@@ -10,9 +10,14 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.GridLayoutManager
 import dagger.hilt.android.AndroidEntryPoint
 import org.piramalswasthya.stoptb.R
+import android.widget.Toast
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.adapters.IconGridAdapter
 import org.piramalswasthya.stoptb.configuration.IconDataset
 import org.piramalswasthya.stoptb.databinding.FragmentVolunteerHomeBinding
+import org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -20,6 +25,9 @@ class VolunteerIconsFragment : Fragment() {
 
     @Inject
     lateinit var iconDataset: IconDataset
+
+    @Inject
+    lateinit var counsellingRepository: ICounsellingRepository
 
     private var _binding: FragmentVolunteerHomeBinding? = null
     private val binding: FragmentVolunteerHomeBinding
@@ -36,7 +44,6 @@ class VolunteerIconsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setUpIconRvAdapter()
-
     }
 
     private fun setUpIconRvAdapter() {

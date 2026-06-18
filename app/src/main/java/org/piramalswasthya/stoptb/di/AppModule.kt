@@ -70,6 +70,7 @@ object AppModule {
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
+            .hostnameVerifier(campHubHostnameVerifier)
             .addInterceptor(campModeUrlInterceptor)
             .addInterceptor(loggingInterceptor)
             .addInterceptor(accountDeactivationInterceptor)
@@ -162,6 +163,30 @@ object AppModule {
             .addInterceptor(loggingInterceptor)
             .build()
     }
+//    @Singleton
+//    @Provides
+//    fun provideTestingApiService(
+//        loggingInterceptor: HttpLoggingInterceptor,
+//        preferenceDao: PreferenceDao
+//    ): TestingApiService {
+//        val client = OkHttpClient.Builder()
+//            .addInterceptor { chain ->
+//                val jwt = preferenceDao.getJWTAmritToken()
+//                val request = chain.request().newBuilder()
+//                    .apply { if (!jwt.isNullOrBlank()) header("Authorization", "Bearer bypass") }
+//                    .header("User-Agent", "okhttp/4.11.0")
+//                    .build()
+//                chain.proceed(request)
+//            }
+//            .addInterceptor(loggingInterceptor)
+//            .build()
+//        return Retrofit.Builder()
+//            .addConverterFactory(GsonConverterFactory.create())
+//            .baseUrl("https://064d-2401-4900-47fa-6e83-8382-1e3-95b0-2748.ngrok-free.app/")
+//            .client(client)
+//            .build()
+//            .create(TestingApiService::class.java)
+//    }
 
     @Singleton
     @Provides
@@ -178,11 +203,30 @@ object AppModule {
             .create(AbhaApiService::class.java)
     }
 
+    private val campHubHostnameVerifier = javax.net.ssl.HostnameVerifier { hostname, session ->
+        val defaultVerifier = javax.net.ssl.HttpsURLConnection.getDefaultHostnameVerifier()
+        if (defaultVerifier.verify(hostname, session)) {
+            true
+        } else {
+            runCatching {
+                val certs = session.peerCertificates
+                if (certs.isNotEmpty()) {
+                    val x509 = certs[0] as? java.security.cert.X509Certificate
+                    val subject = x509?.subjectX500Principal?.name ?: ""
+                    subject.contains("*.piramalswasthya.org") || subject.contains("piramalswasthya.org")
+                } else {
+                    false
+                }
+            }.getOrDefault(false)
+        }
+    }
+
     private val baseClient =
         OkHttpClient.Builder()
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
+            .hostnameVerifier(campHubHostnameVerifier)
             .addInterceptor(ContentTypeInterceptor())
             .build()
 
@@ -208,6 +252,7 @@ object AppModule {
             .build()
             .create(AmritApiService::class.java)
     }
+
 
     @Singleton
     @Provides
@@ -296,4 +341,10 @@ object AppModule {
     @Singleton
     @Provides
     fun provideFormResponseJsonDao(database: InAppDb): FormResponseJsonDao = database.formResponseJsonDao()
+
+    @Singleton
+    @Provides
+    fun provideCounsellingRepository(
+        impl: org.piramalswasthya.stoptb.repositories.dynamicRepo.CounsellingRepositoryImpl
+    ): org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository = impl
 }

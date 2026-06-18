@@ -28,6 +28,11 @@
 
     <group android:checkableBehavior="single">
         <item
+            android:id="@+id/menu_counselling"
+            android:checkable="false"
+            android:icon="@drawable/baseline_chat_24"
+            android:title="@string/counselling_menu_title" />
+        <item
             android:id="@+id/abha_id_activity"
             android:checkable="false"
             android:icon="@drawable/ic_completed_tasks"

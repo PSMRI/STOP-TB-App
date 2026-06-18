@@ -25,9 +25,12 @@ import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.helpers.isNurseRole
+import org.piramalswasthya.stoptb.database.room.InAppDb
+import org.piramalswasthya.stoptb.helpers.dynamicMapper.PayloadBuilder
 import org.piramalswasthya.stoptb.model.*
 import org.piramalswasthya.stoptb.network.*
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel
+import org.piramalswasthya.stoptb.utils.Log
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
 import java.io.File
@@ -46,6 +49,7 @@ class BenRepo @Inject constructor(
     private val userRepo: UserRepo,
     private val tmcNetworkApiService: AmritApiService,
     private val formResponseJsonDao: FormResponseJsonDao,
+    private val db: InAppDb,
 ) {
 
     private val processNewBenMutex = Mutex()
@@ -444,7 +448,8 @@ class BenRepo @Inject constructor(
             } else {
                 Timber.d("Beneficiary batch push succeeded: ${benNetworkPostList.size} ben records, ${householdNetworkPostList.size} household records")
             }
-            return@withContext true
+            val counsellingSyncDone = pushCounsellingData()
+            return@withContext uploadDone && counsellingSyncDone
         }
     }
 
@@ -458,14 +463,23 @@ class BenRepo @Inject constructor(
         val benIds = benNetworkPostSet.map { it.benId }
         val hhIds = householdNetworkPostSet.map { it.householdId }
         Timber.d("Amrit push syncDataToAmrit: sending ${benNetworkPostSet.size} ben(s) $benIds, ${householdNetworkPostSet.size} hh(s) $hhIds, ${kidNetworkPostSet.size} kid(s)")
+
         val rmnchData = SendingRMNCHData(
             houseHoldRegistrationData = householdNetworkPostSet.toList(),
             benficieryRegistrationData = benNetworkPostSet.toList(),
             cbacData = null,
-            birthDetails = kidNetworkPostSet.toList()
+            birthDetails = kidNetworkPostSet.toList(),
+            counsellingDetails = null
         )
         try {
+            val jsonPayload = Gson().toJson(rmnchData)
+            Timber.d("Amrit push syncDataToAmrit payload JSON: $jsonPayload")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to serialize rmnchData to JSON for logging")
+        }
+        try {
             val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
+            Log.d("Response final",response.toString())
             val statusCode = response.code()
             Timber.d("Amrit push syncDataToAmrit response: httpStatus=$statusCode")
 
@@ -489,6 +503,7 @@ class BenRepo @Inject constructor(
                             Timber.d("Amrit push syncDataToAmrit DB updated: benIds=${it.toList()}")
                         }
                         hhToUpdateList?.let { householdDao.householdSyncedWithServer(*it) }
+                        
                         return true
                     } else if (responseStatusCode == 5002 || responseStatusCode == 401) {
                         val user = preferenceDao.getLoggedInUser()
@@ -522,6 +537,83 @@ class BenRepo @Inject constructor(
         }
     }
 
+    private suspend fun pushCounsellingData(retryCount: Int = 3): Boolean {
+        val unsyncedCounselling = db.counsellingFormResponseDao().getUnsyncedFormResponses()
+        if (unsyncedCounselling.isEmpty()) return true
+
+        val officerId = preferenceDao.getLoggedInUser()?.userId?.toLong() ?: 501L
+        val counsellingPayloadList = unsyncedCounselling.map { response ->
+            val formVersionId = response.formResponse.formVersionId
+            val formDef = db.dynamicFormMetadataDao().getFormDefinitionByVersionId(formVersionId)
+            PayloadBuilder.buildBulkPayload(response, formDef, officerId)
+        }
+
+        try {
+            val jsonPayload = Gson().toJson(counsellingPayloadList)
+            Timber.d("Amrit push submitBulk payload JSON: $jsonPayload")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to serialize bulk counselling to JSON for logging")
+        }
+
+        val jwt = preferenceDao.getJWTAmritToken()
+        val authHeader = jwt ?: ""
+
+        try {
+            val response = tmcNetworkApiService.submitBulkCounselling(authHeader, counsellingPayloadList)
+            val statusCode = response.code()
+            Timber.d("Amrit push submitBulk response: httpStatus=$statusCode")
+
+            if (statusCode == 200) {
+                val responseString: String? = response.body()?.string()
+                if (responseString != null) {
+                    val jsonObj = JSONObject(responseString)
+                    val isSuccess = jsonObj.optBoolean("success", false)
+                    val errorMessage = jsonObj.optString("message", "")
+                    if (isSuccess) {
+                        Timber.d("Amrit push submitBulk success: $jsonObj")
+                        unsyncedCounselling.forEach { resp ->
+                            db.counsellingFormResponseDao().updateFormResponse(
+                                resp.formResponse.copy(
+                                    syncStatus = "SYNCED",
+                                    syncedAt = System.currentTimeMillis()
+                                )
+                            )
+                        }
+                        return true
+                    } else {
+                        val responseStatusCode = jsonObj.optInt("statusCode", 200)
+                        if (responseStatusCode == 5002 || responseStatusCode == 401) {
+                            val user = preferenceDao.getLoggedInUser()
+                                ?: throw IllegalStateException("User not logged in according to db")
+                            if (userRepo.refreshTokenTmc(
+                                    user.userName, user.password
+                                )
+                            ) throw SocketTimeoutException("Refreshed Token!")
+                            else throw IllegalStateException("User seems to be logged out and refresh token not working!!!!")
+                        }
+                        Timber.e("Amrit push submitBulk failed: error=$errorMessage")
+                    }
+                } else {
+                    Timber.e("Amrit push submitBulk failed: response body is null, httpStatus=$statusCode")
+                }
+            }
+            Timber.w("Amrit push submitBulk bad response: httpStatus=$statusCode")
+            return false
+        } catch (e: SocketTimeoutException) {
+            Timber.e("Amrit push submitBulk timeout: error=$e")
+            if (e.message == "Refreshed Token!") {
+                if (retryCount > 0) return pushCounsellingData(retryCount - 1)
+            }
+            return false
+        } catch (e: JSONException) {
+            Timber.e("Amrit push submitBulk JSON error: error=$e")
+            return false
+        } catch (e: java.lang.Exception) {
+            Timber.e("Amrit push submitBulk error: error=$e")
+            return false
+        }
+    }
+
 
     suspend fun deactivateHouseHold(
         benNetworkPostSet: List<BenRegCache>,
@@ -539,6 +631,12 @@ class BenRepo @Inject constructor(
             listOf(householdNetworkPostSet),
             benNetworkPostList
         )
+        try {
+            val jsonPayload = Gson().toJson(rmnchData)
+            Timber.d("deactivateHouseHold syncDataToAmrit payload JSON: $jsonPayload")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to serialize deactivateHouseHold payload to JSON")
+        }
         try {
             val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
             val statusCode = response.code()
@@ -598,6 +696,12 @@ class BenRepo @Inject constructor(
             //   listOf(householdNetworkPostSet),
             benficieryRegistrationData= benNetworkPostList
         )
+        try {
+            val jsonPayload = Gson().toJson(rmnchData)
+            Timber.d("deactivateBeneficiary syncDataToAmrit payload JSON: $jsonPayload")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to serialize deactivateBeneficiary payload to JSON")
+        }
         try {
             val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
             val statusCode = response.code()
