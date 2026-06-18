@@ -315,6 +315,18 @@ data class BenDemographics(
     @Json(name = "longitude")
     var longitude: Double? = null,
 
+    @Json(name = "digipin")
+    var digipin: String? = null,
+
+    @Json(name = "gpsTimestamp")
+    var gpsTimestamp: Long? = null,
+
+    @Json(name = "isGpsUnavailable")
+    var isGpsUnavailable: Boolean? = null,
+
+    @Json(name = "gpsUnavailableReason")
+    var gpsUnavailableReason: String? = null,
+
     @Json(name = "createdBy")
     var createdBy: String? = null,
 
@@ -443,8 +455,12 @@ fun BenRegCache.asNetworkSendingModel(
             residentialArea = residentialArea,
             residentialAreaId = residentialAreaId,
             otherResidentialArea = otherResidentialArea,
-            latitude = latitude,
-            longitude = longitude,
+            latitude = gpsLatitude ?: latitude,
+            longitude = gpsLongitude ?: longitude,
+            digipin = digipin,
+            gpsTimestamp = gpsTimestamp?.toLongOrNull(),
+            isGpsUnavailable = isGpsUnavailable,
+            gpsUnavailableReason = gpsUnavailableReason,
             createdBy = user.userName,
         ),
         benPhoneMaps = arrayOf(

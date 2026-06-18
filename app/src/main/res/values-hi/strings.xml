@@ -928,6 +928,44 @@
         <item>CHC</item>
         <item>PHC</item>
     </string-array>
+
+    <!-- Location Details Section -->
+    <string name="loc_section_title">स्थान विवरण</string>
+    <string name="loc_btn_refresh">रिफ्रेश</string>
+    <string name="loc_status_fetching">स्थान प्राप्त हो रहा है…</string>
+    <string name="loc_status_captured">स्थान प्राप्त हुआ</string>
+    <string name="loc_status_failed">स्थान प्राप्त नहीं हो सका</string>
+    <string name="loc_status_permission_denied">अक्षांश और देशांतर प्राप्त करने के लिए कृपया स्थान की अनुमति दें।</string>
+    <string name="loc_status_gps_unavailable">GPS उपलब्ध नहीं</string>
+    <string name="loc_status_gps_disabled">इस डिवाइस पर GPS अक्षम है</string>
+    <string name="loc_label_latitude">अक्षांश</string>
+    <string name="loc_label_longitude">देशांतर</string>
+    <string name="loc_label_digipin">DIGIPIN</string>
+    <string name="loc_label_timestamp">कैप्चर किया गया</string>
+    <string name="loc_cb_gps_unavailable">GPS उपलब्ध नहीं है</string>
+    <string name="loc_label_reason">GPS अनुपलब्धता का कारण</string>
+    <string name="loc_hint_reason">कारण चुनें</string>
+    <string name="loc_err_reason_required">कृपया एक कारण चुनें</string>
+    <string name="loc_err_location_required">कृपया स्थान कैप्चर करें या GPS अनुपलब्ध चिह्नित करें</string>
+    <string name="loc_msg_no_signal">वर्तमान स्थान निर्धारित नहीं किया जा सका। कृपया खुले क्षेत्र में जाएँ और पुनः प्रयास करें।</string>
+    <string name="loc_msg_outside_india">स्थान समर्थित भारतीय सीमा के बाहर है। कृपया GPS सिग्नल जांचें।</string>
+    <string name="loc_msg_enable_gps">स्थान अनुमति आवश्यक है। कृपया सेटिंग में इसे अनुमति दें।</string>
+    <string name="loc_dialog_open_settings">सेटिंग खोलें</string>
+    <string name="loc_permission_rationale">इस घरेलू पंजीकरण के लिए GPS निर्देशांक कैप्चर करने हेतु स्थान अनुमति आवश्यक है।</string>
+    <string name="loc_timeout_msg">स्थान प्राप्त करने में समय समाप्त। कृपया खुले क्षेत्र में जाएँ और रिफ्रेश दबाएं।</string>
+    <string-array name="loc_gps_unavailable_reasons">
+        <item>GPS सिग्नल नहीं</item>
+        <item>इनडोर स्थान</item>
+        <item>भूमिगत</item>
+        <item>डिवाइस GPS अक्षम</item>
+        <item>अन्य</item>
+    </string-array>
+    <string name="dialog_cancel_title">क्या आप सुनिश्चित हैं?</string>
+    <string name="dialog_cancel_message">क्या आप इस पंजीकरण को छोड़कर वापस जाना चाहते हैं?</string>
+    <string name="dialog_yes">हाँ</string>
+    <string name="dialog_no">नहीं</string>
+    <string name="patient_registered_successfully">रोगी का पंजीकरण सफलतापूर्वक हुआ।</string>
+    <string name="proceed_to_register_hof">क्या आप परिवार के मुखिया के पंजीकरण के साथ आगे बढ़ना चाहते हैं?</string>
 </resources>
 
 
