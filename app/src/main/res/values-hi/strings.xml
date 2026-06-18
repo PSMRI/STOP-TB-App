@@ -934,6 +934,7 @@
     <string name="loc_status_fetching">स्थान प्राप्त हो रहा है…</string>
     <string name="loc_status_captured">स्थान प्राप्त हुआ</string>
     <string name="loc_status_failed">स्थान प्राप्त नहीं हो सका</string>
+    <string name="loc_status_permission_denied">अक्षांश और देशांतर प्राप्त करने के लिए कृपया स्थान की अनुमति दें।</string>
     <string name="loc_status_gps_unavailable">GPS उपलब्ध नहीं</string>
     <string name="loc_status_gps_disabled">इस डिवाइस पर GPS अक्षम है</string>
     <string name="loc_label_latitude">अक्षांश</string>

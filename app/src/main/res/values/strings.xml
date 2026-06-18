@@ -1299,6 +1299,7 @@
     <string name="loc_status_fetching">Fetching Location…</string>
     <string name="loc_status_captured">Location Captured</string>
     <string name="loc_status_failed">Unable to Fetch Location</string>
+    <string name="loc_status_permission_denied">Please grant location permission to fetch latitude and longitude.</string>
     <string name="loc_status_gps_unavailable">GPS Unavailable</string>
     <string name="loc_status_gps_disabled">GPS is disabled on this device</string>
     <string name="loc_label_latitude">Latitude</string>

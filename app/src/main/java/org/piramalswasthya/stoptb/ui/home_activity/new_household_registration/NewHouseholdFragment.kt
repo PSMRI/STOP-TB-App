@@ -59,7 +59,6 @@ class NewHouseholdFragment : Fragment() {
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
 
-    // ─── STT ─────────────────────────────────────────────────────────────────
     private val sttContract = registerForActivityResult(SpeechToTextContract()) { value ->
         val formatted = value.uppercase()
         viewModel.updateValueByIdAndReturnListIndex(micClickedElementId, formatted)
@@ -67,7 +66,6 @@ class NewHouseholdFragment : Fragment() {
             ?.let { binding.form.rvInputForm.adapter?.notifyItemChanged(it) }
     }
 
-    // ─── Location permission ──────────────────────────────────────────────────
     private val requestLocationPermission =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
             val granted = grants[Manifest.permission.ACCESS_FINE_LOCATION] == true
@@ -75,22 +73,19 @@ class NewHouseholdFragment : Fragment() {
             if (granted) {
                 checkSettingsAndFetch()
             } else {
+                viewModel.onLocationFailed(LocationState.Failed.PermissionDenied)
                 val showRationale = shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)
                 if (!showRationale) {
                     showOpenSettingsDialog()
-                } else {
-                    viewModel.onLocationFailed(LocationState.Failed.PermissionDenied)
                 }
             }
         }
 
-    // ─── GPS settings resolution (enable GPS dialog) ─────────────────────────
     private val resolveGpsSettings =
         registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
             fetchLocationNow()
         }
 
-    // ─── Inflate ─────────────────────────────────────────────────────────────
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
@@ -116,9 +111,9 @@ class NewHouseholdFragment : Fragment() {
         setupButtons()
         observeViewModel()
 
-        // Auto-capture on first open (silent — no prompt if permission missing)
+        // Auto-capture on first open (prompts for permission if missing)
         if (viewModel.readRecord.value == false) {
-            captureLocationSilently()
+            autoCaptureLocation()
         }
     }
 
@@ -178,7 +173,7 @@ class NewHouseholdFragment : Fragment() {
             toggleGpsFields(!isChecked)
             if (!isChecked) {
                 binding.acvReason.setText("", false)
-                captureLocationSilently()
+                autoCaptureLocation()
             }
         }
 
@@ -268,19 +263,18 @@ class NewHouseholdFragment : Fragment() {
         }
     }
 
-    // ─── Location UI updates ─────────────────────────────────────────────────
-
     private fun updateLocationUI(state: LocationState) {
+        val isEditMode = viewModel.readRecord.value == false
         when (state) {
             is LocationState.Idle -> {
-                setStatusText(getString(R.string.loc_status_fetching), "#FF9800")
+                setStatusText("", "#FF9800")
             }
             is LocationState.Fetching -> {
                 setStatusText(getString(R.string.loc_status_fetching), "#FF9800")
                 binding.btnRefreshLocation.isEnabled = false
             }
             is LocationState.Captured -> {
-                binding.btnRefreshLocation.isEnabled = true
+                binding.btnRefreshLocation.isEnabled = isEditMode
                 setStatusText(getString(R.string.loc_status_captured), "#4CAF50")
                 binding.etLatitude.setText(String.format(java.util.Locale.ENGLISH, "%.6f", state.lat))
                 binding.etLongitude.setText(String.format(java.util.Locale.ENGLISH, "%.6f", state.lon))
@@ -288,22 +282,22 @@ class NewHouseholdFragment : Fragment() {
                 binding.etTimestamp.setText(state.timestamp)
             }
             is LocationState.Failed.PermissionDenied -> {
-                binding.btnRefreshLocation.isEnabled = true
-                setStatusText(getString(R.string.loc_status_failed), "#F44336")
+                binding.btnRefreshLocation.isEnabled = isEditMode
+                setStatusText(getString(R.string.loc_status_permission_denied), "#F44336")
                 clearLocationFields()
             }
             is LocationState.Failed.GpsDisabled -> {
-                binding.btnRefreshLocation.isEnabled = true
+                binding.btnRefreshLocation.isEnabled = isEditMode
                 setStatusText(getString(R.string.loc_status_gps_disabled), "#F44336")
                 clearLocationFields()
             }
             is LocationState.Failed.NoSignal -> {
-                binding.btnRefreshLocation.isEnabled = true
+                binding.btnRefreshLocation.isEnabled = isEditMode
                 setStatusText(getString(R.string.loc_status_failed), "#F44336")
                 clearLocationFields()
             }
             is LocationState.Failed.OutsideIndia -> {
-                binding.btnRefreshLocation.isEnabled = true
+                binding.btnRefreshLocation.isEnabled = isEditMode
                 setStatusText(getString(R.string.loc_status_failed), "#F44336")
                 clearLocationFields()
                 Toast.makeText(context, getString(R.string.loc_msg_outside_india), Toast.LENGTH_LONG).show()
@@ -335,11 +329,18 @@ class NewHouseholdFragment : Fragment() {
         binding.tilTimestamp.visibility = v
     }
 
-    // ─── Location capture ─────────────────────────────────────────────────────
-
-    private fun captureLocationSilently() {
-        if (!hasLocationPermission()) return
-        checkSettingsAndFetch()
+    private fun autoCaptureLocation() {
+        if (hasLocationPermission()) {
+            checkSettingsAndFetch()
+        } else {
+            viewModel.onLocationFailed(LocationState.Failed.PermissionDenied)
+            requestLocationPermission.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
     }
 
     private fun refreshLocation() {
@@ -357,6 +358,7 @@ class NewHouseholdFragment : Fragment() {
     }
 
     private fun checkSettingsAndFetch() {
+        viewModel.setFetching()
         val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10_000L)
             .setWaitForAccurateLocation(false)
             .setMaxUpdates(1)
@@ -426,8 +428,6 @@ class NewHouseholdFragment : Fragment() {
             }
     }
 
-    // ─── Helpers ──────────────────────────────────────────────────────────────
-
     private fun hasLocationPermission(): Boolean =
         ActivityCompat.checkSelfPermission(
             requireContext(), Manifest.permission.ACCESS_FINE_LOCATION
@@ -451,7 +451,6 @@ class NewHouseholdFragment : Fragment() {
             .show()
     }
 
-    // ─── Submit ───────────────────────────────────────────────────────────────
 
     private fun submitForm() {
         activity?.currentFocus?.clearFocus()
@@ -485,7 +484,6 @@ class NewHouseholdFragment : Fragment() {
         return false
     }
 
-    // ─── Dialogs ──────────────────────────────────────────────────────────────
 
     private fun showCancelDialog() {
         MaterialAlertDialogBuilder(requireContext())
@@ -540,7 +538,6 @@ class NewHouseholdFragment : Fragment() {
             .show()
     }
 
-    // ─── Cleanup ──────────────────────────────────────────────────────────────
 
     override fun onDestroyView() {
         super.onDestroyView()

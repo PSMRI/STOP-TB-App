@@ -792,6 +792,7 @@
     <string name="loc_status_fetching">অৱস্থান আনা হৈছে…</string>
     <string name="loc_status_captured">অৱস্থান ধৰা পৰিছে</string>
     <string name="loc_status_failed">অৱস্থান আনিব পৰা নগ\'ল</string>
+    <string name="loc_status_permission_denied">অক্ষাংশ আৰু দ্ৰাঘিমাংশ আনিবলৈ অনুগ্ৰহ কৰি অৱস্থানৰ অনুমতি দিয়ক।</string>
     <string name="loc_status_gps_unavailable">GPS উপলব্ধ নহয়</string>
     <string name="loc_status_gps_disabled">এই ডিভাইচত GPS অক্ষম</string>
     <string name="loc_label_latitude">অক্ষাংশ</string>
