@@ -66,7 +66,7 @@
     <string name="tv_father_name_ph">Father Name</string>
     <string name="tv_husband_name_ph">Husband Name</string>
     <string name="tv_spouse_name_ph">Spouse Name</string>
-    <string name="tv_family_head_name_ph">Family Head Name</string>
+    <string name="tv_family_head_name_ph">Head of Family</string>
     <string name="tv_ben_id_ph">Ben ID</string>
     <string name="tv_mob_no_ph">Mobile Number</string>
     <string name="tv_age_ph">Age</string>
@@ -385,7 +385,7 @@
     <string name="validate">Validate</string>
     <string name="child_immunization">Child Immunization</string>
     <string name="relation_with_hof">Relation with HOF</string>
-    <string name="add_family_member">Add HoF Member</string>
+    <string name="add_family_member">Add Family Member</string>
     <string name="app_native_name">StopTB</string>
     <string name="non_pregnant_women_eligible_couple_section">Non-Pregnant Women (Eligible Couple) section</string>
     <string name="time_of_death">Time of Death</string>
@@ -1010,8 +1010,12 @@
     <string name="height_cms">Height (cms)</string>
     <string name="temperature_degree_fahrenheit">Temperature (Degree Fahrenheit)</string>
     <string name="anthropometry_screen">Anthropometry Screen</string>
-    <string name="normal_temperature_range">Normal range: 97-99&#176;F</string>
-    <string name="temperature_100_or_more">&gt;= 100&#176;F</string>
+    <string name="temperature_hypothermia">&lt;97 - Hypothermia</string>
+    <string name="normal_temperature_range">97-99 - Normal</string>
+    <string name="temperature_100_or_more">&gt;99 - Fever</string>
+    <string name="enter_weight_between_1_250_kg">Enter Weight between 1 and 250 kg</string>
+    <string name="enter_height_between_30_250_cm">Enter Height between 30 and 250 cm</string>
+    <string name="enter_temperature_between_90_110_f">Enter Temperature between 90 and 110 &#176;F</string>
     <string name="anthropometry_age_gender_format">%1$d %2$s | %3$s</string>
     <string name="age_unit_years">Years</string>
     <string name="age_unit_months">Months</string>
@@ -1299,5 +1303,43 @@
         <item>PHC</item>
     </string-array>
     <string name="counselling_date_hint">Date</string>
+    <!-- Location Details Section -->
+    <string name="loc_section_title">Location Details</string>
+    <string name="loc_btn_refresh">Refresh</string>
+    <string name="loc_status_fetching">Fetching Location…</string>
+    <string name="loc_status_captured">Location Captured</string>
+    <string name="loc_status_failed">Unable to Fetch Location</string>
+    <string name="loc_status_permission_denied">Please grant location permission to fetch latitude and longitude.</string>
+    <string name="loc_status_gps_unavailable">GPS Unavailable</string>
+    <string name="loc_status_gps_disabled">GPS is disabled on this device</string>
+    <string name="loc_label_latitude">Latitude</string>
+    <string name="loc_label_longitude">Longitude</string>
+    <string name="loc_label_digipin">DIGIPIN</string>
+    <string name="loc_label_timestamp">Captured At</string>
+    <string name="loc_cb_gps_unavailable">GPS Unavailable</string>
+    <string name="loc_label_reason">Reason for GPS Unavailability</string>
+    <string name="loc_hint_reason">Select reason</string>
+    <string name="loc_err_reason_required">Please select a reason</string>
+    <string name="loc_err_location_required">Please capture location or mark GPS Unavailable with a reason</string>
+    <string name="loc_msg_no_signal">Unable to determine current location. Please move to an open area and try again.</string>
+    <string name="loc_msg_outside_india">Location is outside supported India bounds. Please check your GPS signal.</string>
+    <string name="loc_msg_enable_gps">Location permission is required. Please grant it in Settings.</string>
+    <string name="loc_dialog_open_settings">Open Settings</string>
+    <string name="loc_permission_rationale">Location permission is needed to capture GPS coordinates for this household registration.</string>
+    <string name="loc_timeout_msg">Location timed out. Please move to an open area and tap Refresh.</string>
+    <string-array name="loc_gps_unavailable_reasons">
+        <item>No GPS Signal</item>
+        <item>Indoor Location</item>
+        <item>Underground</item>
+        <item>Device GPS Disabled</item>
+        <item>Other</item>
+    </string-array>
+    <string name="dialog_cancel_title">Are you Sure?</string>
+    <string name="dialog_cancel_message">Do you want to discard this registration and go back?</string>
+    <string name="dialog_yes">Yes</string>
+    <string name="dialog_no">No</string>
+    <string name="patient_registered_successfully">Patient Registered Successfully</string>
+    <string name="proceed_to_register_hof">Do you want to proceed with registration of Head of the Family?</string>
+
 </resources>
 

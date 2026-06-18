@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.piramalswasthya.stoptb.model.LocationState
+import org.piramalswasthya.stoptb.helpers.DigiPinHelper
 import org.piramalswasthya.stoptb.configuration.BenRegFormDataset
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -40,6 +42,8 @@ class NewBenRegViewModel @Inject constructor(
 ) : ViewModel() {
 
     enum class State { IDLE, SAVING, SAVE_SUCCESS, SAVE_FAILED }
+
+
 
     sealed class ListUpdateState {
         object Idle    : ListUpdateState()
@@ -77,9 +81,18 @@ class NewBenRegViewModel @Inject constructor(
     fun setConsentAgreed()    { isConsentAgreed = true }
     fun getIsConsentAgreed()  = isConsentAgreed
 
-    // Geolocation
-    var capturedLatitude: Double = 0.0
-    var capturedLongitude: Double = 0.0
+    // True when registering without an associated household
+    val isStandalone: Boolean get() = hhId == 0L
+
+    // Location state — only used for standalone registrations
+    private val _locationState = MutableStateFlow<LocationState>(LocationState.Idle)
+    val locationState: StateFlow<LocationState> = _locationState.asStateFlow()
+
+    private val _isGpsUnavailable = MutableStateFlow(false)
+    val isGpsUnavailable: StateFlow<Boolean> = _isGpsUnavailable.asStateFlow()
+
+    private val _gpsUnavailableReason = MutableStateFlow<String?>(null)
+    val gpsUnavailableReason: StateFlow<String?> = _gpsUnavailableReason.asStateFlow()
 
     // ─── Data ────────────────────────────────────────────────────────────
     private lateinit var user:           User
@@ -241,6 +254,61 @@ class NewBenRegViewModel @Inject constructor(
                 spouseRegistrationRelToHeadId = relToHeadId
             )
         }
+        // Restore/Inherit Location details
+        if (!isStandalone) {
+            if (household.isGpsUnavailable) {
+                _isGpsUnavailable.value = true
+                _gpsUnavailableReason.value = household.gpsUnavailableReason
+            } else if (household.gpsLatitude != null && household.gpsLongitude != null && household.digipin != null) {
+                _locationState.value = LocationState.Captured(
+                    lat = household.gpsLatitude!!,
+                    lon = household.gpsLongitude!!,
+                    digipin = household.digipin!!,
+                    timestamp = household.gpsTimestamp.orEmpty()
+                )
+            }
+        } else if (benIdFromArgs != 0L) {
+            if (ben.isGpsUnavailable) {
+                _isGpsUnavailable.value = true
+                _gpsUnavailableReason.value = ben.gpsUnavailableReason
+            } else if (ben.gpsLatitude != null && ben.gpsLongitude != null && ben.digipin != null) {
+                _locationState.value = LocationState.Captured(
+                    lat = ben.gpsLatitude!!,
+                    lon = ben.gpsLongitude!!,
+                    digipin = ben.digipin!!,
+                    timestamp = ben.gpsTimestamp.orEmpty()
+                )
+            }
+        }
+    }
+
+    // ─── Location callbacks (standalone registrations only) ─────────────
+    fun setFetching() { _locationState.value = LocationState.Fetching }
+
+    fun onLocationResult(lat: Double, lon: Double) {
+        val digipin = DigiPinHelper.generate(lat, lon)
+        if (digipin == null) {
+            _locationState.value = LocationState.Failed.OutsideIndia
+            return
+        }
+        val ts = System.currentTimeMillis().toString()
+        _locationState.value = LocationState.Captured(lat, lon, digipin, ts)
+    }
+
+    fun onLocationFailed(reason: LocationState.Failed) { _locationState.value = reason }
+
+    fun onGpsUnavailableToggled(checked: Boolean) {
+        _isGpsUnavailable.value = checked
+        if (checked) _locationState.value = LocationState.Idle
+        else _gpsUnavailableReason.value = null
+    }
+
+    fun onGpsUnavailableReasonSelected(reason: String?) { _gpsUnavailableReason.value = reason }
+
+    fun isLocationValid(): Boolean = when {
+        locationState.value is LocationState.Captured -> true
+        isGpsUnavailable.value && !gpsUnavailableReason.value.isNullOrBlank() -> true
+        else -> false
     }
 
     // ─── Save ────────────────────────────────────────────────────────────
@@ -373,9 +441,33 @@ class NewBenRegViewModel @Inject constructor(
 
                     dataset.mapValues(ben, 1)
 
-                    // Set captured geolocation
-                    ben.latitude = capturedLatitude
-                    ben.longitude = capturedLongitude
+                    // Set GPS location: inherit from household when registered under one,
+                    // otherwise persist the standalone-captured GPS state
+                    if (!isStandalone) {
+                        ben.gpsLatitude = household.gpsLatitude
+                        ben.gpsLongitude = household.gpsLongitude
+                        ben.digipin = household.digipin
+                        ben.gpsTimestamp = household.gpsTimestamp
+                        ben.isGpsUnavailable = household.isGpsUnavailable
+                        ben.gpsUnavailableReason = household.gpsUnavailableReason
+                    } else {
+                        val locState = locationState.value
+                        if (locState is LocationState.Captured) {
+                            ben.gpsLatitude = locState.lat
+                            ben.gpsLongitude = locState.lon
+                            ben.digipin = locState.digipin
+                            ben.gpsTimestamp = locState.timestamp
+                            ben.isGpsUnavailable = false
+                            ben.gpsUnavailableReason = null
+                        } else if (isGpsUnavailable.value) {
+                            ben.gpsLatitude = null
+                            ben.gpsLongitude = null
+                            ben.digipin = null
+                            ben.gpsTimestamp = null
+                            ben.isGpsUnavailable = true
+                            ben.gpsUnavailableReason = gpsUnavailableReason.value
+                        }
+                    }
 
                     ben.apply {
                         if (hhId > 0L) householdId = hhId
@@ -394,6 +486,11 @@ class NewBenRegViewModel @Inject constructor(
                         }
                         updatedDate = System.currentTimeMillis()
                         updatedBy   = user.userName
+                    }
+
+                    val spouseLinkBenId = findExistingSpouseLinkForFamilyMember(ben)
+                    if (spouseLinkBenId != null) {
+                        ben.isSpouseAdded = true
                     }
 
                     benRepo.persistRecord(ben, updateIfExists = benIdFromArgs != 0L)
@@ -430,6 +527,9 @@ class NewBenRegViewModel @Inject constructor(
                             }
                         }
                     }
+                    spouseLinkBenId?.let { linkedBenId ->
+                        benRepo.updateBeneficiarySpouseAdded(hhId, linkedBenId, SyncState.UNSYNCED)
+                    }
 
                     _state.postValue(State.SAVE_SUCCESS)
 
@@ -457,6 +557,10 @@ class NewBenRegViewModel @Inject constructor(
     fun getBenName()    = if (this::ben.isInitialized) "${ben.firstName} ${ben.lastName ?: ""}" else ""
     fun isHoFMarried()  = false  // StopTB has no HoF concept
 
+    fun isDeathSelected(): Boolean {
+        return dataset.isDeathSelected()
+    }
+
     fun setImageUriToFormElement(dpUri: Uri) {
         dataset.setImageUriToFormElement(lastImageFormId, dpUri)
     }
@@ -477,6 +581,35 @@ class NewBenRegViewModel @Inject constructor(
 
     fun setRecordExist(b: Boolean) { _recordExists.value = b }
     fun enableEditMode() { dataset.enableEditMode() }
+
+    private suspend fun findExistingSpouseLinkForFamilyMember(newBen: BenRegCache): Long? {
+        if (isAddSpouseFromArgs == 1 || hhId <= 0L || benIdFromArgs != 0L) return null
+        if (relToHeadId != 4 && relToHeadId != 5) return null
+
+        val newFirstName = newBen.firstName.normalizeNameForMatch()
+        val newFullName = newBen.fullName().normalizeNameForMatch()
+        if (newFirstName.isBlank() && newFullName.isBlank()) return null
+
+        val expectedExistingGenderId = if (relToHeadId == 4) 1 else 2
+        val matches = benRepo.getBenListFromHousehold(hhId).filter { existing ->
+            existing.beneficiaryId != newBen.beneficiaryId &&
+                existing.genderId == expectedExistingGenderId &&
+                existing.isMarried &&
+                (relToHeadId == 4 || !existing.isSpouseAdded) &&
+                existing.genDetails?.spouseName.normalizeNameForMatch().let { spouseName ->
+                    spouseName.isNotBlank() &&
+                        (spouseName == newFirstName || spouseName == newFullName)
+                }
+        }
+
+        return matches.singleOrNull()?.beneficiaryId
+    }
+
+    private fun String?.normalizeNameForMatch(): String =
+        this?.trim()
+            ?.replace(Regex("\\s+"), " ")
+            ?.uppercase()
+            .orEmpty()
 
     // ─── Preview ─────────────────────────────────────────────────────────
     suspend fun getFormPreviewData(): List<PreviewItem> = withContext(Dispatchers.Default) {

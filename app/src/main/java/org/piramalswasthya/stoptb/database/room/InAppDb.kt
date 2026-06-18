@@ -383,6 +383,46 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // GPS location fields for standalone beneficiary registration
+                val benColumns = listOf(
+                    "gpsLatitude REAL DEFAULT NULL",
+                    "gpsLongitude REAL DEFAULT NULL",
+                    "digipin TEXT DEFAULT NULL",
+                    "gpsTimestamp TEXT DEFAULT NULL",
+                    "isGpsUnavailable INTEGER NOT NULL DEFAULT 0",
+                    "gpsUnavailableReason TEXT DEFAULT NULL"
+                )
+                benColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "BENEFICIARY", columnName)) {
+                        database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN $columnDefinition")
+                    }
+                }
+            }
+        }
+
+        private val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // GPS location fields for Household Registration Location Details section
+                val householdColumns = listOf(
+                    "gpsLatitude REAL DEFAULT NULL",
+                    "gpsLongitude REAL DEFAULT NULL",
+                    "digipin TEXT DEFAULT NULL",
+                    "gpsTimestamp TEXT DEFAULT NULL",
+                    "isGpsUnavailable INTEGER NOT NULL DEFAULT 0",
+                    "gpsUnavailableReason TEXT DEFAULT NULL"
+                )
+                householdColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "HOUSEHOLD", columnName)) {
+                        database.execSQL("ALTER TABLE HOUSEHOLD ADD COLUMN $columnDefinition")
+                    }
+                }
+            }
+        }
+
         private val MIGRATION_15_16 = object : Migration(15, 16) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 val newColumns = listOf(

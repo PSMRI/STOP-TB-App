@@ -98,7 +98,7 @@ class AnthropometryViewModel @Inject constructor(
                     ben.updatedBy = preferenceDao.getLoggedInUser()?.userName
 
                     benRepo.updateRecord(ben)
-                    if (temperature != null && temperature >= 100.0) {
+                    if (temperature != null && temperature > 99.0) {
                         buildHwcReferral(ben)?.let {
                             ncdReferalRepo.saveReferedNCD(it)
                             referralStatusManager.markAsReferred(benId, "TB")
@@ -130,7 +130,7 @@ class AnthropometryViewModel @Inject constructor(
             referredToInstituteID = 2,
             refrredToAdditionalServiceList = listOf("Health and Wellness Centre"),
             referredToInstituteName = "HWC",
-            referralReason = "Temperature >= 100 F",
+            referralReason = "Temperature > 99 F",
             revisitDate = System.currentTimeMillis(),
             vanID = user.vanId,
             parkingPlaceID = user.serviceMapId,
