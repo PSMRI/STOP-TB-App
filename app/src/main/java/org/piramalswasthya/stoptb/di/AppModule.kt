@@ -163,31 +163,6 @@ object AppModule {
             .addInterceptor(loggingInterceptor)
             .build()
     }
-//    @Singleton
-//    @Provides
-//    fun provideTestingApiService(
-//        loggingInterceptor: HttpLoggingInterceptor,
-//        preferenceDao: PreferenceDao
-//    ): TestingApiService {
-//        val client = OkHttpClient.Builder()
-//            .addInterceptor { chain ->
-//                val jwt = preferenceDao.getJWTAmritToken()
-//                val request = chain.request().newBuilder()
-//                    .apply { if (!jwt.isNullOrBlank()) header("Authorization", "Bearer bypass") }
-//                    .header("User-Agent", "okhttp/4.11.0")
-//                    .build()
-//                chain.proceed(request)
-//            }
-//            .addInterceptor(loggingInterceptor)
-//            .build()
-//        return Retrofit.Builder()
-//            .addConverterFactory(GsonConverterFactory.create())
-//            .baseUrl("https://064d-2401-4900-47fa-6e83-8382-1e3-95b0-2748.ngrok-free.app/")
-//            .client(client)
-//            .build()
-//            .create(TestingApiService::class.java)
-//    }
-
     @Singleton
     @Provides
     fun provideAbhaApiService(
