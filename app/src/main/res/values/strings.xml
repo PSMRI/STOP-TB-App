@@ -211,7 +211,7 @@
     <string name="form_input_error_invalid_rch">Invalid RCH ID !</string>
     <string name="form_input_error_invalid_mcp">Invalid MCP Number !</string>
     <string name="form_input_error_invalid_aadhar">Invalid Aadhaar Number !</string>
-<string name="version_2_0_0">APK Version 2.0.0</string>
+    <string name="version_2_0_0">APK Version 2.0.0</string>
     <string name="full_name">Full Name</string>
     <string name="male">Male</string>
     <string name="female">Female</string>
@@ -1302,7 +1302,7 @@
         <item>CHC</item>
         <item>PHC</item>
     </string-array>
-
+    <string name="counselling_date_hint">Date</string>
     <!-- Location Details Section -->
     <string name="loc_section_title">Location Details</string>
     <string name="loc_btn_refresh">Refresh</string>
@@ -1340,5 +1340,6 @@
     <string name="dialog_no">No</string>
     <string name="patient_registered_successfully">Patient Registered Successfully</string>
     <string name="proceed_to_register_hof">Do you want to proceed with registration of Head of the Family?</string>
+
 </resources>
 

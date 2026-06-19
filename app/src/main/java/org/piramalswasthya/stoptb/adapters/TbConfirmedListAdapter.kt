@@ -112,11 +112,13 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 
 
     class ClickListener(
-        private val clickedForm: ((hhId: Long, benId: Long) -> Unit)? = null
-
+        private val clickedForm: ((hhId: Long, benId: Long) -> Unit)? = null,
+        private val clickedCounselling: ((item: BenWithTbSuspectedDomain) -> Unit)? = null
     ) {
         fun onClickForm(item: BenWithTbSuspectedDomain) =
             clickedForm?.let { it(item.ben.hhId, item.ben.benId) }
+        fun onClickCounselling(item: BenWithTbSuspectedDomain) =
+            clickedCounselling?.let { it(item) }
     }
 
 }

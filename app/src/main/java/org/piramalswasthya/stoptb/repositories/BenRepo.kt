@@ -25,9 +25,13 @@ import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.helpers.isNurseRole
+import org.piramalswasthya.stoptb.database.room.InAppDb
+import org.piramalswasthya.stoptb.helpers.dynamicMapper.PayloadBuilder
 import org.piramalswasthya.stoptb.model.*
 import org.piramalswasthya.stoptb.network.*
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel
+import org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository
+import org.piramalswasthya.stoptb.utils.Log
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
 import java.io.File
@@ -46,11 +50,14 @@ class BenRepo @Inject constructor(
     private val userRepo: UserRepo,
     private val tmcNetworkApiService: AmritApiService,
     private val formResponseJsonDao: FormResponseJsonDao,
+    private val db: InAppDb,
+    private val counsellingRepository: ICounsellingRepository
 ) {
 
     private val processNewBenMutex = Mutex()
 
     companion object {
+        private const val DEFAULT_OFFICER_ID = 501L
         private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
         private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.ENGLISH)
         fun getCurrentDate(millis: Long = System.currentTimeMillis()): String {
@@ -445,7 +452,8 @@ class BenRepo @Inject constructor(
             } else {
                 Timber.d("Beneficiary batch push succeeded: ${benNetworkPostList.size} ben records, ${householdNetworkPostList.size} household records")
             }
-            return@withContext true
+            val counsellingSyncDone = pushCounsellingData()
+            return@withContext uploadDone && counsellingSyncDone
         }
     }
 
@@ -459,14 +467,23 @@ class BenRepo @Inject constructor(
         val benIds = benNetworkPostSet.map { it.benId }
         val hhIds = householdNetworkPostSet.map { it.householdId }
         Timber.d("Amrit push syncDataToAmrit: sending ${benNetworkPostSet.size} ben(s) $benIds, ${householdNetworkPostSet.size} hh(s) $hhIds, ${kidNetworkPostSet.size} kid(s)")
+
         val rmnchData = SendingRMNCHData(
             houseHoldRegistrationData = householdNetworkPostSet.toList(),
             benficieryRegistrationData = benNetworkPostSet.toList(),
             cbacData = null,
-            birthDetails = kidNetworkPostSet.toList()
+            birthDetails = kidNetworkPostSet.toList(),
+            counsellingDetails = null
         )
         try {
+            val jsonPayload = Gson().toJson(rmnchData)
+            Timber.d("Amrit push syncDataToAmrit payload JSON: $jsonPayload")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to serialize rmnchData to JSON for logging")
+        }
+        try {
             val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
+            Log.d("Response final",response.toString())
             val statusCode = response.code()
             Timber.d("Amrit push syncDataToAmrit response: httpStatus=$statusCode")
 
@@ -490,6 +507,7 @@ class BenRepo @Inject constructor(
                             Timber.d("Amrit push syncDataToAmrit DB updated: benIds=${it.toList()}")
                         }
                         hhToUpdateList?.let { householdDao.householdSyncedWithServer(*it) }
+                        
                         return true
                     } else if (responseStatusCode == 5002 || responseStatusCode == 401) {
                         val user = preferenceDao.getLoggedInUser()
@@ -523,6 +541,10 @@ class BenRepo @Inject constructor(
         }
     }
 
+    private suspend fun pushCounsellingData(): Boolean {
+        return counsellingRepository.syncUnsyncedRecords()
+    }
+
 
     suspend fun deactivateHouseHold(
         benNetworkPostSet: List<BenRegCache>,
@@ -541,6 +563,12 @@ class BenRepo @Inject constructor(
             listOf(householdNetworkPostSet),
             benNetworkPostList
         )
+        try {
+            val jsonPayload = Gson().toJson(rmnchData)
+            Timber.d("deactivateHouseHold syncDataToAmrit payload JSON: $jsonPayload")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to serialize deactivateHouseHold payload to JSON")
+        }
         try {
             val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
             val statusCode = response.code()
@@ -601,6 +629,12 @@ class BenRepo @Inject constructor(
             //   listOf(householdNetworkPostSet),
             benficieryRegistrationData= benNetworkPostList
         )
+        try {
+            val jsonPayload = Gson().toJson(rmnchData)
+            Timber.d("deactivateBeneficiary syncDataToAmrit payload JSON: $jsonPayload")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to serialize deactivateBeneficiary payload to JSON")
+        }
         try {
             val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
             val statusCode = response.code()

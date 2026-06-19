@@ -55,6 +55,9 @@
             android:name=".ui.volunteer.VolunteerActivity"
             android:exported="false" />
         <activity
+            android:name=".ui.counselling_activity.CounsellingActivity"
+            android:exported="false" />
+        <activity
             android:name=".ui.service_location_activity.ServiceLocationActivity"
             android:exported="false" />
         <activity
