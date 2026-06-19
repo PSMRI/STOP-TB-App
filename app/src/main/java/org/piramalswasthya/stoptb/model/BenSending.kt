@@ -460,7 +460,7 @@ fun BenRegCache.asNetworkSendingModel(
             longitude = gpsLongitude ?: household?.gpsLongitude ?: longitude,
             digipin = digipin ?: household?.digipin,
             gpsTimestamp = (gpsTimestamp ?: household?.gpsTimestamp)?.toLongOrNull(),
-            isGpsUnavailable = if (gpsLatitude != null || gpsLongitude != null) false else (isGpsUnavailable || (household?.isGpsUnavailable ?: false)),
+            isGpsUnavailable = if (gpsLatitude != null || household?.gpsLatitude != null || gpsLongitude != null || household?.gpsLongitude != null) false else (isGpsUnavailable || (household?.isGpsUnavailable ?: false)),
             gpsUnavailableReason = gpsUnavailableReason ?: household?.gpsUnavailableReason,
             createdBy = user.userName,
         ),
