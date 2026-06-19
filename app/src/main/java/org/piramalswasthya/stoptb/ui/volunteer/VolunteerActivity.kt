@@ -44,7 +44,6 @@ import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
 import org.piramalswasthya.stoptb.helpers.TapjackingProtectionHelper
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
-import org.piramalswasthya.stoptb.ui.counselling_activity.CounsellingActivity
 import org.piramalswasthya.stoptb.ui.home_activity.sync.SyncBottomSheetFragment
 import org.piramalswasthya.stoptb.ui.login_activity.LoginActivity
 import org.piramalswasthya.stoptb.ui.service_location_activity.ServiceLocationActivity
@@ -360,12 +359,6 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
 
         // ── Create ABHA ID ───────────────────────────────────────────────
         refreshCampHubDrawerItem()
-
-        binding.navView.menu.findItem(R.id.menu_counselling)?.setOnMenuItemClickListener {
-            startActivity(Intent(this, CounsellingActivity::class.java))
-            binding.drawerLayout.close()
-            true
-        }
 
         binding.navView.menu.findItem(R.id.abha_id_activity)?.setOnMenuItemClickListener {
             startActivity(Intent(this, AbhaIdActivity::class.java))
