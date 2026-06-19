@@ -348,8 +348,8 @@ class BenRepo @Inject constructor(
     private suspend fun createBenIdAtServerByBeneficiarySending(
         ben: BenRegCache, user: User, locationRecord: LocationRecord
     ): Boolean {
-
-        val sendingData = ben.asNetworkSendingModel(user, locationRecord, context)
+        val household = if (ben.householdId > 0L) householdDao.getHousehold(ben.householdId) else null
+        val sendingData = ben.asNetworkSendingModel(user, locationRecord, context, household)
         Timber.d("Amrit push beneficiary registration: benId=${ben.beneficiaryId}, hhId=${ben.householdId}")
         try {
             val response = tmcNetworkApiService.getBenIdFromBeneficiarySending(sendingData)
@@ -429,10 +429,11 @@ class BenRepo @Inject constructor(
             val updateBenList = benDao.getAllBenForSyncWithServer()
             updateBenList.forEach {
                 benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.SYNCING)
-                benNetworkPostList.add(it.asNetworkPostModel(context, user))
-                householdNetworkPostList.add(
-                    householdDao.getHousehold(it.householdId)!!.asNetworkModel(user)
-                )
+                val household = if (it.householdId > 0L) householdDao.getHousehold(it.householdId) else null
+                benNetworkPostList.add(it.asNetworkPostModel(context, user, household))
+                household?.let { hh ->
+                    householdNetworkPostList.add(hh.asNetworkModel(user))
+                }
                 try {
                     if (it.ageUnitId != 3 || it.age < 15) kidNetworkPostList.add(
                         it.asKidNetworkModel(user)
@@ -553,7 +554,8 @@ class BenRepo @Inject constructor(
         val user = preferenceDao.getLoggedInUser() ?: throw IllegalStateException("No user logged in!!")
         val benNetworkPostList: List<BenPost> =
             benNetworkPostSet.map {
-                it.asNetworkPostModel(context, user)
+                val household = if (it.householdId > 0L) householdDao.getHousehold(it.householdId) else null
+                it.asNetworkPostModel(context, user, household)
             }
 
 
@@ -618,7 +620,8 @@ class BenRepo @Inject constructor(
         val user = preferenceDao.getLoggedInUser() ?: throw IllegalStateException("No user logged in!!")
         val benNetworkPostList: List<BenPost> =
             benNetworkPostSet.map {
-                it.asNetworkPostModel(context, user)
+                val household = if (it.householdId > 0L) householdDao.getHousehold(it.householdId) else null
+                it.asNetworkPostModel(context, user, household)
             }
 
 
