@@ -1315,7 +1315,7 @@
     <string name="loc_label_latitude">Latitude</string>
     <string name="loc_label_longitude">Longitude</string>
     <string name="loc_label_digipin">DIGIPIN</string>
-    <string name="loc_label_timestamp">Captured At</string>
+    <string name="loc_label_timestamp">Timestamp</string>
     <string name="loc_cb_gps_unavailable">GPS Unavailable</string>
     <string name="loc_label_reason">Reason for GPS Unavailability</string>
     <string name="loc_hint_reason">Select reason</string>

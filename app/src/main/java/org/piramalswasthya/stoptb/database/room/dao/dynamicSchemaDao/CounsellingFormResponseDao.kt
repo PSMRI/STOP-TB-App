@@ -56,6 +56,9 @@ interface CounsellingFormResponseDao {
     @Query("SELECT * FROM t_form_response")
     suspend fun getAllFormResponses(): List<CompleteFormResponse>
 
+    @Query("DELETE FROM t_form_response WHERE beneficiaryId = :beneficiaryId")
+    suspend fun deleteFormResponseForBeneficiary(beneficiaryId: Long)
+
     @Query("DELETE FROM t_question_response WHERE sectionResponseId = :sectionResponseId")
     suspend fun deleteQuestionResponsesForSection(sectionResponseId: Long)
 }

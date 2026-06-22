@@ -46,7 +46,7 @@ data class CounsellingQuestionDto(
     @SerializedName("questionUuid") val questionUuid: String,
     @SerializedName("questionText") val questionText: String,
     @SerializedName("questionType") val questionType: String, // TEXT, RADIO, MCQ, DATE
-    @SerializedName("isMandatory") val isMandatory: Boolean,
+    @SerializedName("isMandatory") var isMandatory: Boolean,
     @SerializedName("displayOrder") val displayOrder: Int,
     @SerializedName("maxLength") val maxLength: Int? = null,
     @SerializedName("defaultValue") val defaultValue: String? = null,
@@ -58,7 +58,8 @@ data class CounsellingQuestionDto(
     // Runtime UI state — not from JSON
     @Transient var value: Any? = null,
     @Transient var visible: Boolean = true,
-    @Transient var errorMessage: String? = null
+    @Transient var errorMessage: String? = null,
+    @Transient var originalIsMandatory: Boolean? = null
 )
 
 data class CounsellingValidationDto(

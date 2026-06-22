@@ -19,15 +19,14 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_back"
-            style="@style/Widget.Material3.Button.OutlinedButton"
+            style="@style/Widget.Sakhi.Button.Outlined"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginEnd="6dp"
             android:text="@string/camp_back"
             android:textStyle="bold"
-            android:visibility="gone"
-            app:cornerRadius="18dp" />
+            android:visibility="gone" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_next"

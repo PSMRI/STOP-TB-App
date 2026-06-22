@@ -656,6 +656,23 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "t_section_question", "serverQuestionId")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN serverQuestionId INTEGER DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_question_option", "serverOptionId")) {
+                    database.execSQL("ALTER TABLE t_question_option ADD COLUMN serverOptionId INTEGER DEFAULT NULL")
+                }
+                database.execSQL("DELETE FROM t_question_option")
+                database.execSQL("DELETE FROM t_section_question")
+                database.execSQL("DELETE FROM t_form_section")
+                database.execSQL("DELETE FROM t_form_version")
+                database.execSQL("DELETE FROM t_dynamic_form")
+            }
+        }
+
+
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(

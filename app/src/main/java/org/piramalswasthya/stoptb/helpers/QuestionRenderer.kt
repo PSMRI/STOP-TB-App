@@ -53,10 +53,14 @@ object QuestionRenderer {
             binding.tilInput.isCounterEnabled = false
         }
 
-        binding.etInput.setText(question.value?.toString() ?: "")
-
         val oldWatcher = binding.etInput.tag as? TextWatcher
         if (oldWatcher != null) binding.etInput.removeTextChangedListener(oldWatcher)
+
+        val newValue = question.value?.toString() ?: ""
+        if (binding.etInput.text?.toString() != newValue) {
+            binding.etInput.setText(newValue)
+            binding.etInput.setSelection(newValue.length)
+        }
 
         val watcher = object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -68,12 +72,7 @@ object QuestionRenderer {
         }
         binding.etInput.addTextChangedListener(watcher)
         binding.etInput.tag = watcher
-        if (!question.errorMessage.isNullOrEmpty()) {
-            binding.tvError.text = question.errorMessage
-            binding.tvError.visibility = View.VISIBLE
-        } else {
-            binding.tvError.visibility = View.GONE
-        }
+        binding.tvError.visibility = View.GONE
     }
 
     // ?? Radio (single-select)
@@ -245,11 +244,6 @@ object QuestionRenderer {
             dpd.show()
             }
         }
-        if (!question.errorMessage.isNullOrEmpty()) {
-            binding.tvError.text = question.errorMessage
-            binding.tvError.visibility = View.VISIBLE
-        } else {
-            binding.tvError.visibility = View.GONE
-        }
+        binding.tvError.visibility = View.GONE
     }
 }
