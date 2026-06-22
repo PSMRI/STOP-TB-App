@@ -11,13 +11,9 @@ import dagger.hilt.android.AndroidEntryPoint
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.databinding.ActivityCounsellingBinding
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
-import android.app.DatePickerDialog
 import android.widget.Toast
 import org.piramalswasthya.stoptb.model.CounsellingOverviewData
 import timber.log.Timber
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
 
 @AndroidEntryPoint
 class CounsellingActivity : AppCompatActivity() {
@@ -132,7 +128,7 @@ class CounsellingActivity : AppCompatActivity() {
                 is NetworkResponse.Success -> {
                     state.data?.let {
                         populatePatientHeader(it)
-                        setupDatePicker(it.regDate)
+                        binding.etCounsellingDate.setText(it.counsellingDate)
                         binding.etCounsellingOfficer.setText(it.counsellingOfficer)
                         isOverviewReady = true
                         maybeShowContent()
@@ -166,11 +162,6 @@ class CounsellingActivity : AppCompatActivity() {
             }
         }
 
-        viewModel.counsellingDate.observe(this) { dateInMillis ->
-            val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
-            binding.etCounsellingDate.setText(sdf.format(java.util.Date(dateInMillis)))
-        }
-
         viewModel.formSubmitted.observe(this) { submitted ->
             if (submitted == true) {
                 Timber.d("Form phase completed!")
@@ -186,9 +177,13 @@ class CounsellingActivity : AppCompatActivity() {
 
             val section = viewModel.schemaData?.sections?.getOrNull(step)
             val total = viewModel.schemaData?.sections?.size ?: 1
+            val isEditable = viewModel.isFormEditable.value ?: true
 
-            binding.navigationFooter.btnNext.text =
-                if (step == total - 1) getString(R.string.btn_submit) else getString(R.string.btn_next_text)
+            binding.navigationFooter.btnNext.text = when {
+                step == total - 1 && isEditable -> getString(R.string.btn_submit)
+                step == total - 1 && !isEditable -> "Finish"
+                else -> getString(R.string.btn_next_text)
+            }
             
             binding.navigationFooter.btnBack.text = getString(R.string.btn_back_text)
             binding.navigationFooter.btnBack.visibility = if (step == 0) View.GONE else View.VISIBLE
@@ -208,28 +203,6 @@ class CounsellingActivity : AppCompatActivity() {
 
     private fun maybeShowContent() {
         if (isOverviewReady) showContent()
-    }
-
-    private fun setupDatePicker(minDate: Long) {
-        binding.etCounsellingDate.setOnClickListener {
-            val calendar = Calendar.getInstance()
-            viewModel.counsellingDate.value?.let { calendar.timeInMillis = it }
-            val dpd = DatePickerDialog(
-                this,
-                { _, year, month, dayOfMonth ->
-                    val selected = Calendar.getInstance().apply {
-                        set(year, month, dayOfMonth, 0, 0, 0)
-                    }
-                    viewModel.setCounsellingDate(selected.timeInMillis)
-                },
-                calendar.get(Calendar.YEAR),
-                calendar.get(Calendar.MONTH),
-                calendar.get(Calendar.DAY_OF_MONTH)
-            )
-            dpd.datePicker.maxDate = System.currentTimeMillis()
-            dpd.datePicker.minDate = minDate
-            dpd.show()
-        }
     }
 
     private fun showLoading() {

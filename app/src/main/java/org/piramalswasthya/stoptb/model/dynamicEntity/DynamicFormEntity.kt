@@ -10,5 +10,6 @@ data class DynamicFormEntity(
     val formName: String,
     val formType: String,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    val followUpDelayDays : Int = 15
 )

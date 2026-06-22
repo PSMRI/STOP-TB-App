@@ -44,4 +44,7 @@ interface DynamicFormMetadataDao {
 
     @Query("SELECT versionNumber FROM t_form_version WHERE formId = :formId AND isActive = 1 ORDER BY versionNumber DESC LIMIT 1")
     suspend fun getActiveVersionNumber(formId: Int): Int?
+    @Transaction
+    @Query("SELECT * FROM t_dynamic_form WHERE formId = :formId LIMIT 1")
+    suspend fun getFormById(formId: Int): DynamicFormEntity?
 }

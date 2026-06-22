@@ -26,7 +26,6 @@ class CounsellingViewModel @Inject constructor(
 
     companion object {
         const val EXTRA_BEN_ID = "extra_ben_id"
-        const val EXTRA_OVERVIEW_DATA = "extra_overview_data"
     }
 
     val benId: Long = savedStateHandle.get<Long>(EXTRA_BEN_ID) ?: -1L
@@ -36,10 +35,6 @@ class CounsellingViewModel @Inject constructor(
 
     private val _overview = MutableLiveData<NetworkResponse<CounsellingOverviewData>>(NetworkResponse.Idle())
     val overview: LiveData<NetworkResponse<CounsellingOverviewData>> get() = _overview
-
-    private val _counsellingDate = MutableLiveData(System.currentTimeMillis())
-    val counsellingDate: LiveData<Long> get() = _counsellingDate
-
     private val _formSchema = MutableLiveData<NetworkResponse<CounsellingFormSchemaDto>>(NetworkResponse.Idle())
     val formSchema: LiveData<NetworkResponse<CounsellingFormSchemaDto>> get() = _formSchema
 
@@ -51,6 +46,9 @@ class CounsellingViewModel @Inject constructor(
 
     private val _saveError = MutableLiveData<String?>()
     val saveError: LiveData<String?> get() = _saveError
+
+    private val _isFormEditable = MutableLiveData<Boolean>(true)
+    val isFormEditable: LiveData<Boolean> get() = _isFormEditable
 
     private var lastRequestedPhase: SectionPhase = SectionPhase.PRE_SUBMIT
 
@@ -66,9 +64,6 @@ class CounsellingViewModel @Inject constructor(
             _overview.value = NetworkResponse.Loading()
             _overview.value = counsellingRepo.getCounsellingOverview(benId)
         }
-    }
-    fun setCounsellingDate(dateInMillis: Long) {
-        _counsellingDate.value = dateInMillis
     }
 
     fun loadFormSchema(phase: SectionPhase) {
@@ -115,11 +110,57 @@ class CounsellingViewModel @Inject constructor(
     }
 
     fun startCounselling() {
-        loadFormSchema(SectionPhase.PRE_SUBMIT)
+        viewModelScope.launch {
+            val draft = counsellingRepo.getDraftResponse(benId)
+            val status = draft?.formResponse?.status
+            _isFormEditable.value = status != "SUBMITTED" && status != "COMPLETE"
+            loadFormSchema(SectionPhase.PRE_SUBMIT)
+        }
     }
 
     fun startFollowUp() {
-        loadFormSchema(SectionPhase.POST_SUBMIT)
+        viewModelScope.launch {
+            _formSchema.value = NetworkResponse.Loading()
+            val response = counsellingRepo.getFormSchema(benId, SectionPhase.POST_SUBMIT)
+            if (response is NetworkResponse.Success) {
+                schemaData = response.data
+                val formId = schemaData?.formId ?: 2
+                val statusInfo = counsellingRepo.getFollowUpStatus(benId, formId)
+
+
+                val editable = if (statusInfo.syncedAt == null) {
+                    true // Not yet synced, remains editable
+                } else {
+                    val currentTime = System.currentTimeMillis()
+                    val diffInMillis = currentTime - statusInfo.syncedAt
+                    val daysDiff = diffInMillis / (1000 * 60 * 60 * 24)
+                    daysDiff <= statusInfo.followUpDelayDays
+                }
+                
+                _isFormEditable.value = editable
+                
+                schemaData?.sections?.forEach { sec ->
+                    sec.questions.forEach { q -> q.visible = q.visibleByDefault }
+                }
+
+                val draft = counsellingRepo.getDraftResponse(benId)
+                var startIndex = 0
+                if (draft != null) {
+                    val lastVisitedId = draft.formResponse.lastVisitedSectionId
+                    if (lastVisitedId != null) {
+                        val idx = schemaData?.sections?.indexOfFirst { it.sectionId == lastVisitedId } ?: -1
+                        if (idx != -1) {
+                            startIndex = idx
+                        }
+                    }
+                }
+
+                _formSchema.value = response
+                loadSection(startIndex)
+            } else {
+                _formSchema.value = response
+            }
+        }
     }
 
     fun resetFormSubmitted() {
@@ -248,7 +289,7 @@ class CounsellingViewModel @Inject constructor(
     }
 
     private fun getMandatoryError(q: CounsellingQuestionDto, section: CounsellingSectionDto): String? {
-        if (q.isMandatory) return "This field is required"
+        if (q.isMandatory && q.visibleByDefault) return "This field is required"
         val mandatoryIf = q.validations?.firstOrNull { it.validationType == "MANDATORY_IF" } ?: return null
         val parts = mandatoryIf.validationParam.split("=")
         if (parts.size != 2) return null
@@ -348,6 +389,15 @@ class CounsellingViewModel @Inject constructor(
         val section = schemaData?.sections?.getOrNull(current) ?: return
         val formId = schemaData?.formId ?: 2
         val versionNumber = schemaData?.versionNumber ?: 1
+
+        if (_isFormEditable.value == false) {
+            if (current < (schemaData?.sections?.size ?: 1) - 1) {
+                loadSection(current + 1)
+            } else {
+                _formSubmitted.value = true
+            }
+            return
+        }
 
         viewModelScope.launch {
             val success = counsellingRepo.saveSectionAnswers(benId, formId, section, versionNumber)

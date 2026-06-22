@@ -34,16 +34,17 @@ object QuestionRenderer {
         return "$prefix${question.questionText}$mandatory"
     }
 
-    // ?? Text input ???????????????????????????????????????????????????????????????
-
+    // ?? Text input
     fun showTextView(
         binding: ItemCounsellingTextBinding,
         question: CounsellingQuestionDto,
         prefix: String,
+        isEditable: Boolean,
         onValueChanged: (CounsellingQuestionDto) -> Unit
     ) {
         showLabel(binding.tilInput, question, prefix)
         binding.tilInput.error = question.errorMessage
+        binding.etInput.isEnabled = isEditable
 
         if (question.maxLength != null) {
             binding.tilInput.isCounterEnabled = true
@@ -75,13 +76,14 @@ object QuestionRenderer {
         }
     }
 
-    // ?? Radio (single-select) ????????????????????????????????????????????????????
+    // ?? Radio (single-select)
 
 
     fun showRadio(
         binding: ItemCounsellingRadioBinding,
         question: CounsellingQuestionDto,
         prefix: String,
+        isEditable: Boolean,
         onValueChanged: (CounsellingQuestionDto) -> Unit
     ) {
         showLabel(binding.tvQuestion, question, prefix)
@@ -98,6 +100,7 @@ object QuestionRenderer {
                 text = opt.optionLabel
                 tag = opt.optionValue
                 isChecked = question.value == opt.optionValue
+                isEnabled = isEditable
                 layoutParams = FlexboxLayout.LayoutParams(
                     FlexboxLayout.LayoutParams.WRAP_CONTENT,
                     FlexboxLayout.LayoutParams.WRAP_CONTENT
@@ -105,6 +108,7 @@ object QuestionRenderer {
                     lp.setMargins(0, 0, marginEndPx, marginBottomPx)
                 }
                 setOnClickListener {
+                    if (!isEditable) return@setOnClickListener
                     // Deselect every sibling, then mark this one checked
                     for (i in 0 until container.childCount) {
                         (container.getChildAt(i) as? RadioButton)?.isChecked = false
@@ -128,6 +132,7 @@ object QuestionRenderer {
         binding: ItemCounsellingMcqBinding,
         question: CounsellingQuestionDto,
         prefix: String,
+        isEditable: Boolean,
         onValueChanged: (CounsellingQuestionDto) -> Unit
     ) {
         showLabel(binding.tvQuestion, question, prefix)
@@ -142,7 +147,9 @@ object QuestionRenderer {
             val cb = CheckBox(binding.root.context).apply {
                 text = opt.optionLabel
                 isChecked = currentValues.contains(opt.optionValue)
+                isEnabled = isEditable
                 setOnCheckedChangeListener { _, isChecked ->
+                    if (!isEditable) return@setOnCheckedChangeListener
                     if (isChecked) {
                         if (!currentValues.contains(opt.optionValue)) currentValues.add(opt.optionValue)
                     } else {
@@ -167,14 +174,17 @@ object QuestionRenderer {
         binding: ItemCounsellingDateBinding,
         question: CounsellingQuestionDto,
         prefix: String,
+        isEditable: Boolean,
         onValueChanged: (CounsellingQuestionDto) -> Unit
     ) {
         showLabel(binding.tilDate, question, prefix)
         binding.tilDate.error = question.errorMessage
         binding.etDate.setText(question.value?.toString() ?: "")
+        binding.etDate.isEnabled = isEditable
 
         binding.etDate.setOnClickListener(null)
-        binding.etDate.setOnClickListener {
+        if (isEditable) {
+            binding.etDate.setOnClickListener {
 
             val cal = Calendar.getInstance()
 
@@ -233,6 +243,7 @@ object QuestionRenderer {
             }
 
             dpd.show()
+            }
         }
         if (!question.errorMessage.isNullOrEmpty()) {
             binding.tvError.text = question.errorMessage

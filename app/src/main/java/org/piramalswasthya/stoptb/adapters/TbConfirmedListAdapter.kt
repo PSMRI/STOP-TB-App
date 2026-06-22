@@ -8,6 +8,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.RvItemTbConfirmedListBinding
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.model.BenWithTbSuspectedDomain
 
 class TbConfirmedListAdapter( private val clickListener: ClickListener? = null,
@@ -50,7 +51,10 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             binding.benWithTb = item
 
             binding.ivSyncState.visibility = if (item.tbConfirmedList == null) View.INVISIBLE else View.VISIBLE
-
+            val role = pref?.getLoggedInUser()?.role
+            role?.let{
+                checkIfCounsellingOfficerOrNot(it)
+            }
             if (item.ben.spouseName == "Not Available" && item.ben.fatherName == "Not Available") {
                 binding.father = true
                 binding.husband = false
@@ -87,6 +91,9 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 
         }
 
+        private fun checkIfCounsellingOfficerOrNot(role : String){
+            binding.btnCounselling.visibility = if(role.isCounsellingOfficerRole()) View.VISIBLE else View.GONE
+        }
     }
 
     override fun onCreateViewHolder(

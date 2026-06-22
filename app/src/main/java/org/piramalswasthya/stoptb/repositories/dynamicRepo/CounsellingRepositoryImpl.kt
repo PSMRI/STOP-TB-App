@@ -38,29 +38,6 @@ class CounsellingRepositoryImpl @Inject constructor(
         return metadataDao.getSectionsByPhase(versionId, phase.value)
     }
 
-    /*override suspend fun downloadLatestFormSchema(formType: String): Boolean {
-        return try {
-            val response = amritApiService.getFormDefinition(formType)
-            if (response.isSuccessful) {
-                val apiSchema = response.body()?.data ?: return false
-                val formId = apiSchema.formId.toIntOrNull() ?: 0
-                val activeVersion = metadataDao.getActiveVersionNumber(formId)
-                if (activeVersion == null || apiSchema.versionNumber > activeVersion) {
-                    db.withTransaction {
-                        storeFormSchemaInDb(apiSchema)
-                    }
-                    true
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        } catch (e: Exception) {
-            false
-        }
-    }*/
-
     override suspend fun downloadAndStoreAllForms(): Boolean {
         return try {
             val jwt = preferenceDao.getJWTAmritToken()
@@ -93,12 +70,14 @@ class CounsellingRepositoryImpl @Inject constructor(
     private suspend fun storeFormSchemaInDb(apiSchema: FormSchemaDto) {
         val formId = apiSchema.formId.toIntOrNull() ?: 0
         val formUuid = apiSchema.formUuid ?: "FORM_${formId}"
+        val followUpDelayDays =  apiSchema.followUpDelayDays
         Timber.d("storeFormSchemaInDb: Inserting formId = $formId, formUuid = $formUuid, formName = ${apiSchema.formName}")
         val formEntity = DynamicFormEntity(
             formId = formId,
             formUuid = formUuid,
             formName = apiSchema.formName,
-            formType = apiSchema.formType ?: ""
+            formType = apiSchema.formType ?: "",
+            followUpDelayDays = followUpDelayDays
         )
         metadataDao.insertForm(formEntity)
 

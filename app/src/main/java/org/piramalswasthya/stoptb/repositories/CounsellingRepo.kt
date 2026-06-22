@@ -65,8 +65,13 @@ class CounsellingRepo @Inject constructor(
                 var currentStep = 0
                 var completedSteps = 0
                 var status = "DRAFT"
+                
+                val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
+                var displayDateStr = sdf.format(java.util.Date())
+
                 if (formResponse != null) {
                     status = formResponse.formResponse.status
+                    displayDateStr = sdf.format(java.util.Date(formResponse.formResponse.createdAt))
                     val versionId = formResponse.formResponse.formVersionId
                     val formDef = db.dynamicFormMetadataDao().getFormDefinitionByVersionId(versionId)
                     val activeVersion = formDef?.versions?.find { it.version.versionId == versionId }
@@ -81,14 +86,11 @@ class CounsellingRepo @Inject constructor(
                     completedSteps = formResponse.sectionResponses.count { it.questionResponses.isNotEmpty() }
                 }
 
-                val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
-                val todayStr = sdf.format(java.util.Date())
-
                 val overviewData = CounsellingOverviewData(
                     benId = benId,
                     patientName = "${ben.firstName ?: ""} ${ben.lastName ?: ""}".trim(),
                     nikshayId = ben.nikshayId ?: "",
-                    counsellingDate = todayStr,
+                    counsellingDate = displayDateStr,
                     counsellingOfficer = loggedInUser,
                     regDate = ben.regDate,
                     beneficiaryId = ben.beneficiaryId.toString(),
@@ -379,6 +381,29 @@ class CounsellingRepo @Inject constructor(
             db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId)
         }
     }
+
+    suspend fun getFollowUpStatus(benId: Long, formId: Int): FollowUpStatus {
+        return withContext(Dispatchers.IO) {
+            val response = db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId)
+            val form = db.dynamicFormMetadataDao().getFormById(formId)
+            
+            val delay = if (form?.followUpDelayDays == null || form.followUpDelayDays == -1) {
+                15
+            } else {
+                form.followUpDelayDays
+            }
+
+            FollowUpStatus(
+                syncedAt = response?.formResponse?.syncedAt,
+                followUpDelayDays = delay
+            )
+        }
+    }
 }
+
+data class FollowUpStatus(
+    val syncedAt: Long?,
+    val followUpDelayDays: Int
+)
 
 

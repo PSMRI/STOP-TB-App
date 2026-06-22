@@ -31,13 +31,16 @@ class CounsellingFormFragment : Fragment() {
         val rv = view.findViewById<RecyclerView>(R.id.rv_counselling_form)
         rv.layoutManager = LinearLayoutManager(requireContext())
 
-        adapter = CounsellingDynamicAdapter(emptyList()) { updatedQ ->
-            viewModel.evaluateConditions(updatedQ)
-        }
+        adapter = CounsellingDynamicAdapter(
+            questions = emptyList(),
+            onValueChanged = { updatedQ ->
+                viewModel.evaluateConditions(updatedQ)
+            }
+        )
         rv.adapter = adapter
 
         viewModel.activeQuestions.observe(viewLifecycleOwner) { questions ->
-            adapter.submitList(questions)
+            adapter.submitList(questions, viewModel.isFormEditable.value ?: true)
         }
 
         val tvLetter = view.findViewById<android.widget.TextView>(R.id.tv_section_letter)

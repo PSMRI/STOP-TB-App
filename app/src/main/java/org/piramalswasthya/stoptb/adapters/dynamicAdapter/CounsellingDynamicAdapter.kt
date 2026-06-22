@@ -23,7 +23,8 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingQuestionDto
  */
 class CounsellingDynamicAdapter(
     private var questions: List<CounsellingQuestionDto>,
-    private val onValueChanged: (CounsellingQuestionDto) -> Unit
+    private val onValueChanged: (CounsellingQuestionDto) -> Unit,
+    private var isEditable: Boolean = true
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     companion object {
@@ -36,8 +37,9 @@ class CounsellingDynamicAdapter(
     private var visibleQuestions: List<CounsellingQuestionDto> =
         questions.filter { it.visible }.sortedBy { it.displayOrder }
 
-    fun submitList(newList: List<CounsellingQuestionDto>) {
+    fun submitList(newList: List<CounsellingQuestionDto>, editable: Boolean = true) {
         questions = newList
+        isEditable = editable
         visibleQuestions = questions.filter { it.visible }.sortedBy { it.displayOrder }
         notifyDataSetChanged()
     }
@@ -81,25 +83,25 @@ class CounsellingDynamicAdapter(
     inner class TextViewHolder(private val binding: ItemCounsellingTextBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(q: CounsellingQuestionDto, prefix: String) =
-            QuestionRenderer.showTextView(binding, q, prefix, onValueChanged)
+            QuestionRenderer.showTextView(binding, q, prefix, isEditable, onValueChanged)
     }
 
     inner class RadioViewHolder(private val binding: ItemCounsellingRadioBinding) :
         RecyclerView.ViewHolder(binding.root) {
             val errorMsg = binding.tvError
         fun bind(q: CounsellingQuestionDto, prefix: String) =
-            QuestionRenderer.showRadio(binding, q, prefix, onValueChanged)
+            QuestionRenderer.showRadio(binding, q, prefix, isEditable, onValueChanged)
     }
 
     inner class McqViewHolder(private val binding: ItemCounsellingMcqBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(q: CounsellingQuestionDto, prefix: String) =
-            QuestionRenderer.showMCQ(binding, q, prefix, onValueChanged)
+            QuestionRenderer.showMCQ(binding, q, prefix, isEditable, onValueChanged)
     }
 
     inner class DateViewHolder(private val binding: ItemCounsellingDateBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(q: CounsellingQuestionDto, prefix: String) =
-            QuestionRenderer.showDate(binding, q, prefix, onValueChanged)
+            QuestionRenderer.showDate(binding, q, prefix, isEditable, onValueChanged)
     }
 }
