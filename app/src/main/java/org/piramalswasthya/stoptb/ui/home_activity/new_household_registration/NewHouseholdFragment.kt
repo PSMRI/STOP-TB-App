@@ -241,6 +241,19 @@ class NewHouseholdFragment : Fragment() {
             }
         }
 
+        // Loading state
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.isLoading.collect { loading ->
+                if (loading) {
+                    binding.llContent.visibility = View.GONE
+                    binding.llLoading.visibility = View.VISIBLE
+                } else {
+                    binding.llContent.visibility = View.VISIBLE
+                    binding.llLoading.visibility = View.GONE
+                }
+            }
+        }
+
         // Location state
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.locationState.collect { state ->
@@ -282,8 +295,8 @@ class NewHouseholdFragment : Fragment() {
                 setStatusText(getString(R.string.loc_status_captured), "#4CAF50")
                 binding.etLatitude.setText(String.format(java.util.Locale.ENGLISH, "%.6f", state.lat))
                 binding.etLongitude.setText(String.format(java.util.Locale.ENGLISH, "%.6f", state.lon))
-                binding.etDigipin.setText(state.digipin)
-                binding.etTimestamp.setText(state.timestamp)
+                binding.etDigipin.setText(formatDigiPin(state.digipin))
+                binding.etTimestamp.setText(formatEpochToDateTime(state.timestamp))
             }
             is LocationState.Failed.PermissionDenied -> {
                 binding.btnRefreshLocation.isEnabled = isEditMode
@@ -307,6 +320,25 @@ class NewHouseholdFragment : Fragment() {
                 Toast.makeText(context, getString(R.string.loc_msg_outside_india), Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    private fun formatDigiPin(pin: String): String {
+        val clean = pin.replace("-", "")
+        if (clean.length == 10) {
+            return "${clean.substring(0, 4)}-${clean.substring(4, 8)}-${clean.substring(8, 10)}"
+        }
+        return pin
+    }
+
+    private fun formatEpochToDateTime(epochStr: String): String {
+        return epochStr.toLongOrNull()?.let {
+            try {
+                java.text.SimpleDateFormat("dd-MM-yyyy HH:mm:ss", java.util.Locale.ENGLISH)
+                    .format(java.util.Date(it))
+            } catch (e: Exception) {
+                epochStr
+            }
+        } ?: epochStr
     }
 
     private fun setStatusText(text: String, colorHex: String) {

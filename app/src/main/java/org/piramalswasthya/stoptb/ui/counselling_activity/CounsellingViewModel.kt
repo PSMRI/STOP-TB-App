@@ -211,6 +211,17 @@ class CounsellingViewModel @Inject constructor(
             }
         }
 
+        // Re-evaluate validation state for visible questions to clear or update errors in real-time
+        activeSection.questions.filter { it.visible }.forEach { activeQ ->
+            val qError = validateQuestion(activeQ, activeSection)
+            if (activeQ.errorMessage != qError) {
+                if (activeQ.errorMessage != null || qError == null) {
+                    activeQ.errorMessage = qError
+                    needsUpdate = true
+                }
+            }
+        }
+
         if (needsUpdate) {
             _activeQuestions.value =
                 activeSection.questions.toList()
@@ -224,6 +235,7 @@ class CounsellingViewModel @Inject constructor(
     ) {
         question.visible = false
         question.value = null
+        question.errorMessage = null
 
         question.options?.forEach { option ->
             option.conditions?.forEach { condition ->
@@ -256,78 +268,82 @@ class CounsellingViewModel @Inject constructor(
         return if (refQuestion.value?.toString() == parts[1]) mandatoryIf.errorMessage else null
     }
 
+    private fun validateQuestion(q: CounsellingQuestionDto, section: CounsellingSectionDto): String? {
+        val isEmpty = q.value == null
+                || q.value.toString().isBlank()
+                || (q.value as? List<*>)?.isEmpty() == true
+
+        var qError: String? = null
+
+        if (isEmpty) {
+            qError = getMandatoryError(q, section)
+        } else {
+            q.validations?.forEach { valDto ->
+                if (qError == null) {
+                    when (valDto.validationType) {
+                        "MAX_LENGTH" -> {
+                            val maxLen = valDto.validationParam.toIntOrNull()
+                            if (maxLen != null && q.value.toString().length > maxLen) {
+                                qError = valDto.errorMessage
+                            }
+                        }
+                        "REGEX" -> {
+                            val regexStr = valDto.validationParam
+                            try {
+                                val regex = regexStr.toRegex()
+                                if (!regex.matches(q.value.toString())) {
+                                    qError = valDto.errorMessage
+                                }
+                            } catch (e: Exception) {
+                                // Ignore invalid regex pattern
+                            }
+                        }
+                        "MIN_DATE", "MAX_DATE" -> {
+                            val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
+                            try {
+                                val dateVal = sdf.parse(q.value.toString())
+                                if (dateVal != null) {
+                                    val param = valDto.validationParam
+                                    val targetDate: java.util.Date? = if (param.equals("TODAY", ignoreCase = true)) {
+                                        Calendar.getInstance().apply {
+                                            set(Calendar.HOUR_OF_DAY, 0)
+                                            set(Calendar.MINUTE, 0)
+                                            set(Calendar.SECOND, 0)
+                                            set(Calendar.MILLISECOND, 0)
+                                        }.time
+                                    } else {
+                                        SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).parse(param)
+                                    }
+                                    if (targetDate != null) {
+                                        if (valDto.validationType == "MIN_DATE") {
+                                            if (dateVal.before(targetDate)) {
+                                                qError = valDto.errorMessage
+                                            }
+                                        } else {
+                                            if (dateVal.after(targetDate)) {
+                                                qError = valDto.errorMessage
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                // ignore date parse issues
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return qError
+    }
+
     fun validateCurrentSection(): Boolean {
         val activeSection = schemaData?.sections?.getOrNull(_currentStep.value ?: 0) ?: return true
         if (disabledValidationSections.contains(activeSection.sectionUuid)) return true
 
         var isValid = true
         for (q in activeSection.questions.filter { it.visible }) {
-            val isEmpty = q.value == null
-                    || q.value.toString().isBlank()
-                    || (q.value as? List<*>)?.isEmpty() == true
-
-            var qError: String? = null
-
-            if (isEmpty) {
-                qError = getMandatoryError(q, activeSection)
-            } else {
-                q.validations?.forEach { valDto ->
-                    if (qError == null) {
-                        when (valDto.validationType) {
-                            "MAX_LENGTH" -> {
-                                val maxLen = valDto.validationParam.toIntOrNull()
-                                if (maxLen != null && q.value.toString().length > maxLen) {
-                                    qError = valDto.errorMessage
-                                }
-                            }
-                            "REGEX" -> {
-                                val regexStr = valDto.validationParam
-                                try {
-                                    val regex = regexStr.toRegex()
-                                    if (!regex.matches(q.value.toString())) {
-                                        qError = valDto.errorMessage
-                                    }
-                                } catch (e: Exception) {
-                                    // Ignore invalid regex pattern
-                                }
-                            }
-                            "MIN_DATE", "MAX_DATE" -> {
-                                val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
-                                try {
-                                    val dateVal = sdf.parse(q.value.toString())
-                                    if (dateVal != null) {
-                                        val param = valDto.validationParam
-                                        val targetDate: java.util.Date? = if (param.equals("TODAY", ignoreCase = true)) {
-                                            Calendar.getInstance().apply {
-                                                set(Calendar.HOUR_OF_DAY, 0)
-                                                set(Calendar.MINUTE, 0)
-                                                set(Calendar.SECOND, 0)
-                                                set(Calendar.MILLISECOND, 0)
-                                            }.time
-                                        } else {
-                                            SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).parse(param)
-                                        }
-                                        if (targetDate != null) {
-                                            if (valDto.validationType == "MIN_DATE") {
-                                                if (dateVal.before(targetDate)) {
-                                                    qError = valDto.errorMessage
-                                                }
-                                            } else {
-                                                if (dateVal.after(targetDate)) {
-                                                    qError = valDto.errorMessage
-                                                }
-                                            }
-                                        }
-                                    }
-                                } catch (e: Exception) {
-                                    // ignore date parse issues
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
+            val qError = validateQuestion(q, activeSection)
             if (qError != null) {
                 q.errorMessage = qError
                 isValid = false

@@ -799,7 +799,7 @@
     <string name="loc_label_latitude">অক্ষাংশ</string>
     <string name="loc_label_longitude">দ্ৰাঘিমাংশ</string>
     <string name="loc_label_digipin">DIGIPIN</string>
-    <string name="loc_label_timestamp">ধৰা পৰা সময়</string>
+    <string name="loc_label_timestamp">টাইমষ্টাম্প</string>
     <string name="loc_cb_gps_unavailable">GPS উপলব্ধ নহয়</string>
     <string name="loc_label_reason">GPS অনুপলব্ধতাৰ কাৰণ</string>
     <string name="loc_hint_reason">কাৰণ বাছক</string>
