@@ -162,8 +162,15 @@ object PayloadBuilder {
             }
         }
 
-        val sectionsPayload = response.sectionResponses.map { secResponseWithQuestions ->
+        val sectionsPayload = response.sectionResponses.mapNotNull { secResponseWithQuestions ->
             val sectionId = secResponseWithQuestions.sectionResponse.sectionId
+
+            val activeVersion = formDef?.versions?.find { it.version.versionId == formVersionId }
+            val secDef = activeVersion?.sections?.find { it.section.sectionId == sectionId }
+            if (response.formResponse.status == "COMPLETE" && secDef?.section?.sectionPhase != "POST_SUBMIT") {
+                return@mapNotNull null
+            }
+
             val groupedResponses = secResponseWithQuestions.questionResponses.groupBy { it.questionId }
 
             val answersPayload = groupedResponses.map { (questionId, responses) ->

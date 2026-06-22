@@ -16,6 +16,7 @@ import retrofit2.http.*
 
 import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingSyncRequest
 import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingBulkSubmitRequest
+import org.piramalswasthya.stoptb.model.dynamicEntity.ServerCounsellingResponseDto
 
 interface AmritApiService {
 
@@ -198,6 +199,14 @@ interface AmritApiService {
         @Header("Authorization") authHeader: String,
         @Body request: List<CounsellingBulkSubmitRequest>
     ): Response<okhttp3.ResponseBody>
+
+    @GET("flw-api/dynamicForm/response/getByBeneficiary")
+    suspend fun getCounsellingResponse(
+        @Header("Authorization") jwtToken: String,
+        @Query("beneficiaryId") beneficiaryId: Long,
+        @Query("formUuid") formUuid: String
+    ): Response<ApiResponse<List<ServerCounsellingResponseDto>>>
+
 
     @POST("flw-api/disease/cdtfVisit/saveAll")
     suspend fun submitNCDFollowUp(

@@ -82,7 +82,10 @@ class CounsellingViewModel @Inject constructor(
                 // Gson's unsafe deserializer bypasses Kotlin default values, so set runtime
                 // visibility explicitly from the backend's visibleByDefault field.
                 schemaData?.sections?.forEach { sec ->
-                    sec.questions.forEach { q -> q.visible = q.visibleByDefault }
+                    sec.questions.forEach { q ->
+                        q.visible = q.visibleByDefault
+                        q.originalIsMandatory = q.isMandatory
+                    }
                 }
 
                 // Check for last visited section in saved response
@@ -130,86 +133,21 @@ class CounsellingViewModel @Inject constructor(
         val section = schemaData?.sections?.getOrNull(index) ?: return
         _currentStep.value = index
 
-        // Evaluate conditions for questions that already have saved draft answers
-        section.questions.forEach { q ->
-            if (q.value != null) {
-                evaluateConditions(q)
-            }
-        }
+        evaluateAllConditions(section)
 
         _activeQuestions.value = section.questions.toList()
     }
 
-    /**
-     * Called every time a question value changes. Walks the selected options and evaluates each
-     * condition to show/hide dependent questions in the active section.
-     */
     fun evaluateConditions(q: CounsellingQuestionDto) {
-
-        val selectedValues = when (val v = q.value) {
-            is List<*> -> v.filterIsInstance<String>()
-            is String -> listOf(v)
-            else -> emptyList()
-        }
-
         val activeSection =
             schemaData?.sections?.getOrNull(_currentStep.value ?: 0)
                 ?: return
 
-        var needsUpdate = false
-
-        q.options?.forEach { opt ->
-
-            val isSelected =
-                selectedValues.contains(opt.optionValue)
-
-            opt.conditions?.forEach { cond ->
-
-                when (cond.actionType) {
-
-                    "SHOW", "SHOW_QUESTION" -> {
-
-                        val targetId =
-                            cond.targetQuestionId ?: return@forEach
-
-                        val targetQ =
-                            activeSection.questions.find {
-                                it.questionId == targetId
-                            } ?: return@forEach
-
-                        if (targetQ.visible != isSelected) {
-
-                            if (isSelected) {
-
-                                targetQ.visible = true
-                            } else {
-                                hideQuestionRecursively(
-                                    targetQ,
-                                    activeSection
-                                )
-                            }
-                            needsUpdate = true
-                        }
-                    }
-
-                    "LOCK_FORM" -> {
-                        // TODO
-                    }
-
-                    "DISABLE_SECTION_VALIDATION" -> {
-
-                        val targetCode =
-                            cond.targetSectionUuid ?: return@forEach
-
-                        if (isSelected) {
-                            disabledValidationSections.add(targetCode)
-                        } else {
-                            disabledValidationSections.remove(targetCode)
-                        }
-                    }
-                }
-            }
+        val beforeStates = activeSection.questions.map {
+            Triple(it.questionId, it.visible, it.isMandatory) to it.errorMessage
         }
+
+        evaluateAllConditions(activeSection)
 
         // Re-evaluate validation state for visible questions to clear or update errors in real-time
         activeSection.questions.filter { it.visible }.forEach { activeQ ->
@@ -217,44 +155,95 @@ class CounsellingViewModel @Inject constructor(
             if (activeQ.errorMessage != qError) {
                 if (activeQ.errorMessage != null || qError == null) {
                     activeQ.errorMessage = qError
-                    needsUpdate = true
                 }
             }
         }
 
-        if (needsUpdate) {
-            _activeQuestions.value =
-                activeSection.questions.toList()
+        val afterStates = activeSection.questions.map {
+            Triple(it.questionId, it.visible, it.isMandatory) to it.errorMessage
+        }
+
+        if (beforeStates != afterStates) {
+            _activeQuestions.value = activeSection.questions.toList()
         }
     }
 
+    fun evaluateAllConditions(activeSection: CounsellingSectionDto) {
+        // Ensure originalIsMandatory is initialized
+        activeSection.questions.forEach { q ->
+            if (q.originalIsMandatory == null) {
+                q.originalIsMandatory = q.isMandatory
+            }
+        }
 
-    private fun hideQuestionRecursively(
-        question: CounsellingQuestionDto,
-        activeSection: CounsellingSectionDto
-    ) {
-        question.visible = false
-        question.value = null
-        question.errorMessage = null
+        // Initialize states
+        disabledValidationSections.clear()
+        activeSection.questions.forEach { q ->
+            q.visible = q.visibleByDefault
+            q.isMandatory = q.originalIsMandatory ?: false
+        }
 
-        question.options?.forEach { option ->
-            option.conditions?.forEach { condition ->
+        var changed = true
+        var passes = 0
+        while (changed && passes < 10) {
+            changed = false
+            passes++
 
-                if (condition.actionType == "SHOW" || condition.actionType == "SHOW_QUESTION") {
+            for (q in activeSection.questions) {
+                if (!q.visible) continue
 
-                    val childId = condition.targetQuestionId ?: return@forEach
+                val selectedValues = when (val v = q.value) {
+                    is List<*> -> v.filterIsInstance<String>()
+                    is String -> listOf(v)
+                    else -> emptyList()
+                }
 
-                    val childQuestion = activeSection.questions.find {
-                        it.questionId == childId
-                    }
+                q.options?.forEach { opt ->
+                    val isSelected = selectedValues.contains(opt.optionValue)
+                    if (isSelected) {
+                        opt.conditions?.forEach { cond ->
+                            val targetId = cond.targetQuestionId ?: return@forEach
+                            val targetQ = activeSection.questions.find { it.questionId == targetId } ?: return@forEach
 
-                    if (childQuestion != null) {
-                        hideQuestionRecursively(
-                            childQuestion,
-                            activeSection
-                        )
+                            when (cond.actionType) {
+                                "SHOW", "SHOW_QUESTION" -> {
+                                    if (!targetQ.visible) {
+                                        targetQ.visible = true
+                                        changed = true
+                                    }
+                                    if (cond.actionType == "SHOW_QUESTION") {
+                                        if (!targetQ.isMandatory) {
+                                            targetQ.isMandatory = true
+                                            changed = true
+                                        }
+                                    }
+                                }
+                                "MANDATORY" -> {
+                                    if (!targetQ.isMandatory) {
+                                        targetQ.isMandatory = true
+                                        changed = true
+                                    }
+                                }
+                                "DISABLE_SECTION_VALIDATION" -> {
+                                    val targetCode = cond.targetSectionUuid ?: return@forEach
+                                    if (!disabledValidationSections.contains(targetCode)) {
+                                        disabledValidationSections.add(targetCode)
+                                        changed = true
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
+            }
+        }
+
+        // Post-evaluation cleanup for hidden questions
+        activeSection.questions.forEach { q ->
+            if (!q.visible) {
+                q.value = null
+                q.errorMessage = null
+                q.isMandatory = q.originalIsMandatory ?: false
             }
         }
     }
@@ -382,7 +371,17 @@ class CounsellingViewModel @Inject constructor(
     fun previousSection() {
         val current = _currentStep.value ?: 0
         if (current > 0) {
-            loadSection(current - 1)
+            val section = schemaData?.sections?.getOrNull(current) ?: return
+            val formId = schemaData?.formId ?: 2
+            val versionNumber = schemaData?.versionNumber ?: 1
+            val previousSectionId = schemaData?.sections?.getOrNull(current - 1)?.sectionId
+            viewModelScope.launch {
+                counsellingRepo.saveSectionAnswers(
+                    benId, formId, section, versionNumber,
+                    overrideTargetSectionId = previousSectionId
+                )
+                loadSection(current - 1)
+            }
         }
     }
 }

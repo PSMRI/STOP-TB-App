@@ -10,21 +10,14 @@ import org.piramalswasthya.stoptb.databinding.ItemCounsellingTextBinding
 import org.piramalswasthya.stoptb.helpers.QuestionRenderer
 import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingQuestionDto
 
-/**
- * RecyclerView adapter for dynamic counselling form questions.
- *
- * Responsibilities:
- *   - Map questionType → ViewHolder type
- *   - Inflate the correct item layout
- *   - Compute the display prefix (numbered for non-TEXT questions)
- *   - Delegate all actual rendering to QuestionRenderer
- *
- * All binding logic lives in QuestionRenderer so it can be reused outside this list.
- */
 class CounsellingDynamicAdapter(
     private var questions: List<CounsellingQuestionDto>,
     private val onValueChanged: (CounsellingQuestionDto) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+
+    init {
+        setHasStableIds(true)
+    }
 
     companion object {
         private const val TYPE_TEXT = 1
@@ -35,6 +28,10 @@ class CounsellingDynamicAdapter(
 
     private var visibleQuestions: List<CounsellingQuestionDto> =
         questions.filter { it.visible }.sortedBy { it.displayOrder }
+
+    override fun getItemId(position: Int): Long {
+        return visibleQuestions[position].questionId.toLong()
+    }
 
     fun submitList(newList: List<CounsellingQuestionDto>) {
         questions = newList

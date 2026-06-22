@@ -38,7 +38,6 @@ import kotlin.getValue
 @AndroidEntryPoint
 class TBConfirmedListFragment : Fragment() {
 
-
     @Inject
     lateinit var prefDao: PreferenceDao
 

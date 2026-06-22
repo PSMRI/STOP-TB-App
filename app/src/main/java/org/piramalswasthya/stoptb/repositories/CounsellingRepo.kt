@@ -175,7 +175,7 @@ class CounsellingRepo @Inject constructor(
 
                         CounsellingQuestionDto(
                             questionId = q.questionId,
-                            questionUuid = getQuestionCode(q.questionId),
+                            questionUuid = q.questionUuid ?: getQuestionCode(q.questionId),
                             questionText = q.questionText,
                             questionType = q.questionType,
                             isMandatory = q.isRequired,
@@ -213,6 +213,9 @@ class CounsellingRepo @Inject constructor(
                     sections = sectionsList
                 )
 
+                val formUuid = completeForm.form.formUuid
+                counsellingRepository.fetchAndStoreCounsellingResponse(benId, formUuid)
+
                 val draftResponse = counsellingRepository.getOrCreateDraft(benId, activeVersionWithSections.version.versionId)
 
                 schemaDto.sections.forEach { sec ->
@@ -222,18 +225,18 @@ class CounsellingRepo @Inject constructor(
                             val qResponses = secResponse.questionResponses.filter { it.questionId == q.questionId }
                             if (qResponses.isNotEmpty()) {
                                 when (q.questionType) {
-                                    "RADIO" -> {
+                                    "RADIO", "DROPDOWN" -> {
                                         val optId = qResponses.first().optionId
                                         val opt = q.options?.find { it.optionId == optId }
                                         q.value = opt?.optionValue
                                     }
-                                    "MCQ" -> {
+                                    "MCQ", "CHECKBOX" -> {
                                         val selectedVals = qResponses.mapNotNull { resp ->
                                             q.options?.find { it.optionId == resp.optionId }?.optionValue
                                         }
                                         q.value = selectedVals
                                     }
-                                    "TEXT", "DATE" -> {
+                                    "TEXT", "DATE", "NUMBER" -> {
                                         q.value = qResponses.first().answerText
                                     }
                                 }
@@ -250,11 +253,15 @@ class CounsellingRepo @Inject constructor(
         }
     }
 
+    // overrideTargetSectionId: when navigating backward, pass the previous section's ID so that
+    // lastVisitedSectionId is recorded correctly for form-resume (forward nav leaves it null to
+    // let the function derive the natural next section).
     suspend fun saveSectionAnswers(
         benId: Long,
         formId: Int,
         section: CounsellingSectionDto,
-        formVersionNumber: Int
+        formVersionNumber: Int,
+        overrideTargetSectionId: Int? = null
     ): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -351,22 +358,33 @@ class CounsellingRepo @Inject constructor(
                 } else {
                     val sections = activeVersionWithSections?.sections?.sortedBy { it.section.sectionOrder } ?: emptyList()
                     val currentIdx = sections.indexOfFirst { it.section.sectionId == section.sectionId }
-                    val nextSectionId = if (currentIdx != -1 && currentIdx < sections.size - 1) {
+                    val forwardNextSectionId = if (currentIdx != -1 && currentIdx < sections.size - 1) {
                         sections[currentIdx + 1].section.sectionId
                     } else {
                         null
                     }
-                    Timber.d("saveSectionAnswers: calling saveDraftSection, nextSectionId=$nextSectionId")
-                    counsellingRepository.saveDraftSection(responseId, section.sectionId, nextSectionId, answers)
+                    val targetSectionId = overrideTargetSectionId ?: forwardNextSectionId
+                    Timber.d("saveSectionAnswers: calling saveDraftSection, targetSectionId=$targetSectionId (override=$overrideTargetSectionId)")
+                    counsellingRepository.saveDraftSection(responseId, section.sectionId, targetSectionId, answers)
                 }
 
+                var success = true
                 if (shouldSync) {
                     Timber.d("saveSectionAnswers: shouldSync is true, calling syncUnsyncedRecords")
-                    counsellingRepository.syncUnsyncedRecords()
-                    WorkerUtils.triggerAmritPushWorker(context)
+                    val syncSuccess = counsellingRepository.syncUnsyncedRecords()
+                    if (syncSuccess) {
+                        WorkerUtils.triggerAmritPushWorker(context)
+                    } else {
+                        if (isFinalPreSubmit) {
+                            counsellingRepository.revertFormStatus(responseId, "DRAFT")
+                        } else if (isFinalPostSubmit || isLastSection) {
+                            counsellingRepository.revertFormStatus(responseId, "SUBMITTED")
+                        }
+                        success = false
+                    }
                 }
 
-                true
+                success
             } catch (e: Exception) {
                 Timber.e(e, "saveSectionAnswers failed")
                 false

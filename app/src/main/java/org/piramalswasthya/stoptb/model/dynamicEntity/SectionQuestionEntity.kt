@@ -25,6 +25,7 @@ data class SectionQuestionEntity(
     val questionOrder: Int,
     val isRequired: Boolean,
     val questionUuid: String? = null,
+    val serverQuestionId: Int? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )
