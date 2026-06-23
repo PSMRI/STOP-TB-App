@@ -941,7 +941,7 @@
     <string name="loc_label_latitude">अक्षांश</string>
     <string name="loc_label_longitude">देशांतर</string>
     <string name="loc_label_digipin">DIGIPIN</string>
-    <string name="loc_label_timestamp">कैप्चर किया गया</string>
+    <string name="loc_label_timestamp">टाइमस्टैम्प</string>
     <string name="loc_cb_gps_unavailable">GPS उपलब्ध नहीं है</string>
     <string name="loc_label_reason">GPS अनुपलब्धता का कारण</string>
     <string name="loc_hint_reason">कारण चुनें</string>

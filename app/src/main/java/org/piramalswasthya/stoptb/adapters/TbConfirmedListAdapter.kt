@@ -8,6 +8,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.RvItemTbConfirmedListBinding
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.model.BenWithTbSuspectedDomain
 
 class TbConfirmedListAdapter( private val clickListener: ClickListener? = null,
@@ -50,7 +51,13 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             binding.benWithTb = item
 
             binding.ivSyncState.visibility = if (item.tbConfirmedList == null) View.INVISIBLE else View.VISIBLE
-
+            val role = pref?.getLoggedInUser()?.role
+            if (role != null) {
+                checkIfCounsellingOfficerOrNot(role, item)
+            } else {
+                binding.btnCounselling.visibility = View.GONE
+                binding.btnCounselled.visibility = View.GONE
+            }
             if (item.ben.spouseName == "Not Available" && item.ben.fatherName == "Not Available") {
                 binding.father = true
                 binding.husband = false
@@ -87,6 +94,21 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 
         }
 
+        private fun checkIfCounsellingOfficerOrNot(role: String, item: BenWithTbSuspectedDomain) {
+            val isCounsellingOfficer = role.isCounsellingOfficerRole()
+            if (isCounsellingOfficer) {
+                if (item.isCounselled) {
+                    binding.btnCounselling.visibility = View.GONE
+                    binding.btnCounselled.visibility = View.VISIBLE
+                } else {
+                    binding.btnCounselling.visibility = View.VISIBLE
+                    binding.btnCounselled.visibility = View.GONE
+                }
+            } else {
+                binding.btnCounselling.visibility = View.GONE
+                binding.btnCounselled.visibility = View.GONE
+            }
+        }
     }
 
     override fun onCreateViewHolder(
@@ -113,12 +135,15 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 
     class ClickListener(
         private val clickedForm: ((hhId: Long, benId: Long) -> Unit)? = null,
-        private val clickedCounselling: ((item: BenWithTbSuspectedDomain) -> Unit)? = null
+        private val clickedCounselling: ((item: BenWithTbSuspectedDomain) -> Unit)? = null,
+        private val clickedCounselled: ((item: BenWithTbSuspectedDomain) -> Unit)? = null
     ) {
         fun onClickForm(item: BenWithTbSuspectedDomain) =
             clickedForm?.let { it(item.ben.hhId, item.ben.benId) }
         fun onClickCounselling(item: BenWithTbSuspectedDomain) =
             clickedCounselling?.let { it(item) }
+        fun onClickCounselled(item: BenWithTbSuspectedDomain) =
+            clickedCounselled?.let { it(item) }
     }
 
 }

@@ -21,4 +21,6 @@ interface ICounsellingRepository {
     suspend fun submitSectionF(responseId: Long, answers: List<QuestionResponseEntity>)
     suspend fun getCounsellingRecord(beneficiaryId: Long): Flow<CompleteFormResponse?>
     suspend fun syncUnsyncedRecords(): Boolean
+    suspend fun fetchAndStoreCounsellingResponse(beneficiaryId: Long, formUuid: String): Boolean
+    suspend fun revertFormStatus(responseId: Long, status: String)
 }

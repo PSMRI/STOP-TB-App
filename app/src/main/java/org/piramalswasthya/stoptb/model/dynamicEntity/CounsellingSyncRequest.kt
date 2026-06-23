@@ -44,3 +44,28 @@ data class BulkAnswerPayload(
     @SerializedName("answerDate") val answerDate: String? = null
 )
 
+data class ServerCounsellingResponseDto(
+    @SerializedName("responseId") val responseId: Long,
+    @SerializedName("beneficiaryId") val beneficiaryId: Long,
+    @SerializedName("formId") val formId: Int,
+    @SerializedName("versionId") val versionId: Int,
+    @SerializedName("officerId") val officerId: Long,
+    @SerializedName("status") val status: String? = null,
+    @SerializedName("sections") val sections: List<ServerSectionResponseDto> = emptyList()
+)
+
+data class ServerSectionResponseDto(
+    @SerializedName("sectionResponseId") val sectionResponseId: Long,
+    @SerializedName("sectionId") val sectionId: Int,
+    @SerializedName("status") val status: String? = null,
+    @SerializedName("answers") val answers: List<ServerAnswerDto> = emptyList()
+)
+
+data class ServerAnswerDto(
+    @SerializedName("questionResponseId") val questionResponseId: Long,
+    @SerializedName("questionId") val questionId: Int,
+    @SerializedName("optionId") val optionId: Int? = null,
+    @SerializedName("answerText") val answerText: String? = null
+)
+
+

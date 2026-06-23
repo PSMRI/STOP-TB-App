@@ -94,6 +94,9 @@ class NewBenRegViewModel @Inject constructor(
     private val _gpsUnavailableReason = MutableStateFlow<String?>(null)
     val gpsUnavailableReason: StateFlow<String?> = _gpsUnavailableReason.asStateFlow()
 
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
     // ─── Data ────────────────────────────────────────────────────────────
     private lateinit var user:           User
     private lateinit var household:      HouseholdCache
@@ -120,8 +123,13 @@ class NewBenRegViewModel @Inject constructor(
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            setUpPage()
-            dataset.listFlow.collectLatest { _formList.value = it }
+            try {
+                _isLoading.value = true
+                setUpPage()
+                dataset.listFlow.collectLatest { _formList.value = it }
+            } finally {
+                _isLoading.value = false
+            }
         }
     }
 

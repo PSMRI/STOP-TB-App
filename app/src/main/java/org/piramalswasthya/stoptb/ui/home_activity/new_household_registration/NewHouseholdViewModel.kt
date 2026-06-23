@@ -54,6 +54,9 @@ class NewHouseholdViewModel @Inject constructor(
     private val dataset = HouseholdFormDataset(context, preferenceDao.getCurrentLanguage())
     val formList = dataset.listFlow
 
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
     // ─── Location state ───────────────────────────────────────────────────────
 
     private val _locationState = MutableStateFlow<LocationState>(LocationState.Idle)
@@ -69,39 +72,44 @@ class NewHouseholdViewModel @Inject constructor(
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            user = preferenceDao.getLoggedInUser()!!
-            val locationRecord = preferenceDao.getLocationRecord()!!
-            household = householdRepo.getRecord(hhIdFromArgs) ?: householdRepo.getDraftRecord()
-                ?: HouseholdCache(
-                    householdId = 0,
-                    ashaId = user.userId,
-                    isDraft = true,
-                    processed = "N",
-                    registrationType = isAshaFamily,
-                    locationRecord = locationRecord
-                )
-            dataset.setupPage(household)
+            try {
+                _isLoading.value = true
+                user = preferenceDao.getLoggedInUser()!!
+                val locationRecord = preferenceDao.getLocationRecord()!!
+                household = householdRepo.getRecord(hhIdFromArgs) ?: householdRepo.getDraftRecord()
+                    ?: HouseholdCache(
+                        householdId = 0,
+                        ashaId = user.userId,
+                        isDraft = true,
+                        processed = "N",
+                        registrationType = isAshaFamily,
+                        locationRecord = locationRecord
+                    )
+                dataset.setupPage(household)
 
-            // Restore previously saved location state if editing an existing record
-            household.let { hh ->
-                when {
-                    hh.isGpsUnavailable -> {
-                        _isGpsUnavailable.emit(true)
-                        _gpsUnavailableReason.emit(hh.gpsUnavailableReason)
-                        _locationState.emit(LocationState.Idle)
-                    }
-                    hh.gpsLatitude != null && hh.gpsLongitude != null && hh.digipin != null -> {
-                        _locationState.emit(
-                            LocationState.Captured(
-                                lat = hh.gpsLatitude!!,
-                                lon = hh.gpsLongitude!!,
-                                digipin = hh.digipin!!,
-                                timestamp = hh.gpsTimestamp.orEmpty()
+                // Restore previously saved location state if editing an existing record
+                household.let { hh ->
+                    when {
+                        hh.isGpsUnavailable -> {
+                            _isGpsUnavailable.emit(true)
+                            _gpsUnavailableReason.emit(hh.gpsUnavailableReason)
+                            _locationState.emit(LocationState.Idle)
+                        }
+                        hh.gpsLatitude != null && hh.gpsLongitude != null && hh.digipin != null -> {
+                            _locationState.emit(
+                                LocationState.Captured(
+                                    lat = hh.gpsLatitude!!,
+                                    lon = hh.gpsLongitude!!,
+                                    digipin = hh.digipin!!,
+                                    timestamp = hh.gpsTimestamp.orEmpty()
+                                )
                             )
-                        )
+                        }
+                        else -> Unit
                     }
-                    else -> Unit
                 }
+            } finally {
+                _isLoading.value = false
             }
         }
     }

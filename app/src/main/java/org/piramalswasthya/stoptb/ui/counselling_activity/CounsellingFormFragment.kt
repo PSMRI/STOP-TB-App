@@ -13,7 +13,7 @@ import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.dynamicAdapter.CounsellingDynamicAdapter
 
 @AndroidEntryPoint
-class CounsellingFormFragment : Fragment() {
+class   CounsellingFormFragment : Fragment() {
 
     private val viewModel: CounsellingViewModel by activityViewModels()
     private lateinit var adapter: CounsellingDynamicAdapter
@@ -31,14 +31,22 @@ class CounsellingFormFragment : Fragment() {
         val rv = view.findViewById<RecyclerView>(R.id.rv_counselling_form)
         rv.layoutManager = LinearLayoutManager(requireContext())
 
-        adapter = CounsellingDynamicAdapter(emptyList()) { updatedQ ->
-            viewModel.evaluateConditions(updatedQ)
-        }
+        adapter = CounsellingDynamicAdapter(
+            questions = emptyList(),
+            onValueChanged = { updatedQ ->
+                viewModel.evaluateConditions(updatedQ)
+            }
+        )
         rv.adapter = adapter
 
-        viewModel.activeQuestions.observe(viewLifecycleOwner) { questions ->
-            adapter.submitList(questions)
+        fun refreshAdapter() {
+            adapter.submitList(
+                viewModel.activeQuestions.value.orEmpty(),
+                viewModel.isFormEditable.value ?: true
+            )
         }
+        viewModel.activeQuestions.observe(viewLifecycleOwner) { refreshAdapter() }
+        viewModel.isFormEditable.observe(viewLifecycleOwner) { refreshAdapter() }
 
         val tvLetter = view.findViewById<android.widget.TextView>(R.id.tv_section_letter)
         val tvName = view.findViewById<android.widget.TextView>(R.id.tv_section_name)

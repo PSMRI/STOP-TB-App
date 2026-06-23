@@ -65,8 +65,13 @@ class CounsellingRepo @Inject constructor(
                 var currentStep = 0
                 var completedSteps = 0
                 var status = "DRAFT"
+                
+                val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
+                var displayDateStr = sdf.format(java.util.Date())
+
                 if (formResponse != null) {
                     status = formResponse.formResponse.status
+                    displayDateStr = sdf.format(java.util.Date(formResponse.formResponse.createdAt))
                     val versionId = formResponse.formResponse.formVersionId
                     val formDef = db.dynamicFormMetadataDao().getFormDefinitionByVersionId(versionId)
                     val activeVersion = formDef?.versions?.find { it.version.versionId == versionId }
@@ -81,14 +86,11 @@ class CounsellingRepo @Inject constructor(
                     completedSteps = formResponse.sectionResponses.count { it.questionResponses.isNotEmpty() }
                 }
 
-                val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
-                val todayStr = sdf.format(java.util.Date())
-
                 val overviewData = CounsellingOverviewData(
                     benId = benId,
                     patientName = "${ben.firstName ?: ""} ${ben.lastName ?: ""}".trim(),
                     nikshayId = ben.nikshayId ?: "",
-                    counsellingDate = todayStr,
+                    counsellingDate = displayDateStr,
                     counsellingOfficer = loggedInUser,
                     regDate = ben.regDate,
                     beneficiaryId = ben.beneficiaryId.toString(),
@@ -175,7 +177,7 @@ class CounsellingRepo @Inject constructor(
 
                         CounsellingQuestionDto(
                             questionId = q.questionId,
-                            questionUuid = getQuestionCode(q.questionId),
+                            questionUuid = q.questionUuid ?: getQuestionCode(q.questionId),
                             questionText = q.questionText,
                             questionType = q.questionType,
                             isMandatory = q.isRequired,
@@ -213,6 +215,9 @@ class CounsellingRepo @Inject constructor(
                     sections = sectionsList
                 )
 
+                val formUuid = completeForm.form.formUuid
+                counsellingRepository.fetchAndStoreCounsellingResponse(benId, formUuid)
+
                 val draftResponse = counsellingRepository.getOrCreateDraft(benId, activeVersionWithSections.version.versionId)
 
                 schemaDto.sections.forEach { sec ->
@@ -222,18 +227,18 @@ class CounsellingRepo @Inject constructor(
                             val qResponses = secResponse.questionResponses.filter { it.questionId == q.questionId }
                             if (qResponses.isNotEmpty()) {
                                 when (q.questionType) {
-                                    "RADIO" -> {
+                                    "RADIO", "DROPDOWN" -> {
                                         val optId = qResponses.first().optionId
                                         val opt = q.options?.find { it.optionId == optId }
                                         q.value = opt?.optionValue
                                     }
-                                    "MCQ" -> {
+                                    "MCQ", "CHECKBOX" -> {
                                         val selectedVals = qResponses.mapNotNull { resp ->
                                             q.options?.find { it.optionId == resp.optionId }?.optionValue
                                         }
                                         q.value = selectedVals
                                     }
-                                    "TEXT", "DATE" -> {
+                                    "TEXT", "DATE", "NUMBER" -> {
                                         q.value = qResponses.first().answerText
                                     }
                                 }
@@ -250,25 +255,29 @@ class CounsellingRepo @Inject constructor(
         }
     }
 
+    // overrideTargetSectionId: when navigating backward, pass the previous section's ID so that
+    // lastVisitedSectionId is recorded correctly for form-resume (forward nav leaves it null to
+    // let the function derive the natural next section).
     suspend fun saveSectionAnswers(
         benId: Long,
         formId: Int,
         section: CounsellingSectionDto,
-        formVersionNumber: Int
+        formVersionNumber: Int,
+        overrideTargetSectionId: Int? = null
     ): Boolean {
         return withContext(Dispatchers.IO) {
             try {
                 val versionId = formId * 1000 + formVersionNumber
 
                 val draftResponse = counsellingRepository.getOrCreateDraft(benId, versionId)
-                val responseId = draftResponse.formResponse.responseId
+                    val responseId = draftResponse.formResponse.responseId
 
                 val answers = mutableListOf<QuestionResponseEntity>()
                 section.questions.filter { it.visible }.forEach { q ->
                     val valObj = q.value
                     if (valObj != null) {
                         when (q.questionType) {
-                            "RADIO" -> {
+                            "RADIO", "DROPDOWN" -> {
                                 val opt = q.options?.find { it.optionValue == valObj.toString() }
                                 if (opt != null) {
                                     answers.add(
@@ -281,7 +290,7 @@ class CounsellingRepo @Inject constructor(
                                     )
                                 }
                             }
-                            "MCQ" -> {
+                            "MCQ", "CHECKBOX" -> {
                                 val list = valObj as? List<*> ?: emptyList<Any>()
                                 list.forEach { optVal ->
                                     val opt = q.options?.find { it.optionValue == optVal.toString() }
@@ -297,7 +306,7 @@ class CounsellingRepo @Inject constructor(
                                     }
                                 }
                             }
-                            "TEXT", "DATE" -> {
+                            "TEXT", "DATE", "NUMBER" -> {
                                 val textVal = valObj.toString()
                                 if (textVal.isNotBlank()) {
                                     answers.add(
@@ -351,22 +360,33 @@ class CounsellingRepo @Inject constructor(
                 } else {
                     val sections = activeVersionWithSections?.sections?.sortedBy { it.section.sectionOrder } ?: emptyList()
                     val currentIdx = sections.indexOfFirst { it.section.sectionId == section.sectionId }
-                    val nextSectionId = if (currentIdx != -1 && currentIdx < sections.size - 1) {
+                    val forwardNextSectionId = if (currentIdx != -1 && currentIdx < sections.size - 1) {
                         sections[currentIdx + 1].section.sectionId
                     } else {
                         null
                     }
-                    Timber.d("saveSectionAnswers: calling saveDraftSection, nextSectionId=$nextSectionId")
-                    counsellingRepository.saveDraftSection(responseId, section.sectionId, nextSectionId, answers)
+                    val targetSectionId = overrideTargetSectionId ?: forwardNextSectionId
+                    Timber.d("saveSectionAnswers: calling saveDraftSection, targetSectionId=$targetSectionId (override=$overrideTargetSectionId)")
+                    counsellingRepository.saveDraftSection(responseId, section.sectionId, targetSectionId, answers)
                 }
 
+                var success = true
                 if (shouldSync) {
                     Timber.d("saveSectionAnswers: shouldSync is true, calling syncUnsyncedRecords")
-                    counsellingRepository.syncUnsyncedRecords()
-                    WorkerUtils.triggerAmritPushWorker(context)
+                    val syncSuccess = counsellingRepository.syncUnsyncedRecords()
+                    if (syncSuccess) {
+                        WorkerUtils.triggerAmritPushWorker(context)
+                    } else {
+                        if (isFinalPreSubmit) {
+                            counsellingRepository.revertFormStatus(responseId, "DRAFT")
+                        } else if (isFinalPostSubmit || isLastSection) {
+                            counsellingRepository.revertFormStatus(responseId, "SUBMITTED")
+                        }
+                        success = false
+                    }
                 }
 
-                true
+                success
             } catch (e: Exception) {
                 Timber.e(e, "saveSectionAnswers failed")
                 false
@@ -379,6 +399,29 @@ class CounsellingRepo @Inject constructor(
             db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId)
         }
     }
+
+    suspend fun getFollowUpStatus(benId: Long, formId: Int): FollowUpStatus {
+        return withContext(Dispatchers.IO) {
+            val response = db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId)
+            val form = db.dynamicFormMetadataDao().getFormById(formId)
+            
+            val delay = if (form?.followUpDelayDays == null || form.followUpDelayDays == -1) {
+                15
+            } else {
+                form.followUpDelayDays
+            }
+
+            FollowUpStatus(
+                syncedAt = response?.formResponse?.syncedAt,
+                followUpDelayDays = delay
+            )
+        }
+    }
 }
+
+data class FollowUpStatus(
+    val syncedAt: Long?,
+    val followUpDelayDays: Int
+)
 
 

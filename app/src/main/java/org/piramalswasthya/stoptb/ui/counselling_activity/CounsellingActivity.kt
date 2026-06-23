@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.ui.counselling_activity
 
 import android.os.Bundle
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -11,13 +12,9 @@ import dagger.hilt.android.AndroidEntryPoint
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.databinding.ActivityCounsellingBinding
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
-import android.app.DatePickerDialog
 import android.widget.Toast
 import org.piramalswasthya.stoptb.model.CounsellingOverviewData
 import timber.log.Timber
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
 
 @AndroidEntryPoint
 class CounsellingActivity : AppCompatActivity() {
@@ -34,9 +31,9 @@ class CounsellingActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.nsvContent) { view, insets ->
-            val imeBottom = (insets.getInsets(WindowInsetsCompat.Type.ime()).bottom + binding.navigationFooter.btnNext.height)
+            val imeInset = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
             view.updatePadding(
-                bottom = if (imeBottom > 0) imeBottom
+                bottom = if (imeInset > 0) imeInset + binding.navigationFooter.btnNext.height
                 else resources.getDimensionPixelSize(R.dimen.nsv_counselling_padding_bottom)
             )
             insets
@@ -106,12 +103,17 @@ class CounsellingActivity : AppCompatActivity() {
             else getString(R.string.btn_next_text)
 
         binding.navigationFooter.btnNext.setOnClickListener {
+            hideKeyboard()
+            clearActiveFocus()
             viewModel.nextSection()
+
         }
 
         binding.navigationFooter.btnBack.text = getString(R.string.btn_back_text)
         binding.navigationFooter.btnBack.visibility = if (step == 0) View.GONE else View.VISIBLE
         binding.navigationFooter.btnBack.setOnClickListener {
+            hideKeyboard()
+            clearActiveFocus()
             viewModel.previousSection()
         }
     }
@@ -132,7 +134,7 @@ class CounsellingActivity : AppCompatActivity() {
                 is NetworkResponse.Success -> {
                     state.data?.let {
                         populatePatientHeader(it)
-                        setupDatePicker(it.regDate)
+                        binding.etCounsellingDate.setText(it.counsellingDate)
                         binding.etCounsellingOfficer.setText(it.counsellingOfficer)
                         isOverviewReady = true
                         maybeShowContent()
@@ -166,11 +168,6 @@ class CounsellingActivity : AppCompatActivity() {
             }
         }
 
-        viewModel.counsellingDate.observe(this) { dateInMillis ->
-            val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
-            binding.etCounsellingDate.setText(sdf.format(java.util.Date(dateInMillis)))
-        }
-
         viewModel.formSubmitted.observe(this) { submitted ->
             if (submitted == true) {
                 Timber.d("Form phase completed!")
@@ -184,11 +181,17 @@ class CounsellingActivity : AppCompatActivity() {
             // Only update navigation state while the form is active.
             if (supportFragmentManager.findFragmentById(R.id.fragment_container) !is CounsellingFormFragment) return@observe
 
+            binding.nsvContent.post { binding.nsvContent.scrollTo(0, 0) }
+
             val section = viewModel.schemaData?.sections?.getOrNull(step)
             val total = viewModel.schemaData?.sections?.size ?: 1
+            val isEditable = viewModel.isFormEditable.value ?: true
 
-            binding.navigationFooter.btnNext.text =
-                if (step == total - 1) getString(R.string.btn_submit) else getString(R.string.btn_next_text)
+            binding.navigationFooter.btnNext.text = when {
+                step == total - 1 && isEditable -> getString(R.string.btn_submit)
+                step == total - 1 && !isEditable -> getString(R.string.btn_finish)
+                else -> getString(R.string.btn_next_text)
+            }
             
             binding.navigationFooter.btnBack.text = getString(R.string.btn_back_text)
             binding.navigationFooter.btnBack.visibility = if (step == 0) View.GONE else View.VISIBLE
@@ -208,28 +211,6 @@ class CounsellingActivity : AppCompatActivity() {
 
     private fun maybeShowContent() {
         if (isOverviewReady) showContent()
-    }
-
-    private fun setupDatePicker(minDate: Long) {
-        binding.etCounsellingDate.setOnClickListener {
-            val calendar = Calendar.getInstance()
-            viewModel.counsellingDate.value?.let { calendar.timeInMillis = it }
-            val dpd = DatePickerDialog(
-                this,
-                { _, year, month, dayOfMonth ->
-                    val selected = Calendar.getInstance().apply {
-                        set(year, month, dayOfMonth, 0, 0, 0)
-                    }
-                    viewModel.setCounsellingDate(selected.timeInMillis)
-                },
-                calendar.get(Calendar.YEAR),
-                calendar.get(Calendar.MONTH),
-                calendar.get(Calendar.DAY_OF_MONTH)
-            )
-            dpd.datePicker.maxDate = System.currentTimeMillis()
-            dpd.datePicker.minDate = minDate
-            dpd.show()
-        }
     }
 
     private fun showLoading() {
@@ -278,6 +259,15 @@ class CounsellingActivity : AppCompatActivity() {
         binding.llCounsellingInfo.visibility = View.VISIBLE
         supportActionBar?.title = getString(R.string.counselling_overview_title)
         setupNavigationFooter()
+    }
+
+    private fun hideKeyboard() {
+        val imm = getSystemService(InputMethodManager::class.java)
+        currentFocus?.let { imm.hideSoftInputFromWindow(it.windowToken, 0) }
+    }
+
+    private fun clearActiveFocus() {
+        currentFocus?.clearFocus()
     }
 
     override fun onSupportNavigateUp(): Boolean {

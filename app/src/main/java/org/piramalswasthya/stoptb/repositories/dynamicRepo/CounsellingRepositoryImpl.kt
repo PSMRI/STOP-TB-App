@@ -38,29 +38,6 @@ class CounsellingRepositoryImpl @Inject constructor(
         return metadataDao.getSectionsByPhase(versionId, phase.value)
     }
 
-    /*override suspend fun downloadLatestFormSchema(formType: String): Boolean {
-        return try {
-            val response = amritApiService.getFormDefinition(formType)
-            if (response.isSuccessful) {
-                val apiSchema = response.body()?.data ?: return false
-                val formId = apiSchema.formId.toIntOrNull() ?: 0
-                val activeVersion = metadataDao.getActiveVersionNumber(formId)
-                if (activeVersion == null || apiSchema.versionNumber > activeVersion) {
-                    db.withTransaction {
-                        storeFormSchemaInDb(apiSchema)
-                    }
-                    true
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        } catch (e: Exception) {
-            false
-        }
-    }*/
-
     override suspend fun downloadAndStoreAllForms(): Boolean {
         return try {
             val jwt = preferenceDao.getJWTAmritToken()
@@ -93,12 +70,14 @@ class CounsellingRepositoryImpl @Inject constructor(
     private suspend fun storeFormSchemaInDb(apiSchema: FormSchemaDto) {
         val formId = apiSchema.formId.toIntOrNull() ?: 0
         val formUuid = apiSchema.formUuid ?: "FORM_${formId}"
+        val followUpDelayDays =  apiSchema.followUpDelayDays
         Timber.d("storeFormSchemaInDb: Inserting formId = $formId, formUuid = $formUuid, formName = ${apiSchema.formName}")
         val formEntity = DynamicFormEntity(
             formId = formId,
             formUuid = formUuid,
             formName = apiSchema.formName,
-            formType = apiSchema.formType ?: ""
+            formType = apiSchema.formType ?: "",
+            followUpDelayDays = followUpDelayDays
         )
         metadataDao.insertForm(formEntity)
 
@@ -118,6 +97,16 @@ class CounsellingRepositoryImpl @Inject constructor(
         val conditionsToInsert = mutableListOf<OptionConditionEntity>()
         val validationsToInsert = mutableListOf<QuestionValidationEntity>()
 
+        // Build questionId -> fieldId map for mapping condition target IDs
+        val questionIdToFieldIdMap = mutableMapOf<Int, String>()
+        apiSchema.sections.forEach { sectionDto ->
+            sectionDto.questions.forEach { questionDto ->
+                questionDto.questionId?.let { qId ->
+                    questionIdToFieldIdMap[qId] = questionDto.fieldId
+                }
+            }
+        }
+
         Timber.d("storeFormSchemaInDb: Mapping ${apiSchema.sections.size} sections...")
         apiSchema.sections.forEach { sectionDto ->
             val sectionIdInt = sectionDto.sectionId.toIntOrNull() ?: 0
@@ -133,7 +122,7 @@ class CounsellingRepositoryImpl @Inject constructor(
 
             Timber.d("storeFormSchemaInDb: Mapping ${sectionDto.questions.size} questions for section $sectionIdInt...")
             sectionDto.questions.forEach { questionDto ->
-                val questionIdInt = questionDto.questionId ?: 0
+                val questionIdInt = questionDto.fieldId.hashCode()
                 val questionEntity = SectionQuestionEntity(
                     questionId = questionIdInt,
                     sectionId = sectionIdInt,
@@ -141,28 +130,38 @@ class CounsellingRepositoryImpl @Inject constructor(
                     questionType = questionDto.type,
                     questionOrder = questionDto.displayOrder ?: 0,
                     isRequired = questionDto.isMandatory,
-                    questionUuid = questionDto.fieldId
+                    questionUuid = questionDto.fieldId,
+                    serverQuestionId = questionDto.questionId
                 )
                 questionsToInsert.add(questionEntity)
 
                 val optionItems = questionDto.getOptionItems()
                 Timber.d("storeFormSchemaInDb: Mapping ${optionItems.size} options for question $questionIdInt...")
                 optionItems.forEach { optionDto ->
+                    val optionIdInt = (questionDto.fieldId + "_" + optionDto.optionValue).hashCode()
                     val optionEntity = QuestionOptionEntity(
-                        optionId = optionDto.optionId,
+                        optionId = optionIdInt,
                         questionId = questionIdInt,
                         optionText = optionDto.optionLabel,
                         optionValue = optionDto.optionValue,
-                        optionOrder = optionDto.displayOrder
+                        optionOrder = optionDto.displayOrder,
+                        serverOptionId = optionDto.optionId
                     )
                     optionsToInsert.add(optionEntity)
 
                     optionDto.conditions.forEach conditionLoop@{ conditionDto ->
                         val targetQId = conditionDto.targetQuestionId ?: return@conditionLoop
+                        val mappedTargetQId = conditionDto.targetQuestionUuid?.hashCode()
+                            ?: questionIdToFieldIdMap[targetQId]?.hashCode()
+                            ?: run {
+                                Timber.w("conditionLoop: cannot map targetQId=$targetQId for option ${optionDto.optionValue}, skipping condition")
+                                return@conditionLoop
+                            }
+                        val conditionIdInt = (questionDto.fieldId + "_" + optionDto.optionValue + "_" + targetQId).hashCode()
                         val conditionEntity = OptionConditionEntity(
-                            conditionId = conditionDto.conditionId,
-                            optionId = optionDto.optionId,
-                            targetQuestionId = targetQId,
+                            conditionId = conditionIdInt,
+                            optionId = optionIdInt,
+                            targetQuestionId = mappedTargetQId,
                             actionType = conditionDto.actionType,
                             isFulfilledValue = true
                         )
@@ -171,8 +170,9 @@ class CounsellingRepositoryImpl @Inject constructor(
                 }
 
                 questionDto.validations.forEach { validationDto ->
+                    val validationIdInt = (questionDto.fieldId + "_" + validationDto.validationType).hashCode()
                     val validationEntity = QuestionValidationEntity(
-                        validationId = validationDto.validationId,
+                        validationId = validationIdInt,
                         questionId = questionIdInt,
                         validationType = validationDto.validationType,
                         validationValue = validationDto.validationParam,
@@ -303,7 +303,7 @@ class CounsellingRepositoryImpl @Inject constructor(
     }
 
     override suspend fun submitSectionF(responseId: Long, answers: List<QuestionResponseEntity>) {
-        submitSectionWithPhase(responseId, answers, "POST_SUBMIT", "COMPLETE")
+        submitSectionWithPhase(responseId, answers, "POST_SUBMIT", "COMPLETED")
     }
 
     override suspend fun getCounsellingRecord(beneficiaryId: Long): Flow<CompleteFormResponse?> {
@@ -330,62 +330,262 @@ class CounsellingRepositoryImpl @Inject constructor(
         if (unsynced.isEmpty()) return true
 
         val officerId = preferenceDao.getLoggedInUser()?.userId?.toLong() ?: DEFAULT_OFFICER_ID
-        val counsellingPayloadList = unsynced.map { response ->
-            val formVersionId = response.formResponse.formVersionId
-            val formDef = metadataDao.getFormDefinitionByVersionId(formVersionId)
-            PayloadBuilder.buildBulkPayload(response, formDef, officerId)
-        }
-
-        try {
-            val jsonPayload = com.google.gson.Gson().toJson(counsellingPayloadList)
-            Timber.d("Amrit push submitBulk standalone payload JSON: $jsonPayload")
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to serialize bulk counselling to JSON for logging")
-        }
-
         val jwt = preferenceDao.getJWTAmritToken()
         val authHeader = jwt ?: ""
 
-        return try {
-            val response = amritApiService.submitBulkCounselling(authHeader, counsellingPayloadList)
-            val statusCode = response.code()
-            Timber.d("Amrit push submitBulk standalone response: httpStatus=$statusCode")
+        var allSuccess = true
 
-            if (statusCode == 200) {
-                val responseString: String? = response.body()?.string()
-                if (responseString != null) {
-                    val jsonObj = org.json.JSONObject(responseString)
-                    val isSuccess = jsonObj.optBoolean("success", false)
-                    if (isSuccess) {
-                        Timber.d("Amrit push submitBulk standalone success: $jsonObj")
-                        unsynced.forEach { resp ->
-                            responseDao.updateFormResponse(
-                                resp.formResponse.copy(
-                                    syncStatus = "SYNCED",
-                                    syncedAt = System.currentTimeMillis()
-                                )
-                            )
+        for (resp in unsynced) {
+            val formVersionId = resp.formResponse.formVersionId
+            val formDef = metadataDao.getFormDefinitionByVersionId(formVersionId)
+            val payload = PayloadBuilder.buildBulkPayload(resp, formDef, officerId)
+
+            val recordSuccess = try {
+                if (resp.formResponse.status == "COMPLETE") {
+                    try {
+                        val jsonPayload = com.google.gson.Gson().toJson(payload)
+                        Timber.d("Amrit push complete dynamic payload JSON: $jsonPayload")
+                    } catch (e: Exception) {
+                        Timber.e(e, "Failed to serialize complete payload to JSON for logging")
+                    }
+
+                    val apiResponse = amritApiService.completeCounselling(authHeader, payload)
+                    val statusCode = apiResponse.code()
+                    Timber.d("Amrit push complete dynamic response: httpStatus=$statusCode")
+
+                    if (statusCode == 200) {
+                        val responseString: String? = apiResponse.body()?.string()
+                        if (responseString != null) {
+                            val jsonObj = org.json.JSONObject(responseString)
+                            val isSuccess = jsonObj.optBoolean("success", false)
+                            if (isSuccess) {
+                                Timber.d("Amrit push complete dynamic success: $jsonObj")
+                                true
+                            } else {
+                                Timber.e("Amrit push complete dynamic failed: success=false")
+                                false
+                            }
+                        } else {
+                            Timber.e("Amrit push complete dynamic failed: body is null")
+                            false
                         }
-                        true
                     } else {
-                        Timber.e("Amrit push submitBulk standalone failed: success=false")
+                        Timber.e("Amrit push complete dynamic failed: status=$statusCode")
                         false
                     }
                 } else {
-                    Timber.e("Amrit push submitBulk standalone failed: body is null")
-                    false
+                    val bulkPayload = listOf(payload)
+                    try {
+                        val jsonPayload = com.google.gson.Gson().toJson(bulkPayload)
+                        Timber.d("Amrit push submitBulk standalone payload JSON: $jsonPayload")
+                    } catch (e: Exception) {
+                        Timber.e(e, "Failed to serialize bulk counselling to JSON for logging")
+                    }
+
+                    val apiResponse = amritApiService.submitBulkCounselling(authHeader, bulkPayload)
+                    val statusCode = apiResponse.code()
+                    Timber.d("Amrit push submitBulk standalone response: httpStatus=$statusCode")
+
+                    if (statusCode == 200) {
+                        val responseString: String? = apiResponse.body()?.string()
+                        if (responseString != null) {
+                            val jsonObj = org.json.JSONObject(responseString)
+                            val isSuccess = jsonObj.optBoolean("success", false)
+                            if (isSuccess) {
+                                Timber.d("Amrit push submitBulk standalone success: $jsonObj")
+                                true
+                            } else {
+                                Timber.e("Amrit push submitBulk standalone failed: success=false")
+                                false
+                            }
+                        } else {
+                            Timber.e("Amrit push submitBulk standalone failed: body is null")
+                            false
+                        }
+                    } else {
+                        Timber.e("Amrit push submitBulk standalone failed: status=$statusCode")
+                        false
+                    }
                 }
-            } else {
-                Timber.e("Amrit push submitBulk standalone failed: status=$statusCode")
+            } catch (e: Exception) {
+                Timber.e(e, "Amrit push sync error for responseId=${resp.formResponse.responseId}")
                 false
             }
+
+            if (recordSuccess) {
+                val hasPostSubmitResponse = resp.sectionResponses.any { secResp ->
+                    val secDef = formDef?.versions?.find { it.version.versionId == formVersionId }
+                        ?.sections?.find { it.section.sectionId == secResp.sectionResponse.sectionId }
+                    secDef?.section?.sectionPhase == "POST_SUBMIT" && secResp.questionResponses.isNotEmpty()
+                }
+                val targetStatus = if (hasPostSubmitResponse) "COMPLETE" else resp.formResponse.status
+                responseDao.updateFormResponse(
+                    resp.formResponse.copy(
+                        status = targetStatus,
+                        syncStatus = "SYNCED",
+                        syncedAt = System.currentTimeMillis()
+                    )
+                )
+            } else {
+                allSuccess = false
+            }
+        }
+
+        return allSuccess
+    }
+
+    override suspend fun fetchAndStoreCounsellingResponse(
+        beneficiaryId: Long,
+        formUuid: String
+    ): Boolean {
+        try {
+            val formDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING) ?: return false
+            val activeVersion = formDef.versions.find { it.version.isActive }
+                ?: formDef.versions.maxByOrNull { it.version.versionNumber }
+                ?: return false
+
+            val jwt = preferenceDao.getJWTAmritToken() ?: return false
+            val response = amritApiService.getCounsellingResponse(jwt, beneficiaryId, formUuid)
+            if (!response.isSuccessful) return false
+            val apiResponses = response.body()?.data
+            if (apiResponses.isNullOrEmpty()) return false
+
+            db.withTransaction {
+                // Preserve any locally edited (UNSYNCED) responses — do not overwrite them
+                // with server data, as that would permanently discard unsaved user edits.
+                val unsyncedLocal = responseDao.getUnsyncedResponseForBeneficiary(beneficiaryId)
+                if (unsyncedLocal != null) return@withTransaction
+
+                responseDao.deleteFormResponseForBeneficiary(beneficiaryId)
+
+                val apiResponse = apiResponses.first()
+
+                val questionsMap = activeVersion.sections
+                    .flatMap { it.questions }
+                    .filter { it.question.serverQuestionId != null }
+                    .associateBy { it.question.serverQuestionId!! }
+
+                val optionsMap = mutableMapOf<Pair<Int, Int>, Int>()
+                activeVersion.sections.forEach { sec ->
+                    sec.questions.forEach { qDetails ->
+                        val serverQId = qDetails.question.serverQuestionId
+                        if (serverQId != null) {
+                            qDetails.options.forEach { optDetails ->
+                                val serverOptId = optDetails.option.serverOptionId
+                                if (serverOptId != null) {
+                                    optionsMap[Pair(serverQId, serverOptId)] = optDetails.option.optionId
+                                }
+                            }
+                        }
+                    }
+                }
+
+                val formResponse = FormResponseEntity(
+                    beneficiaryId = beneficiaryId,
+                    formVersionId = activeVersion.version.versionId,
+                    status = "SUBMITTED",
+                    lastVisitedSectionId = null,
+                    syncStatus = "SYNCED",
+                    syncedAt = System.currentTimeMillis()
+                )
+                val responseId = responseDao.insertFormResponse(formResponse)
+
+                val sectionResponses = activeVersion.sections.map {
+                    SectionResponseEntity(
+                        formResponseId = responseId,
+                        sectionId = it.section.sectionId
+                    )
+                }
+                responseDao.insertSectionResponses(sectionResponses)
+
+                val insertedSections = responseDao.getFormResponseById(responseId)?.sectionResponses ?: emptyList()
+                val sectionIdToResponseIdMap = insertedSections.associate {
+                    it.sectionResponse.sectionId to it.sectionResponse.sectionResponseId
+                }
+
+                val questionResponsesToInsert = mutableListOf<QuestionResponseEntity>()
+                var hasPostSubmitAnswers = false
+
+                apiResponse.sections.forEach { apiSec ->
+                    val sectionId = apiSec.sectionId
+                    val sectionDef = activeVersion.sections.find { it.section.sectionId == sectionId }
+                    if (sectionDef != null) {
+                        val sectionResponseId = sectionIdToResponseIdMap[sectionId]
+                        if (sectionResponseId != null) {
+                            if (sectionDef.section.sectionPhase == "POST_SUBMIT" && apiSec.answers.isNotEmpty()) {
+                                hasPostSubmitAnswers = true
+                            }
+
+                            apiSec.answers.forEach { apiAns ->
+                                val serverQId = apiAns.questionId
+                                val qDetails = questionsMap[serverQId]
+                                if (qDetails != null) {
+                                    val qId = qDetails.question.questionId
+
+                                    val serverOptId = apiAns.optionId
+                                    val localOptId = if (serverOptId != null) {
+                                        optionsMap[Pair(serverQId, serverOptId)]
+                                    } else {
+                                        null
+                                    }
+
+                                    questionResponsesToInsert.add(
+                                        QuestionResponseEntity(
+                                            sectionResponseId = sectionResponseId,
+                                            questionId = qId,
+                                            optionId = localOptId,
+                                            answerText = apiAns.answerText
+                                        )
+                                    )
+                                } else {
+                                    Timber.w("fetchAndStoreCounsellingResponse: No local question found for serverQuestionId=$serverQId")
+                                }
+                            }
+                        }
+                    } else {
+                        Timber.w("fetchAndStoreCounsellingResponse: No local section found for serverSectionId=$sectionId")
+                    }
+                }
+
+                if (questionResponsesToInsert.isNotEmpty()) {
+                    responseDao.insertQuestionResponses(questionResponsesToInsert)
+                }
+
+                val finalStatus = if (hasPostSubmitAnswers || apiResponse.status?.uppercase() == "COMPLETE" || apiResponse.status?.uppercase() == "COMPLETED") {
+                    "COMPLETE"
+                } else {
+                    "SUBMITTED"
+                }
+
+                responseDao.updateFormResponse(
+                    formResponse.copy(responseId = responseId, status = finalStatus)
+                )
+            }
+            return true
         } catch (e: Exception) {
-            Timber.e(e, "Amrit push submitBulk standalone error")
-            false
+            Timber.e(e, "fetchAndStoreCounsellingResponse failed for benId=$beneficiaryId")
+            return false
         }
     }
+
+    override suspend fun revertFormStatus(responseId: Long, status: String) {
+        db.withTransaction {
+            val formResponseWithDetails = responseDao.getFormResponseById(responseId)
+            if (formResponseWithDetails != null) {
+                responseDao.updateFormResponse(
+                    formResponseWithDetails.formResponse.copy(
+                        status = status,
+                        syncStatus = "UNSYNCED",
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+            }
+        }
+    }
+
 
     companion object {
         private const val DEFAULT_OFFICER_ID = 501L
     }
 }
+

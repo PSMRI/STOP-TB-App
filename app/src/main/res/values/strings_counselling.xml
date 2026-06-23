@@ -46,9 +46,11 @@
     <string name="counselling_retry">Retry</string>
     <string name="btn_next_text">Next</string>
     <string name="btn_back_text">Back</string>
+    <string name="btn_finish">Finish</string>
     <string name="counselling_start_button">Start Counselling</string>
     <string name="counselling_follow_up_button">Follow Up</string>
     <string name="completed" translatable="false">COMPLETE</string>
+    <string name="counselled">Counselled</string>
 
     <string name="counselling_data_load_error">We\'re unable to fetch data.\nPlease try again later.</string>
 
