@@ -142,5 +142,5 @@ data class BenWithTbSuspectedDomain(
             ?.syncState
 
     val isCounselled: Boolean
-        get() = formResponse?.status == "COMPLETE"
+        get() = formResponse?.status == "COMPLETE" || formResponse?.status == "COMPLETED"
 }
