@@ -53,7 +53,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             binding.ivSyncState.visibility = if (item.tbConfirmedList == null) View.INVISIBLE else View.VISIBLE
             val role = pref?.getLoggedInUser()?.role
             if (role != null) {
-                checkIfCounsellingOfficerOrNot(role, item)
+                checkIfCounsellingOfficerOrNot(role, item.isCounselled)
             } else {
                 binding.btnCounselling.visibility = View.GONE
                 binding.btnCounselled.visibility = View.GONE
@@ -94,21 +94,19 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 
         }
 
-        private fun checkIfCounsellingOfficerOrNot(role: String, item: BenWithTbSuspectedDomain) {
+        private fun checkIfCounsellingOfficerOrNot(
+            role: String,
+            isCounselled: Boolean
+        ) {
             val isCounsellingOfficer = role.isCounsellingOfficerRole()
-            if (isCounsellingOfficer) {
-                if (item.isCounselled) {
-                    binding.btnCounselling.visibility = View.GONE
-                    binding.btnCounselled.visibility = View.VISIBLE
-                } else {
-                    binding.btnCounselling.visibility = View.VISIBLE
-                    binding.btnCounselled.visibility = View.GONE
-                }
-            } else {
-                binding.btnCounselling.visibility = View.GONE
-                binding.btnCounselled.visibility = View.GONE
-            }
+
+            binding.btnCounselling.visibility =
+                if (isCounsellingOfficer && !isCounselled) View.VISIBLE else View.GONE
+
+            binding.btnCounselled.visibility =
+                if (isCounsellingOfficer && isCounselled) View.VISIBLE else View.GONE
         }
+
     }
 
     override fun onCreateViewHolder(
