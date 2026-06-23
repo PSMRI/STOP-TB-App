@@ -126,10 +126,10 @@ class NewBenRegViewModel @Inject constructor(
             try {
                 _isLoading.value = true
                 setUpPage()
-                dataset.listFlow.collectLatest { _formList.value = it }
             } finally {
                 _isLoading.value = false
             }
+            dataset.listFlow.collectLatest { _formList.value = it }
         }
     }
 
