@@ -189,7 +189,7 @@ class CounsellingActivity : AppCompatActivity() {
 
             binding.navigationFooter.btnNext.text = when {
                 step == total - 1 && isEditable -> getString(R.string.btn_submit)
-                step == total - 1 && !isEditable -> "Finish"
+                step == total - 1 && !isEditable -> getString(R.string.btn_finish)
                 else -> getString(R.string.btn_next_text)
             }
             

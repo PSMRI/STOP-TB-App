@@ -123,10 +123,13 @@ class NewBenRegViewModel @Inject constructor(
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            _isLoading.value = true
-            setUpPage()
-            _isLoading.value = false
-            dataset.listFlow.collectLatest { _formList.value = it }
+            try {
+                _isLoading.value = true
+                setUpPage()
+                dataset.listFlow.collectLatest { _formList.value = it }
+            } finally {
+                _isLoading.value = false
+            }
         }
     }
 

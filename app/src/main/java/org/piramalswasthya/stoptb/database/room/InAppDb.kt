@@ -659,6 +659,11 @@ abstract class InAppDb : RoomDatabase() {
                 if (!columnExists(database, "t_question_option", "serverOptionId")) {
                     database.execSQL("ALTER TABLE t_question_option ADD COLUMN serverOptionId INTEGER DEFAULT NULL")
                 }
+                // Delete child tables first to satisfy FK constraints (t_form_response
+                // references t_form_version with ON DELETE RESTRICT).
+                database.execSQL("DELETE FROM t_question_response")
+                database.execSQL("DELETE FROM t_section_response")
+                database.execSQL("DELETE FROM t_form_response")
                 database.execSQL("DELETE FROM t_question_option")
                 database.execSQL("DELETE FROM t_section_question")
                 database.execSQL("DELETE FROM t_form_section")

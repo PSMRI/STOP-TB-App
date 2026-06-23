@@ -153,7 +153,10 @@ class CounsellingRepositoryImpl @Inject constructor(
                         val targetQId = conditionDto.targetQuestionId ?: return@conditionLoop
                         val mappedTargetQId = conditionDto.targetQuestionUuid?.hashCode()
                             ?: questionIdToFieldIdMap[targetQId]?.hashCode()
-                            ?: targetQId
+                            ?: run {
+                                Timber.w("conditionLoop: cannot map targetQId=$targetQId for option ${optionDto.optionValue}, skipping condition")
+                                return@conditionLoop
+                            }
                         val conditionIdInt = (questionDto.fieldId + "_" + optionDto.optionValue + "_" + targetQId).hashCode()
                         val conditionEntity = OptionConditionEntity(
                             conditionId = conditionIdInt,
@@ -300,7 +303,7 @@ class CounsellingRepositoryImpl @Inject constructor(
     }
 
     override suspend fun submitSectionF(responseId: Long, answers: List<QuestionResponseEntity>) {
-        submitSectionWithPhase(responseId, answers, "POST_SUBMIT", "SUBMITTED")
+        submitSectionWithPhase(responseId, answers, "POST_SUBMIT", "COMPLETED")
     }
 
     override suspend fun getCounsellingRecord(beneficiaryId: Long): Flow<CompleteFormResponse?> {
@@ -448,6 +451,11 @@ class CounsellingRepositoryImpl @Inject constructor(
             if (apiResponses.isNullOrEmpty()) return false
 
             db.withTransaction {
+                // Preserve any locally edited (UNSYNCED) responses — do not overwrite them
+                // with server data, as that would permanently discard unsaved user edits.
+                val unsyncedLocal = responseDao.getUnsyncedResponseForBeneficiary(beneficiaryId)
+                if (unsyncedLocal != null) return@withTransaction
+
                 responseDao.deleteFormResponseForBeneficiary(beneficiaryId)
 
                 val apiResponse = apiResponses.first()

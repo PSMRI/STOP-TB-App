@@ -52,6 +52,9 @@ interface CounsellingFormResponseDao {
     @Query("SELECT * FROM t_form_response WHERE syncStatus = 'UNSYNCED' AND status IN ('SUBMITTED', 'COMPLETE')")
     suspend fun getUnsyncedFormResponses(): List<CompleteFormResponse>
 
+    @Query("SELECT * FROM t_form_response WHERE beneficiaryId = :beneficiaryId AND syncStatus = 'UNSYNCED' LIMIT 1")
+    suspend fun getUnsyncedResponseForBeneficiary(beneficiaryId: Long): FormResponseEntity?
+
     @Transaction
     @Query("SELECT * FROM t_form_response")
     suspend fun getAllFormResponses(): List<CompleteFormResponse>

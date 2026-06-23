@@ -39,9 +39,14 @@ class   CounsellingFormFragment : Fragment() {
         )
         rv.adapter = adapter
 
-        viewModel.activeQuestions.observe(viewLifecycleOwner) { questions ->
-            adapter.submitList(questions, viewModel.isFormEditable.value ?: true)
+        fun refreshAdapter() {
+            adapter.submitList(
+                viewModel.activeQuestions.value.orEmpty(),
+                viewModel.isFormEditable.value ?: true
+            )
         }
+        viewModel.activeQuestions.observe(viewLifecycleOwner) { refreshAdapter() }
+        viewModel.isFormEditable.observe(viewLifecycleOwner) { refreshAdapter() }
 
         val tvLetter = view.findViewById<android.widget.TextView>(R.id.tv_section_letter)
         val tvName = view.findViewById<android.widget.TextView>(R.id.tv_section_name)

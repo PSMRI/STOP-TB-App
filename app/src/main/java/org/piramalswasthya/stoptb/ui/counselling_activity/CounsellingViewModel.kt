@@ -140,7 +140,7 @@ class CounsellingViewModel @Inject constructor(
                     daysDiff <= statusInfo.followUpDelayDays
                 }
                 
-                _isFormEditable.value = true
+                _isFormEditable.value = editable
                 
                 schemaData?.sections?.forEach { sec ->
                     sec.questions.forEach { q -> q.visible = q.visibleByDefault }
@@ -421,16 +421,25 @@ class CounsellingViewModel @Inject constructor(
     fun previousSection() {
         val current = _currentStep.value ?: 0
         if (current > 0) {
+            // In read-only mode skip the save and navigate directly.
+            if (_isFormEditable.value == false) {
+                loadSection(current - 1)
+                return
+            }
             val section = schemaData?.sections?.getOrNull(current) ?: return
             val formId = schemaData?.formId ?: 2
             val versionNumber = schemaData?.versionNumber ?: 1
             val previousSectionId = schemaData?.sections?.getOrNull(current - 1)?.sectionId
             viewModelScope.launch {
-                counsellingRepo.saveSectionAnswers(
+                val success = counsellingRepo.saveSectionAnswers(
                     benId, formId, section, versionNumber,
                     overrideTargetSectionId = previousSectionId
                 )
-                loadSection(current - 1)
+                if (success) {
+                    loadSection(current - 1)
+                } else {
+                    _saveError.value = "Failed to save section answers. Please try again."
+                }
             }
         }
     }

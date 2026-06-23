@@ -25,7 +25,7 @@ data class FormSchemaDto(
     val sections: List<FormSectionDto> = emptyList(),
 
     @SerializedName("followUpDelayDays")
-    val followUpDelayDays : Int = -1
+    val followUpDelayDays: Int = 0
 ) {
     val versionNumber: Int
         get() = version

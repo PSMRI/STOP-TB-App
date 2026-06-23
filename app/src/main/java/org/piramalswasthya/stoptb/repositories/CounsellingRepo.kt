@@ -270,14 +270,14 @@ class CounsellingRepo @Inject constructor(
                 val versionId = formId * 1000 + formVersionNumber
 
                 val draftResponse = counsellingRepository.getOrCreateDraft(benId, versionId)
-                val responseId = draftResponse.formResponse.responseId
+                    val responseId = draftResponse.formResponse.responseId
 
                 val answers = mutableListOf<QuestionResponseEntity>()
                 section.questions.filter { it.visible }.forEach { q ->
                     val valObj = q.value
                     if (valObj != null) {
                         when (q.questionType) {
-                            "RADIO" -> {
+                            "RADIO", "DROPDOWN" -> {
                                 val opt = q.options?.find { it.optionValue == valObj.toString() }
                                 if (opt != null) {
                                     answers.add(
@@ -290,7 +290,7 @@ class CounsellingRepo @Inject constructor(
                                     )
                                 }
                             }
-                            "MCQ" -> {
+                            "MCQ", "CHECKBOX" -> {
                                 val list = valObj as? List<*> ?: emptyList<Any>()
                                 list.forEach { optVal ->
                                     val opt = q.options?.find { it.optionValue == optVal.toString() }
@@ -306,7 +306,7 @@ class CounsellingRepo @Inject constructor(
                                     }
                                 }
                             }
-                            "TEXT", "DATE" -> {
+                            "TEXT", "DATE", "NUMBER" -> {
                                 val textVal = valObj.toString()
                                 if (textVal.isNotBlank()) {
                                     answers.add(
