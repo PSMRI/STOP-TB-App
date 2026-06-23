@@ -86,6 +86,13 @@ class CounsellingRepo @Inject constructor(
                     completedSteps = formResponse.sectionResponses.count { it.questionResponses.isNotEmpty() }
                 }
 
+                // A separate status-filtered query drives the Follow-Up button. This is
+                // necessary because after post-submit there are two rows for the same
+                // beneficiaryId and getFormResponseForBeneficiary (LIMIT 1) may return
+                // either one, making the status unreliable for button-visibility decisions.
+                val preSubmitSubmitted = db.counsellingFormResponseDao()
+                    .getSubmittedOrCompleteResponseForBeneficiary(benId) != null
+
                 val overviewData = CounsellingOverviewData(
                     benId = benId,
                     patientName = "${ben.firstName ?: ""} ${ben.lastName ?: ""}".trim(),
@@ -98,7 +105,8 @@ class CounsellingRepo @Inject constructor(
                     diagnosis = diagnosis,
                     currentStep = currentStep,
                     completedSteps = completedSteps,
-                    status = status
+                    status = status,
+                    preSubmitSubmitted = preSubmitSubmitted
                 )
                 NetworkResponse.Success(overviewData)
             } catch (e: Exception) {
@@ -397,6 +405,13 @@ class CounsellingRepo @Inject constructor(
     suspend fun getDraftResponse(benId: Long): CompleteFormResponse? {
         return withContext(Dispatchers.IO) {
             db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId)
+        }
+    }
+
+    suspend fun hasPreSubmitBeenSubmitted(benId: Long): Boolean {
+        return withContext(Dispatchers.IO) {
+            db.counsellingFormResponseDao()
+                .getSubmittedOrCompleteResponseForBeneficiary(benId) != null
         }
     }
 

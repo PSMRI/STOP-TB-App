@@ -114,9 +114,7 @@ class CounsellingViewModel @Inject constructor(
 
     fun startCounselling() {
         viewModelScope.launch {
-            val draft = counsellingRepo.getDraftResponse(benId)
-            val status = draft?.formResponse?.status
-            _isFormEditable.value = status != "SUBMITTED" && status != "COMPLETE"
+            _isFormEditable.value = !counsellingRepo.hasPreSubmitBeenSubmitted(benId)
             loadFormSchema(SectionPhase.PRE_SUBMIT)
         }
     }
