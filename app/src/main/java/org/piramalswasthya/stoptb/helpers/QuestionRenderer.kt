@@ -56,16 +56,20 @@ object QuestionRenderer {
         val oldWatcher = binding.etInput.tag as? TextWatcher
         if (oldWatcher != null) binding.etInput.removeTextChangedListener(oldWatcher)
 
+        var isProgrammaticSet = false
         val newValue = question.value?.toString() ?: ""
         if (binding.etInput.text?.toString() != newValue) {
+            isProgrammaticSet = true
             binding.etInput.setText(newValue)
             binding.etInput.setSelection(newValue.length)
+            isProgrammaticSet = false
         }
 
         val watcher = object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
+                if (isProgrammaticSet) return
                 question.value = s?.toString()
                 onValueChanged(question)
             }

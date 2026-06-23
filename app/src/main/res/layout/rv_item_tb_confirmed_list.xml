@@ -292,24 +292,22 @@
                     android:text="@string/counselling_start_button"
                     android:onClick="@{()-> clickListener.onClickCounselling(benWithTb)}"
                     android:textColor="?attr/colorOnPrimary"
-                    android:visibility="@{benWithTb.isCounselled ? View.GONE : View.VISIBLE}"
                     android:backgroundTint="@android:color/holo_green_dark"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@+id/linear_tb_suspected_list_Layout" />
 
-                <TextView
-                    android:id="@+id/tv_counselling_status"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_counselled"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="@dimen/margin_normal"
                     android:layout_marginBottom="@dimen/margin_normal"
-                    android:text="Counselled"
-                    android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
-                    android:textColor="@android:color/holo_green_dark"
-                    android:textStyle="bold"
-                    android:gravity="center"
-                    android:visibility="@{benWithTb.isCounselled ? View.VISIBLE : View.GONE}"
+                    android:text="@string/counselled"
+                    android:onClick="@{()->clickListener.onClickCounselled(benWithTb)}"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:backgroundTint="@android:color/holo_green_dark"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@+id/linear_tb_suspected_list_Layout" />

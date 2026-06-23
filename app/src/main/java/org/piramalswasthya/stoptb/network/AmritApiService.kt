@@ -200,6 +200,12 @@ interface AmritApiService {
         @Body request: List<CounsellingBulkSubmitRequest>
     ): Response<okhttp3.ResponseBody>
 
+    @POST("flw-api/dynamicForm/response/complete")
+    suspend fun completeCounselling(
+        @Header("Authorization") authHeader: String,
+        @Body request: CounsellingBulkSubmitRequest
+    ): Response<okhttp3.ResponseBody>
+
     @GET("flw-api/dynamicForm/response/getByBeneficiary")
     suspend fun getCounsellingResponse(
         @Header("Authorization") jwtToken: String,

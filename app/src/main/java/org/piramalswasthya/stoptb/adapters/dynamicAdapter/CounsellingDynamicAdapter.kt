@@ -27,9 +27,6 @@ class CounsellingDynamicAdapter(
     private var isEditable: Boolean = true
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
-    init {
-        setHasStableIds(true)
-    }
 
     companion object {
         private const val TYPE_TEXT = 1
@@ -41,11 +38,8 @@ class CounsellingDynamicAdapter(
     private var visibleQuestions: List<CounsellingQuestionDto> =
         questions.filter { it.visible }.sortedBy { it.displayOrder }
 
-    override fun getItemId(position: Int): Long {
-        return visibleQuestions[position].questionId.toLong()
-    }
 
-    fun submitList(newList: List<CounsellingQuestionDto>) {
+    fun submitList(newList: List<CounsellingQuestionDto>, editable: Boolean = true) {
         questions = newList
         isEditable = editable
         visibleQuestions = questions.filter { it.visible }.sortedBy { it.displayOrder }

@@ -49,6 +49,7 @@
     <string name="counselling_start_button">Start Counselling</string>
     <string name="counselling_follow_up_button">Follow Up</string>
     <string name="completed" translatable="false">COMPLETE</string>
+    <string name="counselled">Counselled</string>
 
     <string name="counselling_data_load_error">We\'re unable to fetch data.\nPlease try again later.</string>
 

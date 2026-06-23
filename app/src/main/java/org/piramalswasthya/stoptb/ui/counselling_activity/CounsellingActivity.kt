@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.ui.counselling_activity
 
 import android.os.Bundle
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -30,9 +31,9 @@ class CounsellingActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.nsvContent) { view, insets ->
-            val imeBottom = (insets.getInsets(WindowInsetsCompat.Type.ime()).bottom + binding.navigationFooter.btnNext.height)
+            val imeInset = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
             view.updatePadding(
-                bottom = if (imeBottom > 0) imeBottom
+                bottom = if (imeInset > 0) imeInset + binding.navigationFooter.btnNext.height
                 else resources.getDimensionPixelSize(R.dimen.nsv_counselling_padding_bottom)
             )
             insets
@@ -102,12 +103,17 @@ class CounsellingActivity : AppCompatActivity() {
             else getString(R.string.btn_next_text)
 
         binding.navigationFooter.btnNext.setOnClickListener {
+            hideKeyboard()
+            clearActiveFocus()
             viewModel.nextSection()
+
         }
 
         binding.navigationFooter.btnBack.text = getString(R.string.btn_back_text)
         binding.navigationFooter.btnBack.visibility = if (step == 0) View.GONE else View.VISIBLE
         binding.navigationFooter.btnBack.setOnClickListener {
+            hideKeyboard()
+            clearActiveFocus()
             viewModel.previousSection()
         }
     }
@@ -174,6 +180,8 @@ class CounsellingActivity : AppCompatActivity() {
         viewModel.currentStep.observe(this) { step ->
             // Only update navigation state while the form is active.
             if (supportFragmentManager.findFragmentById(R.id.fragment_container) !is CounsellingFormFragment) return@observe
+
+            binding.nsvContent.post { binding.nsvContent.scrollTo(0, 0) }
 
             val section = viewModel.schemaData?.sections?.getOrNull(step)
             val total = viewModel.schemaData?.sections?.size ?: 1
@@ -251,6 +259,15 @@ class CounsellingActivity : AppCompatActivity() {
         binding.llCounsellingInfo.visibility = View.VISIBLE
         supportActionBar?.title = getString(R.string.counselling_overview_title)
         setupNavigationFooter()
+    }
+
+    private fun hideKeyboard() {
+        val imm = getSystemService(InputMethodManager::class.java)
+        currentFocus?.let { imm.hideSoftInputFromWindow(it.windowToken, 0) }
+    }
+
+    private fun clearActiveFocus() {
+        currentFocus?.clearFocus()
     }
 
     override fun onSupportNavigateUp(): Boolean {

@@ -13,7 +13,7 @@ import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.dynamicAdapter.CounsellingDynamicAdapter
 
 @AndroidEntryPoint
-class CounsellingFormFragment : Fragment() {
+class   CounsellingFormFragment : Fragment() {
 
     private val viewModel: CounsellingViewModel by activityViewModels()
     private lateinit var adapter: CounsellingDynamicAdapter

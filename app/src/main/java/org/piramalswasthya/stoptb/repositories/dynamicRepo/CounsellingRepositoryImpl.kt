@@ -300,7 +300,7 @@ class CounsellingRepositoryImpl @Inject constructor(
     }
 
     override suspend fun submitSectionF(responseId: Long, answers: List<QuestionResponseEntity>) {
-        submitSectionWithPhase(responseId, answers, "POST_SUBMIT", "COMPLETE")
+        submitSectionWithPhase(responseId, answers, "POST_SUBMIT", "SUBMITTED")
     }
 
     override suspend fun getCounsellingRecord(beneficiaryId: Long): Flow<CompleteFormResponse?> {
@@ -327,59 +327,108 @@ class CounsellingRepositoryImpl @Inject constructor(
         if (unsynced.isEmpty()) return true
 
         val officerId = preferenceDao.getLoggedInUser()?.userId?.toLong() ?: DEFAULT_OFFICER_ID
-        val counsellingPayloadList = unsynced.map { response ->
-            val formVersionId = response.formResponse.formVersionId
-            val formDef = metadataDao.getFormDefinitionByVersionId(formVersionId)
-            PayloadBuilder.buildBulkPayload(response, formDef, officerId)
-        }
-
-        try {
-            val jsonPayload = com.google.gson.Gson().toJson(counsellingPayloadList)
-            Timber.d("Amrit push submitBulk standalone payload JSON: $jsonPayload")
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to serialize bulk counselling to JSON for logging")
-        }
-
         val jwt = preferenceDao.getJWTAmritToken()
         val authHeader = jwt ?: ""
 
-        return try {
-            val response = amritApiService.submitBulkCounselling(authHeader, counsellingPayloadList)
-            val statusCode = response.code()
-            Timber.d("Amrit push submitBulk standalone response: httpStatus=$statusCode")
+        var allSuccess = true
 
-            if (statusCode == 200) {
-                val responseString: String? = response.body()?.string()
-                if (responseString != null) {
-                    val jsonObj = org.json.JSONObject(responseString)
-                    val isSuccess = jsonObj.optBoolean("success", false)
-                    if (isSuccess) {
-                        Timber.d("Amrit push submitBulk standalone success: $jsonObj")
-                        unsynced.forEach { resp ->
-                            responseDao.updateFormResponse(
-                                resp.formResponse.copy(
-                                    syncStatus = "SYNCED",
-                                    syncedAt = System.currentTimeMillis()
-                                )
-                            )
+        for (resp in unsynced) {
+            val formVersionId = resp.formResponse.formVersionId
+            val formDef = metadataDao.getFormDefinitionByVersionId(formVersionId)
+            val payload = PayloadBuilder.buildBulkPayload(resp, formDef, officerId)
+
+            val recordSuccess = try {
+                if (resp.formResponse.status == "COMPLETE") {
+                    try {
+                        val jsonPayload = com.google.gson.Gson().toJson(payload)
+                        Timber.d("Amrit push complete dynamic payload JSON: $jsonPayload")
+                    } catch (e: Exception) {
+                        Timber.e(e, "Failed to serialize complete payload to JSON for logging")
+                    }
+
+                    val apiResponse = amritApiService.completeCounselling(authHeader, payload)
+                    val statusCode = apiResponse.code()
+                    Timber.d("Amrit push complete dynamic response: httpStatus=$statusCode")
+
+                    if (statusCode == 200) {
+                        val responseString: String? = apiResponse.body()?.string()
+                        if (responseString != null) {
+                            val jsonObj = org.json.JSONObject(responseString)
+                            val isSuccess = jsonObj.optBoolean("success", false)
+                            if (isSuccess) {
+                                Timber.d("Amrit push complete dynamic success: $jsonObj")
+                                true
+                            } else {
+                                Timber.e("Amrit push complete dynamic failed: success=false")
+                                false
+                            }
+                        } else {
+                            Timber.e("Amrit push complete dynamic failed: body is null")
+                            false
                         }
-                        true
                     } else {
-                        Timber.e("Amrit push submitBulk standalone failed: success=false")
+                        Timber.e("Amrit push complete dynamic failed: status=$statusCode")
                         false
                     }
                 } else {
-                    Timber.e("Amrit push submitBulk standalone failed: body is null")
-                    false
+                    val bulkPayload = listOf(payload)
+                    try {
+                        val jsonPayload = com.google.gson.Gson().toJson(bulkPayload)
+                        Timber.d("Amrit push submitBulk standalone payload JSON: $jsonPayload")
+                    } catch (e: Exception) {
+                        Timber.e(e, "Failed to serialize bulk counselling to JSON for logging")
+                    }
+
+                    val apiResponse = amritApiService.submitBulkCounselling(authHeader, bulkPayload)
+                    val statusCode = apiResponse.code()
+                    Timber.d("Amrit push submitBulk standalone response: httpStatus=$statusCode")
+
+                    if (statusCode == 200) {
+                        val responseString: String? = apiResponse.body()?.string()
+                        if (responseString != null) {
+                            val jsonObj = org.json.JSONObject(responseString)
+                            val isSuccess = jsonObj.optBoolean("success", false)
+                            if (isSuccess) {
+                                Timber.d("Amrit push submitBulk standalone success: $jsonObj")
+                                true
+                            } else {
+                                Timber.e("Amrit push submitBulk standalone failed: success=false")
+                                false
+                            }
+                        } else {
+                            Timber.e("Amrit push submitBulk standalone failed: body is null")
+                            false
+                        }
+                    } else {
+                        Timber.e("Amrit push submitBulk standalone failed: status=$statusCode")
+                        false
+                    }
                 }
-            } else {
-                Timber.e("Amrit push submitBulk standalone failed: status=$statusCode")
+            } catch (e: Exception) {
+                Timber.e(e, "Amrit push sync error for responseId=${resp.formResponse.responseId}")
                 false
             }
-        } catch (e: Exception) {
-            Timber.e(e, "Amrit push submitBulk standalone error")
-            false
+
+            if (recordSuccess) {
+                val hasPostSubmitResponse = resp.sectionResponses.any { secResp ->
+                    val secDef = formDef?.versions?.find { it.version.versionId == formVersionId }
+                        ?.sections?.find { it.section.sectionId == secResp.sectionResponse.sectionId }
+                    secDef?.section?.sectionPhase == "POST_SUBMIT" && secResp.questionResponses.isNotEmpty()
+                }
+                val targetStatus = if (hasPostSubmitResponse) "COMPLETE" else resp.formResponse.status
+                responseDao.updateFormResponse(
+                    resp.formResponse.copy(
+                        status = targetStatus,
+                        syncStatus = "SYNCED",
+                        syncedAt = System.currentTimeMillis()
+                    )
+                )
+            } else {
+                allSuccess = false
+            }
         }
+
+        return allSuccess
     }
 
     override suspend fun fetchAndStoreCounsellingResponse(

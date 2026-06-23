@@ -140,7 +140,7 @@ class CounsellingViewModel @Inject constructor(
                     daysDiff <= statusInfo.followUpDelayDays
                 }
                 
-                _isFormEditable.value = editable
+                _isFormEditable.value = true
                 
                 schemaData?.sections?.forEach { sec ->
                     sec.questions.forEach { q -> q.visible = q.visibleByDefault }
@@ -290,7 +290,7 @@ class CounsellingViewModel @Inject constructor(
     }
 
     private fun getMandatoryError(q: CounsellingQuestionDto, section: CounsellingSectionDto): String? {
-        if (q.isMandatory && q.visibleByDefault) return "This field is required"
+        if (q.isMandatory && q.visible) return "This field is required"
         val mandatoryIf = q.validations?.firstOrNull { it.validationType == "MANDATORY_IF" } ?: return null
         val parts = mandatoryIf.validationParam.split("=")
         if (parts.size != 2) return null

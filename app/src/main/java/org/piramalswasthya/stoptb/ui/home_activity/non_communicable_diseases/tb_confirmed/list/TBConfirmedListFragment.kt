@@ -71,6 +71,14 @@ class TBConfirmedListFragment : Fragment() {
                         Intent(requireContext(), CounsellingActivity::class.java)
                             .putExtra(CounsellingViewModel.EXTRA_BEN_ID, item.ben.benId)
                     )
+                },
+                clickedCounselled = { item ->
+                    // Counselled state: open Counselling Overview — Pre-Submit will be read-only,
+                    // Post-Submit remains accessible per existing editable-window logic.
+                    startActivity(
+                        Intent(requireContext(), CounsellingActivity::class.java)
+                            .putExtra(CounsellingViewModel.EXTRA_BEN_ID, item.ben.benId)
+                    )
                 }
             ),
             pref = prefDao

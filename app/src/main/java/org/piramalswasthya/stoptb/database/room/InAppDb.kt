@@ -648,16 +648,11 @@ abstract class InAppDb : RoomDatabase() {
                 if (!columnExists(database, "t_dynamic_form", "followUpDelayDays")) {
                     database.execSQL(
                         """
-                ALTER TABLE t_dynamic_form
-                ADD COLUMN followUpDelayDays INTEGER NOT NULL DEFAULT -1
-                """.trimIndent()
+                        ALTER TABLE t_dynamic_form
+                        ADD COLUMN followUpDelayDays INTEGER NOT NULL DEFAULT -1
+                        """.trimIndent()
                     )
                 }
-            }
-        }
-
-        private val MIGRATION_19_20 = object : Migration(19, 20) {
-            override fun migrate(database: SupportSQLiteDatabase) {
                 if (!columnExists(database, "t_section_question", "serverQuestionId")) {
                     database.execSQL("ALTER TABLE t_section_question ADD COLUMN serverQuestionId INTEGER DEFAULT NULL")
                 }

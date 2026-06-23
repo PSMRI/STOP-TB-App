@@ -52,8 +52,11 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 
             binding.ivSyncState.visibility = if (item.tbConfirmedList == null) View.INVISIBLE else View.VISIBLE
             val role = pref?.getLoggedInUser()?.role
-            role?.let{
-                checkIfCounsellingOfficerOrNot(it)
+            if (role != null) {
+                checkIfCounsellingOfficerOrNot(role, item)
+            } else {
+                binding.btnCounselling.visibility = View.GONE
+                binding.btnCounselled.visibility = View.GONE
             }
             if (item.ben.spouseName == "Not Available" && item.ben.fatherName == "Not Available") {
                 binding.father = true
@@ -91,8 +94,20 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 
         }
 
-        private fun checkIfCounsellingOfficerOrNot(role : String){
-            binding.btnCounselling.visibility = if(role.isCounsellingOfficerRole()) View.VISIBLE else View.GONE
+        private fun checkIfCounsellingOfficerOrNot(role: String, item: BenWithTbSuspectedDomain) {
+            val isCounsellingOfficer = role.isCounsellingOfficerRole()
+            if (isCounsellingOfficer) {
+                if (item.isCounselled) {
+                    binding.btnCounselling.visibility = View.GONE
+                    binding.btnCounselled.visibility = View.VISIBLE
+                } else {
+                    binding.btnCounselling.visibility = View.VISIBLE
+                    binding.btnCounselled.visibility = View.GONE
+                }
+            } else {
+                binding.btnCounselling.visibility = View.GONE
+                binding.btnCounselled.visibility = View.GONE
+            }
         }
     }
 
@@ -120,12 +135,15 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 
     class ClickListener(
         private val clickedForm: ((hhId: Long, benId: Long) -> Unit)? = null,
-        private val clickedCounselling: ((item: BenWithTbSuspectedDomain) -> Unit)? = null
+        private val clickedCounselling: ((item: BenWithTbSuspectedDomain) -> Unit)? = null,
+        private val clickedCounselled: ((item: BenWithTbSuspectedDomain) -> Unit)? = null
     ) {
         fun onClickForm(item: BenWithTbSuspectedDomain) =
             clickedForm?.let { it(item.ben.hhId, item.ben.benId) }
         fun onClickCounselling(item: BenWithTbSuspectedDomain) =
             clickedCounselling?.let { it(item) }
+        fun onClickCounselled(item: BenWithTbSuspectedDomain) =
+            clickedCounselled?.let { it(item) }
     }
 
 }
