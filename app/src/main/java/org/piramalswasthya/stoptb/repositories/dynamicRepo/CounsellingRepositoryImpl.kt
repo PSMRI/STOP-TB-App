@@ -341,7 +341,7 @@ class CounsellingRepositoryImpl @Inject constructor(
             val payload = PayloadBuilder.buildBulkPayload(resp, formDef, officerId)
 
             val recordSuccess = try {
-                if (resp.formResponse.status == "COMPLETE") {
+                if (resp.formResponse.status == "COMPLETE" || resp.formResponse.status == "COMPLETED") {
                     try {
                         val jsonPayload = com.google.gson.Gson().toJson(payload)
                         Timber.d("Amrit push complete dynamic payload JSON: $jsonPayload")
