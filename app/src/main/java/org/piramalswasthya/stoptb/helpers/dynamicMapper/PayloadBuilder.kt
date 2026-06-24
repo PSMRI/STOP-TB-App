@@ -135,7 +135,8 @@ object PayloadBuilder {
     fun buildBulkPayload(
         response: CompleteFormResponse,
         formDef: CompleteFormDefinition?,
-        officerId: Long
+        officerId: Long,
+        phaseFilter: String? = null
     ): CounsellingBulkSubmitRequest {
         val formVersionId = response.formResponse.formVersionId
         val formCode = formDef?.form?.formUuid ?: "counselling-form-v1"
@@ -167,8 +168,14 @@ object PayloadBuilder {
             val sectionId = secResponseWithQuestions.sectionResponse.sectionId
 
             val secDef = activeVersion?.sections?.find { it.section.sectionId == sectionId }
-            if (response.formResponse.status == "COMPLETE" && secDef?.section?.sectionPhase != "POST_SUBMIT") {
-                return@mapNotNull null
+            if (phaseFilter != null) {
+                if (secDef?.section?.sectionPhase != phaseFilter) {
+                    return@mapNotNull null
+                }
+            } else {
+                if ((response.formResponse.status == "COMPLETE" || response.formResponse.status == "COMPLETED") && secDef?.section?.sectionPhase != "POST_SUBMIT") {
+                    return@mapNotNull null
+                }
             }
 
             val groupedResponses = secResponseWithQuestions.questionResponses.groupBy { it.questionId }

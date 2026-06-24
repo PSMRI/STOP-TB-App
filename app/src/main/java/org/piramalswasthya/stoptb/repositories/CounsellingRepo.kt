@@ -385,12 +385,31 @@ class CounsellingRepo @Inject constructor(
                     if (syncSuccess) {
                         WorkerUtils.triggerAmritPushWorker(context)
                     } else {
-                        if (isFinalPreSubmit) {
-                            counsellingRepository.revertFormStatus(responseId, "DRAFT")
-                        } else if (isFinalPostSubmit || isLastSection) {
-                            counsellingRepository.revertFormStatus(responseId, "SUBMITTED")
+                        val isCampMode = preferenceDao.isCampModeEnabled()
+                        val isHubConnected = preferenceDao.isCampHubConnected()
+                        val isInternet = org.piramalswasthya.stoptb.helpers.isInternetAvailable(context)
+                        val isOffline = (isCampMode && !isHubConnected) || (!isCampMode && !isInternet)
+
+                        if (isOffline) {
+                            Timber.d("saveSectionAnswers: offline mode detected during sync failure, scheduling offline sync worker instead of reverting")
+                            org.piramalswasthya.stoptb.work.CounsellingSyncWorker.scheduleSync(context)
+                            
+                            withContext(Dispatchers.Main) {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Saved offline. It will be synced when connectivity is restored.",
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        } else {
+                            Timber.d("saveSectionAnswers: sync failed in online mode, reverting status")
+                            if (isFinalPreSubmit) {
+                                counsellingRepository.revertFormStatus(responseId, "DRAFT")
+                            } else if (isFinalPostSubmit || isLastSection) {
+                                counsellingRepository.revertFormStatus(responseId, "SUBMITTED")
+                            }
+                            success = false
                         }
-                        success = false
                     }
                 }
 
