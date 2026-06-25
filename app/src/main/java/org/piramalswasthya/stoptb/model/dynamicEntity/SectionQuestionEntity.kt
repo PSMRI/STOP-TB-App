@@ -21,6 +21,7 @@ data class SectionQuestionEntity(
     @PrimaryKey val questionId: Int,
     val sectionId: Int,
     val questionText: String,
+    val questionTextHindi: String? = null,
     val questionType: String, // "RADIO", "MCQ", "TEXT", "DATE", "AUTO_FILL", "DISPLAY"
     val questionOrder: Int,
     val isRequired: Boolean,

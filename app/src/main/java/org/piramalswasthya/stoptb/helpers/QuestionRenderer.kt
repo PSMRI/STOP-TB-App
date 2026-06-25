@@ -45,6 +45,7 @@ object QuestionRenderer {
         showLabel(binding.tilInput, question, prefix)
         binding.tilInput.error = question.errorMessage
         binding.etInput.isEnabled = isEditable
+        binding.etInput.filters = arrayOf(LatinInputFilter())
 
         if (question.maxLength != null) {
             binding.tilInput.isCounterEnabled = true

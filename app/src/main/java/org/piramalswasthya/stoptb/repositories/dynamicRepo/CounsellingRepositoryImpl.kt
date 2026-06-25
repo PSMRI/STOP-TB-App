@@ -10,7 +10,6 @@ import org.piramalswasthya.stoptb.helpers.dynamicMapper.PayloadBuilder
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
-import org.piramalswasthya.stoptb.utils.Log
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Named
@@ -114,6 +113,7 @@ class CounsellingRepositoryImpl @Inject constructor(
                 sectionId = sectionIdInt,
                 versionId = versionId,
                 sectionName = sectionDto.sectionName,
+                sectionNameHindi = sectionDto.sectionNameHindi,
                 sectionOrder = sectionDto.displayOrder ?: 0,
                 sectionPhase = sectionDto.sectionPhase ?: "",
                 sectionUuid = sectionDto.sectionUuid
@@ -127,6 +127,7 @@ class CounsellingRepositoryImpl @Inject constructor(
                     questionId = questionIdInt,
                     sectionId = sectionIdInt,
                     questionText = questionDto.label,
+                    questionTextHindi = questionDto.labelHindi,
                     questionType = questionDto.type,
                     questionOrder = questionDto.displayOrder ?: 0,
                     isRequired = questionDto.isMandatory,
@@ -143,6 +144,7 @@ class CounsellingRepositoryImpl @Inject constructor(
                         optionId = optionIdInt,
                         questionId = questionIdInt,
                         optionText = optionDto.optionLabel,
+                        optionTextHindi = optionDto.optionLabelHindi,
                         optionValue = optionDto.optionValue,
                         optionOrder = optionDto.displayOrder,
                         serverOptionId = optionDto.optionId
