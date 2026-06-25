@@ -25,9 +25,13 @@ import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.helpers.isNurseRole
+import org.piramalswasthya.stoptb.database.room.InAppDb
+import org.piramalswasthya.stoptb.helpers.dynamicMapper.PayloadBuilder
 import org.piramalswasthya.stoptb.model.*
 import org.piramalswasthya.stoptb.network.*
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel
+import org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository
+import org.piramalswasthya.stoptb.utils.Log
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
 import java.io.File
@@ -46,11 +50,14 @@ class BenRepo @Inject constructor(
     private val userRepo: UserRepo,
     private val tmcNetworkApiService: AmritApiService,
     private val formResponseJsonDao: FormResponseJsonDao,
+    private val db: InAppDb,
+    private val counsellingRepository: ICounsellingRepository
 ) {
 
     private val processNewBenMutex = Mutex()
 
     companion object {
+        private const val DEFAULT_OFFICER_ID = 501L
         private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
         private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.ENGLISH)
         fun getCurrentDate(millis: Long = System.currentTimeMillis()): String {
@@ -341,8 +348,8 @@ class BenRepo @Inject constructor(
     private suspend fun createBenIdAtServerByBeneficiarySending(
         ben: BenRegCache, user: User, locationRecord: LocationRecord
     ): Boolean {
-
-        val sendingData = ben.asNetworkSendingModel(user, locationRecord, context)
+        val household = if (ben.householdId > 0L) householdDao.getHousehold(ben.householdId) else null
+        val sendingData = ben.asNetworkSendingModel(user, locationRecord, context, household)
         Timber.d("Amrit push beneficiary registration: benId=${ben.beneficiaryId}, hhId=${ben.householdId}")
         try {
             val response = tmcNetworkApiService.getBenIdFromBeneficiarySending(sendingData)
@@ -422,10 +429,11 @@ class BenRepo @Inject constructor(
             val updateBenList = benDao.getAllBenForSyncWithServer()
             updateBenList.forEach {
                 benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.SYNCING)
-                benNetworkPostList.add(it.asNetworkPostModel(context, user))
-                householdNetworkPostList.add(
-                    householdDao.getHousehold(it.householdId)!!.asNetworkModel(user)
-                )
+                val household = if (it.householdId > 0L) householdDao.getHousehold(it.householdId) else null
+                benNetworkPostList.add(it.asNetworkPostModel(context, user, household))
+                household?.let { hh ->
+                    householdNetworkPostList.add(hh.asNetworkModel(user))
+                }
                 try {
                     if (it.ageUnitId != 3 || it.age < 15) kidNetworkPostList.add(
                         it.asKidNetworkModel(user)
@@ -444,7 +452,8 @@ class BenRepo @Inject constructor(
             } else {
                 Timber.d("Beneficiary batch push succeeded: ${benNetworkPostList.size} ben records, ${householdNetworkPostList.size} household records")
             }
-            return@withContext true
+            val counsellingSyncDone = pushCounsellingData()
+            return@withContext uploadDone && counsellingSyncDone
         }
     }
 
@@ -458,14 +467,23 @@ class BenRepo @Inject constructor(
         val benIds = benNetworkPostSet.map { it.benId }
         val hhIds = householdNetworkPostSet.map { it.householdId }
         Timber.d("Amrit push syncDataToAmrit: sending ${benNetworkPostSet.size} ben(s) $benIds, ${householdNetworkPostSet.size} hh(s) $hhIds, ${kidNetworkPostSet.size} kid(s)")
+
         val rmnchData = SendingRMNCHData(
             houseHoldRegistrationData = householdNetworkPostSet.toList(),
             benficieryRegistrationData = benNetworkPostSet.toList(),
             cbacData = null,
-            birthDetails = kidNetworkPostSet.toList()
+            birthDetails = kidNetworkPostSet.toList(),
+            counsellingDetails = null
         )
         try {
+            val jsonPayload = Gson().toJson(rmnchData)
+            Timber.d("Amrit push syncDataToAmrit payload JSON: $jsonPayload")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to serialize rmnchData to JSON for logging")
+        }
+        try {
             val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
+            Log.d("Response final",response.toString())
             val statusCode = response.code()
             Timber.d("Amrit push syncDataToAmrit response: httpStatus=$statusCode")
 
@@ -489,6 +507,7 @@ class BenRepo @Inject constructor(
                             Timber.d("Amrit push syncDataToAmrit DB updated: benIds=${it.toList()}")
                         }
                         hhToUpdateList?.let { householdDao.householdSyncedWithServer(*it) }
+                        
                         return true
                     } else if (responseStatusCode == 5002 || responseStatusCode == 401) {
                         val user = preferenceDao.getLoggedInUser()
@@ -522,6 +541,10 @@ class BenRepo @Inject constructor(
         }
     }
 
+    private suspend fun pushCounsellingData(): Boolean {
+        return counsellingRepository.syncUnsyncedRecords()
+    }
+
 
     suspend fun deactivateHouseHold(
         benNetworkPostSet: List<BenRegCache>,
@@ -531,7 +554,8 @@ class BenRepo @Inject constructor(
         val user = preferenceDao.getLoggedInUser() ?: throw IllegalStateException("No user logged in!!")
         val benNetworkPostList: List<BenPost> =
             benNetworkPostSet.map {
-                it.asNetworkPostModel(context, user)
+                val household = if (it.householdId > 0L) householdDao.getHousehold(it.householdId) else null
+                it.asNetworkPostModel(context, user, household)
             }
 
 
@@ -539,6 +563,12 @@ class BenRepo @Inject constructor(
             listOf(householdNetworkPostSet),
             benNetworkPostList
         )
+        try {
+            val jsonPayload = Gson().toJson(rmnchData)
+            Timber.d("deactivateHouseHold syncDataToAmrit payload JSON: $jsonPayload")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to serialize deactivateHouseHold payload to JSON")
+        }
         try {
             val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
             val statusCode = response.code()
@@ -590,7 +620,8 @@ class BenRepo @Inject constructor(
         val user = preferenceDao.getLoggedInUser() ?: throw IllegalStateException("No user logged in!!")
         val benNetworkPostList: List<BenPost> =
             benNetworkPostSet.map {
-                it.asNetworkPostModel(context, user)
+                val household = if (it.householdId > 0L) householdDao.getHousehold(it.householdId) else null
+                it.asNetworkPostModel(context, user, household)
             }
 
 
@@ -598,6 +629,12 @@ class BenRepo @Inject constructor(
             //   listOf(householdNetworkPostSet),
             benficieryRegistrationData= benNetworkPostList
         )
+        try {
+            val jsonPayload = Gson().toJson(rmnchData)
+            Timber.d("deactivateBeneficiary syncDataToAmrit payload JSON: $jsonPayload")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to serialize deactivateBeneficiary payload to JSON")
+        }
         try {
             val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
             val statusCode = response.code()
@@ -918,9 +955,19 @@ class BenRepo @Inject constructor(
 //    }
 
     private fun getLongFromDate(date: String): Long {
+        return getLongFromDateOrNull(date) ?: 0L
+    }
+
+    private fun getLongFromDateOrNull(date: String?): Long? {
+        if (date.isNullOrBlank()) return null
+
         val patterns = listOf(
             "MMM dd, yyyy HH:mm:ss a",
             "MMM dd, yyyy h:mm:ss a",
+            "MMM d, yyyy HH:mm:ss a",
+            "MMM d, yyyy h:mm:ss a",
+            "yyyy-MM-dd",
+            "yyyy-MM-dd HH:mm:ss",
             "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
             "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
         )
@@ -929,7 +976,7 @@ class BenRepo @Inject constructor(
                 SimpleDateFormat(pattern, Locale.ENGLISH).parse(date)?.time
             }.getOrNull()?.let { return it }
         }
-        return 0
+        return null
     }
 
     private fun getResponseDataArray(jsonObj: JSONObject): JSONArray {
@@ -1582,10 +1629,24 @@ class BenRepo @Inject constructor(
                     val lastNameFromFullName =
                         fullName.substringAfter(" ", "").takeIf { it.isNotBlank() }
 
-                    val dobMillis = (
-                            benDataObj.optStringOrNull("dob")
-                                ?: benDataObj.optStringOrNull("dOB")
-                            )?.let { getLongFromDate(it) } ?: 0L
+                    val benId =
+                        if (jsonObject.has("benficieryid")) jsonObject.getLong("benficieryid")
+                        else -1L
+
+                    if (benId == -1L) continue
+
+                    val existingBen = benDao.getBen(benId)
+
+                    val parsedDobMillis = getLongFromDateOrNull(
+                        benDataObj.optStringOrNull("dob")
+                            ?: benDataObj.optStringOrNull("dOB")
+                    )
+
+                    val dobMillis = when {
+                        parsedDobMillis != null -> parsedDobMillis
+                        existingBen?.dob?.takeIf { it > 0L } != null -> existingBen.dob
+                        else -> 0L
+                    }
 
                     val ageUnitText =
                         benDataObj.optStringOrNull("age_unit")
@@ -1619,20 +1680,12 @@ class BenRepo @Inject constructor(
                     val childDataObj =
                         jsonObject.optJSONObject("bornbirthDeatils") ?: JSONObject()
 
-                    val benId =
-                        if (jsonObject.has("benficieryid")) jsonObject.getLong("benficieryid")
-                        else -1L
-
-                    if (benId == -1L) continue
-
                     val nikshayIdValue = benDataObj.optStringOrNull("nikshayId")
                         ?: benDataObj.optStringOrNull("nikshayID")
                         ?: jsonObject.optStringOrNull("nikshayId")
                         ?: jsonObject.optStringOrNull("nikshayID")
                         ?: stopTBDetailsObj.optStringOrNull("nikshayId")
                         ?: stopTBDetailsObj.optStringOrNull("nikshayID")
-
-                    val existingBen = benDao.getBen(benId)
 
                     try {
                         val serverBen =
