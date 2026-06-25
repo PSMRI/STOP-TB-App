@@ -56,8 +56,8 @@ class DashboardFragment : Fragment() {
      */
     override fun onResume() {
         super.onResume()
-       // timePeriodAdapter?.let { binding.actvTimePeriod.setAdapter(it) }
-      //  villageAdapter?.let { binding.actvVillage.setAdapter(it) }
+        timePeriodAdapter?.let { binding.actvTimePeriod.setAdapter(it) }
+        villageAdapter?.let { binding.actvVillage.setAdapter(it) }
     }
 
     private fun setupFilters() {

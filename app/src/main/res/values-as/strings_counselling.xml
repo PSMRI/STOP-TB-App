@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="counselling_overview_title">পৰামৰ্শৰ সাৰাংশ</string>
+    <string name="counselling_menu_title">পৰামৰ্শ</string>
+    <string name="counselling_progress_title">পৰামৰ্শৰ অগ্ৰগতি</string>
+    <string name="counselling_completed_default">৬ টাৰ ভিতৰত ০ টা সম্পূৰ্ণ</string>
+    <string name="counselling_completed_of_total">৬ টাৰ ভিতৰত %1$d টা সম্পূৰ্ণ</string>
+    <string name="counselling_section_default">অংশ ১ / ৬</string>
+    <string name="counselling_section_of_total">অংশ %1$d / ৬</string>
+
+    <string name="counselling_step_a">A</string>
+    <string name="counselling_step_b">B</string>
+    <string name="counselling_step_c">C</string>
+    <string name="counselling_step_d">D</string>
+    <string name="counselling_step_e">E</string>
+    <string name="counselling_step_f">F</string>
+
+    <string name="counselling_section_a_name">ৰোগ সম্পৰ্কীয় সজাগতা</string>
+    <string name="counselling_section_b_name">কৰণীয় আৰু বর্জনীয়</string>
+    <string name="counselling_section_c_name">চৰকাৰী আঁচনি</string>
+    <string name="counselling_section_d_name">চিকিৎসা পদ্ধতি</string>
+    <string name="counselling_section_e_name">পৰামৰ্শ সম্পূৰ্ণকৰণ</string>
+    <string name="counselling_section_f_name">টিইউলৈ অনুসৰণ</string>
+
+    <string-array name="counselling_section_names">
+        <item>ৰোগ সম্পৰ্কীয় সজাগতা</item>
+        <item>কৰণীয় আৰু বর্জনীয়</item>
+        <item>চৰকাৰী আঁচনি</item>
+        <item>চিকিৎসা পদ্ধতি</item>
+        <item>পৰামৰ্শ সম্পূৰ্ণকৰণ</item>
+        <item>টিইউলৈ অনুসৰণ</item>
+    </string-array>
+
+    <string name="counselling_date_label">পৰামৰ্শৰ তাৰিখ</string>
+    <string name="counselling_officer_label">পৰামৰ্শ বিষয়া</string>
+    <string name="age_gender_label">বয়স / লিংগ</string>
+    <string name="diagnosis_label">ৰোগ নিৰ্ণয়</string>
+
+    <string name="counselling_notes_label">অতিৰিক্ত টোকা (ঐচ্ছিক)</string>
+    <string name="counselling_notes_hint">ইয়াত টোকা লিখক</string>
+
+    <string name="counselling_nikshay_id_format">নিক্ষয় আইডি: %1$s</string>
+
+    <string name="counselling_load_error">ৰোগীৰ তথ্য ল\'ড কৰিব পৰা নগ\'ল।\nঅনুগ্ৰহ কৰি পুনৰ চেষ্টা কৰক।</string>
+
+    <string name="counselling_retry">পুনৰ চেষ্টা কৰক</string>
+
+    <string name="btn_next_text">পৰৱৰ্তী</string>
+    <string name="btn_back_text">পিছলৈ</string>
+
+    <string name="counselling_start_button">পৰামৰ্শ আৰম্ভ কৰক</string>
+    <string name="counselling_follow_up_button">ফলো-আপ</string>
+    <string name="counselling_data_load_error">আমি তথ্য লাভ কৰিবলৈ অসমৰ্থ।\nঅনুগ্ৰহ কৰি পাছত পুনৰ চেষ্টা কৰক।</string>
+</resources>

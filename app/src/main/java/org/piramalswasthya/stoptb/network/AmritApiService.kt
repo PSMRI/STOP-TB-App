@@ -1,7 +1,9 @@
 package org.piramalswasthya.stoptb.network
 
 import okhttp3.ResponseBody
+import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.*
+import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingApiResponse
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormNCDFollowUpSubmitRequest
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormSchemaDto
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormSubmitRequest
@@ -11,6 +13,10 @@ import org.piramalswasthya.stoptb.model.dynamicModel.HBNCVisitListResponse
 import org.piramalswasthya.stoptb.model.dynamicModel.HBNCVisitRequest
 import retrofit2.Response
 import retrofit2.http.*
+
+import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingSyncRequest
+import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingBulkSubmitRequest
+import org.piramalswasthya.stoptb.model.dynamicEntity.ServerCounsellingResponseDto
 
 interface AmritApiService {
 
@@ -171,11 +177,42 @@ interface AmritApiService {
         @Path("formId") formId: String,
         @Query("lang") lang: String
     ): Response<ApiResponse<FormSchemaDto>>
+    
+
+    @GET("flw-api/dynamicForm/getAllForms")
+    suspend fun getAllForms(
+        @Header("Authorization") authHeader: String,
+    ): Response<ApiResponse<List<FormSchemaDto>>>
 
     @POST("flw-api/child-care/hbncVisit/saveAll")
     suspend fun submitForm(
         @Body request: List<FormSubmitRequest>
     ): Response<Unit>
+
+    @POST("flw-api/counselling/save")
+    suspend fun submitCounselling(
+        @Body request: CounsellingSyncRequest
+    ): Response<okhttp3.ResponseBody>
+
+    @POST("flw-api/dynamicForm/response/submitBulk")
+    suspend fun submitBulkCounselling(
+        @Header("Authorization") authHeader: String,
+        @Body request: List<CounsellingBulkSubmitRequest>
+    ): Response<okhttp3.ResponseBody>
+
+    @POST("flw-api/dynamicForm/response/complete")
+    suspend fun completeCounselling(
+        @Header("Authorization") authHeader: String,
+        @Body request: CounsellingBulkSubmitRequest
+    ): Response<okhttp3.ResponseBody>
+
+    @GET("flw-api/dynamicForm/response/getByBeneficiary")
+    suspend fun getCounsellingResponse(
+        @Header("Authorization") jwtToken: String,
+        @Query("beneficiaryId") beneficiaryId: Long,
+        @Query("formUuid") formUuid: String
+    ): Response<ApiResponse<List<ServerCounsellingResponseDto>>>
+
 
     @POST("flw-api/disease/cdtfVisit/saveAll")
     suspend fun submitNCDFollowUp(
