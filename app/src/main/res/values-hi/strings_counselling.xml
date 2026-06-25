@@ -48,6 +48,7 @@
 
     <string name="btn_next_text">अगला</string>
     <string name="btn_back_text">वापस</string>
+    <string name="btn_finish">समाप्त</string>
 
     <string name="counselling_start_button">परामर्श प्रारंभ करें</string>
     <string name="counselling_follow_up_button">फॉलो अप</string>
