@@ -4,6 +4,7 @@ import android.content.res.Resources
 import dagger.hilt.android.scopes.ActivityRetainedScoped
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.model.Icon
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import org.piramalswasthya.stoptb.ui.home_activity.communicable_diseases.CdFragmentDirections
@@ -69,6 +70,10 @@ class IconDataset @Inject constructor(
             iconList.removeAll { icon ->
                 icon.title != resources.getString(R.string.icon_title_ben) &&
                 icon.title != resources.getString(R.string.icon_title_household)
+            }
+        } else if (role.isCounsellingOfficerRole()) {
+            iconList.removeAll { icon ->
+                icon.title != resources.getString(R.string.tuberculosis)
             }
         }
 
@@ -141,31 +146,42 @@ class IconDataset @Inject constructor(
         }
     }
 
-    fun getCDDataset(resources: Resources) = listOf(
-        Icon(
-            R.drawable.ic__ncd_eligibility,
-            resources.getString(R.string.icon_title_ncd_tb_screening),
-            resources.getString(R.string.home_card_tb_screening_subtitle),
-            recordsRepo.tbScreeningListCount,
-            CdFragmentDirections.actionCdFragmentToTBScreeningListFragment()
-        ),
-        Icon(
-            R.drawable.ic__death,
-            resources.getString(R.string.icon_title_ncd_tb_suspected),
-            resources.getString(R.string.home_card_tb_suspected_short_subtitle),
-            recordsRepo.tbSuspectedListCount,
-            CdFragmentDirections.actionCdFragmentToTBSuspectedListFragment()
-        ),
-        Icon(
-            icon = R.drawable.ic__death,
-            title = resources.getString(R.string.icon_title_ncd_tb_confirmed),
-            subtitle = resources.getString(R.string.home_card_tb_confirmed_short_subtitle),
-            count = recordsRepo.tbConfirmedListCount,
-            navAction = CdFragmentDirections.actionCdFragmentToTBConfirmedListFragment()
+    fun getCDDataset(resources: Resources): List<Icon> {
+        val role = preferenceDao.getLoggedInUser()?.role
+        val iconList = mutableListOf(
+            Icon(
+                R.drawable.ic__ncd_eligibility,
+                resources.getString(R.string.icon_title_ncd_tb_screening),
+                resources.getString(R.string.home_card_tb_screening_subtitle),
+                recordsRepo.tbScreeningListCount,
+                CdFragmentDirections.actionCdFragmentToTBScreeningListFragment()
+            ),
+            Icon(
+                R.drawable.ic__death,
+                resources.getString(R.string.icon_title_ncd_tb_suspected),
+                resources.getString(R.string.home_card_tb_suspected_short_subtitle),
+                recordsRepo.tbSuspectedListCount,
+                CdFragmentDirections.actionCdFragmentToTBSuspectedListFragment()
+            ),
+            Icon(
+                icon = R.drawable.ic__death,
+                title = resources.getString(R.string.icon_title_ncd_tb_confirmed),
+                subtitle = resources.getString(R.string.home_card_tb_confirmed_short_subtitle),
+                count = recordsRepo.tbConfirmedListCount,
+                navAction = CdFragmentDirections.actionCdFragmentToTBConfirmedListFragment()
+            )
         )
-    ).apply {
-        forEachIndexed { index, icon ->
-            icon.colorPrimary = index % 2 == 0
+
+        if (role.isCounsellingOfficerRole()) {
+            iconList.removeAll { icon ->
+                icon.title != resources.getString(R.string.icon_title_ncd_tb_confirmed)
+            }
+        }
+
+        return iconList.apply {
+            forEachIndexed { index, icon ->
+                icon.colorPrimary = index % 2 == 0
+            }
         }
     }
 

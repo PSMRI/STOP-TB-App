@@ -26,8 +26,11 @@ object WorkerUtils {
 
     const val pushWorkerUniqueName = "PUSH-TO-AMRIT"
     const val pullWorkerUniqueName = "PULL-FROM-AMRIT"
+    const val campAutoPullIntervalMs = 30_000L
     private const val campQuickPullDebounceMs = 30_000L
     private var lastCampQuickPullAt = 0L
+    @Volatile
+    private var manualCampRefreshInProgress = false
 
     private val networkOnlyConstraint = Constraints.Builder()
         .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -121,6 +124,7 @@ object WorkerUtils {
         preferenceDao: PreferenceDao,
         force: Boolean = false
     ) {
+        if (manualCampRefreshInProgress) return
         if (!preferenceDao.isCampModeEnabled() || !preferenceDao.isCampHubConnected()) return
 
         val now = SystemClock.elapsedRealtime()
@@ -128,6 +132,27 @@ object WorkerUtils {
 
         lastCampQuickPullAt = now
         triggerAmritPullWorker(context)
+    }
+
+    fun startManualCampRefresh(
+        context: Context,
+        preferenceDao: PreferenceDao
+    ): List<java.util.UUID> {
+        manualCampRefreshInProgress = true
+        cancelCampPullWorker(context)
+        val pushIds = triggerAmritPushWorker(context)
+        val pullIds = triggerAmritPullWorker(context)
+        return pushIds + pullIds
+    }
+
+    fun finishManualCampRefresh() {
+        manualCampRefreshInProgress = false
+    }
+
+    fun isManualCampRefreshInProgress(): Boolean = manualCampRefreshInProgress
+
+    fun cancelCampPullWorker(context: Context) {
+        WorkManager.getInstance(context).cancelUniqueWork(pullWorkerUniqueName)
     }
 
     fun triggerD2dSyncWorker(context: Context) {}

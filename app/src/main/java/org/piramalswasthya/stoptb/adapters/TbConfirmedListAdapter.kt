@@ -46,15 +46,16 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             clickListener: ClickListener?,
             pref: PreferenceDao?
         ) {
-            binding.btnFormTb.visibility = View.VISIBLE
-
             binding.benWithTb = item
 
             binding.ivSyncState.visibility = if (item.tbConfirmedList == null) View.INVISIBLE else View.VISIBLE
             val role = pref?.getLoggedInUser()?.role
             if (role != null) {
+                binding.btnFormTb.visibility =
+                    if (role.isCounsellingOfficerRole()) View.VISIBLE else View.GONE
                 checkIfCounsellingOfficerOrNot(role, item.isCounselled)
             } else {
+                binding.btnFormTb.visibility = View.GONE
                 binding.btnCounselling.visibility = View.GONE
                 binding.btnCounselled.visibility = View.GONE
             }

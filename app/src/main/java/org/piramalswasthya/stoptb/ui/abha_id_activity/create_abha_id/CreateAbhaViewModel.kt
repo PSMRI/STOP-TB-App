@@ -233,30 +233,39 @@ class CreateAbhaViewModel @Inject constructor(
         )
 
         viewModelScope.launch {
-            when (val result = abhaIdRepo.mapHealthIDToBeneficiary(req, ben)) {
+            when (val result =
+                abhaIdRepo.mapHealthIDToBeneficiary(req,ben)) {
                 is NetworkResult.Success -> {
-                    val updatedBen = benRepo.getBenFromId(benId)
-                    updatedBen?.let {
-                        it.firstName?.let { firstName -> _benMapped.value = firstName }
-                        it.lastName?.let { lastName -> _benMapped.value = it.firstName + " $lastName" }
+                    _state.value = State.ABHA_GENERATE_SUCCESS
+                    val ben = benRepo.getBenFromId(benId)
+                    ben?.let {
+                        ben.firstName?.let { firstName ->
+                            _benMapped.value = firstName
+                        }
+                        ben.lastName?.let { lastName ->
+                            _benMapped.value = ben.firstName + " $lastName"
+                        }
                         it.healthIdDetails = BenHealthIdDetails(
                             healthId,
                             healthIdNumber ?: "",
                             isNewAbha = response.isNew
                         )
                         it.isNewAbha = response.isNew
-                        benRepo.updateRecord(it)
+                        benRepo.updateRecord(ben)
                     }
-                    _state.value = State.ABHA_GENERATE_SUCCESS
                 }
+
                 is NetworkResult.Error -> {
-                    if (result.code == 0) {
+                    if (result.code == 0){
                         _uiEvent.emit(UIEvent.ShowDialog("${ben?.firstName}", "${ben?.lastName}"))
+
                     } else {
                         _errorMessage.value = result.message
                         _state.value = State.ERROR_SERVER
                     }
+
                 }
+
                 is NetworkResult.NetworkError -> {
                     Timber.i(result.toString())
                     _state.value = State.ERROR_NETWORK
