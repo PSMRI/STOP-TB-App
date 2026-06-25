@@ -47,6 +47,9 @@ data class FormSectionDto(
     @SerializedName("sectionTitle", alternate = ["sectionName"])
     val sectionTitle: String = "",
 
+    @SerializedName("sectionNameHindi")
+    val sectionNameHindi: String? = null,
+
     @SerializedName("sectionPhase")
     val sectionPhase: String? = null,
 
@@ -78,6 +81,9 @@ data class FormFieldDto(
 
     @SerializedName("label", alternate = ["questionText"])
     val label: String = "",
+
+    @SerializedName("labelHindi", alternate = ["questionTextHindi"])
+    val labelHindi: String? = null,
 
     @SerializedName("type", alternate = ["questionType"])
     val type: String = "",
@@ -150,9 +156,11 @@ data class FormFieldDto(
 
                     val labelFallback = it["optionLabel"] ?: it["label"] ?: ""
                     val valueFallback = it["optionValue"] ?: it["value"] ?: ""
+                    val labelHindiFallback = it["optionLabelHindi"]?.toString()
                     OptionItemDto(
                         optionId = (it["optionId"] as? Number)?.toInt() ?: (index + 1),
                         optionLabel = labelFallback.toString(),
+                        optionLabelHindi = labelHindiFallback,
                         optionValue = valueFallback.toString(),
                         displayOrder = (it["displayOrder"] as? Number)?.toInt() ?: (index + 1),
                         conditions = conds
@@ -226,6 +234,7 @@ data class FieldValidationDto(
 data class OptionItemDto(
     val optionId: Int,
     val optionLabel: String,
+    val optionLabelHindi: String? = null,
     val optionValue: String,
     val displayOrder: Int,
     val conditions: List<ConditionDto>

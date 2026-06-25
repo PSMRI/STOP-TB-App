@@ -6,6 +6,7 @@ import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.CounsellingOverviewData
 import timber.log.Timber
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.model.dynamicEntity.*
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository
@@ -133,7 +134,10 @@ class CounsellingRepo @Inject constructor(
         return withContext(Dispatchers.IO) {
             try {
                 var completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING)
-                if (completeForm == null) {
+                val hindiMissing = completeForm?.versions
+                    ?.firstOrNull()?.sections
+                    ?.any { it.section.sectionNameHindi == null } ?: false
+                if (completeForm == null || hindiMissing) {
                     val success = counsellingRepository.downloadAndStoreAllForms()
                     if (success) {
                         completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING)
@@ -149,6 +153,8 @@ class CounsellingRepo @Inject constructor(
                     ?: return@withContext NetworkResponse.Error("No active version found")
 
                 val filteredSectionsFromDb = counsellingRepository.getSectionsByPhase(FormType.TB_COUNSELLING, phase)
+
+                val isHindi = preferenceDao.getCurrentLanguage() == Languages.HINDI
 
                 val showConditionTargets = mutableSetOf<Int>()
                 filteredSectionsFromDb.forEach { sec ->
@@ -178,7 +184,7 @@ class CounsellingRepo @Inject constructor(
                             }
                             CounsellingOptionDto(
                                 optionId = opt.optionId,
-                                optionLabel = opt.optionText,
+                                optionLabel = if (isHindi) opt.optionTextHindi ?: opt.optionText else opt.optionText,
                                 optionValue = opt.optionValue,
                                 displayOrder = opt.optionOrder,
                                 conditions = conditionsList
@@ -199,7 +205,7 @@ class CounsellingRepo @Inject constructor(
                         CounsellingQuestionDto(
                             questionId = q.questionId,
                             questionUuid = q.questionUuid ?: getQuestionCode(q.questionId),
-                            questionText = q.questionText,
+                            questionText = if (isHindi) q.questionTextHindi ?: q.questionText else q.questionText,
                             questionType = q.questionType,
                             isMandatory = q.isRequired,
                             displayOrder = q.questionOrder,
@@ -217,7 +223,7 @@ class CounsellingRepo @Inject constructor(
                     CounsellingSectionDto(
                         sectionId = sec.sectionId,
                         sectionUuid = getSectionCode(sec.sectionId),
-                        sectionName = sec.sectionName,
+                        sectionName = if (isHindi) sec.sectionNameHindi ?: sec.sectionName else sec.sectionName,
                         sectionPhase = sec.sectionPhase,
                         isRequired = true,
                         displayOrder = sec.sectionOrder,

@@ -21,6 +21,7 @@ data class FormSectionEntity(
     @PrimaryKey val sectionId: Int,
     val versionId: Int,
     val sectionName: String,
+    val sectionNameHindi: String? = null,
     val sectionOrder: Int,
     val sectionPhase: String, // "PRE_SUBMIT" (A-E) or "POST_SUBMIT" (F)
     val sectionUuid: String? = null,

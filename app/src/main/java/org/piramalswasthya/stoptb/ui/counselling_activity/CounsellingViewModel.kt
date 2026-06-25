@@ -7,6 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.CounsellingOverviewData
 import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingFormSchemaDto
@@ -21,7 +23,8 @@ import javax.inject.Inject
 @HiltViewModel
 class CounsellingViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
-    private val counsellingRepo: CounsellingRepo
+    private val counsellingRepo: CounsellingRepo,
+    private val prefDao: PreferenceDao
 ) : ViewModel() {
 
     companion object {
@@ -288,7 +291,14 @@ class CounsellingViewModel @Inject constructor(
     }
 
     private fun getMandatoryError(q: CounsellingQuestionDto, section: CounsellingSectionDto): String? {
-        if (q.isMandatory && q.visible) return "This field is required"
+        val isHindi = prefDao.getCurrentLanguage() == Languages.HINDI
+        if (q.isMandatory && q.visible) {
+            return if (isHindi) {
+                "यह जानकारी अनिवार्य है।"
+            } else {
+                "This field is required"
+            }
+        }
         val mandatoryIf = q.validations?.firstOrNull { it.validationType == "MANDATORY_IF" } ?: return null
         val parts = mandatoryIf.validationParam.split("=")
         if (parts.size != 2) return null
