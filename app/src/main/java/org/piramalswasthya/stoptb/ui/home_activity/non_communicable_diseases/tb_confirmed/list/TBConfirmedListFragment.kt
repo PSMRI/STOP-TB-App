@@ -30,6 +30,7 @@ import kotlin.getValue
 @AndroidEntryPoint
 class TBConfirmedListFragment : Fragment() {
 
+
     @Inject
     lateinit var prefDao: PreferenceDao
 
@@ -60,28 +61,14 @@ class TBConfirmedListFragment : Fragment() {
         viewModel.fetchCompletedBeneficiaries()
         binding.btnNextPage.visibility = View.GONE
         val benAdapter = TbConfirmedListAdapter(
-            TbConfirmedListAdapter.ClickListener(
-                clickedForm = { hhId, benId ->
-                    findNavController().navigate(
-                        TBConfirmedListFragmentDirections
-                            .actionTBConfirmedListFragmentToTBConfirmedFormFragment(benId)
+            TbConfirmedListAdapter.ClickListener { hhId, benId ->
+                findNavController().navigate(
+                    TBConfirmedListFragmentDirections.actionTBConfirmedListFragmentToTBConfirmedFormFragment(
+                    benId
                     )
-                },
-                clickedCounselling = { item ->
-                    startActivity(
-                        Intent(requireContext(), CounsellingActivity::class.java)
-                            .putExtra(CounsellingViewModel.EXTRA_BEN_ID, item.ben.benId)
-                    )
-                },
-                clickedCounselled = { item ->
-                    // Counselled state: open Counselling Overview — Pre-Submit will be read-only,
-                    // Post-Submit remains accessible per existing editable-window logic.
-                    startActivity(
-                        Intent(requireContext(), CounsellingActivity::class.java)
-                            .putExtra(CounsellingViewModel.EXTRA_BEN_ID, item.ben.benId)
-                    )
-                }
-            ),
+                )
+
+            },
             pref = prefDao
         )
         binding.rvAny.adapter = benAdapter
@@ -123,10 +110,6 @@ class TBConfirmedListFragment : Fragment() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-
-    }
 
     override fun onStart() {
         super.onStart()

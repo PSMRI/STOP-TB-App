@@ -177,12 +177,6 @@ interface AmritApiService {
         @Path("formId") formId: String,
         @Query("lang") lang: String
     ): Response<ApiResponse<FormSchemaDto>>
-    
-
-    @GET("flw-api/dynamicForm/getAllForms")
-    suspend fun getAllForms(
-        @Header("Authorization") authHeader: String,
-    ): Response<ApiResponse<List<FormSchemaDto>>>
 
     @POST("flw-api/child-care/hbncVisit/saveAll")
     suspend fun submitForm(

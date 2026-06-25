@@ -8,7 +8,6 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.RvItemTbConfirmedListBinding
-import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.model.BenWithTbSuspectedDomain
 
 class TbConfirmedListAdapter( private val clickListener: ClickListener? = null,
@@ -135,16 +134,11 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 
 
     class ClickListener(
-        private val clickedForm: ((hhId: Long, benId: Long) -> Unit)? = null,
-        private val clickedCounselling: ((item: BenWithTbSuspectedDomain) -> Unit)? = null,
-        private val clickedCounselled: ((item: BenWithTbSuspectedDomain) -> Unit)? = null
+        private val clickedForm: ((hhId: Long, benId: Long) -> Unit)? = null
+
     ) {
         fun onClickForm(item: BenWithTbSuspectedDomain) =
             clickedForm?.let { it(item.ben.hhId, item.ben.benId) }
-        fun onClickCounselling(item: BenWithTbSuspectedDomain) =
-            clickedCounselling?.let { it(item) }
-        fun onClickCounselled(item: BenWithTbSuspectedDomain) =
-            clickedCounselled?.let { it(item) }
     }
     fun submitBenIds(list: List<Long>?) {
         if (list != null) {

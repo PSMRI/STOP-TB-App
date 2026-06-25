@@ -1,50 +1,35 @@
 package org.piramalswasthya.stoptb.model.dynamicEntity
 
+import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 
 data class FormSchemaDto(
     @SerializedName("formId")
     val formId: String,
 
-    @SerializedName("formUuid")
-    val formUuid: String? = null,
-
     @SerializedName("formName")
     val formName: String,
 
-    @SerializedName("formType")
-    val formType: String? = null,
-
-    @SerializedName("isActive")
-    val isActive: Boolean = true,
-
-    @SerializedName("version", alternate = ["versionNumber"])
+    @SerializedName("version")
     val version: Int = 1,
 
+
+
     @SerializedName("sections")
-    val sections: List<FormSectionDto> = emptyList(),
-
-    @SerializedName("followUpDelayDays")
-    val followUpDelayDays: Int = 0
+    val sections: List<FormSectionDto> = emptyList()
 ) {
-    val versionNumber: Int
-        get() = version
-
     companion object {
-        fun fromJson(json: String): FormSchemaDto = com.google.gson.Gson().fromJson(json, FormSchemaDto::class.java)
+        fun fromJson(json: String): FormSchemaDto = Gson().fromJson(json, FormSchemaDto::class.java)
     }
 
-    fun toJson(): String = com.google.gson.Gson().toJson(this)
+    fun toJson(): String = Gson().toJson(this)
 }
 
 data class FormSectionDto(
     @SerializedName("sectionId")
     val sectionId: String = "",
 
-    @SerializedName("sectionUuid")
-    val sectionUuid: String? = null,
-
-    @SerializedName("sectionTitle", alternate = ["sectionName"])
+    @SerializedName("sectionTitle")
     val sectionTitle: String = "",
 
     @SerializedName("sectionNameHindi")
@@ -64,22 +49,13 @@ data class FormSectionDto(
 
     @SerializedName("fields", alternate = ["questions"])
     val fields: List<FormFieldDto> = emptyList()
-) {
-    val sectionName: String
-        get() = sectionTitle
-
-    val questions: List<FormFieldDto>
-        get() = fields
-}
+)
 
 data class FormFieldDto(
-    @SerializedName("fieldId", alternate = ["questionUuid"])
+    @SerializedName("fieldId")
     val fieldId: String = "",
 
-    @SerializedName("questionId")
-    val questionId: Int? = null,
-
-    @SerializedName("label", alternate = ["questionText"])
+    @SerializedName("label")
     val label: String = "",
 
     @SerializedName("labelHindi", alternate = ["questionTextHindi"])
@@ -89,9 +65,9 @@ data class FormFieldDto(
     val type: String = "",
 
     @SerializedName("options")
-    val options: List<Any>? = null,
+    var options: List<String>? = null,
 
-    @SerializedName("isRequired", alternate = ["isMandatory"])
+    @SerializedName("isRequired")
     val required: Boolean = false,
 
     @SerializedName("conditional")
@@ -99,9 +75,6 @@ data class FormFieldDto(
 
     @SerializedName("validation")
     val validation: FieldValidationDto? = null,
-
-    @SerializedName("validations")
-    val validations: List<ValidationItemDto> = emptyList(),
 
     @SerializedName("placeholder")
     val placeholder: String? = null,
@@ -114,9 +87,6 @@ data class FormFieldDto(
 
     @SerializedName("value")
     var value: Any? = null,
-
-    @SerializedName("displayOrder")
-    val displayOrder: Int? = null,
 
     @Transient var visible: Boolean = true,
     @Transient var errorMessage: String? = null,
@@ -258,6 +228,5 @@ data class ValidationItemDto(
 
 data class OptionItem(
     val label: String = "",
-    val value: String = ""
+    val value: String =  ""
 )
-

@@ -91,17 +91,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         TBConfirmedTreatmentCache::class,
         VitalCache::class,
         GeneralOpdCache::class,
-        TBDiagnosticsCache::class,
-        DynamicFormEntity::class,
-        FormVersionEntity::class,
-        FormSectionEntity::class,
-        SectionQuestionEntity::class,
-        QuestionOptionEntity::class,
-        QuestionValidationEntity::class,
-        OptionConditionEntity::class,
-        FormResponseEntity::class,
-        SectionResponseEntity::class,
-        QuestionResponseEntity::class
+        TBDiagnosticsCache::class
     ],
     views = [BenBasicCache::class],
     version = 21, exportSchema = false
@@ -130,8 +120,6 @@ abstract class InAppDb : RoomDatabase() {
     abstract fun formResponseDao(): FormResponseDao
     abstract fun NCDReferalFormResponseJsonDao(): NCDReferalFormResponseJsonDao
     abstract fun formResponseJsonDao(): FormResponseJsonDao
-    abstract fun dynamicFormMetadataDao(): DynamicFormMetadataDao
-    abstract fun counsellingFormResponseDao(): CounsellingFormResponseDao
     abstract val syncDao: SyncDao
     abstract val vitalDao: VitalDao
 
@@ -378,44 +366,6 @@ abstract class InAppDb : RoomDatabase() {
                 tables.forEach { tableName ->
                     if (tableExists(database, tableName) && !columnExists(database, tableName, "serverUpdatedDate")) {
                         database.execSQL("ALTER TABLE $tableName ADD COLUMN serverUpdatedDate INTEGER DEFAULT NULL")
-                    }
-                }
-            }
-        }
-
-        private val MIGRATION_17_18 = object : Migration(17, 18) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                val benColumns = listOf(
-                    "gpsLatitude REAL DEFAULT NULL",
-                    "gpsLongitude REAL DEFAULT NULL",
-                    "digipin TEXT DEFAULT NULL",
-                    "gpsTimestamp TEXT DEFAULT NULL",
-                    "isGpsUnavailable INTEGER NOT NULL DEFAULT 0",
-                    "gpsUnavailableReason TEXT DEFAULT NULL"
-                )
-                benColumns.forEach { columnDefinition ->
-                    val columnName = columnDefinition.substringBefore(" ")
-                    if (!columnExists(database, "BENEFICIARY", columnName)) {
-                        database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN $columnDefinition")
-                    }
-                }
-            }
-        }
-
-        private val MIGRATION_16_17 = object : Migration(16, 17) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                val householdColumns = listOf(
-                    "gpsLatitude REAL DEFAULT NULL",
-                    "gpsLongitude REAL DEFAULT NULL",
-                    "digipin TEXT DEFAULT NULL",
-                    "gpsTimestamp TEXT DEFAULT NULL",
-                    "isGpsUnavailable INTEGER NOT NULL DEFAULT 0",
-                    "gpsUnavailableReason TEXT DEFAULT NULL"
-                )
-                householdColumns.forEach { columnDefinition ->
-                    val columnName = columnDefinition.substringBefore(" ")
-                    if (!columnExists(database, "HOUSEHOLD", columnName)) {
-                        database.execSQL("ALTER TABLE HOUSEHOLD ADD COLUMN $columnDefinition")
                     }
                 }
             }
@@ -810,6 +760,25 @@ abstract class InAppDb : RoomDatabase() {
         }
 
         fun getInstance(appContext: Context): InAppDb {
+
+            // =====================================================================
+            // HOW TO ADD MIGRATION IN FUTURE:
+            // Step 1: Increment version in @Database annotation (e.g., version = 2)
+            // Step 2: Add migration object below
+            // Step 3: Add migration to addMigrations() and remove fallbackToDestructiveMigration()
+            //
+            // Example:
+            // val MIGRATION_1_2 = object : Migration(1, 2) {
+            //     override fun migrate(database: SupportSQLiteDatabase) {
+            //         database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN newField TEXT DEFAULT NULL")
+            //     }
+            // }
+            //
+            // Then in builder:
+            // instance = builder
+            //     .addMigrations(MIGRATION_1_2)
+            //     .build()
+            // =====================================================================
 
             synchronized(this) {
                 var instance = INSTANCE

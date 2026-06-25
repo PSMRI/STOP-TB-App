@@ -1251,14 +1251,6 @@ data class BenRegCache(
 
     var longitude: Double = 0.0,
 
-    // GPS location captured at registration time (standalone beneficiary only)
-    var gpsLatitude: Double? = null,
-    var gpsLongitude: Double? = null,
-    var digipin: String? = null,
-    var gpsTimestamp: String? = null,
-    @ColumnInfo(defaultValue = "0") var isGpsUnavailable: Boolean = false,
-    var gpsUnavailableReason: String? = null,
-
     ///////////////////////////Bank details Start///////////////////////////
     var hasAadhar: Boolean? = false,
 
@@ -1387,7 +1379,7 @@ data class BenRegCache(
 
 )  : FormDataModel {
 
-    fun asNetworkPostModel(context: Context, user: User, household: HouseholdCache? = null): BenPost {
+    fun asNetworkPostModel(context: Context, user: User): BenPost {
         return BenPost(
             householdId = householdId.toString(),
             benRegId = benRegId,
@@ -1570,12 +1562,8 @@ data class BenRegCache(
                 residentialArea = residentialArea,
                 residentialAreaId = residentialAreaId,
                 otherResidentialArea = otherResidentialArea,
-                latitude = gpsLatitude ?: household?.gpsLatitude ?: latitude,
-                longitude = gpsLongitude ?: household?.gpsLongitude ?: longitude,
-                digipin = digipin ?: household?.digipin,
-                gpsTimestamp = (gpsTimestamp ?: household?.gpsTimestamp)?.toLongOrNull(),
-                isGpsUnavailable = if (gpsLatitude != null || household?.gpsLatitude != null || gpsLongitude != null || household?.gpsLongitude != null) false else (isGpsUnavailable || (household?.isGpsUnavailable ?: false)),
-                gpsUnavailableReason = gpsUnavailableReason ?: household?.gpsUnavailableReason,
+                latitude = latitude,
+                longitude = longitude,
                 createdBy = user.userName,
             ),
             benPhoneMaps = arrayOf(
