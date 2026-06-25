@@ -20,17 +20,15 @@ import org.piramalswasthya.stoptb.work.dynamicWoker.FormSyncWorker
 import org.piramalswasthya.stoptb.work.dynamicWoker.NCDFollowUpSyncWorker
 import org.piramalswasthya.stoptb.work.dynamicWoker.NDCFollowUpPushWorker
 import timber.log.Timber
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 object WorkerUtils {
 
     const val pushWorkerUniqueName = "PUSH-TO-AMRIT"
     const val pullWorkerUniqueName = "PULL-FROM-AMRIT"
-    const val campAutoPullIntervalMs = 30_000L
     private const val campQuickPullDebounceMs = 30_000L
     private var lastCampQuickPullAt = 0L
-    @Volatile
-    private var manualCampRefreshInProgress = false
 
     private val networkOnlyConstraint = Constraints.Builder()
         .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -41,18 +39,18 @@ object WorkerUtils {
             .setConstraints(networkOnlyConstraint)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
 
-    fun triggerAmritPushWorker(context: Context): List<java.util.UUID> {
+    fun triggerAmritPushWorker(context: Context): Set<UUID> {
         // Block all data push until camp mode is active AND hub is connected
         val prefs = PreferenceManager.getInstance(context)
         val campKey = context.getString(R.string.PREF_camp_mode_enabled)
         if (!prefs.getBoolean(campKey, false)) {
             Timber.d("Push worker skipped: camp mode is disabled")
-            return emptyList()
+            return emptySet()
         }
         val hubConnectedKey = context.getString(R.string.PREF_camp_hub_connected)
         if (!prefs.getBoolean(hubConnectedKey, false)) {
             Timber.d("Push worker skipped: camp hub is disconnected")
-            return emptyList()
+            return emptySet()
         }
 
         val workManager = WorkManager.getInstance(context)
@@ -76,10 +74,11 @@ object WorkerUtils {
         val chainAbha = afterRegistration.then(listOf(groupAbha))
 
         WorkContinuation.combine(listOf(chainTB, chainAbha)).enqueue()
-        return listOf(registration.id, groupAbha.id) + groupTB.map { it.id }
+
+        return setOf(registration.id, groupTB.first().id, groupAbha.id)
     }
 
-    fun triggerAmritPullWorker(context: Context): List<java.util.UUID> {
+    fun triggerAmritPullWorker(context: Context): Set<UUID> {
         val workManager = WorkManager.getInstance(context)
 
         // StopTB pull chain:
@@ -99,7 +98,8 @@ object WorkerUtils {
         val chainTB = afterFoundation.then(groupTB)
 
         chainTB.then(setSyncCompleteWorker).enqueue()
-        return listOf(pullWorkRequest.id, setSyncCompleteWorker.id) + groupTB.map { it.id }
+
+        return setOf(pullWorkRequest.id, groupTB.first().id, setSyncCompleteWorker.id)
     }
 
     /** Convenience alias — camp check is already inside [triggerAmritPushWorker]. */
@@ -124,7 +124,6 @@ object WorkerUtils {
         preferenceDao: PreferenceDao,
         force: Boolean = false
     ) {
-        if (manualCampRefreshInProgress) return
         if (!preferenceDao.isCampModeEnabled() || !preferenceDao.isCampHubConnected()) return
 
         val now = SystemClock.elapsedRealtime()
@@ -132,27 +131,6 @@ object WorkerUtils {
 
         lastCampQuickPullAt = now
         triggerAmritPullWorker(context)
-    }
-
-    fun startManualCampRefresh(
-        context: Context,
-        preferenceDao: PreferenceDao
-    ): List<java.util.UUID> {
-        manualCampRefreshInProgress = true
-        cancelCampPullWorker(context)
-        val pushIds = triggerAmritPushWorker(context)
-        val pullIds = triggerAmritPullWorker(context)
-        return pushIds + pullIds
-    }
-
-    fun finishManualCampRefresh() {
-        manualCampRefreshInProgress = false
-    }
-
-    fun isManualCampRefreshInProgress(): Boolean = manualCampRefreshInProgress
-
-    fun cancelCampPullWorker(context: Context) {
-        WorkManager.getInstance(context).cancelUniqueWork(pullWorkerUniqueName)
     }
 
     fun triggerD2dSyncWorker(context: Context) {}

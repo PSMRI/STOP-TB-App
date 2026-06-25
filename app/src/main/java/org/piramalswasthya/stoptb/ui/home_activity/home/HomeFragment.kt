@@ -34,8 +34,6 @@ class HomeFragment : Fragment() {
     lateinit var formRepository: FormRepository
     @Inject
     lateinit var pref: PreferenceDao
-    @Inject
-    lateinit var counsellingRepository: org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository
     companion object {
         var numViewCopies = 0
         var numCopies = 0

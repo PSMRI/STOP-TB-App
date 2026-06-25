@@ -86,7 +86,7 @@
         android:id="@+id/newHouseholdFragment"
         android:name="org.piramalswasthya.stoptb.ui.home_activity.new_household_registration.NewHouseholdFragment"
         android:label="@string/frag_nhhr_title"
-        tools:layout="@layout/fragment_new_household">
+        tools:layout="@layout/fragment_new_form">
         <argument
             android:name="hhId"
             android:defaultValue="0L"

@@ -21,8 +21,6 @@ class VolunteerIconsFragment : Fragment() {
     @Inject
     lateinit var iconDataset: IconDataset
 
-
-
     private var _binding: FragmentVolunteerHomeBinding? = null
     private val binding: FragmentVolunteerHomeBinding
         get() = _binding!!
@@ -38,6 +36,7 @@ class VolunteerIconsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setUpIconRvAdapter()
+
     }
 
     private fun setUpIconRvAdapter() {
