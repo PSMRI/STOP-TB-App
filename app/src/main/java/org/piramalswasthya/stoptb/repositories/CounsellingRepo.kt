@@ -61,6 +61,19 @@ class CounsellingRepo @Inject constructor(
                 }
                 val ageGender = "${ben.age} $ageUnitText / $genderText"
 
+                try {
+                    val completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING)
+                        ?: run {
+                            counsellingRepository.downloadAndStoreAllForms()
+                            counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING)
+                        }
+                    completeForm?.form?.formUuid?.let { formUuid ->
+                        counsellingRepository.fetchAndStoreCounsellingResponse(benId, formUuid)
+                    }
+                } catch (e: Exception) {
+                    Timber.w(e, "fetchAndStoreCounsellingResponse failed during overview pull for benId=$benId")
+                }
+
                 val formResponse = db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId)
                 var currentStep = 0
                 var completedSteps = 0

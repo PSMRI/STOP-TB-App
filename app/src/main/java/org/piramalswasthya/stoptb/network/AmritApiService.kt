@@ -213,6 +213,12 @@ interface AmritApiService {
         @Query("formUuid") formUuid: String
     ): Response<ApiResponse<List<ServerCounsellingResponseDto>>>
 
+    @GET("flw-api/dynamicForm/response/getCompletedBeneficiaries")
+    suspend fun getCompletedBeneficiaries(
+        @Header("Authorization") authHeader: String,
+        @Query("formType") formType: String
+    ): Response<ApiResponse<List<Long>>>
+
 
     @POST("flw-api/disease/cdtfVisit/saveAll")
     suspend fun submitNCDFollowUp(

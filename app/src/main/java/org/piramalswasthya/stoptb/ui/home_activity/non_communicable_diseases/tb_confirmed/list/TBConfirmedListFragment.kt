@@ -57,6 +57,7 @@ class TBConfirmedListFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        viewModel.fetchCompletedBeneficiaries()
         binding.btnNextPage.visibility = View.GONE
         val benAdapter = TbConfirmedListAdapter(
             TbConfirmedListAdapter.ClickListener(
@@ -94,6 +95,9 @@ class TBConfirmedListFragment : Fragment() {
                 benAdapter.submitList(it)
             }
         }
+        viewModel.beneficiaryIdArray.observe(viewLifecycleOwner,{ benids ->
+            benAdapter.submitBenIds(benids)
+        })
 
         binding.ibSearch.setOnClickListener { sttContract.launch(Unit) }
         val searchTextWatcher = object : TextWatcher {
@@ -119,6 +123,10 @@ class TBConfirmedListFragment : Fragment() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+
+    }
 
     override fun onStart() {
         super.onStart()

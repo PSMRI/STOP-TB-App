@@ -25,7 +25,6 @@ class CounsellingRepositoryImpl @Inject constructor(
 
     private val metadataDao = db.dynamicFormMetadataDao()
     private val responseDao = db.counsellingFormResponseDao()
-
     override suspend fun getFormDefinition(formType: FormType): CompleteFormDefinition? {
         return metadataDao.getFormDefinition(formType)
     }
@@ -598,6 +597,26 @@ class CounsellingRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             Timber.e(e, "fetchAndStoreCounsellingResponse failed for benId=$beneficiaryId")
             return false
+        }
+    }
+
+    override suspend fun fetchAndStoreCompletedBeneficiaries(): List<Long>? {
+        try {
+            val jwt = preferenceDao.getJWTAmritToken()
+            val authHeader = jwt ?: run {
+                Timber.w("fetchAndStoreCompletedBeneficiaries: JWT token is null")
+                return null
+            }
+            val response = amritApiService.getCompletedBeneficiaries(authHeader, "TB_COUNSELLING")
+            if (response.isSuccessful) {
+                return response.body()?.data as List<Long> ?: return null
+            } else {
+                Timber.w("fetchAndStoreCompletedBeneficiaries failed: status code ${response.code()}")
+                return null
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "fetchAndStoreCompletedBeneficiaries exception")
+            return null
         }
     }
 
