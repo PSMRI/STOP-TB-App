@@ -1014,7 +1014,6 @@ class FormInputAdapter(
                     item.value = getDateString(calDob.timeInMillis)
                     item.errorText = null
                     binding.tilEditTextDate.error = null
-                    binding.tilEditTextNum.error = null
                     if (item.hasDependants) formValueListener?.onValueChanged(item, -1)
                 }
             }
@@ -1033,13 +1032,8 @@ class FormInputAdapter(
             var thisMonth = today.get(Calendar.MONTH)
             var thisDay = today.get(Calendar.DAY_OF_MONTH)
 
-            item.errorText?.also {
-                binding.tilEditTextDate.error = it
-                binding.tilEditTextNum.error = it
-            } ?: run {
-                binding.tilEditTextDate.error = null
-                binding.tilEditTextNum.error = null
-            }
+            item.errorText?.also { binding.tilEditTextDate.error = it }
+                ?: run { binding.tilEditTextDate.error = null }
             binding.etDate.setOnClickListener {
                 val activity = binding.etDate.context.findFragmentActivity()
                     ?: return@setOnClickListener

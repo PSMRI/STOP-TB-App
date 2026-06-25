@@ -89,7 +89,9 @@ class TBSuspectedQuickFragment : Fragment() {
                         getString(R.string.diagnostics_submitted),
                         Toast.LENGTH_SHORT
                     ).show()
-                    WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
+                    if (!viewModel.viewOnly) {
+                        WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
+                    }
                     if (viewModel.viewOnly) {
                         findNavController().navigateUp()
                     } else {
