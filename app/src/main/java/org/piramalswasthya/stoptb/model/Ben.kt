@@ -773,6 +773,8 @@ data class BenBasicCache(
 }
 
 fun getAgeDisplayString(dob: Long): String {
+    if (dob <= 0L) return "N/A"
+
     val calDob = Calendar.getInstance().apply { timeInMillis = dob }
     val calNow = Calendar.getInstance()
 

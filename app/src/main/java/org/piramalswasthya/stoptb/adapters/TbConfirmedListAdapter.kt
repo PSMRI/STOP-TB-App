@@ -47,8 +47,6 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             pref: PreferenceDao?,
             benIdList: List<Long>?
         ) {
-            binding.btnFormTb.visibility = View.VISIBLE
-
             binding.benWithTb = item
 
             val isBenAlreadyCounselled = (benIdList != null &&  benIdList.contains(item.ben.benId))
@@ -57,6 +55,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             if (role != null) {
                 checkIfCounsellingOfficerOrNot(role, ( item.isCounselled|| isBenAlreadyCounselled))
             } else {
+                binding.btnFormTb.visibility = View.GONE
                 binding.btnCounselling.visibility = View.GONE
                 binding.btnCounselled.visibility = View.GONE
             }
