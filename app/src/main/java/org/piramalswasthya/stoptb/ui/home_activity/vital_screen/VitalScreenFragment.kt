@@ -178,6 +178,7 @@ class VitalScreenFragment : Fragment() {
             selectedRiskFactors = BooleanArray(riskFactorOptions.size)
 
             if (vital == null) {
+                autoSelectNotApplicableIfApplicable()
                 // New form — auto-select Pregnancy when ben registration says "Yes"
                 autoSelectPregnancyIfApplicable()
                 return@observe
@@ -541,7 +542,20 @@ class VitalScreenFragment : Fragment() {
         if (!viewModel.isPregnant) return
         val pregnancyIndex = riskFactorOptions.indexOfFirst { it.code == "PREGNANCY" }
         if (pregnancyIndex >= 0) {
+            val notApplicableIndex = riskFactorOptions.indexOfFirst { it.code == "NOT_APPLICABLE" }
+            if (notApplicableIndex >= 0) {
+                selectedRiskFactors[notApplicableIndex] = false
+            }
             selectedRiskFactors[pregnancyIndex] = true
+            refreshRiskFactorText()
+        }
+    }
+
+    private fun autoSelectNotApplicableIfApplicable() {
+        if (viewModel.isPregnant) return
+        val notApplicableIndex = riskFactorOptions.indexOfFirst { it.code == "NOT_APPLICABLE" }
+        if (notApplicableIndex >= 0) {
+            selectedRiskFactors[notApplicableIndex] = true
             refreshRiskFactorText()
         }
     }

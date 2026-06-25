@@ -30,6 +30,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.text.HtmlCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.MenuProvider
@@ -80,6 +81,9 @@ import org.piramalswasthya.stoptb.work.WorkerUtils
 import java.net.URI
 import java.util.Locale
 import javax.inject.Inject
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 
 @AndroidEntryPoint
@@ -113,6 +117,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
 
     var lastClickTime: Long = 0L
     private var lastAutoTriggerPushTime: Long = 0L
+    private var campAutoPullJob: Job? = null
     private companion object {
         const val AUTO_PUSH_DEBOUNCE_MS = 120_000L  // 2 minutes
     }
@@ -559,6 +564,8 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
     override fun onPause() {
         super.onPause()
         pref.removeOnPreferenceChangeListener(campHubPrefListener)
+        campAutoPullJob?.cancel()
+        campAutoPullJob = null
         window.decorView.alpha = 0f
     }
 
@@ -568,6 +575,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
         refreshCampHubOfflineBanner()
         refreshCampHubDrawerItem()
         WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
+        startCampAutoPullLoop()
         window.decorView.alpha = 1f
         if (isDeviceRootedOrEmulator()) {
             AlertDialog.Builder(this)
@@ -579,6 +587,16 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
         }
         binding.versionName.text ="${BuildConfig.VERSION_NAME}" //"APK Version 2.2.3"
         inAppUpdateHelper.resumeUpdateIfNeeded()
+    }
+
+    private fun startCampAutoPullLoop() {
+        if (campAutoPullJob?.isActive == true) return
+        campAutoPullJob = lifecycleScope.launch {
+            while (isActive) {
+                WorkerUtils.triggerCampQuickPullIfConnected(applicationContext, pref)
+                delay(WorkerUtils.campAutoPullIntervalMs)
+            }
+        }
     }
 
 
@@ -836,8 +854,24 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
     }
 
     private fun refreshCampHubOfflineBanner() {
-        binding.tvCampHubOffline.visibility =
-            if (pref.isCampModeEnabled() && !pref.isCampHubConnected()) View.VISIBLE else View.GONE
+        if (!pref.isCampModeEnabled()) {
+            binding.tvCampHubOffline.visibility = View.GONE
+            return
+        }
+
+        val isConnected = pref.isCampHubConnected()
+        binding.tvCampHubOffline.visibility = View.VISIBLE
+        binding.tvCampHubOffline.text =
+            if (isConnected) getString(R.string.camp_hub_connected)
+            else getString(R.string.camp_hub_offline)
+        binding.tvCampHubOffline.setBackgroundColor(
+            ContextCompat.getColor(
+                this,
+                if (isConnected) android.R.color.holo_green_dark else android.R.color.holo_red_dark
+            )
+        )
+        binding.tvCampHubOffline.isClickable = !isConnected
+        binding.tvCampHubOffline.isFocusable = !isConnected
     }
 
     private fun refreshCampHubDrawerItem() {

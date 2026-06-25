@@ -955,9 +955,19 @@ class BenRepo @Inject constructor(
 //    }
 
     private fun getLongFromDate(date: String): Long {
+        return getLongFromDateOrNull(date) ?: 0L
+    }
+
+    private fun getLongFromDateOrNull(date: String?): Long? {
+        if (date.isNullOrBlank()) return null
+
         val patterns = listOf(
             "MMM dd, yyyy HH:mm:ss a",
             "MMM dd, yyyy h:mm:ss a",
+            "MMM d, yyyy HH:mm:ss a",
+            "MMM d, yyyy h:mm:ss a",
+            "yyyy-MM-dd",
+            "yyyy-MM-dd HH:mm:ss",
             "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
             "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
         )
@@ -966,7 +976,7 @@ class BenRepo @Inject constructor(
                 SimpleDateFormat(pattern, Locale.ENGLISH).parse(date)?.time
             }.getOrNull()?.let { return it }
         }
-        return 0
+        return null
     }
 
     private fun getResponseDataArray(jsonObj: JSONObject): JSONArray {
@@ -1619,10 +1629,24 @@ class BenRepo @Inject constructor(
                     val lastNameFromFullName =
                         fullName.substringAfter(" ", "").takeIf { it.isNotBlank() }
 
-                    val dobMillis = (
-                            benDataObj.optStringOrNull("dob")
-                                ?: benDataObj.optStringOrNull("dOB")
-                            )?.let { getLongFromDate(it) } ?: 0L
+                    val benId =
+                        if (jsonObject.has("benficieryid")) jsonObject.getLong("benficieryid")
+                        else -1L
+
+                    if (benId == -1L) continue
+
+                    val existingBen = benDao.getBen(benId)
+
+                    val parsedDobMillis = getLongFromDateOrNull(
+                        benDataObj.optStringOrNull("dob")
+                            ?: benDataObj.optStringOrNull("dOB")
+                    )
+
+                    val dobMillis = when {
+                        parsedDobMillis != null -> parsedDobMillis
+                        existingBen?.dob?.takeIf { it > 0L } != null -> existingBen.dob
+                        else -> 0L
+                    }
 
                     val ageUnitText =
                         benDataObj.optStringOrNull("age_unit")
@@ -1656,20 +1680,12 @@ class BenRepo @Inject constructor(
                     val childDataObj =
                         jsonObject.optJSONObject("bornbirthDeatils") ?: JSONObject()
 
-                    val benId =
-                        if (jsonObject.has("benficieryid")) jsonObject.getLong("benficieryid")
-                        else -1L
-
-                    if (benId == -1L) continue
-
                     val nikshayIdValue = benDataObj.optStringOrNull("nikshayId")
                         ?: benDataObj.optStringOrNull("nikshayID")
                         ?: jsonObject.optStringOrNull("nikshayId")
                         ?: jsonObject.optStringOrNull("nikshayID")
                         ?: stopTBDetailsObj.optStringOrNull("nikshayId")
                         ?: stopTBDetailsObj.optStringOrNull("nikshayID")
-
-                    val existingBen = benDao.getBen(benId)
 
                     try {
                         val serverBen =
