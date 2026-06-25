@@ -10,7 +10,6 @@ import org.piramalswasthya.stoptb.helpers.dynamicMapper.PayloadBuilder
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
-import org.piramalswasthya.stoptb.utils.Log
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Named
@@ -25,7 +24,6 @@ class CounsellingRepositoryImpl @Inject constructor(
 
     private val metadataDao = db.dynamicFormMetadataDao()
     private val responseDao = db.counsellingFormResponseDao()
-
     override suspend fun getFormDefinition(formType: FormType): CompleteFormDefinition? {
         return metadataDao.getFormDefinition(formType)
     }
@@ -114,6 +112,7 @@ class CounsellingRepositoryImpl @Inject constructor(
                 sectionId = sectionIdInt,
                 versionId = versionId,
                 sectionName = sectionDto.sectionName,
+                sectionNameHindi = sectionDto.sectionNameHindi,
                 sectionOrder = sectionDto.displayOrder ?: 0,
                 sectionPhase = sectionDto.sectionPhase ?: "",
                 sectionUuid = sectionDto.sectionUuid
@@ -127,6 +126,7 @@ class CounsellingRepositoryImpl @Inject constructor(
                     questionId = questionIdInt,
                     sectionId = sectionIdInt,
                     questionText = questionDto.label,
+                    questionTextHindi = questionDto.labelHindi,
                     questionType = questionDto.type,
                     questionOrder = questionDto.displayOrder ?: 0,
                     isRequired = questionDto.isMandatory,
@@ -143,6 +143,7 @@ class CounsellingRepositoryImpl @Inject constructor(
                         optionId = optionIdInt,
                         questionId = questionIdInt,
                         optionText = optionDto.optionLabel,
+                        optionTextHindi = optionDto.optionLabelHindi,
                         optionValue = optionDto.optionValue,
                         optionOrder = optionDto.displayOrder,
                         serverOptionId = optionDto.optionId
@@ -341,36 +342,69 @@ class CounsellingRepositoryImpl @Inject constructor(
             val payload = PayloadBuilder.buildBulkPayload(resp, formDef, officerId)
 
             val recordSuccess = try {
-                if (resp.formResponse.status == "COMPLETE") {
-                    try {
-                        val jsonPayload = com.google.gson.Gson().toJson(payload)
-                        Timber.d("Amrit push complete dynamic payload JSON: $jsonPayload")
-                    } catch (e: Exception) {
-                        Timber.e(e, "Failed to serialize complete payload to JSON for logging")
+                if (resp.formResponse.status == "COMPLETE" || resp.formResponse.status == "COMPLETED") {
+                    val preSubmitPayload = PayloadBuilder.buildBulkPayload(resp, formDef, officerId, phaseFilter = "PRE_SUBMIT")
+                    var preSubmitSuccess = true
+                    if (preSubmitPayload.sections.isNotEmpty()) {
+                        val bulkPayload = listOf(preSubmitPayload)
+                        try {
+                            val jsonPayload = com.google.gson.Gson().toJson(bulkPayload)
+                            Timber.d("Amrit push complete dynamic pre-submit payload JSON: $jsonPayload")
+                        } catch (e: Exception) {
+                            Timber.e(e, "Failed to serialize pre-submit payload to JSON for logging")
+                        }
+                        val apiResponse = amritApiService.submitBulkCounselling(authHeader, bulkPayload)
+                        val statusCode = apiResponse.code()
+                        Timber.d("Amrit push complete dynamic pre-submit response: httpStatus=$statusCode")
+                        if (statusCode == 200) {
+                            val responseString = apiResponse.body()?.string()
+                            val isSuccess = responseString?.let { org.json.JSONObject(it).optBoolean("success", false) } ?: false
+                            if (isSuccess) {
+                                Timber.d("Amrit push complete dynamic pre-submit success")
+                            } else {
+                                Timber.e("Amrit push complete dynamic pre-submit failed: success=false")
+                                preSubmitSuccess = false
+                            }
+                        } else {
+                            Timber.e("Amrit push complete dynamic pre-submit failed: status=$statusCode")
+                            preSubmitSuccess = false
+                        }
                     }
 
-                    val apiResponse = amritApiService.completeCounselling(authHeader, payload)
-                    val statusCode = apiResponse.code()
-                    Timber.d("Amrit push complete dynamic response: httpStatus=$statusCode")
+                    if (preSubmitSuccess) {
+                        val postSubmitPayload = PayloadBuilder.buildBulkPayload(resp, formDef, officerId, phaseFilter = "POST_SUBMIT")
+                        try {
+                            val jsonPayload = com.google.gson.Gson().toJson(postSubmitPayload)
+                            Timber.d("Amrit push complete dynamic post-submit payload JSON: $jsonPayload")
+                        } catch (e: Exception) {
+                            Timber.e(e, "Failed to serialize complete payload to JSON for logging")
+                        }
 
-                    if (statusCode == 200) {
-                        val responseString: String? = apiResponse.body()?.string()
-                        if (responseString != null) {
-                            val jsonObj = org.json.JSONObject(responseString)
-                            val isSuccess = jsonObj.optBoolean("success", false)
-                            if (isSuccess) {
-                                Timber.d("Amrit push complete dynamic success: $jsonObj")
-                                true
+                        val apiResponse = amritApiService.completeCounselling(authHeader, postSubmitPayload)
+                        val statusCode = apiResponse.code()
+                        Timber.d("Amrit push complete dynamic response: httpStatus=$statusCode")
+
+                        if (statusCode == 200) {
+                            val responseString: String? = apiResponse.body()?.string()
+                            if (responseString != null) {
+                                val jsonObj = org.json.JSONObject(responseString)
+                                val isSuccess = jsonObj.optBoolean("success", false)
+                                if (isSuccess) {
+                                    Timber.d("Amrit push complete dynamic success: $jsonObj")
+                                    true
+                                } else {
+                                    Timber.e("Amrit push complete dynamic failed: success=false")
+                                    false
+                                }
                             } else {
-                                Timber.e("Amrit push complete dynamic failed: success=false")
+                                Timber.e("Amrit push complete dynamic failed: body is null")
                                 false
                             }
                         } else {
-                            Timber.e("Amrit push complete dynamic failed: body is null")
+                            Timber.e("Amrit push complete dynamic failed: status=$statusCode")
                             false
                         }
                     } else {
-                        Timber.e("Amrit push complete dynamic failed: status=$statusCode")
                         false
                     }
                 } else {
@@ -565,6 +599,26 @@ class CounsellingRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             Timber.e(e, "fetchAndStoreCounsellingResponse failed for benId=$beneficiaryId")
             return false
+        }
+    }
+
+    override suspend fun fetchAndStoreCompletedBeneficiaries(): List<Long>? {
+        try {
+            val jwt = preferenceDao.getJWTAmritToken()
+            val authHeader = jwt ?: run {
+                Timber.w("fetchAndStoreCompletedBeneficiaries: JWT token is null")
+                return null
+            }
+            val response = amritApiService.getCompletedBeneficiaries(authHeader, "TB_COUNSELLING")
+            if (response.isSuccessful) {
+                return response.body()?.data as List<Long> ?: return null
+            } else {
+                Timber.w("fetchAndStoreCompletedBeneficiaries failed: status code ${response.code()}")
+                return null
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "fetchAndStoreCompletedBeneficiaries exception")
+            return null
         }
     }
 

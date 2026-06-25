@@ -23,6 +23,7 @@ data class QuestionOptionEntity(
     val optionText: String,
     val optionValue: String,
     val optionOrder: Int,
+    val optionTextHindi: String? = null,
     val serverOptionId: Int? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()

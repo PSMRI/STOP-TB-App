@@ -6,6 +6,7 @@ import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.CounsellingOverviewData
 import timber.log.Timber
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.model.dynamicEntity.*
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository
@@ -60,6 +61,19 @@ class CounsellingRepo @Inject constructor(
                     else -> "Y"
                 }
                 val ageGender = "${ben.age} $ageUnitText / $genderText"
+
+                try {
+                    val completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING)
+                        ?: run {
+                            counsellingRepository.downloadAndStoreAllForms()
+                            counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING)
+                        }
+                    completeForm?.form?.formUuid?.let { formUuid ->
+                        counsellingRepository.fetchAndStoreCounsellingResponse(benId, formUuid)
+                    }
+                } catch (e: Exception) {
+                    Timber.w(e, "fetchAndStoreCounsellingResponse failed during overview pull for benId=$benId")
+                }
 
                 val formResponse = db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId)
                 var currentStep = 0
@@ -120,7 +134,10 @@ class CounsellingRepo @Inject constructor(
         return withContext(Dispatchers.IO) {
             try {
                 var completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING)
-                if (completeForm == null) {
+                val hindiMissing = completeForm?.versions
+                    ?.firstOrNull()?.sections
+                    ?.any { it.section.sectionNameHindi == null } ?: false
+                if (completeForm == null || hindiMissing) {
                     val success = counsellingRepository.downloadAndStoreAllForms()
                     if (success) {
                         completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING)
@@ -136,6 +153,8 @@ class CounsellingRepo @Inject constructor(
                     ?: return@withContext NetworkResponse.Error("No active version found")
 
                 val filteredSectionsFromDb = counsellingRepository.getSectionsByPhase(FormType.TB_COUNSELLING, phase)
+
+                val isHindi = preferenceDao.getCurrentLanguage() == Languages.HINDI
 
                 val showConditionTargets = mutableSetOf<Int>()
                 filteredSectionsFromDb.forEach { sec ->
@@ -165,7 +184,7 @@ class CounsellingRepo @Inject constructor(
                             }
                             CounsellingOptionDto(
                                 optionId = opt.optionId,
-                                optionLabel = opt.optionText,
+                                optionLabel = if (isHindi) opt.optionTextHindi ?: opt.optionText else opt.optionText,
                                 optionValue = opt.optionValue,
                                 displayOrder = opt.optionOrder,
                                 conditions = conditionsList
@@ -186,7 +205,7 @@ class CounsellingRepo @Inject constructor(
                         CounsellingQuestionDto(
                             questionId = q.questionId,
                             questionUuid = q.questionUuid ?: getQuestionCode(q.questionId),
-                            questionText = q.questionText,
+                            questionText = if (isHindi) q.questionTextHindi ?: q.questionText else q.questionText,
                             questionType = q.questionType,
                             isMandatory = q.isRequired,
                             displayOrder = q.questionOrder,
@@ -204,7 +223,7 @@ class CounsellingRepo @Inject constructor(
                     CounsellingSectionDto(
                         sectionId = sec.sectionId,
                         sectionUuid = getSectionCode(sec.sectionId),
-                        sectionName = sec.sectionName,
+                        sectionName = if (isHindi) sec.sectionNameHindi ?: sec.sectionName else sec.sectionName,
                         sectionPhase = sec.sectionPhase,
                         isRequired = true,
                         displayOrder = sec.sectionOrder,
@@ -385,12 +404,31 @@ class CounsellingRepo @Inject constructor(
                     if (syncSuccess) {
                         WorkerUtils.triggerAmritPushWorker(context)
                     } else {
-                        if (isFinalPreSubmit) {
-                            counsellingRepository.revertFormStatus(responseId, "DRAFT")
-                        } else if (isFinalPostSubmit || isLastSection) {
-                            counsellingRepository.revertFormStatus(responseId, "SUBMITTED")
+                        val isCampMode = preferenceDao.isCampModeEnabled()
+                        val isHubConnected = preferenceDao.isCampHubConnected()
+                        val isInternet = org.piramalswasthya.stoptb.helpers.isInternetAvailable(context)
+                        val isOffline = (isCampMode && !isHubConnected) || (!isCampMode && !isInternet)
+
+                        if (isOffline) {
+                            Timber.d("saveSectionAnswers: offline mode detected during sync failure, scheduling offline sync worker instead of reverting")
+                            org.piramalswasthya.stoptb.work.CounsellingSyncWorker.scheduleSync(context)
+                            
+                            withContext(Dispatchers.Main) {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Saved offline. It will be synced when connectivity is restored.",
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        } else {
+                            Timber.d("saveSectionAnswers: sync failed in online mode, reverting status")
+                            if (isFinalPreSubmit) {
+                                counsellingRepository.revertFormStatus(responseId, "DRAFT")
+                            } else if (isFinalPostSubmit || isLastSection) {
+                                counsellingRepository.revertFormStatus(responseId, "SUBMITTED")
+                            }
+                            success = false
                         }
-                        success = false
                     }
                 }
 

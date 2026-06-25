@@ -1,23 +1,49 @@
 package org.piramalswasthya.stoptb.ui.counselling_activity
 
+import android.content.Context
 import android.os.Bundle
 import android.view.View
 import android.view.inputmethod.InputMethodManager
+import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
 import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.ActivityCounsellingBinding
+import org.piramalswasthya.stoptb.helpers.MyContextWrapper
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
-import android.widget.Toast
 import org.piramalswasthya.stoptb.model.CounsellingOverviewData
 import timber.log.Timber
 
 @AndroidEntryPoint
 class CounsellingActivity : AppCompatActivity() {
+
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface WrapperEntryPoint {
+        val pref: PreferenceDao
+    }
+
+    override fun attachBaseContext(newBase: Context) {
+        val pref = EntryPointAccessors.fromApplication(
+            newBase, WrapperEntryPoint::class.java
+        ).pref
+        super.attachBaseContext(
+            MyContextWrapper.wrap(
+                newBase,
+                newBase.applicationContext,
+                pref.getCurrentLanguage().symbol
+            )
+        )
+    }
 
     private lateinit var binding: ActivityCounsellingBinding
     private val viewModel: CounsellingViewModel by viewModels()

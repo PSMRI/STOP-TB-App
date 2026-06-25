@@ -17,7 +17,7 @@ private val pref: PreferenceDao? = null
 ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 (BenDiffUtilCallBack) {
 
-
+    private var benIdList: MutableList<Long>? = null
     private object BenDiffUtilCallBack : DiffUtil.ItemCallback<BenWithTbSuspectedDomain>() {
         override fun areItemsTheSame(
             oldItem: BenWithTbSuspectedDomain,
@@ -44,16 +44,18 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
         fun bind(
             item: BenWithTbSuspectedDomain,
             clickListener: ClickListener?,
-            pref: PreferenceDao?
+            pref: PreferenceDao?,
+            benIdList: List<Long>?
         ) {
+            binding.btnFormTb.visibility = View.VISIBLE
+
             binding.benWithTb = item
 
+            val isBenAlreadyCounselled = (benIdList != null &&  benIdList.contains(item.ben.benId))
             binding.ivSyncState.visibility = if (item.tbConfirmedList == null) View.INVISIBLE else View.VISIBLE
             val role = pref?.getLoggedInUser()?.role
             if (role != null) {
-                binding.btnFormTb.visibility =
-                    if (role.isCounsellingOfficerRole()) View.VISIBLE else View.GONE
-                checkIfCounsellingOfficerOrNot(role, item.isCounselled)
+                checkIfCounsellingOfficerOrNot(role, ( item.isCounselled|| isBenAlreadyCounselled))
             } else {
                 binding.btnFormTb.visibility = View.GONE
                 binding.btnCounselling.visibility = View.GONE
@@ -101,6 +103,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
         ) {
             val isCounsellingOfficer = role.isCounsellingOfficerRole()
 
+
             binding.btnCounselling.visibility =
                 if (isCounsellingOfficer && !isCounselled) View.VISIBLE else View.GONE
 
@@ -119,7 +122,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
         holder: BenViewHolder,
         position: Int
     ) {
-        holder.bind(getItem(position), clickListener, pref)    }
+        holder.bind(getItem(position), clickListener, pref,benIdList)    }
 
     /*override fun onCreateViewHolder(
         parent: ViewGroup,
@@ -143,6 +146,14 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             clickedCounselling?.let { it(item) }
         fun onClickCounselled(item: BenWithTbSuspectedDomain) =
             clickedCounselled?.let { it(item) }
+    }
+    fun submitBenIds(list: List<Long>?) {
+        if (list != null) {
+            if (benIdList == null) benIdList = mutableListOf()
+            benIdList!!.clear()
+            benIdList!!.addAll(list)
+        }
+        notifyDataSetChanged()
     }
 
 }

@@ -41,12 +41,14 @@
     <string name="counselling_notes_hint">यहाँ टिप्पणी दर्ज करें</string>
 
     <string name="counselling_nikshay_id_format">निक्षय आईडी: %1$s</string>
+    <string name="counselled">परामर्शित</string>
 
     <string name="counselling_load_error">रोगी का डेटा लोड नहीं हो सका।\nकृपया पुनः प्रयास करें।</string>
     <string name="counselling_retry">पुनः प्रयास करें</string>
 
     <string name="btn_next_text">अगला</string>
     <string name="btn_back_text">वापस</string>
+    <string name="btn_finish">समाप्त</string>
 
     <string name="counselling_start_button">परामर्श प्रारंभ करें</string>
     <string name="counselling_follow_up_button">फॉलो अप</string>

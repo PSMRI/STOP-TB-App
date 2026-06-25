@@ -48,6 +48,7 @@
 
     <string name="btn_next_text">পৰৱৰ্তী</string>
     <string name="btn_back_text">পিছলৈ</string>
+    <string name="btn_finish">সমাপ্ত কৰক</string>
 
     <string name="counselling_start_button">পৰামৰ্শ আৰম্ভ কৰক</string>
     <string name="counselling_follow_up_button">ফলো-আপ</string>
