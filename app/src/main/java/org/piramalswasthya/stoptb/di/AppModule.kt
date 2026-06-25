@@ -70,6 +70,7 @@ object AppModule {
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
+            .hostnameVerifier(campHubHostnameVerifier)
             .addInterceptor(campModeUrlInterceptor)
             .addInterceptor(loggingInterceptor)
             .addInterceptor(accountDeactivationInterceptor)
@@ -162,7 +163,6 @@ object AppModule {
             .addInterceptor(loggingInterceptor)
             .build()
     }
-
     @Singleton
     @Provides
     fun provideAbhaApiService(
@@ -178,11 +178,17 @@ object AppModule {
             .create(AbhaApiService::class.java)
     }
 
+    private val campHubHostnameVerifier = javax.net.ssl.HostnameVerifier { hostname, session ->
+        val defaultVerifier = javax.net.ssl.HttpsURLConnection.getDefaultHostnameVerifier()
+        defaultVerifier.verify(hostname, session)
+    }
+
     private val baseClient =
         OkHttpClient.Builder()
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
+            .hostnameVerifier(campHubHostnameVerifier)
             .addInterceptor(ContentTypeInterceptor())
             .build()
 
@@ -208,6 +214,7 @@ object AppModule {
             .build()
             .create(AmritApiService::class.java)
     }
+
 
     @Singleton
     @Provides
@@ -296,4 +303,10 @@ object AppModule {
     @Singleton
     @Provides
     fun provideFormResponseJsonDao(database: InAppDb): FormResponseJsonDao = database.formResponseJsonDao()
+
+    @Singleton
+    @Provides
+    fun provideCounsellingRepository(
+        impl: org.piramalswasthya.stoptb.repositories.dynamicRepo.CounsellingRepositoryImpl
+    ): org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository = impl
 }

@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.tb_confirmed.list
 
+import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -18,6 +19,8 @@ import org.piramalswasthya.stoptb.adapters.TbConfirmedListAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchRvButtonBinding
+import org.piramalswasthya.stoptb.ui.counselling_activity.CounsellingActivity
+import org.piramalswasthya.stoptb.ui.counselling_activity.CounsellingViewModel
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import javax.inject.Inject
@@ -26,7 +29,6 @@ import kotlin.getValue
 
 @AndroidEntryPoint
 class TBConfirmedListFragment : Fragment() {
-
 
     @Inject
     lateinit var prefDao: PreferenceDao
@@ -57,14 +59,28 @@ class TBConfirmedListFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         binding.btnNextPage.visibility = View.GONE
         val benAdapter = TbConfirmedListAdapter(
-            TbConfirmedListAdapter.ClickListener { hhId, benId ->
-                findNavController().navigate(
-                    TBConfirmedListFragmentDirections.actionTBConfirmedListFragmentToTBConfirmedFormFragment(
-                    benId
+            TbConfirmedListAdapter.ClickListener(
+                clickedForm = { hhId, benId ->
+                    findNavController().navigate(
+                        TBConfirmedListFragmentDirections
+                            .actionTBConfirmedListFragmentToTBConfirmedFormFragment(benId)
                     )
-                )
-
-            },
+                },
+                clickedCounselling = { item ->
+                    startActivity(
+                        Intent(requireContext(), CounsellingActivity::class.java)
+                            .putExtra(CounsellingViewModel.EXTRA_BEN_ID, item.ben.benId)
+                    )
+                },
+                clickedCounselled = { item ->
+                    // Counselled state: open Counselling Overview — Pre-Submit will be read-only,
+                    // Post-Submit remains accessible per existing editable-window logic.
+                    startActivity(
+                        Intent(requireContext(), CounsellingActivity::class.java)
+                            .putExtra(CounsellingViewModel.EXTRA_BEN_ID, item.ben.benId)
+                    )
+                }
+            ),
             pref = prefDao
         )
         binding.rvAny.adapter = benAdapter
@@ -102,6 +118,7 @@ class TBConfirmedListFragment : Fragment() {
 
         }
     }
+
 
     override fun onStart() {
         super.onStart()
