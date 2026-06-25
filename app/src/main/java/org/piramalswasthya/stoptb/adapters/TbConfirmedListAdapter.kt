@@ -47,6 +47,8 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             pref: PreferenceDao?,
             benIdList: List<Long>?
         ) {
+            binding.btnFormTb.visibility = View.VISIBLE
+
             binding.benWithTb = item
 
             val isBenAlreadyCounselled = (benIdList != null &&  benIdList.contains(item.ben.benId))
