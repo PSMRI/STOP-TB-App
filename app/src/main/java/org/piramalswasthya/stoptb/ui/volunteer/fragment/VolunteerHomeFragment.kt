@@ -48,6 +48,7 @@ class VolunteerHomeFragment : Fragment() {
             ) {
                 activity?.runOnUiThread {
                     manualHomeRefreshRequested = false
+                    WorkerUtils.finishManualCampRefresh()
                     setQuickRefreshButtonEnabled(true)
                     if (_binding != null) {
                         binding.tvQuickRefreshStatus.text =
@@ -96,10 +97,12 @@ class VolunteerHomeFragment : Fragment() {
             setQuickRefreshButtonEnabled(false)
             binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_refreshing)
             manualRefreshWorkIds.clear()
-            val pushIds = WorkerUtils.triggerAmritPushWorker(requireContext().applicationContext)
-            val pullIds = WorkerUtils.triggerAmritPullWorker(requireContext().applicationContext)
-            manualRefreshWorkIds.addAll(pushIds)
-            manualRefreshWorkIds.addAll(pullIds)
+            manualRefreshWorkIds.addAll(
+                WorkerUtils.startManualCampRefresh(
+                    requireContext().applicationContext,
+                    pref
+                )
+            )
         }
 
         WorkManager.getInstance(requireContext().applicationContext)
@@ -116,6 +119,7 @@ class VolunteerHomeFragment : Fragment() {
                 // (the worker may stay BLOCKED forever waiting for connectivity).
                 if (!pref.isCampModeEnabled() || !pref.isCampHubConnected()) {
                     manualHomeRefreshRequested = false
+                    WorkerUtils.finishManualCampRefresh()
                     setQuickRefreshButtonEnabled(true)
                     binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_camp_disconnected)
                     return@observe
@@ -142,12 +146,14 @@ class VolunteerHomeFragment : Fragment() {
 
                     isFailed -> {
                         manualHomeRefreshRequested = false
+                        WorkerUtils.finishManualCampRefresh()
                         setQuickRefreshButtonEnabled(true)
                         binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_failed)
                     }
 
                     isFinished -> {
                         manualHomeRefreshRequested = false
+                        WorkerUtils.finishManualCampRefresh()
                         setQuickRefreshButtonEnabled(true)
                         pref.lastQuickRefreshTimestamp = System.currentTimeMillis()
                         updateQuickRefreshStatus()

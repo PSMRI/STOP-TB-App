@@ -676,23 +676,15 @@ class TBRepo @Inject constructor(
 
                 try {
                     val cache = tbConfirmedDTO.toCache()
-                    // Get all existing follow-ups for this ben
-                    val allExisting = tbDao.getAllFollowUpsForBeneficiary(cache.benId)
-                    // Find exact match by followUpDate
-                    val existing = allExisting.find {
-                        it.followUpDate != null &&
-                                cache.followUpDate != null &&
-                                it.followUpDate == cache.followUpDate
-                    }
+                    val existing = tbDao.getTbConfirmed(cache.benId)
                     if (shouldApplyServerRecord(
                             existing?.syncState,
                             existing?.serverUpdatedDate,
                             cache.serverUpdatedDate ?: 0L
                         )
                     ) {
-                        val cacheToSave = if (existing != null) cache.copy(id = existing.id) else cache
-                        tbDao.saveTbConfirmed(cacheToSave)
-                        tbConfirmedList.add(cacheToSave)
+                        tbDao.saveTbConfirmed(cache)
+                        tbConfirmedList.add(cache)
                     }
 
                 } catch (e: Exception) {
@@ -1143,28 +1135,21 @@ class TBRepo @Inject constructor(
 
         private fun getLongFromDateMultipleSupport(dateString: String?): Long {
             if (dateString.isNullOrBlank() || dateString.equals("null", ignoreCase = true)) {
-                return 0L
+                return System.currentTimeMillis()
             }
             val patterns = listOf(
                 "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
                 "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
-                "MMM d, yyyy, h:mm:ss a",
-                "MMM dd, yyyy, h:mm:ss a",
-                "MMM d, yyyy h:mm:ss a",
-                "MMM dd, yyyy h:mm:ss a",
-                "yyyy-MM-dd'T'HH:mm:ss.SSS",
-                "yyyy-MM-dd'T'HH:mm:ss",
-                "yyyy-MM-dd HH:mm:ss",
-                "yyyy-MM-dd"
+                "MMM d, yyyy h:mm:ss a"
             )
             patterns.forEach { pattern ->
                 runCatching {
                     SimpleDateFormat(pattern, Locale.ENGLISH).parse(dateString)?.time
                 }.getOrNull()?.let { return it }
             }
-            Timber.w("TB_DATE_PARSE: failed to parse visitDate='$dateString'")
-            return 0L
+            return System.currentTimeMillis()
         }
+
         private fun getServerUpdatedDate(jsonObject: JSONObject): Long {
             return parseServerUpdateDate(
                 jsonObject.optStringOrNull("updateDate")

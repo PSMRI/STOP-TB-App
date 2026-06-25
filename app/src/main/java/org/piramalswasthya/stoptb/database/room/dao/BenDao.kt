@@ -636,11 +636,11 @@ interface BenDao {
     @Query("""
         SELECT COUNT(*) FROM BEN_BASIC_CACHE
         WHERE isDeactivate = 0 AND abhaId IS NOT NULL
-        AND (:villageId = 0 OR villageId = :villageId)
+        AND ((:villageId != 0 AND villageId = :villageId) OR (:villageId = 0 AND villageId IN (:assignedVillageIds)))
         AND (:startTime = 0 OR regDate >= :startTime)
         AND (:endTime = 0 OR regDate <= :endTime)
     """)
-    fun getDashboardAbhaCount(villageId: Int, startTime: Long, endTime: Long): Flow<Int>
+    fun getDashboardAbhaCount(villageId: Int, assignedVillageIds: List<Int>, startTime: Long, endTime: Long): Flow<Int>
 
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage AND isDeactivate=0 AND rchId IS NOT NULL AND rchId != ''")
     fun getAllBenWithRchCount(selectedVillage: Int): Flow<Int>
