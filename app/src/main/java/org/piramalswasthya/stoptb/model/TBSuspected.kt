@@ -10,7 +10,6 @@ import org.piramalswasthya.stoptb.configuration.FormDataModel
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.network.TBSuspectedDTO
 import kotlin.Boolean
-import org.piramalswasthya.stoptb.model.dynamicEntity.FormResponseEntity
 
 @Entity(
     tableName = "TB_SUSPECTED",
@@ -110,21 +109,14 @@ data class BenWithTbSuspectedCache(
         parentColumn = "benId",
         entityColumn = "benId"
     )
-    val tbConfirmedList: List<TBConfirmedTreatmentCache>,
-
-    @Relation(
-        parentColumn = "benId",
-        entityColumn = "beneficiaryId"
-    )
-    val formResponse: FormResponseEntity?
+    val tbConfirmedList: List<TBConfirmedTreatmentCache>
 )
 {
     fun asTbSuspectedDomainModel(): BenWithTbSuspectedDomain {
         return BenWithTbSuspectedDomain(
             ben = ben.asBasicDomainModel(),
             tbSuspected = tbSuspected,
-            tbConfirmedList = tbConfirmedList,
-            formResponse = formResponse
+            tbConfirmedList = tbConfirmedList
         )
     }
 
@@ -133,14 +125,10 @@ data class BenWithTbSuspectedCache(
 data class BenWithTbSuspectedDomain(
     val ben: BenBasicDomain,
     val tbSuspected: TBSuspectedCache?,
-    val tbConfirmedList: List<TBConfirmedTreatmentCache>,
-    val formResponse: FormResponseEntity? = null
+    val tbConfirmedList: List<TBConfirmedTreatmentCache>
 ) {
     val latestTbSyncState: SyncState?
         get() = tbConfirmedList
             .maxByOrNull { it.followUpDate ?: 0L }
             ?.syncState
-
-    val isCounselled: Boolean
-        get() = formResponse?.status == "COMPLETE" || formResponse?.status == "COMPLETED"
 }

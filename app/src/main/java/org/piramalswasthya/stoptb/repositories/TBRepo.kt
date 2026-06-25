@@ -49,10 +49,6 @@ class TBRepo @Inject constructor(
 
     suspend fun saveTBScreening(tbScreeningCache: TBScreeningCache) {
         withContext(Dispatchers.IO) {
-            benDao.getBen(tbScreeningCache.benId)?.let { ben ->
-                ben.gpsLatitude?.let { tbScreeningCache.latitude = it }
-                ben.gpsLongitude?.let { tbScreeningCache.longitude = it }
-            }
             tbDao.saveTbScreening(tbScreeningCache)
         }
     }
@@ -93,10 +89,6 @@ class TBRepo @Inject constructor(
 
     suspend fun saveTBDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache) {
         withContext(Dispatchers.IO) {
-            benDao.getBen(tbDiagnosticsCache.benId)?.let { ben ->
-                ben.gpsLatitude?.let { tbDiagnosticsCache.latitude = it }
-                ben.gpsLongitude?.let { tbDiagnosticsCache.longitude = it }
-            }
             tbDao.saveTbDiagnostics(tbDiagnosticsCache)
         }
     }
@@ -109,10 +101,6 @@ class TBRepo @Inject constructor(
 
     suspend fun saveTBSuspected(tbSuspectedCache: TBSuspectedCache) {
         withContext(Dispatchers.IO) {
-            benDao.getBen(tbSuspectedCache.benId)?.let { ben ->
-                ben.gpsLatitude?.let { tbSuspectedCache.latitude = it }
-                ben.gpsLongitude?.let { tbSuspectedCache.longitude = it }
-            }
             tbDao.saveTbSuspected(tbSuspectedCache)
         }
     }

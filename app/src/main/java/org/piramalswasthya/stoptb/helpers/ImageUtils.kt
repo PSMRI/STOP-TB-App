@@ -92,26 +92,15 @@ object ImageUtils {
                     it.write(inputByteArray)
                     it.flush()
                 }
-                val compressedFile = Compressor.compress(context, targetFile) {
-                    quality(80)
-                }
-                if (compressedFile.exists() && compressedFile.length() > 0L) {
-                    targetFile.delete()
-                    val renamed = compressedFile.renameTo(targetFile)
-                    if (!renamed) {
-                        Timber.e("ImageUtils: Failed to rename compressed file to target file, attempting copy fallback")
-                        try {
-                            compressedFile.copyTo(targetFile, overwrite = true)
-                        } catch (e: Exception) {
-                            Timber.e(e, "ImageUtils: Copy fallback failed")
-                            return@withContext null
-                        }
+                try {
+                    val compressedFile = Compressor.compress(context, targetFile) {
+                        quality(80)
                     }
-                } else {
-                    Timber.e("ImageUtils: Server image compression produced invalid file")
-                    return@withContext null
+                    compressedFile.renameTo(targetFile)
+                    Timber.d("Compressed target file :->$targetFile ${targetFile.length()}")
+                } catch (e: java.lang.Exception) {
+                    Timber.d("Compress failed, using original image $e ${e.localizedMessage} ${e.stackTrace}")
                 }
-                Timber.d("Compressed target file :->$targetFile ${targetFile.length()}")
                 Uri.fromFile(targetFile).toString()
 
             } catch (e: java.lang.Exception) {
