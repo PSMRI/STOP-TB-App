@@ -136,7 +136,7 @@ class CounsellingRepo @Inject constructor(
                 var completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING)
                 val hindiMissing = completeForm?.versions
                     ?.firstOrNull()?.sections
-                    ?.any { it.section.sectionNameHindi == null } ?: false
+                    ?.any { it.section.sectionNameHindi.isNullOrEmpty() } ?: false
                 if (completeForm == null || hindiMissing) {
                     val success = counsellingRepository.downloadAndStoreAllForms()
                     if (success) {
@@ -184,7 +184,7 @@ class CounsellingRepo @Inject constructor(
                             }
                             CounsellingOptionDto(
                                 optionId = opt.optionId,
-                                optionLabel = if (isHindi) opt.optionTextHindi ?: opt.optionText else opt.optionText,
+                                optionLabel = if (isHindi) opt.optionTextHindi.takeIf { !it.isNullOrEmpty() } ?: opt.optionText else opt.optionText,
                                 optionValue = opt.optionValue,
                                 displayOrder = opt.optionOrder,
                                 conditions = conditionsList
@@ -205,7 +205,7 @@ class CounsellingRepo @Inject constructor(
                         CounsellingQuestionDto(
                             questionId = q.questionId,
                             questionUuid = q.questionUuid ?: getQuestionCode(q.questionId),
-                            questionText = if (isHindi) q.questionTextHindi ?: q.questionText else q.questionText,
+                            questionText = if (isHindi) q.questionTextHindi.takeIf { !it.isNullOrEmpty() } ?: q.questionText else q.questionText,
                             questionType = q.questionType,
                             isMandatory = q.isRequired,
                             displayOrder = q.questionOrder,
@@ -223,7 +223,7 @@ class CounsellingRepo @Inject constructor(
                     CounsellingSectionDto(
                         sectionId = sec.sectionId,
                         sectionUuid = getSectionCode(sec.sectionId),
-                        sectionName = if (isHindi) sec.sectionNameHindi ?: sec.sectionName else sec.sectionName,
+                        sectionName = if (isHindi) sec.sectionNameHindi.takeIf { !it.isNullOrEmpty() } ?: sec.sectionName else sec.sectionName,
                         sectionPhase = sec.sectionPhase,
                         isRequired = true,
                         displayOrder = sec.sectionOrder,

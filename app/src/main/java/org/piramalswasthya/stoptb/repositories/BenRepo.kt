@@ -1002,6 +1002,12 @@ class BenRepo @Inject constructor(
         return optString(name).takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
     }
 
+    private fun JSONObject.optDoubleOrNull(name: String): Double? {
+        if (!has(name) || isNull(name)) return null
+        val value = optDouble(name)
+        return if (value.isNaN()) null else value
+    }
+
     var count = 0
 //    private suspend fun getBenCacheFromServerResponse(response: String): MutableList<BenRegCache> {
 //        val jsonObj = JSONObject(response)
@@ -1612,7 +1618,9 @@ class BenRepo @Inject constructor(
                           jsonObject.optJSONObject("beneficiaryDetails") ?: jsonObject
 
                     val demographicsObj =
-                        jsonObject.optJSONObject("i_bendemographics") ?: JSONObject()
+                        jsonObject.optJSONObject("i_bendemographics")
+                            ?: jsonObject.optJSONObject("benDemographics")
+                            ?: JSONObject()
 
                     val abhaHealthDetailsObj =
                         jsonObject.optJSONObject("abhaHealthDetails") ?: JSONObject()
@@ -1687,6 +1695,32 @@ class BenRepo @Inject constructor(
                         ?: stopTBDetailsObj.optStringOrNull("nikshayId")
                         ?: stopTBDetailsObj.optStringOrNull("nikshayID")
 
+                    val benGpsLatitude = demographicsObj.optDoubleOrNull("latitude")
+                        ?: demographicsObj.optDoubleOrNull("gpsLatitude")
+                        ?: benDataObj.optDoubleOrNull("gpsLatitude")
+                        ?: jsonObject.optDoubleOrNull("gpsLatitude")
+
+                    val benGpsLongitude = demographicsObj.optDoubleOrNull("longitude")
+                        ?: demographicsObj.optDoubleOrNull("gpsLongitude")
+                        ?: benDataObj.optDoubleOrNull("gpsLongitude")
+                        ?: jsonObject.optDoubleOrNull("gpsLongitude")
+
+                    val benDigipin = demographicsObj.optStringOrNull("digipin")
+                        ?: benDataObj.optStringOrNull("digipin")
+                        ?: jsonObject.optStringOrNull("digipin")
+
+                    val benGpsTimestamp = demographicsObj.optStringOrNull("gpsTimestamp")
+                        ?: benDataObj.optStringOrNull("gpsTimestamp")
+                        ?: jsonObject.optStringOrNull("gpsTimestamp")
+
+                    val benIsGpsUnavailable = demographicsObj.optBoolean("isGpsUnavailable", false)
+                        || benDataObj.optBoolean("isGpsUnavailable", false)
+                        || jsonObject.optBoolean("isGpsUnavailable", false)
+
+                    val benGpsUnavailableReason = demographicsObj.optStringOrNull("gpsUnavailableReason")
+                        ?: benDataObj.optStringOrNull("gpsUnavailableReason")
+                        ?: jsonObject.optStringOrNull("gpsUnavailableReason")
+
                     try {
                         val serverBen =
                             BenRegCache(
@@ -1730,6 +1764,13 @@ class BenRepo @Inject constructor(
 
                                 ashaId = jsonObject.optInt("ashaId", 0),
                                 benRegId = jsonObject.optLong("BenRegId", 0L),
+
+                                gpsLatitude = benGpsLatitude,
+                                gpsLongitude = benGpsLongitude,
+                                digipin = benDigipin,
+                                gpsTimestamp = benGpsTimestamp,
+                                isGpsUnavailable = benIsGpsUnavailable,
+                                gpsUnavailableReason = benGpsUnavailableReason,
 
                                 isNewAbha = if (abhaHealthDetailsObj.has("isNewAbha"))
                                     abhaHealthDetailsObj.getBoolean("isNewAbha") else false,
@@ -2107,119 +2148,162 @@ class BenRepo @Inject constructor(
                     val houseDataObj = jsonObject.getJSONObject("householdDetails")
                     val benDataObj = jsonObject.getJSONObject("beneficiaryDetails")
 
-                    val hhExists =
-                        householdDao.getHousehold(hhId) != null || result.map { it.householdId }
-                            .contains(hhId)
+                    val existingHh = householdDao.getHousehold(hhId)
+                    val resultContains = result.map { it.householdId }.contains(hhId)
 
-                    if (hhExists) {
+                    if (resultContains) {
                         continue
                     }
                     Timber.d("HouseHoldList $result")
+
+                    val hhGpsLatitude = houseDataObj.optDoubleOrNull("latitude")
+                        ?: houseDataObj.optDoubleOrNull("gpsLatitude")
+                        ?: benDataObj.optDoubleOrNull("latitude")
+                        ?: benDataObj.optDoubleOrNull("gpsLatitude")
+                        ?: jsonObject.optDoubleOrNull("latitude")
+                        ?: jsonObject.optDoubleOrNull("gpsLatitude")
+
+                    val hhGpsLongitude = houseDataObj.optDoubleOrNull("longitude")
+                        ?: houseDataObj.optDoubleOrNull("gpsLongitude")
+                        ?: benDataObj.optDoubleOrNull("longitude")
+                        ?: benDataObj.optDoubleOrNull("gpsLongitude")
+                        ?: jsonObject.optDoubleOrNull("longitude")
+                        ?: jsonObject.optDoubleOrNull("gpsLongitude")
+
+                    val hhDigipin = houseDataObj.optStringOrNull("digipin")
+                        ?: benDataObj.optStringOrNull("digipin")
+                        ?: jsonObject.optStringOrNull("digipin")
+
+                    val hhGpsTimestamp = houseDataObj.optStringOrNull("gpsTimestamp")
+                        ?: benDataObj.optStringOrNull("gpsTimestamp")
+                        ?: jsonObject.optStringOrNull("gpsTimestamp")
+
+                    val hhIsGpsUnavailable = houseDataObj.optBoolean("isGpsUnavailable", false)
+                        || benDataObj.optBoolean("isGpsUnavailable", false)
+                        || jsonObject.optBoolean("isGpsUnavailable", false)
+
+                    val hhGpsUnavailableReason = houseDataObj.optStringOrNull("gpsUnavailableReason")
+                        ?: benDataObj.optStringOrNull("gpsUnavailableReason")
+                        ?: jsonObject.optStringOrNull("gpsUnavailableReason")
+
                     try {
-                        result.add(
-                            HouseholdCache(
-                                householdId = hhId,  // already resolved from both spellings above
-                                ashaId = jsonObject.getInt("ashaId"),
-                                benId = jsonObject.getLong("benficieryid"),
-                                family = HouseholdFamily(
-                                    familyHeadName = houseDataObj.getString("familyHeadName"),
-                                    familyName = if (houseDataObj.has("familyName")) houseDataObj.getString(
-                                        "familyName"
-                                    ) else null,
-                                    familyHeadPhoneNo = houseDataObj.getString("familyHeadPhoneNo")
-                                        .toLongOrNull() ?: 0L,
-                                    houseNo = if (houseDataObj.has("houseno")) houseDataObj.getString(
-                                        "houseno"
-                                    )
-                                        .let { if (it == "null") null else it } else null,
-                                    wardNo = if (houseDataObj.has("wardNo")) houseDataObj.getString(
-                                        "wardNo"
-                                    )
-                                        .let { if (it == "null") null else it } else null,
-                                    wardName = if (houseDataObj.has("wardName")) houseDataObj.getString(
-                                        "wardName"
-                                    )
-                                        .let { if (it == "null") null else it } else null,
-                                    mohallaName = if (houseDataObj.has("mohallaName")) houseDataObj.getString(
-                                        "mohallaName"
-                                    )
-                                        .let { if (it == "null") null else it } else null,
+                        val serverHh = HouseholdCache(
+                            householdId = hhId,  // already resolved from both spellings above
+                            ashaId = jsonObject.getInt("ashaId"),
+                            benId = jsonObject.getLong("benficieryid"),
+                            family = HouseholdFamily(
+                                familyHeadName = houseDataObj.getString("familyHeadName"),
+                                familyName = if (houseDataObj.has("familyName")) houseDataObj.getString(
+                                    "familyName"
+                                ) else null,
+                                familyHeadPhoneNo = houseDataObj.getString("familyHeadPhoneNo")
+                                    .toLongOrNull() ?: 0L,
+                                houseNo = if (houseDataObj.has("houseno")) houseDataObj.getString(
+                                    "houseno"
+                                )
+                                    .let { if (it == "null") null else it } else null,
+                                wardNo = if (houseDataObj.has("wardNo")) houseDataObj.getString(
+                                    "wardNo"
+                                )
+                                    .let { if (it == "null") null else it } else null,
+                                wardName = if (houseDataObj.has("wardName")) houseDataObj.getString(
+                                    "wardName"
+                                )
+                                    .let { if (it == "null") null else it } else null,
+                                mohallaName = if (houseDataObj.has("mohallaName")) houseDataObj.getString(
+                                    "mohallaName"
+                                )
+                                    .let { if (it == "null") null else it } else null,
 //                                rationCardDetails = houseDataObj.getString("rationCardDetails"),
-                                    povertyLine = houseDataObj.getString("type_bpl_apl"),
-                                    povertyLineId = houseDataObj.getInt("bpl_aplId"),
-                                ),
-                                details = HouseholdDetails(
-                                    residentialArea = houseDataObj.getString("residentialArea")
-                                        .let { if (it == "null") null else it },
-                                    residentialAreaId = houseDataObj.getInt("residentialAreaId"),
-                                    otherResidentialArea = houseDataObj.getString("other_residentialArea"),
-                                    houseType = houseDataObj.getString("houseType"),
-                                    houseTypeId = houseDataObj.getInt("houseTypeId"),
-                                    otherHouseType = houseDataObj.getString("other_houseType"),
-                                    isHouseOwned = houseDataObj.getString("houseOwnerShip"),
-                                    isHouseOwnedId = houseDataObj.getInt("houseOwnerShipId"),
+                                povertyLine = houseDataObj.getString("type_bpl_apl"),
+                                povertyLineId = houseDataObj.getInt("bpl_aplId"),
+                            ),
+                            details = HouseholdDetails(
+                                residentialArea = houseDataObj.getString("residentialArea")
+                                    .let { if (it == "null") null else it },
+                                residentialAreaId = houseDataObj.getInt("residentialAreaId"),
+                                otherResidentialArea = houseDataObj.getString("other_residentialArea"),
+                                houseType = houseDataObj.getString("houseType"),
+                                houseTypeId = houseDataObj.getInt("houseTypeId"),
+                                otherHouseType = houseDataObj.getString("other_houseType"),
+                                isHouseOwned = houseDataObj.getString("houseOwnerShip"),
+                                isHouseOwnedId = houseDataObj.getInt("houseOwnerShipId"),
 //                                isLandOwned = houseDataObj.getString("landOwned") == "Yes",
 //                                isLandIrrigated = houseDataObj.has("landIrregated") && houseDataObj.getString("landIrregated") == "Yes",
 //                                isLivestockOwned = houseDataObj.getString("liveStockOwnerShip") == "Yes",
 //                                street = houseDataObj.getString("street"),
 //                                colony = houseDataObj.getString("colony"),
 //                                pincode = houseDataObj.getInt("pincode"),
-                                ),
-                                amenities = HouseholdAmenities(
-                                    separateKitchen = houseDataObj.getString("seperateKitchen"),
-                                    separateKitchenId = houseDataObj.getInt("seperateKitchenId"),
-                                    fuelUsed = houseDataObj.getString("fuelUsed"),
-                                    fuelUsedId = houseDataObj.getInt("fuelUsedId"),
-                                    otherFuelUsed = houseDataObj.getString("other_fuelUsed"),
-                                    sourceOfDrinkingWater = houseDataObj.getString("sourceofDrinkingWater"),
-                                    sourceOfDrinkingWaterId = houseDataObj.getInt("sourceofDrinkingWaterId"),
-                                    otherSourceOfDrinkingWater = houseDataObj.getString("other_sourceofDrinkingWater"),
-                                    availabilityOfElectricity = houseDataObj.getString("avalabilityofElectricity"),
-                                    availabilityOfElectricityId = houseDataObj.getInt("avalabilityofElectricityId"),
-                                    otherAvailabilityOfElectricity = houseDataObj.getString("other_avalabilityofElectricity"),
-                                    availabilityOfToilet = houseDataObj.getString("availabilityofToilet"),
-                                    availabilityOfToiletId = houseDataObj.getInt("availabilityofToiletId"),
-                                    otherAvailabilityOfToilet = houseDataObj.getString("other_availabilityofToilet"),
-                                ),
+                            ),
+                            amenities = HouseholdAmenities(
+                                separateKitchen = houseDataObj.getString("seperateKitchen"),
+                                separateKitchenId = houseDataObj.getInt("seperateKitchenId"),
+                                fuelUsed = houseDataObj.getString("fuelUsed"),
+                                fuelUsedId = houseDataObj.getInt("fuelUsedId"),
+                                otherFuelUsed = houseDataObj.getString("other_fuelUsed"),
+                                sourceOfDrinkingWater = houseDataObj.getString("sourceofDrinkingWater"),
+                                sourceOfDrinkingWaterId = houseDataObj.getInt("sourceofDrinkingWaterId"),
+                                otherSourceOfDrinkingWater = houseDataObj.getString("other_sourceofDrinkingWater"),
+                                availabilityOfElectricity = houseDataObj.getString("avalabilityofElectricity"),
+                                availabilityOfElectricityId = houseDataObj.getInt("avalabilityofElectricityId"),
+                                otherAvailabilityOfElectricity = houseDataObj.getString("other_avalabilityofElectricity"),
+                                availabilityOfToilet = houseDataObj.getString("availabilityofToilet"),
+                                availabilityOfToiletId = houseDataObj.getInt("availabilityofToiletId"),
+                                otherAvailabilityOfToilet = houseDataObj.getString("other_availabilityofToilet"),
+                            ),
 //                                motorizedVehicle = houseDataObj.getString("motarizedVehicle"),
 //                                otherMotorizedVehicle = houseDataObj.getString("other_motarizedVehicle"),
-                                registrationType = if (houseDataObj.has("registrationType")) houseDataObj.getString(
-                                    "registrationType"
-                                ) else null,
-                                locationRecord = LocationRecord(
-                                    country = preferenceDao.getLocationRecord()?.country ?: LocationEntity(1, "India"),
-                                    state = LocationEntity(
-                                        benDataObj.getInt("stateId"),
-                                        benDataObj.getString("stateName"),
-                                    ),
-                                    district = LocationEntity(
-                                        benDataObj.getInt("districtid"),
-                                        benDataObj.getString("districtname"),
-                                    ),
-                                    block = LocationEntity(
-                                        benDataObj.getInt("blockId"),
-                                        benDataObj.getString("blockName"),
-                                    ),
-                                    village = LocationEntity(
-                                        benDataObj.getInt("villageId"),
-                                        benDataObj.getString("villageName"),
-                                    ),
+                            registrationType = if (houseDataObj.has("registrationType")) houseDataObj.getString(
+                                "registrationType"
+                            ) else null,
+                            locationRecord = LocationRecord(
+                                country = preferenceDao.getLocationRecord()?.country ?: LocationEntity(1, "India"),
+                                state = LocationEntity(
+                                    benDataObj.getInt("stateId"),
+                                    benDataObj.getString("stateName"),
                                 ),
-                                serverUpdatedStatus = houseDataObj.getInt("serverUpdatedStatus"),
-                                createdBy = houseDataObj.getString("createdBy"),
-                                createdTimeStamp = getLongFromDate(houseDataObj.getString("createdDate")),
+                                district = LocationEntity(
+                                    benDataObj.getInt("districtid"),
+                                    benDataObj.getString("districtname"),
+                                ),
+                                block = LocationEntity(
+                                    benDataObj.getInt("blockId"),
+                                    benDataObj.getString("blockName"),
+                                ),
+                                village = LocationEntity(
+                                    benDataObj.getInt("villageId"),
+                                    benDataObj.getString("villageName"),
+                                ),
+                            ),
+                            gpsLatitude = hhGpsLatitude,
+                            gpsLongitude = hhGpsLongitude,
+                            digipin = hhDigipin,
+                            gpsTimestamp = hhGpsTimestamp,
+                            isGpsUnavailable = hhIsGpsUnavailable,
+                            gpsUnavailableReason = hhGpsUnavailableReason,
+                            serverUpdatedStatus = houseDataObj.getInt("serverUpdatedStatus"),
+                            createdBy = houseDataObj.getString("createdBy"),
+                            createdTimeStamp = getLongFromDate(houseDataObj.getString("createdDate")),
 //                            updatedBy = houseDataObj.getString("other_houseType"),
 //                            updatedTimeStamp = houseDataObj.getString("other_houseType"),
-                                processed = "P",
-                                isDraft = false,
-                                isDeactivate =  if (houseDataObj.has("isDeactivate")) houseDataObj.getBoolean(
-                                    "isDeactivate"
-                                ) else false
-                            )
+                            processed = "P",
+                            isDraft = false,
+                            isDeactivate =  if (houseDataObj.has("isDeactivate")) houseDataObj.getBoolean(
+                                "isDeactivate"
+                            ) else false
                         )
+
+                        if (existingHh == null) {
+                            result.add(serverHh)
+                        } else {
+                            if (existingHh.processed == "P") {
+                                result.add(serverHh)
+                            }
+                        }
                     } catch (e: JSONException) {
                         Timber.e("Household skipped: ${jsonObject.getLong("houseoldId")} with error $e")
                     }
+
                 }
             }
         }

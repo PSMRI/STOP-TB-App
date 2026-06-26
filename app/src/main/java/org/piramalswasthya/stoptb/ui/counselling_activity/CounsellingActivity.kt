@@ -150,6 +150,7 @@ class CounsellingActivity : AppCompatActivity() {
         viewModel.schemaData?.sections?.getOrNull(step)?.let { sec ->
             val letter = if (sec.sectionPhase == "POST_SUBMIT") "F"
             else ('A' + sec.displayOrder - 1).toChar().toString()
+//            supportActionBar?.title = getString(R.string.counselling_section_title_format, letter, sec.sectionName)
             supportActionBar?.title = "Section $letter - ${sec.sectionName}"
         }
     }

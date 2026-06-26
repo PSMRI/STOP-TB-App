@@ -17,6 +17,7 @@ import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.model.BenBasicCache.Companion.getAgeFromDob
 import org.piramalswasthya.stoptb.model.BenBasicCache.Companion.getAgeUnitFromDob
 import org.piramalswasthya.stoptb.utils.HelperUtil.getDateStringFromLong
+import org.piramalswasthya.stoptb.utils.toGpsTimestampLong
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -1575,7 +1576,7 @@ data class BenRegCache(
                 latitude = gpsLatitude ?: household?.gpsLatitude ?: latitude,
                 longitude = gpsLongitude ?: household?.gpsLongitude ?: longitude,
                 digipin = digipin ?: household?.digipin,
-                gpsTimestamp = (gpsTimestamp ?: household?.gpsTimestamp)?.toLongOrNull(),
+                gpsTimestamp = (gpsTimestamp ?: household?.gpsTimestamp).toGpsTimestampLong(),
                 isGpsUnavailable = if (gpsLatitude != null || household?.gpsLatitude != null || gpsLongitude != null || household?.gpsLongitude != null) false else (isGpsUnavailable || (household?.isGpsUnavailable ?: false)),
                 gpsUnavailableReason = gpsUnavailableReason ?: household?.gpsUnavailableReason,
                 createdBy = user.userName,

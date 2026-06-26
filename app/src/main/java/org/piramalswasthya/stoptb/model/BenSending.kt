@@ -5,6 +5,7 @@ import androidx.room.ColumnInfo
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import org.piramalswasthya.stoptb.helpers.ImageUtils
+import org.piramalswasthya.stoptb.utils.toGpsTimestampLong
 import org.piramalswasthya.stoptb.model.Gender.FEMALE
 import org.piramalswasthya.stoptb.model.Gender.MALE
 import org.piramalswasthya.stoptb.model.Gender.TRANSGENDER
@@ -459,7 +460,7 @@ fun BenRegCache.asNetworkSendingModel(
             latitude = gpsLatitude ?: household?.gpsLatitude ?: latitude,
             longitude = gpsLongitude ?: household?.gpsLongitude ?: longitude,
             digipin = digipin ?: household?.digipin,
-            gpsTimestamp = (gpsTimestamp ?: household?.gpsTimestamp)?.toLongOrNull(),
+            gpsTimestamp = (gpsTimestamp ?: household?.gpsTimestamp).toGpsTimestampLong(),
             isGpsUnavailable = if (gpsLatitude != null || household?.gpsLatitude != null || gpsLongitude != null || household?.gpsLongitude != null) false else (isGpsUnavailable || (household?.isGpsUnavailable ?: false)),
             gpsUnavailableReason = gpsUnavailableReason ?: household?.gpsUnavailableReason,
             createdBy = user.userName,
