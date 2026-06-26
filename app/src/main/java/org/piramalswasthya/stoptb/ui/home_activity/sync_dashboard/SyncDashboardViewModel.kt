@@ -24,6 +24,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.SyncLogExporter
 import org.piramalswasthya.stoptb.helpers.SyncLogManager
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.model.FailedWorkerInfo
 import org.piramalswasthya.stoptb.model.SyncLogEntry
 import org.piramalswasthya.stoptb.model.SyncStatusCache
@@ -96,6 +97,10 @@ class SyncDashboardViewModel @Inject constructor(
 
     fun getEnglishNames(context: Context): Array<String> {
         return getLocalizedResources(context, Languages.ENGLISH).getStringArray(R.array.sync_records)
+    }
+
+    fun isCounsellingOfficerRole():Boolean{
+        return preferenceDao.getLoggedInUser()?.role.isCounsellingOfficerRole()
     }
 
     // Tab 2: Log export

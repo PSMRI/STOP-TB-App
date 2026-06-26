@@ -50,11 +50,27 @@ class SyncStatusTabFragment : Fragment() {
 
         val localNames = viewModel.getLocalNames(requireContext())
         val englishNames = viewModel.getEnglishNames(requireContext())
+        val showCounselling = viewModel.isCounsellingOfficerRole()
 
         // Collect sync status
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.syncStatus.collect { statusList ->
-                adapter.submitList(statusList.asDomainModel(localNames, englishNames))
+                val list = statusList.asDomainModel(localNames, englishNames)
+
+                val counsellingName = if (showCounselling) {
+                    null
+                } else {
+                    val index = englishNames.indexOf("Counselling")
+                    if (index != -1) localNames[index] else "Counselling"
+                }
+
+                adapter.submitList(
+                    if (showCounselling) {
+                        list
+                    } else {
+                        list.filter { it.name != counsellingName }
+                    }
+                )
             }
         }
 
