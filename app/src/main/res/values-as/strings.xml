@@ -78,6 +78,7 @@
     <string name="view">চাবলৈ</string>
     <string name="home">ঘৰ</string>
     <string name="sync_records">ৰেকৰ্ড সমকৰণ কৰক</string>
+    <string name="counselling_section_title_format">খণ্ড %1$s - %2$s</string>
     <string name="about">আমাৰ বিষয়ে</string>
     <string name="help">সাহায্য</string>
     <string name="logout">লগআউট</string>
@@ -115,6 +116,11 @@
         <item>এইচআরপি ট্র্যাক</item>
         <item>এইচআর গৈরগর্ভ মূল্যায়ন</item>
         <item>এইচআর গৈরগর্ভ ট্র্যাক</item>
+        <item>এনথ্ৰোপমেট্ৰিক</item>
+        <item>সাধাৰণ পৰীক্ষা</item>
+        <item>অ’ পি ডি</item>
+        <item>ৰোগ নিৰ্ণয়</item>
+        <item>পৰামৰ্শদান</item>
     </string-array>
 
     <string-array name="temp_array">

@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import org.piramalswasthya.stoptb.configuration.FormDataModel
+import org.piramalswasthya.stoptb.utils.toGpsTimestampLong
 
 
 data class HouseholdFamily(
@@ -146,7 +147,7 @@ data class HouseholdCache(
             latitude = gpsLatitude,
             longitude = gpsLongitude,
             digipin = digipin,
-            gpsTimestamp = gpsTimestamp?.toLongOrNull(),
+            gpsTimestamp = gpsTimestamp.toGpsTimestampLong(),
             isGpsUnavailable = isGpsUnavailable,
             gpsUnavailableReason = gpsUnavailableReason
         )

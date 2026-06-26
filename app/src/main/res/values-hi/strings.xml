@@ -127,6 +127,7 @@
     <string name="view">देखें</string>
     <string name="home">होम</string>
     <string name="sync_records">रिकॉर्ड सिंक करें</string>
+    <string name="counselling_section_title_format">अनुभाग %1$s - %2$s</string>
     <string name="about">हमारे बारे में</string>
     <string name="help">सहायता</string>
     <string name="logout">लॉगआउट करें</string>

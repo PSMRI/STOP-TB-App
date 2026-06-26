@@ -611,7 +611,48 @@ class CounsellingRepositoryImpl @Inject constructor(
             }
             val response = amritApiService.getCompletedBeneficiaries(authHeader, "TB_COUNSELLING")
             if (response.isSuccessful) {
-                return response.body()?.data as List<Long> ?: return null
+                val completedIds = response.body()?.data as? List<Long> ?: return null
+
+                var formDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING)
+                if (formDef == null) {
+                    downloadAndStoreAllForms()
+                    formDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING)
+                }
+                val activeVersion = formDef?.versions?.find { it.version.isActive }
+                    ?: formDef?.versions?.maxByOrNull { it.version.versionNumber }
+                val versionId = activeVersion?.version?.versionId
+
+                if (versionId != null) {
+                    db.withTransaction {
+                        for (benId in completedIds) {
+                            val existing = responseDao.getFormResponseForBeneficiary(benId)
+                            if (existing == null) {
+                                responseDao.insertFormResponse(
+                                    FormResponseEntity(
+                                        beneficiaryId = benId,
+                                        formVersionId = versionId,
+                                        status = "COMPLETE",
+                                        syncStatus = "SYNCED",
+                                        syncedAt = System.currentTimeMillis(),
+                                        lastVisitedSectionId = null
+                                    )
+                                )
+                            } else {
+                                val currentFr = existing.formResponse
+                                if (currentFr.status != "COMPLETE" && currentFr.status != "COMPLETED") {
+                                    responseDao.updateFormResponse(
+                                        currentFr.copy(
+                                            status = "COMPLETE",
+                                            syncStatus = "SYNCED",
+                                            syncedAt = System.currentTimeMillis()
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                return completedIds
             } else {
                 Timber.w("fetchAndStoreCompletedBeneficiaries failed: status code ${response.code()}")
                 return null

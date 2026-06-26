@@ -84,6 +84,14 @@ interface SyncDao {
                 "    FROM TB_DIAGNOSTICS diag " +
                 "    INNER JOIN beneficiary b ON b.beneficiaryId = diag.benId AND b.loc_village_id = :selectedVillage " +
 
+                "    UNION ALL " +
+                "    SELECT 24 as id, 'Counselling' as name, " +
+                "           CASE WHEN fr.syncStatus = 'SYNCED' THEN 2 " +
+                "                WHEN fr.syncStatus = 'SYNCING' THEN 1 " +
+                "                ELSE 0 END as syncState " +
+                "    FROM t_form_response fr " +
+                "    INNER JOIN beneficiary b ON b.beneficiaryId = fr.beneficiaryId AND b.loc_village_id = :selectedVillage " +
+
                 // ❌ NCD Refer removed
 //            "    UNION ALL " +
 //            "    SELECT 13 as id, 'NCD Refer' as name, ref.syncState as syncState " +
