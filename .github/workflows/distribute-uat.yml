@@ -69,17 +69,11 @@ jobs:
           echo "VERSION=${{ github.event.inputs.versionName }}" > version/version.properties
           echo "VERSIONCODE=${{ github.event.inputs.versionCode }}" >> version/version.properties
 
-      - name: Create release keystore
+      - name: Decode debug keystore
         run: |
-          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 --decode > stoptb_signing_key.jks
-          cat > keystore.properties <<'EOF'
-          storeFile=../stoptb_signing_key.jks
-          storePassword=${{ secrets.RELEASE_STORE_PASSWORD }}
-          keyAlias=${{ secrets.RELEASE_KEY_ALIAS }}
-          keyPassword=${{ secrets.RELEASE_KEY_PASSWORD }}
-          EOF
+          echo "${{ secrets.DEBUG_KEYSTORE_FILE }}" | base64 --decode > debug-keystore.jks
 
-      - name: Build UAT Release APK
+      - name: Build UAT Debug APK
         env:
           ENCRYPTED_PASS_KEY: ${{ secrets.ENCRYPTED_PASS_KEY }}
           ABHA_CLIENT_SECRET: ${{ secrets.ABHA_CLIENT_SECRET }}
@@ -89,13 +83,18 @@ jobs:
           ABHA_TOKEN_URL: ${{ secrets.ABHA_TOKEN_URL }}
           ABHA_AUTH_URL: ${{ secrets.ABHA_AUTH_URL }}
           CHAT_URL: ${{ secrets.CHAT_URL }}
-        run: ./gradlew assembleStoptbUatRelease --no-daemon
+        run: >
+          ./gradlew assembleStoptbUatDebug --no-daemon
+          -Pandroid.injected.signing.store.file=debug-keystore.jks
+          -Pandroid.injected.signing.store.password=${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
+          -Pandroid.injected.signing.key.alias=${{ secrets.DEBUG_KEY_ALIAS }}
+          -Pandroid.injected.signing.key.password=${{ secrets.DEBUG_KEY_PASSWORD }}
 
       - name: Upload APK as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: uat-release-apk
-          path: app/build/outputs/apk/stoptbUat/release/*.apk
+          name: uat-debug-apk
+          path: app/build/outputs/apk/stoptbUat/debug/*.apk
 
       - name: Distribute to Firebase App Distribution
         uses: wzieba/Firebase-Distribution-Github-Action@v1
@@ -103,7 +102,7 @@ jobs:
           appId: ${{ secrets.FIREBASE_APP_ID_UAT }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
           groups: testers
-          file: app/build/outputs/apk/stoptbUat/release/app-stoptbUat-universal-release.apk
+          file: app/build/outputs/apk/stoptbUat/debug/app-stoptbUat-universal-debug.apk
           releaseNotes: |
             Environment: UAT
             Version: ${{ github.event.inputs.versionName }} (${{ github.event.inputs.versionCode }})
