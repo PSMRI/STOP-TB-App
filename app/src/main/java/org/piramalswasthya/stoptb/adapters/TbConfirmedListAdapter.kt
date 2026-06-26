@@ -103,6 +103,8 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
         ) {
             val isCounsellingOfficer = role.isCounsellingOfficerRole()
 
+            binding.btnFormTb.visibility =
+                if (isCounsellingOfficer) View.VISIBLE else View.GONE
 
             binding.btnCounselling.visibility =
                 if (isCounsellingOfficer && !isCounselled) View.VISIBLE else View.GONE
