@@ -139,7 +139,6 @@ object WorkerUtils {
         preferenceDao: PreferenceDao
     ): List<java.util.UUID> {
         manualCampRefreshInProgress = true
-        cancelCampPullWorker(context)
         val pushIds = triggerAmritPushWorker(context)
         val pullIds = triggerAmritPullWorker(context)
         return pushIds + pullIds

@@ -311,38 +311,38 @@ class DashboardViewModel @Inject constructor(
 
         // TB Confirmed breakdown
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbConfirmedCount(village, assignedVillageIds, startTime, endTime, "", 0,0).collect { total ->
+            benDao.getDashboardFilteredTbConfirmedCount(village, assignedVillageIds, startTime, endTime, "", 0,0).collect { total ->
                 val current = _tbConfirmed.value ?: TbGenderBreakdown()
                 _tbConfirmed.value = current.copy(total = total)
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbConfirmedCount(village, assignedVillageIds, startTime, endTime, "MALE", 0,0).collect { male ->
+            benDao.getDashboardFilteredTbConfirmedCount(village, assignedVillageIds, startTime, endTime, "MALE", 0,0).collect { male ->
                 val current = _tbConfirmed.value ?: TbGenderBreakdown()
                 _tbConfirmed.value = current.copy(male = male)
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbConfirmedCount(village, assignedVillageIds, startTime, endTime, "FEMALE", 0,0).collect { female ->
+            benDao.getDashboardFilteredTbConfirmedCount(village, assignedVillageIds, startTime, endTime, "FEMALE", 0,0).collect { female ->
                 val current = _tbConfirmed.value ?: TbGenderBreakdown()
                 _tbConfirmed.value = current.copy(female = female)
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbConfirmedCount(village, assignedVillageIds, startTime, endTime, "", 1,0).collect { children ->
+            benDao.getDashboardFilteredTbConfirmedCount(village, assignedVillageIds, startTime, endTime, "", 1,0).collect { children ->
                 val current = _tbConfirmed.value ?: TbGenderBreakdown()
                 _tbConfirmed.value = current.copy(children = children)
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbConfirmedCount(village, assignedVillageIds, startTime, endTime, "OTHERS", 0,0).collect { others ->
+            benDao.getDashboardFilteredTbConfirmedCount(village, assignedVillageIds, startTime, endTime, "OTHERS", 0,0).collect { others ->
                 val current = _tbConfirmed.value ?: TbGenderBreakdown()
                 _tbConfirmed.value = current.copy(others = others)
             }
         }
 
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbConfirmedCount(village, assignedVillageIds, startTime, endTime, "", 0,1).collect { seniorCitizen ->
+            benDao.getDashboardFilteredTbConfirmedCount(village, assignedVillageIds, startTime, endTime, "", 0,1).collect { seniorCitizen ->
                 val current = _tbConfirmed.value ?: TbGenderBreakdown()
                 _tbConfirmed.value = current.copy(seniorCitizen = seniorCitizen)
             }
