@@ -1048,6 +1048,46 @@ interface BenDao {
     fun getTbConfirmedList(
         villageId: Int
     ): Flow<List<BenWithTbSuspectedCache>>
+
+    @Query("""
+        SELECT COUNT(DISTINCT b.benId)
+        FROM BEN_BASIC_CACHE b
+        LEFT JOIN TB_SUSPECTED ts ON b.benId = ts.benId
+        LEFT JOIN TB_DIAGNOSTICS td ON b.benId = td.benId
+        WHERE b.isDeactivate = 0
+          AND b.isDeath = 0
+          AND ((:villageId != 0 AND b.villageId = :villageId) OR (:villageId = 0 AND b.villageId IN (:assignedVillageIds)))
+          AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
+          AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+          AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
+          AND (
+                (
+                    ts.isTbConfirmed = 1
+                    AND (:startTime = 0 OR ts.visitDate >= :startTime)
+                    AND (:endTime = 0 OR ts.visitDate <= :endTime)
+                )
+                OR
+                (
+                    (
+                        td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) = 'POSITIVE'
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                    )
+                    AND (:startTime = 0 OR td.visitDate >= :startTime)
+                    AND (:endTime = 0 OR td.visitDate <= :endTime)
+                )
+              )
+    """)
+    fun getDashboardFilteredTbConfirmedCount(
+        villageId: Int,
+        assignedVillageIds: List<Int>,
+        startTime: Long,
+        endTime: Long,
+        gender: String,
+        isChild: Int,
+        isSeniorCitizen: Int
+    ): Flow<Int>
+
     @Transaction
     @Query("SELECT * FROM BEN_BASIC_CACHE b where CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER)  >= :min and b.reproductiveStatusId!=2 and b.isDeactivate=0 and b.villageId=:selectedVillage group by b.benId order by b.regDate desc")
     fun getBenWithCbac(
