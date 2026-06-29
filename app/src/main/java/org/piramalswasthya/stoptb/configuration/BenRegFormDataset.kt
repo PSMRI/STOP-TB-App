@@ -541,9 +541,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                 }
             }
             beneficiaryStatus.value = when (saved.isDeath) {
-                true -> BenStatus.Death.name
-                false -> BenStatus.Alive.name
-                null -> null
+                true -> beneficiaryStatus.entries?.getOrNull(1)
+                false -> beneficiaryStatus.entries?.getOrNull(0)
+                null -> beneficiaryStatus.entries?.getOrNull(0) // default to Alive
             }
             dateOfDeath.value    = saved.dateOfDeath
             timeOfDeath.value    = saved.timeOfDeath
