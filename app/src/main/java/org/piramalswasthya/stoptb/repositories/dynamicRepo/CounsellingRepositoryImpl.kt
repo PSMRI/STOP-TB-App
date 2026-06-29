@@ -47,10 +47,17 @@ class CounsellingRepositoryImpl @Inject constructor(
             if (response.isSuccessful) {
                 val apiSchemas = response.body()?.data ?: return false
                 db.withTransaction {
+                    val nullQuestions = metadataDao.getQuestionsWithNullServerIdCount()
+                    val nullOptions = metadataDao.getOptionsWithNullServerIdCount()
+                    val forceRefresh = nullQuestions > 0 || nullOptions > 0
+                    if (forceRefresh) {
+                        Timber.d("downloadAndStoreAllForms: Detected null server ID columns in metadata database. Forcing schema updates.")
+                    }
+
                     apiSchemas.forEach { apiSchema ->
                         val formId = apiSchema.formId.toIntOrNull() ?: 0
                         val activeVersion = metadataDao.getActiveVersionNumber(formId)
-                        if (activeVersion == null || apiSchema.versionNumber > activeVersion) {
+                        if (activeVersion == null || apiSchema.versionNumber > activeVersion || forceRefresh) {
                             storeFormSchemaInDb(apiSchema)
                         }
                     }
@@ -473,6 +480,16 @@ class CounsellingRepositoryImpl @Inject constructor(
         formUuid: String
     ): Boolean {
         try {
+            val localResponse = responseDao.getFormResponseForBeneficiary(beneficiaryId)
+            val hasLocalAnswers = localResponse?.sectionResponses?.any { it.questionResponses.isNotEmpty() } == true
+            if (localResponse != null && localResponse.formResponse.syncStatus == "SYNCED" &&
+                (localResponse.formResponse.status == "SUBMITTED" || localResponse.formResponse.status == "COMPLETE" || localResponse.formResponse.status == "COMPLETED") &&
+                hasLocalAnswers
+            ) {
+                Timber.d("fetchAndStoreCounsellingResponse: Synced response with answers already exists locally. Skipping fetch to preserve data.")
+                return true
+            }
+
             val formDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING) ?: return false
             val activeVersion = formDef.versions.find { it.version.isActive }
                 ?: formDef.versions.maxByOrNull { it.version.versionNumber }

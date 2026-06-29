@@ -94,15 +94,15 @@ class CounsellingActivity : AppCompatActivity() {
         val overviewData = (viewModel.overview.value as? NetworkResponse.Success)?.data
 
         binding.navigationFooter.root.visibility = View.VISIBLE
-        binding.navigationFooter.btnNext.text = getString(R.string.counselling_start_button)
+        if (overviewData?.preSubmitSubmitted == true) {
+            binding.navigationFooter.btnNext.text = getString(R.string.counselled)
+        } else {
+            binding.navigationFooter.btnNext.text = getString(R.string.counselling_start_button)
+        }
         binding.navigationFooter.btnNext.visibility = View.VISIBLE
         binding.navigationFooter.btnNext.setOnClickListener {
             viewModel.startCounselling()
         }
-
-        // Show the Follow-Up button as soon as the pre-submit form has ever been submitted.
-        // This flag remains true permanently and is not affected by the post-submit row's
-        // status, so the button stays visible even after the follow-up form is completed.
         if (overviewData?.preSubmitSubmitted == true) {
             binding.navigationFooter.btnBack.text = getString(R.string.counselling_follow_up_button)
             binding.navigationFooter.btnBack.visibility = View.VISIBLE

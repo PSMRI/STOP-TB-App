@@ -47,4 +47,10 @@ interface DynamicFormMetadataDao {
     @Transaction
     @Query("SELECT * FROM t_dynamic_form WHERE formId = :formId LIMIT 1")
     suspend fun getFormById(formId: Int): DynamicFormEntity?
+
+    @Query("SELECT COUNT(*) FROM t_section_question WHERE serverQuestionId IS NULL")
+    suspend fun getQuestionsWithNullServerIdCount(): Int
+
+    @Query("SELECT COUNT(*) FROM t_question_option WHERE serverOptionId IS NULL")
+    suspend fun getOptionsWithNullServerIdCount(): Int
 }
