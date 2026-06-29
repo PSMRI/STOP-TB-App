@@ -104,6 +104,8 @@ class CounsellingActivity : AppCompatActivity() {
         // This flag remains true permanently and is not affected by the post-submit row's
         // status, so the button stays visible even after the follow-up form is completed.
         if (overviewData?.preSubmitSubmitted == true) {
+            binding.navigationFooter.btnNext.text = getString(R.string.counselled)
+            binding.navigationFooter.btnNext.visibility = View.VISIBLE
             binding.navigationFooter.btnBack.text = getString(R.string.counselling_follow_up_button)
             binding.navigationFooter.btnBack.visibility = View.VISIBLE
             binding.navigationFooter.btnBack.setOnClickListener {
