@@ -130,7 +130,7 @@ class CounsellingRepo @Inject constructor(
         }
     }
 
-    suspend fun getFormSchema(benId: Long, phase: SectionPhase, isFormEditable : Boolean = true): NetworkResponse<CounsellingFormSchemaDto> {
+    suspend fun getFormSchema(benId: Long, phase: SectionPhase): NetworkResponse<CounsellingFormSchemaDto> {
         return withContext(Dispatchers.IO) {
             try {
                 var completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING)
@@ -243,42 +243,38 @@ class CounsellingRepo @Inject constructor(
                 )
 
                 val formUuid = completeForm.form.formUuid
-                val apiStatus = counsellingRepository.fetchAndStoreCounsellingResponse(benId, formUuid)
+                counsellingRepository.fetchAndStoreCounsellingResponse(benId, formUuid)
 
-                if (!isFormEditable && apiStatus.isException){
-                    NetworkResponse.Error("Unable to load counselling details. Please connect to the internet and try again.")
-                }else{
-                    val draftResponse = counsellingRepository.getOrCreateDraft(benId, activeVersionWithSections.version.versionId)
+                val draftResponse = counsellingRepository.getOrCreateDraft(benId, activeVersionWithSections.version.versionId)
 
-                    schemaDto.sections.forEach { sec ->
-                        val secResponse = draftResponse.sectionResponses.find { it.sectionResponse.sectionId == sec.sectionId }
-                        if (secResponse != null) {
-                            sec.questions.forEach { q ->
-                                val qResponses = secResponse.questionResponses.filter { it.questionId == q.questionId }
-                                if (qResponses.isNotEmpty()) {
-                                    when (q.questionType) {
-                                        "RADIO", "DROPDOWN" -> {
-                                            val optId = qResponses.first().optionId
-                                            val opt = q.options?.find { it.optionId == optId }
-                                            q.value = opt?.optionValue
+                schemaDto.sections.forEach { sec ->
+                    val secResponse = draftResponse.sectionResponses.find { it.sectionResponse.sectionId == sec.sectionId }
+                    if (secResponse != null) {
+                        sec.questions.forEach { q ->
+                            val qResponses = secResponse.questionResponses.filter { it.questionId == q.questionId }
+                            if (qResponses.isNotEmpty()) {
+                                when (q.questionType) {
+                                    "RADIO", "DROPDOWN" -> {
+                                        val optId = qResponses.first().optionId
+                                        val opt = q.options?.find { it.optionId == optId }
+                                        q.value = opt?.optionValue
+                                    }
+                                    "MCQ", "CHECKBOX" -> {
+                                        val selectedVals = qResponses.mapNotNull { resp ->
+                                            q.options?.find { it.optionId == resp.optionId }?.optionValue
                                         }
-                                        "MCQ", "CHECKBOX" -> {
-                                            val selectedVals = qResponses.mapNotNull { resp ->
-                                                q.options?.find { it.optionId == resp.optionId }?.optionValue
-                                            }
-                                            q.value = selectedVals
-                                        }
-                                        "TEXT", "DATE", "NUMBER" -> {
-                                            q.value = qResponses.first().answerText
-                                        }
+                                        q.value = selectedVals
+                                    }
+                                    "TEXT", "DATE", "NUMBER" -> {
+                                        q.value = qResponses.first().answerText
                                     }
                                 }
                             }
                         }
                     }
-
-                    NetworkResponse.Success(schemaDto)
                 }
+
+                NetworkResponse.Success(schemaDto)
             } catch (e: Exception) {
                 Timber.e(e, "getFormSchema failed for benId=$benId, phase=$phase")
                 NetworkResponse.Error("Failed to load form schema")
