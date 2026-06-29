@@ -51,6 +51,7 @@ data class ServerCounsellingResponseDto(
     @SerializedName("versionId") val versionId: Int,
     @SerializedName("officerId") val officerId: Long,
     @SerializedName("status") val status: String? = null,
+    @SerializedName("submittedAt") val submittedAt: String? = null,
     @SerializedName("sections") val sections: List<ServerSectionResponseDto> = emptyList()
 )
 
