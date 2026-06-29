@@ -244,8 +244,8 @@ class CounsellingRepo @Inject constructor(
 
                 val formUuid = completeForm.form.formUuid
                 val apiStatus = counsellingRepository.fetchAndStoreCounsellingResponse(benId, formUuid)
-
-                if (!isFormEditable && apiStatus.isException){
+                val formStatus = db.counsellingFormResponseDao().getExistingFormStatus(benId)
+                if (!isFormEditable && apiStatus.isException && (formStatus=="COMPLETE" || formStatus=="COMPLETED" )){
                     NetworkResponse.Error("Unable to load counselling details. Please connect to the internet and try again.")
                 }else{
                     val draftResponse = counsellingRepository.getOrCreateDraft(benId, activeVersionWithSections.version.versionId)

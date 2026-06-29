@@ -58,6 +58,9 @@ interface CounsellingFormResponseDao {
     @Query("SELECT * FROM t_form_response WHERE beneficiaryId = :beneficiaryId AND (status = 'SUBMITTED' OR status = 'COMPLETE' OR status = 'COMPLETED') LIMIT 1")
     suspend fun getSubmittedOrCompleteResponseForBeneficiary(beneficiaryId: Long): FormResponseEntity?
 
+    @Query("SELECT status FROM t_form_response WHERE beneficiaryId = :beneficiaryId")
+    suspend fun getExistingFormStatus(beneficiaryId: Long) : String?
+
     @Transaction
     @Query("SELECT * FROM t_form_response")
     suspend fun getAllFormResponses(): List<CompleteFormResponse>
