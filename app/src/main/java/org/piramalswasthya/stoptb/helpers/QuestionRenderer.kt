@@ -79,27 +79,37 @@ object QuestionRenderer {
         binding.etInput.tag = watcher
         binding.etInput.setOnFocusChangeListener { v, hasFocus ->
             if (hasFocus) {
-                v.postDelayed({
-                    var parentView = v.parent
-                    while (parentView != null) {
-                        if (parentView is androidx.core.widget.NestedScrollView) {
-                            val rect = android.graphics.Rect()
-                            v.getDrawingRect(rect)
-                            try {
-                                parentView.offsetDescendantRectToMyCoords(v, rect)
-                                val scrollY = (rect.top - (50 * v.resources.displayMetrics.density).toInt()).coerceAtLeast(0)
-                                parentView.smoothScrollTo(0, scrollY)
-                            } catch (e: IllegalArgumentException) {
-                                parentView.requestChildFocus(v, v)
-                            }
-                            break
-                        }
-                        parentView = parentView.parent
-                    }
-                }, 150)
+                scrollToView(v)
             }
         }
+        binding.etInput.setOnClickListener { v ->
+            scrollToView(v)
+        }
+        if (binding.etInput.hasFocus()) {
+            scrollToView(binding.etInput)
+        }
         binding.tvError.visibility = View.GONE
+    }
+
+    private fun scrollToView(v: View) {
+        v.postDelayed({
+            var parentView = v.parent
+            while (parentView != null) {
+                if (parentView is androidx.core.widget.NestedScrollView) {
+                    val rect = android.graphics.Rect()
+                    v.getDrawingRect(rect)
+                    try {
+                        parentView.offsetDescendantRectToMyCoords(v, rect)
+                        val scrollY = (rect.top - (50 * v.resources.displayMetrics.density).toInt()).coerceAtLeast(0)
+                        parentView.smoothScrollTo(0, scrollY)
+                    } catch (e: IllegalArgumentException) {
+                        parentView.requestChildFocus(v, v)
+                    }
+                    break
+                }
+                parentView = parentView.parent
+            }
+        }, 200)
     }
 
     // ?? Radio (single-select)
