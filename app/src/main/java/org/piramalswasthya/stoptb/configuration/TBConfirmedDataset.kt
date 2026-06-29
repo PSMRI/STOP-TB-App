@@ -139,7 +139,7 @@ class TBConfirmedDataset(
         id = 11,
         inputType = InputType.DATE_PICKER,
         title = resources.getString(R.string.date_of_death),
-        required = false,
+        required = true,
         max = System.currentTimeMillis(),
         isEnabled = true
     )
