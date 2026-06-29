@@ -69,11 +69,11 @@ class CounsellingViewModel @Inject constructor(
         }
     }
 
-    fun loadFormSchema(phase: SectionPhase) {
+    fun loadFormSchema(phase: SectionPhase, isFormEditable : Boolean = true) {
         lastRequestedPhase = phase
         viewModelScope.launch {
             _formSchema.value = NetworkResponse.Loading()
-            val response = counsellingRepo.getFormSchema(benId, phase)
+            val response = counsellingRepo.getFormSchema(benId, phase,isFormEditable)
             if (response is NetworkResponse.Success) {
                 schemaData = response.data
 
@@ -108,7 +108,7 @@ class CounsellingViewModel @Inject constructor(
     }
 
     fun retryLoadFormSchema() {
-        loadFormSchema(lastRequestedPhase)
+        loadFormSchema(lastRequestedPhase,_isFormEditable.value?:true)
     }
 
     fun resetSaveError() {
@@ -118,7 +118,7 @@ class CounsellingViewModel @Inject constructor(
     fun startCounselling() {
         viewModelScope.launch {
             _isFormEditable.value = !counsellingRepo.hasPreSubmitBeenSubmitted(benId)
-            loadFormSchema(SectionPhase.PRE_SUBMIT)
+            loadFormSchema(SectionPhase.PRE_SUBMIT, isFormEditable = _isFormEditable.value?:true)
         }
     }
 
