@@ -243,9 +243,26 @@ class CounsellingRepo @Inject constructor(
                 )
 
                 val formUuid = completeForm.form.formUuid
-                counsellingRepository.fetchAndStoreCounsellingResponse(benId, formUuid)
+                val fetchSuccess = counsellingRepository.fetchAndStoreCounsellingResponse(benId, formUuid)
 
                 val draftResponse = counsellingRepository.getOrCreateDraft(benId, activeVersionWithSections.version.versionId)
+
+                val isReadOnly = draftResponse.formResponse.status == "SUBMITTED" || 
+                                 draftResponse.formResponse.status == "COMPLETE" || 
+                                 draftResponse.formResponse.status == "COMPLETED"
+                val hasLocalAnswers = draftResponse.sectionResponses.any { it.questionResponses.isNotEmpty() }
+                
+                if (isReadOnly && !hasLocalAnswers && !fetchSuccess) {
+                    val isCampMode = preferenceDao.isCampModeEnabled()
+                    val isHubConnected = preferenceDao.isCampHubConnected()
+                    val isInternet = org.piramalswasthya.stoptb.helpers.isInternetAvailable(context)
+                    val isOffline = (isCampMode && !isHubConnected) || (!isCampMode && !isInternet)
+                    if (isOffline) {
+                        return@withContext NetworkResponse.Error("Unable to load counselling details. Please connect to the internet and try again.")
+                    } else {
+                        return@withContext NetworkResponse.Error("Failed to fetch counselling details from the server.")
+                    }
+                }
 
                 schemaDto.sections.forEach { sec ->
                     val secResponse = draftResponse.sectionResponses.find { it.sectionResponse.sectionId == sec.sectionId }

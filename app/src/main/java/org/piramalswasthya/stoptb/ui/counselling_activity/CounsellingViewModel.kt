@@ -53,6 +53,12 @@ class CounsellingViewModel @Inject constructor(
     private val _isFormEditable = MutableLiveData<Boolean>(true)
     val isFormEditable: LiveData<Boolean> get() = _isFormEditable
 
+    enum class CounsellingEntryMode {
+        COUNSELLING,
+        FOLLOW_UP
+    }
+
+    private var lastEntryMode: CounsellingEntryMode = CounsellingEntryMode.COUNSELLING
     private var lastRequestedPhase: SectionPhase = SectionPhase.PRE_SUBMIT
 
     var schemaData: CounsellingFormSchemaDto? = null
@@ -108,7 +114,10 @@ class CounsellingViewModel @Inject constructor(
     }
 
     fun retryLoadFormSchema() {
-        loadFormSchema(lastRequestedPhase)
+        when (lastEntryMode) {
+            CounsellingEntryMode.COUNSELLING -> startCounselling()
+            CounsellingEntryMode.FOLLOW_UP -> startFollowUp()
+        }
     }
 
     fun resetSaveError() {
@@ -116,6 +125,7 @@ class CounsellingViewModel @Inject constructor(
     }
 
     fun startCounselling() {
+        lastEntryMode = CounsellingEntryMode.COUNSELLING
         viewModelScope.launch {
             _isFormEditable.value = !counsellingRepo.hasPreSubmitBeenSubmitted(benId)
             loadFormSchema(SectionPhase.PRE_SUBMIT)
@@ -123,6 +133,7 @@ class CounsellingViewModel @Inject constructor(
     }
 
     fun startFollowUp() {
+        lastEntryMode = CounsellingEntryMode.FOLLOW_UP
         viewModelScope.launch {
             _formSchema.value = NetworkResponse.Loading()
             val response = counsellingRepo.getFormSchema(benId, SectionPhase.POST_SUBMIT)
