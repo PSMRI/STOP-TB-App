@@ -474,18 +474,19 @@ class CounsellingRepositoryImpl @Inject constructor(
     override suspend fun fetchAndStoreCounsellingResponse(
         beneficiaryId: Long,
         formUuid: String
-    ): Boolean {
+    ): CounsellingResponseModel {
+        var counsellingResponseModel = CounsellingResponseModel(isSuccess = false, isException = false)
         try {
-            val formDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING) ?: return false
+            val formDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING) ?: return counsellingResponseModel
             val activeVersion = formDef.versions.find { it.version.isActive }
                 ?: formDef.versions.maxByOrNull { it.version.versionNumber }
-                ?: return false
+                ?: return counsellingResponseModel
 
-            val jwt = preferenceDao.getJWTAmritToken() ?: return false
+            val jwt = preferenceDao.getJWTAmritToken() ?: return counsellingResponseModel
             val response = amritApiService.getCounsellingResponse(jwt, beneficiaryId, formUuid)
-            if (!response.isSuccessful) return false
+            if (!response.isSuccessful) return counsellingResponseModel
             val apiResponses = response.body()?.data
-            if (apiResponses.isNullOrEmpty()) return false
+            if (apiResponses.isNullOrEmpty()) return counsellingResponseModel
 
             db.withTransaction {
                 // Preserve any locally edited (UNSYNCED) responses — do not overwrite them
@@ -609,10 +610,12 @@ class CounsellingRepositoryImpl @Inject constructor(
                     formResponse.copy(responseId = responseId, status = finalStatus)
                 )
             }
-            return true
+            counsellingResponseModel.isSuccess = true
+            return counsellingResponseModel
         } catch (e: Exception) {
             Timber.e(e, "fetchAndStoreCounsellingResponse failed for benId=$beneficiaryId")
-            return false
+            counsellingResponseModel.isException = true
+            return counsellingResponseModel
         }
     }
 
