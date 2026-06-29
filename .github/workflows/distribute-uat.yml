@@ -71,7 +71,7 @@ jobs:
 
       - name: Decode debug keystore
         run: |
-          echo "${{ secrets.DEBUG_KEYSTORE_FILE }}" | base64 --decode > debug-keystore.jks
+          echo "${{ secrets.DEBUG_KEYSTORE_FILE }}" | base64 --decode > app/debug-keystore.jks
 
       - name: Build UAT Debug APK
         env:
@@ -85,7 +85,7 @@ jobs:
           CHAT_URL: ${{ secrets.CHAT_URL }}
         run: >
           ./gradlew assembleStoptbUatDebug --no-daemon
-          -Pandroid.injected.signing.store.file=debug-keystore.jks
+          -Pandroid.injected.signing.store.file=app/debug-keystore.jks
           -Pandroid.injected.signing.store.password=${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
           -Pandroid.injected.signing.key.alias=${{ secrets.DEBUG_KEY_ALIAS }}
           -Pandroid.injected.signing.key.password=${{ secrets.DEBUG_KEY_PASSWORD }}
