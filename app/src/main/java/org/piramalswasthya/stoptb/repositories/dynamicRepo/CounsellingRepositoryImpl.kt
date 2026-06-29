@@ -1,8 +1,9 @@
 package org.piramalswasthya.stoptb.repositories.dynamicRepo
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.model.dynamicEntity.*
 import org.piramalswasthya.stoptb.network.AmritApiService
@@ -11,6 +12,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
 import timber.log.Timber
+import java.time.OffsetDateTime
 import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
@@ -475,6 +477,7 @@ class CounsellingRepositoryImpl @Inject constructor(
         return allSuccess
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override suspend fun fetchAndStoreCounsellingResponse(
         beneficiaryId: Long,
         formUuid: String
@@ -507,9 +510,19 @@ class CounsellingRepositoryImpl @Inject constructor(
                 val unsyncedLocal = responseDao.getUnsyncedResponseForBeneficiary(beneficiaryId)
                 if (unsyncedLocal != null) return@withTransaction
 
+                val existingCreatedAt = responseDao.getFormResponseForBeneficiary(beneficiaryId)
+                    ?.formResponse?.createdAt
+
                 responseDao.deleteFormResponseForBeneficiary(beneficiaryId)
 
                 val apiResponse = apiResponses.first()
+
+                val serverDate: Long? = try {
+                    apiResponse.submittedAt?.let { OffsetDateTime.parse(it).toInstant().toEpochMilli() }
+                } catch (e: Exception) {
+                    Timber.w(e, "fetchAndStoreCounsellingResponse: failed to parse submittedAt=${apiResponse.submittedAt}")
+                    null
+                }
 
                 val questionsMap = activeVersion.sections
                     .flatMap { it.questions }
@@ -537,7 +550,8 @@ class CounsellingRepositoryImpl @Inject constructor(
                     status = "SUBMITTED",
                     lastVisitedSectionId = null,
                     syncStatus = "SYNCED",
-                    syncedAt = System.currentTimeMillis()
+                    syncedAt = System.currentTimeMillis(),
+                    createdAt = serverDate ?: existingCreatedAt ?: System.currentTimeMillis()
                 )
                 val responseId = responseDao.insertFormResponse(formResponse)
 
