@@ -474,19 +474,18 @@ class CounsellingRepositoryImpl @Inject constructor(
     override suspend fun fetchAndStoreCounsellingResponse(
         beneficiaryId: Long,
         formUuid: String
-    ): CounsellingResponseModel {
-        var counsellingResponseModel = CounsellingResponseModel(isSuccess = false, isException = false)
+    ): Boolean {
         try {
-            val formDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING) ?: return counsellingResponseModel
+            val formDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING) ?: return false
             val activeVersion = formDef.versions.find { it.version.isActive }
                 ?: formDef.versions.maxByOrNull { it.version.versionNumber }
-                ?: return counsellingResponseModel
+                ?: return false
 
-            val jwt = preferenceDao.getJWTAmritToken() ?: return counsellingResponseModel
+            val jwt = preferenceDao.getJWTAmritToken() ?: return false
             val response = amritApiService.getCounsellingResponse(jwt, beneficiaryId, formUuid)
-            if (!response.isSuccessful) return counsellingResponseModel
+            if (!response.isSuccessful) return false
             val apiResponses = response.body()?.data
-            if (apiResponses.isNullOrEmpty()) return counsellingResponseModel
+            if (apiResponses.isNullOrEmpty()) return false
 
             db.withTransaction {
                 // Preserve any locally edited (UNSYNCED) responses — do not overwrite them
@@ -610,12 +609,10 @@ class CounsellingRepositoryImpl @Inject constructor(
                     formResponse.copy(responseId = responseId, status = finalStatus)
                 )
             }
-            counsellingResponseModel.isSuccess = true
-            return counsellingResponseModel
+            return true
         } catch (e: Exception) {
             Timber.e(e, "fetchAndStoreCounsellingResponse failed for benId=$beneficiaryId")
-            counsellingResponseModel.isException = true
-            return counsellingResponseModel
+            return false
         }
     }
 
