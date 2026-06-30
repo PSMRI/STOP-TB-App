@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.tb_confirmed.from
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -95,6 +96,7 @@ class TBConfirmedFormFragment : Fragment() {
         viewModel.state.observe(viewLifecycleOwner) {
             when (it) {
                 TBConfirmedViewModel.State.SAVE_SUCCESS -> {
+                    binding.btnSubmit.isEnabled = false
                     Toast.makeText(
                         requireContext(),
                         resources.getString(R.string.tb_tracking_submitted), Toast.LENGTH_SHORT
@@ -109,9 +111,13 @@ class TBConfirmedFormFragment : Fragment() {
     }
 
 
+    @SuppressLint("NotifyDataSetChanged")
     private fun submitTBSuspectedForm() {
         if (validateCurrentPage()) {
             viewModel.saveForm()
+
+            (binding.form.rvInputForm.adapter as? FormInputAdapter)
+                ?.notifyDataSetChanged()
         }
     }
 
