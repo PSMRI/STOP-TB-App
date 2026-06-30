@@ -24,6 +24,9 @@ import org.piramalswasthya.stoptb.model.User
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.HouseholdRepo
 import timber.log.Timber
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 
 @HiltViewModel
@@ -127,7 +130,13 @@ class NewHouseholdViewModel @Inject constructor(
             return
         }
         val ts = System.currentTimeMillis().toString()
-        _locationState.value = LocationState.Captured(lat, lon, digipin, ts)
+        _locationState.value = LocationState.Captured(lat, lon, digipin, formatTimestamp(ts))
+    }
+
+    fun formatTimestamp(ts: String): String {
+        val date = Date(ts.toLong())
+        val formatter = SimpleDateFormat("MMM d, yyyy h:mm:ss a", Locale.ENGLISH)
+        return formatter.format(date)
     }
 
     fun onLocationFailed(reason: LocationState.Failed) {
