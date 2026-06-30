@@ -2088,12 +2088,34 @@ class BenRepo @Inject constructor(
                                 noOfChildren = jsonObject.optInt("noOfchildren", 0),
                             )
 
+                        val nowMillis = System.currentTimeMillis()
+
                         if (existingBen == null) {
                             result.add(serverBen)
                         } else {
-                            val savedServerUpdatedDate = existingBen.serverUpdatedDate ?: 0L
+                            val rawSavedServerUpdatedDate = existingBen.serverUpdatedDate ?: 0L
+                            // Treat corrupted future-dated local values (e.g. from device clock issues) as invalid
+                            val savedServerUpdatedDate = if (rawSavedServerUpdatedDate > nowMillis + 86_400_000L) 0L else rawSavedServerUpdatedDate
                             val serverUpdatedDate = serverBen.serverUpdatedDate ?: 0L
-                            if (existingBen.syncState != SyncState.SYNCED || serverUpdatedDate <= savedServerUpdatedDate) {
+
+                            // Skip ONLY if the record is genuinely unsynced locally (has unpushed local edits).
+                            // Do NOT skip purely because serverUpdatedDate is older/equal — always re-check
+                            // actual field-level diffs as a fallback so the pull is never silently dropped.
+                            val hasNewerServerDate = serverUpdatedDate > savedServerUpdatedDate
+                            val hasFieldDiff = serverBen.lastName != existingBen.lastName ||
+                                    serverBen.firstName != existingBen.firstName ||
+                                    serverBen.isDeath != existingBen.isDeath ||
+                                    serverBen.contactNumber != existingBen.contactNumber
+
+                            if (existingBen.syncState == SyncState.UNSYNCED) {
+                                // Local has unpushed edits — don't overwrite with server data
+                                nikshayIdValue?.takeIf { it.isNotBlank() && it != existingBen.nikshayId }?.let {
+                                    benDao.updateNikshayId(benId, it)
+                                }
+                                continue
+                            }
+
+                            if (!hasNewerServerDate && !hasFieldDiff) {
                                 nikshayIdValue?.takeIf { it.isNotBlank() && it != existingBen.nikshayId }?.let {
                                     benDao.updateNikshayId(benId, it)
                                 }
