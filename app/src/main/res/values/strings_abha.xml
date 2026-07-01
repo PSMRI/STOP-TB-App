@@ -107,7 +107,8 @@
 
     <string name="str_aadhaar_consent_5">I consent to the anonymization and subsequent use of my government health records for public health purposes.</string>
     <string name="str_aadhaar_consent_6">I, @ashaName, confirm that I have duly informed and explained the beneficiary of the
- contents of consent for aforementioned purposes.</string>
+ contents of consent for aforementioned purposes.
+    </string>
     <string name="str_aadhaar_consent_7">I, @beneficiaryName, have been explained about the consent as stated above and hereby provide my consent for the aforementioned purposes.</string>
     <string name="str_seconds">" seconds"</string>
     <string name="str_aadhaar_otp_number">"OTP sent to Aadhaar registered mobile number ending with @mobileNumber"</string>

@@ -5,6 +5,7 @@ import okhttp3.Interceptor
 import okhttp3.Response
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import java.io.IOException
+import java.io.InterruptedIOException
 import javax.inject.Inject
 
 class CampModeUrlInterceptor @Inject constructor(
@@ -38,6 +39,9 @@ class CampModeUrlInterceptor @Inject constructor(
                     .build()
             )
         } catch (e: IOException) {
+            if (e is InterruptedIOException || e.message.equals("Canceled", ignoreCase = true)) {
+                throw e
+            }
             preferenceDao.setCampHubConnected(false)
             throw e
         }

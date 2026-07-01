@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="counselling_overview_title">Counselling Overview</string>
+    <string name="counselling_menu_title">Counselling</string>
+
+    <string name="counselling_progress_title">Counselling Progress</string>
+    <string name="counselling_completed_default">0 of 6 completed</string>
+    <string name="counselling_completed_of_total">%1$d of 6 completed</string>
+    <string name="counselling_section_default">Section 1 of 6</string>
+    <string name="counselling_section_of_total">Section %1$d of 6</string>
+
+    <string name="counselling_step_a">A</string>
+    <string name="counselling_step_b">B</string>
+    <string name="counselling_step_c">C</string>
+    <string name="counselling_step_d">D</string>
+    <string name="counselling_step_e">E</string>
+    <string name="counselling_step_f">F</string>
+
+    <string name="counselling_section_a_name">DISEASE AWARENESS</string>
+    <string name="counselling_section_b_name">DO\'S AND DON\'TS</string>
+    <string name="counselling_section_c_name">GOVERNMENT SCHEMES</string>
+    <string name="counselling_section_d_name">TREATMENT REGIMEN</string>
+    <string name="counselling_section_e_name">COUNSELLING COMPLETION</string>
+    <string name="counselling_section_f_name">FOLLOW UP TO TU</string>
+
+    <!-- Ordered array used by CounsellingProgressFragment -->
+    <string-array name="counselling_section_names">
+        <item>DISEASE AWARENESS</item>
+        <item>DO\'S AND DON\'TS</item>
+        <item>GOVERNMENT SCHEMES</item>
+        <item>TREATMENT REGIMEN</item>
+        <item>COUNSELLING COMPLETION</item>
+        <item>FOLLOW UP TO TU</item>
+    </string-array>
+
+    <string name="counselling_date_label">Counselling Date</string>
+    <string name="counselling_officer_label">Counselling Officer</string>
+    <string name="age_gender_label">Age / Gender</string>
+    <string name="diagnosis_label">Diagnosis</string>
+
+    <string name="counselling_notes_label">Additional Notes (Optional)</string>
+    <string name="counselling_notes_hint">Enter notes here</string>
+    <string name="counselling_nikshay_id_format">Nikshay ID: %1$s</string>
+    <string name="counselling_load_error">Could not load patient data.\nPlease try again.</string>
+    <string name="counselling_retry">Retry</string>
+    <string name="btn_next_text">Next</string>
+    <string name="btn_back_text">Back</string>
+    <string name="btn_finish">Finish</string>
+    <string name="counselling_start_button">Start Counselling</string>
+    <string name="counselling_follow_up_button">Follow Up</string>
+    <string name="completed" translatable="false">COMPLETE</string>
+    <string name="counselled" translatable="false">Counselled</string>
+
+    <string name="counselling_data_load_error">We\'re unable to fetch data.\nPlease try again later.</string>
+
+</resources>

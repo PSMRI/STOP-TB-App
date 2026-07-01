@@ -616,5 +616,9 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         household.householdId = getHHidFromUserId(userId)
     }
 
-
+    fun enableEditMode() {
+        if (firstNameHeadOfFamily.inputType == TEXT_VIEW) firstNameHeadOfFamily.inputType = EDIT_TEXT
+        if (lastNameHeadOfFamily.inputType == TEXT_VIEW) lastNameHeadOfFamily.inputType = EDIT_TEXT
+        if (mobileNoHeadOfFamily.inputType == TEXT_VIEW) mobileNoHeadOfFamily.inputType = EDIT_TEXT
+    }
 }

@@ -24,7 +24,7 @@
     <string name="tv_ben_surname">উপকাৰীৰ বৰ্গীকৰণ</string>
     <string name="tv_gender_ph">লিংগ</string>
     <string name="tv_father_name_ph">পিতৃৰ নাম</string>
-    <string name="tv_family_head_name_ph">পৰিৱাৰৰ প্ৰধানৰ নাম</string>
+    <string name="tv_family_head_name_ph">Head of Family</string>
     <string name="tv_ben_id_ph">উপকাৰী আইডি</string>
     <string name="tv_mob_no_ph">"ম\'বাইল নম্বৰ</string>
     <string name="tv_age_ph">বয়স</string>
@@ -78,6 +78,7 @@
     <string name="view">চাবলৈ</string>
     <string name="home">ঘৰ</string>
     <string name="sync_records">ৰেকৰ্ড সমকৰণ কৰক</string>
+    <string name="counselling_section_title_format">খণ্ড %1$s - %2$s</string>
     <string name="about">আমাৰ বিষয়ে</string>
     <string name="help">সাহায্য</string>
     <string name="logout">লগআউট</string>
@@ -115,6 +116,11 @@
         <item>এইচআরপি ট্র্যাক</item>
         <item>এইচআর গৈরগর্ভ মূল্যায়ন</item>
         <item>এইচআর গৈরগর্ভ ট্র্যাক</item>
+        <item>এনথ্ৰোপমেট্ৰিক</item>
+        <item>সাধাৰণ পৰীক্ষা</item>
+        <item>অ’ পি ডি</item>
+        <item>ৰোগ নিৰ্ণয়</item>
+        <item>পৰামৰ্শদান</item>
     </string-array>
 
     <string-array name="temp_array">
@@ -137,7 +143,7 @@
     <string name="high_risk_non_pregnant_women">উচ্চ ঝুঁকিপূৰ্ণ অগৰ্ভৱতী মহিলা</string>
     <string name="low_birth_weight_babies">কম ওজনৰ নবজাত শিশুসকল</string>
     <string name="relation_with_hof">গৃহমুৰব্বীৰ সৈতে সম্পৰ্ক</string>
-    <string name="add_family_member">পৰিয়ালৰ সদস্য যোগ কৰক</string>
+    <string name="add_family_member">পৰিয়াল সদস্য যোগ কৰক</string>
 
     <string name="male">পুৰুষ</string>
     <string name="female">মহিলা</string>
@@ -518,8 +524,9 @@
     <string name="weight_kgs">ওজন (কেজি)</string>
     <string name="height_cms">উচ্চতা (চে.মি.)</string>
     <string name="temperature_degree_fahrenheit">তাপমাত্ৰা (ডিগ্ৰী ফাৰেনহাইট)</string>
-    <string name="normal_temperature_range">সাধাৰণ সীমা: 97-99&#176;F</string>
-    <string name="temperature_100_or_more">&gt;= 100&#176;F</string>
+    <string name="temperature_hypothermia">&lt;97 - Hypothermia</string>
+    <string name="normal_temperature_range">97-99 - Normal</string>
+    <string name="temperature_100_or_more">&gt;99 - Fever</string>
     <string name="anthropometry_age_gender_format">%1$d %2$s | %3$s</string>
     <string name="age_unit_years">বছৰ</string>
     <string name="age_unit_months">মাহ</string>
@@ -785,6 +792,44 @@
         <item>CHC</item>
         <item>PHC</item>
     </string-array>
+
+    <!-- Location Details Section -->
+    <string name="loc_section_title">অৱস্থানৰ বিৱৰণ</string>
+    <string name="loc_btn_refresh">পুনৰ সতেজ কৰক</string>
+    <string name="loc_status_fetching">অৱস্থান আনা হৈছে…</string>
+    <string name="loc_status_captured">অৱস্থান ধৰা পৰিছে</string>
+    <string name="loc_status_failed">অৱস্থান আনিব পৰা নগ\'ল</string>
+    <string name="loc_status_permission_denied">অক্ষাংশ আৰু দ্ৰাঘিমাংশ আনিবলৈ অনুগ্ৰহ কৰি অৱস্থানৰ অনুমতি দিয়ক।</string>
+    <string name="loc_status_gps_unavailable">GPS উপলব্ধ নহয়</string>
+    <string name="loc_status_gps_disabled">এই ডিভাইচত GPS অক্ষম</string>
+    <string name="loc_label_latitude">অক্ষাংশ</string>
+    <string name="loc_label_longitude">দ্ৰাঘিমাংশ</string>
+    <string name="loc_label_digipin">DIGIPIN</string>
+    <string name="loc_label_timestamp">টাইমষ্টাম্প</string>
+    <string name="loc_cb_gps_unavailable">GPS উপলব্ধ নহয়</string>
+    <string name="loc_label_reason">GPS অনুপলব্ধতাৰ কাৰণ</string>
+    <string name="loc_hint_reason">কাৰণ বাছক</string>
+    <string name="loc_err_reason_required">অনুগ্ৰহ কৰি এটা কাৰণ বাছক</string>
+    <string name="loc_err_location_required">অনুগ্ৰহ কৰি অৱস্থান ধৰক বা GPS অনুপলব্ধ চিহ্নিত কৰক</string>
+    <string name="loc_msg_no_signal">বৰ্তমান অৱস্থান নিৰ্ধাৰণ কৰিব পৰা নগ\'ল। অনুগ্ৰহ কৰি মুকলি ঠাইলৈ যাওক আৰু পুনৰ চেষ্টা কৰক।</string>
+    <string name="loc_msg_outside_india">অৱস্থান সমৰ্থিত ভাৰতীয় সীমাৰ বাহিৰত। GPS সংকেত পৰীক্ষা কৰক।</string>
+    <string name="loc_msg_enable_gps">অৱস্থানৰ অনুমতি প্ৰয়োজন। অনুগ্ৰহ কৰি ছেটিংছত অনুমতি দিয়ক।</string>
+    <string name="loc_dialog_open_settings">ছেটিংছ খোলক</string>
+    <string name="loc_permission_rationale">এই ঘৰেলু পঞ্জীয়নৰ বাবে GPS স্থানাংক ধৰিবলৈ অৱস্থানৰ অনুমতি প্ৰয়োজন।</string>
+    <string name="loc_timeout_msg">অৱস্থান সময় শেষ হ\'ল। মুকলি ঠাইলৈ যাওক আৰু পুনৰ সতেজ কৰক।</string>
+    <string-array name="loc_gps_unavailable_reasons">
+        <item>GPS সংকেত নাই</item>
+        <item>ঘৰৰ ভিতৰত</item>
+        <item>ভূগৰ্ভত</item>
+        <item>ডিভাইচ GPS অক্ষম</item>
+        <item>অন্যান্য</item>
+    </string-array>
+    <string name="dialog_cancel_title">আপুনি নিশ্চিত নে?</string>
+    <string name="dialog_cancel_message">আপুনি এই পঞ্জীয়ন বাতিল কৰি পিছলৈ যাব বিচাৰেনে?</string>
+    <string name="dialog_yes">হয়</string>
+    <string name="dialog_no">নহয়</string>
+    <string name="patient_registered_successfully">ৰোগীৰ পঞ্জীয়ন সফলতাৰে কৰা হ’ল।</string>
+    <string name="proceed_to_register_hof">আপুনি পৰিয়ালৰ প্ৰধানৰ পঞ্জীয়ন কৰিবলৈ আগবাঢ়িব বিচাৰেনে?</string>
 </resources>
 
 

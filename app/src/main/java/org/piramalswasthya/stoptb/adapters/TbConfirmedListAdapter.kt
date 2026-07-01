@@ -8,6 +8,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.RvItemTbConfirmedListBinding
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.model.BenWithTbSuspectedDomain
 
 class TbConfirmedListAdapter( private val clickListener: ClickListener? = null,
@@ -16,7 +17,7 @@ private val pref: PreferenceDao? = null
 ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 (BenDiffUtilCallBack) {
 
-
+    private var benIdList: MutableList<Long>? = null
     private object BenDiffUtilCallBack : DiffUtil.ItemCallback<BenWithTbSuspectedDomain>() {
         override fun areItemsTheSame(
             oldItem: BenWithTbSuspectedDomain,
@@ -43,14 +44,23 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
         fun bind(
             item: BenWithTbSuspectedDomain,
             clickListener: ClickListener?,
-            pref: PreferenceDao?
+            pref: PreferenceDao?,
+            benIdList: List<Long>?
         ) {
             binding.btnFormTb.visibility = View.VISIBLE
 
             binding.benWithTb = item
 
+            val isBenAlreadyCounselled = (benIdList != null &&  benIdList.contains(item.ben.benId))
             binding.ivSyncState.visibility = if (item.tbConfirmedList == null) View.INVISIBLE else View.VISIBLE
-
+            val role = pref?.getLoggedInUser()?.role
+            if (role != null) {
+                checkIfCounsellingOfficerOrNot(role, ( item.isCounselled|| isBenAlreadyCounselled))
+            } else {
+                binding.btnFormTb.visibility = View.GONE
+                binding.btnCounselling.visibility = View.GONE
+                binding.btnCounselled.visibility = View.GONE
+            }
             if (item.ben.spouseName == "Not Available" && item.ben.fatherName == "Not Available") {
                 binding.father = true
                 binding.husband = false
@@ -87,6 +97,22 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 
         }
 
+        private fun checkIfCounsellingOfficerOrNot(
+            role: String,
+            isCounselled: Boolean
+        ) {
+            val isCounsellingOfficer = role.isCounsellingOfficerRole()
+
+            binding.btnFormTb.visibility =
+                if (isCounsellingOfficer) View.VISIBLE else View.GONE
+
+            binding.btnCounselling.visibility =
+                if (isCounsellingOfficer && !isCounselled) View.VISIBLE else View.GONE
+
+            binding.btnCounselled.visibility =
+                if (isCounsellingOfficer && isCounselled) View.VISIBLE else View.GONE
+        }
+
     }
 
     override fun onCreateViewHolder(
@@ -98,7 +124,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
         holder: BenViewHolder,
         position: Int
     ) {
-        holder.bind(getItem(position), clickListener, pref)    }
+        holder.bind(getItem(position), clickListener, pref,benIdList)    }
 
     /*override fun onCreateViewHolder(
         parent: ViewGroup,
@@ -112,11 +138,24 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 
 
     class ClickListener(
-        private val clickedForm: ((hhId: Long, benId: Long) -> Unit)? = null
-
+        private val clickedForm: ((hhId: Long, benId: Long) -> Unit)? = null,
+        private val clickedCounselling: ((item: BenWithTbSuspectedDomain) -> Unit)? = null,
+        private val clickedCounselled: ((item: BenWithTbSuspectedDomain) -> Unit)? = null
     ) {
         fun onClickForm(item: BenWithTbSuspectedDomain) =
             clickedForm?.let { it(item.ben.hhId, item.ben.benId) }
+        fun onClickCounselling(item: BenWithTbSuspectedDomain) =
+            clickedCounselling?.let { it(item) }
+        fun onClickCounselled(item: BenWithTbSuspectedDomain) =
+            clickedCounselled?.let { it(item) }
+    }
+    fun submitBenIds(list: List<Long>?) {
+        if (list != null) {
+            if (benIdList == null) benIdList = mutableListOf()
+            benIdList!!.clear()
+            benIdList!!.addAll(list)
+        }
+        notifyDataSetChanged()
     }
 
 }

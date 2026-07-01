@@ -1,13 +1,29 @@
-name: Build & Distribute UAT
+name: StopTB UAT Build
+run-name: STOP TB Android Build - UAT
 
 on:
-  push:
-    branches: [ main, develop ]
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      versionName:
+        description: 'Version name (example: 1.0.3)'
+        required: true
+        default: '1.0.2'
+      versionCode:
+        description: 'Version code (example: 4)'
+        required: true
+        default: '3'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: distribute-uat-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-distribute:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout code
@@ -19,6 +35,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -42,8 +64,31 @@ jobs:
       - name: Install NDK
         run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;29.0.14033849"
 
+      - name: Set app version
+        run: |
+          echo "VERSION=${{ github.event.inputs.versionName }}" > version/version.properties
+          echo "VERSIONCODE=${{ github.event.inputs.versionCode }}" >> version/version.properties
+
+      - name: Decode debug keystore
+        run: |
+          echo "${{ secrets.DEBUG_KEYSTORE_FILE }}" | base64 --decode > $GITHUB_WORKSPACE/app/debug-keystore.jks
+
       - name: Build UAT Debug APK
-        run: ./gradlew assembleStoptbUatDebug --no-daemon
+        env:
+          ENCRYPTED_PASS_KEY: ${{ secrets.ENCRYPTED_PASS_KEY }}
+          ABHA_CLIENT_SECRET: ${{ secrets.ABHA_CLIENT_SECRET }}
+          ABHA_CLIENT_ID: ${{ secrets.ABHA_CLIENT_ID }}
+          BASE_TMC_URL: ${{ secrets.BASE_TMC_URL }}
+          BASE_ABHA_URL: ${{ secrets.BASE_ABHA_URL }}
+          ABHA_TOKEN_URL: ${{ secrets.ABHA_TOKEN_URL }}
+          ABHA_AUTH_URL: ${{ secrets.ABHA_AUTH_URL }}
+          CHAT_URL: ${{ secrets.CHAT_URL }}
+        run: >
+          ./gradlew assembleStoptbUatDebug --no-daemon
+          -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/app/debug-keystore.jks
+          -Pandroid.injected.signing.store.password=${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
+          -Pandroid.injected.signing.key.alias=${{ secrets.DEBUG_KEY_ALIAS }}
+          -Pandroid.injected.signing.key.password=${{ secrets.DEBUG_KEY_PASSWORD }}
 
       - name: Upload APK as artifact
         uses: actions/upload-artifact@v4
@@ -57,8 +102,10 @@ jobs:
           appId: ${{ secrets.FIREBASE_APP_ID_UAT }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
           groups: testers
-          file: app/build/outputs/apk/stoptbUat/debug/app-stoptbUat-debug.apk
+          file: app/build/outputs/apk/stoptbUat/debug/app-stoptbUat-universal-debug.apk
           releaseNotes: |
+            Environment: UAT
+            Version: ${{ github.event.inputs.versionName }} (${{ github.event.inputs.versionCode }})
             Branch: ${{ github.ref_name }}
             Commit: ${{ github.sha }}
             Message: ${{ github.event.head_commit.message }}

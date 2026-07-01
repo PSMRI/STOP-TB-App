@@ -20,6 +20,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
+import org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
 
@@ -29,6 +30,7 @@ class PullTBFromAmritWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val tbRepo: TBRepo,
     private val vitalRepo: VitalRepo,
+    private val counsellingRepository: ICounsellingRepository,
     private val preferenceDao: PreferenceDao,
 ) : CoroutineWorker(appContext, params) {
 
@@ -61,7 +63,8 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                             async { getGeneralOpdDetails() },
                             async { getTbDiagnosticsDetails() },
                             async { getTbSuspectedDetails() },
-                            async { getTbConfirmedDetails() }
+                            async { getTbConfirmedDetails() },
+                            async { getCounsellingCompletedDetails() }
                         )
 
                     val endTime = System.currentTimeMillis()
@@ -176,6 +179,17 @@ class PullTBFromAmritWorker @AssistedInject constructor(
             } catch (e: Exception) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
 
+            }
+            true
+        }
+    }
+
+    private suspend fun getCounsellingCompletedDetails(): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                counsellingRepository.fetchAndStoreCompletedBeneficiaries()
+            } catch (e: Exception) {
+                Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
             }
             true
         }

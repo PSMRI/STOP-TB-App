@@ -119,7 +119,7 @@ class TBConfirmedDataset(
         id = 9,
         inputType = InputType.DATE_PICKER,
         title = resources.getString(R.string.actual_treatment_completion_date),
-        required = false,
+        required = true,
         max = System.currentTimeMillis(),
         isEnabled = true
     )
@@ -139,7 +139,7 @@ class TBConfirmedDataset(
         id = 11,
         inputType = InputType.DATE_PICKER,
         title = resources.getString(R.string.date_of_death),
-        required = false,
+        required = true,
         max = System.currentTimeMillis(),
         isEnabled = true
     )
@@ -159,15 +159,16 @@ class TBConfirmedDataset(
         inputType = InputType.EDIT_TEXT,
         title = resources.getString(R.string.reason_for_death),
         required = false,
-        isEnabled = false
+        isEnabled = true
     )
 
     private val reasonForNotCompleting = FormElement(
         id = 14,
         inputType = InputType.EDIT_TEXT,
         title = resources.getString(R.string.reason_for_not_completing),
-        required = false,
+        required = true,
         isEnabled = true
+
     )
 
     suspend fun setUpPage(
@@ -235,7 +236,7 @@ class TBConfirmedDataset(
                 getLocalValueInArray(R.array.tb_treatment_outcomes, saved.treatmentOutcome)
             dateOfDeath.value = saved.dateOfDeath?.let { getDateFromLong(it) }
             placeOfDeath.value = getLocalValueInArray(R.array.place_of_death, saved.placeOfDeath)
-            reasonForDeath.value = saved.reasonForDeath
+            reasonForDeath.value = saved.reasonForDeath ?: resources.getString(R.string.tuberculosis)
             reasonForNotCompleting.value = saved.reasonForNotCompleting
 
             treatmentStartDateValue =
@@ -302,6 +303,7 @@ class TBConfirmedDataset(
             regimenType.id -> {
                 regimenTypeValue = regimenType.value
                 calculateExpectedCompletionDate()
+                updateFollowUpDateConstraints()
                 checkAndEnableTreatmentCompletion()
             }
 
@@ -309,9 +311,8 @@ class TBConfirmedDataset(
                 val dateLong = getLongFromDate(treatmentStartDate.value)
                 treatmentStartDateValue = dateLong
                 treatmentStartDateLong = dateLong
-                followUpDate.min = dateLong
-                followUpDate.isEnabled = true
                 calculateExpectedCompletionDate()
+                updateFollowUpDateConstraints()
             }
 
             followUpDate.id -> {
@@ -373,7 +374,12 @@ class TBConfirmedDataset(
             return
         }
 
-        followUpDate.max = System.currentTimeMillis()
+        // Cap follow-up date max to expected completion date if known
+        val expectedCompletionMax = calculateExpectedCompletionDateLong()
+        followUpDate.max = if (expectedCompletionMax > 0L)
+            minOf(System.currentTimeMillis(), expectedCompletionMax)
+        else
+            System.currentTimeMillis()
 
         if (lastFollowUpDateLong == 0L) {
             followUpDate.min = treatmentStartDateLong
@@ -385,49 +391,120 @@ class TBConfirmedDataset(
         }
     }
 
+
     fun validateAllFields(): Boolean {
-        val followUpDateValid = validateCurrentFollowUpDate()
+        var isValid = true
+
         if (regimenType.required && regimenType.value.isNullOrEmpty()) {
             regimenType.errorText = "Regimen type is required"
-            return false
+            isValid = false
         }
+
         if (treatmentStartDate.required && treatmentStartDate.value.isNullOrEmpty()) {
             treatmentStartDate.errorText = "Treatment start date is required"
-            return false
+            isValid = false
         }
-        return followUpDateValid
-    }
 
+        if (!validateCurrentFollowUpDate()) {
+            isValid = false
+        }
+
+        if (adherenceToMedicines.required &&
+            listFlow.value.contains(adherenceToMedicines) &&
+            adherenceToMedicines.value.isNullOrEmpty()) {
+            adherenceToMedicines.errorText = "Adherence to medicines is required"
+            isValid = false
+        }
+
+        if (anyDiscomfort.required &&
+            listFlow.value.contains(anyDiscomfort) &&
+            anyDiscomfort.value.isNullOrEmpty()) {
+            anyDiscomfort.errorText = "This field is required"
+            isValid = false
+        }
+
+        if (actualTreatmentCompletionDate.required &&
+            listFlow.value.contains(actualTreatmentCompletionDate)) {
+            if (actualTreatmentCompletionDate.value.isNullOrEmpty()) {
+                actualTreatmentCompletionDate.errorText =
+                    "Actual treatment completion date is required"
+                isValid = false
+            } else {
+                val actualDate = getLongFromDate(actualTreatmentCompletionDate.value)
+                val lastFollowUp = getLongFromDate(followUpDate.value)
+                if (actualDate > 0 && lastFollowUp > 0 && actualDate <= lastFollowUp) {
+                    actualTreatmentCompletionDate.errorText =
+                        "Actual treatment completion date must be after the last follow-up date"
+                    isValid = false
+                } else {
+                    actualTreatmentCompletionDate.errorText = null
+                }
+            }
+        }
+
+        if (dateOfDeath.required &&
+            listFlow.value.contains(dateOfDeath) &&
+            dateOfDeath.value.isNullOrEmpty()) {
+            dateOfDeath.errorText = "Date of death is required"
+            isValid = false
+        }
+
+        if (reasonForNotCompleting.required &&
+            listFlow.value.contains(reasonForNotCompleting) &&
+            reasonForNotCompleting.value.isNullOrEmpty()) {
+            reasonForNotCompleting.errorText = "Reason for not completing is required"
+            isValid = false
+        }
+
+        return isValid
+    }
     fun validateCurrentFollowUpDate(): Boolean {
         val dateString = followUpDate.value
         if (dateString.isNullOrEmpty()) {
             followUpDate.errorText = "Follow-up date is required"
             return false
         }
-
         val dateLong = getLongFromDate(dateString)
+        // If this date equals lastFollowUpDateLong it means it was already
+        // saved as the current follow-up — treat as valid, clear error
+//        if (dateLong == lastFollowUpDateLong && lastFollowUpDateLong > 0) {
+//            followUpDate.errorText = null
+//            return true
+//        }
         val error = validateFollowUpDate(dateLong)
         followUpDate.errorText = error
         return error == null
     }
 
     private fun validateFollowUpDate(selectedDate: Long): String? {
+
         if (selectedDate > System.currentTimeMillis()) {
             return "Follow-up date cannot be in the future"
         }
+
         if (selectedDate < treatmentStartDateLong) {
             return "Follow-up date cannot be before treatment start date"
         }
+
+        val expectedCompletionDate = calculateExpectedCompletionDateLong()
+        if (expectedCompletionDate > 0L && selectedDate > expectedCompletionDate) {
+            return "Follow-up date cannot be after treatment end date"
+        }
+
         if (lastFollowUpDateLong > 0) {
             if (selectedDate <= lastFollowUpDateLong) {
                 return "Follow-up date must be after last follow-up date"
             }
+
             if (isSameMonth(selectedDate, lastFollowUpDateLong)) {
                 return "Only one follow-up is allowed per month"
             }
         }
+
         return null
     }
+    fun getFollowUpDateLong(): Long = getLongFromDate(followUpDate.value)
+
 
     private fun calculateExpectedCompletionDate() {
         if (regimenTypeValue == null || treatmentStartDateValue == null) return
@@ -469,6 +546,30 @@ class TBConfirmedDataset(
                 expectedTreatmentCompletionDate.value =
                     "${getDateFromLong(minDate)} to ${getDateFromLong(maxDate)}"
             }
+        }
+    }
+
+    private fun calculateExpectedCompletionDateLong(): Long {
+        if (regimenTypeValue == null || treatmentStartDateValue == null) return 0L
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = treatmentStartDateValue!!
+        }
+        return when (regimenTypeValue) {
+            resources.getStringArray(R.array.tb_regimen_types)[0],
+            resources.getStringArray(R.array.tb_regimen_types)[3],
+            resources.getStringArray(R.array.tb_regimen_types)[4] -> {
+                calendar.add(Calendar.MONTH, 6)
+                calendar.timeInMillis
+            }
+            resources.getStringArray(R.array.tb_regimen_types)[1] -> {
+                calendar.add(Calendar.MONTH, 12)
+                calendar.timeInMillis
+            }
+            resources.getStringArray(R.array.tb_regimen_types)[2] -> {
+                calendar.add(Calendar.MONTH, 24)
+                calendar.timeInMillis
+            }
+            else -> 0L
         }
     }
 
@@ -581,6 +682,6 @@ class TBConfirmedDataset(
         cal1.timeInMillis = date1
         cal2.timeInMillis = date2
         return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
-            cal1.get(Calendar.MONTH) == cal2.get(Calendar.MONTH)
+                cal1.get(Calendar.MONTH) == cal2.get(Calendar.MONTH)
     }
 }
