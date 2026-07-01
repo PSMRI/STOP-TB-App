@@ -146,7 +146,7 @@ class NewBenRegFragment : Fragment() {
         // Submit button
         binding.btnSubmit.setOnClickListener {
             if (validateCurrentPage()) {
-                handlePhotoReminderBeforePreview()
+                showPreview()
             }
         }
 

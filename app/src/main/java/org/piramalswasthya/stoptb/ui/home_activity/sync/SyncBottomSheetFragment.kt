@@ -32,7 +32,7 @@ class SyncBottomSheetFragment : BottomSheetDialogFragment() {
     private val viewModel: SyncViewModel by viewModels({ requireActivity() })
 
     // Rows visible to Registrar only (others hidden)
-    private val registrarRows = setOf("Beneficiary", "Anthropometric")
+    private val registrarRows = setOf("Beneficiary", "Anthropometric", "TB Screening")
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?

@@ -920,6 +920,9 @@
     <string name="tb_referral_required">Referral Required</string>
     <string name="tb_referral_for">Referral For</string>
     <string name="tb_family_contact_screening_alert">Advise tracing and screening of all family members</string>
+    <string name="tb_presumptive_alert_title">A Presumptive TB case!</string>
+    <string name="tb_presumptive_alert_refer">Refer to X-ray and collect sputum for Truenat test</string>
+    <string name="tb_presumptive_alert_family">Advise screening of all family members</string>
     <string name="referred_for_digital_chest_xray">Referred for digital chest x-ray</string>
     <string name="referred_for_sputum_collection">Referred for Sputum Collection</string>
     <string name="recommended_for_truenat_test">Recommended for Truenat test</string>

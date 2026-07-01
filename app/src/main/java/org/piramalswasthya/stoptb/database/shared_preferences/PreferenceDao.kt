@@ -223,6 +223,11 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         return pref.getString(key, null) ?: "http://192.168.137.1:8080/"
     }
 
+    fun getStoredCampHubUrl(): String? {
+        val key = context.getString(R.string.PREF_camp_hub_url)
+        return pref.getString(key, null)
+    }
+
     fun setCampHubConnected(connected: Boolean) {
         val key = context.getString(R.string.PREF_camp_hub_connected)
         pref.edit().putBoolean(key, connected).commit()
