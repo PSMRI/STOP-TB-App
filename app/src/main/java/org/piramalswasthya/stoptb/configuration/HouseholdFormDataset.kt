@@ -80,7 +80,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         inputType = EDIT_TEXT,
         title = resources.getString(R.string.nhhr_mob_no_hof),
         arrayId = -1,
-        required = true,
+        required = false,
         etInputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL,
         isMobileNumber = true,
         etMaxLength = 10,
@@ -128,6 +128,12 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         required = true
     )
 
+    private fun setDefaultPovertyLineIfNeeded() {
+        if (povertyLine.value.isNullOrBlank()) {
+            povertyLine.value = povertyLine.entries?.lastOrNull()
+        }
+    }
+
     suspend fun setupPage(hh: HouseholdCache?) {
 
         val list = mutableListOf<FormElement>()
@@ -158,6 +164,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             mohallaName.value = saved.mohallaName
             povertyLine.value = povertyLine.getStringFromPosition(saved.povertyLineId)
         }
+        setDefaultPovertyLineIfNeeded()
 
 
         val secondPage =
@@ -235,6 +242,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             mohallaName.value = saved.mohallaName
             povertyLine.value = povertyLine.getStringFromPosition(saved.povertyLineId)
         }
+        setDefaultPovertyLineIfNeeded()
     }
 
 //////////////////////////////// Second Page /////////////////////////////////////////
@@ -272,7 +280,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_type_of_house),
         arrayId = R.array.nhhr_type_of_house_array,
         entries = resources.getStringArray(R.array.nhhr_type_of_house_array),
-        required = true
+        required = false
     )
     private val houseOwnership = FormElement(
         id = 11,
@@ -280,7 +288,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_house_own),
         arrayId = R.array.nhhr_house_own_array,
         entries = resources.getStringArray(R.array.nhhr_house_own_array),
-        required = true
+        required = false
     )
 
 
@@ -319,7 +327,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_separate_kitchen),
         arrayId = R.array.nhhr_separate_kitchen_array,
         entries = resources.getStringArray(R.array.nhhr_separate_kitchen_array),
-        required = true
+        required = false
     )
 
     private val fuelForCooking = FormElement(
@@ -328,7 +336,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_fuel_cooking),
         arrayId = R.array.nhhr_fuel_cooking_array,
         entries = resources.getStringArray(R.array.nhhr_fuel_cooking_array),
-        required = true,
+        required = false,
         hasDependants = true,
     )
 
@@ -348,7 +356,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_primary_water),
         arrayId = R.array.nhhr_primary_water_array,
         entries = resources.getStringArray(R.array.nhhr_primary_water_array),
-        required = true,
+        required = false,
         hasDependants = true,
     )
 
@@ -368,7 +376,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_avail_electricity),
         arrayId = R.array.nhhr_avail_electricity_array,
         entries = resources.getStringArray(R.array.nhhr_avail_electricity_array),
-        required = true,
+        required = false,
         hasDependants = true
     )
 
@@ -388,7 +396,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_avail_toilet),
         arrayId = R.array.nhhr_avail_toilet_array,
         entries = resources.getStringArray(R.array.nhhr_avail_toilet_array),
-        required = true,
+        required = false,
         hasDependants = true,
     )
 

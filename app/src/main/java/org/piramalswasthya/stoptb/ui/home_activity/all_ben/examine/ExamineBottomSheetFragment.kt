@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 
 @AndroidEntryPoint
@@ -57,6 +58,9 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
     /** True when logged-in user is Registrar — only Anthropometry form shown */
     private val isRegistrar: Boolean
         get() = prefDao.getLoggedInUser()?.role.isRegistrationOfficerRole()
+
+    private val isNurse: Boolean
+        get() = prefDao.getLoggedInUser()?.role.isNurseRole()
 
     private val autoFlow: Boolean
         get() = arguments?.getBoolean("autoFlow", false) ?: false
@@ -101,8 +105,12 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
         )
 
         rows.forEachIndexed { index, (rowView, formName, formIndex) ->
-            // Registrar role: show ONLY Anthropometry (index 0); Nurse: show all 5
-            if (isRegistrar && formIndex != FORM_ANTHROPOMETRY) {
+            // Registrar role: show Anthropometry + TB Screening; Nurse: hide Diagnosis only
+            if (isRegistrar && formIndex != FORM_ANTHROPOMETRY && formIndex != FORM_TB_SCREENING) {
+                rowView.visibility = View.GONE
+                return@forEachIndexed
+            }
+            if (isNurse && formIndex == FORM_DIAGNOSIS) {
                 rowView.visibility = View.GONE
                 return@forEachIndexed
             }

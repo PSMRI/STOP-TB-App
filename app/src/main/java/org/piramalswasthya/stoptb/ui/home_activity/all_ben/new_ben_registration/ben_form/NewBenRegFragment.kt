@@ -180,8 +180,7 @@ class NewBenRegFragment : Fragment() {
         // Submit button
         binding.btnSubmit.setOnClickListener {
             if (validateCurrentPage()) {
-                if (viewModel.isStandalone && !validateLocationSection()) return@setOnClickListener
-                handlePhotoReminderBeforePreview()
+                showPreview()
             }
         }
 

@@ -193,7 +193,11 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
             ExamineBottomSheetFragment.FORM_TB_SCREENING -> {
                 findNavController().navigate(
                     R.id.TBScreeningFormFragment,
-                    bundleOf("benId" to benId, "autoFlow" to !viewOnly)
+                    bundleOf(
+                        "benId" to benId,
+                        "autoFlow" to !viewOnly,
+                        "openedFromHousehold" to true
+                    )
                 )
             }
             ExamineBottomSheetFragment.FORM_GENERAL_OPD -> {

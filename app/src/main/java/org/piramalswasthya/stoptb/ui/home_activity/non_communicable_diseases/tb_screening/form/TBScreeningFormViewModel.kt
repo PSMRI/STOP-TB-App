@@ -108,7 +108,7 @@ class TBScreeningFormViewModel @Inject constructor(
 
     }
 
-    fun getFamilyContactAlert(): String? = dataset.getFamilyContactAlert()
+    fun getSubmitAlertMessage(): String? = dataset.getPresumptiveTbAlert()
 
     fun saveForm() {
         viewModelScope.launch {

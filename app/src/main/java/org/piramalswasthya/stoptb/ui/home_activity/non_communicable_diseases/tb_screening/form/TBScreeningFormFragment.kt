@@ -44,6 +44,9 @@ class TBScreeningFormFragment : Fragment() {
 
     @Inject lateinit var preferenceDao: PreferenceDao
 
+    private val openedFromHousehold: Boolean
+        get() = arguments?.getBoolean("openedFromHousehold", false) == true
+
     private var _binding: FragmentNewFormBinding? = null
     private val binding: FragmentNewFormBinding
         get() = _binding!!
@@ -142,7 +145,7 @@ class TBScreeningFormFragment : Fragment() {
             when (it) {
                 TBScreeningFormViewModel.State.SAVE_SUCCESS -> {
                     WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
-                    val alertMessage = viewModel.getFamilyContactAlert()
+                    val alertMessage = viewModel.getSubmitAlertMessage()
                     if (alertMessage.isNullOrBlank()) {
                         handleSaveSuccessNavigation()
                     } else {
@@ -186,7 +189,9 @@ class TBScreeningFormFragment : Fragment() {
             requireContext(),
             resources.getString(R.string.tb_screening_submitted), Toast.LENGTH_SHORT
         ).show()
-        if (viewModel.autoFlow) {
+        if (openedFromHousehold) {
+            findNavController().navigateUp()
+        } else if (viewModel.autoFlow) {
             // Examine flow — return to AllBenFragment so user picks the next form
             val popped = findNavController().popBackStack(R.id.allBenFragment, false)
             if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
