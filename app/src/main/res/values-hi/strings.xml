@@ -600,6 +600,9 @@
     <string name="tb_referral_required">रेफरल आवश्यक</string>
     <string name="tb_referral_for">किसके लिए रेफरल</string>
     <string name="tb_family_contact_screening_alert">परिवार के सभी सदस्यों की ट्रेसिंग और स्क्रीनिंग की सलाह दें</string>
+    <string name="tb_presumptive_alert_title">संभावित टीबी मामला!</string>
+    <string name="tb_presumptive_alert_refer">एक्स-रे के लिए रेफर करें और ट्रूनैट टेस्ट के लिए थूक एकत्र करें</string>
+    <string name="tb_presumptive_alert_family">परिवार के सभी सदस्यों की स्क्रीनिंग की सलाह दें</string>
     <string name="referred_for_digital_chest_xray">डिजिटल चेस्ट एक्स-रे के लिए रेफर किया गया</string>
     <string name="referred_for_sputum_collection">स्पुटम कलेक्शन के लिए रेफर किया गया</string>
     <string name="recommended_for_truenat_test">ट्रूनैट टेस्ट की सिफारिश</string>

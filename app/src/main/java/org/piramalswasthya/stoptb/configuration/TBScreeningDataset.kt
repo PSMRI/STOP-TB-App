@@ -255,6 +255,34 @@ class TBScreeningDataset(
 
     fun requiresFamilyContactScreening(): Boolean = isYes(familyHistoryTB)
 
+    private fun hasSingleStarYes(): Boolean = listOf(
+        isCoughing,
+        bloodInSputum,
+        isFever,
+        riseOfFever,
+        lossOfAppetite,
+        lossOfWeight,
+        nightSweats,
+        historyOfTB
+    ).any(::isYes)
+
+    private fun hasDoubleStarYes(): Boolean = listOf(
+        currentlyTakingDrugs,
+        familyHistoryTB
+    ).any(::isYes)
+
+    fun getPresumptiveTbAlert(): String? =
+        when {
+            hasDoubleStarYes() ->
+                resources.getString(R.string.tb_presumptive_alert_title) +
+                    "\n" + resources.getString(R.string.tb_presumptive_alert_refer) +
+                    "\n" + resources.getString(R.string.tb_presumptive_alert_family)
+            hasSingleStarYes() ->
+                resources.getString(R.string.tb_presumptive_alert_title) +
+                    "\n" + resources.getString(R.string.tb_presumptive_alert_refer)
+            else -> null
+        }
+
     fun getFamilyContactAlert(): String? =
         if (requiresFamilyContactScreening())
             resources.getString(R.string.tb_family_contact_screening_alert)

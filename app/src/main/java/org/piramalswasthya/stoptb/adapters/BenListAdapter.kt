@@ -183,11 +183,25 @@ class BenListAdapter(
                 )
             }
             // Examine button — show filled count X/total
-            // Registrar role: only Anthropometry counts (total=1)
-            // Nurse/others: all 5 forms count (total=5)
+            // Registrar: Anthropometry + TB Screening
+            // Nurse: Diagnosis hidden, so total stays 4
+            // Others: all 5 forms
             val isRegistrar = pref?.getLoggedInUser()?.role.isRegistrationOfficerRole()
+            val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
             val (examineFilledCount, examineTotal) = if (isRegistrar) {
-                Pair(if (hasAnthropometry) 1 else 0, 1)
+                val filled = listOf(
+                    hasAnthropometry,
+                    hasTbScreening
+                ).count { it }
+                Pair(filled, 2)
+            } else if (isNurse) {
+                val filled = listOf(
+                    hasAnthropometry,
+                    isMatched,        // vitals/general exam
+                    hasTbScreening,
+                    hasGeneralOpd
+                ).count { it }
+                Pair(filled, 4)
             } else {
                 val filled = listOf(
                     hasAnthropometry,
