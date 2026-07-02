@@ -177,7 +177,7 @@ interface AmritApiService {
         @Path("formId") formId: String,
         @Query("lang") lang: String
     ): Response<ApiResponse<FormSchemaDto>>
-    
+
 
     @GET("flw-api/dynamicForm/getAllForms")
     suspend fun getAllForms(
@@ -216,7 +216,9 @@ interface AmritApiService {
     @GET("flw-api/dynamicForm/response/getCompletedBeneficiaries")
     suspend fun getCompletedBeneficiaries(
         @Header("Authorization") authHeader: String,
-        @Query("formType") formType: String
+        @Query("formType") formType: String,
+        @Query("villageId") villageId: Int,
+        @Query("providerServiceMapId") providerServiceMapId: Int
     ): Response<ApiResponse<List<Long>>>
 
 
@@ -244,3 +246,4 @@ interface AmritApiService {
 //    ): Response<HBNCVisitListResponse>
 
 }
+
