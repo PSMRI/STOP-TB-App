@@ -103,17 +103,7 @@ class CounsellingActivity : AppCompatActivity() {
         binding.navigationFooter.btnNext.setOnClickListener {
             viewModel.startCounselling()
         }
-        if (overviewData?.preSubmitSubmitted == true) {
-            binding.navigationFooter.btnNext.text = getString(R.string.counselled)
-            binding.navigationFooter.btnNext.visibility = View.VISIBLE
-            binding.navigationFooter.btnBack.text = getString(R.string.counselling_follow_up_button)
-            binding.navigationFooter.btnBack.visibility = View.VISIBLE
-            binding.navigationFooter.btnBack.setOnClickListener {
-                viewModel.startFollowUp()
-            }
-        } else {
-            binding.navigationFooter.btnBack.visibility = View.GONE
-        }
+        binding.navigationFooter.btnBack.visibility = View.GONE
     }
 
     private fun switchToFormView() {
