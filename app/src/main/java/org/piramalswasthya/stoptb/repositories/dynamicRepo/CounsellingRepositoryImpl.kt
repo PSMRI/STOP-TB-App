@@ -287,7 +287,7 @@ class CounsellingRepositoryImpl @Inject constructor(
                 activeVersion.sections
                     .find { it.section.sectionPhase == "POST_SUBMIT" }
             } ?: activeVersion.sections.maxByOrNull { it.section.sectionOrder }
-              ?: return@withTransaction
+            ?: return@withTransaction
 
             val sectionResponse = formResponseWithDetails.sectionResponses.find { it.sectionResponse.sectionId == sectionDef.section.sectionId }
                 ?: return@withTransaction
@@ -640,7 +640,21 @@ class CounsellingRepositoryImpl @Inject constructor(
                 Timber.w("fetchAndStoreCompletedBeneficiaries: JWT token is null")
                 return null
             }
-            val response = amritApiService.getCompletedBeneficiaries(authHeader, "TB_COUNSELLING")
+            val villageId = preferenceDao.getLocationRecord()?.village?.id ?: run {
+                Timber.w("fetchAndStoreCompletedBeneficiaries: villageId is null")
+                return null
+            }
+            val user = preferenceDao.getLoggedInUser() ?: run {
+                Timber.w("fetchAndStoreCompletedBeneficiaries: user is null")
+                return null
+            }
+            val providerServiceMapId = user.serviceMapId
+            val response = amritApiService.getCompletedBeneficiaries(
+                authHeader = authHeader,
+                formType = "TB_COUNSELLING",
+                villageId = villageId,
+                providerServiceMapId = providerServiceMapId
+            )
             if (response.isSuccessful) {
                 val completedIds = response.body()?.data as? List<Long> ?: return null
 
@@ -714,4 +728,5 @@ class CounsellingRepositoryImpl @Inject constructor(
         private const val DEFAULT_OFFICER_ID = 501L
     }
 }
+
 
