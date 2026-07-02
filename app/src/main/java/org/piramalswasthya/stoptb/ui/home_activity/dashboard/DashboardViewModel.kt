@@ -232,7 +232,6 @@ class DashboardViewModel @Inject constructor(
                 _tbScreening.value = current.copy(others = others)
             }
         }
-
         collectJobs += viewModelScope.launch {
             tbDao.getDashboardTbScreeningCount(village, assignedVillageIds, startTime, endTime, "", 0,1).collect { seniorCitizen ->
                 val current = _tbScreening.value ?: TbGenderBreakdown()
@@ -426,44 +425,33 @@ class DashboardViewModel @Inject constructor(
         maleQuery: () -> Flow<Int>,
         femaleQuery: () -> Flow<Int>,
         childrenQuery: () -> Flow<Int>,
-
         othersQuery: () -> Flow<Int>,
         seniorCitizenQuery: () -> Flow<Int>,
     ) {
         collectJobs += viewModelScope.launch {
-            totalQuery().collect { total ->
-                val current = target.value ?: TbGenderBreakdown()
-                target.value = current.copy(total = total)
+            kotlinx.coroutines.flow.combine(
+                totalQuery(),
+                maleQuery(),
+                femaleQuery(),
+                childrenQuery(),
+                othersQuery(),
+            ) { values ->
+                TbGenderBreakdown(
+                    total = values[0],
+                    male = values[1],
+                    female = values[2],
+                    children = values[3],
+                    others = values[4],
+                )
+            }.collect { breakdown ->
+                target.value = breakdown
             }
         }
-        collectJobs += viewModelScope.launch {
-            maleQuery().collect { male ->
-                val current = target.value ?: TbGenderBreakdown()
-                target.value = current.copy(male = male)
-            }
-        }
-        collectJobs += viewModelScope.launch {
-            femaleQuery().collect { female ->
-                val current = target.value ?: TbGenderBreakdown()
-                target.value = current.copy(female = female)
-            }
-        }
-        collectJobs += viewModelScope.launch {
-            childrenQuery().collect { children ->
-                val current = target.value ?: TbGenderBreakdown()
-                target.value = current.copy(children = children)
-            }
-        }
+        // Senior citizen collected separately since combine only takes 5
         collectJobs += viewModelScope.launch {
             seniorCitizenQuery().collect { seniorCitizen ->
                 val current = target.value ?: TbGenderBreakdown()
                 target.value = current.copy(seniorCitizen = seniorCitizen)
-            }
-        }
-        collectJobs += viewModelScope.launch {
-            othersQuery().collect { others ->
-                val current = target.value ?: TbGenderBreakdown()
-                target.value = current.copy(others = others)
             }
         }
     }
