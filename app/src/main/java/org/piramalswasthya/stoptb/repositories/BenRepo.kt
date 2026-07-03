@@ -2211,73 +2211,56 @@ class BenRepo @Inject constructor(
                     try {
                         val serverHh = HouseholdCache(
                             householdId = hhId,  // already resolved from both spellings above
-                            ashaId = jsonObject.getInt("ashaId"),
-                            benId = jsonObject.getLong("benficieryid"),
+                            ashaId = jsonObject.optInt("ashaId"),
+                            benId = jsonObject.optLong("benficieryid").takeIf { it > 0L },
                             family = HouseholdFamily(
-                                familyHeadName = houseDataObj.getString("familyHeadName"),
-                                familyName = if (houseDataObj.has("familyName")) houseDataObj.getString(
-                                    "familyName"
-                                ) else null,
-                                familyHeadPhoneNo = houseDataObj.getString("familyHeadPhoneNo")
-                                    .toLongOrNull() ?: 0L,
-                                houseNo = if (houseDataObj.has("houseno")) houseDataObj.getString(
-                                    "houseno"
-                                )
-                                    .let { if (it == "null") null else it } else null,
-                                wardNo = if (houseDataObj.has("wardNo")) houseDataObj.getString(
-                                    "wardNo"
-                                )
-                                    .let { if (it == "null") null else it } else null,
-                                wardName = if (houseDataObj.has("wardName")) houseDataObj.getString(
-                                    "wardName"
-                                )
-                                    .let { if (it == "null") null else it } else null,
-                                mohallaName = if (houseDataObj.has("mohallaName")) houseDataObj.getString(
-                                    "mohallaName"
-                                )
-                                    .let { if (it == "null") null else it } else null,
-//                                rationCardDetails = houseDataObj.getString("rationCardDetails"),
-                                povertyLine = houseDataObj.getString("type_bpl_apl"),
-                                povertyLineId = houseDataObj.getInt("bpl_aplId"),
+                                familyHeadName = houseDataObj.optStringOrNull("familyHeadName"),
+                                familyName = houseDataObj.optStringOrNull("familyName"),
+                                familyHeadPhoneNo = houseDataObj.optStringOrNull("familyHeadPhoneNo")
+                                    ?.toLongOrNull() ?: 0L,
+                                houseNo = houseDataObj.optStringOrNull("houseno"),
+                                wardNo = houseDataObj.optStringOrNull("wardNo"),
+                                wardName = houseDataObj.optStringOrNull("wardName"),
+                                mohallaName = houseDataObj.optStringOrNull("mohallaName"),
+//                                rationCardDetails = houseDataObj.optStringOrNull("rationCardDetails"),
+                                povertyLine = houseDataObj.optStringOrNull("type_bpl_apl"),
+                                povertyLineId = houseDataObj.optInt("bpl_aplId"),
                             ),
                             details = HouseholdDetails(
-                                residentialArea = houseDataObj.getString("residentialArea")
-                                    .let { if (it == "null") null else it },
-                                residentialAreaId = houseDataObj.getInt("residentialAreaId"),
-                                otherResidentialArea = houseDataObj.getString("other_residentialArea"),
-                                houseType = houseDataObj.getString("houseType"),
-                                houseTypeId = houseDataObj.getInt("houseTypeId"),
-                                otherHouseType = houseDataObj.getString("other_houseType"),
-                                isHouseOwned = houseDataObj.getString("houseOwnerShip"),
-                                isHouseOwnedId = houseDataObj.getInt("houseOwnerShipId"),
-//                                isLandOwned = houseDataObj.getString("landOwned") == "Yes",
-//                                isLandIrrigated = houseDataObj.has("landIrregated") && houseDataObj.getString("landIrregated") == "Yes",
-//                                isLivestockOwned = houseDataObj.getString("liveStockOwnerShip") == "Yes",
-//                                street = houseDataObj.getString("street"),
-//                                colony = houseDataObj.getString("colony"),
-//                                pincode = houseDataObj.getInt("pincode"),
+                                residentialArea = houseDataObj.optStringOrNull("residentialArea"),
+                                residentialAreaId = houseDataObj.optInt("residentialAreaId"),
+                                otherResidentialArea = houseDataObj.optStringOrNull("other_residentialArea"),
+                                houseType = houseDataObj.optStringOrNull("houseType"),
+                                houseTypeId = houseDataObj.optInt("houseTypeId"),
+                                otherHouseType = houseDataObj.optStringOrNull("other_houseType"),
+                                isHouseOwned = houseDataObj.optStringOrNull("houseOwnerShip"),
+                                isHouseOwnedId = houseDataObj.optInt("houseOwnerShipId"),
+//                                isLandOwned = houseDataObj.optStringOrNull("landOwned") == "Yes",
+//                                isLandIrrigated = houseDataObj.has("landIrregated") && houseDataObj.optStringOrNull("landIrregated") == "Yes",
+//                                isLivestockOwned = houseDataObj.optStringOrNull("liveStockOwnerShip") == "Yes",
+//                                street = houseDataObj.optStringOrNull("street"),
+//                                colony = houseDataObj.optStringOrNull("colony"),
+//                                pincode = houseDataObj.optInt("pincode"),
                             ),
                             amenities = HouseholdAmenities(
-                                separateKitchen = houseDataObj.getString("seperateKitchen"),
-                                separateKitchenId = houseDataObj.getInt("seperateKitchenId"),
-                                fuelUsed = houseDataObj.getString("fuelUsed"),
-                                fuelUsedId = houseDataObj.getInt("fuelUsedId"),
-                                otherFuelUsed = houseDataObj.getString("other_fuelUsed"),
-                                sourceOfDrinkingWater = houseDataObj.getString("sourceofDrinkingWater"),
-                                sourceOfDrinkingWaterId = houseDataObj.getInt("sourceofDrinkingWaterId"),
-                                otherSourceOfDrinkingWater = houseDataObj.getString("other_sourceofDrinkingWater"),
-                                availabilityOfElectricity = houseDataObj.getString("avalabilityofElectricity"),
-                                availabilityOfElectricityId = houseDataObj.getInt("avalabilityofElectricityId"),
-                                otherAvailabilityOfElectricity = houseDataObj.getString("other_avalabilityofElectricity"),
-                                availabilityOfToilet = houseDataObj.getString("availabilityofToilet"),
-                                availabilityOfToiletId = houseDataObj.getInt("availabilityofToiletId"),
-                                otherAvailabilityOfToilet = houseDataObj.getString("other_availabilityofToilet"),
+                                separateKitchen = houseDataObj.optStringOrNull("seperateKitchen"),
+                                separateKitchenId = houseDataObj.optInt("seperateKitchenId"),
+                                fuelUsed = houseDataObj.optStringOrNull("fuelUsed"),
+                                fuelUsedId = houseDataObj.optInt("fuelUsedId"),
+                                otherFuelUsed = houseDataObj.optStringOrNull("other_fuelUsed"),
+                                sourceOfDrinkingWater = houseDataObj.optStringOrNull("sourceofDrinkingWater"),
+                                sourceOfDrinkingWaterId = houseDataObj.optInt("sourceofDrinkingWaterId"),
+                                otherSourceOfDrinkingWater = houseDataObj.optStringOrNull("other_sourceofDrinkingWater"),
+                                availabilityOfElectricity = houseDataObj.optStringOrNull("avalabilityofElectricity"),
+                                availabilityOfElectricityId = houseDataObj.optInt("avalabilityofElectricityId"),
+                                otherAvailabilityOfElectricity = houseDataObj.optStringOrNull("other_avalabilityofElectricity"),
+                                availabilityOfToilet = houseDataObj.optStringOrNull("availabilityofToilet"),
+                                availabilityOfToiletId = houseDataObj.optInt("availabilityofToiletId"),
+                                otherAvailabilityOfToilet = houseDataObj.optStringOrNull("other_availabilityofToilet"),
                             ),
-//                                motorizedVehicle = houseDataObj.getString("motarizedVehicle"),
-//                                otherMotorizedVehicle = houseDataObj.getString("other_motarizedVehicle"),
-                            registrationType = if (houseDataObj.has("registrationType")) houseDataObj.getString(
-                                "registrationType"
-                            ) else null,
+//                                motorizedVehicle = houseDataObj.optStringOrNull("motarizedVehicle"),
+//                                otherMotorizedVehicle = houseDataObj.optStringOrNull("other_motarizedVehicle"),
+                            registrationType = houseDataObj.optStringOrNull("registrationType"),
                             locationRecord = LocationRecord(
                                 country = preferenceDao.getLocationRecord()?.country ?: LocationEntity(1, "India"),
                                 state = LocationEntity(
@@ -2303,9 +2286,9 @@ class BenRepo @Inject constructor(
                             gpsTimestamp = hhGpsTimestamp,
                             isGpsUnavailable = hhIsGpsUnavailable,
                             gpsUnavailableReason = hhGpsUnavailableReason,
-                            serverUpdatedStatus = houseDataObj.getInt("serverUpdatedStatus"),
-                            createdBy = houseDataObj.getString("createdBy"),
-                            createdTimeStamp = getLongFromDate(houseDataObj.getString("createdDate")),
+                            serverUpdatedStatus = houseDataObj.optInt("serverUpdatedStatus"),
+                            createdBy = houseDataObj.optStringOrNull("createdBy"),
+                            createdTimeStamp = houseDataObj.optStringOrNull("createdDate")?.let { getLongFromDate(it) },
 //                            updatedBy = houseDataObj.getString("other_houseType"),
 //                            updatedTimeStamp = houseDataObj.getString("other_houseType"),
                             processed = "P",

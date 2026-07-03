@@ -62,7 +62,12 @@ data class TmcGenerateBenIdsRequest(val benIDRequired: Int, val vanID: Int)
 
 @JsonClass(generateAdapter = true)
 data class GetDataPaginatedRequest(
-    val ashaId: Int, val pageNo: Int, val fromDate: String, val toDate: String
+    val ashaId: Int,
+    val pageNo: Int,
+    val fromDate: String,
+    val toDate: String,
+    val providerServiceMapID: Int? = null,
+    val villageID: Int? = null
 )
 @JsonClass(generateAdapter = true)
 data class GetDataPaginatedRequests(

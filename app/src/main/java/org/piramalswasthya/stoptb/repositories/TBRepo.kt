@@ -502,12 +502,15 @@ class TBRepo @Inject constructor(
                     ?: throw IllegalStateException("No user logged in!!")
             val lastTimeStamp = preferenceDao.getLastSyncedTimeStamp()
             try {
+                val villageId = preferenceDao.getLocationRecord()?.village?.id
                 val response = tmcNetworkApiService.getTBSuspectedData(
                     GetDataPaginatedRequest(
                         ashaId = user.userId,
                         pageNo = 0,
                         fromDate = BenRepo.getCurrentDate(Konstants.defaultTimeStamp),
-                        toDate = getCurrentDate()
+                        toDate = getCurrentDate(),
+                        providerServiceMapID = user.serviceMapId,
+                        villageID = villageId
                     )
                 )
                 val statusCode = response.code()
