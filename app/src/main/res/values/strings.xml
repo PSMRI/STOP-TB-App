@@ -387,6 +387,7 @@
     <string name="child_immunization">Child Immunization</string>
     <string name="relation_with_hof">Relation with HOF</string>
     <string name="add_family_member">Add Family Member</string>
+    <string name="add_household_member">Add HoF Member</string>
     <string name="app_native_name">StopTB</string>
     <string name="non_pregnant_women_eligible_couple_section">Non-Pregnant Women (Eligible Couple) section</string>
     <string name="time_of_death">Time of Death</string>

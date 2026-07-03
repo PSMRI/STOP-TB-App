@@ -154,7 +154,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         hh?.family?.let { saved ->
             firstNameHeadOfFamily.value = saved.familyHeadName
             lastNameHeadOfFamily.value = saved.familyName
-            mobileNoHeadOfFamily.value = saved.familyHeadPhoneNo.toString()
+            mobileNoHeadOfFamily.value = saved.familyHeadPhoneNo?.toString() ?: "9999999999"
             saved.familyHeadName?.takeIf { it.isNotEmpty() }?.let { firstNameHeadOfFamily.inputType = TEXT_VIEW }
             saved.familyName?.takeIf { it.isNotEmpty() }?.let { lastNameHeadOfFamily.inputType = TEXT_VIEW }
             saved.familyHeadPhoneNo.takeIf { it != null }?.let { mobileNoHeadOfFamily.inputType = TEXT_VIEW }
@@ -552,7 +552,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         family.let { family ->
             family.familyHeadName = firstNameHeadOfFamily.value
             family.familyName = lastNameHeadOfFamily.value
-            family.familyHeadPhoneNo = mobileNoHeadOfFamily.value?.toLong()
+            family.familyHeadPhoneNo =  mobileNoHeadOfFamily.value?.toLongOrNull() ?: 9999999999L
             family.houseNo = houseNo.value
             family.wardNo = wardNo.value
             family.wardName = wardName.value
