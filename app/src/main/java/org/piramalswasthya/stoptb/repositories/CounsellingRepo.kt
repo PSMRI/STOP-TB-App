@@ -438,13 +438,16 @@ class CounsellingRepo @Inject constructor(
                                 ).show()
                             }
                         } else {
-                            Timber.d("saveSectionAnswers: sync failed in online mode, reverting status")
-                            if (isFinalPreSubmit) {
-                                counsellingRepository.revertFormStatus(responseId, "DRAFT")
-                            } else if (isFinalPostSubmit || isLastSection) {
-                                counsellingRepository.revertFormStatus(responseId, "SUBMITTED")
+                            Timber.d("saveSectionAnswers: sync failed in online mode, saved locally for automatic background sync retry")
+                            org.piramalswasthya.stoptb.work.CounsellingSyncWorker.scheduleSync(context)
+                            withContext(Dispatchers.Main) {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Saved locally. It will sync automatically in the background.",
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
                             }
-                            success = false
+                            success = true
                         }
                     }
                 }

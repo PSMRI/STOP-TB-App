@@ -309,7 +309,7 @@ class CounsellingRepositoryImpl @Inject constructor(
     }
 
     override suspend fun submitSectionE(responseId: Long, answers: List<QuestionResponseEntity>) {
-        submitSectionWithPhase(responseId, answers, "PRE_SUBMIT", "SUBMITTED")
+        submitSectionWithPhase(responseId, answers, "PRE_SUBMIT", "COMPLETED")
     }
 
     override suspend fun submitSectionF(responseId: Long, answers: List<QuestionResponseEntity>) {
@@ -355,79 +355,41 @@ class CounsellingRepositoryImpl @Inject constructor(
                     val preSubmitPayload = PayloadBuilder.buildBulkPayload(resp, formDef, officerId, phaseFilter = "PRE_SUBMIT")
                     var preSubmitSuccess = true
                     if (preSubmitPayload.sections.isNotEmpty()) {
-                        val bulkPayload = listOf(preSubmitPayload)
                         try {
-                            val jsonPayload = com.google.gson.Gson().toJson(bulkPayload)
-                            Timber.d("Amrit push complete dynamic pre-submit payload JSON: $jsonPayload")
+                            val jsonPayload = com.google.gson.Gson().toJson(preSubmitPayload)
+                            Timber.d("Amrit push complete dynamic payload JSON: $jsonPayload")
                         } catch (e: Exception) {
-                            Timber.e(e, "Failed to serialize pre-submit payload to JSON for logging")
+                            Timber.e(e, "Failed to serialize payload to JSON for logging")
                         }
-                        val apiResponse = amritApiService.submitBulkCounselling(authHeader, bulkPayload)
+                        val apiResponse = amritApiService.completeCounselling(authHeader, preSubmitPayload)
                         val statusCode = apiResponse.code()
-                        Timber.d("Amrit push complete dynamic pre-submit response: httpStatus=$statusCode")
+                        Timber.d("Amrit push complete dynamic response: httpStatus=$statusCode")
                         if (statusCode == 200) {
                             val responseString = apiResponse.body()?.string()
                             val isSuccess = responseString?.let { org.json.JSONObject(it).optBoolean("success", false) } ?: false
                             if (isSuccess) {
-                                Timber.d("Amrit push complete dynamic pre-submit success")
+                                Timber.d("Amrit push complete dynamic success")
                             } else {
-                                Timber.e("Amrit push complete dynamic pre-submit failed: success=false")
+                                Timber.e("Amrit push complete dynamic failed: success=false")
                                 preSubmitSuccess = false
                             }
                         } else {
-                            Timber.e("Amrit push complete dynamic pre-submit failed: status=$statusCode")
+                            Timber.e("Amrit push complete dynamic failed: status=$statusCode")
                             preSubmitSuccess = false
                         }
                     }
-
-                    if (preSubmitSuccess) {
-                        val postSubmitPayload = PayloadBuilder.buildBulkPayload(resp, formDef, officerId, phaseFilter = "POST_SUBMIT")
-                        try {
-                            val jsonPayload = com.google.gson.Gson().toJson(postSubmitPayload)
-                            Timber.d("Amrit push complete dynamic post-submit payload JSON: $jsonPayload")
-                        } catch (e: Exception) {
-                            Timber.e(e, "Failed to serialize complete payload to JSON for logging")
-                        }
-
-                        val apiResponse = amritApiService.completeCounselling(authHeader, postSubmitPayload)
-                        val statusCode = apiResponse.code()
-                        Timber.d("Amrit push complete dynamic response: httpStatus=$statusCode")
-
-                        if (statusCode == 200) {
-                            val responseString: String? = apiResponse.body()?.string()
-                            if (responseString != null) {
-                                val jsonObj = org.json.JSONObject(responseString)
-                                val isSuccess = jsonObj.optBoolean("success", false)
-                                if (isSuccess) {
-                                    Timber.d("Amrit push complete dynamic success: $jsonObj")
-                                    true
-                                } else {
-                                    Timber.e("Amrit push complete dynamic failed: success=false")
-                                    false
-                                }
-                            } else {
-                                Timber.e("Amrit push complete dynamic failed: body is null")
-                                false
-                            }
-                        } else {
-                            Timber.e("Amrit push complete dynamic failed: status=$statusCode")
-                            false
-                        }
-                    } else {
-                        false
-                    }
+                    preSubmitSuccess
                 } else {
-                    val bulkPayload = listOf(payload)
                     try {
-                        val jsonPayload = com.google.gson.Gson().toJson(bulkPayload)
-                        Timber.d("Amrit push submitBulk standalone payload JSON: $jsonPayload")
+                        val jsonPayload = com.google.gson.Gson().toJson(payload)
+                        Timber.d("Amrit push complete standalone payload JSON: $jsonPayload")
                     } catch (e: Exception) {
-                        Timber.e(e, "Failed to serialize bulk counselling to JSON for logging")
+                        Timber.e(e, "Failed to serialize counselling to JSON for logging")
                     }
 
-                    val apiResponse = amritApiService.submitBulkCounselling(authHeader, bulkPayload)
+                    val apiResponse = amritApiService.completeCounselling(authHeader, payload)
                     val statusCode = apiResponse.code()
-                    Timber.d("Amrit push submitBulk standalone response: httpStatus=$statusCode")
+                    Timber.d("Amrit push complete standalone response: httpStatus=$statusCode")
 
                     if (statusCode == 200) {
                         val responseString: String? = apiResponse.body()?.string()
@@ -435,18 +397,18 @@ class CounsellingRepositoryImpl @Inject constructor(
                             val jsonObj = org.json.JSONObject(responseString)
                             val isSuccess = jsonObj.optBoolean("success", false)
                             if (isSuccess) {
-                                Timber.d("Amrit push submitBulk standalone success: $jsonObj")
+                                Timber.d("Amrit push complete standalone success: $jsonObj")
                                 true
                             } else {
-                                Timber.e("Amrit push submitBulk standalone failed: success=false")
+                                Timber.e("Amrit push complete standalone failed: success=false")
                                 false
                             }
                         } else {
-                            Timber.e("Amrit push submitBulk standalone failed: body is null")
+                            Timber.e("Amrit push complete standalone failed: body is null")
                             false
                         }
                     } else {
-                        Timber.e("Amrit push submitBulk standalone failed: status=$statusCode")
+                        Timber.e("Amrit push complete standalone failed: status=$statusCode")
                         false
                     }
                 }
