@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.ui.home_activity.new_household_registration
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
@@ -495,6 +496,8 @@ class NewHouseholdFragment : Fragment() {
     }
 
     private fun validateCurrentPage(): Boolean {
+        val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.hideSoftInputFromWindow(binding.root.windowToken, 0)
         val result = (binding.form.rvInputForm.adapter as? FormInputAdapter)
             ?.validateInput(resources, binding.form.rvInputForm)
         Timber.d("Validation : $result")
