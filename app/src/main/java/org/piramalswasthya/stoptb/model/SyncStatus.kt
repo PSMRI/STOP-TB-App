@@ -21,6 +21,7 @@ fun List<SyncStatusCache>.asDomainModel(
         "General Examination",
         "OPD",
         "Diagnosis",
+        "TB Confirmed",
         "Counselling"
     )
     val grouped = groupBy { it.name }

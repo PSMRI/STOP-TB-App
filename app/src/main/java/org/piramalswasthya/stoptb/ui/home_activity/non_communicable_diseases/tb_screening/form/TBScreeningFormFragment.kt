@@ -136,7 +136,8 @@ class TBScreeningFormFragment : Fragment() {
         legendSpan.setSpan(ForegroundColorSpan(starColor), line2Start, line2Start + 2, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         binding.tvFormFooter.text = legendSpan
 
-        captureGeolocation()
+        // Auto geolocation disabled for TB Screening form: location is not required to open/use this module.
+//        captureGeolocation()
         binding.btnSubmit.setOnClickListener {
             submitTBScreeningForm()
         }

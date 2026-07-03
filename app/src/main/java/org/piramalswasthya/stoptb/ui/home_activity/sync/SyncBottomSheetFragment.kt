@@ -33,6 +33,7 @@ class SyncBottomSheetFragment : BottomSheetDialogFragment() {
 
     // Rows visible to Registrar only (others hidden)
     private val registrarRows = setOf("Beneficiary", "Anthropometric", "TB Screening")
+    private val counsellingRows = setOf("TB Confirmed", "Counselling")
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -62,6 +63,12 @@ class SyncBottomSheetFragment : BottomSheetDialogFragment() {
                         val idx = localNames.indexOf(item.name)
                         val english = if (idx >= 0) englishNames.getOrNull(idx) ?: item.name else item.name
                         english in registrarRows
+                    }
+                } else if (isCounsellingOfficer) {
+                    list = list.filter { item ->
+                        val idx = localNames.indexOf(item.name)
+                        val english = if (idx >= 0) englishNames.getOrNull(idx) ?: item.name else item.name
+                        english in counsellingRows
                     }
                 } else if (!isCounsellingOfficer) {
                     // Nurse and other roles: hide Counselling

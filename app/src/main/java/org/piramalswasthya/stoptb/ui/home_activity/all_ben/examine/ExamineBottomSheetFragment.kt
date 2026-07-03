@@ -117,6 +117,12 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
             rowView.visibility = View.VISIBLE
             rowView.findViewById<TextView>(R.id.tv_form_name).text = formName
             val btn = rowView.findViewById<MaterialButton>(R.id.btn_form_action)
+            btn.text = getString(R.string.examine_btn_loading)
+            btn.isEnabled = false
+            btn.alpha = 1f
+            btn.backgroundTintList = ContextCompat.getColorStateList(
+                requireContext(), android.R.color.darker_gray
+            )
 
             if (formIndex == FORM_DIAGNOSIS) {
                 // Diagnosis is only enabled after TB Screening is completed
@@ -196,6 +202,8 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
                 if (isFilled) {
                     // Green — View
                     btn.text = getString(R.string.examine_btn_view)
+                    btn.isEnabled = true
+                    btn.alpha = 1f
                     btn.backgroundTintList = ContextCompat.getColorStateList(
                         requireContext(), android.R.color.holo_green_dark
                     )
@@ -205,6 +213,8 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
                 } else {
                     // Red — Fill
                     btn.text = getString(R.string.examine_btn_fill)
+                    btn.isEnabled = true
+                    btn.alpha = 1f
                     btn.backgroundTintList = ContextCompat.getColorStateList(
                         requireContext(), android.R.color.holo_red_dark
                     )

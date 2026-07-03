@@ -63,7 +63,7 @@ object WorkerUtils {
             .addTag("push_group1_registration").build()
 
         val afterRegistration = workManager.beginUniqueWork(
-            pushWorkerUniqueName, ExistingWorkPolicy.APPEND_OR_REPLACE, registration)
+            pushWorkerUniqueName, ExistingWorkPolicy.KEEP, registration)
 
         val groupTB = listOf(
             syncRequestBuilder<PushTBToAmritWorker>().addTag("push_group5_tb").build(),
