@@ -48,13 +48,13 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 
      companion object {
         fun getLongFromDate(dateString: String?): Long {
-            if (dateString.isNullOrEmpty()) return 0L
-            val f = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
-            return try {
-                f.parse(dateString)?.time ?: 0L
-            } catch (e: java.text.ParseException) {
-                0L
-            }
+            return dateString
+                ?.takeIf { it.isNotBlank() }
+                ?.let {
+                    runCatching {
+                        SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).parse(it)?.time ?: 0L
+                    }.getOrDefault(0L)
+                } ?: 0L
         }
 
 
