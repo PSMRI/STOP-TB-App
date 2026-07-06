@@ -243,6 +243,9 @@ class TBConfirmedDataset(
                 if (saved.treatmentStartDate > 0) millisAtStartOfDay(saved.treatmentStartDate) else null
             regimenTypeValue = saved.regimenType
 
+            updateFollowUpDateConstraints()
+            validateCurrentFollowUpDate()
+
             baseList.addAll(
                 listOf(
                     regimenType,
