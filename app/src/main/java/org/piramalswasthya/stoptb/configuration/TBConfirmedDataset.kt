@@ -244,7 +244,7 @@ class TBConfirmedDataset(
             regimenTypeValue = saved.regimenType
 
             updateFollowUpDateConstraints()
-            validateCurrentFollowUpDate()
+            followUpDate.errorText = null
 
             baseList.addAll(
                 listOf(
