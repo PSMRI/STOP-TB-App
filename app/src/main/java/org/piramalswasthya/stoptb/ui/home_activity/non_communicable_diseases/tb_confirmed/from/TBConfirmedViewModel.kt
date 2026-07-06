@@ -66,6 +66,10 @@ class TBConfirmedViewModel @Inject constructor(
     private  var tbSuspected: TBSuspectedCache? = null
     private var tbConfirmedTreatmentCache: TBConfirmedTreatmentCache? = null
 
+    private val _isTreatmentCompleted = MutableLiveData(false)
+    val isTreatmentCompleted: LiveData<Boolean>
+        get() = _isTreatmentCompleted
+
     init {
         viewModelScope.launch {
             val ben = benRepo.getBenFromId(benId)?.also { ben ->
@@ -88,10 +92,11 @@ class TBConfirmedViewModel @Inject constructor(
             tbRepo.getTBConfirmed(benId)?.let {
                 tbConfirmedTreatmentCache = it
                 _recordExists.value = true
+                _isTreatmentCompleted.postValue(it.treatmentCompleted == true)
             }?: run{
                 tbConfirmedTreatmentCache = null
                 _recordExists.value = false
-
+                _isTreatmentCompleted.postValue(false)
 
         }
 
@@ -158,6 +163,9 @@ class TBConfirmedViewModel @Inject constructor(
                         }
                     }
                     tbRepo.saveTBConfirmed(tbConfirmedTreatmentCache!!)
+                    if (tbConfirmedTreatmentCache?.treatmentCompleted == true) {
+                        _isTreatmentCompleted.postValue(true)
+                    }
                     tbSuspected?.let {
                         it.isConfirmed = true
                         it.isTBConfirmed = true

@@ -108,6 +108,11 @@ class TBConfirmedFormFragment : Fragment() {
                 else -> {}
             }
         }
+
+        viewModel.isTreatmentCompleted.observe(viewLifecycleOwner) { completed ->
+            binding.btnSubmit.visibility =
+                if (completed) View.GONE else View.VISIBLE
+        }
     }
 
 
