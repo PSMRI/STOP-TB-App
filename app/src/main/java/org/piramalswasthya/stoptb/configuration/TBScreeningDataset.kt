@@ -28,7 +28,8 @@ class TBScreeningDataset(
         title = resources.getString(R.string.tracking_date),
         required = true,
         max = System.currentTimeMillis(),
-        hasDependants = true
+        hasDependants = true,
+        isEnabled = false
     )
 
     private val isCoughing = FormElement(
