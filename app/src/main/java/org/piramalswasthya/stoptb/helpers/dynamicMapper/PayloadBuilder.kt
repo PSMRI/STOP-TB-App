@@ -193,10 +193,12 @@ object PayloadBuilder {
                         )
                     }
                     "MCQ", "CHECKBOX" -> {
-                        val optionValues = responses.mapNotNull { it.optionId?.let { optId -> optionsMap[optId] } }
+                        val optionValues = responses
+                            .mapNotNull { it.optionId?.let { optId -> optionsMap[optId] } }
+                            .joinToString("")
                         BulkAnswerPayload(
                             questionUuid = qUuid,
-                            optionValues = optionValues
+                            optionValue = optionValues
                         )
                     }
                     "NUMBER" -> {

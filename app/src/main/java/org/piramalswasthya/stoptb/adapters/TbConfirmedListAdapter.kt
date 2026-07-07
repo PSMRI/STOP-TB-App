@@ -51,14 +51,21 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 
             binding.benWithTb = item
 
-            val isBenAlreadyCounselled = (benIdList != null &&  benIdList.contains(item.ben.benId))
-            binding.ivSyncState.visibility = if (item.tbConfirmedList == null) View.INVISIBLE else View.VISIBLE
-            
             val isRefused = item.formResponse?.status == "REFUSED"
+            val isDraft = item.formResponse?.status == "DRAFT"
+            val isBenAlreadyCounselled = (benIdList != null && benIdList.contains(item.ben.benId)) && !isDraft
+            binding.ivSyncState.visibility = if (item.tbConfirmedList == null) View.INVISIBLE else View.VISIBLE
+
             if (isRefused) {
+                binding.btnCounselling.visibility = View.GONE
                 binding.btnCounselled.text = binding.root.context.getString(org.piramalswasthya.stoptb.R.string.refused)
                 binding.btnCounselled.setBackgroundColor(binding.root.resources.getColor(android.R.color.holo_red_dark))
-            } else {
+            } else if(isDraft) {
+                binding.btnCounselled.visibility = View.GONE
+                binding.btnCounselling.visibility = View.VISIBLE
+            }
+            else {
+                binding.btnCounselling.visibility = View.GONE
                 binding.btnCounselled.text = binding.root.context.getString(org.piramalswasthya.stoptb.R.string.counselled)
                 binding.btnCounselled.setBackgroundColor(binding.root.resources.getColor(android.R.color.holo_green_dark))
             }

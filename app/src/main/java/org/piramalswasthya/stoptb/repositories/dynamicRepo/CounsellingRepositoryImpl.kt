@@ -418,7 +418,7 @@ class CounsellingRepositoryImpl @Inject constructor(
             val localResponse = responseDao.getFormResponseForBeneficiary(beneficiaryId)
             val hasLocalAnswers = localResponse?.sectionResponses?.any { it.questionResponses.isNotEmpty() } == true
             if (localResponse != null && localResponse.formResponse.syncStatus == "SYNCED" &&
-                (localResponse.formResponse.status == "SUBMITTED" || localResponse.formResponse.status == "COMPLETE" || localResponse.formResponse.status == "COMPLETED") &&
+                (localResponse.formResponse.status == "SUBMITTED" || localResponse.formResponse.status == "COMPLETE" || localResponse.formResponse.status == "COMPLETED" || localResponse.formResponse.status == "REFUSED") &&
                 hasLocalAnswers
             ) {
                 Timber.d("fetchAndStoreCounsellingResponse: Synced response with answers already exists locally. Skipping fetch to preserve data.")
@@ -548,10 +548,10 @@ class CounsellingRepositoryImpl @Inject constructor(
                     responseDao.insertQuestionResponses(questionResponsesToInsert)
                 }
 
-                val finalStatus = if (hasPostSubmitAnswers || apiResponse.status?.uppercase() == "COMPLETE" || apiResponse.status?.uppercase() == "COMPLETED") {
-                    "COMPLETE"
-                } else {
-                    "SUBMITTED"
+                val finalStatus = when {
+                    apiResponse.status?.uppercase() == "REFUSED" -> "REFUSED"
+                    hasPostSubmitAnswers || apiResponse.status?.uppercase() == "COMPLETE" || apiResponse.status?.uppercase() == "COMPLETED" -> "COMPLETE"
+                    else -> "SUBMITTED"
                 }
 
                 responseDao.updateFormResponse(

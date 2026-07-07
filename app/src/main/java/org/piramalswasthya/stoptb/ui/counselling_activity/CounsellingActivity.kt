@@ -107,38 +107,38 @@ class CounsellingActivity : AppCompatActivity() {
         binding.rvGeneralInfo.layoutManager = LinearLayoutManager(this)
         binding.rvGeneralInfo.adapter = generalInfoAdapter
 
-        binding.etCounsellingDate.setOnClickListener {
-            if (viewModel.isFormEditable.value == false) return@setOnClickListener
-            val overviewData = (viewModel.overview.value as? NetworkResponse.Success)?.data ?: return@setOnClickListener
-            val cal = Calendar.getInstance()
-            val currentText = binding.etCounsellingDate.text.toString()
-            val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
-            try {
-                sdf.parse(currentText)?.let {
-                    cal.time = it
-                }
-            } catch (e: Exception) {}
-
-            val dpd = DatePickerDialog(
-                this,
-                { _, year, month, day ->
-                    val selected = Calendar.getInstance().apply {
-                        set(Calendar.HOUR_OF_DAY, 0)
-                        set(Calendar.MINUTE, 0)
-                        set(Calendar.SECOND, 0)
-                        set(Calendar.MILLISECOND, 0)
-                        set(year, month, day)
-                    }
-                    viewModel.updateCounsellingDate(selected.timeInMillis)
-                },
-                cal.get(Calendar.YEAR),
-                cal.get(Calendar.MONTH),
-                cal.get(Calendar.DAY_OF_MONTH)
-            )
-            dpd.datePicker.maxDate = System.currentTimeMillis()
-            dpd.datePicker.minDate = overviewData.regDate
-            dpd.show()
-        }
+//        binding.etCounsellingDate.setOnClickListener {
+//            if (viewModel.isFormEditable.value == false) return@setOnClickListener
+//            val overviewData = (viewModel.overview.value as? NetworkResponse.Success)?.data ?: return@setOnClickListener
+//            val cal = Calendar.getInstance()
+//            val currentText = binding.etCounsellingDate.text.toString()
+//            val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
+//            try {
+//                sdf.parse(currentText)?.let {
+//                    cal.time = it
+//                }
+//            } catch (e: Exception) {}
+//
+//            val dpd = DatePickerDialog(
+//                this,
+//                { _, year, month, day ->
+//                    val selected = Calendar.getInstance().apply {
+//                        set(Calendar.HOUR_OF_DAY, 0)
+//                        set(Calendar.MINUTE, 0)
+//                        set(Calendar.SECOND, 0)
+//                        set(Calendar.MILLISECOND, 0)
+//                        set(year, month, day)
+//                    }
+//                    viewModel.updateCounsellingDate(selected.timeInMillis)
+//                },
+//                cal.get(Calendar.YEAR),
+//                cal.get(Calendar.MONTH),
+//                cal.get(Calendar.DAY_OF_MONTH)
+//            )
+//            dpd.datePicker.maxDate = System.currentTimeMillis()
+//            dpd.datePicker.minDate = overviewData.regDate
+//            dpd.show()
+//        }
     }
 
     private fun updateGeneralInfoUi() {
@@ -169,8 +169,10 @@ class CounsellingActivity : AppCompatActivity() {
             viewModel.setGeneralInfoToggle(checked)
         }
 
-        val isEditable = viewModel.isFormEditable.value != false
-        binding.etCounsellingDate.isEnabled = isEditable
+        val overviewData = (viewModel.overview.value as? NetworkResponse.Success)?.data
+        val formFullySubmitted = overviewData?.status in setOf("COMPLETE", "COMPLETED")
+        val isEditable = !formFullySubmitted
+//        binding.etCounsellingDate.isEnabled = isEditable
 
         if (toggleOn) {
             generalInfoAdapter.submitList(questions, isEditable)
@@ -182,11 +184,10 @@ class CounsellingActivity : AppCompatActivity() {
         binding.navigationFooter.root.visibility = View.VISIBLE
         binding.navigationFooter.btnBack.visibility = View.GONE
 
-        val overviewData = (viewModel.overview.value as? NetworkResponse.Success)?.data
         val preSubmitSubmitted = overviewData?.preSubmitSubmitted == true
 
         if (preSubmitSubmitted) {
-            binding.ConsentToggleButton.isEnabled = false
+            binding.ConsentToggleButton.isEnabled = isEditable
             binding.navigationFooter.btnNext.text = getString(R.string.counselled)
             binding.navigationFooter.btnNext.visibility = View.VISIBLE
             binding.navigationFooter.btnNext.setOnClickListener {

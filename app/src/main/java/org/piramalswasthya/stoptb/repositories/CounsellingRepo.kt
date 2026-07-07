@@ -581,19 +581,19 @@ class CounsellingRepo @Inject constructor(
         }
     }
 
-    suspend fun updateCounsellingDate(benId: Long, dateMillis: Long) {
-        withContext(Dispatchers.IO) {
-            val response = db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId)
-            if (response != null) {
-                db.counsellingFormResponseDao().updateFormResponse(
-                    response.formResponse.copy(
-                        createdAt = dateMillis,
-                        updatedAt = System.currentTimeMillis()
-                    )
-                )
-            }
-        }
-    }
+//    suspend fun updateCounsellingDate(benId: Long, dateMillis: Long) {
+//        withContext(Dispatchers.IO) {
+//            val response = db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId)
+//            if (response != null) {
+//                db.counsellingFormResponseDao().updateFormResponse(
+//                    response.formResponse.copy(
+//                        createdAt = dateMillis,
+//                        updatedAt = System.currentTimeMillis()
+//                    )
+//                )
+//            }
+//        }
+//    }
 
     suspend fun revertFormStatus(responseId: Long, status: String) {
         withContext(Dispatchers.IO) {
