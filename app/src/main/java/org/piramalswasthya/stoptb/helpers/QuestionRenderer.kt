@@ -30,7 +30,7 @@ object QuestionRenderer {
     }
 
     private fun buildLabel(question: CounsellingQuestionDto, prefix: String): String {
-        val mandatory = if (question.isMandatory) " *" else ""
+        val mandatory = if (question.isMandatory) "\u00A0*" else ""
         return "$prefix${question.questionText}$mandatory"
     }
 
@@ -171,7 +171,14 @@ object QuestionRenderer {
         isEditable: Boolean,
         onValueChanged: (CounsellingQuestionDto) -> Unit
     ) {
-        showLabel(binding.tvQuestion, question, prefix)
+        val isSingleCheckbox = question.questionType == "CHECKBOX" && question.options?.size == 1
+
+        if (isSingleCheckbox) {
+            binding.tvQuestion.visibility = View.GONE
+        } else {
+            binding.tvQuestion.visibility = View.VISIBLE
+            showLabel(binding.tvQuestion, question, prefix)
+        }
         binding.llCheckboxes.removeAllViews()
 
         val currentValues = (question.value as? List<*>)
@@ -181,7 +188,12 @@ object QuestionRenderer {
 
         question.options?.sortedBy { it.displayOrder }?.forEach { opt ->
             val cb = CheckBox(binding.root.context).apply {
-                text = opt.optionLabel
+                if (isSingleCheckbox) {
+                    text = buildLabel(question, prefix)
+                    textSize = 16f
+                } else {
+                    text = opt.optionLabel
+                }
                 isChecked = currentValues.contains(opt.optionValue)
                 isEnabled = isEditable
                 setOnCheckedChangeListener { _, isChecked ->

@@ -19,6 +19,7 @@ interface ICounsellingRepository {
     )
     suspend fun submitSectionE(responseId: Long, answers: List<QuestionResponseEntity>)
     suspend fun submitSectionF(responseId: Long, answers: List<QuestionResponseEntity>)
+    suspend fun submitSectionGeneralInfo(responseId: Long, answers: List<QuestionResponseEntity>)
     suspend fun getCounsellingRecord(beneficiaryId: Long): Flow<CompleteFormResponse?>
     suspend fun syncUnsyncedRecords(): Boolean
     suspend fun fetchAndStoreCounsellingResponse(beneficiaryId: Long, formUuid: String): Boolean

@@ -51,6 +51,7 @@ class CounsellingDynamicAdapter(
         "RADIO" -> TYPE_RADIO
         "MCQ" -> TYPE_MCQ
         "DATE" -> TYPE_DATE
+        "MCQ", "CHECKBOX" -> TYPE_MCQ
         else -> TYPE_TEXT
     }
 

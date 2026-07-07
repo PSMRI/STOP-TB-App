@@ -30,5 +30,13 @@
         app:cornerRadius="8dp"
         tools:backgroundTint="@android:color/holo_red_dark"
         tools:text="Fill" />
+    <TextView
+        android:id="@+id/tv_not_filled"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/not_filled"
+        android:textColor="@color/dark_grey"
+        android:textStyle="italic"
+        android:visibility="gone" />
 
 </LinearLayout>

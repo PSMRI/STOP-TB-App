@@ -80,6 +80,14 @@ class TBConfirmedListFragment : Fragment() {
                         Intent(requireContext(), CounsellingActivity::class.java)
                             .putExtra(CounsellingViewModel.EXTRA_BEN_ID, item.ben.benId)
                     )
+                },
+                clickedViewMember = { item ->
+                    findNavController().navigate(
+                        TBConfirmedListFragmentDirections
+                            .actionTBConfirmedListFragmentToHouseholdMembersFragment(
+                                hhId = item.ben.hhId
+                            )
+                    )
                 }
             ),
             pref = prefDao
