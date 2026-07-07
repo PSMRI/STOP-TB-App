@@ -218,7 +218,7 @@ interface AmritApiService {
         @Query("formType") formType: String,
         @Query("villageId") villageId: Int,
         @Query("providerServiceMapId") providerServiceMapId: Int
-    ): Response<ApiResponse<List<Long>>>
+    ): Response<ApiResponse<org.piramalswasthya.stoptb.model.dynamicEntity.CompletedBeneficiariesResponse>>
 
 
     @POST("flw-api/disease/cdtfVisit/saveAll")

@@ -62,6 +62,9 @@ data class FormSectionDto(
     @SerializedName("hasSubmitButton")
     val hasSubmitButton: Boolean? = null,
 
+    @SerializedName("isEditable")
+    val isEditable: Boolean = false,
+
     @SerializedName("fields", alternate = ["questions"])
     val fields: List<FormFieldDto> = emptyList()
 ) {

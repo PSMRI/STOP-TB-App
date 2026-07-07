@@ -86,6 +86,7 @@ class CounsellingRepositoryImpl @Inject constructor(
             formType = apiSchema.formType ?: "",
             followUpDelayDays = followUpDelayDays
         )
+        metadataDao.deleteVersionsByFormId(formId)
         metadataDao.insertForm(formEntity)
 
         val versionId = formId * 1000 + apiSchema.versionNumber
@@ -124,7 +125,8 @@ class CounsellingRepositoryImpl @Inject constructor(
                 sectionNameHindi = sectionDto.sectionNameHindi,
                 sectionOrder = sectionDto.displayOrder ?: 0,
                 sectionPhase = sectionDto.sectionPhase ?: "",
-                sectionUuid = sectionDto.sectionUuid
+                sectionUuid = sectionDto.sectionUuid,
+                isEditable = sectionDto.isEditable
             )
             sectionsToInsert.add(sectionEntity)
 
@@ -279,12 +281,13 @@ class CounsellingRepositoryImpl @Inject constructor(
             val activeVersion = formDef.versions.find { it.version.versionId == formVersionId }
                 ?: return@withTransaction
 
-            val sectionDef = if (phase == "PRE_SUBMIT") {
-                activeVersion.sections
+            val sectionDef = when (phase) {
+                "PRE_SUBMIT" -> activeVersion.sections
                     .filter { it.section.sectionPhase == "PRE_SUBMIT" }
                     .maxByOrNull { it.section.sectionOrder }
-            } else {
-                activeVersion.sections
+                "GENERAL_INFO" -> activeVersion.sections
+                    .find { it.section.sectionPhase == "GENERAL_INFO" }
+                else -> activeVersion.sections
                     .find { it.section.sectionPhase == "POST_SUBMIT" }
             } ?: activeVersion.sections.maxByOrNull { it.section.sectionOrder }
             ?: return@withTransaction
@@ -309,11 +312,15 @@ class CounsellingRepositoryImpl @Inject constructor(
     }
 
     override suspend fun submitSectionE(responseId: Long, answers: List<QuestionResponseEntity>) {
-        submitSectionWithPhase(responseId, answers, "PRE_SUBMIT", "COMPLETED")
+        submitSectionWithPhase(responseId, answers, "PRE_SUBMIT", "SUBMITTED")
     }
 
     override suspend fun submitSectionF(responseId: Long, answers: List<QuestionResponseEntity>) {
         submitSectionWithPhase(responseId, answers, "POST_SUBMIT", "COMPLETED")
+    }
+
+    override suspend fun submitSectionGeneralInfo(responseId: Long, answers: List<QuestionResponseEntity>) {
+        submitSectionWithPhase(responseId, answers, "GENERAL_INFO", "REFUSED")
     }
 
     override suspend fun getCounsellingRecord(beneficiaryId: Long): Flow<CompleteFormResponse?> {
@@ -342,7 +349,6 @@ class CounsellingRepositoryImpl @Inject constructor(
         val officerId = preferenceDao.getLoggedInUser()?.userId?.toLong() ?: DEFAULT_OFFICER_ID
         val jwt = preferenceDao.getJWTAmritToken()
         val authHeader = jwt ?: ""
-
         var allSuccess = true
 
         for (resp in unsynced) {
@@ -351,66 +357,36 @@ class CounsellingRepositoryImpl @Inject constructor(
             val payload = PayloadBuilder.buildBulkPayload(resp, formDef, officerId)
 
             val recordSuccess = try {
-                if (resp.formResponse.status == "COMPLETE" || resp.formResponse.status == "COMPLETED") {
-                    val preSubmitPayload = PayloadBuilder.buildBulkPayload(resp, formDef, officerId, phaseFilter = "PRE_SUBMIT")
-                    var preSubmitSuccess = true
-                    if (preSubmitPayload.sections.isNotEmpty()) {
-                        try {
-                            val jsonPayload = com.google.gson.Gson().toJson(preSubmitPayload)
-                            Timber.d("Amrit push complete dynamic payload JSON: $jsonPayload")
-                        } catch (e: Exception) {
-                            Timber.e(e, "Failed to serialize payload to JSON for logging")
-                        }
-                        val apiResponse = amritApiService.completeCounselling(authHeader, preSubmitPayload)
-                        val statusCode = apiResponse.code()
-                        Timber.d("Amrit push complete dynamic response: httpStatus=$statusCode")
-                        if (statusCode == 200) {
-                            val responseString = apiResponse.body()?.string()
-                            val isSuccess = responseString?.let { org.json.JSONObject(it).optBoolean("success", false) } ?: false
-                            if (isSuccess) {
-                                Timber.d("Amrit push complete dynamic success")
-                            } else {
-                                Timber.e("Amrit push complete dynamic failed: success=false")
-                                preSubmitSuccess = false
-                            }
-                        } else {
-                            Timber.e("Amrit push complete dynamic failed: status=$statusCode")
-                            preSubmitSuccess = false
-                        }
-                    }
-                    preSubmitSuccess
-                } else {
-                    try {
-                        val jsonPayload = com.google.gson.Gson().toJson(payload)
-                        Timber.d("Amrit push complete standalone payload JSON: $jsonPayload")
-                    } catch (e: Exception) {
-                        Timber.e(e, "Failed to serialize counselling to JSON for logging")
-                    }
+                try {
+                    val jsonPayload = com.google.gson.Gson().toJson(payload)
+                    Timber.d("Amrit push complete dynamic payload JSON: $jsonPayload")
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to serialize complete payload to JSON for logging")
+                }
 
-                    val apiResponse = amritApiService.completeCounselling(authHeader, payload)
-                    val statusCode = apiResponse.code()
-                    Timber.d("Amrit push complete standalone response: httpStatus=$statusCode")
+                val apiResponse = amritApiService.completeCounselling(authHeader, payload)
+                val statusCode = apiResponse.code()
+                Timber.d("Amrit push complete dynamic response: httpStatus=$statusCode")
 
-                    if (statusCode == 200) {
-                        val responseString: String? = apiResponse.body()?.string()
-                        if (responseString != null) {
-                            val jsonObj = org.json.JSONObject(responseString)
-                            val isSuccess = jsonObj.optBoolean("success", false)
-                            if (isSuccess) {
-                                Timber.d("Amrit push complete standalone success: $jsonObj")
-                                true
-                            } else {
-                                Timber.e("Amrit push complete standalone failed: success=false")
-                                false
-                            }
+                if (statusCode == 200) {
+                    val responseString: String? = apiResponse.body()?.string()
+                    if (responseString != null) {
+                        val jsonObj = org.json.JSONObject(responseString)
+                        val isSuccess = jsonObj.optBoolean("success", false)
+                        if (isSuccess) {
+                            Timber.d("Amrit push complete dynamic success: $jsonObj")
+                            true
                         } else {
-                            Timber.e("Amrit push complete standalone failed: body is null")
+                            Timber.e("Amrit push complete dynamic failed: success=false")
                             false
                         }
                     } else {
-                        Timber.e("Amrit push complete standalone failed: status=$statusCode")
+                        Timber.e("Amrit push complete dynamic failed: body is null")
                         false
                     }
+                } else {
+                    Timber.e("Amrit push complete dynamic failed: status=$statusCode")
+                    false
                 }
             } catch (e: Exception) {
                 Timber.e(e, "Amrit push sync error for responseId=${resp.formResponse.responseId}")
@@ -418,15 +394,9 @@ class CounsellingRepositoryImpl @Inject constructor(
             }
 
             if (recordSuccess) {
-                val hasPostSubmitResponse = resp.sectionResponses.any { secResp ->
-                    val secDef = formDef?.versions?.find { it.version.versionId == formVersionId }
-                        ?.sections?.find { it.section.sectionId == secResp.sectionResponse.sectionId }
-                    secDef?.section?.sectionPhase == "POST_SUBMIT" && secResp.questionResponses.isNotEmpty()
-                }
-                val targetStatus = if (hasPostSubmitResponse) "COMPLETE" else resp.formResponse.status
                 responseDao.updateFormResponse(
                     resp.formResponse.copy(
-                        status = targetStatus,
+                        status = resp.formResponse.status,
                         syncStatus = "SYNCED",
                         syncedAt = System.currentTimeMillis()
                     )
@@ -455,7 +425,7 @@ class CounsellingRepositoryImpl @Inject constructor(
                 return true
             }
 
-            val formDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING) ?: return false
+            val formDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING_V2) ?: return false
             val activeVersion = formDef.versions.find { it.version.isActive }
                 ?: formDef.versions.maxByOrNull { it.version.versionNumber }
                 ?: return false
@@ -593,37 +563,37 @@ class CounsellingRepositoryImpl @Inject constructor(
             Timber.e(e, "fetchAndStoreCounsellingResponse failed for benId=$beneficiaryId")
             return false
         }
-    }
-
-    override suspend fun fetchAndStoreCompletedBeneficiaries(): List<Long>? {
+    }    override suspend fun fetchAndStoreCompletedBeneficiaries(): List<Long>? {
         try {
             val jwt = preferenceDao.getJWTAmritToken()
             val authHeader = jwt ?: run {
                 Timber.w("fetchAndStoreCompletedBeneficiaries: JWT token is null")
                 return null
             }
-            val villageId = preferenceDao.getLocationRecord()?.village?.id ?: run {
-                Timber.w("fetchAndStoreCompletedBeneficiaries: villageId is null")
+            val user = preferenceDao.getLoggedInUser() ?: run {
+                Timber.w("fetchAndStoreCompletedBeneficiaries: Logged-in user is null")
                 return null
             }
-            val user = preferenceDao.getLoggedInUser() ?: run {
-                Timber.w("fetchAndStoreCompletedBeneficiaries: user is null")
+            val villageId = preferenceDao.getLocationRecord()?.village?.id ?: run {
+                Timber.w("fetchAndStoreCompletedBeneficiaries: LocationRecord/Village is null")
                 return null
             }
             val providerServiceMapId = user.serviceMapId
             val response = amritApiService.getCompletedBeneficiaries(
                 authHeader = authHeader,
-                formType = "TB_COUNSELLING",
+                formType = FormType.TB_COUNSELLING_V2.name,
                 villageId = villageId,
                 providerServiceMapId = providerServiceMapId
             )
             if (response.isSuccessful) {
-                val completedIds = response.body()?.data as? List<Long> ?: return null
+                val apiResponseData = response.body()?.data ?: return null
+                val completedIds = apiResponseData.completed
+                val refusedIds = apiResponseData.refused
 
-                var formDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING)
+                var formDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING_V2)
                 if (formDef == null) {
                     downloadAndStoreAllForms()
-                    formDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING)
+                    formDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING_V2)
                 }
                 val activeVersion = formDef?.versions?.find { it.version.isActive }
                     ?: formDef?.versions?.maxByOrNull { it.version.versionNumber }
@@ -657,9 +627,35 @@ class CounsellingRepositoryImpl @Inject constructor(
                                 }
                             }
                         }
+                        for (benId in refusedIds) {
+                            val existing = responseDao.getFormResponseForBeneficiary(benId)
+                            if (existing == null) {
+                                responseDao.insertFormResponse(
+                                    FormResponseEntity(
+                                        beneficiaryId = benId,
+                                        formVersionId = versionId,
+                                        status = "REFUSED",
+                                        syncStatus = "SYNCED",
+                                        syncedAt = System.currentTimeMillis(),
+                                        lastVisitedSectionId = null
+                                    )
+                                )
+                            } else {
+                                val currentFr = existing.formResponse
+                                if (currentFr.status != "REFUSED") {
+                                    responseDao.updateFormResponse(
+                                        currentFr.copy(
+                                            status = "REFUSED",
+                                            syncStatus = "SYNCED",
+                                            syncedAt = System.currentTimeMillis()
+                                        )
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
-                return completedIds
+                return completedIds + refusedIds
             } else {
                 Timber.w("fetchAndStoreCompletedBeneficiaries failed: status code ${response.code()}")
                 return null
@@ -690,5 +686,3 @@ class CounsellingRepositoryImpl @Inject constructor(
         private const val DEFAULT_OFFICER_ID = 501L
     }
 }
-
-

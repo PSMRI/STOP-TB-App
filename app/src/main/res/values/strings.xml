@@ -1344,9 +1344,12 @@
     <string name="dialog_cancel_title">Are you Sure?</string>
     <string name="dialog_cancel_message">Do you want to discard this registration and go back?</string>
     <string name="dialog_yes">Yes</string>
+    <string name="not_filled" translatable="false">Not Filled</string>
+    <string name="counselling_consent">Counselling Consent</string>
+
     <string name="dialog_no">No</string>
     <string name="patient_registered_successfully">Patient Registered Successfully</string>
     <string name="proceed_to_register_hof">Do you want to proceed with registration of Head of the Family?</string>
-
+    <string name="refused">Refused</string>
 </resources>
 

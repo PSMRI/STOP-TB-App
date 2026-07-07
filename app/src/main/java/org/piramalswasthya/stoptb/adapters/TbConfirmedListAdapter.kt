@@ -53,6 +53,16 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 
             val isBenAlreadyCounselled = (benIdList != null &&  benIdList.contains(item.ben.benId))
             binding.ivSyncState.visibility = if (item.tbConfirmedList == null) View.INVISIBLE else View.VISIBLE
+            
+            val isRefused = item.formResponse?.status == "REFUSED"
+            if (isRefused) {
+                binding.btnCounselled.text = binding.root.context.getString(org.piramalswasthya.stoptb.R.string.refused)
+                binding.btnCounselled.setBackgroundColor(binding.root.resources.getColor(android.R.color.holo_red_dark))
+            } else {
+                binding.btnCounselled.text = binding.root.context.getString(org.piramalswasthya.stoptb.R.string.counselled)
+                binding.btnCounselled.setBackgroundColor(binding.root.resources.getColor(android.R.color.holo_green_dark))
+            }
+
             val role = pref?.getLoggedInUser()?.role
             if (role != null) {
                 checkIfCounsellingOfficerOrNot(role, ( item.isCounselled|| isBenAlreadyCounselled))
@@ -111,6 +121,9 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 
             binding.btnCounselled.visibility =
                 if (isCounsellingOfficer && isCounselled) View.VISIBLE else View.GONE
+
+            binding.ivViewMember.visibility =
+                if(isCounsellingOfficer) View.VISIBLE else View.GONE
         }
 
     }
@@ -140,7 +153,8 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
     class ClickListener(
         private val clickedForm: ((hhId: Long, benId: Long) -> Unit)? = null,
         private val clickedCounselling: ((item: BenWithTbSuspectedDomain) -> Unit)? = null,
-        private val clickedCounselled: ((item: BenWithTbSuspectedDomain) -> Unit)? = null
+        private val clickedCounselled: ((item: BenWithTbSuspectedDomain) -> Unit)? = null,
+        private val clickedViewMember : ((item : BenWithTbSuspectedDomain) -> Unit)? = null
     ) {
         fun onClickForm(item: BenWithTbSuspectedDomain) =
             clickedForm?.let { it(item.ben.hhId, item.ben.benId) }
@@ -148,6 +162,8 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             clickedCounselling?.let { it(item) }
         fun onClickCounselled(item: BenWithTbSuspectedDomain) =
             clickedCounselled?.let { it(item) }
+        fun onClickViewMember(item : BenWithTbSuspectedDomain) =
+            clickedViewMember?.let { it(item) }
     }
     fun submitBenIds(list: List<Long>?) {
         if (list != null) {

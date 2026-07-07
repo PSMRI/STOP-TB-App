@@ -210,6 +210,9 @@
         <action
             android:id="@+id/action_TBConfirmedListFragment_to_TBConfirmedFormFragment"
             app:destination="@id/TBConfirmedFormFragment" />
+        <action
+            android:id="@+id/action_TBConfirmedListFragment_to_householdMembersFragment"
+            app:destination="@id/householdMembersFragment" />
     </fragment>
 
     <fragment
