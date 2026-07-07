@@ -151,12 +151,12 @@ class CounsellingViewModel @Inject constructor(
         }
     }
 
-    fun updateCounsellingDate(dateMillis: Long) {
-        viewModelScope.launch {
-            counsellingRepo.updateCounsellingDate(benId, dateMillis)
-            loadOverview()
-        }
-    }
+//    fun updateCounsellingDate(dateMillis: Long) {
+//        viewModelScope.launch {
+//            counsellingRepo.updateCounsellingDate(benId, dateMillis)
+//            loadOverview()
+//        }
+//    }
 
     fun evaluateGeneralInfoConditions(q: CounsellingQuestionDto) {
         val section = generalInfoSection ?: return
