@@ -32,6 +32,7 @@
     <string name="iv_sync_state_tv">সময়সৰণি স্থিতি</string>
     <string name="iv_death_indicator">মৃত্যু</string>
     <string name="add_file">ফাইল যোগ কৰক</string>
+    <string name="view_members">সদস্যসকলক চাওক</string>
 <string name="form_input_empty_error">"প্ৰয়োজনীয় ক্ষেত্ৰখন খালী হ’ব নোৱাৰে !</string>
     <string name="form_input_upper_case_error">শুধুমাত্র বড় অক্ষরে অক্ষর অনুমোদিত!</string>
     <string name="form_input_missing_entry_error">ঘরে %1d টি সংখ্যা থাকা আবশ্যক।</string>
@@ -830,6 +831,7 @@
     <string name="dialog_no">নহয়</string>
     <string name="patient_registered_successfully">ৰোগীৰ পঞ্জীয়ন সফলতাৰে কৰা হ’ল।</string>
     <string name="proceed_to_register_hof">আপুনি পৰিয়ালৰ প্ৰধানৰ পঞ্জীয়ন কৰিবলৈ আগবাঢ়িব বিচাৰেনে?</string>
+    <string name="counselling_consent">পৰামৰ্শৰ বাবে সন্মতি</string>
 </resources>
 
 

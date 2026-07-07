@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.ui.counselling_activity
 
+import android.app.DatePickerDialog
 import android.content.Context
 import android.os.Bundle
 import android.view.View
@@ -10,18 +11,24 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
+import androidx.recyclerview.widget.LinearLayoutManager
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.adapters.dynamicAdapter.CounsellingDynamicAdapter
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.ActivityCounsellingBinding
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.CounsellingOverviewData
+import org.piramalswasthya.stoptb.model.dynamicEntity.*
 import timber.log.Timber
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 @AndroidEntryPoint
 class CounsellingActivity : AppCompatActivity() {
@@ -47,6 +54,7 @@ class CounsellingActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityCounsellingBinding
     private val viewModel: CounsellingViewModel by viewModels()
+    private lateinit var generalInfoAdapter: CounsellingDynamicAdapter
 
     // Progress bar stays visible until overview has loaded.
     private var isOverviewReady = false
@@ -69,6 +77,7 @@ class CounsellingActivity : AppCompatActivity() {
             setDisplayHomeAsUpEnabled(true)
             title = getString(R.string.counselling_overview_title)
         }
+        setupGeneralInfoSection()
         setupNavigationFooter()
         observeViewModel()
 
@@ -90,6 +99,128 @@ class CounsellingActivity : AppCompatActivity() {
         })
     }
 
+    private fun setupGeneralInfoSection() {
+        generalInfoAdapter = CounsellingDynamicAdapter(
+            questions = emptyList(),
+            onValueChanged = { updatedQ -> viewModel.evaluateGeneralInfoConditions(updatedQ) }
+        )
+        binding.rvGeneralInfo.layoutManager = LinearLayoutManager(this)
+        binding.rvGeneralInfo.adapter = generalInfoAdapter
+
+        binding.etCounsellingDate.setOnClickListener {
+            if (viewModel.isFormEditable.value == false) return@setOnClickListener
+            val overviewData = (viewModel.overview.value as? NetworkResponse.Success)?.data ?: return@setOnClickListener
+            val cal = Calendar.getInstance()
+            val currentText = binding.etCounsellingDate.text.toString()
+            val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
+            try {
+                sdf.parse(currentText)?.let {
+                    cal.time = it
+                }
+            } catch (e: Exception) {}
+
+            val dpd = DatePickerDialog(
+                this,
+                { _, year, month, day ->
+                    val selected = Calendar.getInstance().apply {
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                        set(year, month, day)
+                    }
+                    viewModel.updateCounsellingDate(selected.timeInMillis)
+                },
+                cal.get(Calendar.YEAR),
+                cal.get(Calendar.MONTH),
+                cal.get(Calendar.DAY_OF_MONTH)
+            )
+            dpd.datePicker.maxDate = System.currentTimeMillis()
+            dpd.datePicker.minDate = overviewData.regDate
+            dpd.show()
+        }
+    }
+
+    private fun updateGeneralInfoUi() {
+        val questions = viewModel.generalInfoQuestions.value.orEmpty()
+
+        if (questions.isEmpty()) {
+            binding.rvGeneralInfo.visibility = View.GONE
+            binding.ConsentToggleButton.visibility = View.GONE
+            binding.consentToggleHeader.visibility = View.GONE
+            return
+        }
+
+        binding.ConsentToggleButton.visibility = View.VISIBLE
+        binding.consentToggleHeader.visibility = View.VISIBLE
+
+        val consentQuestion = questions.firstOrNull { it.questionUuid == "TB2_GI_Q1" || it.questionUuid == "TB_A_Q1" }
+        val consentAnswer = when (val v = consentQuestion?.value) {
+            is List<*> -> v.firstOrNull()?.toString()
+            is String -> v
+            else -> null
+        }
+
+        val toggleOn = viewModel.isGeneralInfoToggleOn.value ?: true
+
+        binding.ConsentToggleButton.setOnCheckedChangeListener(null)
+        binding.ConsentToggleButton.isChecked = toggleOn
+        binding.ConsentToggleButton.setOnCheckedChangeListener { _, checked ->
+            viewModel.setGeneralInfoToggle(checked)
+        }
+
+        val isEditable = viewModel.isFormEditable.value != false
+        binding.etCounsellingDate.isEnabled = isEditable
+
+        if (toggleOn) {
+            generalInfoAdapter.submitList(questions, isEditable)
+            binding.rvGeneralInfo.visibility = View.VISIBLE
+        } else {
+            binding.rvGeneralInfo.visibility = View.GONE
+        }
+
+        binding.navigationFooter.root.visibility = View.VISIBLE
+        binding.navigationFooter.btnBack.visibility = View.GONE
+
+        val overviewData = (viewModel.overview.value as? NetworkResponse.Success)?.data
+        val preSubmitSubmitted = overviewData?.preSubmitSubmitted == true
+
+        if (preSubmitSubmitted) {
+            binding.ConsentToggleButton.isEnabled = false
+            binding.navigationFooter.btnNext.text = getString(R.string.counselled)
+            binding.navigationFooter.btnNext.visibility = View.VISIBLE
+            binding.navigationFooter.btnNext.setOnClickListener {
+                viewModel.startCounselling()
+            }
+            binding.navigationFooter.btnBack.visibility = View.GONE
+        } else {
+            binding.ConsentToggleButton.isEnabled = isEditable
+            if (toggleOn) {
+                when {
+                    consentAnswer?.equals("NO", ignoreCase = true) == true -> {
+                        binding.navigationFooter.btnNext.text = getString(R.string.btn_submit)
+                        binding.navigationFooter.btnNext.visibility = if (isEditable) View.VISIBLE else View.GONE
+                        binding.navigationFooter.btnNext.setOnClickListener {
+                            viewModel.submitGeneralInfoRefusal()
+                        }
+                    }
+                    consentAnswer?.equals("YES", ignoreCase = true) == true -> {
+                        binding.navigationFooter.btnNext.text = getString(R.string.counselling_start_button)
+                        binding.navigationFooter.btnNext.visibility = View.VISIBLE
+                        binding.navigationFooter.btnNext.setOnClickListener {
+                            viewModel.startCounselling()
+                        }
+                    }
+                    else -> {
+                        binding.navigationFooter.btnNext.visibility = View.GONE
+                    }
+                }
+            } else {
+                binding.navigationFooter.btnNext.visibility = View.GONE
+            }
+        }
+    }
+
     private fun setupNavigationFooter() {
         val overviewData = (viewModel.overview.value as? NetworkResponse.Success)?.data
 
@@ -103,7 +234,13 @@ class CounsellingActivity : AppCompatActivity() {
         binding.navigationFooter.btnNext.setOnClickListener {
             viewModel.startCounselling()
         }
-        binding.navigationFooter.btnBack.visibility = View.GONE
+        if (overviewData?.preSubmitSubmitted == true) {
+            binding.navigationFooter.btnNext.text = getString(R.string.counselled)
+            binding.navigationFooter.btnNext.visibility = View.VISIBLE
+            binding.navigationFooter.btnBack.visibility = View.GONE
+        } else {
+            binding.navigationFooter.btnBack.visibility = View.GONE
+        }
     }
 
     private fun switchToFormView() {
@@ -141,8 +278,11 @@ class CounsellingActivity : AppCompatActivity() {
     private fun updateSectionTitle(step: Int) {
         viewModel.schemaData?.sections?.getOrNull(step)?.let { sec ->
             val letter = if (sec.sectionPhase == "POST_SUBMIT") "F"
-            else ('A' + sec.displayOrder - 1).toChar().toString()
-//            supportActionBar?.title = getString(R.string.counselling_section_title_format, letter, sec.sectionName)
+            else {
+                val preSubmitSections = viewModel.schemaData?.sections?.filter { it.sectionPhase == "PRE_SUBMIT" } ?: emptyList()
+                val idx = preSubmitSections.indexOf(sec)
+                if (idx != -1) ('A' + idx).toString() else ('A' + sec.displayOrder - 2).toChar().toString()
+            }
             supportActionBar?.title = "Section $letter - ${sec.sectionName}"
         }
     }
@@ -160,6 +300,7 @@ class CounsellingActivity : AppCompatActivity() {
                         isOverviewReady = true
                         maybeShowContent()
                         setupNavigationFooter()
+                        updateGeneralInfoUi()
                     }
                 }
                 is NetworkResponse.Error -> {
@@ -206,14 +347,14 @@ class CounsellingActivity : AppCompatActivity() {
 
             val section = viewModel.schemaData?.sections?.getOrNull(step)
             val total = viewModel.schemaData?.sections?.size ?: 1
-            val isEditable = viewModel.isFormEditable.value ?: true
+            val isEditable = viewModel.isSectionEditable(section)
 
             binding.navigationFooter.btnNext.text = when {
                 step == total - 1 && isEditable -> getString(R.string.btn_submit)
                 step == total - 1 && !isEditable -> getString(R.string.btn_finish)
                 else -> getString(R.string.btn_next_text)
             }
-            
+
             binding.navigationFooter.btnBack.text = getString(R.string.btn_back_text)
             binding.navigationFooter.btnBack.visibility = if (step == 0) View.GONE else View.VISIBLE
 
@@ -227,6 +368,13 @@ class CounsellingActivity : AppCompatActivity() {
                 Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show()
                 viewModel.resetSaveError()
             }
+        }
+
+        viewModel.generalInfoQuestions.observe(this) { updateGeneralInfoUi() }
+        viewModel.isGeneralInfoToggleOn.observe(this) { updateGeneralInfoUi() }
+        viewModel.isFormEditable.observe(this) { updateGeneralInfoUi() }
+        viewModel.generalInfoRefusalSubmitted.observe(this) { submitted ->
+            if (submitted == true) finish()
         }
     }
 
@@ -280,6 +428,7 @@ class CounsellingActivity : AppCompatActivity() {
         binding.llCounsellingInfo.visibility = View.VISIBLE
         supportActionBar?.title = getString(R.string.counselling_overview_title)
         setupNavigationFooter()
+        updateGeneralInfoUi()
     }
 
     private fun hideKeyboard() {

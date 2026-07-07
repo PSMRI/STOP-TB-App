@@ -22,6 +22,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertNewBenBinding
 import org.piramalswasthya.stoptb.databinding.FragmentHouseholdMembersBinding
 import org.piramalswasthya.stoptb.model.Gender
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
@@ -149,8 +150,11 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
         }
 
         // Nurse role: invisible (takes space but not visible/clickable)
-        val isNurse = prefDao.getLoggedInUser()?.role.isNurseRole()
-        binding.fabAddMember.visibility = if (isNurse) View.INVISIBLE else View.VISIBLE
+        // Nurse & Counselling officer role: invisible (takes space but not visible/clickable)
+        val role = prefDao.getLoggedInUser()?.role
+        val isNurse = role.isNurseRole()
+        val isCounsellingOfficer = role.isCounsellingOfficerRole()
+        binding.fabAddMember.visibility = if (isNurse || isCounsellingOfficer) View.INVISIBLE else View.VISIBLE
         binding.fabAddMember.setOnClickListener {
             addBenAlert?.show()
         }

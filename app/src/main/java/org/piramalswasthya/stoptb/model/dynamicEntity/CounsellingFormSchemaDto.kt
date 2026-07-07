@@ -38,6 +38,7 @@ data class CounsellingSectionDto(
     @SerializedName("isRequired") val isRequired: Boolean,
     @SerializedName("displayOrder") val displayOrder: Int,
     @SerializedName("hasSubmitButton") val hasSubmitButton: Boolean,
+    @SerializedName("isEditable") val isEditable: Boolean = false,
     @SerializedName("questions") var questions: List<CounsellingQuestionDto>
 )
 

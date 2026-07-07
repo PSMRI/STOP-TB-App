@@ -65,6 +65,19 @@
                         app:drawableLeftCompat="@drawable/ic__hh"
                         app:drawableTint="?attr/colorPrimary"
                         tools:text="Hello Meister" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/iv_view_member"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/view_members"
+                        android:textSize="12sp"
+                        android:layout_gravity="center_vertical|end"
+                        android:layout_margin="@dimen/margin_normal"
+                        android:onClick="@{()->clickListener.onClickViewMember(benWithTb)}"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:backgroundTint="?attr/colorPrimary"
+                        />
 
                     <ImageView
                         android:id="@+id/iv_sync_state"

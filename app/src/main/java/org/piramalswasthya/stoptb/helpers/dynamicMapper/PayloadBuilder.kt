@@ -172,10 +172,10 @@ object PayloadBuilder {
                 if (secDef?.section?.sectionPhase != phaseFilter) {
                     return@mapNotNull null
                 }
-            } else {
-                if ((response.formResponse.status == "COMPLETE" || response.formResponse.status == "COMPLETED") && secDef?.section?.sectionPhase != "POST_SUBMIT") {
-                    return@mapNotNull null
-                }
+            }
+
+            if (secResponseWithQuestions.questionResponses.isEmpty()) {
+                return@mapNotNull null
             }
 
             val groupedResponses = secResponseWithQuestions.questionResponses.groupBy { it.questionId }
