@@ -697,10 +697,24 @@ class FormInputAdapter(
                 val labels = item.entries ?: emptyArray()
                 val checkedItems = BooleanArray(labels.size) { index -> selectedIndexes.contains(index) }
 
-                AlertDialog.Builder(binding.root.context)
+                lateinit var dialogRef: AlertDialog
+                val builder = AlertDialog.Builder(binding.root.context)
                     .setTitle(item.title)
-                    .setMultiChoiceItems(labels, checkedItems) { _, which, isChecked ->
-                        checkedItems[which] = isChecked
+                    .setMultiChoiceItems(labels, checkedItems) { dialog, which, isChecked ->
+                        val exclusiveIndices = item.exclusiveOptionIndices
+                        if (exclusiveIndices != null) {
+                            if (isChecked && exclusiveIndices.contains(which)) {
+                                // "Not Applicable" (or similar) checked -> uncheck everything else
+                                checkedItems.indices.forEach { idx ->
+                                    if (idx != which) checkedItems[idx] = false
+                                }
+                            } else if (isChecked && exclusiveIndices.isNotEmpty()) {
+                                // A normal option checked -> uncheck the exclusive option(s)
+                                exclusiveIndices.forEach { idx -> checkedItems[idx] = false }
+                            }
+                            val listView = (dialog as? AlertDialog)?.listView
+                            checkedItems.indices.forEach { idx -> listView?.setItemChecked(idx, checkedItems[idx]) }
+                        }
                     }
                     .setPositiveButton(android.R.string.ok) { _, _ ->
                         selectedIndexes.clear()
@@ -717,7 +731,7 @@ class FormInputAdapter(
                         formValueListener?.onValueChanged(item, -1)
                     }
                     .setNegativeButton(android.R.string.cancel, null)
-                    .show()
+                builder.show()
             }
             binding.etMultiSelect.setOnClickListener(showDialog)
             binding.tilMultiSelect.setEndIconOnClickListener(showDialog)
