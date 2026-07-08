@@ -9,6 +9,9 @@ import org.piramalswasthya.stoptb.model.FormElement
 import org.piramalswasthya.stoptb.model.InputType
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.utils.Log
+import org.piramalswasthya.stoptb.model.Gender
+import org.piramalswasthya.stoptb.utils.CommonConstants
+
 
 class TBScreeningDataset(
     context: Context,
@@ -135,6 +138,53 @@ class TBScreeningDataset(
         hasDependants = true
     )
 
+    private data class CodedOption(val id: Int, val code: String, val label: String)
+
+    private val riskFactorCodes = CommonConstants.RISK_FACTOR_CODES
+
+    private fun masterRiskFactorOptions(): List<CodedOption> {
+        val labels = resources.getStringArray(R.array.key_population_risk_factor_options)
+        return labels.mapIndexed { index, label ->
+            CodedOption(index + 1, riskFactorCodes.getOrElse(index) { label.uppercase().replace(" ", "_") }, label)
+        }
+    }
+
+    private var isMaleBen: Boolean = false
+    private var isPregnantBen: Boolean = false
+    private var riskFactorOptions: List<CodedOption> = emptyList()
+
+    private val hivStatusOptions: List<CodedOption>
+        get() = listOf(
+            CodedOption(1, "POSITIVE", resources.getString(R.string.positive)),
+            CodedOption(2, "REACTIVE", resources.getString(R.string.reactive)),
+            CodedOption(3, "NEGATIVE", resources.getString(R.string.negative)),
+            CodedOption(4, "UNKNOWN", resources.getString(R.string.unknown))
+        )
+
+    private val riskFactorsHeading = FormElement(
+        id = 17,
+        inputType = InputType.HEADLINE,
+        title = resources.getString(R.string.risk_factors),
+        required = false
+    )
+
+    private val keyPopulationRiskFactors = FormElement(
+        id = 18,
+        inputType = InputType.CHECKBOXES,
+        title = resources.getString(R.string.select_key_population_risk_factors),
+        entries = emptyArray(),
+        required = true,
+        showAsMultiSelectDialog = true
+    )
+
+    private val hivStatus = FormElement(
+        id = 19,
+        inputType = InputType.DROPDOWN,
+        title = resources.getString(R.string.hiv_status),
+        entries = emptyArray(),
+        required = true
+    )
+
     // ── Asymptomatic logic ───────────────────────────────────────────────────
 
     /** IDs of the 10 symptom questions that drive asymptomatic auto-select */
@@ -169,10 +219,32 @@ class TBScreeningDataset(
         ben?.let {
             dateOfVisit.min = it.regDate
             benAgeYears = if (it.dob > 0L) BenBasicCache.getAgeFromDob(it.dob) else it.age
+            isMaleBen = it.gender == Gender.MALE
+            val reproductiveStatus = it.genDetails?.reproductiveStatus
+            isPregnantBen = it.genDetails?.reproductiveStatusId == 1 ||
+                    reproductiveStatus.equals("Yes", ignoreCase = true)
         }
+
+        riskFactorOptions = masterRiskFactorOptions().let { all ->
+            if (isMaleBen) all.filter { it.code != "PREGNANCY" && it.code != "LACTATING_MOTHER" } else all
+        }
+        keyPopulationRiskFactors.entries = riskFactorOptions.map { it.label }.toTypedArray()
+        val notApplicableIndex = riskFactorOptions.indexOfFirst { it.code == "NOT_APPLICABLE" }
+        keyPopulationRiskFactors.exclusiveOptionIndices =
+            if (notApplicableIndex >= 0) setOf(notApplicableIndex) else null
+        hivStatus.entries = hivStatusOptions.map { it.label }.toTypedArray()
 
         if (saved == null) {
             dateOfVisit.value = getDateFromLong(System.currentTimeMillis())
+            val pregnancyIndex = riskFactorOptions.indexOfFirst { it.code == "PREGNANCY" }
+            val notApplicableIndex = riskFactorOptions.indexOfFirst { it.code == "NOT_APPLICABLE" }
+
+            keyPopulationRiskFactors.value = when {
+                isPregnantBen && pregnancyIndex >= 0 -> pregnancyIndex.toString()
+                notApplicableIndex >= 0 -> notApplicableIndex.toString()
+                else -> null
+            }
+            hivStatus.value = hivStatusOptions.first { it.code == "UNKNOWN" }.label
         } else {
             dateOfVisit.value        = getDateFromLong(saved.visitDate)
             isCoughing.value         = boolToYesNo(saved.coughMoreThan2Weeks)
@@ -185,14 +257,27 @@ class TBScreeningDataset(
             historyOfTB.value        = boolToYesNo(saved.historyOfTb)
             currentlyTakingDrugs.value = boolToYesNo(saved.takingAntiTBDrugs)
             familyHistoryTB.value    = boolToYesNo(saved.familySufferingFromTB)
-            // Restore saved asymptomatic; fall back to computed if null
             isAsymptomatic.value     = saved.asymptomatic ?: computeAsymptomatic()
-        }
 
+            val savedIds = saved.keyPopulationRiskFactorIds.orEmpty()
+            val savedCodes = saved.keyPopulationRiskFactors.orEmpty()
+            val selectedIndexes = riskFactorOptions.mapIndexedNotNull { index, option ->
+                val matches = savedIds.contains(option.id) ||
+                        savedCodes.any { it.equals(option.code, true) || it.equals(option.label, true) }
+                if (matches) index else null
+            }
+            keyPopulationRiskFactors.value =
+                if (selectedIndexes.isEmpty()) null else selectedIndexes.sorted().joinToString("|")
+
+            hivStatus.value = hivStatusOptions.firstOrNull {
+                it.id == saved.hivStatusId ||
+                        saved.hivStatus.equals(it.code, true) ||
+                        saved.hivStatus.equals(it.label, true)
+            }?.label ?: hivStatusOptions.first { it.code == "UNKNOWN" }.label
+        }
 
         setUpPage(buildFormList())
     }
-
     // ── Value change handling ────────────────────────────────────────────────
 
     override suspend fun handleListOnValueChanged(formId: Int, index: Int): Int {
@@ -207,6 +292,7 @@ class TBScreeningDataset(
             historyOfTB.id          -> historyOfTB.value          = yesNoFromIndex(index)
             currentlyTakingDrugs.id -> currentlyTakingDrugs.value = yesNoFromIndex(index)
             familyHistoryTB.id      -> familyHistoryTB.value      = yesNoFromIndex(index)
+            keyPopulationRiskFactors.id -> enforceNotApplicableExclusivity()
         }
         // If a symptom question was answered, recompute asymptomatic and signal a
         // list refresh so the fragment can force-rebind the auto-computed field.
@@ -215,6 +301,18 @@ class TBScreeningDataset(
             Log.d("ASYM_TEST", "Computed = ${isAsymptomatic.value}")
             listFlow.value.indexOf(isAsymptomatic).takeIf { it >= 0 } ?: -1
         } else -1
+    }
+
+    private fun enforceNotApplicableExclusivity() {
+        val naIndex = riskFactorOptions.indexOfFirst { it.code == "NOT_APPLICABLE" }
+        if (naIndex < 0) return
+        val selected = keyPopulationRiskFactors.value
+            ?.split("|")?.mapNotNull { it.toIntOrNull() }?.toMutableSet() ?: return
+        if (selected.size > 1 && selected.contains(naIndex)) {
+            selected.remove(naIndex)
+            keyPopulationRiskFactors.value =
+                if (selected.isEmpty()) null else selected.sorted().joinToString("|")
+        }
     }
 
     // ── Saving ───────────────────────────────────────────────────────────────
@@ -234,6 +332,16 @@ class TBScreeningDataset(
             form.familySufferingFromTB = isYes(familyHistoryTB)
             form.asymptomatic          = isAsymptomatic.value?.takeIf { it.isNotBlank() }
             form.familyContactScreeningRequired = requiresFamilyContactScreening()
+            val selectedRiskFactors = keyPopulationRiskFactors.value
+                ?.split("|")?.mapNotNull { it.toIntOrNull() }
+                ?.mapNotNull { riskFactorOptions.getOrNull(it) }
+                .orEmpty()
+            form.keyPopulationRiskFactorIds = selectedRiskFactors.map { it.id }.takeIf { it.isNotEmpty() }
+            form.keyPopulationRiskFactors = selectedRiskFactors.map { it.code }.takeIf { it.isNotEmpty() }
+
+            val selectedHiv = hivStatusOptions.firstOrNull { it.label == hivStatus.value }
+            form.hivStatusId = selectedHiv?.id
+            form.hivStatus = selectedHiv?.code
             // Fields no longer collected in TB Screening — clear them
             form.age                             = null
             form.diabetic                        = null
@@ -304,7 +412,10 @@ class TBScreeningDataset(
         historyOfTB,
         currentlyTakingDrugs,
         familyHistoryTB,
-        isAsymptomatic
+        isAsymptomatic,
+        riskFactorsHeading,
+        keyPopulationRiskFactors,
+        hivStatus
     )
 
     private fun yesNoFromIndex(index: Int): String? = if (index == 0) yesValue else noValue

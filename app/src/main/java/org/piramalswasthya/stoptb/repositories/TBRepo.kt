@@ -321,6 +321,10 @@ class TBRepo @Inject constructor(
                 recommendedForTruenatTest = item.optNullableBoolean("recommendedForTruenat"),
                 recommendedForLiquidCultureTest = item.optNullableBoolean("recommendedForLiquidCulture"),
                 reasonForDenialForGettingTested = item.optStringListOrNull("testDenialReasons"),
+                keyPopulationRiskFactorIds = item.optIntListOrNull("keyPopulationRiskFactorIds"),
+                keyPopulationRiskFactors = item.optStringListOrNull("keyPopulationRiskFactors"),
+                hivStatusId = item.optIntOrNull("hivStatusId"),
+                hivStatus = item.optStringOrNull("hivStatus"),
                 serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
                 syncState = SyncState.SYNCED
             )
@@ -1206,6 +1210,9 @@ class TBRepo @Inject constructor(
             return optBoolean(name)
         }
 
+        private fun JSONObject.optIntOrNull(name: String): Int? =
+            if (!has(name) || isNull(name)) null else optInt(name)
+
         private fun JSONObject.optStringOrNull(name: String): String? {
             if (!has(name) || isNull(name)) return null
             return optString(name).takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
@@ -1231,6 +1238,18 @@ class TBRepo @Inject constructor(
                 is JSONArray -> data
                 is JSONObject -> data.optJSONArray("data") ?: JSONArray()
                 else -> JSONArray()
+            }
+        }
+
+        private fun JSONObject.optIntListOrNull(name: String): List<Int>? {
+            if (!has(name) || isNull(name)) return null
+            return when (val value = opt(name)) {
+                is JSONArray -> List(value.length()) { index -> value.optInt(index) }
+                is String -> runCatching {
+                    val jsonArray = JSONArray(value)
+                    List(jsonArray.length()) { index -> jsonArray.optInt(index) }
+                }.getOrNull()
+                else -> null
             }
         }
     }
