@@ -15,6 +15,7 @@ import org.piramalswasthya.stoptb.configuration.GeneralOpdDataset
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.GeneralOpdCache
+import org.piramalswasthya.stoptb.model.getAgeGenderDisplayString
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import timber.log.Timber
@@ -60,7 +61,7 @@ class GeneralOpdFormViewModel @Inject constructor(
             val ben = benRepo.getBenFromId(benId)
             ben?.let {
                 _benName.value = "${it.firstName} ${it.lastName.orEmpty()}".trim()
-                _benAgeGender.value = "${it.age} ${it.ageUnit?.name} | ${it.gender?.name}"
+                _benAgeGender.value = it.getAgeGenderDisplayString()
                 generalOpdCache = GeneralOpdCache(benId = it.beneficiaryId)
             }
 

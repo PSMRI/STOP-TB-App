@@ -924,6 +924,26 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
         return -1
     }
 
+    protected fun validatePincodeOnEditText(formElement: FormElement): Int {
+        val value = formElement.value?.trim()
+
+        formElement.errorText = when {
+            value.isNullOrEmpty() -> if (formElement.required) {
+                resources.getString(R.string.form_input_empty_error)
+            } else {
+                null
+            }
+            value.any { !it.isDigit() } -> resources.getString(R.string.form_input_digit_only_error)
+            value.length != formElement.etMaxLength -> resources.getString(
+                R.string.form_input_missing_entry_error,
+                formElement.etMaxLength
+            )
+            else -> null
+        }
+
+        return -1
+    }
+
 //    protected fun validateNumberOnEditText(formElement: FormElement): Int {
 //        val input = formElement.value?.trim() ?: ""
 //
