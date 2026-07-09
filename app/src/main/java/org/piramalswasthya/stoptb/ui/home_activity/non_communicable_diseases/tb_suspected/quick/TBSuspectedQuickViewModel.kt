@@ -15,6 +15,7 @@ import org.piramalswasthya.stoptb.configuration.TBSuspectedQuickDataset
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
+import org.piramalswasthya.stoptb.model.getAgeGenderDisplayString
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
@@ -62,7 +63,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
         viewModelScope.launch {
             val ben = benRepo.getBenFromId(benId)?.also { beneficiary ->
                 _benName.value = listOfNotNull(beneficiary.firstName, beneficiary.lastName).joinToString(" ")
-                _benAgeGender.value = "${beneficiary.age} ${beneficiary.ageUnit?.name} | ${beneficiary.gender?.name}"
+                _benAgeGender.value = beneficiary.getAgeGenderDisplayString()
                 tbDiagnostics = TBDiagnosticsCache(benId = beneficiary.beneficiaryId)
             }
             val tbScreening = tbRepo.getTBScreening(benId)

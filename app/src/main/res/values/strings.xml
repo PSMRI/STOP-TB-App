@@ -1226,6 +1226,7 @@
     <string name="examine_btn_fill">Fill</string>
     <string name="examine_btn_view">View</string>
     <string name="diagnosis_locked_msg">Please fill TB Screening form first</string>
+    <string name="tb_screening_locked_msg">Please fill TB Screening form first</string>
     <string name="tb_screening_legend_xray_sputum">* Refer for Digital Chest X-Ray or for Sputum Collection</string>
     <string name="tb_screening_legend_family_members">** Advise for screening of all family members</string>
 

@@ -1809,6 +1809,11 @@ class BenRepo @Inject constructor(
                                     .ifEmpty { jsonObject.optString("addressLine1") }
                                     .ifEmpty { jsonObject.optString("address") },
 
+                                pinCode = demographicsObj.optString("pinCode")
+                                    .ifEmpty { benDataObj.optString("pinCode") }
+                                    .ifEmpty { jsonObject.optString("pinCode") }
+                                    .ifEmpty { null },
+
                                 genderId = benDataObj.optInt(
                                     "genderId",
                                     benDataObj.optInt("genderID", 0)
