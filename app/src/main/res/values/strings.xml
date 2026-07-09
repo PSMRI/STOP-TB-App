@@ -1050,8 +1050,8 @@
     <string name="lymphadenopathy">Lymphadenopathy</string>
     <string name="oedema">Oedema</string>
     <string name="key_population_risk_factors">Key Population / Risk Factors *</string>
-    <string name="select_key_population_risk_factors">Select Key Population / Risk Factors</string>
-    <string name="hiv_status">HIV Status *</string>
+    <string name="select_key_population_risk_factors">Select Key Population / Risk Factors *</string>
+    <string name="hiv_status">HIV Status </string>
     <string name="no_risk_factor_selected">No risk factor selected</string>
     <string name="risk_factor_required">Select Key Population / Risk Factors</string>
     <string name="hiv_status_required">Select HIV Status</string>

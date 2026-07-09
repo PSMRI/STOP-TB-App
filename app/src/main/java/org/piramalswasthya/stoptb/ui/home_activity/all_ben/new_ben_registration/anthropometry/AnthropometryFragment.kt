@@ -99,7 +99,13 @@ class AnthropometryFragment : Fragment() {
         binding.etTemperature.doAfterTextChanged {
             validateTemperature(showBlankError = false)
             selectTemperatureRange(binding.etTemperature.text?.toString()?.toDoubleOrNull())
-            if (isHighTemperature()) showHighTemperatureAlert()
+            if (isHighTemperature()) {
+                showHighTemperatureAlert()
+            } else {
+                // Temperature no longer high — allow the alert to fire again
+                // the next time it crosses back above the threshold.
+                highTemperatureAlertShown = false
+            }
         }
 
         binding.rgTemperature.setOnCheckedChangeListener { _, checkedId ->
