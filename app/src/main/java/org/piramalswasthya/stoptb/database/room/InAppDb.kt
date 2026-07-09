@@ -104,7 +104,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class],
-    version = 22, exportSchema = false
+    version = 23, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -694,6 +694,11 @@ abstract class InAppDb : RoomDatabase() {
                 }
             }
         }
+        private val MIGRATION_22_23 = object : Migration(22, 23) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                addTBScreeningRiskFactorColumns(database)
+            }
+        }
 
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
@@ -795,6 +800,21 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        private fun addTBScreeningRiskFactorColumns(database: SupportSQLiteDatabase) {
+            val columns = listOf(
+                "keyPopulationRiskFactorIds TEXT DEFAULT NULL",
+                "keyPopulationRiskFactors TEXT DEFAULT NULL",
+                "hivStatusId INTEGER DEFAULT NULL",
+                "hivStatus TEXT DEFAULT NULL"
+            )
+            columns.forEach { columnDefinition ->
+                val columnName = columnDefinition.substringBefore(" ")
+                if (!columnExists(database, "TB_SCREENING", columnName)) {
+                    database.execSQL("ALTER TABLE TB_SCREENING ADD COLUMN $columnDefinition")
+                }
+            }
+        }
+
         private fun addLocationRecordExtraColumns(
             database: SupportSQLiteDatabase,
             tableName: String
@@ -862,6 +882,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_19_20)
                         .addMigrations(MIGRATION_20_21)
                         .addMigrations(MIGRATION_21_22)
+                        .addMigrations(MIGRATION_22_23)
                         .fallbackToDestructiveMigration()
                         .build()
 
