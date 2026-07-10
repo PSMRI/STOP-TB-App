@@ -181,20 +181,13 @@ class FormInputAdapter(
                 binding.et.isFocusable = false
             }
 
-            if (item.title.contains("first name", true) ||
-                item.title.contains("last name", true) ||
-                item.title.contains("father's name", true) ||
-                item.title.contains("mother's name", true)
-            ) {
-//                edittext.setFilters(arrayOf<InputFilter>(AllCaps()))
+            if (item.allCaps) {
                 val editFilters = binding.et.filters
                 var newFilters = arrayOfNulls<InputFilter>(editFilters.size + 1)
                 editFilters.forEachIndexed { index, inputFilter ->
                     newFilters[index] = editFilters[index]
                 }
                 newFilters[editFilters.size] = AllCaps()
-//                newFilters.set(editFilters.size, AllCaps())
-//                binding.et.filters = arrayOf<InputFilter>(AllCaps())
                 binding.et.filters = newFilters
             }
             binding.form = item
