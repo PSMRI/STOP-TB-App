@@ -145,6 +145,10 @@ class FormInputAdapter(
 
         fun bind(item: FormElement, isEnabled: Boolean, formValueListener: FormValueListener?) {
             val effectiveEnabled = isEnabled && item.isEnabled
+            val isReadOnlyUnavailableContact =
+                item.title.equals("Contact Number", ignoreCase = true) &&
+                        !item.required &&
+                        item.value == "9999999999"
             Timber.d("binding triggered!!! $effectiveEnabled ${item.id}")
             if (!effectiveEnabled) {
                 binding.et.isEnabled = false
@@ -165,6 +169,12 @@ class FormInputAdapter(
                 binding.et.isFocusable = true
                 binding.et.isFocusableInTouchMode = true
                 binding.et.isCursorVisible = true
+            }
+            if (isReadOnlyUnavailableContact) {
+                binding.et.isClickable = false
+                binding.et.isFocusable = false
+                binding.et.isFocusableInTouchMode = false
+                binding.et.isCursorVisible = false
             }
             if (isOtpVerified && item.id == 44 && item.title.equals("Contact Number")) {
                 binding.et.isClickable = false
@@ -677,7 +687,27 @@ class FormInputAdapter(
             binding.tvTitle.visibility = View.GONE
             binding.llChecks.visibility = View.GONE
             binding.tilMultiSelect.visibility = View.VISIBLE
-            binding.tilMultiSelect.hint = item.title
+            val title = item.title ?: ""
+            val hintText = when {
+                item.required && item.doubleStar -> SpannableString("$title **").apply {
+                    setSpan(
+                        ForegroundColorSpan(Color.parseColor("#B00020")),
+                        length - 2,
+                        length,
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                }
+                item.required -> SpannableString("$title *").apply {
+                    setSpan(
+                        ForegroundColorSpan(Color.parseColor("#B00020")),
+                        length - 1,
+                        length,
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                }
+                else -> title
+            }
+            binding.tilMultiSelect.hint = hintText
             binding.tilMultiSelect.isEnabled = effectiveEnabled
             binding.etMultiSelect.isEnabled = effectiveEnabled
             binding.etMultiSelect.isClickable = effectiveEnabled
@@ -1503,12 +1533,17 @@ class FormInputAdapter(
      */
     fun validateInput(resources: Resources, formRecyclerView: RecyclerView? = null): Int {
         if (!isEnabled) return -1
+        val emptyError = resources.getString(R.string.form_input_empty_error)
         var firstEmptyRequired = -1
         currentList.forEachIndexed { index, it ->
+            if (!it.required && it.errorText == emptyError) {
+                it.errorText = null
+                notifyItemChanged(index)
+            }
             if (it.inputType != TEXT_VIEW && it.required) {
                 if (it.value.isNullOrBlank()) {
                     Timber.d("validateInput called for item $it, with index $index")
-                    it.errorText = resources.getString(R.string.form_input_empty_error)
+                    it.errorText = emptyError
                     notifyItemChanged(index)
                     if (firstEmptyRequired == -1) firstEmptyRequired = index
                 }
