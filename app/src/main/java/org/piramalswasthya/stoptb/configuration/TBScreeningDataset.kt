@@ -171,7 +171,7 @@ class TBScreeningDataset(
     private val keyPopulationRiskFactors = FormElement(
         id = 18,
         inputType = InputType.CHECKBOXES,
-        title = resources.getString(R.string.select_key_population_risk_factors),
+        title = resources.getString(R.string.key_population_risk_factors),
         entries = emptyArray(),
         required = true,
         showAsMultiSelectDialog = true

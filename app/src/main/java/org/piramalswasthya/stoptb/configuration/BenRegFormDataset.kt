@@ -503,12 +503,15 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         // PRD: default = "Active (Active Case Finding)" = index 1 in type_of_case_finding_array
         if (typeOfCaseFinding.value.isNullOrBlank()) typeOfCaseFinding.value = typeOfCaseFinding.entries?.getOrNull(1) ?: typeOfCaseFinding.entries?.firstOrNull()
         val hasFamilyHeadMobile = familyHeadPhoneNo != null
+        isHeadOfFamilyRegistration = relToHeadId == 18
         contactNumber.value = familyHeadPhoneNo?.toString()
         contactNumber.isEnabled = true
         mobileNotAvailable.value = null
-        mobileNotAvailable.isEnabled = !hasFamilyHeadMobile
+        mobileNotAvailable.isEnabled = true
         if (mobileNoOfRelation.value.isNullOrBlank()) {
-            mobileNoOfRelation.value = if (hasFamilyHeadMobile) {
+            mobileNoOfRelation.value = if (isHeadOfFamilyRegistration) {
+                mobileNoOfRelation.entries?.firstOrNull()
+            } else if (hasFamilyHeadMobile) {
                 mobileNoOfRelation.entries?.getOrNull(4)
             } else {
                 mobileNoOfRelation.entries?.firstOrNull()
@@ -616,10 +619,14 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             contactNumber.value = saved.contactNumber?.toString()
             if (contactNumber.value == "9999999999") {
                 mobileNotAvailable.value = "0"
-                contactNumber.isEnabled = false
+                contactNumber.required = false
+                contactNumber.isEnabled = true
                 mobileNotAvailable.isEnabled = true
+                list.remove(mobileNoOfRelation)
+                list.remove(otherMobileNoOfRelation)
             } else {
-                mobileNotAvailable.isEnabled = saved.mobileNoOfRelationId != 5
+                contactNumber.required = true
+                mobileNotAvailable.isEnabled = true
             }
             address.value = saved.address ?: ""
             pinCode.value = saved.pinCode ?: ""
@@ -781,6 +788,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
     private var familyHeadPhoneNo: String? = null
     private var villageEntities: List<LocationEntity> = emptyList()
+    private var isHeadOfFamilyRegistration: Boolean = false
 
     fun hasThirdPage(): Boolean {
         return (getAgeFromDob(getLongFromDate(agePopup.value)) >= Konstants.minAgeForGenBen
@@ -1110,6 +1118,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             }
 
             contactNumber.id -> {
+                if (isMobileNotAvailableChecked()) {
+                    contactNumber.errorText = null
+                    return -1
+                }
                 validateEmptyOnEditText(contactNumber)
                 validateMobileNumberOnEditText(contactNumber)
                 return -1
@@ -1119,14 +1131,38 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                 if (isChecked) {
                     // Keep checkbox value in index format so adapter can render it checked.
                     mobileNotAvailable.value = "0"
+                    contactNumber.required = false
                     contactNumber.value = "9999999999"
                     contactNumber.errorText = null
-                    contactNumber.isEnabled = false
+                    contactNumber.isEnabled = true
+                    triggerDependants(
+                        source = contactNumber,
+                        passedIndex = 1,
+                        triggerIndex = 0,
+                        target = listOf(mobileNoOfRelation),
+                        targetSideEffect = listOf(otherMobileNoOfRelation)
+                    )
                 } else {
                     mobileNotAvailable.value = null
+                    contactNumber.required = true
                     contactNumber.isEnabled = true
                     contactNumber.value = null
                     contactNumber.errorText = null
+                    if (mobileNoOfRelation.value.isNullOrBlank()) {
+                        mobileNoOfRelation.value = if (isHeadOfFamilyRegistration) {
+                            mobileNoOfRelation.entries?.firstOrNull()
+                        } else if (familyHeadPhoneNo != null) {
+                            mobileNoOfRelation.entries?.getOrNull(4)
+                        } else {
+                            mobileNoOfRelation.entries?.firstOrNull()
+                        }
+                    }
+                    triggerDependants(
+                        source = contactNumber,
+                        passedIndex = 0,
+                        triggerIndex = 0,
+                        target = listOf(mobileNoOfRelation)
+                    )
                 }
                 return 1
             }
