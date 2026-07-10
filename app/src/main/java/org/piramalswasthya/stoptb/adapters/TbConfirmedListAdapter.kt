@@ -18,6 +18,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 (BenDiffUtilCallBack) {
 
     private var benIdList: MutableList<Long>? = null
+    private var totalSectionsFallback: Int? = null
     private object BenDiffUtilCallBack : DiffUtil.ItemCallback<BenWithTbSuspectedDomain>() {
         override fun areItemsTheSame(
             oldItem: BenWithTbSuspectedDomain,
@@ -45,34 +46,45 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             item: BenWithTbSuspectedDomain,
             clickListener: ClickListener?,
             pref: PreferenceDao?,
-            benIdList: List<Long>?
+            benIdList: List<Long>?,
+            totalSectionsFallback: Int?
         ) {
             binding.btnFormTb.visibility = View.VISIBLE
 
             binding.benWithTb = item
 
             val isRefused = item.formResponse?.status == "REFUSED"
-            val isDraft = item.formResponse?.status == "DRAFT"
-            val isBenAlreadyCounselled = (benIdList != null && benIdList.contains(item.ben.benId)) && !isDraft
+            val sectionsFilled = item.formResponse?.sectionsFilled ?: 0
+            val totalSections = item.formResponse?.totalSections ?: totalSectionsFallback ?: 0
+            val isInProgress = !isRefused && sectionsFilled > 0 && sectionsFilled < totalSections
+            val isCounselledByProgress = !isRefused && totalSections > 0 && sectionsFilled >= totalSections
+            val isBenAlreadyCounselled = (benIdList != null && benIdList.contains(item.ben.benId)) &&
+                    sectionsFilled == 0
             binding.ivSyncState.visibility = if (item.tbConfirmedList == null) View.INVISIBLE else View.VISIBLE
+
+            binding.counsellingSectionProgress.setProgress(sectionsFilled, totalSections)
 
             if (isRefused) {
                 binding.btnCounselling.visibility = View.GONE
                 binding.btnCounselled.text = binding.root.context.getString(org.piramalswasthya.stoptb.R.string.refused)
                 binding.btnCounselled.setBackgroundColor(binding.root.resources.getColor(android.R.color.holo_red_dark))
-            } else if(isDraft) {
+            } else if (isInProgress) {
                 binding.btnCounselled.visibility = View.GONE
                 binding.btnCounselling.visibility = View.VISIBLE
-            }
-            else {
+                binding.btnCounselling.text = binding.root.context.getString(org.piramalswasthya.stoptb.R.string.counselling_in_progress)
+            } else if (isCounselledByProgress) {
                 binding.btnCounselling.visibility = View.GONE
                 binding.btnCounselled.text = binding.root.context.getString(org.piramalswasthya.stoptb.R.string.counselled)
                 binding.btnCounselled.setBackgroundColor(binding.root.resources.getColor(android.R.color.holo_green_dark))
+            } else {
+                binding.btnCounselled.visibility = View.GONE
+                binding.btnCounselling.visibility = View.VISIBLE
+                binding.btnCounselling.text = binding.root.context.getString(org.piramalswasthya.stoptb.R.string.counselling_start_button)
             }
 
             val role = pref?.getLoggedInUser()?.role
             if (role != null) {
-                checkIfCounsellingOfficerOrNot(role, ( item.isCounselled|| isBenAlreadyCounselled))
+                checkIfCounsellingOfficerOrNot(role, (item.isCounselled || isCounselledByProgress || isRefused || isBenAlreadyCounselled))
             } else {
                 binding.btnFormTb.visibility = View.GONE
                 binding.btnCounselling.visibility = View.GONE
@@ -144,7 +156,8 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
         holder: BenViewHolder,
         position: Int
     ) {
-        holder.bind(getItem(position), clickListener, pref,benIdList)    }
+        holder.bind(getItem(position), clickListener, pref, benIdList, totalSectionsFallback)
+    }
 
     /*override fun onCreateViewHolder(
         parent: ViewGroup,
@@ -178,6 +191,11 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             benIdList!!.clear()
             benIdList!!.addAll(list)
         }
+        notifyDataSetChanged()
+    }
+
+    fun submitTotalSectionsFallback(totalSections: Int) {
+        totalSectionsFallback = totalSections
         notifyDataSetChanged()
     }
 
