@@ -134,6 +134,38 @@ interface TBDao {
     fun getDashboardTbScreeningCount(villageId: Int, assignedVillageIds: List<Int>, startTime: Long, endTime: Long, gender: String, isChild: Int,    isSeniorCitizen: Int
     ): Flow<Int>
 
+
+    // Dashboard query - Presumptive TB: any starred verbal screening symptom = Yes
+    @Query("""
+    SELECT COUNT(*) FROM TB_SCREENING ts
+    INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
+    WHERE (
+        ts.coughMoreThan2Weeks = 1
+        OR ts.bloodInSputum = 1
+        OR ts.feverMoreThan2Weeks = 1
+        OR ts.lossOfWeight = 1
+        OR ts.nightSweats = 1
+        OR ts.riseOfFever = 1
+        OR ts.lossOfAppetite = 1
+        OR ts.familySufferingFromTB = 1
+        OR ts.contactWithTBPatient = 1
+        OR ts.historyOfTBInLastFiveYrs = 1
+    )
+    AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+    AND (:startTime = 0 OR ts.visitDate >= :startTime)
+    AND (:endTime = 0 OR ts.visitDate <= :endTime)
+    AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
+    AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+""")
+    fun getDashboardPresumptiveTbCount(
+        villageId: Int,
+        assignedVillageIds: List<Int>,
+        startTime: Long,
+        endTime: Long,
+        gender: String,
+        isChild: Int
+    ): Flow<Int>
+
     @Query("""
         SELECT COUNT(*) FROM TB_SCREENING ts
         INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
