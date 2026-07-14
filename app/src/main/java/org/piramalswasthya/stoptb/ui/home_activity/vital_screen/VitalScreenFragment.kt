@@ -42,6 +42,8 @@ class VitalScreenFragment : Fragment() {
     private var referralAlert: AlertDialog? = null
     private var riskFactorOptions: List<CodedOption> = emptyList()
     private var selectedRiskFactors = BooleanArray(0)
+    private val openedFromHousehold: Boolean
+        get() = arguments?.getBoolean("openedFromHousehold", false) == true
 
     private data class CodedOption(
         val id: Int,
@@ -335,6 +337,10 @@ class VitalScreenFragment : Fragment() {
     }
 
     private fun navigateAfterVitals() {
+        if (openedFromHousehold) {
+            findNavController().navigateUp()
+            return
+        }
         if (!viewModel.autoFlow) {
             findNavController().navigateUp()
             return
