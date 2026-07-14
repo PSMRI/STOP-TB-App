@@ -502,12 +502,20 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         if (personFrom.value.isNullOrBlank()) personFrom.value = personFrom.entries?.firstOrNull()
         // PRD: default = "Active (Active Case Finding)" = index 1 in type_of_case_finding_array
         if (typeOfCaseFinding.value.isNullOrBlank()) typeOfCaseFinding.value = typeOfCaseFinding.entries?.getOrNull(1) ?: typeOfCaseFinding.entries?.firstOrNull()
-        val hasFamilyHeadMobile = familyHeadPhoneNo != null
+        val normalizedFamilyHeadPhone = familyHeadPhoneNo
+            ?.takeIf { it > 0L && it != 9999999999L }
+        val hasFamilyHeadMobile = normalizedFamilyHeadPhone != null
         isHeadOfFamilyRegistration = relToHeadId == 18
-        contactNumber.value = familyHeadPhoneNo?.toString()
+        contactNumber.value = normalizedFamilyHeadPhone?.toString()
         contactNumber.isEnabled = true
-        mobileNotAvailable.value = null
+        mobileNotAvailable.value = if (hasFamilyHeadMobile) null else "0"
         mobileNotAvailable.isEnabled = true
+        contactNumber.required = hasFamilyHeadMobile
+        if (!hasFamilyHeadMobile) {
+            contactNumber.value = "9999999999"
+            list.remove(mobileNoOfRelation)
+            list.remove(otherMobileNoOfRelation)
+        }
         if (mobileNoOfRelation.value.isNullOrBlank()) {
             mobileNoOfRelation.value = if (isHeadOfFamilyRegistration) {
                 mobileNoOfRelation.entries?.firstOrNull()
