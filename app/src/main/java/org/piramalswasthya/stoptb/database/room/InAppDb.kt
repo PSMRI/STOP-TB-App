@@ -596,7 +596,7 @@ abstract class InAppDb : RoomDatabase() {
                         `answerText` TEXT, 
                         `createdAt` INTEGER NOT NULL, 
                         `updatedAt` INTEGER NOT NULL, 
-                        FOREIGN KEY(`sectionResponseId`) REFERENCES `t_section_response`(`sectionResponseId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
+                        FOREIGN KEY(`sectionResponseId`) REcFERENCES `t_section_response`(`sectionResponseId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
                         FOREIGN KEY(`questionId`) REFERENCES `t_section_question`(`questionId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
                         FOREIGN KEY(`optionId`) REFERENCES `t_question_option`(`optionId`) ON UPDATE NO ACTION ON DELETE SET NULL
                     )
@@ -610,7 +610,7 @@ abstract class InAppDb : RoomDatabase() {
                 if (!columnExists(database, "t_section_question", "questionUuid")) {
                     database.execSQL("ALTER TABLE t_section_question ADD COLUMN questionUuid TEXT DEFAULT NULL")
                 }
-                val householdColumns = listOf(
+                val householdColumns =  listOf(
                     "gpsLatitude REAL DEFAULT NULL",
                     "gpsLongitude REAL DEFAULT NULL",
                     "digipin TEXT DEFAULT NULL",
