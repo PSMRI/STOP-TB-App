@@ -20,8 +20,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import org.piramalswasthya.stoptb.helpers.isInternetAvailable
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
+import org.piramalswasthya.stoptb.work.CounsellingSyncWorker
 import org.piramalswasthya.stoptb.work.WorkerUtils
 
 @Singleton
@@ -254,7 +256,7 @@ class CounsellingRepo @Inject constructor(
                 if (isReadOnly && !hasLocalAnswers && !fetchSuccess) {
                     val isCampMode = preferenceDao.isCampModeEnabled()
                     val isHubConnected = preferenceDao.isCampHubConnected()
-                    val isInternet = org.piramalswasthya.stoptb.helpers.isInternetAvailable(context)
+                    val isInternet = isInternetAvailable(context)
                     val isOffline = (isCampMode && !isHubConnected) || (!isCampMode && !isInternet)
                     if (isOffline) {
                         return@withContext NetworkResponse.Error("Unable to load counselling details. Please connect to the internet and try again.")
@@ -422,13 +424,12 @@ class CounsellingRepo @Inject constructor(
                     } else {
                         val isCampMode = preferenceDao.isCampModeEnabled()
                         val isHubConnected = preferenceDao.isCampHubConnected()
-                        val isInternet = org.piramalswasthya.stoptb.helpers.isInternetAvailable(context)
+                        val isInternet = isInternetAvailable(context)
                         val isOffline = (isCampMode && !isHubConnected) || (!isCampMode && !isInternet)
 
                         if (isOffline) {
                             Timber.d("saveSectionAnswers: offline mode detected during sync failure, scheduling offline sync worker instead of reverting")
-                            org.piramalswasthya.stoptb.work.CounsellingSyncWorker.scheduleSync(context)
-                            
+                            CounsellingSyncWorker.scheduleSync(context)
                             withContext(Dispatchers.Main) {
                                 android.widget.Toast.makeText(
                                     context,
@@ -438,7 +439,7 @@ class CounsellingRepo @Inject constructor(
                             }
                         } else {
                             Timber.d("saveSectionAnswers: sync failed in online mode, saved locally for automatic background sync retry")
-                            org.piramalswasthya.stoptb.work.CounsellingSyncWorker.scheduleSync(context)
+                            CounsellingSyncWorker.scheduleSync(context)
                             withContext(Dispatchers.Main) {
                                 android.widget.Toast.makeText(
                                     context,
@@ -447,6 +448,30 @@ class CounsellingRepo @Inject constructor(
                                 ).show()
                             }
                             success = true
+                        }
+                    }
+                } else {
+                    Timber.d("saveSectionAnswers: non-final section, calling submitSectionBulk for sectionId=${section.sectionId}")
+                    val bulkSuccess = counsellingRepository.submitSectionBulk(responseId, section.sectionId)
+                    if (!bulkSuccess) {
+                        val isCampMode = preferenceDao.isCampModeEnabled()
+                        val isHubConnected = preferenceDao.isCampHubConnected()
+                        val isInternet = isInternetAvailable(context)
+                        val isOffline = (isCampMode && !isHubConnected) || (!isCampMode && !isInternet)
+
+                        CounsellingSyncWorker.scheduleSync(context)
+
+                        if (isOffline) {
+                            Timber.d("saveSectionAnswers: offline mode detected for non-final sectionId=${section.sectionId}, staying silent until the final section")
+                        } else {
+                            Timber.d("saveSectionAnswers: submitSectionBulk failed in online mode for sectionId=${section.sectionId}, saved locally for automatic background sync retry")
+                            withContext(Dispatchers.Main) {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Saved locally. It will sync automatically in the background.",
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
+                            }
                         }
                     }
                 }
@@ -527,10 +552,10 @@ class CounsellingRepo @Inject constructor(
                 if (syncSuccess) {
                     WorkerUtils.triggerAmritPushWorker(context)
                 } else {
-                    org.piramalswasthya.stoptb.work.CounsellingSyncWorker.scheduleSync(context)
+                    CounsellingSyncWorker.scheduleSync(context)
                     val isCampMode = preferenceDao.isCampModeEnabled()
                     val isHubConnected = preferenceDao.isCampHubConnected()
-                    val isInternet = org.piramalswasthya.stoptb.helpers.isInternetAvailable(context)
+                    val isInternet = isInternetAvailable(context)
                     val isOffline = (isCampMode && !isHubConnected) || (!isCampMode && !isInternet)
                     withContext(Dispatchers.Main) {
                         android.widget.Toast.makeText(

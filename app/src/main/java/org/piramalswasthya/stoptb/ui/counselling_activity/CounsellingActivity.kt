@@ -182,7 +182,7 @@ class CounsellingActivity : AppCompatActivity() {
         }
 
         binding.navigationFooter.root.visibility = View.VISIBLE
-        binding.navigationFooter.btnBack.visibility = View.GONE
+//        binding.navigationFooter.btnBack.visibility = View.GONE
 
         val preSubmitSubmitted = overviewData?.preSubmitSubmitted == true
 
@@ -193,7 +193,7 @@ class CounsellingActivity : AppCompatActivity() {
             binding.navigationFooter.btnNext.setOnClickListener {
                 viewModel.startCounselling()
             }
-            binding.navigationFooter.btnBack.visibility = View.GONE
+//            binding.navigationFooter.btnBack.visibility = View.GONE
         } else {
             binding.ConsentToggleButton.isEnabled = isEditable
             if (toggleOn) {
@@ -238,9 +238,9 @@ class CounsellingActivity : AppCompatActivity() {
         if (overviewData?.preSubmitSubmitted == true) {
             binding.navigationFooter.btnNext.text = getString(R.string.counselled)
             binding.navigationFooter.btnNext.visibility = View.VISIBLE
-            binding.navigationFooter.btnBack.visibility = View.GONE
+//            binding.navigationFooter.btnBack.visibility = View.GONE
         } else {
-            binding.navigationFooter.btnBack.visibility = View.GONE
+//            binding.navigationFooter.btnBack.visibility = View.GONE
         }
     }
 
@@ -267,13 +267,14 @@ class CounsellingActivity : AppCompatActivity() {
 
         }
 
-        binding.navigationFooter.btnBack.text = getString(R.string.btn_back_text)
+        /*binding.navigationFooter.btnBack.text = getString(R.string.btn_back_text)
         binding.navigationFooter.btnBack.visibility = if (step == 0) View.GONE else View.VISIBLE
         binding.navigationFooter.btnBack.setOnClickListener {
             hideKeyboard()
             clearActiveFocus()
             viewModel.previousSection()
         }
+         */
     }
 
     private fun updateSectionTitle(step: Int) {
@@ -356,8 +357,8 @@ class CounsellingActivity : AppCompatActivity() {
                 else -> getString(R.string.btn_next_text)
             }
 
-            binding.navigationFooter.btnBack.text = getString(R.string.btn_back_text)
-            binding.navigationFooter.btnBack.visibility = if (step == 0) View.GONE else View.VISIBLE
+//            binding.navigationFooter.btnBack.text = getString(R.string.btn_back_text)
+//            binding.navigationFooter.btnBack.visibility = if (step == 0) View.GONE else View.VISIBLE
 
             section?.let {
                 updateSectionTitle(step)

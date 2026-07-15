@@ -111,6 +111,9 @@ class TBConfirmedListFragment : Fragment() {
         viewModel.beneficiaryIdArray.observe(viewLifecycleOwner,{ benids ->
             benAdapter.submitBenIds(benids)
         })
+        viewModel.totalSectionsFallback.observe(viewLifecycleOwner) { totalSections ->
+            benAdapter.submitTotalSectionsFallback(totalSections)
+        }
 
         binding.ibSearch.setOnClickListener { sttContract.launch(Unit) }
         val searchTextWatcher = object : TextWatcher {

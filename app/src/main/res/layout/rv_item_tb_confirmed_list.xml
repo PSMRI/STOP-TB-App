@@ -295,6 +295,15 @@
 
                     </LinearLayout>
                 </LinearLayout>
+
+                <org.piramalswasthya.stoptb.custom_views.CounsellingSectionProgressView
+                    android:id="@+id/counselling_section_progress"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="@dimen/padding_normal"
+                    android:layout_marginBottom="@dimen/margin_normal"
+                    app:layout_constraintTop_toBottomOf="@id/linear_tb_suspected_list_Layout" />
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_counselling"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
@@ -308,7 +317,7 @@
                     android:backgroundTint="@android:color/holo_green_dark"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toBottomOf="@+id/linear_tb_suspected_list_Layout" />
+                    app:layout_constraintTop_toBottomOf="@id/counselling_section_progress" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_counselled"
@@ -323,7 +332,7 @@
                     android:backgroundTint="@android:color/holo_green_dark"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toBottomOf="@+id/linear_tb_suspected_list_Layout" />
+                    app:layout_constraintTop_toBottomOf="@id/counselling_section_progress" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_form_tb"
@@ -337,7 +346,7 @@
                     android:textColor="?attr/colorOnPrimary"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintTop_toBottomOf="@+id/linear_tb_suspected_list_Layout"
+                    app:layout_constraintTop_toBottomOf="@id/counselling_section_progress"
                     tools:backgroundTint="@android:color/holo_red_dark" />
 
             </androidx.constraintlayout.widget.ConstraintLayout>
