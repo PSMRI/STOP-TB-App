@@ -104,7 +104,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class],
-    version = 23, exportSchema = false
+    version = 24, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -699,6 +699,21 @@ abstract class InAppDb : RoomDatabase() {
                 addTBScreeningRiskFactorColumns(database)
             }
         }
+        private val MIGRATION_23_24 = object : Migration(23, 24) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val householdFamilyColumns = listOf(
+                    "fam_totalHhMembers INTEGER DEFAULT NULL",
+                    "fam_isRegisteredAtCampSite TEXT DEFAULT NULL",
+                    "fam_isRegisteredAtCampSiteId INTEGER NOT NULL DEFAULT 0"
+                )
+                householdFamilyColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "HOUSEHOLD", columnName)) {
+                        database.execSQL("ALTER TABLE HOUSEHOLD ADD COLUMN $columnDefinition")
+                    }
+                }
+            }
+        }
 
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
@@ -883,6 +898,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_20_21)
                         .addMigrations(MIGRATION_21_22)
                         .addMigrations(MIGRATION_22_23)
+                        .addMigrations(MIGRATION_23_24)
                         .fallbackToDestructiveMigration()
                         .build()
 

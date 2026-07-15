@@ -321,6 +321,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
         lifecycleScope.launch {
             viewModel.tbScreeningBenIds.collectLatest { benIds ->
+                Timber.e("TB Screening IDs: $benIds")
                 benAdapter.submitTbScreeningBenIds(benIds)
             }
         }

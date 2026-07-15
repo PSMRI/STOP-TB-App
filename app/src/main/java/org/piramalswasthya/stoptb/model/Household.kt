@@ -11,6 +11,9 @@ import org.piramalswasthya.stoptb.utils.toGpsTimestampLong
 
 
 data class HouseholdFamily(
+    var totalHhMembers: Int? = null,
+    var isRegisteredAtCampSite: String? = null,
+    var isRegisteredAtCampSiteId: Int = 0,
     var familyHeadName: String? = null,
     var familyName: String? = null,
     var familyHeadPhoneNo: Long? = null,
@@ -91,6 +94,10 @@ data class HouseholdCache(
 
     fun asNetworkModel(user: User): HouseholdNetwork {
         return HouseholdNetwork(
+            totalHhMembers = family?.totalHhMembers,
+            registeredAtCampSite = family?.isRegisteredAtCampSite,
+            registeredAtCampSiteId = family?.isRegisteredAtCampSiteId ?: 0,
+
             Countyid = locationRecord.country.id,
             Processed = processed,
             providerServiceMapID = user.serviceMapId,
@@ -158,6 +165,10 @@ data class HouseholdCache(
 
 @JsonClass(generateAdapter = true)
 data class HouseholdNetwork(
+    @Json(name = "totalHhMembers") val totalHhMembers: Int? = null,
+    @Json(name = "registeredAtCampSite") val registeredAtCampSite: String? = null,
+    @Json(name = "registeredAtCampSiteId") val registeredAtCampSiteId: Int = 0,
+
     @Json(name = "houseoldId") val householdId: String,
     @Json(name = "ashaid") val ashaId: Int,
     @Json(name = "benficieryid") val benId: Long = 0,

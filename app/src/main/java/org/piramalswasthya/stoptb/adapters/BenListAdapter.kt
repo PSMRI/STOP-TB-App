@@ -17,6 +17,7 @@ import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.Gender
+import timber.log.Timber
 
 
 class BenListAdapter(
@@ -199,7 +200,20 @@ class BenListAdapter(
                     hasTbScreening
                 ).count { it }
                 Pair(filled, 2)
+
+
             } else if (isNurse) {
+
+                Timber.e(
+                    """
+                    benId=${item.benId}
+                    hasTbScreening=$hasTbScreening
+                    hasAnthropometry=$hasAnthropometry
+                    hasGeneralOpd=$hasGeneralOpd
+                    hasDiagnosis=$hasDiagnosis
+                    isMatched=$isMatched
+                    """.trimIndent()
+                )
                 val filled = listOf(
                     hasAnthropometry,
                     isMatched,        // vitals/general exam
@@ -217,6 +231,7 @@ class BenListAdapter(
                 ).count { it }
                 Pair(filled, 5)
             }
+
             binding.btnExamine.text = binding.root.context.getString(
                 R.string.btn_examine_count_of, examineFilledCount, examineTotal
             )

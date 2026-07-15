@@ -147,4 +147,12 @@
     <string name="hh_no_members">Household EMPTY!</string>
     <string name="add_head_of_family_message">Would you like to add <b>%1s</b> as a HoF Beneficiary ?</string>
 
+    <string name="nhhr_total_members_hh">Total number of members living in the HH</string>
+    <string name="nhhr_registered_camp_site">Registration done at camp site</string>
+
+    <string-array name="nhhr_yes_no_array">
+        <item>Yes</item>
+        <item>No</item>
+    </string-array>
+
 </resources>

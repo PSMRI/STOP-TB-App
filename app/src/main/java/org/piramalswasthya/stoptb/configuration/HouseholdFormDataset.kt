@@ -54,6 +54,27 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
 
     )
 
+    private val totalMembersInHousehold = FormElement(
+        id = 21,
+        inputType = EDIT_TEXT,
+        title = resources.getString(R.string.nhhr_total_members_hh),
+        arrayId = -1,
+        required = true,
+        etInputType = InputType.TYPE_CLASS_NUMBER, // whole numbers only, no decimal flag
+        etMaxLength = 2,
+        max = 99,
+        min = 1
+    )
+
+    private val registeredAtCampSite = FormElement(
+        id = 22,
+        inputType = RADIO,
+        title = resources.getString(R.string.nhhr_registered_camp_site),
+        arrayId = R.array.nhhr_yes_no_array,
+        entries = resources.getStringArray(R.array.nhhr_yes_no_array),
+        required = true
+    )
+
     private val firstNameHeadOfFamily = FormElement(
         id = 0,
         inputType = EDIT_TEXT,
@@ -140,6 +161,8 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         val firstPage by lazy {
             listOf(
                 familyHeading,
+                totalMembersInHousehold,
+                registeredAtCampSite,
                 firstNameHeadOfFamily,
                 lastNameHeadOfFamily,
                 mobileNoHeadOfFamily,
@@ -152,6 +175,8 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         }
         list.addAll(firstPage)
         hh?.family?.let { saved ->
+            totalMembersInHousehold.value = saved.totalHhMembers?.toString()
+            registeredAtCampSite.value = registeredAtCampSite.getStringFromPosition(saved.isRegisteredAtCampSiteId)
             firstNameHeadOfFamily.value = saved.familyHeadName
             lastNameHeadOfFamily.value = saved.familyName
             mobileNoHeadOfFamily.value = saved.familyHeadPhoneNo?.toString() ?: "9999999999"
@@ -446,6 +471,10 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
 
     override suspend fun handleListOnValueChanged(formId: Int, index: Int): Int {
         return when (formId) {
+            totalMembersInHousehold.id -> {
+                validateEmptyOnEditText(totalMembersInHousehold)
+                validateIntMinMax(totalMembersInHousehold)
+            }
             firstNameHeadOfFamily.id -> {
                 validateEmptyOnEditText(firstNameHeadOfFamily)
                  //  validateAllCapsOrSpaceOnEditText(firstNameHeadOfFamily)
@@ -551,6 +580,9 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         val family = HouseholdFamily()
         family.let { family ->
             family.familyHeadName = firstNameHeadOfFamily.value
+            family.totalHhMembers = totalMembersInHousehold.value?.toIntOrNull()
+            family.isRegisteredAtCampSiteId = registeredAtCampSite.getPosition()
+            family.isRegisteredAtCampSite = registeredAtCampSite.getEnglishStringFromPosition(family.isRegisteredAtCampSiteId)
             family.familyName = lastNameHeadOfFamily.value
             family.familyHeadPhoneNo =  mobileNoHeadOfFamily.value?.toLongOrNull() ?: 9999999999L
             family.houseNo = houseNo.value
