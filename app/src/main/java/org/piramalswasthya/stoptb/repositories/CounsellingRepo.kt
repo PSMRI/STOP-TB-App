@@ -20,8 +20,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import org.piramalswasthya.stoptb.helpers.isInternetAvailable
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
+import org.piramalswasthya.stoptb.work.CounsellingSyncWorker
 import org.piramalswasthya.stoptb.work.WorkerUtils
 
 @Singleton
@@ -63,11 +65,8 @@ class CounsellingRepo @Inject constructor(
                 val ageGender = "${ben.age} $ageUnitText / $genderText"
 
                 try {
-                    val completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING)
-                        ?: run {
-                            counsellingRepository.downloadAndStoreAllForms()
-                            counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING)
-                        }
+                    counsellingRepository.downloadAndStoreAllForms()
+                    val completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING_V2)
                     completeForm?.form?.formUuid?.let { formUuid ->
                         counsellingRepository.fetchAndStoreCounsellingResponse(benId, formUuid)
                     }
@@ -133,14 +132,14 @@ class CounsellingRepo @Inject constructor(
     suspend fun getFormSchema(benId: Long, phase: SectionPhase): NetworkResponse<CounsellingFormSchemaDto> {
         return withContext(Dispatchers.IO) {
             try {
-                var completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING)
+                var completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING_V2)
                 val hindiMissing = completeForm?.versions
                     ?.firstOrNull()?.sections
                     ?.any { it.section.sectionNameHindi.isNullOrEmpty() } ?: false
                 if (completeForm == null || hindiMissing) {
                     val success = counsellingRepository.downloadAndStoreAllForms()
                     if (success) {
-                        completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING)
+                        completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING_V2)
                     }
                 }
 
@@ -152,7 +151,7 @@ class CounsellingRepo @Inject constructor(
                     ?: completeForm.versions.maxByOrNull { it.version.versionNumber }
                     ?: return@withContext NetworkResponse.Error("No active version found")
 
-                val filteredSectionsFromDb = counsellingRepository.getSectionsByPhase(FormType.TB_COUNSELLING, phase)
+                val filteredSectionsFromDb = counsellingRepository.getSectionsByPhase(FormType.TB_COUNSELLING_V2, phase)
 
                 val isHindi = preferenceDao.getCurrentLanguage() == Languages.HINDI
 
@@ -169,7 +168,7 @@ class CounsellingRepo @Inject constructor(
                     }
                 }
 
-                val sectionsList = filteredSectionsFromDb.map { formSecWithQuestions ->
+                val sectionsList = filteredSectionsFromDb.sortedBy { it.section.sectionOrder }.map { formSecWithQuestions ->
                     val sec = formSecWithQuestions.section
                     val questionsList = formSecWithQuestions.questions.sortedBy { it.question.questionOrder }.map { secQWithDetails ->
                         val q = secQWithDetails.question
@@ -228,7 +227,9 @@ class CounsellingRepo @Inject constructor(
                         isRequired = true,
                         displayOrder = sec.sectionOrder,
                         hasSubmitButton = (sec.sectionPhase == SectionPhase.PRE_SUBMIT.value && filteredSectionsFromDb.lastOrNull { it.section.sectionPhase == "PRE_SUBMIT" }?.section?.sectionId == sec.sectionId) || (sec.sectionPhase == "POST_SUBMIT"),
+                        isEditable = sec.isEditable,
                         questions = questionsList
+
                     )
                 }
 
@@ -247,15 +248,15 @@ class CounsellingRepo @Inject constructor(
 
                 val draftResponse = counsellingRepository.getOrCreateDraft(benId, activeVersionWithSections.version.versionId)
 
-                val isReadOnly = draftResponse.formResponse.status == "SUBMITTED" || 
-                                 draftResponse.formResponse.status == "COMPLETE" || 
-                                 draftResponse.formResponse.status == "COMPLETED"
+                val isReadOnly = draftResponse.formResponse.status == "SUBMITTED" ||
+                        draftResponse.formResponse.status == "COMPLETE" ||
+                        draftResponse.formResponse.status == "COMPLETED"
                 val hasLocalAnswers = draftResponse.sectionResponses.any { it.questionResponses.isNotEmpty() }
                 
                 if (isReadOnly && !hasLocalAnswers && !fetchSuccess) {
                     val isCampMode = preferenceDao.isCampModeEnabled()
                     val isHubConnected = preferenceDao.isCampHubConnected()
-                    val isInternet = org.piramalswasthya.stoptb.helpers.isInternetAvailable(context)
+                    val isInternet = isInternetAvailable(context)
                     val isOffline = (isCampMode && !isHubConnected) || (!isCampMode && !isInternet)
                     if (isOffline) {
                         return@withContext NetworkResponse.Error("Unable to load counselling details. Please connect to the internet and try again.")
@@ -367,7 +368,7 @@ class CounsellingRepo @Inject constructor(
                     }
                 }
 
-                val completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING)
+                val completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING_V2)
                 Timber.d("saveSectionAnswers: formId=$formId, version=$formVersionNumber, versionId=$versionId, completeFormFound=${completeForm != null}")
 
                 val activeVersionWithSections = completeForm?.versions?.find { it.version.versionId == versionId }
@@ -423,13 +424,12 @@ class CounsellingRepo @Inject constructor(
                     } else {
                         val isCampMode = preferenceDao.isCampModeEnabled()
                         val isHubConnected = preferenceDao.isCampHubConnected()
-                        val isInternet = org.piramalswasthya.stoptb.helpers.isInternetAvailable(context)
+                        val isInternet = isInternetAvailable(context)
                         val isOffline = (isCampMode && !isHubConnected) || (!isCampMode && !isInternet)
 
                         if (isOffline) {
                             Timber.d("saveSectionAnswers: offline mode detected during sync failure, scheduling offline sync worker instead of reverting")
-                            org.piramalswasthya.stoptb.work.CounsellingSyncWorker.scheduleSync(context)
-                            
+                            CounsellingSyncWorker.scheduleSync(context)
                             withContext(Dispatchers.Main) {
                                 android.widget.Toast.makeText(
                                     context,
@@ -439,7 +439,7 @@ class CounsellingRepo @Inject constructor(
                             }
                         } else {
                             Timber.d("saveSectionAnswers: sync failed in online mode, saved locally for automatic background sync retry")
-                            org.piramalswasthya.stoptb.work.CounsellingSyncWorker.scheduleSync(context)
+                            CounsellingSyncWorker.scheduleSync(context)
                             withContext(Dispatchers.Main) {
                                 android.widget.Toast.makeText(
                                     context,
@@ -450,11 +450,126 @@ class CounsellingRepo @Inject constructor(
                             success = true
                         }
                     }
+                } else {
+                    Timber.d("saveSectionAnswers: non-final section, calling submitSectionBulk for sectionId=${section.sectionId}")
+                    val bulkSuccess = counsellingRepository.submitSectionBulk(responseId, section.sectionId)
+                    if (!bulkSuccess) {
+                        val isCampMode = preferenceDao.isCampModeEnabled()
+                        val isHubConnected = preferenceDao.isCampHubConnected()
+                        val isInternet = isInternetAvailable(context)
+                        val isOffline = (isCampMode && !isHubConnected) || (!isCampMode && !isInternet)
+
+                        CounsellingSyncWorker.scheduleSync(context)
+
+                        if (isOffline) {
+                            Timber.d("saveSectionAnswers: offline mode detected for non-final sectionId=${section.sectionId}, staying silent until the final section")
+                        } else {
+                            Timber.d("saveSectionAnswers: submitSectionBulk failed in online mode for sectionId=${section.sectionId}, saved locally for automatic background sync retry")
+                            withContext(Dispatchers.Main) {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Saved locally. It will sync automatically in the background.",
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    }
                 }
 
                 success
             } catch (e: Exception) {
                 Timber.e(e, "saveSectionAnswers failed")
+                false
+            }
+        }
+    }
+    suspend fun submitGeneralInfoAnswers(
+        benId: Long,
+        formId: Int,
+        section: CounsellingSectionDto,
+        formVersionNumber: Int
+    ): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val versionId = formId * 1000 + formVersionNumber
+                val draftResponse = counsellingRepository.getOrCreateDraft(benId, versionId)
+                val responseId = draftResponse.formResponse.responseId
+
+                val answers = mutableListOf<QuestionResponseEntity>()
+                section.questions.filter { it.visible }.forEach { q ->
+                    val valObj = q.value
+                    if (valObj != null) {
+                        when (q.questionType) {
+                            "RADIO", "DROPDOWN" -> {
+                                val opt = q.options?.find { it.optionValue == valObj.toString() }
+                                if (opt != null) {
+                                    answers.add(
+                                        QuestionResponseEntity(
+                                            sectionResponseId = 0L,
+                                            questionId = q.questionId,
+                                            optionId = opt.optionId,
+                                            answerText = null
+                                        )
+                                    )
+                                }
+                            }
+                            "MCQ", "CHECKBOX" -> {
+                                val list = valObj as? List<*> ?: emptyList<Any>()
+                                list.forEach { optVal ->
+                                    val opt = q.options?.find { it.optionValue == optVal.toString() }
+                                    if (opt != null) {
+                                        answers.add(
+                                            QuestionResponseEntity(
+                                                sectionResponseId = 0L,
+                                                questionId = q.questionId,
+                                                optionId = opt.optionId,
+                                                answerText = null
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                            "TEXT", "DATE", "NUMBER" -> {
+                                val textVal = valObj.toString()
+                                if (textVal.isNotBlank()) {
+                                    answers.add(
+                                        QuestionResponseEntity(
+                                            sectionResponseId = 0L,
+                                            questionId = q.questionId,
+                                            optionId = null,
+                                            answerText = textVal
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                counsellingRepository.submitSectionGeneralInfo(responseId, answers)
+
+                val syncSuccess = counsellingRepository.syncUnsyncedRecords()
+                if (syncSuccess) {
+                    WorkerUtils.triggerAmritPushWorker(context)
+                } else {
+                    CounsellingSyncWorker.scheduleSync(context)
+                    val isCampMode = preferenceDao.isCampModeEnabled()
+                    val isHubConnected = preferenceDao.isCampHubConnected()
+                    val isInternet = isInternetAvailable(context)
+                    val isOffline = (isCampMode && !isHubConnected) || (!isCampMode && !isInternet)
+                    withContext(Dispatchers.Main) {
+                        android.widget.Toast.makeText(
+                            context,
+                            if (isOffline) "Saved offline. It will be synced when connectivity is restored."
+                            else "Saved locally. It will sync automatically in the background.",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+
+                true
+            } catch (e: Exception) {
+                Timber.e(e, "submitGeneralInfoAnswers failed")
                 false
             }
         }
@@ -488,6 +603,112 @@ class CounsellingRepo @Inject constructor(
                 syncedAt = response?.formResponse?.syncedAt,
                 followUpDelayDays = delay
             )
+        }
+    }
+
+//    suspend fun updateCounsellingDate(benId: Long, dateMillis: Long) {
+//        withContext(Dispatchers.IO) {
+//            val response = db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId)
+//            if (response != null) {
+//                db.counsellingFormResponseDao().updateFormResponse(
+//                    response.formResponse.copy(
+//                        createdAt = dateMillis,
+//                        updatedAt = System.currentTimeMillis()
+//                    )
+//                )
+//            }
+//        }
+//    }
+
+    suspend fun revertFormStatus(responseId: Long, status: String) {
+        withContext(Dispatchers.IO) {
+            counsellingRepository.revertFormStatus(responseId, status)
+        }
+    }
+
+    suspend fun resetLastVisitedSection(responseId: Long) {
+        withContext(Dispatchers.IO) {
+            val response = db.counsellingFormResponseDao().getFormResponseById(responseId)
+            if (response != null) {
+                db.counsellingFormResponseDao().updateFormResponse(
+                    response.formResponse.copy(
+                        lastVisitedSectionId = null,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun saveGeneralInfoDraft(
+        benId: Long,
+        formId: Int,
+        section: CounsellingSectionDto,
+        formVersionNumber: Int
+    ): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val versionId = formId * 1000 + formVersionNumber
+                val draftResponse = counsellingRepository.getOrCreateDraft(benId, versionId)
+                val responseId = draftResponse.formResponse.responseId
+
+                val answers = mutableListOf<QuestionResponseEntity>()
+                section.questions.filter { it.visible }.forEach { q ->
+                    val valObj = q.value
+                    if (valObj != null) {
+                        when (q.questionType) {
+                            "RADIO", "DROPDOWN" -> {
+                                val opt = q.options?.find { it.optionValue == valObj.toString() }
+                                if (opt != null) {
+                                    answers.add(
+                                        QuestionResponseEntity(
+                                            sectionResponseId = 0L,
+                                            questionId = q.questionId,
+                                            optionId = opt.optionId,
+                                            answerText = null
+                                        )
+                                    )
+                                }
+                            }
+                            "MCQ", "CHECKBOX" -> {
+                                val list = valObj as? List<*> ?: emptyList<Any>()
+                                list.forEach { optVal ->
+                                    val opt = q.options?.find { it.optionValue == optVal.toString() }
+                                    if (opt != null) {
+                                        answers.add(
+                                            QuestionResponseEntity(
+                                                sectionResponseId = 0L,
+                                                questionId = q.questionId,
+                                                optionId = opt.optionId,
+                                                answerText = null
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                            "TEXT", "DATE", "NUMBER" -> {
+                                val textVal = valObj.toString()
+                                if (textVal.isNotBlank()) {
+                                    answers.add(
+                                        QuestionResponseEntity(
+                                            sectionResponseId = 0L,
+                                            questionId = q.questionId,
+                                            optionId = null,
+                                            answerText = textVal
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                counsellingRepository.saveDraftSection(responseId, section.sectionId, null, answers)
+                true
+            } catch (e: Exception) {
+                Timber.e(e, "saveGeneralInfoDraft failed")
+                false
+            }
         }
     }
 }

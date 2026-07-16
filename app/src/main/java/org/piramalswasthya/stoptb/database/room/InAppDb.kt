@@ -689,16 +689,27 @@ abstract class InAppDb : RoomDatabase() {
 
         private val MIGRATION_21_22 = object : Migration(21, 22) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                if (!columnExists(database, "BENEFICIARY", "pinCode")) {
+                
+               if (!columnExists(database, "BENEFICIARY", "pinCode")) {
                     database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN pinCode TEXT")
+                }
+                
+                 if (!columnExists(database, "t_form_section", "isEditable")) {
+                    database.execSQL("ALTER TABLE t_form_section ADD COLUMN isEditable INTEGER NOT NULL DEFAULT 0")
                 }
             }
         }
         private val MIGRATION_22_23 = object : Migration(22, 23) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                addTBScreeningRiskFactorColumns(database)
+                if (!columnExists(database, "t_form_response", "sectionsFilled")) {
+                    database.execSQL("ALTER TABLE t_form_response ADD COLUMN sectionsFilled INTEGER DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_form_response", "totalSections")) {
+                    database.execSQL("ALTER TABLE t_form_response ADD COLUMN totalSections INTEGER DEFAULT NULL")
+                }
             }
         }
+
 
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")

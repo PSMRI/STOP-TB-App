@@ -11,6 +11,8 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.helpers.filterTbSuspectedList
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository
+import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
+import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
 import javax.inject.Inject
 
 @HiltViewModel
@@ -23,20 +25,45 @@ class TBConfirmedListViewModel @Inject constructor(
 
     private val _beneficiaryIdArray : MutableLiveData<List<Long>> = MutableLiveData()
     val beneficiaryIdArray : LiveData<List<Long>> = _beneficiaryIdArray
+
+    // Fallback total-section count (from the locally cached form schema) used only for
+    // beneficiaries with no persisted counselling progress yet, so the progress tracker
+    // never has to hardcode the number of sections.
+    private val _totalSectionsFallback: MutableLiveData<Int> = MutableLiveData()
+    val totalSectionsFallback: LiveData<Int> = _totalSectionsFallback
+
     val benList = allBenList.combine(filter) { list, filter ->
         filterTbSuspectedList(list, filter)
     }
 
     init {
         fetchCompletedBeneficiaries()
+        fetchTotalSectionsFallback()
     }
 
     fun fetchCompletedBeneficiaries() {
         viewModelScope.launch {
             try {
                 _beneficiaryIdArray.value = counsellingRepository.fetchAndStoreCompletedBeneficiaries()
+                    ?.map { it.beneficiaryId }
             } catch (e: Exception) {
                 // Ignore or log error
+            }
+        }
+    }
+
+    private fun fetchTotalSectionsFallback() {
+        viewModelScope.launch {
+            try {
+                val preSubmitSections = counsellingRepository.getSectionsByPhase(
+                    FormType.TB_COUNSELLING_V2,
+                    SectionPhase.PRE_SUBMIT
+                )
+                if (preSubmitSections.isNotEmpty()) {
+                    _totalSectionsFallback.value = preSubmitSections.size
+                }
+            } catch (e: Exception) {
+                // Ignore; the progress tracker simply has no fallback until this succeeds
             }
         }
     }
