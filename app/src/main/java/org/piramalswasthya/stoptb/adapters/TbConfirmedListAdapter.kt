@@ -19,6 +19,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 
     private var benIdList: MutableList<Long>? = null
     private var totalSectionsFallback: Int? = null
+    private var localFilledCounts: Map<Long, Int>? = null
     private object BenDiffUtilCallBack : DiffUtil.ItemCallback<BenWithTbSuspectedDomain>() {
         override fun areItemsTheSame(
             oldItem: BenWithTbSuspectedDomain,
@@ -47,14 +48,17 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             clickListener: ClickListener?,
             pref: PreferenceDao?,
             benIdList: List<Long>?,
-            totalSectionsFallback: Int?
+            totalSectionsFallback: Int?,
+            localFilledCounts: Map<Long, Int>?
         ) {
             binding.btnFormTb.visibility = View.VISIBLE
 
             binding.benWithTb = item
 
             val isRefused = item.formResponse?.status == "REFUSED"
-            val sectionsFilled = item.formResponse?.sectionsFilled ?: 0
+            val apiSectionsFilled = item.formResponse?.sectionsFilled ?: 0
+            val localSectionsFilled = localFilledCounts?.get(item.ben.benId) ?: 0
+            val sectionsFilled = maxOf(apiSectionsFilled, localSectionsFilled)
             val totalSections = item.formResponse?.totalSections ?: totalSectionsFallback ?: 0
             val isInProgress = !isRefused && sectionsFilled > 0 && sectionsFilled < totalSections
             val isCounselledByProgress = !isRefused && totalSections > 0 && sectionsFilled >= totalSections
@@ -156,7 +160,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
         holder: BenViewHolder,
         position: Int
     ) {
-        holder.bind(getItem(position), clickListener, pref, benIdList, totalSectionsFallback)
+        holder.bind(getItem(position), clickListener, pref, benIdList, totalSectionsFallback, localFilledCounts)
     }
 
     /*override fun onCreateViewHolder(
@@ -196,6 +200,11 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 
     fun submitTotalSectionsFallback(totalSections: Int) {
         totalSectionsFallback = totalSections
+        notifyDataSetChanged()
+    }
+
+    fun submitLocalFilledCounts(counts: Map<Long, Int>) {
+        localFilledCounts = counts
         notifyDataSetChanged()
     }
 

@@ -82,6 +82,7 @@ class CounsellingRepo @Inject constructor(
                 val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
                 var displayDateStr = sdf.format(java.util.Date())
 
+                var preSubmitAnsweredCount = 0
                 if (formResponse != null) {
                     status = formResponse.formResponse.status
                     displayDateStr = sdf.format(java.util.Date(formResponse.formResponse.createdAt))
@@ -97,6 +98,15 @@ class CounsellingRepo @Inject constructor(
                         }
                     }
                     completedSteps = formResponse.sectionResponses.count { it.questionResponses.isNotEmpty() }
+
+
+                    val preSubmitSectionIds = sections
+                        .filter { it.section.sectionPhase == "PRE_SUBMIT" }
+                        .map { it.section.sectionId }
+                        .toSet()
+                    preSubmitAnsweredCount = formResponse.sectionResponses.count {
+                        it.sectionResponse.sectionId in preSubmitSectionIds && it.questionResponses.isNotEmpty()
+                    }
                 }
 
                 // A separate status-filtered query drives the Follow-Up button. This is
@@ -105,6 +115,7 @@ class CounsellingRepo @Inject constructor(
                 // either one, making the status unreliable for button-visibility decisions.
                 val preSubmitSubmitted = db.counsellingFormResponseDao()
                     .getSubmittedOrCompleteResponseForBeneficiary(benId) != null
+                val preSubmitInProgress = !preSubmitSubmitted && preSubmitAnsweredCount > 0
 
                 val overviewData = CounsellingOverviewData(
                     benId = benId,
@@ -119,7 +130,8 @@ class CounsellingRepo @Inject constructor(
                     currentStep = currentStep,
                     completedSteps = completedSteps,
                     status = status,
-                    preSubmitSubmitted = preSubmitSubmitted
+                    preSubmitSubmitted = preSubmitSubmitted,
+                    preSubmitInProgress = preSubmitInProgress
                 )
                 NetworkResponse.Success(overviewData)
             } catch (e: Exception) {
@@ -268,6 +280,7 @@ class CounsellingRepo @Inject constructor(
                 schemaDto.sections.forEach { sec ->
                     val secResponse = draftResponse.sectionResponses.find { it.sectionResponse.sectionId == sec.sectionId }
                     if (secResponse != null) {
+                        sec.isSubmitted = secResponse.sectionResponse.completedAt != null
                         sec.questions.forEach { q ->
                             val qResponses = secResponse.questionResponses.filter { it.questionId == q.questionId }
                             if (qResponses.isNotEmpty()) {
@@ -308,7 +321,8 @@ class CounsellingRepo @Inject constructor(
         formId: Int,
         section: CounsellingSectionDto,
         formVersionNumber: Int,
-        overrideTargetSectionId: Int? = null
+        overrideTargetSectionId: Int? = null,
+        isBackNavigation: Boolean = false
     ): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -366,6 +380,11 @@ class CounsellingRepo @Inject constructor(
                             }
                         }
                     }
+                }
+                if (isBackNavigation) {
+                    Timber.d("saveSectionAnswers: back navigation for sectionId=${section.sectionId}, saving draft only (no submit), targetSectionId=$overrideTargetSectionId")
+                    counsellingRepository.saveDraftSection(responseId, section.sectionId, overrideTargetSectionId, answers)
+                    return@withContext true
                 }
 
                 val completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING_V2)
@@ -606,20 +625,20 @@ class CounsellingRepo @Inject constructor(
         }
     }
 
-//    suspend fun updateCounsellingDate(benId: Long, dateMillis: Long) {
-//        withContext(Dispatchers.IO) {
-//            val response = db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId)
-//            if (response != null) {
-//                db.counsellingFormResponseDao().updateFormResponse(
-//                    response.formResponse.copy(
-//                        createdAt = dateMillis,
-//                        updatedAt = System.currentTimeMillis()
-//                    )
-//                )
-//            }
-//        }
-//    }
-
+/*    suspend fun updateCounsellingDate(benId: Long, dateMillis: Long) {
+        withContext(Dispatchers.IO) {
+            val response = db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId)
+            if (response != null) {
+                db.counsellingFormResponseDao().updateFormResponse(
+                    response.formResponse.copy(
+                        createdAt = dateMillis,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+            }
+        }
+    }
+*/
     suspend fun revertFormStatus(responseId: Long, status: String) {
         withContext(Dispatchers.IO) {
             counsellingRepository.revertFormStatus(responseId, status)
