@@ -253,6 +253,7 @@ class CounsellingRepositoryImpl @Inject constructor(
 
             val mappedAnswers = answers.map { it.copy(sectionResponseId = sectionResponse.sectionResponse.sectionResponseId) }
             responseDao.insertQuestionResponses(mappedAnswers)
+            Timber.d("saveDraftSection: responseId=$responseId, sectionId=$sectionId, savedAnswers=${mappedAnswers.size}")
 
             // Mark this section pending re-submission via submitBulk, whether it's the first
             // save or a re-edit of an already-synced section (Navigate Up + edit + Next again).
@@ -309,6 +310,7 @@ class CounsellingRepositoryImpl @Inject constructor(
 
             val mappedAnswers = answers.map { it.copy(sectionResponseId = secId) }
             responseDao.insertQuestionResponses(mappedAnswers)
+            Timber.d("submitSectionWithPhase: responseId=$responseId, phase=$phase, sectionId=${sectionDef.section.sectionId}, savedAnswers=${mappedAnswers.size}")
 
             responseDao.updateFormResponse(
                 formResponseWithDetails.formResponse.copy(
@@ -502,6 +504,13 @@ class CounsellingRepositoryImpl @Inject constructor(
                 responseDao.updateFormResponse(
                     resp.formResponse.copy(syncStatus = "SYNCED", syncedAt = System.currentTimeMillis())
                 )
+
+                val finalSectionResponse = resp.sectionResponses.find { it.sectionResponse.sectionId == finalSectionId }
+                if (finalSectionResponse != null) {
+                    responseDao.updateSectionResponse(
+                        finalSectionResponse.sectionResponse.copy(completedAt = System.currentTimeMillis())
+                    )
+                }
             } else {
                 allSuccess = false
             }
@@ -646,6 +655,7 @@ class CounsellingRepositoryImpl @Inject constructor(
 
                 val questionResponsesToInsert = mutableListOf<QuestionResponseEntity>()
                 var hasPostSubmitAnswers = false
+                val answeredSectionIds = mutableSetOf<Int>()
 
                 apiResponse.sections.forEach { apiSec ->
                     val sectionId = apiSec.sectionId
@@ -653,6 +663,9 @@ class CounsellingRepositoryImpl @Inject constructor(
                     if (sectionDef != null) {
                         val sectionResponseId = sectionIdToResponseIdMap[sectionId]
                         if (sectionResponseId != null) {
+                            if (apiSec.answers.isNotEmpty()) {
+                                answeredSectionIds.add(sectionId)
+                            }
                             if (sectionDef.section.sectionPhase == "POST_SUBMIT" && apiSec.answers.isNotEmpty()) {
                                 hasPostSubmitAnswers = true
                             }
@@ -692,10 +705,25 @@ class CounsellingRepositoryImpl @Inject constructor(
                     responseDao.insertQuestionResponses(questionResponsesToInsert)
                 }
 
+                insertedSections
+                    .filter { it.sectionResponse.sectionId in answeredSectionIds }
+                    .forEach { sr ->
+                        responseDao.updateSectionResponse(
+                            sr.sectionResponse.copy(completedAt = serverDate ?: System.currentTimeMillis())
+                        )
+                    }
+
+                val preSubmitSectionIds = activeVersion.sections
+                    .filter { it.section.sectionPhase == "PRE_SUBMIT" }
+                    .map { it.section.sectionId }
+                val allPreSubmitAnswered = preSubmitSectionIds.isNotEmpty() &&
+                        preSubmitSectionIds.all { it in answeredSectionIds }
+
                 val finalStatus = when {
                     apiResponse.status?.uppercase() == "REFUSED" -> "REFUSED"
                     hasPostSubmitAnswers || apiResponse.status?.uppercase() == "COMPLETE" || apiResponse.status?.uppercase() == "COMPLETED" -> "COMPLETE"
-                    else -> "SUBMITTED"
+                    allPreSubmitAnswered -> "SUBMITTED"
+                    else -> "DRAFT"
                 }
 
                 responseDao.updateFormResponse(
@@ -742,9 +770,11 @@ class CounsellingRepositoryImpl @Inject constructor(
                 val versionId = activeVersion?.version?.versionId
 
                 if (versionId != null) {
+                    val statusesByBenId = statuses.groupBy { it.beneficiaryId }
                     db.withTransaction {
-                        for (item in statuses) {
-                            val benId = item.beneficiaryId
+                        for ((benId, items) in statusesByBenId) {
+                            val item = items.find { it.refused } ?: items.first()
+                            Timber.d("fetchAndStoreCompletedBeneficiaries: benId=$benId, entries=${items.size}, chosen refused=${item.refused}, sectionsFilled=${item.sectionsFilled}, totalSections=${item.totalSections}")
                             // Untouched beneficiaries (sectionsFilled == 0, not refused) keep the
                             // current behavior of having no Room row at all unless one already exists.
                             if (!item.refused && item.sectionsFilled == 0) {
@@ -752,7 +782,7 @@ class CounsellingRepositoryImpl @Inject constructor(
                             }
                             val newStatus = when {
                                 item.refused -> "REFUSED"
-                                item.sectionsFilled == item.totalSections -> "COMPLETE"
+                                item.totalSections > 0 && item.sectionsFilled == item.totalSections -> "COMPLETE"
                                 else -> null // in-progress: keep whatever local status already exists
                             }
                             val existing = responseDao.getFormResponseForBeneficiary(benId)
@@ -774,6 +804,12 @@ class CounsellingRepositoryImpl @Inject constructor(
                                 if (newStatus == null ||
                                     currentFr.status == newStatus ||
                                     (newStatus == "COMPLETE" && currentFr.status == "COMPLETED")
+//                                    // Never let this list-level reconciliation downgrade an
+//                                    // already-known REFUSED status — it's a terminal state
+//                                    // established via the more reliable per-section detail fetch
+//                                    // (fetchAndStoreCounsellingResponse), and this endpoint's
+//                                    // own refused flag can be wrong for the same beneficiary.
+//                                    (currentFr.status == "REFUSED" && newStatus != "REFUSED")
                                 ) {
                                     responseDao.updateFormResponse(
                                         currentFr.copy(
@@ -822,6 +858,11 @@ class CounsellingRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun getLocalPreSubmitFilledCounts(): Map<Long, Int> {
+        val raw = responseDao.getLocalPreSubmitFilledCounts()
+        Timber.d("getLocalPreSubmitFilledCounts: ${raw.map { "benId=${it.beneficiaryId} filledCount=${it.filledCount}" }}")
+        return raw.associate { it.beneficiaryId to it.filledCount }
+    }
 
     companion object {
         private const val DEFAULT_OFFICER_ID = 501L
