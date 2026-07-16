@@ -801,7 +801,7 @@ object HelperUtil {
 
     fun getAgeStrFromAgeUnit(ageUnitDTO: org.piramalswasthya.stoptb.model.AgeUnitDTO): String {
         return when {
-            ageUnitDTO.years > 0 -> "${ageUnitDTO.years} Yr ${ageUnitDTO.months} Mo"
+            ageUnitDTO.years > 0 -> "${ageUnitDTO.years} Yr ${ageUnitDTO.months} Mo ${ageUnitDTO.days} D"
             ageUnitDTO.months > 0 -> "${ageUnitDTO.months} Mo ${ageUnitDTO.days} D"
             else -> "${ageUnitDTO.days} D"
         }

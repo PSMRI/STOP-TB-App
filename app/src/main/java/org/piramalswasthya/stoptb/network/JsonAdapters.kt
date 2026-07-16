@@ -377,7 +377,11 @@ data class TBScreeningSaveRequest(
     val recommendedForTruenat: Boolean?,
     val recommendedForLiquidCulture: Boolean?,
     val testDenialReasons: Any?,
-    val createdBy: String?
+    val createdBy: String?,
+    val keyPopulationRiskFactorIds: List<Int>? = null,
+    val keyPopulationRiskFactors: List<String>? = null,
+    val hivStatusId: Int? = null,
+    val hivStatus: String? = null
 ) {
     companion object {
         fun from(cache: TBScreeningCache, beneficiaryRegID: Long, providerServiceMapID: Int, createdBy: String?): TBScreeningSaveRequest {
@@ -405,7 +409,11 @@ data class TBScreeningSaveRequest(
                 testDenialReasons = cache.reasonForDenialForGettingTested?.let {
                     if (it.size == 1) it.first() else it
                 },
-                createdBy = createdBy
+                createdBy = createdBy,
+                keyPopulationRiskFactorIds = cache.keyPopulationRiskFactorIds,
+                keyPopulationRiskFactors = cache.keyPopulationRiskFactors,
+                hivStatusId = cache.hivStatusId,
+                hivStatus = cache.hivStatus
             )
         }
     }

@@ -16,6 +16,7 @@ import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.ReferalCache
 import org.piramalswasthya.stoptb.model.VitalCache
+import org.piramalswasthya.stoptb.model.getAgeGenderDisplayString
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.NcdReferalRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
@@ -77,7 +78,7 @@ class VitalScreenViewModel @Inject constructor(
             benRepo.getBenFromId(benId)?.let { ben ->
                 benCache = ben
                 _benName.value = listOfNotNull(ben.firstName, ben.lastName).joinToString(" ")
-                _benAgeGender.value = "${ben.age} ${ben.ageUnit?.name} | ${ben.gender?.name}"
+                _benAgeGender.value = ben.getAgeGenderDisplayString()
                 _referredFor.value = getDefaultReferralTests(ben).joinToString(", ")
             }
             _existingVitals.value = vitalRepo.getVitals(benId)

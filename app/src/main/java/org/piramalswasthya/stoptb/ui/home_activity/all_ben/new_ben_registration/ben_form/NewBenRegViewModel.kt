@@ -405,6 +405,7 @@ class NewBenRegViewModel @Inject constructor(
             genderId = genderFromArgs,
             contactNumber = family?.familyHeadPhoneNo,
             address = address.ifBlank { null },
+            pinCode = details?.pincode?.takeIf { it > 0 }?.toString(),
             economicStatus = family?.povertyLine,
             economicStatusId = family?.povertyLineId,
             residentialArea = details?.residentialArea,

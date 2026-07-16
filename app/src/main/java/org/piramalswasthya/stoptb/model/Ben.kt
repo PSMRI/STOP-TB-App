@@ -827,6 +827,28 @@ fun getAgeDisplayString(dob: Long): String {
     }
 }
 
+fun BenRegCache.getAgeGenderDisplayString(): String {
+    val ageText = if (dob > 0L) {
+        getAgeDisplayString(dob)
+    } else {
+        when (ageUnit) {
+            AgeUnit.YEARS -> "$age Years"
+            AgeUnit.MONTHS -> "$age Months"
+            AgeUnit.DAYS -> "$age Days"
+            else -> "N/A"
+        }
+    }
+
+    val genderText = gender?.name
+        ?.replace('_', ' ')
+        ?.lowercase()
+        ?.split(' ')
+        ?.joinToString(" ") { part -> part.replaceFirstChar { ch -> ch.titlecase() } }
+        ?: "N/A"
+
+    return "$ageText | $genderText"
+}
+
 
 
 @Parcelize
@@ -1383,6 +1405,7 @@ data class BenRegCache(
     var typeOfCaseFindingId: Int? = null,
     var mobileNumberAvailable: Boolean? = null,
     var address: String? = null,
+    var pinCode: String? = null,
     var height: Double? = null,
     var weight: Double? = null,
     var bmi: Double? = null,
@@ -1571,6 +1594,7 @@ data class BenRegCache(
                 addressLine2 = "",
                 addressLine3 = "",
                 occupation = occupation ?: "unknown",
+                pinCode = pinCode,
                 economicStatus = economicStatus,
                 economicStatusId = economicStatusId,
                 residentialArea = residentialArea,

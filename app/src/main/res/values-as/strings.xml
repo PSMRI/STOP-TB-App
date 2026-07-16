@@ -470,6 +470,9 @@
     <string name="recommended_for_truenat_test">Truenat পৰীক্ষাৰ পৰামৰ্শ দিয়া হৈছে</string>
     <string name="recommended_for_liquid_culture_test">লিকুইড কালচাৰ পৰীক্ষাৰ পৰামৰ্শ দিয়া হৈছে</string>
     <string name="reason_for_denial_for_getting_tested">পৰীক্ষা কৰাবলৈ অস্বীকাৰ কৰাৰ কাৰণ</string>
+    <string name="risk_factors">ঝুঁকিৰ কাৰকসমূহ</string>
+
+
     <string-array name="tb_reason_for_denial_testing">
         <item>ভয় আৰু উদ্বেগ</item>
         <item>ভুল ধাৰণা</item>

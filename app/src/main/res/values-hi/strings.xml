@@ -192,6 +192,8 @@
     <string name="follow_up_date">फॉलो-अप तिथि</string>
     <string name="follow_up_history">फॉलो-अप रिकॉर्ड </string>
 
+    <string name="risk_factors">जोखिम कारक</string>
+
     <string name="pending">बाकी है</string>
 
     <string-array name="leprosy_status">

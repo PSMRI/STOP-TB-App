@@ -31,7 +31,8 @@ class SuspectedTBDataset(
         inputType = InputType.DATE_PICKER,
         title = resources.getString(R.string.tracking_date),
         required = true,
-        max = System.currentTimeMillis()
+        max = System.currentTimeMillis(),
+        isEnabled = false
     )
 
     private val sputumCollected = FormElement(
