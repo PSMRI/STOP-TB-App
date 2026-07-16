@@ -920,7 +920,6 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_19_20)
                         .addMigrations(MIGRATION_20_21)
                         .addMigrations(MIGRATION_21_22)
-                        .addMigrations(MIGRATION_22_23)
                         .fallbackToDestructiveMigration()
                         .build()
 
