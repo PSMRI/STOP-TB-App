@@ -28,6 +28,9 @@
         <action
             android:id="@+id/action_homeFragment_to_referralIconsFragment"
             app:destination="@id/referralIconsFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_nonHHFragment"
+            app:destination="@id/nonHHFragment" />
     </fragment>
 
     <fragment
@@ -95,6 +98,10 @@
             android:name="isAshaFamily"
             android:defaultValue="No"
             app:argType="string" />
+        <argument
+            android:name="linkBenId"
+            android:defaultValue="0L"
+            app:argType="long" />
         <action
             android:id="@+id/action_newHouseholdFragment_to_newBenRegFragment"
             app:destination="@id/newBenRegFragment" />
@@ -230,6 +237,24 @@
             android:name="isAddSpouse"
             android:defaultValue="0"
             app:argType="integer" />
+        <argument
+            android:name="isNonHH"
+            android:defaultValue="false"
+            app:argType="boolean" />
+        <argument
+            android:name="placeOfCurrentLiving"
+            android:defaultValue="0"
+            app:argType="integer" />
+        <argument
+            android:name="otherPlace"
+            android:defaultValue="@null"
+            app:nullable="true"
+            app:argType="string" />
+        <argument
+            android:name="institutionName"
+            android:defaultValue="@null"
+            app:nullable="true"
+            app:argType="string" />
         <action
             android:id="@+id/action_newBenRegFragment_self"
             app:destination="@id/newBenRegFragment"
@@ -238,6 +263,9 @@
             android:id="@+id/action_newChild_asBenRegFragment"
             app:destination="@id/newChildAsBenRegistrationFragment"
             app:launchSingleTop="true" />
+        <action
+            android:id="@+id/action_newBenRegFragment_to_newHouseholdFragment"
+            app:destination="@id/newHouseholdFragment" />
     </fragment>
 
     <fragment
@@ -524,5 +552,29 @@
         android:name="org.piramalswasthya.stoptb.ui.home_activity.sync_dashboard.SyncDashboardFragment"
         android:label="@string/sync_dashboard"
         tools:layout="@layout/fragment_sync_dashboard" />
+
+    <fragment
+        android:id="@+id/nonHHFragment"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.non_hh.NonHHFragment"
+        android:label="Non-Household List">
+        <action
+            android:id="@+id/action_nonHHFragment_to_currentLivingInfoFragment"
+            app:destination="@id/currentLivingInfoFragment" />
+        <action
+            android:id="@+id/action_nonHHFragment_to_newBenRegFragment"
+            app:destination="@id/newBenRegFragment" />
+        <action
+            android:id="@+id/action_nonHHFragment_to_newHouseholdFragment"
+            app:destination="@id/newHouseholdFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/currentLivingInfoFragment"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.non_hh.CurrentLivingInfoFragment"
+        android:label="Current Living Information">
+        <action
+            android:id="@+id/action_currentLivingInfoFragment_to_newBenRegFragment"
+            app:destination="@id/newBenRegFragment" />
+    </fragment>
 
 </navigation>

@@ -37,6 +37,7 @@ import com.google.mlkit.vision.face.FaceDetectorOptions
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.firstOrNull
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.isNurseRole
@@ -185,6 +186,10 @@ class NewBenRegFragment : Fragment() {
             }
         }
 
+        binding.btnLinkHousehold.setOnClickListener {
+            triggerLinkHouseholdFlow(viewModel.benIdFromArgs)
+        }
+
         binding.btnCancel.setOnClickListener {
             val isEditMode = viewModel.recordExists.value == false
             if (isEditMode) showDiscardDialog()
@@ -251,6 +256,7 @@ class NewBenRegFragment : Fragment() {
         viewModel.recordExists.observe(viewLifecycleOwner) { recordExists ->
             binding.fabEdit.visibility = if (recordExists && !isNurse) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (recordExists) View.GONE else View.VISIBLE
+            binding.btnLinkHousehold.visibility = if (viewModel.showLinkHouseholdButton) View.VISIBLE else View.GONE
             adapter.isEnabled = !recordExists
             if (viewModel.isStandalone) {
                 binding.btnRefreshLocation.isEnabled = !recordExists
@@ -274,7 +280,10 @@ class NewBenRegFragment : Fragment() {
                     Toast.makeText(context, resources.getString(R.string.save_successful), Toast.LENGTH_LONG).show()
                     try {
                         WorkerUtils.triggerAmritPushWorker(requireContext())
-                        if (viewModel.relToHeadId == 18) {
+                        if (viewModel.isNonHHArg) {
+                            val popped = findNavController().popBackStack(R.id.nonHHFragment, false)
+                            if (!popped) findNavController().navigateUp()
+                        } else if (viewModel.relToHeadId == 18) {
                             val popped = findNavController().popBackStack(R.id.allHouseholdFragment, false)
                             if (!popped) findNavController().navigateUp()
                         } else {
@@ -790,5 +799,114 @@ class NewBenRegFragment : Fragment() {
     override fun onDestroy() {
         super.onDestroy()
         _binding = null
+    }
+
+    private fun triggerLinkHouseholdFlow(benId: Long) {
+        val options = arrayOf("Link to Existing Household", "Create New Household")
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Link Household")
+            .setItems(options) { dialog, which ->
+                dialog.dismiss()
+                if (which == 0) {
+                    showExistingHouseholdSelectionDialog(benId)
+                } else {
+                    findNavController().navigate(
+                        NewBenRegFragmentDirections.actionNewBenRegFragmentToNewHouseholdFragment(
+                            hhId = 0L,
+                            isAshaFamily = "No",
+                            linkBenId = benId
+                        )
+                    )
+                }
+            }
+            .show()
+    }
+
+    private fun showExistingHouseholdSelectionDialog(benId: Long) {
+        lifecycleScope.launch {
+            val hhList = viewModel.hhList.firstOrNull()
+            if (hhList.isNullOrEmpty()) {
+                Toast.makeText(requireContext(), "No existing households found in this village", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            
+            val hhNames = hhList.map { hh ->
+                val headName = hh.household.family?.familyHeadName ?: "No Head Name"
+                val famName = hh.household.family?.familyName ?: ""
+                "Head: $headName $famName (HH ID: ${hh.household.householdId})"
+            }.toTypedArray()
+            
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Select Household")
+                .setItems(hhNames, android.content.DialogInterface.OnClickListener { selectDialog, index ->
+                    selectDialog.dismiss()
+                    val selectedHh = hhList[index]
+                    showRelationshipSelectionDialog(benId, selectedHh.household.householdId)
+                })
+                .show()
+        }
+    }
+
+    private fun showRelationshipSelectionDialog(benId: Long, hhId: Long) {
+        val relations = arrayOf("Self", "Spouse", "Son", "Daughter", "Mother", "Father", "Brother", "Sister", "Other")
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Select Relationship to HOF")
+            .setItems(relations, android.content.DialogInterface.OnClickListener { dialog, index ->
+                dialog.dismiss()
+                val selectedRelation = relations[index]
+                lifecycleScope.launch {
+                    val ben = viewModel.getBenFromId(benId) ?: return@launch
+                    val relationPos: Int
+                    val relationName: String
+                    when (selectedRelation) {
+                        "Self" -> {
+                            relationPos = 19
+                            relationName = "Self"
+                        }
+                        "Spouse" -> {
+                            if (ben.genderId == 1) {
+                                relationPos = 6
+                                relationName = "Husband"
+                            } else {
+                                relationPos = 5
+                                relationName = "Wife"
+                            }
+                        }
+                        "Son" -> {
+                            relationPos = 9
+                            relationName = "Son"
+                        }
+                        "Daughter" -> {
+                            relationPos = 10
+                            relationName = "Daughter"
+                        }
+                        "Mother" -> {
+                            relationPos = 1
+                            relationName = "Mother"
+                        }
+                        "Father" -> {
+                            relationPos = 2
+                            relationName = "Father"
+                        }
+                        "Brother" -> {
+                            relationPos = 3
+                            relationName = "Brother"
+                        }
+                        "Sister" -> {
+                            relationPos = 4
+                            relationName = "Sister"
+                        }
+                        else -> {
+                            relationPos = 21
+                            relationName = "Other"
+                        }
+                    }
+                    viewModel.linkBenToHousehold(hhId, relationPos, relationName)
+                    Toast.makeText(requireContext(), "Linked to household successfully", Toast.LENGTH_SHORT).show()
+                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerAmritPushWorker(requireContext())
+                    findNavController().navigateUp()
+                }
+            })
+            .show()
     }
 }

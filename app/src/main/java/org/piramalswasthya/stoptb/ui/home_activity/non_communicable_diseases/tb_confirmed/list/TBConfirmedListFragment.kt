@@ -89,7 +89,7 @@ class TBConfirmedListFragment : Fragment() {
                     findNavController().navigate(
                         TBConfirmedListFragmentDirections
                             .actionTBConfirmedListFragmentToHouseholdMembersFragment(
-                                hhId = item.ben.hhId
+                                hhId = item.ben.hhId ?: 0L
                             )
                     )
                 }

@@ -115,10 +115,21 @@ class BenListAdapter(
             }
 
             // Hide unused UI elements upfront (no eye surgery / children buttons in StopTB)
-            val isHeadOfFamily = item.relToHeadId == 19
-            val hasFamilyHeadName = item.familyHeadName.isNotBlank() && item.familyHeadName != "Not Available"
+            val isNonHH = item.isNonHH
+            val isHeadOfFamily = if (isNonHH) false else item.relToHeadId == 19
+            val hasFamilyHeadName = !isNonHH && item.familyHeadName.isNotBlank() && item.familyHeadName != "Not Available"
             binding.HOF.visibility = View.GONE
-            binding.ivIsHead.visibility = if (isHeadOfFamily) View.VISIBLE else View.GONE
+            if (isNonHH) {
+                binding.ivIsHead.visibility = View.VISIBLE
+                binding.ivIsHead.setImageResource(R.drawable.ic_no_hh)
+                binding.ivIsHead.imageTintList = null
+            } else {
+                binding.ivIsHead.setImageResource(R.drawable.ic__hh)
+                binding.ivIsHead.imageTintList = android.content.res.ColorStateList.valueOf(
+                    androidx.core.content.ContextCompat.getColor(binding.root.context, R.color.md_theme_light_primary)
+                )
+                binding.ivIsHead.visibility = if (isHeadOfFamily) View.VISIBLE else View.GONE
+            }
             binding.head.visibility = if (isHeadOfFamily) View.VISIBLE else View.GONE
             binding.ncdHofName.visibility = if (!isHeadOfFamily && hasFamilyHeadName) View.VISIBLE else View.GONE
             binding.btnAbove30.visibility = View.GONE
@@ -408,7 +419,8 @@ class BenListAdapter(
         private val clickedResult: (item: BenBasicDomain, benId: Long, hhId: Long) -> Unit = { _, _, _ -> },
         private val clickedGeneralOpd: (item: BenBasicDomain, benId: Long, hhId: Long, viewOnly: Boolean) -> Unit = { _, _, _, _ -> },
         private val clickedAnthropometry: (item: BenBasicDomain, benId: Long, hhId: Long, viewOnly: Boolean) -> Unit = { _, _, _, _ -> },
-        private val clickedExamine: (item: BenBasicDomain, benId: Long) -> Unit = { _, _ -> }
+        private val clickedExamine: (item: BenBasicDomain, benId: Long) -> Unit = { _, _ -> },
+        private val clickedNonHHHousehold: (item: BenBasicDomain) -> Unit = {}
     ) {
         fun onClickedBen(item: BenBasicDomain) = clickedBen(
             item,
@@ -456,5 +468,6 @@ class BenListAdapter(
         fun onClickedForCall(item: BenBasicDomain) = callBen(item)
         fun onClickSoftDeleteBen(item: BenBasicDomain) = softDeleteBen(item)
         fun onClickExamine(item: BenBasicDomain) = clickedExamine(item, item.benId)
+        fun onClickNonHHHousehold(item: BenBasicDomain) = clickedNonHHHousehold(item)
     }
 }

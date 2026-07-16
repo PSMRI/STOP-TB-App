@@ -720,17 +720,17 @@ interface BenDao {
     suspend fun isBenDead(benId: Long): Boolean
 
 
-    @Query("UPDATE BENEFICIARY SET syncState = :syncState WHERE beneficiaryId =:benId AND householdId = :hhId")
-    suspend fun setSyncState(hhId: Long, benId: Long, syncState: SyncState)
+    @Query("UPDATE BENEFICIARY SET syncState = :syncState WHERE beneficiaryId =:benId AND householdId IS :hhId")
+    suspend fun setSyncState(hhId: Long?, benId: Long, syncState: SyncState)
 
     @Query("DELETE FROM BENEFICIARY WHERE householdId = :hhId and isKid = :kid")
     suspend fun deleteBen(hhId: Long, kid: Boolean)
 
-    @Query("UPDATE BENEFICIARY SET beneficiaryId = :newId, benRegId = :benRegId WHERE householdId = :hhId AND beneficiaryId =:oldId")
-    suspend fun substituteBenId(hhId: Long, oldId: Long, newId: Long, benRegId: Long)
+    @Query("UPDATE BENEFICIARY SET beneficiaryId = :newId, benRegId = :benRegId WHERE householdId IS :hhId AND beneficiaryId =:oldId")
+    suspend fun substituteBenId(hhId: Long?, oldId: Long, newId: Long, benRegId: Long)
 
-    @Query("UPDATE BENEFICIARY SET serverUpdatedStatus = 1 , beneficiaryId = :newId , benRegId =:newBenRegId ,processed = 'U', userImage = :imageUri  WHERE householdId = :hhId AND beneficiaryId =:oldId")
-    suspend fun updateToFinalBenId(hhId: Long, oldId: Long, newId: Long, imageUri: String? = null,newBenRegId:Long)
+    @Query("UPDATE BENEFICIARY SET serverUpdatedStatus = 1 , beneficiaryId = :newId , benRegId =:newBenRegId ,processed = 'U', userImage = :imageUri  WHERE householdId IS :hhId AND beneficiaryId =:oldId")
+    suspend fun updateToFinalBenId(hhId: Long?, oldId: Long, newId: Long, imageUri: String? = null,newBenRegId:Long)
 
     @Query("SELECT * FROM BENEFICIARY WHERE isDraft = 0 AND processed = 'N' AND syncState =:unsynced ")
     suspend fun getAllUnprocessedBen(unsynced: SyncState = SyncState.UNSYNCED): List<BenRegCache>
@@ -1206,4 +1206,17 @@ interface BenDao {
 
     @Query("UPDATE BENEFICIARY SET syncState = 0 WHERE syncState = 1")
     suspend fun resetSyncingToUnsynced()
+
+    @Query("SELECT * FROM BEN_BASIC_CACHE WHERE villageId = :selectedVillage AND isDeactivate = 0 AND isNonHH = 1")
+    fun getNonHHBeneficiaries(selectedVillage: Int): Flow<List<BenBasicCache>>
+
+    @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE WHERE villageId = :selectedVillage AND isDeactivate = 0 AND isNonHH = 1")
+    fun getNonHHCount(selectedVillage: Int): Flow<Int>
+
+    @Query("""
+        SELECT * FROM BEN_BASIC_CACHE
+        WHERE villageId = :selectedVillage AND isDeactivate = 0 AND isNonHH = 1
+        AND (:query = '' OR benName LIKE '%' || :query || '%' OR benSurname LIKE '%' || :query || '%' OR (benName || ' ' || benSurname) LIKE '%' || :query || '%' OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%')
+    """)
+    fun searchNonHHBeneficiaries(selectedVillage: Int, query: String): Flow<List<BenBasicCache>>
 }
