@@ -23,10 +23,12 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchAndToggleRvButtonBinding
 import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.model.BenBasicDomain
+import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
+import androidx.core.os.bundleOf
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class NonHHFragment : Fragment() {
+class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     @Inject
     lateinit var prefDao: PreferenceDao
@@ -37,6 +39,7 @@ class NonHHFragment : Fragment() {
     private val viewModel: NonHHViewModel by viewModels()
 
     private lateinit var benAdapter: BenListAdapter
+    private var pendingExamineBenId: Long? = null
 
     private val sttContract = registerForActivityResult(SpeechToTextContract()) { value ->
         val lowerValue = value.lowercase()
@@ -105,6 +108,10 @@ class NonHHFragment : Fragment() {
                 softDeleteBen = { },
                 clickedNonHHHousehold = { item ->
                     triggerLinkHouseholdFlow(item.benId)
+                },
+                clickedExamine = { _, benId ->
+                    pendingExamineBenId = benId
+                    showExamineBottomSheet(benId)
                 }
             ),
             showBeneficiaries = true,
@@ -246,5 +253,87 @@ class NonHHFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+    }
+
+    private fun showExamineBottomSheet(benId: Long) {
+        val existing = childFragmentManager.findFragmentByTag(ExamineBottomSheetFragment.TAG)
+        if (existing != null) return
+        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false)
+            .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
+    }
+
+    override fun onNavigateToExamineForm(benId: Long, formIndex: Int, viewOnly: Boolean) {
+        pendingExamineBenId = benId
+        when (formIndex) {
+            ExamineBottomSheetFragment.FORM_ANTHROPOMETRY -> {
+                findNavController().navigate(
+                    R.id.anthropometryFragment,
+                    bundleOf(
+                        "benId" to benId,
+                        "autoFlow" to false,
+                        "examineFlow" to !viewOnly
+                    )
+                )
+            }
+            ExamineBottomSheetFragment.FORM_GENERAL_EXAM -> {
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val ben = viewModel.getBenFromId(benId)
+                    val benRegId = ben?.benRegId ?: 0L
+                    findNavController().navigate(
+                        R.id.vitalScreenFragment,
+                        bundleOf(
+                            "benId" to benId,
+                            "benRegId" to benRegId,
+                            "autoFlow" to !viewOnly
+                        )
+                    )
+                }
+            }
+            ExamineBottomSheetFragment.FORM_TB_SCREENING -> {
+                findNavController().navigate(
+                    R.id.TBScreeningFormFragment,
+                    bundleOf(
+                        "benId" to benId,
+                        "autoFlow" to !viewOnly
+                    )
+                )
+            }
+            ExamineBottomSheetFragment.FORM_GENERAL_OPD -> {
+                findNavController().navigate(
+                    R.id.GeneralOpdFormFragment,
+                    bundleOf(
+                        "benId" to benId,
+                        "viewOnly" to viewOnly,
+                        "autoFlow" to !viewOnly,
+                        "generalOpdFlow" to !viewOnly
+                    )
+                )
+            }
+            ExamineBottomSheetFragment.FORM_DIAGNOSIS -> {
+                findNavController().navigate(
+                    R.id.TBSuspectedQuickFragment,
+                    bundleOf(
+                        "benId" to benId,
+                        "viewOnly" to viewOnly
+                    )
+                )
+            }
+        }
+    }
+
+    override fun onExamineDismissed() {
+        pendingExamineBenId = null
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val sh = findNavController().currentBackStackEntry?.savedStateHandle
+        if (sh?.remove<Boolean>("examine_flow_done") == true) {
+            pendingExamineBenId = null
+        }
+        val benId = pendingExamineBenId
+        if (benId != null) {
+            showExamineBottomSheet(benId)
+        }
     }
 }
