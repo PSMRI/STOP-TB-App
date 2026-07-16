@@ -757,7 +757,7 @@ class BenRepo @Inject constructor(
                                 val benCacheList =
                                     getBenCacheFromServerResponse(responseString)
 
-                                benDao.upsert(*benCacheList.toTypedArray())
+                                upsertServerBeneficiariesSafely(benCacheList)
 
                                 Timber.d("GeTBenDataList: $pageSize")
 
@@ -807,6 +807,17 @@ class BenRepo @Inject constructor(
             }
 
             -1
+        }
+    }
+
+    private suspend fun upsertServerBeneficiariesSafely(benCacheList: List<BenRegCache>) {
+        benCacheList.forEach { serverBen ->
+            val existingBen = benDao.getBen(serverBen.beneficiaryId)
+            if (existingBen != null) {
+                benDao.updateBen(serverBen)
+            } else {
+                benDao.upsert(serverBen)
+            }
         }
     }
 
@@ -1849,6 +1860,11 @@ class BenRepo @Inject constructor(
                                     .ifEmpty { benDataObj.optString("address") }
                                     .ifEmpty { jsonObject.optString("addressLine1") }
                                     .ifEmpty { jsonObject.optString("address") },
+
+                                pinCode = demographicsObj.optString("pinCode")
+                                    .ifEmpty { benDataObj.optString("pinCode") }
+                                    .ifEmpty { jsonObject.optString("pinCode") }
+                                    .ifEmpty { null },
 
                                 genderId = benDataObj.optInt(
                                     "genderId",

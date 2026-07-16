@@ -29,5 +29,7 @@ data class FormResponseEntity(
     val syncStatus: String = "UNSYNCED", // "UNSYNCED", "SYNCED", "ERROR"
     val syncedAt: Long? = null,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    val sectionsFilled: Int? = null,
+    val totalSections: Int? = null
 )

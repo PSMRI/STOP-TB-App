@@ -145,6 +145,10 @@ class FormInputAdapter(
 
         fun bind(item: FormElement, isEnabled: Boolean, formValueListener: FormValueListener?) {
             val effectiveEnabled = isEnabled && item.isEnabled
+            val isReadOnlyUnavailableContact =
+                item.title.equals("Contact Number", ignoreCase = true) &&
+                        !item.required &&
+                        item.value == "9999999999"
             Timber.d("binding triggered!!! $effectiveEnabled ${item.id}")
             if (!effectiveEnabled) {
                 binding.et.isEnabled = false
@@ -166,25 +170,24 @@ class FormInputAdapter(
                 binding.et.isFocusableInTouchMode = true
                 binding.et.isCursorVisible = true
             }
+            if (isReadOnlyUnavailableContact) {
+                binding.et.isClickable = false
+                binding.et.isFocusable = false
+                binding.et.isFocusableInTouchMode = false
+                binding.et.isCursorVisible = false
+            }
             if (isOtpVerified && item.id == 44 && item.title.equals("Contact Number")) {
                 binding.et.isClickable = false
                 binding.et.isFocusable = false
             }
 
-            if (item.title.contains("first name", true) ||
-                item.title.contains("last name", true) ||
-                item.title.contains("father's name", true) ||
-                item.title.contains("mother's name", true)
-            ) {
-//                edittext.setFilters(arrayOf<InputFilter>(AllCaps()))
+            if (item.allCaps) {
                 val editFilters = binding.et.filters
                 var newFilters = arrayOfNulls<InputFilter>(editFilters.size + 1)
                 editFilters.forEachIndexed { index, inputFilter ->
                     newFilters[index] = editFilters[index]
                 }
                 newFilters[editFilters.size] = AllCaps()
-//                newFilters.set(editFilters.size, AllCaps())
-//                binding.et.filters = arrayOf<InputFilter>(AllCaps())
                 binding.et.filters = newFilters
             }
             binding.form = item
@@ -684,7 +687,27 @@ class FormInputAdapter(
             binding.tvTitle.visibility = View.GONE
             binding.llChecks.visibility = View.GONE
             binding.tilMultiSelect.visibility = View.VISIBLE
-            binding.tilMultiSelect.hint = item.title
+            val title = item.title ?: ""
+            val hintText = when {
+                item.required && item.doubleStar -> SpannableString("$title **").apply {
+                    setSpan(
+                        ForegroundColorSpan(Color.parseColor("#B00020")),
+                        length - 2,
+                        length,
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                }
+                item.required -> SpannableString("$title *").apply {
+                    setSpan(
+                        ForegroundColorSpan(Color.parseColor("#B00020")),
+                        length - 1,
+                        length,
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                }
+                else -> title
+            }
+            binding.tilMultiSelect.hint = hintText
             binding.tilMultiSelect.isEnabled = effectiveEnabled
             binding.etMultiSelect.isEnabled = effectiveEnabled
             binding.etMultiSelect.isClickable = effectiveEnabled
@@ -697,10 +720,24 @@ class FormInputAdapter(
                 val labels = item.entries ?: emptyArray()
                 val checkedItems = BooleanArray(labels.size) { index -> selectedIndexes.contains(index) }
 
-                AlertDialog.Builder(binding.root.context)
+                lateinit var dialogRef: AlertDialog
+                val builder = AlertDialog.Builder(binding.root.context)
                     .setTitle(item.title)
-                    .setMultiChoiceItems(labels, checkedItems) { _, which, isChecked ->
-                        checkedItems[which] = isChecked
+                    .setMultiChoiceItems(labels, checkedItems) { dialog, which, isChecked ->
+                        val exclusiveIndices = item.exclusiveOptionIndices
+                        if (exclusiveIndices != null) {
+                            if (isChecked && exclusiveIndices.contains(which)) {
+                                // "Not Applicable" (or similar) checked -> uncheck everything else
+                                checkedItems.indices.forEach { idx ->
+                                    if (idx != which) checkedItems[idx] = false
+                                }
+                            } else if (isChecked && exclusiveIndices.isNotEmpty()) {
+                                // A normal option checked -> uncheck the exclusive option(s)
+                                exclusiveIndices.forEach { idx -> checkedItems[idx] = false }
+                            }
+                            val listView = (dialog as? AlertDialog)?.listView
+                            checkedItems.indices.forEach { idx -> listView?.setItemChecked(idx, checkedItems[idx]) }
+                        }
                     }
                     .setPositiveButton(android.R.string.ok) { _, _ ->
                         selectedIndexes.clear()
@@ -717,7 +754,7 @@ class FormInputAdapter(
                         formValueListener?.onValueChanged(item, -1)
                     }
                     .setNegativeButton(android.R.string.cancel, null)
-                    .show()
+                builder.show()
             }
             binding.etMultiSelect.setOnClickListener(showDialog)
             binding.tilMultiSelect.setEndIconOnClickListener(showDialog)
@@ -1496,12 +1533,17 @@ class FormInputAdapter(
      */
     fun validateInput(resources: Resources, formRecyclerView: RecyclerView? = null): Int {
         if (!isEnabled) return -1
+        val emptyError = resources.getString(R.string.form_input_empty_error)
         var firstEmptyRequired = -1
         currentList.forEachIndexed { index, it ->
+            if (!it.required && it.errorText == emptyError) {
+                it.errorText = null
+                notifyItemChanged(index)
+            }
             if (it.inputType != TEXT_VIEW && it.required) {
                 if (it.value.isNullOrBlank()) {
                     Timber.d("validateInput called for item $it, with index $index")
-                    it.errorText = resources.getString(R.string.form_input_empty_error)
+                    it.errorText = emptyError
                     notifyItemChanged(index)
                     if (firstEmptyRequired == -1) firstEmptyRequired = index
                 }

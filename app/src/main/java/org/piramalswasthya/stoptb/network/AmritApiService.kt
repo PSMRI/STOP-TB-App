@@ -189,17 +189,16 @@ interface AmritApiService {
         @Body request: List<FormSubmitRequest>
     ): Response<Unit>
 
-    @POST("flw-api/counselling/save")
-    suspend fun submitCounselling(
-        @Body request: CounsellingSyncRequest
-    ): Response<okhttp3.ResponseBody>
-
-//    @POST("flw-api/dynamicForm/response/submitBulk")
-//    suspend fun submitBulkCounselling(
-//        @Header("Authorization") authHeader: String,
-//        @Body request: List<CounsellingBulkSubmitRequest>
+//    @POST("flw-api/counselling/save")
+//    suspend fun submitCounselling(
+//        @Body request: CounsellingSyncRequest
 //    ): Response<okhttp3.ResponseBody>
 
+    @POST("flw-api/dynamicForm/response/submitBulk")
+    suspend fun submitBulkCounselling(
+        @Header("Authorization") authHeader: String,
+        @Body request: List<CounsellingBulkSubmitRequest>
+    ): Response<ResponseBody>
     @POST("flw-api/dynamicForm/response/complete")
     suspend fun completeCounselling(
         @Header("Authorization") authHeader: String,
@@ -218,7 +217,7 @@ interface AmritApiService {
         @Query("formType") formType: String,
         @Query("villageId") villageId: Int,
         @Query("providerServiceMapId") providerServiceMapId: Int
-    ): Response<ApiResponse<org.piramalswasthya.stoptb.model.dynamicEntity.CompletedBeneficiariesResponse>>
+    ): Response<ApiResponse<List<org.piramalswasthya.stoptb.model.dynamicEntity.CompletedBeneficiaryStatus>>>
 
 
     @POST("flw-api/disease/cdtfVisit/saveAll")

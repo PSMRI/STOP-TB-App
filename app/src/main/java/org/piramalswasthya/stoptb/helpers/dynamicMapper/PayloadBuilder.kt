@@ -136,7 +136,8 @@ object PayloadBuilder {
         response: CompleteFormResponse,
         formDef: CompleteFormDefinition?,
         officerId: Long,
-        phaseFilter: String? = null
+        phaseFilter: String? = null,
+        sectionIdFilter: Int? = null
     ): CounsellingBulkSubmitRequest {
         val formVersionId = response.formResponse.formVersionId
         val formCode = formDef?.form?.formUuid ?: "counselling-form-v1"
@@ -173,8 +174,14 @@ object PayloadBuilder {
                     return@mapNotNull null
                 }
             }
+            if (sectionIdFilter != null && sectionId != sectionIdFilter) {
+                return@mapNotNull null
+            }
 
-            if (secResponseWithQuestions.questionResponses.isEmpty()) {
+            // A section explicitly targeted via sectionIdFilter must always be included, even
+            // with no answers (e.g. an optional final section left blank) — only drop empty
+            // sections when building a broad, non-targeted (whole-form/phase) payload.
+            if (sectionIdFilter == null && secResponseWithQuestions.questionResponses.isEmpty()) {
                 return@mapNotNull null
             }
 

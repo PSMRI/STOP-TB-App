@@ -912,6 +912,7 @@
     <string name="check_if_the_person_has_any_of_these_symptoms">Check if the person has any of these Symptoms:</string>
     <string name="tb_asymptomatic_screening">Asymptomatic Screening</string>
     <string name="tb_is_beneficiary_asymptomatic">Is beneficiary asymptomatic</string>
+    <string name="risk_factors">Risk Factors</string>
     <string name="tb_rise_of_fever">Rise of fever in evening</string>
     <string name="tb_loss_of_appetite">Loss of Appetite</string>
     <string name="tb_age_more_than_60">Age more than 60 years</string>
@@ -1048,9 +1049,9 @@
     <string name="clubbing">Clubbing</string>
     <string name="lymphadenopathy">Lymphadenopathy</string>
     <string name="oedema">Oedema</string>
-    <string name="key_population_risk_factors">Key Population / Risk Factors *</string>
+    <string name="key_population_risk_factors">Key Population / Risk Factors</string>
     <string name="select_key_population_risk_factors">Select Key Population / Risk Factors</string>
-    <string name="hiv_status">HIV Status *</string>
+    <string name="hiv_status">HIV Status</string>
     <string name="no_risk_factor_selected">No risk factor selected</string>
     <string name="risk_factor_required">Select Key Population / Risk Factors</string>
     <string name="hiv_status_required">Select HIV Status</string>
@@ -1225,6 +1226,7 @@
     <string name="examine_btn_fill">Fill</string>
     <string name="examine_btn_view">View</string>
     <string name="diagnosis_locked_msg">Please fill TB Screening form first</string>
+    <string name="tb_screening_locked_msg">Please fill TB Screening form first</string>
     <string name="tb_screening_legend_xray_sputum">* Refer for Digital Chest X-Ray or for Sputum Collection</string>
     <string name="tb_screening_legend_family_members">** Advise for screening of all family members</string>
 

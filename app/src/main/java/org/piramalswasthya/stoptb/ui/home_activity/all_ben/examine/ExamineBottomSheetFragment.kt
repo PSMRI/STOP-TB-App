@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
@@ -95,6 +96,17 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
             FormRow(view.findViewById(R.id.row_diagnosis),      getString(R.string.tb_suspected_quick_title), FORM_DIAGNOSIS)
         )
 
+        if (isRegistrar || isNurse) {
+            val container = view as? LinearLayout
+            val anthropometryRow = view.findViewById<View>(R.id.row_anthropometry)
+            val tbScreeningRow = view.findViewById<View>(R.id.row_tb_screening)
+            if (container != null && anthropometryRow != null && tbScreeningRow != null) {
+                container.removeView(tbScreeningRow)
+                val anthropometryIndex = container.indexOfChild(anthropometryRow)
+                container.addView(tbScreeningRow, anthropometryIndex.coerceAtLeast(0))
+            }
+        }
+
         val fillStatusFlows = listOf(
             viewModel.isAnthropometryFilled,
             viewModel.isGeneralExamFilled,
@@ -114,7 +126,54 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
             val btn = rowView.findViewById<MaterialButton>(R.id.btn_form_action)
             val notFilled = rowView.findViewById<TextView>(R.id.tv_not_filled)
 
-            if (formIndex == FORM_DIAGNOSIS) {
+            if ((isRegistrar && formIndex == FORM_ANTHROPOMETRY) ||
+                (isNurse && formIndex != FORM_TB_SCREENING)
+            ) {
+                viewLifecycleOwner.lifecycleScope.launch {
+                    combine(
+                        viewModel.isTbScreeningFilled,
+                        fillStatusFlows[index]
+                    ) { tbScreeningDone, currentFormFilled ->
+                        Pair(tbScreeningDone, currentFormFilled)
+                    }.collect { (tbScreeningDone, currentFormFilled) ->
+                        if (!tbScreeningDone) {
+                            btn.text = getString(R.string.examine_btn_fill)
+                            btn.isEnabled = true
+                            btn.alpha = 1f
+                            btn.backgroundTintList = ContextCompat.getColorStateList(
+                                requireContext(), android.R.color.darker_gray
+                            )
+                            btn.setOnClickListener {
+                                android.widget.Toast.makeText(
+                                    requireContext(),
+                                    getString(R.string.tb_screening_locked_msg),
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        } else {
+                            btn.isEnabled = true
+                            btn.alpha = 1f
+                            if (currentFormFilled) {
+                                btn.text = getString(R.string.examine_btn_view)
+                                btn.backgroundTintList = ContextCompat.getColorStateList(
+                                    requireContext(), android.R.color.holo_green_dark
+                                )
+                                btn.setOnClickListener {
+                                    navigateToForm(benId, formIndex, viewOnly = true)
+                                }
+                            } else {
+                                btn.text = getString(R.string.examine_btn_fill)
+                                btn.backgroundTintList = ContextCompat.getColorStateList(
+                                    requireContext(), android.R.color.holo_red_dark
+                                )
+                                btn.setOnClickListener {
+                                    navigateToForm(benId, formIndex, viewOnly = false)
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (formIndex == FORM_DIAGNOSIS) {
                 // Diagnosis is only enabled after TB Screening is completed
                 viewLifecycleOwner.lifecycleScope.launch {
                     combine(
@@ -174,7 +233,29 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
         // Auto-flow: if opened with autoFlow=true, immediately navigate to next unfilled form
         if (autoFlow) {
             viewLifecycleOwner.lifecycleScope.launch {
-                val nextIndex = viewModel.nextUnfilledFormIndex.first()
+                val nextIndex = if (isRegistrar) {
+                    val tbFilled = viewModel.isTbScreeningFilled.first()
+                    val anthropometryFilled = viewModel.isAnthropometryFilled.first()
+                    when {
+                        !tbFilled -> FORM_TB_SCREENING
+                        !anthropometryFilled -> FORM_ANTHROPOMETRY
+                        else -> null
+                    }
+                } else if (isNurse) {
+                    val tbFilled = viewModel.isTbScreeningFilled.first()
+                    val anthropometryFilled = viewModel.isAnthropometryFilled.first()
+                    val generalExamFilled = viewModel.isGeneralExamFilled.first()
+                    val generalOpdFilled = viewModel.isGeneralOpdFilled.first()
+                    when {
+                        !tbFilled -> FORM_TB_SCREENING
+                        !anthropometryFilled -> FORM_ANTHROPOMETRY
+                        !generalExamFilled -> FORM_GENERAL_EXAM
+                        !generalOpdFilled -> FORM_GENERAL_OPD
+                        else -> null
+                    }
+                } else {
+                    viewModel.nextUnfilledFormIndex.first()
+                }
                 if (nextIndex != null) {
                     navigateToForm(benId, nextIndex, viewOnly = false)
                 } else {

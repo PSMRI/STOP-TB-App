@@ -32,6 +32,15 @@ class TBSuspectedQuickDataset(
 
     // ── Always visible ────────────────────────────────────────────────────────
 
+    private val dateOfVisit = FormElement(
+        id = 19,
+        inputType = InputType.DATE_PICKER,
+        title = resources.getString(R.string.tracking_date),
+        required = true,
+        max = System.currentTimeMillis(),
+        hasDependants = true
+    )
+
     private val nikshayId = FormElement(
         id = 8,
         inputType = InputType.TEXT_VIEW,
@@ -211,12 +220,19 @@ class TBSuspectedQuickDataset(
         screening: TBScreeningCache?,
         saved: TBDiagnosticsCache?,
         vital: VitalCache? = null,
-        referralMode: Boolean = false
+        referralMode: Boolean = false ,
+
     ) {
         benCache = ben
         screeningCache = screening
         vitalCache = vital
         this.referralMode = referralMode
+
+        // Date of visit — same min/default logic as TBScreeningDataset
+        dateOfVisit.value = saved?.visitDate?.takeIf { it > 0 }
+            ?.let { getDateFromLong(it) }
+            ?: getDateFromLong(System.currentTimeMillis())
+        dateOfVisit.isEnabled = false
 
         // NikshayId
         nikshayId.value = ben?.nikshayId?.takeIf { it.isNotBlank() }
@@ -580,6 +596,9 @@ class TBSuspectedQuickDataset(
 
     override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
         (cacheModel as TBDiagnosticsCache).let { form ->
+            // Always record the actual moment of submission — never editable,
+            // never derived from a possibly-stale displayed value.
+            form.visitDate = System.currentTimeMillis()
             // Digital Chest X-Ray (entire section is not applicable for pregnant women)
             form.isReferredForDigitalChestXray =
                 if (!isPregnant()) isYes(referredForDigitalChestXray) else null
@@ -667,9 +686,12 @@ class TBSuspectedQuickDataset(
         ).any { it }
     }
 
+    fun getIndexOfDate(): Int = listFlow.value.indexOf(dateOfVisit)
+
     // ── Form list builder ─────────────────────────────────────────────────────
 
     private fun buildFormList(): List<FormElement> = buildList {
+        add(dateOfVisit)
         add(nikshayId)
 
         // Digital Chest X-Ray section — hidden entirely for pregnant women

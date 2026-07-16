@@ -254,6 +254,15 @@ class CounsellingRepositoryImpl @Inject constructor(
             val mappedAnswers = answers.map { it.copy(sectionResponseId = sectionResponse.sectionResponse.sectionResponseId) }
             responseDao.insertQuestionResponses(mappedAnswers)
 
+            // Mark this section pending re-submission via submitBulk, whether it's the first
+            // save or a re-edit of an already-synced section (Navigate Up + edit + Next again).
+            responseDao.updateSectionResponse(
+                sectionResponse.sectionResponse.copy(
+                    completedAt = null,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+
             responseDao.updateFormResponse(
                 formResponseWithDetails.formResponse.copy(
                     lastVisitedSectionId = nextSectionId ?: sectionId,
@@ -323,6 +332,85 @@ class CounsellingRepositoryImpl @Inject constructor(
         submitSectionWithPhase(responseId, answers, "GENERAL_INFO", "REFUSED")
     }
 
+    override suspend fun submitSectionBulk(responseId: Long, sectionId: Int): Boolean {
+        val resp = responseDao.getFormResponseById(responseId) ?: return true
+        val sectionResponse = resp.sectionResponses.find { it.sectionResponse.sectionId == sectionId }
+            ?: return true
+
+        val formDef = metadataDao.getFormDefinitionByVersionId(resp.formResponse.formVersionId)
+        val officerId = preferenceDao.getLoggedInUser()?.userId?.toLong() ?: DEFAULT_OFFICER_ID
+        val payload = PayloadBuilder.buildBulkPayload(resp, formDef, officerId, sectionIdFilter = sectionId)
+
+        if (payload.sections.isEmpty()) {
+            Timber.d("submitSectionBulk: sectionId=$sectionId has no answers, skipping API call")
+            return true
+        }
+
+        val jwt = preferenceDao.getJWTAmritToken()
+        val authHeader = jwt ?: ""
+
+        val success = try {
+            val apiResponse = amritApiService.submitBulkCounselling(authHeader, listOf(payload))
+            val statusCode = apiResponse.code()
+            Timber.d("submitSectionBulk: sectionId=$sectionId, httpStatus=$statusCode")
+
+            if (statusCode == 200) {
+                val responseString = apiResponse.body()?.string()
+                if (responseString != null) {
+                    val jsonObj = org.json.JSONObject(responseString)
+                    val isSuccess = jsonObj.optBoolean("success", false)
+                    if (isSuccess) {
+                        Timber.d("submitSectionBulk: sectionId=$sectionId success")
+                        true
+                    } else {
+                        Timber.e("submitSectionBulk: sectionId=$sectionId failed: success=false")
+                        false
+                    }
+                } else {
+                    Timber.e("submitSectionBulk: sectionId=$sectionId failed: body is null")
+                    false
+                }
+            } else {
+                Timber.e("submitSectionBulk: sectionId=$sectionId failed: status=$statusCode")
+                false
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "submitSectionBulk: sectionId=$sectionId error")
+            false
+        }
+
+        if (success) {
+            responseDao.updateSectionResponse(
+                sectionResponse.sectionResponse.copy(
+                    completedAt = System.currentTimeMillis(),
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+        }
+
+        return success
+    }
+
+    private data class SectionClassification(
+        val finalSectionId: Int?,
+        // Non-GENERAL_INFO sections other than finalSectionId, ordered by sectionOrder. These
+        // must already be synced via submitBulk before finalSectionId's complete call can fire.
+        val nonFinalSectionIdsInOrder: List<Int>
+    )
+
+    // GENERAL_INFO (refusal) is a separate, out-of-scope flow left on its own path in
+    // syncUnsyncedRecords — this only classifies the main stepper sections.
+    private fun classifySections(sections: List<FormSectionWithQuestions>): SectionClassification {
+        val stepperSections = sections
+            .filter { it.section.sectionPhase != "GENERAL_INFO" }
+            .sortedBy { it.section.sectionOrder }
+        val finalSectionId = stepperSections.lastOrNull()?.section?.sectionId
+        val nonFinalSectionIdsInOrder = stepperSections
+            .filter { it.section.sectionId != finalSectionId }
+            .map { it.section.sectionId }
+        return SectionClassification(finalSectionId, nonFinalSectionIdsInOrder)
+    }
+
     override suspend fun getCounsellingRecord(beneficiaryId: Long): Flow<CompleteFormResponse?> {
         return responseDao.getFormResponseForBeneficiaryFlow(beneficiaryId)
     }
@@ -352,54 +440,67 @@ class CounsellingRepositoryImpl @Inject constructor(
         var allSuccess = true
 
         for (resp in unsynced) {
-            val formVersionId = resp.formResponse.formVersionId
-            val formDef = metadataDao.getFormDefinitionByVersionId(formVersionId)
-            val payload = PayloadBuilder.buildBulkPayload(resp, formDef, officerId)
+            val responseId = resp.formResponse.responseId
+            val formDef = metadataDao.getFormDefinitionByVersionId(resp.formResponse.formVersionId)
 
-            val recordSuccess = try {
-                try {
-                    val jsonPayload = com.google.gson.Gson().toJson(payload)
-                    Timber.d("Amrit push complete dynamic payload JSON: $jsonPayload")
-                } catch (e: Exception) {
-                    Timber.e(e, "Failed to serialize complete payload to JSON for logging")
-                }
+            // General Info refusal now pushes via submitBulk (not complete), reusing the same
+            // single-section submitSectionBulk() used by the main stepper's non-final sections.
+            if (resp.formResponse.status == "REFUSED") {
+                val activeVersion = formDef?.versions?.find { it.version.versionId == resp.formResponse.formVersionId }
+                val generalInfoSectionId = activeVersion?.sections
+                    ?.find { it.section.sectionPhase == "GENERAL_INFO" }?.section?.sectionId
 
-                val apiResponse = amritApiService.completeCounselling(authHeader, payload)
-                val statusCode = apiResponse.code()
-                Timber.d("Amrit push complete dynamic response: httpStatus=$statusCode")
-
-                if (statusCode == 200) {
-                    val responseString: String? = apiResponse.body()?.string()
-                    if (responseString != null) {
-                        val jsonObj = org.json.JSONObject(responseString)
-                        val isSuccess = jsonObj.optBoolean("success", false)
-                        if (isSuccess) {
-                            Timber.d("Amrit push complete dynamic success: $jsonObj")
-                            true
-                        } else {
-                            Timber.e("Amrit push complete dynamic failed: success=false")
-                            false
-                        }
-                    } else {
-                        Timber.e("Amrit push complete dynamic failed: body is null")
-                        false
-                    }
+                val recordSuccess = if (generalInfoSectionId != null) {
+                    submitSectionBulk(responseId, generalInfoSectionId)
                 } else {
-                    Timber.e("Amrit push complete dynamic failed: status=$statusCode")
+                    Timber.e("syncUnsyncedRecords: no GENERAL_INFO section found for responseId=$responseId")
                     false
                 }
-            } catch (e: Exception) {
-                Timber.e(e, "Amrit push sync error for responseId=${resp.formResponse.responseId}")
-                false
+
+                if (recordSuccess) {
+                    responseDao.updateFormResponse(
+                        resp.formResponse.copy(syncStatus = "SYNCED", syncedAt = System.currentTimeMillis())
+                    )
+                } else {
+                    allSuccess = false
+                }
+                continue
             }
+
+            val activeVersion = formDef?.versions?.find { it.version.versionId == resp.formResponse.formVersionId }
+            val classification = classifySections(activeVersion?.sections ?: emptyList())
+            val finalSectionId = classification.finalSectionId
+
+            var nonFinalSuccess = true
+            for (sectionId in classification.nonFinalSectionIdsInOrder) {
+                val sectionResponse = resp.sectionResponses.find { it.sectionResponse.sectionId == sectionId }
+                val hasAnswers = sectionResponse?.questionResponses?.isNotEmpty() == true
+                val alreadySynced = sectionResponse?.sectionResponse?.completedAt != null
+                if (!hasAnswers || alreadySynced) continue
+
+                Timber.d("syncUnsyncedRecords: catching up sectionId=$sectionId for responseId=$responseId")
+                if (!submitSectionBulk(responseId, sectionId)) {
+                    nonFinalSuccess = false
+                    break
+                }
+            }
+
+            if (!nonFinalSuccess) {
+                allSuccess = false
+                continue
+            }
+
+            val finalSectionReached = resp.formResponse.status != "DRAFT"
+            if (!finalSectionReached || finalSectionId == null || resp.formResponse.syncStatus == "SYNCED") {
+                continue
+            }
+
+            val payload = PayloadBuilder.buildBulkPayload(resp, formDef, officerId, sectionIdFilter = finalSectionId)
+            val recordSuccess = executeCompleteCounselling(authHeader, payload, "responseId=$responseId, sectionId=$finalSectionId")
 
             if (recordSuccess) {
                 responseDao.updateFormResponse(
-                    resp.formResponse.copy(
-                        status = resp.formResponse.status,
-                        syncStatus = "SYNCED",
-                        syncedAt = System.currentTimeMillis()
-                    )
+                    resp.formResponse.copy(syncStatus = "SYNCED", syncedAt = System.currentTimeMillis())
                 )
             } else {
                 allSuccess = false
@@ -407,6 +508,49 @@ class CounsellingRepositoryImpl @Inject constructor(
         }
 
         return allSuccess
+    }
+
+    private suspend fun executeCompleteCounselling(
+        authHeader: String,
+        payload: CounsellingBulkSubmitRequest,
+        logLabel: String
+    ): Boolean {
+        return try {
+            try {
+                val jsonPayload = com.google.gson.Gson().toJson(payload)
+                Timber.d("Amrit push complete payload ($logLabel): $jsonPayload")
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to serialize complete payload to JSON for logging ($logLabel)")
+            }
+
+            val apiResponse = amritApiService.completeCounselling(authHeader, payload)
+            val statusCode = apiResponse.code()
+            Timber.d("Amrit push complete response ($logLabel): httpStatus=$statusCode")
+
+            if (statusCode == 200) {
+                val responseString: String? = apiResponse.body()?.string()
+                if (responseString != null) {
+                    val jsonObj = org.json.JSONObject(responseString)
+                    val isSuccess = jsonObj.optBoolean("success", false)
+                    if (isSuccess) {
+                        Timber.d("Amrit push complete success ($logLabel)")
+                        true
+                    } else {
+                        Timber.e("Amrit push complete failed ($logLabel): success=false")
+                        false
+                    }
+                } else {
+                    Timber.e("Amrit push complete failed ($logLabel): body is null")
+                    false
+                }
+            } else {
+                Timber.e("Amrit push complete failed ($logLabel): status=$statusCode")
+                false
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Amrit push complete error ($logLabel)")
+            false
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -563,7 +707,7 @@ class CounsellingRepositoryImpl @Inject constructor(
             Timber.e(e, "fetchAndStoreCounsellingResponse failed for benId=$beneficiaryId")
             return false
         }
-    }    override suspend fun fetchAndStoreCompletedBeneficiaries(): List<Long>? {
+    }    override suspend fun fetchAndStoreCompletedBeneficiaries(): List<CompletedBeneficiaryStatus>? {
         try {
             val jwt = preferenceDao.getJWTAmritToken()
             val authHeader = jwt ?: run {
@@ -586,9 +730,7 @@ class CounsellingRepositoryImpl @Inject constructor(
                 providerServiceMapId = providerServiceMapId
             )
             if (response.isSuccessful) {
-                val apiResponseData = response.body()?.data ?: return null
-                val completedIds = apiResponseData.completed
-                val refusedIds = apiResponseData.refused
+                val statuses = response.body()?.data ?: return null
 
                 var formDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING_V2)
                 if (formDef == null) {
@@ -601,53 +743,52 @@ class CounsellingRepositoryImpl @Inject constructor(
 
                 if (versionId != null) {
                     db.withTransaction {
-                        for (benId in completedIds) {
+                        for (item in statuses) {
+                            val benId = item.beneficiaryId
+                            // Untouched beneficiaries (sectionsFilled == 0, not refused) keep the
+                            // current behavior of having no Room row at all unless one already exists.
+                            if (!item.refused && item.sectionsFilled == 0) {
+                                continue
+                            }
+                            val newStatus = when {
+                                item.refused -> "REFUSED"
+                                item.sectionsFilled == item.totalSections -> "COMPLETE"
+                                else -> null // in-progress: keep whatever local status already exists
+                            }
                             val existing = responseDao.getFormResponseForBeneficiary(benId)
                             if (existing == null) {
                                 responseDao.insertFormResponse(
                                     FormResponseEntity(
                                         beneficiaryId = benId,
                                         formVersionId = versionId,
-                                        status = "COMPLETE",
+                                        status = newStatus ?: "DRAFT",
                                         syncStatus = "SYNCED",
                                         syncedAt = System.currentTimeMillis(),
-                                        lastVisitedSectionId = null
+                                        lastVisitedSectionId = null,
+                                        sectionsFilled = item.sectionsFilled,
+                                        totalSections = item.totalSections
                                     )
                                 )
                             } else {
                                 val currentFr = existing.formResponse
-                                if (currentFr.status != "COMPLETE" && currentFr.status != "COMPLETED") {
+                                if (newStatus == null ||
+                                    currentFr.status == newStatus ||
+                                    (newStatus == "COMPLETE" && currentFr.status == "COMPLETED")
+                                ) {
                                     responseDao.updateFormResponse(
                                         currentFr.copy(
-                                            status = "COMPLETE",
-                                            syncStatus = "SYNCED",
-                                            syncedAt = System.currentTimeMillis()
+                                            sectionsFilled = item.sectionsFilled,
+                                            totalSections = item.totalSections
                                         )
                                     )
-                                }
-                            }
-                        }
-                        for (benId in refusedIds) {
-                            val existing = responseDao.getFormResponseForBeneficiary(benId)
-                            if (existing == null) {
-                                responseDao.insertFormResponse(
-                                    FormResponseEntity(
-                                        beneficiaryId = benId,
-                                        formVersionId = versionId,
-                                        status = "REFUSED",
-                                        syncStatus = "SYNCED",
-                                        syncedAt = System.currentTimeMillis(),
-                                        lastVisitedSectionId = null
-                                    )
-                                )
-                            } else {
-                                val currentFr = existing.formResponse
-                                if (currentFr.status != "REFUSED") {
+                                } else {
                                     responseDao.updateFormResponse(
                                         currentFr.copy(
-                                            status = "REFUSED",
+                                            status = newStatus,
                                             syncStatus = "SYNCED",
-                                            syncedAt = System.currentTimeMillis()
+                                            syncedAt = System.currentTimeMillis(),
+                                            sectionsFilled = item.sectionsFilled,
+                                            totalSections = item.totalSections
                                         )
                                     )
                                 }
@@ -655,7 +796,7 @@ class CounsellingRepositoryImpl @Inject constructor(
                         }
                     }
                 }
-                return completedIds + refusedIds
+                return statuses
             } else {
                 Timber.w("fetchAndStoreCompletedBeneficiaries failed: status code ${response.code()}")
                 return null

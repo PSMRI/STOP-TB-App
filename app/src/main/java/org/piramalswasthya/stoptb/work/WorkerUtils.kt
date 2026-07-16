@@ -67,7 +67,7 @@ object WorkerUtils {
 
         val groupTB = listOf(
             syncRequestBuilder<PushTBToAmritWorker>().addTag("push_group5_tb").build(),
-        )
+        ) 
 
         val groupAbha = syncRequestBuilder<PushMapAbhatoBenficiaryWorker>()
             .addTag("push_group9_digital_health").build()

@@ -53,15 +53,10 @@ class CounsellingViewModel @Inject constructor(
     private val _isFormEditable = MutableLiveData<Boolean>(true)
     val isFormEditable: LiveData<Boolean> get() = _isFormEditable
 
-    // Additive override on top of _isFormEditable: a section the backend flags isEditable=true
-    // stays editable even when the form overall is read-only (e.g. already completed).
     fun isSectionEditable(section: CounsellingSectionDto?): Boolean {
         return _isFormEditable.value != false || section?.isEditable == true
     }
 
-    // Defaults ON: this Activity is only ever reached via the confirmed-list's
-    // Start Counselling / Counselled buttons, so "ON when arriving via that button" is
-    // satisfied by an unconditional default rather than a per-launch signal.
     private val _isGeneralInfoToggleOn = MutableLiveData(true)
     val isGeneralInfoToggleOn: LiveData<Boolean> get() = _isGeneralInfoToggleOn
 

@@ -451,6 +451,7 @@ fun BenRegCache.asNetworkSendingModel(
             addressLine1 = address ?: "",
             addressLine2 = "",
             addressLine3 = "",
+            pinCode = pinCode,
             occupation = occupation ?: "unknown",
             economicStatus = economicStatus,
             economicStatusId = economicStatusId,

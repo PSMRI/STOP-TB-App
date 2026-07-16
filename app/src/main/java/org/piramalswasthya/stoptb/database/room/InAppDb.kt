@@ -596,7 +596,7 @@ abstract class InAppDb : RoomDatabase() {
                         `answerText` TEXT, 
                         `createdAt` INTEGER NOT NULL, 
                         `updatedAt` INTEGER NOT NULL, 
-                        FOREIGN KEY(`sectionResponseId`) REFERENCES `t_section_response`(`sectionResponseId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
+                        FOREIGN KEY(`sectionResponseId`) REcFERENCES `t_section_response`(`sectionResponseId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
                         FOREIGN KEY(`questionId`) REFERENCES `t_section_question`(`questionId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
                         FOREIGN KEY(`optionId`) REFERENCES `t_question_option`(`optionId`) ON UPDATE NO ACTION ON DELETE SET NULL
                     )
@@ -610,7 +610,7 @@ abstract class InAppDb : RoomDatabase() {
                 if (!columnExists(database, "t_section_question", "questionUuid")) {
                     database.execSQL("ALTER TABLE t_section_question ADD COLUMN questionUuid TEXT DEFAULT NULL")
                 }
-                val householdColumns = listOf(
+                val householdColumns =  listOf(
                     "gpsLatitude REAL DEFAULT NULL",
                     "gpsLongitude REAL DEFAULT NULL",
                     "digipin TEXT DEFAULT NULL",
@@ -689,11 +689,17 @@ abstract class InAppDb : RoomDatabase() {
 
         private val MIGRATION_21_22 = object : Migration(21, 22) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                if (!columnExists(database, "t_form_section", "isEditable")) {
+                
+               if (!columnExists(database, "BENEFICIARY", "pinCode")) {
+                    database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN pinCode TEXT")
+                }
+                
+                 if (!columnExists(database, "t_form_section", "isEditable")) {
                     database.execSQL("ALTER TABLE t_form_section ADD COLUMN isEditable INTEGER NOT NULL DEFAULT 0")
                 }
             }
         }
+<<<<<<< HEAD
 
         private val MIGRATION_22_23 = object : Migration(22, 23) {
             override fun migrate(database: SupportSQLiteDatabase) {
@@ -749,6 +755,20 @@ abstract class InAppDb : RoomDatabase() {
                 recreateBenBasicCacheView(database)
             }
         }
+=======
+        private val MIGRATION_22_23 = object : Migration(22, 23) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "t_form_response", "sectionsFilled")) {
+                    database.execSQL("ALTER TABLE t_form_response ADD COLUMN sectionsFilled INTEGER DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_form_response", "totalSections")) {
+                    database.execSQL("ALTER TABLE t_form_response ADD COLUMN totalSections INTEGER DEFAULT NULL")
+                }
+            }
+        }
+
+
+>>>>>>> release-2.0
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(
@@ -853,6 +873,21 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        private fun addTBScreeningRiskFactorColumns(database: SupportSQLiteDatabase) {
+            val columns = listOf(
+                "keyPopulationRiskFactorIds TEXT DEFAULT NULL",
+                "keyPopulationRiskFactors TEXT DEFAULT NULL",
+                "hivStatusId INTEGER DEFAULT NULL",
+                "hivStatus TEXT DEFAULT NULL"
+            )
+            columns.forEach { columnDefinition ->
+                val columnName = columnDefinition.substringBefore(" ")
+                if (!columnExists(database, "TB_SCREENING", columnName)) {
+                    database.execSQL("ALTER TABLE TB_SCREENING ADD COLUMN $columnDefinition")
+                }
+            }
+        }
+
         private fun addLocationRecordExtraColumns(
             database: SupportSQLiteDatabase,
             tableName: String
@@ -920,6 +955,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_19_20)
                         .addMigrations(MIGRATION_20_21)
                         .addMigrations(MIGRATION_21_22)
+                        .addMigrations(MIGRATION_22_23)
                         .fallbackToDestructiveMigration()
                         .build()
 
