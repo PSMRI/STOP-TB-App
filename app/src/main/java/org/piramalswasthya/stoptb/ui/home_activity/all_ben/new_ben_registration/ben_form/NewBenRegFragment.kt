@@ -172,7 +172,7 @@ class NewBenRegFragment : Fragment() {
         binding.cardLocation.visibility = View.VISIBLE
         if (viewModel.isStandalone) {
             setupLocationSection()
-            if (viewModel.recordExists.value == false) {
+            if (viewModel.recordExists.value == false && viewModel.getIsConsentAgreed()) {
                 captureLocationSilently()
             }
         } else {
@@ -479,8 +479,13 @@ class NewBenRegFragment : Fragment() {
 
     // ─── Location capture ─────────────────────────────────────────────────
     private fun captureLocationSilently() {
-        if (!hasLocationPermission()) return
-        checkSettingsAndFetch()
+        if (!hasLocationPermission()) {
+            requestLocationPermission.launch(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+            )
+        } else {
+            checkSettingsAndFetch()
+        }
     }
 
     private fun refreshLocation() {
@@ -621,6 +626,9 @@ class NewBenRegFragment : Fragment() {
             if (alertBinding.checkBox.isChecked) {
                 viewModel.setConsentAgreed()
                 alertDialog.dismiss()
+                if (viewModel.isStandalone && viewModel.recordExists.value == false) {
+                    captureLocationSilently()
+                }
             } else {
                 Toast.makeText(context, resources.getString(R.string.please_tick_the_checkbox), Toast.LENGTH_SHORT).show()
             }
