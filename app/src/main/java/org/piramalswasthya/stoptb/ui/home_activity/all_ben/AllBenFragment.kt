@@ -454,7 +454,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     )
                 )
             }
-            ExamineBottomSheetFragment.FORM_DIAGNOSIS -> {
+            /*ExamineBottomSheetFragment.FORM_DIAGNOSIS -> {
                 findNavController().navigate(
                     AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
                         benId = benId,
@@ -462,6 +462,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     )
                 )
             }
+             */
         }
     }
 
