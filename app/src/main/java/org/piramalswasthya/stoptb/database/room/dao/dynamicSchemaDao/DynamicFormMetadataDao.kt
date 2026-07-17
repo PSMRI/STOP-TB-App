@@ -48,6 +48,9 @@ interface DynamicFormMetadataDao {
     @Query("SELECT * FROM t_dynamic_form WHERE formId = :formId LIMIT 1")
     suspend fun getFormById(formId: Int): DynamicFormEntity?
 
+    @Query("DELETE FROM t_form_version WHERE formId = :formId")
+    suspend fun deleteVersionsByFormId(formId: Int)
+
     @Query("SELECT COUNT(*) FROM t_section_question WHERE serverQuestionId IS NULL")
     suspend fun getQuestionsWithNullServerIdCount(): Int
 

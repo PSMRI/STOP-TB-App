@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 
@@ -62,6 +63,8 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
 
     private val isNurse: Boolean
         get() = prefDao.getLoggedInUser()?.role.isNurseRole()
+    private val isCounsellingOfficer : Boolean
+        get() = prefDao.getLoggedInUser()?.role.isCounsellingOfficerRole()
 
     private val autoFlow: Boolean
         get() = arguments?.getBoolean("autoFlow", false) ?: false
@@ -117,24 +120,15 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
         )
 
         rows.forEachIndexed { index, (rowView, formName, formIndex) ->
-            // Registrar role: show Anthropometry + TB Screening; Nurse: hide Diagnosis only
-            if (isRegistrar && formIndex != FORM_ANTHROPOMETRY && formIndex != FORM_TB_SCREENING) {
-                rowView.visibility = View.GONE
-                return@forEachIndexed
-            }
-            if (isNurse && formIndex == FORM_DIAGNOSIS) {
+            // Registrar role: show ONLY Anthropometry (index 0); Nurse: show all 5
+            if (isRegistrar && formIndex != FORM_ANTHROPOMETRY) {
                 rowView.visibility = View.GONE
                 return@forEachIndexed
             }
             rowView.visibility = View.VISIBLE
             rowView.findViewById<TextView>(R.id.tv_form_name).text = formName
             val btn = rowView.findViewById<MaterialButton>(R.id.btn_form_action)
-            btn.text = getString(R.string.examine_btn_loading)
-            btn.isEnabled = false
-            btn.alpha = 1f
-            btn.backgroundTintList = ContextCompat.getColorStateList(
-                requireContext(), android.R.color.darker_gray
-            )
+            val notFilled = rowView.findViewById<TextView>(R.id.tv_not_filled)
 
             if ((isRegistrar && formIndex == FORM_ANTHROPOMETRY) ||
                 (isNurse && formIndex != FORM_TB_SCREENING)
@@ -193,21 +187,27 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
                         Pair(tbScreeningDone, diagnosisFilled)
                     }.collect { (tbScreeningDone, diagnosisFilled) ->
                         if (!tbScreeningDone) {
-                            // TB Screening not done — show grey button, toast on click
-                            btn.text = getString(R.string.examine_btn_fill)
-                            btn.isEnabled = false
-                            btn.alpha = 1f
-                            btn.backgroundTintList = ContextCompat.getColorStateList(
-                                requireContext(), android.R.color.darker_gray
-                            )
-                            // Allow tap to show hint message even when disabled
-                            btn.isEnabled = true
-                            btn.setOnClickListener {
-                                android.widget.Toast.makeText(
-                                    requireContext(),
-                                    getString(R.string.diagnosis_locked_msg),
-                                    android.widget.Toast.LENGTH_SHORT
-                                ).show()
+                            if(isCounsellingOfficer){
+                                btn.visibility = View.GONE
+                                notFilled.visibility = View.VISIBLE
+                            }else {
+                                btn.visibility = View.VISIBLE
+                                // TB Screening not done — show grey button, toast on click
+                                btn.text = getString(R.string.examine_btn_fill)
+                                btn.isEnabled = false
+                                btn.alpha = 1f
+                                btn.backgroundTintList = ContextCompat.getColorStateList(
+                                    requireContext(), android.R.color.darker_gray
+                                )
+                                // Allow tap to show hint message even when disabled
+                                btn.isEnabled = true
+                                btn.setOnClickListener {
+                                    android.widget.Toast.makeText(
+                                        requireContext(),
+                                        getString(R.string.diagnosis_locked_msg),
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                }
                             }
                         } else {
                             // TB Screening done — normal behavior
@@ -230,7 +230,7 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
                     }
                 }
             } else {
-                observeFormStatus(fillStatusFlows[index], btn, benId, formIndex)
+                observeFormStatus(fillStatusFlows[index], btn, notFilled, benId, formIndex)
             }
         }
 
@@ -275,6 +275,7 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
     private fun observeFormStatus(
         filledFlow: Flow<Boolean>,
         btn: MaterialButton,
+        notFilled: TextView,
         benId: Long,
         formIndex: Int
     ) {
@@ -283,8 +284,6 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
                 if (isFilled) {
                     // Green — View
                     btn.text = getString(R.string.examine_btn_view)
-                    btn.isEnabled = true
-                    btn.alpha = 1f
                     btn.backgroundTintList = ContextCompat.getColorStateList(
                         requireContext(), android.R.color.holo_green_dark
                     )
@@ -292,15 +291,19 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
                         navigateToForm(benId, formIndex, viewOnly = true)
                     }
                 } else {
-                    // Red — Fill
-                    btn.text = getString(R.string.examine_btn_fill)
-                    btn.isEnabled = true
-                    btn.alpha = 1f
-                    btn.backgroundTintList = ContextCompat.getColorStateList(
-                        requireContext(), android.R.color.holo_red_dark
-                    )
-                    btn.setOnClickListener {
-                        navigateToForm(benId, formIndex, viewOnly = false)
+                    if(isCounsellingOfficer){
+                        btn.visibility = View.GONE
+                        notFilled.visibility = View.VISIBLE
+                    }else{
+                        btn.visibility = View.VISIBLE
+                        // Red — Fill
+                        btn.text = getString(R.string.examine_btn_fill)
+                        btn.backgroundTintList = ContextCompat.getColorStateList(
+                            requireContext(), android.R.color.holo_red_dark
+                        )
+                        btn.setOnClickListener {
+                            navigateToForm(benId, formIndex, viewOnly = false)
+                        }
                     }
                 }
             }

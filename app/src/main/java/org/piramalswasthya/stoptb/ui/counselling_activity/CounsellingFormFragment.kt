@@ -34,15 +34,18 @@ class   CounsellingFormFragment : Fragment() {
         adapter = CounsellingDynamicAdapter(
             questions = emptyList(),
             onValueChanged = { updatedQ ->
-                viewModel.evaluateConditions(updatedQ)
+                if (updatedQ.questionType != "TEXT") {
+                    viewModel.evaluateConditions(updatedQ)
+                }
             }
         )
         rv.adapter = adapter
 
         fun refreshAdapter() {
+            val section = viewModel.schemaData?.sections?.getOrNull(viewModel.currentStep.value ?: 0)
             adapter.submitList(
                 viewModel.activeQuestions.value.orEmpty(),
-                viewModel.isFormEditable.value ?: true
+                viewModel.isSectionEditable(section)
             )
         }
         viewModel.activeQuestions.observe(viewLifecycleOwner) { refreshAdapter() }
@@ -57,7 +60,11 @@ class   CounsellingFormFragment : Fragment() {
                 // Determine letter from sectionCode, e.g. "SECTION_A" -> "A"
                 // Using safe calls because Gson might leave non-nullable fields as null if missing in JSON
                 val letter = if (it.sectionPhase == "POST_SUBMIT") "F"
-                else ('A' + it.displayOrder - 1).toChar().toString()
+                else {
+                    val preSubmitSections = viewModel.schemaData?.sections?.filter { it.sectionPhase == "PRE_SUBMIT" } ?: emptyList()
+                    val idx = preSubmitSections.indexOf(it)
+                    if (idx != -1) ('A' + idx).toString() else ('A' + it.displayOrder - 2).toChar().toString()
+                }
                 tvLetter.text = letter
                 tvName.text = it.sectionName
             }

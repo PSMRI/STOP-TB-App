@@ -21,6 +21,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchRvButtonBinding
 import org.piramalswasthya.stoptb.ui.counselling_activity.CounsellingActivity
 import org.piramalswasthya.stoptb.ui.counselling_activity.CounsellingViewModel
+import org.piramalswasthya.stoptb.model.BenWithTbSuspectedDomain
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import javax.inject.Inject
@@ -38,6 +39,9 @@ class TBConfirmedListFragment : Fragment() {
         get() = _binding!!
 
     private val viewModel: TBConfirmedListViewModel by viewModels()
+
+    private lateinit var benAdapter: TbConfirmedListAdapter
+    private var currentBenList: List<BenWithTbSuspectedDomain> = emptyList()
 
     private val sttContract = registerForActivityResult(SpeechToTextContract()) { value ->
         val lowerValue = value.lowercase()
@@ -59,7 +63,7 @@ class TBConfirmedListFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         viewModel.fetchCompletedBeneficiaries()
         binding.btnNextPage.visibility = View.GONE
-        val benAdapter = TbConfirmedListAdapter(
+        benAdapter = TbConfirmedListAdapter(
             TbConfirmedListAdapter.ClickListener(
                 clickedForm = { hhId, benId ->
                     findNavController().navigate(
@@ -80,6 +84,14 @@ class TBConfirmedListFragment : Fragment() {
                         Intent(requireContext(), CounsellingActivity::class.java)
                             .putExtra(CounsellingViewModel.EXTRA_BEN_ID, item.ben.benId)
                     )
+                },
+                clickedViewMember = { item ->
+                    findNavController().navigate(
+                        TBConfirmedListFragmentDirections
+                            .actionTBConfirmedListFragmentToHouseholdMembersFragment(
+                                hhId = item.ben.hhId
+                            )
+                    )
                 }
             ),
             pref = prefDao
@@ -92,12 +104,19 @@ class TBConfirmedListFragment : Fragment() {
                     binding.flEmpty.visibility = View.VISIBLE
                 else
                     binding.flEmpty.visibility = View.GONE
+                currentBenList = it
                 benAdapter.submitList(it)
             }
         }
         viewModel.beneficiaryIdArray.observe(viewLifecycleOwner,{ benids ->
             benAdapter.submitBenIds(benids)
         })
+        viewModel.totalSectionsFallback.observe(viewLifecycleOwner) { totalSections ->
+            benAdapter.submitTotalSectionsFallback(totalSections)
+        }
+        viewModel.localFilledCounts.observe(viewLifecycleOwner) { counts ->
+            benAdapter.submitLocalFilledCounts(counts)
+        }
 
         binding.ibSearch.setOnClickListener { sttContract.launch(Unit) }
         val searchTextWatcher = object : TextWatcher {
@@ -125,7 +144,10 @@ class TBConfirmedListFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-
+        if (::benAdapter.isInitialized) {
+            benAdapter.submitList(currentBenList)
+        }
+        viewModel.fetchCompletedBeneficiaries()
     }
 
     override fun onStart() {

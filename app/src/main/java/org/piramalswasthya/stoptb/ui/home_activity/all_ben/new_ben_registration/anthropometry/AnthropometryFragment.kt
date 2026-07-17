@@ -53,6 +53,8 @@ class AnthropometryFragment : Fragment() {
     private var highTemperatureAlertShown = false
     private var isFormLocked = false
     private var isUpdatingTemperatureSelection = false
+    private val openedFromHousehold: Boolean
+        get() = arguments?.getBoolean("openedFromHousehold", false) == true
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -140,6 +142,9 @@ class AnthropometryFragment : Fragment() {
                     WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
                     Toast.makeText(requireContext(), R.string.save_successful, Toast.LENGTH_SHORT).show()
                     when {
+                        openedFromHousehold -> {
+                            findNavController().navigateUp()
+                        }
                         viewModel.examineFlow -> {
                             // Examine flow — return to AllBenFragment so user picks the next form
                             val popped = findNavController().popBackStack(R.id.allBenFragment, false)

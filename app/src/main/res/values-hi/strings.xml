@@ -31,6 +31,7 @@
     <string name="form_input_upper_case_error">केवल बड़े अक्षरों में अंग्रेजी वर्णमाला की अनुमति है!</string>
     <string name="form_input_min_limit_error">%1$s %2$d से अधिक या उसके बराबर होना चाहिए</string>
     <string name="antra_injection_details">अंतरा इंजेक्शन विवरण</string>
+    <string name="view_members">सदस्यों को देखें</string>
     <string name="dose">खुराक</string>
     <string name="next_due_date">अगली देय तारीख</string>
     <string name="yes_dialog">हाँ</string>

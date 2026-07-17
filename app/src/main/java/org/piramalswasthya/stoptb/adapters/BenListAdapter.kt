@@ -13,6 +13,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.RvItemBenBinding
 import org.piramalswasthya.stoptb.helpers.getDateFromLong
 import org.piramalswasthya.stoptb.helpers.getPatientTypeByAge
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.model.BenBasicDomain
@@ -248,10 +249,12 @@ class BenListAdapter(
             binding.llBenDetails4.visibility = View.GONE
             binding.btnAddChildren.visibility = View.GONE
 
-            // Register Wife / Register Husband — Registrar only (hidden for Nurse)
-            val isNurseRole = pref?.getLoggedInUser()?.role.isNurseRole()
+            // Register Wife / Register Husband — Registrar only (hidden for Nurse & Counselling officer)
+            val currentRole = pref?.getLoggedInUser()?.role
+            val isNurseRole = currentRole.isNurseRole()
+            val isCounsellingOfficer = currentRole.isCounsellingOfficerRole()
             when {
-                !isNurseRole && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
+                !isNurseRole && !isCounsellingOfficer && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
                         && !item.isDeath && !item.isDeactivate -> {
                     binding.llAddSpouseBtn.visibility = View.VISIBLE
                     binding.btnAddSpouse.visibility = View.VISIBLE
@@ -260,7 +263,7 @@ class BenListAdapter(
                         clickListener?.onClickedWifeBen(item)
                     }
                 }
-                !isNurseRole && item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
+                (!isNurseRole && !isCounsellingOfficer) && item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
                         && !item.isDeath && !item.isDeactivate -> {
                     binding.llAddSpouseBtn.visibility = View.VISIBLE
                     binding.btnAddSpouse.visibility = View.VISIBLE

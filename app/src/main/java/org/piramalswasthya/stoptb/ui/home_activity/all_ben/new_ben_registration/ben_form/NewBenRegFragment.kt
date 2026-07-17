@@ -46,6 +46,7 @@ import org.piramalswasthya.stoptb.databinding.AlertConsentBinding
 import org.piramalswasthya.stoptb.databinding.FragmentNewBenRegBinding
 import org.piramalswasthya.stoptb.databinding.LayoutViewMediaBinding
 import org.piramalswasthya.stoptb.helpers.Konstants
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.model.LocationState
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel.State
@@ -193,10 +194,12 @@ class NewBenRegFragment : Fragment() {
         }
 
         // Death badge visibility
-        val isNurse = prefDao.getLoggedInUser()?.role.isNurseRole()
+        val currentRole = prefDao.getLoggedInUser()?.role
+        val isNurse = currentRole.isNurseRole()
+        val isCounsellingOfficer = currentRole.isCounsellingOfficerRole()
         viewModel.isDeath.observe(viewLifecycleOwner) { isDeath ->
             val recordExists = viewModel.recordExists.value ?: false
-            binding.fabEdit.visibility = if (isDeath || !recordExists || isNurse) View.GONE else View.VISIBLE
+            binding.fabEdit.visibility = if (isDeath || !recordExists || isNurse || isCounsellingOfficer) View.GONE else View.VISIBLE
         }
 
         // Set up adapter

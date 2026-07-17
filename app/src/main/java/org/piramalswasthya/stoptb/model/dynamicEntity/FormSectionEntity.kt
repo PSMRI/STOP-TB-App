@@ -25,6 +25,7 @@ data class FormSectionEntity(
     val sectionOrder: Int,
     val sectionPhase: String, // "PRE_SUBMIT" (A-E) or "POST_SUBMIT" (F)
     val sectionUuid: String? = null,
+    val isEditable: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

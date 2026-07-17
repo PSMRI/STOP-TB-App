@@ -250,11 +250,16 @@ class NewBenRegViewModel @Inject constructor(
                 prefillMotherName,
                 selectedSpouseMemberName
             )
+            val hof = benRepo.getBenListFromHousehold(hhId)
+                .firstOrNull { it.familyHeadRelationPosition == 19 }
+
             val prefillLocation = prefillBen?.locationRecord ?: locationRecord
             dataset.setUpPage(
                 prefillBen,
                 household.family?.familyHeadPhoneNo,
+                familyHeadCommunityId = hof?.communityId ?: 0,
                 prefillLocation.village.name,
+                pinCodeValue = hof?.pinCode,
                 villageNames,
                 user.villages,
                 user.subCentre,

@@ -1050,9 +1050,9 @@
     <string name="clubbing">Clubbing</string>
     <string name="lymphadenopathy">Lymphadenopathy</string>
     <string name="oedema">Oedema</string>
-    <string name="key_population_risk_factors">Key Population / Risk Factors *</string>
-    <string name="select_key_population_risk_factors">Select Key Population / Risk Factors *</string>
-    <string name="hiv_status">HIV Status </string>
+    <string name="key_population_risk_factors">Key Population / Risk Factors</string>
+    <string name="select_key_population_risk_factors">Select Key Population / Risk Factors</string>
+    <string name="hiv_status">HIV Status</string>
     <string name="no_risk_factor_selected">No risk factor selected</string>
     <string name="risk_factor_required">Select Key Population / Risk Factors</string>
     <string name="hiv_status_required">Select HIV Status</string>
@@ -1347,9 +1347,12 @@
     <string name="dialog_cancel_title">Are you Sure?</string>
     <string name="dialog_cancel_message">Do you want to discard this registration and go back?</string>
     <string name="dialog_yes">Yes</string>
+    <string name="not_filled" translatable="false">Not Filled</string>
+    <string name="counselling_consent">Counselling Consent</string>
+
     <string name="dialog_no">No</string>
     <string name="patient_registered_successfully">Patient Registered Successfully</string>
     <string name="proceed_to_register_hof">Do you want to proceed with registration of Head of the Family?</string>
-
+    <string name="refused">Refused</string>
 </resources>
 

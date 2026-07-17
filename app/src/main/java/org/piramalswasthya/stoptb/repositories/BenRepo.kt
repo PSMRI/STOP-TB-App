@@ -732,7 +732,7 @@ class BenRepo @Inject constructor(
                                 val benCacheList =
                                     getBenCacheFromServerResponse(responseString)
 
-                                benDao.upsert(*benCacheList.toTypedArray())
+                                upsertServerBeneficiariesSafely(benCacheList)
 
                                 Timber.d("GeTBenDataList: $pageSize")
 
@@ -782,6 +782,17 @@ class BenRepo @Inject constructor(
             }
 
             -1
+        }
+    }
+
+    private suspend fun upsertServerBeneficiariesSafely(benCacheList: List<BenRegCache>) {
+        benCacheList.forEach { serverBen ->
+            val existingBen = benDao.getBen(serverBen.beneficiaryId)
+            if (existingBen != null) {
+                benDao.updateBen(serverBen)
+            } else {
+                benDao.upsert(serverBen)
+            }
         }
     }
 

@@ -37,6 +37,7 @@ import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentNewHouseholdBinding
 import org.piramalswasthya.stoptb.helpers.Konstants
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.model.LocationState
 import org.piramalswasthya.stoptb.ui.home_activity.new_household_registration.NewHouseholdViewModel.State
