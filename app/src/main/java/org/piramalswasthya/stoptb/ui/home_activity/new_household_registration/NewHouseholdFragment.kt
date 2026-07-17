@@ -551,25 +551,32 @@ class NewHouseholdFragment : Fragment() {
             .setPositiveButton(getString(R.string.ok)) { successDialog, _ ->
                 successDialog.dismiss()
                 if (isAdded) {
-                    MaterialAlertDialogBuilder(requireContext())
-                        .setMessage(getString(R.string.proceed_to_register_hof))
-                        .setCancelable(false)
-                        .setPositiveButton(getString(R.string.yes)) { dialog, _ ->
-                            dialog.dismiss()
-                            if (isAdded) {
-                                findNavController().navigate(
-                                    NewHouseholdFragmentDirections.actionNewHouseholdFragmentToNewBenRegFragment(
-                                        hhId = viewModel.getHHId(),
-                                        relToHeadId = 18
+                    if (viewModel.linkBenId != 0L) {
+                        android.widget.Toast.makeText(requireContext(), "Beneficiary linked as Head of Family successfully", android.widget.Toast.LENGTH_SHORT).show()
+                        org.piramalswasthya.stoptb.work.WorkerUtils.triggerAmritPushWorker(requireContext())
+                        val popped = findNavController().popBackStack(R.id.nonHHFragment, false)
+                        if (!popped) findNavController().navigateUp()
+                    } else {
+                        MaterialAlertDialogBuilder(requireContext())
+                            .setMessage(getString(R.string.proceed_to_register_hof))
+                            .setCancelable(false)
+                            .setPositiveButton(getString(R.string.yes)) { dialog, _ ->
+                                dialog.dismiss()
+                                if (isAdded) {
+                                    findNavController().navigate(
+                                        NewHouseholdFragmentDirections.actionNewHouseholdFragmentToNewBenRegFragment(
+                                            hhId = viewModel.getHHId(),
+                                            relToHeadId = 18
+                                        )
                                     )
-                                )
+                                }
                             }
-                        }
-                        .setNegativeButton(getString(R.string.no)) { dialog, _ ->
-                            dialog.dismiss()
-                            if (isAdded) findNavController().navigateUp()
-                        }
-                        .show()
+                            .setNegativeButton(getString(R.string.no)) { dialog, _ ->
+                                dialog.dismiss()
+                                if (isAdded) findNavController().navigateUp()
+                            }
+                            .show()
+                    }
                 }
             }
             .show()

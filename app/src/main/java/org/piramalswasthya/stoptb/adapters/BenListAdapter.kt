@@ -115,10 +115,21 @@ class BenListAdapter(
             }
 
             // Hide unused UI elements upfront (no eye surgery / children buttons in StopTB)
-            val isHeadOfFamily = item.relToHeadId == 19
-            val hasFamilyHeadName = item.familyHeadName.isNotBlank() && item.familyHeadName != "Not Available"
+            val isNonHH = item.isNonHH
+            val isHeadOfFamily = if (isNonHH) false else item.relToHeadId == 19
+            val hasFamilyHeadName = !isNonHH && item.familyHeadName.isNotBlank() && item.familyHeadName != "Not Available"
             binding.HOF.visibility = View.GONE
-            binding.ivIsHead.visibility = if (isHeadOfFamily) View.VISIBLE else View.GONE
+            if (isNonHH) {
+                binding.ivIsHead.visibility = View.VISIBLE
+                binding.ivIsHead.setImageResource(R.drawable.ic_no_hh)
+                binding.ivIsHead.imageTintList = null
+            } else {
+                binding.ivIsHead.setImageResource(R.drawable.ic__hh)
+                binding.ivIsHead.imageTintList = android.content.res.ColorStateList.valueOf(
+                    androidx.core.content.ContextCompat.getColor(binding.root.context, R.color.md_theme_light_primary)
+                )
+                binding.ivIsHead.visibility = if (isHeadOfFamily) View.VISIBLE else View.GONE
+            }
             binding.head.visibility = if (isHeadOfFamily) View.VISIBLE else View.GONE
             binding.ncdHofName.visibility = if (!isHeadOfFamily && hasFamilyHeadName) View.VISIBLE else View.GONE
             binding.btnAbove30.visibility = View.GONE
@@ -192,15 +203,17 @@ class BenListAdapter(
             // Registrar: Anthropometry + TB Screening
             // Nurse: Diagnosis hidden, so total stays 4
             // Others: all 5 forms
-            val isRegistrar = pref?.getLoggedInUser()?.role.isRegistrationOfficerRole()
-            val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
+            val currentRole = pref?.getLoggedInUser()?.role
+            val isRegistrar = currentRole.isRegistrationOfficerRole()
+            val isNurse = currentRole.isNurseRole()
+            val isCounsellingOfficer = currentRole.isCounsellingOfficerRole()
             val (examineFilledCount, examineTotal) = if (isRegistrar) {
                 val filled = listOf(
                     hasAnthropometry,
                     hasTbScreening
                 ).count { it }
                 Pair(filled, 2)
-            } else if (isNurse) {
+            } else if (isNurse || isCounsellingOfficer) {
                 val filled = listOf(
                     hasAnthropometry,
                     isMatched,        // vitals/general exam
@@ -213,10 +226,9 @@ class BenListAdapter(
                     hasAnthropometry,
                     isMatched,        // vitals/general exam
                     hasTbScreening,
-                    hasGeneralOpd,
-                    hasDiagnosis
+                    hasGeneralOpd
                 ).count { it }
-                Pair(filled, 5)
+                Pair(filled, 4)
             }
             binding.btnExamine.text = binding.root.context.getString(
                 R.string.btn_examine_count_of, examineFilledCount, examineTotal
@@ -235,9 +247,7 @@ class BenListAdapter(
             binding.btnAddChildren.visibility = View.GONE
 
             // Register Wife / Register Husband — Registrar only (hidden for Nurse & Counselling officer)
-            val currentRole = pref?.getLoggedInUser()?.role
             val isNurseRole = currentRole.isNurseRole()
-            val isCounsellingOfficer = currentRole.isCounsellingOfficerRole()
             when {
                 !isNurseRole && !isCounsellingOfficer && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
                         && !item.isDeath && !item.isDeactivate -> {
@@ -408,7 +418,8 @@ class BenListAdapter(
         private val clickedResult: (item: BenBasicDomain, benId: Long, hhId: Long) -> Unit = { _, _, _ -> },
         private val clickedGeneralOpd: (item: BenBasicDomain, benId: Long, hhId: Long, viewOnly: Boolean) -> Unit = { _, _, _, _ -> },
         private val clickedAnthropometry: (item: BenBasicDomain, benId: Long, hhId: Long, viewOnly: Boolean) -> Unit = { _, _, _, _ -> },
-        private val clickedExamine: (item: BenBasicDomain, benId: Long) -> Unit = { _, _ -> }
+        private val clickedExamine: (item: BenBasicDomain, benId: Long) -> Unit = { _, _ -> },
+        private val clickedNonHHHousehold: (item: BenBasicDomain) -> Unit = {}
     ) {
         fun onClickedBen(item: BenBasicDomain) = clickedBen(
             item,
@@ -456,5 +467,6 @@ class BenListAdapter(
         fun onClickedForCall(item: BenBasicDomain) = callBen(item)
         fun onClickSoftDeleteBen(item: BenBasicDomain) = softDeleteBen(item)
         fun onClickExamine(item: BenBasicDomain) = clickedExamine(item, item.benId)
+        fun onClickNonHHHousehold(item: BenBasicDomain) = clickedNonHHHousehold(item)
     }
 }

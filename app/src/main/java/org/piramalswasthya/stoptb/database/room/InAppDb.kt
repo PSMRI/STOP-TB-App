@@ -689,23 +689,20 @@ abstract class InAppDb : RoomDatabase() {
 
         private val MIGRATION_21_22 = object : Migration(21, 22) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                
-               if (!columnExists(database, "BENEFICIARY", "pinCode")) {
-                    database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN pinCode TEXT")
-                }
-                
-                 if (!columnExists(database, "t_form_section", "isEditable")) {
-                    database.execSQL("ALTER TABLE t_form_section ADD COLUMN isEditable INTEGER NOT NULL DEFAULT 0")
-                }
-            }
-        }
-        private val MIGRATION_22_23 = object : Migration(22, 23) {
-            override fun migrate(database: SupportSQLiteDatabase) {
                 if (!columnExists(database, "t_form_response", "sectionsFilled")) {
                     database.execSQL("ALTER TABLE t_form_response ADD COLUMN sectionsFilled INTEGER DEFAULT NULL")
                 }
                 if (!columnExists(database, "t_form_response", "totalSections")) {
                     database.execSQL("ALTER TABLE t_form_response ADD COLUMN totalSections INTEGER DEFAULT NULL")
+                }
+                
+               if (!columnExists(database, "BENEFICIARY", "pinCode")) {
+                    database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN pinCode TEXT")
+                }
+                
+                
+                 if (!columnExists(database, "t_form_section", "isEditable")) {
+                    database.execSQL("ALTER TABLE t_form_section ADD COLUMN isEditable INTEGER NOT NULL DEFAULT 0")
                 }
             }
         }
@@ -719,6 +716,60 @@ abstract class InAppDb : RoomDatabase() {
         }
 
 
+        private val MIGRATION_22_23 = object : Migration(22, 23) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                var originalSql = ""
+                database.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='BENEFICIARY'").use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        originalSql = cursor.getString(0)
+                    }
+                }
+                
+                if (originalSql.isNotEmpty()) {
+                    var newSql = originalSql.replace("CREATE TABLE `BENEFICIARY`", "CREATE TABLE `BENEFICIARY_new`")
+                    newSql = newSql.replace("CREATE TABLE BENEFICIARY", "CREATE TABLE BENEFICIARY_new")
+                    newSql = newSql.replace("`householdId` INTEGER NOT NULL", "`householdId` INTEGER")
+                    newSql = newSql.replace("householdId INTEGER NOT NULL", "householdId INTEGER")
+                    
+                    database.execSQL(newSql)
+                    
+                    database.execSQL("ALTER TABLE `BENEFICIARY_new` ADD COLUMN `isNonHH` INTEGER NOT NULL DEFAULT 0")
+                    database.execSQL("ALTER TABLE `BENEFICIARY_new` ADD COLUMN `placeOfCurrentLiving` INTEGER DEFAULT NULL")
+                    database.execSQL("ALTER TABLE `BENEFICIARY_new` ADD COLUMN `otherPlaceOfCurrentLiving` TEXT DEFAULT NULL")
+                    database.execSQL("ALTER TABLE `BENEFICIARY_new` ADD COLUMN `institutionName` TEXT DEFAULT NULL")
+                    
+                    val columns = ArrayList<String>()
+                    database.query("PRAGMA table_info(`BENEFICIARY`)").use { cursor ->
+                        val nameIndex = cursor.getColumnIndex("name")
+                        while (cursor.moveToNext()) {
+                            columns.add(cursor.getString(nameIndex))
+                        }
+                    }
+                    val columnsCsv = columns.joinToString(", ") { "`$it`" }
+                    
+                    database.execSQL("INSERT INTO `BENEFICIARY_new` ($columnsCsv) SELECT $columnsCsv FROM `BENEFICIARY`")
+                    
+                    val indexSqls = ArrayList<String>()
+                    database.query("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='BENEFICIARY' AND sql IS NOT NULL").use { cursor ->
+                        while (cursor.moveToNext()) {
+                            indexSqls.add(cursor.getString(0))
+                        }
+                    }
+                    
+                    database.execSQL("DROP TABLE `BENEFICIARY`")
+                    database.execSQL("ALTER TABLE `BENEFICIARY_new` RENAME TO `BENEFICIARY`")
+                    
+                    for (indexSql in indexSqls) {
+                        try {
+                            database.execSQL(indexSql)
+                        } catch (e: Exception) {
+                            // in case the index already got created, ignore
+                        }
+                    }
+                }
+                recreateBenBasicCacheView(database)
+            }
+        }
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(
@@ -744,6 +795,10 @@ abstract class InAppDb : RoomDatabase() {
                     ", NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState" +
                     ", 0 as isDelivered, 0 as pwHrp" +
                     ", 0 as irFilled, 0 as crFilled, 0 as doFilled" +
+                    ", b.isNonHH" +
+                    ", b.placeOfCurrentLiving" +
+                    ", b.otherPlaceOfCurrentLiving" +
+                    ", b.institutionName" +
                     " FROM BENEFICIARY b " +
                     "LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId " +
                     "LEFT OUTER JOIN CBAC cbac ON b.beneficiaryId = cbac.benId " +

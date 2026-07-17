@@ -226,12 +226,13 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
                     )
                 )
             }
-            ExamineBottomSheetFragment.FORM_DIAGNOSIS -> {
+            /*ExamineBottomSheetFragment.FORM_DIAGNOSIS -> {
                 findNavController().navigate(
                     R.id.TBSuspectedQuickFragment,
                     bundleOf("benId" to benId, "viewOnly" to viewOnly)
                 )
             }
+             */
         }
     }
 
