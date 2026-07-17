@@ -447,6 +447,16 @@ data class GeneralOpdSaveRequest(
         }
     }
 }
+
+data class GeneralOpdSaveResponseItem(
+    val beneficiaryRegID: Long?,
+    val visitCode: Long?
+)
+
+data class GeneralOpdSaveResponse(
+    val data: List<GeneralOpdSaveResponseItem>?
+)
+
 data class TBDiagnosticsSaveRequest(
     val benRegID: Long,
     val providerServiceMapID: Int,
@@ -573,6 +583,7 @@ data class TBScreeningDTO(
 data class GeneralOpdDTO(
     val id: Long,
     val benId: Long,
+    val visitCode: Long? = null,
     val visitDate: String?,
     val chiefComplaints: List<String>? = null,
     val medications: List<String>? = null,
@@ -584,6 +595,7 @@ data class GeneralOpdDTO(
 ) {
     fun toCache(): GeneralOpdCache = GeneralOpdCache(
         benId = benId,
+        visitCode = visitCode,
         visitDate = getLongFromDate(visitDate),
         chiefComplaints = chiefComplaints,
         medications = medications,

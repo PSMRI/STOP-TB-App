@@ -18,6 +18,7 @@ import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.network.AmritApiService
 import org.piramalswasthya.stoptb.network.GeneralOpdRequestDTO
+import org.piramalswasthya.stoptb.network.GeneralOpdSaveResponse
 import org.piramalswasthya.stoptb.network.GeneralOpdSaveRequest
 import org.piramalswasthya.stoptb.network.GetDataPaginatedRequest
 import org.piramalswasthya.stoptb.network.StopTbVillageRequest
@@ -368,6 +369,7 @@ class TBRepo @Inject constructor(
                 continue
             }
             val cache = (existing ?: GeneralOpdCache(benId = ben.beneficiaryId)).copy(
+                visitCode = item.optLong("visitCode").takeIf { it > 0L } ?: existing?.visitCode,
                 chiefComplaints = item.optStringListOrNull("chiefComplaint"),
                 medications = item.optStringOrNull("medication")?.let { listOf(it) },
                 dosage = item.optStringOrNull("dosage"),
@@ -856,6 +858,7 @@ class TBRepo @Inject constructor(
                             when (val responseStatusCode = jsonObj.getInt("statusCode")) {
                                 200 -> {
                                     updateSyncStatusGeneralOpd(chunk)
+                                    updateVisitCodeGeneralOpdFromSaveResponse(responseString)
                                     successCount += chunk.size
                                 }
 
@@ -1108,6 +1111,17 @@ class TBRepo @Inject constructor(
         opdList.forEach {
             it.syncState = SyncState.SYNCED
             tbDao.saveGeneralOpd(it)
+        }
+    }
+
+    private suspend fun updateVisitCodeGeneralOpdFromSaveResponse(responseString: String) {
+        val payload = Gson().fromJson(responseString, GeneralOpdSaveResponse::class.java)
+        payload?.data?.forEach { item ->
+            val benRegId = item.beneficiaryRegID?.takeIf { it > 0L } ?: return@forEach
+            val visitCode = item.visitCode?.takeIf { it > 0L } ?: return@forEach
+            val ben = benDao.getBenByRegId(benRegId) ?: return@forEach
+            val existing = tbDao.getGeneralOpd(ben.beneficiaryId) ?: return@forEach
+            tbDao.saveGeneralOpd(existing.copy(visitCode = visitCode))
         }
     }
 

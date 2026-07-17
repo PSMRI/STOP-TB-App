@@ -23,6 +23,7 @@ data class GeneralOpdCache(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     val benId: Long,
+    var visitCode: Long? = null,
     var visitDate: Long = System.currentTimeMillis(),
     var chiefComplaints: List<String>? = null,
     var medications: List<String>? = null,
