@@ -374,6 +374,15 @@
                     android:text="@string/cancel" />
 
                 <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_link_household"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="@dimen/margin_big"
+                    android:visibility="gone"
+                    android:text="Link Household"
+                    android:textColor="@android:color/white" />
+
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_submit"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"

@@ -506,6 +506,25 @@ personal health profile.</string>
         <item>Not Available</item>
     </string-array>
 
+    <string-array name="place_of_current_living_choices">
+        <item>Footpath</item>
+        <item>Railway Platform</item>
+        <item>Bus Station</item>
+        <item>Under a Tree</item>
+        <item>Temple</item>
+        <item>Mosque</item>
+        <item>Church</item>
+        <item>Other Praying Place</item>
+        <item>Educational Institution</item>
+        <item>Ekalavya School</item>
+        <item>Rehabilitation Centre</item>
+        <item>Orphanage</item>
+        <item>Old Age Home</item>
+        <item>Private Hostel</item>
+        <item>Govt Hostel</item>
+        <item>NGO Hostel</item>
+        <item>Other</item>
+    </string-array>
 
-
+    <string name="no_hh_badge">🏠❌ No HH</string>
 </resources>

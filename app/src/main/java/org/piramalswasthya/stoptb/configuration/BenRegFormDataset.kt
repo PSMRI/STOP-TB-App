@@ -455,7 +455,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         villageEntityList: List<LocationEntity> = emptyList(),
         subCentreName: String? = null,
         relToHeadId: Int = -1,
-        spouseRegistrationRelToHeadId: Int = -1
+        spouseRegistrationRelToHeadId: Int = -1,
+        isNonHH: Boolean = false
     ) {
         val list = mutableListOf(
             pic,
@@ -490,7 +491,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
         this.familyHeadPhoneNo = familyHeadPhoneNo?.toString()
 
-        if (relToHeadId >= 0) {
+        if (relToHeadId >= 0 && !isNonHH) {
             list.add(list.indexOf(gender) + 1, relationToHead)
             relationToHead.value = resources.getStringArray(R.array.nbr_relationship_to_head_src).getOrNull(relToHeadId)
             // Lock gender only when it was pre-selected from Add HoF Member dialog (not for HoF/Self)
@@ -816,8 +817,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     }
 
     // Keep setFirstPageToRead as alias for backward compat with ViewModel
-    suspend fun setFirstPageToRead(ben: BenRegCache?, familyHeadPhoneNo: Long?, familyHeadCommunityId: Int = 0, villageName: String? = null,  pinCodeValue: String? = null, villageNames: Array<String>? = null, villageEntityList: List<LocationEntity> = emptyList(), subCentreName: String? = null, relToHeadId: Int = -1) =
-        setUpPage(ben, familyHeadPhoneNo, familyHeadCommunityId, villageName, pinCodeValue,villageNames, villageEntityList, subCentreName, relToHeadId)
+    suspend fun setFirstPageToRead(ben: BenRegCache?, familyHeadPhoneNo: Long?, familyHeadCommunityId: Int = 0, villageName: String? = null,  pinCodeValue: String? = null, villageNames: Array<String>? = null, villageEntityList: List<LocationEntity> = emptyList(), subCentreName: String? = null, relToHeadId: Int = -1,isNonHH: Boolean = false) =
+        setUpPage(ben, familyHeadPhoneNo, familyHeadCommunityId, villageName, pinCodeValue,villageNames, villageEntityList, subCentreName, relToHeadId,isNonHH = isNonHH)
 
 
     private var familyHeadPhoneNo: String? = null
