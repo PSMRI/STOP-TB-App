@@ -448,7 +448,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     suspend fun setUpPage(
         ben: BenRegCache?,
         familyHeadPhoneNo: Long?,
+        familyHeadCommunityId: Int = 0,
         villageName: String? = null,
+        pinCodeValue: String? = null,
         villageNames: Array<String>? = null,
         villageEntityList: List<LocationEntity> = emptyList(),
         subCentreName: String? = null,
@@ -531,7 +533,11 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                 ?: ben?.locationRecord?.village?.name?.takeIf { it.isNotBlank() }
                 ?: ""
         }
-        if (pinCode.value.isNullOrBlank()) pinCode.value = ""
+        if (pinCode.value.isNullOrBlank()) {
+            pinCode.value = pinCodeValue?.trim()?.takeIf { it.isNotBlank() }
+                ?: ben?.pinCode?.trim()?.takeIf { it.isNotBlank() }
+                        ?: ""
+        }
         state.entries = arrayOf(ben?.locationRecord?.state?.name ?: "")
         district.entries = arrayOf(ben?.locationRecord?.district?.name ?: "")
         tu.entries = arrayOf(ben?.locationRecord?.tu?.name ?: "")
@@ -552,6 +558,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
         ben?.takeIf { it.isDraft }?.let { prefill ->
             applyDraftPrefill(prefill)
+        }
+
+        if (relToHeadId >= 0 && familyHeadCommunityId > 0) {
+            community.value = community.getStringFromPosition(familyHeadCommunityId)
         }
 
         ben?.takeIf { !it.isDraft }?.let { saved ->
@@ -763,9 +773,25 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             healthFacility.value = it.healthFacility?.name ?: ""
         }
 
+        // Household-level fields are already captured once on the household form;
+        // hide them here when this beneficiary is being added to an existing household.
+        if (relToHeadId >= 0 && relToHeadId != 18) {
+            list.removeAll(
+                listOf(address, pinCode, villageHamlet, residentialAreaType, economicStatus)
+            )
+            address.required = false
+            pinCode.required = false
+            villageHamlet.required = false
+            residentialAreaType.required = false
+            economicStatus.required = false
+        }
+
 
         setUpPage(list)
+
+
     }
+
 
     private fun applyDraftPrefill(prefill: BenRegCache) {
         prefill.firstName?.takeIf { it.isNotBlank() }?.let { firstName.value = it }
@@ -791,8 +817,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     }
 
     // Keep setFirstPageToRead as alias for backward compat with ViewModel
-    suspend fun setFirstPageToRead(ben: BenRegCache?, familyHeadPhoneNo: Long?, villageName: String? = null, villageNames: Array<String>? = null, villageEntityList: List<LocationEntity> = emptyList(), subCentreName: String? = null, relToHeadId: Int = -1, isNonHH: Boolean = false) =
-        setUpPage(ben, familyHeadPhoneNo, villageName, villageNames, villageEntityList, subCentreName, relToHeadId, isNonHH = isNonHH)
+    suspend fun setFirstPageToRead(ben: BenRegCache?, familyHeadPhoneNo: Long?, familyHeadCommunityId: Int = 0, villageName: String? = null,  pinCodeValue: String? = null, villageNames: Array<String>? = null, villageEntityList: List<LocationEntity> = emptyList(), subCentreName: String? = null, relToHeadId: Int = -1,isNonHH: Boolean = false) =
+        setUpPage(ben, familyHeadPhoneNo, familyHeadCommunityId, villageName, pinCodeValue,villageNames, villageEntityList, subCentreName, relToHeadId,isNonHH = isNonHH)
 
 
     private var familyHeadPhoneNo: String? = null

@@ -259,7 +259,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         inputType = DROPDOWN,
         title = resources.getString(R.string.nhhr_type_residential_area),
         arrayId = R.array.nhhr_type_residential_area_array,
-        entries = resources.getStringArray(R.array.nhhr_type_residential_area_array),
+        entries = resources.getStringArray(R.array.nbr_residential_area_array),
         required = false,
         hasDependants = true
     )

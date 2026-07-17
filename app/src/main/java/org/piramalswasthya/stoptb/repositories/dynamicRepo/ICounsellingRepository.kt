@@ -26,4 +26,5 @@ interface ICounsellingRepository {
     suspend fun fetchAndStoreCounsellingResponse(beneficiaryId: Long, formUuid: String): Boolean
     suspend fun fetchAndStoreCompletedBeneficiaries(): List<CompletedBeneficiaryStatus>?
     suspend fun revertFormStatus(responseId: Long, status: String)
+    suspend fun getLocalPreSubmitFilledCounts(): Map<Long, Int>
 }

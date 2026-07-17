@@ -250,7 +250,7 @@ class BenListAdapter(
             val isNurseRole = currentRole.isNurseRole()
             val isCounsellingOfficer = currentRole.isCounsellingOfficerRole()
             when {
-                !isNurseRole && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
+                !isNurseRole && !isCounsellingOfficer && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
                         && !item.isDeath && !item.isDeactivate -> {
                     binding.llAddSpouseBtn.visibility = View.VISIBLE
                     binding.btnAddSpouse.visibility = View.VISIBLE

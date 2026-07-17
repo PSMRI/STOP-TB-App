@@ -54,7 +54,11 @@ class CounsellingViewModel @Inject constructor(
     val isFormEditable: LiveData<Boolean> get() = _isFormEditable
 
     fun isSectionEditable(section: CounsellingSectionDto?): Boolean {
-        return _isFormEditable.value != false || section?.isEditable == true
+        // Backend's isEditable=true (only the last section) is an unconditional override — that
+        // section stays editable forever regardless of submitted/completed/refused state.
+        if (section?.isEditable == true) return true
+        if (section?.isSubmitted == true) return false
+        return _isFormEditable.value != false
     }
 
     private val _isGeneralInfoToggleOn = MutableLiveData(true)
@@ -568,6 +572,11 @@ class CounsellingViewModel @Inject constructor(
         viewModelScope.launch {
             val success = counsellingRepo.saveSectionAnswers(benId, formId, section, versionNumber)
             if (success) {
+                val persistedSection = counsellingRepo.getDraftResponse(benId)
+                    ?.sectionResponses?.find { it.sectionResponse.sectionId == section.sectionId }
+                if (persistedSection?.sectionResponse?.completedAt != null) {
+                    section.isSubmitted = true
+                }
                 if (current < (schemaData?.sections?.size ?: 1) - 1) {
                     loadSection(current + 1)
                 } else {
@@ -595,7 +604,8 @@ class CounsellingViewModel @Inject constructor(
             viewModelScope.launch {
                 val success = counsellingRepo.saveSectionAnswers(
                     benId, formId, section, versionNumber,
-                    overrideTargetSectionId = previousSectionId
+                    overrideTargetSectionId = previousSectionId,
+                    isBackNavigation = true
                 )
                 if (success) {
                     loadSection(current - 1)

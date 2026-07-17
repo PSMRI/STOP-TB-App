@@ -67,4 +67,25 @@ interface CounsellingFormResponseDao {
 
     @Query("DELETE FROM t_question_response WHERE sectionResponseId = :sectionResponseId")
     suspend fun deleteQuestionResponsesForSection(sectionResponseId: Long)
+    @Query(
+        """
+        SELECT fr.beneficiaryId AS beneficiaryId, COUNT(DISTINCT sr.sectionId) AS filledCount
+        FROM t_form_response fr
+        JOIN t_section_response sr ON sr.formResponseId = fr.responseId
+        JOIN t_form_section fs ON fs.sectionId = sr.sectionId AND fs.versionId = fr.formVersionId
+        WHERE fs.sectionPhase = 'PRE_SUBMIT'
+          AND (
+            fr.status IN ('SUBMITTED', 'COMPLETE', 'COMPLETED')
+            OR sr.completedAt IS NOT NULL
+            OR EXISTS (SELECT 1 FROM t_question_response qr WHERE qr.sectionResponseId = sr.sectionResponseId)
+          )
+        GROUP BY fr.beneficiaryId
+        """
+    )
+    suspend fun getLocalPreSubmitFilledCounts(): List<BeneficiaryPreSubmitFilledCount>
 }
+
+data class BeneficiaryPreSubmitFilledCount(
+    val beneficiaryId: Long,
+    val filledCount: Int
+)
