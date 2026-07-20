@@ -73,6 +73,10 @@ class CounsellingViewModel @Inject constructor(
     private val _generalInfoRefusalSubmitted = MutableLiveData<Boolean>()
     val generalInfoRefusalSubmitted: LiveData<Boolean> get() = _generalInfoRefusalSubmitted
 
+
+    private val _generalInfoQuestionUpdated = MutableLiveData<Int>()
+    val generalInfoQuestionUpdated: LiveData<Int> get() = _generalInfoQuestionUpdated
+
     enum class CounsellingEntryMode {
         COUNSELLING,
         FOLLOW_UP
@@ -160,8 +164,8 @@ class CounsellingViewModel @Inject constructor(
     fun evaluateGeneralInfoConditions(q: CounsellingQuestionDto) {
         val section = generalInfoSection ?: return
 
-        val beforeStates = section.questions.map {
-            Triple(it.questionId, it.visible, it.isMandatory) to it.errorMessage
+        val beforeStates = section.questions.associate {
+            it.questionId to Triple(it.visible, it.isMandatory, it.errorMessage)
         }
 
         evaluateAllConditions(section)
@@ -176,11 +180,21 @@ class CounsellingViewModel @Inject constructor(
             }
         }
 
-        val afterStates = section.questions.map {
-            Triple(it.questionId, it.visible, it.isMandatory) to it.errorMessage
+        val afterStates = section.questions.associate {
+            it.questionId to Triple(it.visible, it.isMandatory, it.errorMessage)
         }
 
-        if (beforeStates != afterStates) {
+        val changedIds = afterStates.filterKeys { id -> beforeStates[id] != afterStates[id] }.keys
+        if (changedIds.isEmpty()) return
+
+
+        val onlySelfChanged = changedIds.size == 1 && changedIds.first() == q.questionId &&
+            beforeStates[q.questionId]?.first == afterStates[q.questionId]?.first &&
+            beforeStates[q.questionId]?.second == afterStates[q.questionId]?.second
+
+        if (onlySelfChanged) {
+            _generalInfoQuestionUpdated.value = q.questionId
+        } else {
             _generalInfoQuestions.value = section.questions.toList()
         }
     }
