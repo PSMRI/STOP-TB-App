@@ -9,6 +9,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.Toast
 import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -237,7 +238,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         )
                     }
                 },
-                { item, benId, hhId ->
+                clickedResult = { item, benId, hhId ->
                     if (!showResultButton) return@BenClickListener
                     findNavController().navigate(
                         AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
@@ -245,6 +246,95 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                             viewOnly = true
                         )
                     )
+                },
+                clickedOrderAction = { item, action, orderType ->
+                    if (!showResultButton) return@BenClickListener
+                    when (action) {
+                        "REFER" -> {
+                            findNavController().navigate(
+                                AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                    benId = item.benId,
+                                    viewOnly = false,
+                                    referralType = if (orderType == "XRAY_CHEST") 6 else 7
+                                )
+                            )
+                        }
+                        "COMPLETE" -> {
+                            val title = if (orderType == "XRAY_CHEST") "Confirm X-ray Completion" else "Confirm TrueNat Completion"
+                            val msg = if (orderType == "XRAY_CHEST") {
+                                "Please confirm that the beneficiary has completed the Digital Chest X-ray. The application will now start retrieving the diagnostic result."
+                            } else {
+                                "Please confirm that the beneficiary has completed the TrueNat test. The application will now start retrieving the diagnostic result."
+                            }
+                            androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                                .setTitle(title)
+                                .setMessage(msg)
+                                .setPositiveButton("CONFIRM") { d, _ ->
+                                    d.dismiss()
+                                    viewModel.markOrderTestCompleted(item.benId, orderType)
+                                }
+                                .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
+                                .show()
+                        }
+                        "POLL", "RETRY_POLL" -> {
+                            viewModel.pollOrderResult(item.benId, orderType)
+                        }
+                        "REPEAT_TEST" -> {
+                            lifecycleScope.launch {
+                                val diag = viewModel.tbRepo.getTBDiagnosticsById(item.benId)
+                                val naatRes = diag?.naatResult
+                                val rifRes = diag?.trueNatRifResult
+
+                                val isInvalidMtb = naatRes.equals("Invalid", ignoreCase = true)
+                                val isIndeterminateRif = rifRes.equals("Indeterminate", ignoreCase = true)
+
+                                val title = when {
+                                    isInvalidMtb -> "Invalid Test Result"
+                                    isIndeterminateRif -> "Indeterminate Test Result"
+                                    else -> "Repeat Test"
+                                }
+
+                                val msg = when {
+                                    isInvalidMtb -> "The test results are invalid. Repeat the test."
+                                    isIndeterminateRif -> "The test results are indeterminate. Repeat the test."
+                                    else -> "Are you sure you want to repeat this test? A new test order will be created."
+                                }
+
+                                val targetOrder = when {
+                                    isIndeterminateRif -> "MDR_RIF"
+                                    else -> "MTB_PLUS"
+                                }
+
+                                androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                                    .setTitle(title)
+                                    .setMessage(msg)
+                                    .setPositiveButton("REPEAT TEST") { d, _ ->
+                                        d.dismiss()
+                                        viewModel.repeatTest(item.benId, targetOrder)
+                                    }
+                                    .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
+                                    .show()
+                            }
+                        }
+                        "VIEW" -> {
+                            findNavController().navigate(
+                                AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                    benId = item.benId,
+                                    viewOnly = true,
+                                    referralType = if (orderType == "XRAY_CHEST") 6 else 7
+                                )
+                            )
+                        }
+                        "ENTER_LC", "VIEW_LC" -> {
+                            findNavController().navigate(
+                                AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                    benId = item.benId,
+                                    viewOnly = false,
+                                    referralType = 8
+                                )
+                            )
+                        }
+                    }
                 },
                 { item, benId, hhId, viewOnly ->
                     if (isReadOnlyReferralList) return@BenClickListener
@@ -283,7 +373,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             showActionButtons = false,
             showResultButton = showResultButton,
             showAnthropometryButton = false,
-            showExamineButton = !isReadOnlyReferralList
+            showExamineButton = !isReadOnlyReferralList,
+            source = args.source
         )
 
         binding.rvAny.adapter = benAdapter
@@ -342,6 +433,39 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 benAdapter.submitDiagnosisBenIds(benIds)
             }
         }
+
+        lifecycleScope.launch {
+            viewModel.allTbDiagnostics.collectLatest { diagnosticsList ->
+                benAdapter.submitTBDiagnostics(diagnosticsList)
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.orderActionState.collectLatest { state ->
+                when (state) {
+                    is AllBenViewModel.OrderActionResult.Idle -> {}
+                    is AllBenViewModel.OrderActionResult.Loading -> {}
+                    is AllBenViewModel.OrderActionResult.Success -> {
+                        Toast.makeText(requireContext(), state.message, Toast.LENGTH_LONG).show()
+                        viewModel.resetOrderActionState()
+                        if (state.message.contains("completed", ignoreCase = true) || state.orderType.equals("MDR_RIF", ignoreCase = true)) {
+                            if (state.orderType.equals("SPUTUM_TRUENAT", ignoreCase = true) || state.orderType.equals("MTB_PLUS", ignoreCase = true) || state.orderType.equals("MDR_RIF", ignoreCase = true)) {
+                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext(), viewModel.tbRepo.useMockApi)
+                            } else {
+                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(requireContext())
+                            }
+                        }
+                    }
+                    is AllBenViewModel.OrderActionResult.Error -> {
+                        Toast.makeText(requireContext(), state.error, Toast.LENGTH_LONG).show()
+                        viewModel.resetOrderActionState()
+                    }
+                }
+            }
+        }
+
+        org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(requireContext())
+        org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext())
 
         binding.ibSearch.visibility = View.VISIBLE
         binding.ibSearch.setOnClickListener { sttContract.launch(Unit) }
@@ -480,6 +604,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     override fun onResume() {
         super.onResume()
         updateToolbarTitle()
+        viewModel.fetchBeneficiaryStatuses()
 
         // If TBSuspectedQuickFragment (Diagnosis) signalled that the examine flow
         // is fully complete, clear pendingExamineBenId so the BottomSheet does NOT

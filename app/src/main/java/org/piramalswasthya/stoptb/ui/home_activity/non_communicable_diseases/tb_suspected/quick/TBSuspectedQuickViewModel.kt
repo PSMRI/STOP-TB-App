@@ -41,6 +41,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
     val viewOnly = args.viewOnly
     val autoFlow = args.autoFlow
     val generalOpdFlow = args.generalOpdFlow
+    val referralType = args.referralType
 
     private val dataset = TBSuspectedQuickDataset(context, preferenceDao.getCurrentLanguage())
     val formList = dataset.listFlow
@@ -98,9 +99,42 @@ class TBSuspectedQuickViewModel @Inject constructor(
                 tbScreening,
                 if (::tbDiagnostics.isInitialized) tbDiagnostics else null,
                 vital = vital,
-                referralMode = viewOnly
+                referralMode = viewOnly,
+                referralType = referralType
             )
             _showSubmit.value = dataset.shouldShowSubmit()
+        }
+    }
+
+    fun getChestXRayResult(): String? {
+        return if (::tbDiagnostics.isInitialized) tbDiagnostics.chestXRayResult else null
+    }
+
+    fun getIsChestXRayDone(): Boolean? {
+        return if (::tbDiagnostics.isInitialized) tbDiagnostics.isChestXRayDone else null
+    }
+
+    fun getNaatResult(): String? {
+        return if (::tbDiagnostics.isInitialized) tbDiagnostics.naatResult else null
+    }
+
+    fun getTrueNatRifResult(): String? {
+        return if (::tbDiagnostics.isInitialized) tbDiagnostics.trueNatRifResult else null
+    }
+
+    fun getIsNaatConducted(): Boolean? {
+        return if (::tbDiagnostics.isInitialized) tbDiagnostics.isNaatConducted else null
+    }
+
+    fun repeatTest(orderType: String, customVisitCode: Int? = null) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    tbRepo.createProdigiOrder(benId, orderType, customVisitCode)
+                } catch (e: Exception) {
+                    Timber.e(e, "repeatTest failed for benId=%s", benId)
+                }
+            }
         }
     }
 
@@ -110,13 +144,49 @@ class TBSuspectedQuickViewModel @Inject constructor(
                 try {
                     _state.postValue(State.SAVING)
                     dataset.mapValues(tbDiagnostics, 1)
+                    
+                    if (referralType == 6) {
+                        if (tbDiagnostics.isReferredForDigitalChestXray == false) {
+                            tbDiagnostics.xrayOrderStatus = "REFERRAL_DECLINED"
+                        }
+                    } else if (referralType == 7) {
+                        if (tbDiagnostics.isSputumCollected == false) {
+                            tbDiagnostics.trueNatOrderStatus = "REFERRAL_DECLINED"
+                        }
+                    }
+                    
                     // Load existing row's id to UPDATE instead of INSERT new row
-                    // (TBDiagnosticsCache.id defaults to 0 → REPLACE inserts new row each time)
                     val existingId = tbRepo.getTBDiagnosticsById(benId)?.id ?: 0
                     if (existingId > 0) tbDiagnostics = tbDiagnostics.copy(id = existingId)
                     tbDiagnostics.syncState = SyncState.UNSYNCED
                     tbRepo.saveTBDiagnostics(tbDiagnostics)
-                    _state.postValue(State.SAVE_SUCCESS)
+                    
+                    // Synchronously push order to server before completing form save
+                    var orderPushSuccess = true
+                    var orderPushError: String? = null
+                    val hasXrayOrder = !tbDiagnostics.xrayOrderId.isNullOrBlank() && !tbDiagnostics.xrayOrderStatus.equals("FAILED", ignoreCase = true)
+                    val hasTrueNatOrder = !tbDiagnostics.trueNatOrderId.isNullOrBlank() && !tbDiagnostics.trueNatOrderStatus.equals("FAILED", ignoreCase = true)
+
+                    if (referralType == 6 && tbDiagnostics.isReferredForDigitalChestXray == true && !hasXrayOrder) {
+                        val response = tbRepo.createProdigiOrder(benId, "XRAY_CHEST")
+                        if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Error) {
+                            orderPushSuccess = false
+                            orderPushError = response.message
+                        }
+                    } else if (referralType == 7 && tbDiagnostics.isSputumCollected == true && !hasTrueNatOrder) {
+                        val response = tbRepo.createProdigiOrder(benId, "SPUTUM_TRUENAT")
+                        if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Error) {
+                            orderPushSuccess = false
+                            orderPushError = response.message
+                        }
+                    }
+                    
+                    if (orderPushSuccess) {
+                        _state.postValue(State.SAVE_SUCCESS)
+                    } else {
+                        Timber.e("Pushing diagnostic order failed for benId=%s: %s", benId, orderPushError)
+                        _state.postValue(State.SAVE_FAILED)
+                    }
                 } catch (e: Exception) {
                     Timber.e(e, "Saving diagnostics failed for benId=%s", benId)
                     _state.postValue(State.SAVE_FAILED)
