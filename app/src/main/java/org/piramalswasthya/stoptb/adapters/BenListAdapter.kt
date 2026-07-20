@@ -391,6 +391,12 @@ class BenListAdapter(
                     ContextCompat.getColor(binding.root.context, android.R.color.white)
                 )
             }
+            // Examine button — show filled count X/total
+            // Registrar: Anthropometry + TB Screening
+            // Nurse: Diagnosis hidden, so total stays 4
+            // Others: all 5 forms
+            val currentRole = pref?.getLoggedInUser()?.role
+            val isCounsellingOfficer = currentRole.isCounsellingOfficerRole()
             val isRegistrar = pref?.getLoggedInUser()?.role.isRegistrationOfficerRole()
             val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
             val (examineFilledCount, examineTotal) = if (isRegistrar) {
@@ -399,7 +405,7 @@ class BenListAdapter(
                     hasTbScreening
                 ).count { it }
                 Pair(filled, 2)
-            } else if (isNurse) {
+            } else if (isNurse || isCounsellingOfficer) {
                 val filled = listOf(
                     hasAnthropometry,
                     isMatched,
@@ -412,10 +418,9 @@ class BenListAdapter(
                     hasAnthropometry,
                     isMatched,
                     hasTbScreening,
-                    hasGeneralOpd,
-                    hasDiagnosis
+                    hasGeneralOpd
                 ).count { it }
-                Pair(filled, 5)
+                Pair(filled, 4)
             }
             binding.btnExamine.text = "Examine ($examineFilledCount/$examineTotal)"
             val allExamineFilled = examineFilledCount == examineTotal
@@ -432,9 +437,9 @@ class BenListAdapter(
 
             binding.llBenDetails4.visibility = View.GONE
             binding.btnAddChildren.visibility = View.GONE
-            val currentRole = pref?.getLoggedInUser()?.role
+
+            // Register Wife / Register Husband — Registrar only (hidden for Nurse & Counselling officer)
             val isNurseRole = currentRole.isNurseRole()
-            val isCounsellingOfficer = currentRole.isCounsellingOfficerRole()
             when {
                 !isNurseRole && !isCounsellingOfficer && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
                         && !item.isDeath && !item.isDeactivate -> {

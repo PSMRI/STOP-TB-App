@@ -847,7 +847,7 @@
 
     <!-- Examine flow -->
     <string name="btn_examine">जांचें</string>
-    <string name="btn_examine_count">जांचें %1$d/5</string>
+    <string name="btn_examine_count">जांचें %1$d/4</string>
     <string name="examine_bottomsheet_title">परीक्षण फॉर्म</string>
     <string name="examine_btn_fill">भरें</string>
     <string name="examine_btn_view">देखें</string>

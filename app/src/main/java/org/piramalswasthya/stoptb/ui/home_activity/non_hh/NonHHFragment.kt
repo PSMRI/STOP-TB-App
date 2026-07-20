@@ -309,7 +309,7 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     )
                 )
             }
-            ExamineBottomSheetFragment.FORM_DIAGNOSIS -> {
+            /*ExamineBottomSheetFragment.FORM_DIAGNOSIS -> {
                 findNavController().navigate(
                     R.id.TBSuspectedQuickFragment,
                     bundleOf(
@@ -318,6 +318,7 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     )
                 )
             }
+             */
         }
     }
 

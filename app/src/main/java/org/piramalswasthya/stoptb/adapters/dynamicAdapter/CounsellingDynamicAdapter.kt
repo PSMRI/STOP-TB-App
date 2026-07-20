@@ -46,6 +46,12 @@ class CounsellingDynamicAdapter(
         notifyDataSetChanged()
     }
 
+    // rebinding the rest of the list, so an unrelated row's focus/keyboard isn't disturbed.
+    fun notifyQuestionUpdated(questionId: Int) {
+        val index = visibleQuestions.indexOfFirst { it.questionId == questionId }
+        if (index != -1) notifyItemChanged(index)
+    }
+
     override fun getItemViewType(position: Int): Int = when (visibleQuestions[position].questionType) {
         "TEXT" -> TYPE_TEXT
         "RADIO" -> TYPE_RADIO
