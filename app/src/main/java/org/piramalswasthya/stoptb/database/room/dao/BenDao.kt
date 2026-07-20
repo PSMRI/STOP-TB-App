@@ -249,7 +249,7 @@ interface BenDao {
                 WHERE UPPER(IFNULL(td.chestXRayResult, '')) = 'POSITIVE'
                   AND UPPER(IFNULL(td.naatResult, '')) = 'NEGATIVE'
             ))
-            OR (:source = 6 AND isDeath = 0 AND (
+            OR (:source = 6 AND isDeath = 0 AND reproductiveStatusId != 1 AND benId NOT IN (SELECT v.benId FROM BEN_VITALS v WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%') AND (
                 benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isChestXRayDone IS NOT NULL
@@ -258,12 +258,17 @@ interface BenDao {
                     SELECT td.benId FROM TB_DIAGNOSTICS td
                     WHERE td.isChestXRayDone IS NOT NULL
                 )
-                OR (reproductiveStatusId != 1 AND benId IN (
+                OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
-                ))
+                )
             ))
             OR (:source = 7 AND isDeath = 0 AND (
-                benId IN (
+                reproductiveStatusId = 1
+                OR benId IN (
+                    SELECT v.benId FROM BEN_VITALS v
+                    WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%'
+                )
+                OR benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isNaatConducted IS NOT NULL
                        OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'
@@ -277,7 +282,6 @@ interface BenDao {
                     SELECT tbs.benId FROM TB_SCREENING tbs
                     WHERE
                         tbs.recommendedForTruenatTest = 1
-                        OR reproductiveStatusId = 1
                         OR (
                             tbs.bloodInSputum = 1
                             OR tbs.coughMoreThan2Weeks = 1
@@ -364,7 +368,7 @@ interface BenDao {
                 WHERE UPPER(IFNULL(td.chestXRayResult, '')) = 'POSITIVE'
                   AND UPPER(IFNULL(td.naatResult, '')) = 'NEGATIVE'
             ))
-            OR (:source = 6 AND isDeath = 0 AND (
+            OR (:source = 6 AND isDeath = 0 AND reproductiveStatusId != 1 AND benId NOT IN (SELECT v.benId FROM BEN_VITALS v WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%') AND (
                 benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isChestXRayDone IS NOT NULL
@@ -373,12 +377,17 @@ interface BenDao {
                     SELECT td.benId FROM TB_DIAGNOSTICS td
                     WHERE td.isChestXRayDone IS NOT NULL
                 )
-                OR (reproductiveStatusId != 1 AND benId IN (
+                OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
-                ))
+                )
             ))
             OR (:source = 7 AND isDeath = 0 AND (
-                benId IN (
+                reproductiveStatusId = 1
+                OR benId IN (
+                    SELECT v.benId FROM BEN_VITALS v
+                    WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%'
+                )
+                OR benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isNaatConducted IS NOT NULL
                        OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'
@@ -392,7 +401,6 @@ interface BenDao {
                     SELECT tbs.benId FROM TB_SCREENING tbs
                     WHERE
                         tbs.recommendedForTruenatTest = 1
-                        OR reproductiveStatusId = 1
                         OR (
                             tbs.bloodInSputum = 1
                             OR tbs.coughMoreThan2Weeks = 1
@@ -484,7 +492,7 @@ interface BenDao {
                 WHERE UPPER(IFNULL(td.chestXRayResult, '')) = 'POSITIVE'
                   AND UPPER(IFNULL(td.naatResult, '')) = 'NEGATIVE'
             ))
-            OR (:source = 6 AND isDeath = 0 AND (
+            OR (:source = 6 AND isDeath = 0 AND reproductiveStatusId != 1 AND benId NOT IN (SELECT v.benId FROM BEN_VITALS v WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%') AND (
                 benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isChestXRayDone IS NOT NULL
@@ -493,12 +501,17 @@ interface BenDao {
                     SELECT td.benId FROM TB_DIAGNOSTICS td
                     WHERE td.isChestXRayDone IS NOT NULL
                 )
-                OR (reproductiveStatusId != 1 AND benId IN (
+                OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
-                ))
+                )
             ))
             OR (:source = 7 AND isDeath = 0 AND (
-                benId IN (
+                reproductiveStatusId = 1
+                OR benId IN (
+                    SELECT v.benId FROM BEN_VITALS v
+                    WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%'
+                )
+                OR benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isNaatConducted IS NOT NULL
                        OR UPPER(IFNULL(ts.chestXRayResult, '')) = 'POSITIVE'
@@ -512,7 +525,6 @@ interface BenDao {
                     SELECT tbs.benId FROM TB_SCREENING tbs
                     WHERE
                         tbs.recommendedForTruenatTest = 1
-                        OR reproductiveStatusId = 1
                         OR (
                             tbs.bloodInSputum = 1
                             OR tbs.coughMoreThan2Weeks = 1

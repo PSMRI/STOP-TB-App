@@ -104,7 +104,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class],
-    version = 23, exportSchema = false
+    version = 24, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -800,6 +800,26 @@ abstract class InAppDb : RoomDatabase() {
             )
         }
 
+        private val MIGRATION_23_24 = object : Migration(23, 24) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "TB_DIAGNOSTICS", "xrayOrderId")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN xrayOrderId TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "TB_DIAGNOSTICS", "xrayOrderStatus")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN xrayOrderStatus TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "TB_DIAGNOSTICS", "trueNatOrderId")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN trueNatOrderId TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "TB_DIAGNOSTICS", "trueNatOrderStatus")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN trueNatOrderStatus TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "TB_DIAGNOSTICS", "trueNatRifResult")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN trueNatRifResult TEXT DEFAULT NULL")
+                }
+            }
+        }
+
         private fun addVitalGeneralExaminationColumns(database: SupportSQLiteDatabase) {
             val columns = listOf(
                 "benRegId INTEGER NOT NULL DEFAULT 0",
@@ -949,6 +969,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_20_21)
                         .addMigrations(MIGRATION_21_22)
                         .addMigrations(MIGRATION_22_23)
+                        .addMigrations(MIGRATION_23_24)
                         .fallbackToDestructiveMigration()
                         .build()
 

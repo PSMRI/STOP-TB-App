@@ -511,6 +511,17 @@
                             android:layout_weight="0"
                             android:orientation="vertical">
 
+                            <TextView
+                                android:id="@+id/tv_order_status"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginBottom="4dp"
+                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                android:textColor="?attr/colorOnPrimary"
+                                android:textStyle="bold"
+                                android:visibility="gone"
+                                tools:text="Status: Referred for X-ray" />
+
                             <com.google.android.material.button.MaterialButton
                                 android:id="@+id/btn_vital_screen"
                                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
@@ -522,7 +533,6 @@
                                 android:paddingHorizontal="@dimen/padding_small"
                                 android:maxLines="1"
                                 android:singleLine="true"
-                                android:onClick="@{()-> showActionButtons ? clickListener.onClickVitalScreen(ben) : clickListener.onClickResult(ben)}"
                                 android:text="@string/vital_screen"
                                 android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
                                 android:textSize="14sp"
