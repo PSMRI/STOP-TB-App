@@ -383,6 +383,10 @@ class CounsellingActivity : AppCompatActivity() {
         viewModel.generalInfoQuestions.observe(this) { updateGeneralInfoUi() }
         viewModel.isGeneralInfoToggleOn.observe(this) { updateGeneralInfoUi() }
         viewModel.isFormEditable.observe(this) { updateGeneralInfoUi() }
+
+        viewModel.generalInfoQuestionUpdated.observe(this) { questionId ->
+            generalInfoAdapter.notifyQuestionUpdated(questionId)
+        }
         viewModel.generalInfoRefusalSubmitted.observe(this) { submitted ->
             if (submitted == true) finish()
         }
