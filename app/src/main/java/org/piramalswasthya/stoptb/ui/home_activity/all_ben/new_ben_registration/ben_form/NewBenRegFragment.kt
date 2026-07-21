@@ -837,21 +837,107 @@ class NewBenRegFragment : Fragment() {
                 Toast.makeText(requireContext(), "No existing households found in this village", Toast.LENGTH_SHORT).show()
                 return@launch
             }
-            
-            val hhNames = hhList.map { hh ->
+
+            data class HouseholdSearchItem(
+                val displayText: String,
+                val hhId: Long,
+                val headName: String,
+                val famName: String
+            )
+
+            val searchItems = hhList.map { hh ->
                 val headName = hh.household.family?.familyHeadName ?: "No Head Name"
                 val famName = hh.household.family?.familyName ?: ""
-                "Head: $headName $famName (HH ID: ${hh.household.householdId})"
-            }.toTypedArray()
-            
-            MaterialAlertDialogBuilder(requireContext())
+                val displayText = "Head: $headName $famName (HH ID: ${hh.household.householdId})"
+                HouseholdSearchItem(displayText, hh.household.householdId, headName, famName)
+            }
+
+            val context = requireContext()
+            val container = android.widget.LinearLayout(context).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                val paddingPx = (16 * context.resources.displayMetrics.density).toInt()
+                setPadding(paddingPx, paddingPx, paddingPx, 0)
+            }
+
+            val searchInput = android.widget.EditText(context).apply {
+                hint = "Search by name or ID..."
+                setSingleLine(true)
+                maxLines = 1
+                val searchIcon = androidx.core.content.ContextCompat.getDrawable(context, android.R.drawable.ic_menu_search)
+                setCompoundDrawablesWithIntrinsicBounds(searchIcon, null, null, null)
+                compoundDrawablePadding = (8 * context.resources.displayMetrics.density).toInt()
+                val p = (10 * context.resources.displayMetrics.density).toInt()
+                setPadding(p, p, p, p)
+            }
+            container.addView(searchInput)
+
+            val adapterList = searchItems.map { it.displayText }.toMutableList()
+            val arrayAdapter = android.widget.ArrayAdapter(context, android.R.layout.simple_list_item_1, adapterList)
+
+            var filteredItems = searchItems.toList()
+
+            val listView = android.widget.ListView(context).apply {
+                adapter = arrayAdapter
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    (300 * context.resources.displayMetrics.density).toInt()
+                )
+            }
+            container.addView(listView)
+
+            val tvEmptyResult = android.widget.TextView(context).apply {
+                text = "No matching result found"
+                gravity = android.view.Gravity.CENTER
+                visibility = android.view.View.GONE
+                val p = (16 * context.resources.displayMetrics.density).toInt()
+                setPadding(p, p, p, p)
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium)
+            }
+            container.addView(tvEmptyResult)
+
+            val dialog = MaterialAlertDialogBuilder(context)
                 .setTitle("Select Household")
-                .setItems(hhNames, android.content.DialogInterface.OnClickListener { selectDialog, index ->
-                    selectDialog.dismiss()
-                    val selectedHh = hhList[index]
-                    showRelationshipSelectionDialog(benId, selectedHh.household.householdId)
-                })
-                .show()
+                .setView(container)
+                .setNegativeButton("Cancel", null)
+                .create()
+
+            searchInput.addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    val query = s.toString().trim()
+                    filteredItems = if (query.isEmpty()) {
+                        searchItems
+                    } else {
+                        searchItems.filter { item ->
+                            item.headName.contains(query, ignoreCase = true) ||
+                            item.famName.contains(query, ignoreCase = true) ||
+                            item.hhId.toString().contains(query, ignoreCase = true)
+                        }
+                    }
+                    arrayAdapter.clear()
+                    arrayAdapter.addAll(filteredItems.map { it.displayText })
+                    arrayAdapter.notifyDataSetChanged()
+
+                    if (filteredItems.isEmpty()) {
+                        listView.visibility = android.view.View.GONE
+                        tvEmptyResult.visibility = android.view.View.VISIBLE
+                    } else {
+                        listView.visibility = android.view.View.VISIBLE
+                        tvEmptyResult.visibility = android.view.View.GONE
+                    }
+                }
+                override fun afterTextChanged(s: android.text.Editable?) {}
+            })
+
+            listView.setOnItemClickListener { _, _, position, _ ->
+                dialog.dismiss()
+                if (position in filteredItems.indices) {
+                    val selected = filteredItems[position]
+                    showRelationshipSelectionDialog(benId, selected.hhId)
+                }
+            }
+
+            dialog.show()
         }
     }
 
