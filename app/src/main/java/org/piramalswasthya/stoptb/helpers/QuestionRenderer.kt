@@ -4,15 +4,20 @@ import android.app.DatePickerDialog
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
+import android.widget.ArrayAdapter
 import android.widget.CheckBox
 import android.widget.RadioButton
 import android.widget.TextView
 import com.google.android.flexbox.FlexboxLayout
 import com.google.android.material.textfield.TextInputLayout
+import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.databinding.ItemCounsellingDateBinding
+import org.piramalswasthya.stoptb.databinding.ItemCounsellingDropdownBinding
 import org.piramalswasthya.stoptb.databinding.ItemCounsellingMcqBinding
 import org.piramalswasthya.stoptb.databinding.ItemCounsellingRadioBinding
 import org.piramalswasthya.stoptb.databinding.ItemCounsellingTextBinding
+import org.piramalswasthya.stoptb.databinding.ItemCtNumberBinding
+import org.piramalswasthya.stoptb.databinding.ItemCtReadonlyBinding
 import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingQuestionDto
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -294,5 +299,102 @@ object QuestionRenderer {
             }
         }
         binding.tvError.visibility = View.GONE
+    }
+
+    // Dropdown (single-select, from a popup list)
+    fun showDropdown(
+        binding: ItemCounsellingDropdownBinding,
+        question: CounsellingQuestionDto,
+        prefix: String,
+        isEditable: Boolean,
+        onValueChanged: (CounsellingQuestionDto) -> Unit
+    ) {
+        showLabel(binding.tilDropdown, question, prefix)
+        binding.tilDropdown.error = question.errorMessage
+        binding.tilDropdown.isEnabled = isEditable
+        binding.actDropdown.isEnabled = isEditable
+
+        val options = question.options?.sortedBy { it.displayOrder } ?: emptyList()
+        val labels = options.map { it.optionLabel }
+
+        binding.actDropdown.setAdapter(
+            ArrayAdapter(binding.root.context, android.R.layout.simple_list_item_1, labels)
+        )
+
+        val selectedOption = options.firstOrNull { it.optionValue == question.value }
+        binding.actDropdown.setText(selectedOption?.optionLabel ?: "", false)
+
+        binding.actDropdown.setOnItemClickListener { _, _, position, _ ->
+            if (!isEditable) return@setOnItemClickListener
+            val opt = options[position]
+            question.value = opt.optionValue
+            onValueChanged(question)
+        }
+
+        if (!question.errorMessage.isNullOrEmpty()) {
+            binding.tvError.text = question.errorMessage
+            binding.tvError.visibility = View.VISIBLE
+        } else {
+            binding.tvError.visibility = View.GONE
+        }
+    }
+
+    // Numeric-only input (age, hours, counts). New — no existing function covers this type.
+    fun showNumber(
+        binding: ItemCtNumberBinding,
+        question: CounsellingQuestionDto,
+        prefix: String,
+        isEditable: Boolean,
+        onValueChanged: (CounsellingQuestionDto) -> Unit
+    ) {
+        showLabel(binding.tilNumber, question, prefix)
+        binding.tilNumber.error = question.errorMessage
+        binding.etNumber.isEnabled = isEditable
+
+        val exactLength = question.validations
+            ?.firstOrNull { it.validationType == "EXACT_LENGTH" }
+            ?.validationParam?.toIntOrNull()
+        binding.etNumber.filters = if (exactLength != null) {
+            arrayOf(android.text.InputFilter.LengthFilter(exactLength))
+        } else {
+            emptyArray()
+        }
+
+        val oldWatcher = binding.etNumber.tag as? TextWatcher
+        if (oldWatcher != null) binding.etNumber.removeTextChangedListener(oldWatcher)
+
+        var isProgrammaticSet = false
+        val newValue = question.value?.toString() ?: ""
+        if (binding.etNumber.text?.toString() != newValue) {
+            isProgrammaticSet = true
+            binding.etNumber.setText(newValue)
+            binding.etNumber.setSelection(newValue.length)
+            isProgrammaticSet = false
+        }
+
+        val watcher = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                if (isProgrammaticSet) return
+                question.value = s?.toString()
+                onValueChanged(question)
+            }
+        }
+        binding.etNumber.addTextChangedListener(watcher)
+        binding.etNumber.tag = watcher
+        binding.etNumber.setOnFocusChangeListener { v, hasFocus -> if (hasFocus) scrollToView(v) }
+        binding.tvError.visibility = View.GONE
+    }
+
+    // Read-only auto-populated display (GPS lat/long, DigiPin, timestamp, visit number).
+    // New — no existing function covers this type; nothing here is ever edited or validated.
+    fun showReadOnly(
+        binding: ItemCtReadonlyBinding,
+        question: CounsellingQuestionDto,
+        prefix: String
+    ) {
+        binding.tvLabel.text = "$prefix${question.questionText}"
+        binding.tvValue.text = question.value?.toString()?.takeIf { it.isNotBlank() } ?: "—"
     }
 }

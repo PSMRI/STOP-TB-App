@@ -11,5 +11,10 @@ data class DynamicFormEntity(
     val formType: String,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
-    val followUpDelayDays : Int = 15
+    val followUpDelayDays : Int = 15,
+    // Contact Tracing fields (nullable, unused by existing forms)
+    val definition: String? = null,
+    val triggerRuleJson: String? = null,
+    val globalRuleJson: String? = null,
+    val enabledIfJson: String? = null
 )

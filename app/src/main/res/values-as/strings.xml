@@ -16,6 +16,7 @@
     <string name="notification_sync_channel_id">sakhi-sync0</string>
     <string name="btn_submit">জমা দিব</string>
     <string name="btn_skip">এৰি যাওক</string>
+    <string name="contact_tracing">সংস্পৰ্শ অনুসৰণ</string>
     <string name="long_to_string">%d</string>
     <string name="tv_reg_date_ph">নিবন্ধনৰ তাৰিখ</string>
     <string name="tv_ben_name_ph">উপকাৰীৰ নাম</string>

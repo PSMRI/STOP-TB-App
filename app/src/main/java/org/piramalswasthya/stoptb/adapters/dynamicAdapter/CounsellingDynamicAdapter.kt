@@ -4,9 +4,12 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import org.piramalswasthya.stoptb.databinding.ItemCounsellingDateBinding
+import org.piramalswasthya.stoptb.databinding.ItemCounsellingDropdownBinding
 import org.piramalswasthya.stoptb.databinding.ItemCounsellingMcqBinding
 import org.piramalswasthya.stoptb.databinding.ItemCounsellingRadioBinding
 import org.piramalswasthya.stoptb.databinding.ItemCounsellingTextBinding
+import org.piramalswasthya.stoptb.databinding.ItemCtNumberBinding
+import org.piramalswasthya.stoptb.databinding.ItemCtReadonlyBinding
 import org.piramalswasthya.stoptb.helpers.QuestionRenderer
 import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingQuestionDto
 
@@ -33,6 +36,10 @@ class CounsellingDynamicAdapter(
         private const val TYPE_RADIO = 2
         private const val TYPE_MCQ = 3
         private const val TYPE_DATE = 4
+        private const val TYPE_DROPDOWN = 5
+        // Contact Tracing types — additive, Counselling schemas never produce these strings.
+        private const val TYPE_NUMBER = 6
+        private const val TYPE_READONLY = 7
     }
 
     private var visibleQuestions: List<CounsellingQuestionDto> =
@@ -51,7 +58,10 @@ class CounsellingDynamicAdapter(
         "RADIO" -> TYPE_RADIO
         "MCQ" -> TYPE_MCQ
         "DATE" -> TYPE_DATE
+        "DROPDOWN" -> TYPE_DROPDOWN
         "MCQ", "CHECKBOX" -> TYPE_MCQ
+        "NUMBER" -> TYPE_NUMBER
+        "READONLY_NUMBER", "READONLY_TEXT" -> TYPE_READONLY
         else -> TYPE_TEXT
     }
 
@@ -62,6 +72,9 @@ class CounsellingDynamicAdapter(
             TYPE_RADIO -> RadioViewHolder(ItemCounsellingRadioBinding.inflate(inflater, parent, false))
             TYPE_MCQ -> McqViewHolder(ItemCounsellingMcqBinding.inflate(inflater, parent, false))
             TYPE_DATE -> DateViewHolder(ItemCounsellingDateBinding.inflate(inflater, parent, false))
+            TYPE_DROPDOWN -> DropdownViewHolder(ItemCounsellingDropdownBinding.inflate(inflater, parent, false))
+            TYPE_NUMBER -> NumberViewHolder(ItemCtNumberBinding.inflate(inflater, parent, false))
+            TYPE_READONLY -> ReadOnlyViewHolder(ItemCtReadonlyBinding.inflate(inflater, parent, false))
             else -> TextViewHolder(ItemCounsellingTextBinding.inflate(inflater, parent, false))
         }
     }
@@ -78,6 +91,9 @@ class CounsellingDynamicAdapter(
             is RadioViewHolder -> holder.bind(q, prefix)
             is McqViewHolder -> holder.bind(q, prefix)
             is DateViewHolder -> holder.bind(q, prefix)
+            is DropdownViewHolder -> holder.bind(q, prefix)
+            is NumberViewHolder -> holder.bind(q, prefix)
+            is ReadOnlyViewHolder -> holder.bind(q, prefix)
         }
     }
 
@@ -106,5 +122,22 @@ class CounsellingDynamicAdapter(
         RecyclerView.ViewHolder(binding.root) {
         fun bind(q: CounsellingQuestionDto, prefix: String) =
             QuestionRenderer.showDate(binding, q, prefix, isEditable, onValueChanged)
+    }
+    inner class DropdownViewHolder(private val binding: ItemCounsellingDropdownBinding) :
+        RecyclerView.ViewHolder(binding.root) {
+        fun bind(q: CounsellingQuestionDto, prefix: String) =
+            QuestionRenderer.showDropdown(binding, q, prefix, isEditable, onValueChanged)
+    }
+
+    inner class NumberViewHolder(private val binding: ItemCtNumberBinding) :
+        RecyclerView.ViewHolder(binding.root) {
+        fun bind(q: CounsellingQuestionDto, prefix: String) =
+            QuestionRenderer.showNumber(binding, q, prefix, isEditable, onValueChanged)
+    }
+
+    inner class ReadOnlyViewHolder(private val binding: ItemCtReadonlyBinding) :
+        RecyclerView.ViewHolder(binding.root) {
+        fun bind(q: CounsellingQuestionDto, prefix: String) =
+            QuestionRenderer.showReadOnly(binding, q, prefix)
     }
 }

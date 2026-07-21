@@ -259,6 +259,17 @@
     <string name="view_cbac">View CBAC</string>
     <string name="view">VIEW</string>
     <string name="add">ADD</string>
+    <string name="contact_tracing">Contact tracing</string>
+    <string name="contact_tracing_no_members">No contacts added yet.</string>
+    <string name="contact_tracing_add_contact">Add Contact</string>
+    <string name="contact_tracing_household_note">Household contacts can be traced from View Members on this case\'s household list.</string>
+    <string name="contact_tracing_load_error">Could not load this form.</string>
+    <string name="community_contact_tracing">Community Contacts</string>
+    <string name="occupational_contact_tracing">Occupational Contacts</string>
+    <string name="contact_tracing_selector_title">Contact Tracing</string>
+    <string name="contact_tracing_section_progress">Section %1$d of %2$d</string>
+    <string name="trace_contact">Trace Contact</string>
+    <string name="household_contact_tracing">Household Contact Tracing</string>
     <string name="home">Home</string>
     <string name="asha_profile">Profile</string>
     <string name="sync_records">Sync Records</string>

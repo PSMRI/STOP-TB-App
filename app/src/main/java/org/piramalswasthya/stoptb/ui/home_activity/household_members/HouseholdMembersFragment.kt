@@ -13,6 +13,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
+import androidx.navigation.fragment.navArgs
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -23,6 +24,7 @@ import org.piramalswasthya.stoptb.databinding.AlertNewBenBinding
 import org.piramalswasthya.stoptb.databinding.FragmentHouseholdMembersBinding
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
+import org.piramalswasthya.stoptb.ui.contact_tracing.ContactTracingActivity
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
@@ -37,6 +39,8 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
     private var _binding: FragmentHouseholdMembersBinding? = null
     private val binding: FragmentHouseholdMembersBinding get() = _binding!!
     private val viewModel: HouseholdMembersViewModel by viewModels()
+
+    private val args: HouseholdMembersFragmentArgs by navArgs()
 
     private var addBenAlert: AlertDialog? = null
     private var addBenAlertBinding: AlertNewBenBinding? = null
@@ -103,13 +107,17 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
                 softDeleteBen = {},
                 clickedExamine = { _, benId ->
                     showExamineBottomSheet(benId)
+                },
+                clickedTraceContact = { _, benId, _ ->
+                    ContactTracingActivity.startForHouseholdContact(requireContext(), args.indexCaseBenId, benId)
                 }
             ),
             showBeneficiaries = true,
             showRegistrationDate = true,
             showSyncIcon = true,
             pref = prefDao,
-            context = requireActivity()
+            context = requireActivity(),
+            showTraceContactButton = args.indexCaseBenId > 0
         )
         binding.rvAny.adapter = benAdapter
 

@@ -66,6 +66,10 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.SectionResponseEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionResponseEntity
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.DynamicFormMetadataDao
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.CounsellingFormResponseDao
+import org.piramalswasthya.stoptb.database.room.dao.contactTracingDao.ContactTracingResponseDao
+import org.piramalswasthya.stoptb.model.contactTracing.ContactTracingResponseEntity
+import org.piramalswasthya.stoptb.model.contactTracing.ContactTracingSectionResponseEntity
+import org.piramalswasthya.stoptb.model.contactTracing.ContactTracingQuestionResponseEntity
 
 
 @Database(
@@ -101,10 +105,13 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         OptionConditionEntity::class,
         FormResponseEntity::class,
         SectionResponseEntity::class,
-        QuestionResponseEntity::class
+        QuestionResponseEntity::class,
+        ContactTracingResponseEntity::class,
+        ContactTracingSectionResponseEntity::class,
+        ContactTracingQuestionResponseEntity::class
     ],
     views = [BenBasicCache::class],
-    version = 23, exportSchema = false
+    version = 24, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -132,6 +139,7 @@ abstract class InAppDb : RoomDatabase() {
     abstract fun formResponseJsonDao(): FormResponseJsonDao
     abstract fun dynamicFormMetadataDao(): DynamicFormMetadataDao
     abstract fun counsellingFormResponseDao(): CounsellingFormResponseDao
+    abstract fun contactTracingResponseDao(): ContactTracingResponseDao
     abstract val syncDao: SyncDao
     abstract val vitalDao: VitalDao
 
@@ -705,6 +713,145 @@ abstract class InAppDb : RoomDatabase() {
                 }
             }
         }
+
+        // Contact Tracing: reuses the generic dynamic-form schema tables (new nullable columns only)
+        // and adds its own, independent response tables. No Counselling table/data is altered in shape.
+        private val MIGRATION_23_24 = object : Migration(23, 24) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "t_dynamic_form", "definition")) {
+                    database.execSQL("ALTER TABLE t_dynamic_form ADD COLUMN definition TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_dynamic_form", "triggerRuleJson")) {
+                    database.execSQL("ALTER TABLE t_dynamic_form ADD COLUMN triggerRuleJson TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_dynamic_form", "globalRuleJson")) {
+                    database.execSQL("ALTER TABLE t_dynamic_form ADD COLUMN globalRuleJson TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_dynamic_form", "enabledIfJson")) {
+                    database.execSQL("ALTER TABLE t_dynamic_form ADD COLUMN enabledIfJson TEXT DEFAULT NULL")
+                }
+
+                if (!columnExists(database, "t_form_section", "hasSubmitButton")) {
+                    database.execSQL("ALTER TABLE t_form_section ADD COLUMN hasSubmitButton INTEGER NOT NULL DEFAULT 0")
+                }
+
+                if (!columnExists(database, "t_section_question", "allowMultiple")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN allowMultiple INTEGER NOT NULL DEFAULT 0")
+                }
+                if (!columnExists(database, "t_section_question", "containsPii")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN containsPii INTEGER NOT NULL DEFAULT 0")
+                }
+                if (!columnExists(database, "t_section_question", "visibleByDefault")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN visibleByDefault INTEGER NOT NULL DEFAULT 1")
+                }
+                if (!columnExists(database, "t_section_question", "maxLength")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN maxLength INTEGER DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_section_question", "enabledIfJson")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN enabledIfJson TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_section_question", "disabledIfJson")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN disabledIfJson TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_section_question", "mandatoryIfJson")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN mandatoryIfJson TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_section_question", "autoPopulated")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN autoPopulated INTEGER NOT NULL DEFAULT 0")
+                }
+                if (!columnExists(database, "t_section_question", "autoPopulateLogic")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN autoPopulateLogic TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_section_question", "autoPopulateNote")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN autoPopulateNote TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_section_question", "unit")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN unit TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_section_question", "exampleValuesJson")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN exampleValuesJson TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_section_question", "note")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN note TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_section_question", "displayFormat")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN displayFormat TEXT DEFAULT NULL")
+                }
+
+                if (!columnExists(database, "t_question_option", "isExclusive")) {
+                    database.execSQL("ALTER TABLE t_question_option ADD COLUMN isExclusive INTEGER NOT NULL DEFAULT 0")
+                }
+
+                if (!columnExists(database, "t_option_condition", "targetFormUuid")) {
+                    database.execSQL("ALTER TABLE t_option_condition ADD COLUMN targetFormUuid TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_option_condition", "alertMessage")) {
+                    database.execSQL("ALTER TABLE t_option_condition ADD COLUMN alertMessage TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_option_condition", "targetList")) {
+                    database.execSQL("ALTER TABLE t_option_condition ADD COLUMN targetList TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_option_condition", "actionValue")) {
+                    database.execSQL("ALTER TABLE t_option_condition ADD COLUMN actionValue TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_option_condition", "note")) {
+                    database.execSQL("ALTER TABLE t_option_condition ADD COLUMN note TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_option_condition", "reEnableCondition")) {
+                    database.execSQL("ALTER TABLE t_option_condition ADD COLUMN reEnableCondition TEXT DEFAULT NULL")
+                }
+
+                if (!tableExists(database, "t_ct_response")) {
+                    database.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `t_ct_response` (" +
+                            "`responseId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                            "`indexCaseBenId` INTEGER NOT NULL, " +
+                            "`contactBenId` INTEGER, " +
+                            "`contactType` TEXT NOT NULL, " +
+                            "`formVersionId` INTEGER NOT NULL, " +
+                            "`status` TEXT NOT NULL, " +
+                            "`syncStatus` TEXT NOT NULL, " +
+                            "`createdAt` INTEGER NOT NULL, " +
+                            "`updatedAt` INTEGER NOT NULL, " +
+                            "`syncedAt` INTEGER)"
+                    )
+                    database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_ct_response_indexCaseBenId` ON `t_ct_response` (`indexCaseBenId`)")
+                    database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_ct_response_contactBenId` ON `t_ct_response` (`contactBenId`)")
+                }
+
+                if (!tableExists(database, "t_ct_section_response")) {
+                    database.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `t_ct_section_response` (" +
+                            "`sectionResponseId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                            "`responseId` INTEGER NOT NULL, " +
+                            "`sectionId` INTEGER NOT NULL, " +
+                            "`visitNumber` INTEGER NOT NULL, " +
+                            "`completedAt` INTEGER, " +
+                            "`createdAt` INTEGER NOT NULL, " +
+                            "`updatedAt` INTEGER NOT NULL, " +
+                            "FOREIGN KEY(`responseId`) REFERENCES `t_ct_response`(`responseId`) ON DELETE CASCADE)"
+                    )
+                    database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_t_ct_section_response_responseId_sectionId_visitNumber` ON `t_ct_section_response` (`responseId`, `sectionId`, `visitNumber`)")
+                }
+
+                if (!tableExists(database, "t_ct_question_response")) {
+                    database.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `t_ct_question_response` (" +
+                            "`questionResponseId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                            "`sectionResponseId` INTEGER NOT NULL, " +
+                            "`questionId` INTEGER NOT NULL, " +
+                            "`optionId` INTEGER, " +
+                            "`answerText` TEXT, " +
+                            "`createdAt` INTEGER NOT NULL, " +
+                            "`updatedAt` INTEGER NOT NULL, " +
+                            "FOREIGN KEY(`sectionResponseId`) REFERENCES `t_ct_section_response`(`sectionResponseId`) ON DELETE CASCADE)"
+                    )
+                    database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_ct_question_response_sectionResponseId` ON `t_ct_question_response` (`sectionResponseId`)")
+                    database.execSQL("CREATE INDEX IF NOT EXISTS `index_t_ct_question_response_questionId` ON `t_ct_question_response` (`questionId`)")
+                }
+            }
+        }
+
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(
@@ -873,6 +1020,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_20_21)
                         .addMigrations(MIGRATION_21_22)
                         .addMigrations(MIGRATION_22_23)
+                        .addMigrations(MIGRATION_23_24)
                         .fallbackToDestructiveMigration()
                         .build()
 

@@ -174,7 +174,8 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
         private val clickedForm: ((hhId: Long, benId: Long) -> Unit)? = null,
         private val clickedCounselling: ((item: BenWithTbSuspectedDomain) -> Unit)? = null,
         private val clickedCounselled: ((item: BenWithTbSuspectedDomain) -> Unit)? = null,
-        private val clickedViewMember : ((item : BenWithTbSuspectedDomain) -> Unit)? = null
+        private val clickedViewMember : ((item : BenWithTbSuspectedDomain) -> Unit)? = null,
+        private val clickedContactTracing: ((item: BenWithTbSuspectedDomain) -> Unit)? = null
     ) {
         fun onClickForm(item: BenWithTbSuspectedDomain) =
             clickedForm?.let { it(item.ben.hhId, item.ben.benId) }
@@ -184,6 +185,8 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             clickedCounselled?.let { it(item) }
         fun onClickViewMember(item : BenWithTbSuspectedDomain) =
             clickedViewMember?.let { it(item) }
+        fun onClickContactTracing(item: BenWithTbSuspectedDomain) =
+            clickedContactTracing?.let { it(item) }
     }
     fun submitBenIds(list: List<Long>?) {
         if (list != null) {
