@@ -946,13 +946,35 @@ class NewBenRegFragment : Fragment() {
     private fun showRelationshipSelectionDialog(benId: Long, hhId: Long) {
         lifecycleScope.launch {
             val ben = viewModel.getBenFromId(benId) ?: return@launch
-            val isMale = ben.genderId == 1 || ben.gender?.name?.equals("MALE", ignoreCase = true) == true
             val isFemale = ben.genderId == 2 || ben.gender?.name?.equals("FEMALE", ignoreCase = true) == true
 
-            val relations = when {
-                isMale -> arrayOf("Spouse", "Son", "Father", "Brother", "Other")
-                isFemale -> arrayOf("Spouse", "Daughter", "Mother", "Sister", "Other")
-                else -> arrayOf("Spouse", "Son", "Daughter", "Mother", "Father", "Brother", "Sister", "Other")
+            val relations = if (isFemale) {
+                arrayOf(
+                    "Mother",
+                    "Sister",
+                    "Wife",
+                    "Niece",
+                    "Daughter",
+                    "Grand Mother",
+                    "Mother in Law",
+                    "Grand Daughter",
+                    "Daughter in Law",
+                    "Sister in Law",
+                    "Other"
+                )
+            } else {
+                arrayOf(
+                    "Father",
+                    "Brother",
+                    "Husband",
+                    "Nephew",
+                    "Son",
+                    "Grand Father",
+                    "Father in Law",
+                    "Grand Son",
+                    "Son in Law",
+                    "Other"
+                )
             }
 
             MaterialAlertDialogBuilder(requireContext())
@@ -960,46 +982,27 @@ class NewBenRegFragment : Fragment() {
                 .setItems(relations, android.content.DialogInterface.OnClickListener { dialog, index ->
                     dialog.dismiss()
                     val selectedRelation = relations[index]
-                    val relationPos: Int
-                    val relationName: String
-                    when (selectedRelation) {
-                        "Spouse" -> {
-                            if (isMale) {
-                                relationPos = 6
-                                relationName = "Husband"
-                            } else {
-                                relationPos = 5
-                                relationName = "Wife"
-                            }
-                        }
-                        "Son" -> {
-                            relationPos = 9
-                            relationName = "Son"
-                        }
-                        "Daughter" -> {
-                            relationPos = 10
-                            relationName = "Daughter"
-                        }
-                        "Mother" -> {
-                            relationPos = 1
-                            relationName = "Mother"
-                        }
-                        "Father" -> {
-                            relationPos = 2
-                            relationName = "Father"
-                        }
-                        "Brother" -> {
-                            relationPos = 3
-                            relationName = "Brother"
-                        }
-                        "Sister" -> {
-                            relationPos = 4
-                            relationName = "Sister"
-                        }
-                        else -> {
-                            relationPos = 21
-                            relationName = "Other"
-                        }
+                    val (relationPos, relationName) = when (selectedRelation) {
+                        "Mother" -> Pair(1, "Mother")
+                        "Father" -> Pair(2, "Father")
+                        "Brother" -> Pair(3, "Brother")
+                        "Sister" -> Pair(4, "Sister")
+                        "Wife" -> Pair(5, "Wife")
+                        "Husband" -> Pair(6, "Husband")
+                        "Nephew" -> Pair(7, "Nephew")
+                        "Niece" -> Pair(8, "Niece")
+                        "Son" -> Pair(9, "Son")
+                        "Daughter" -> Pair(10, "Daughter")
+                        "Grand Father" -> Pair(11, "Grand Father")
+                        "Grand Mother" -> Pair(12, "Grand Mother")
+                        "Father in Law" -> Pair(13, "Father in Law")
+                        "Mother in Law" -> Pair(14, "Mother in Law")
+                        "Grand Son" -> Pair(15, "Grand Son")
+                        "Grand Daughter" -> Pair(16, "Grand Daughter")
+                        "Son in Law" -> Pair(17, "Son in Law")
+                        "Daughter in Law" -> Pair(18, "Daughter in Law")
+                        "Sister in Law" -> Pair(20, "Sister in Law")
+                        else -> Pair(21, "Other")
                     }
                     viewModel.linkBenToHousehold(hhId, relationPos, relationName)
                     Toast.makeText(requireContext(), "Linked to household successfully", Toast.LENGTH_SHORT).show()
