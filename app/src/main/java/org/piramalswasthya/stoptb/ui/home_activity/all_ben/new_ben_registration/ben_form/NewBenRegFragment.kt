@@ -256,7 +256,7 @@ class NewBenRegFragment : Fragment() {
         viewModel.recordExists.observe(viewLifecycleOwner) { recordExists ->
             binding.fabEdit.visibility = if (recordExists && !isNurse) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (recordExists) View.GONE else View.VISIBLE
-            binding.btnLinkHousehold.visibility = if (viewModel.showLinkHouseholdButton) View.VISIBLE else View.GONE
+            binding.btnLinkHousehold.visibility = if (!recordExists && viewModel.showLinkHouseholdButton) View.VISIBLE else View.GONE
             adapter.isEnabled = !recordExists
             if (viewModel.isStandalone) {
                 binding.btnRefreshLocation.isEnabled = !recordExists
@@ -589,7 +589,9 @@ class NewBenRegFragment : Fragment() {
     // ─── onStart ──────────────────────────────────────────────────────────
     override fun onStart() {
         super.onStart()
+        val isNonHH = viewModel.isNonHHArg || (viewModel.benIdFromArgs != 0L && viewModel.showLinkHouseholdButton)
         val title = when {
+            isNonHH                     -> "New Non-Household Beneficiary Registration"
             viewModel.relToHeadId == 18 -> getString(R.string.frag_nhhr_title)
             viewModel.relToHeadId > 0   -> getString(R.string.title_new_ben_reg_non_hof)
             else                        -> getString(R.string.frag_new_ben_reg_type_title)
@@ -837,84 +839,177 @@ class NewBenRegFragment : Fragment() {
                 Toast.makeText(requireContext(), "No existing households found in this village", Toast.LENGTH_SHORT).show()
                 return@launch
             }
-            
-            val hhNames = hhList.map { hh ->
+
+            data class HouseholdSearchItem(
+                val displayText: String,
+                val hhId: Long,
+                val headName: String,
+                val famName: String
+            )
+
+            val searchItems = hhList.map { hh ->
                 val headName = hh.household.family?.familyHeadName ?: "No Head Name"
                 val famName = hh.household.family?.familyName ?: ""
-                "Head: $headName $famName (HH ID: ${hh.household.householdId})"
-            }.toTypedArray()
-            
-            MaterialAlertDialogBuilder(requireContext())
+                val displayText = "Head: $headName $famName (HH ID: ${hh.household.householdId})"
+                HouseholdSearchItem(displayText, hh.household.householdId, headName, famName)
+            }
+
+            val context = requireContext()
+            val container = android.widget.LinearLayout(context).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                val paddingPx = (16 * context.resources.displayMetrics.density).toInt()
+                setPadding(paddingPx, paddingPx, paddingPx, 0)
+            }
+
+            val searchInput = android.widget.EditText(context).apply {
+                hint = "Search by name or ID..."
+                setSingleLine(true)
+                maxLines = 1
+                val searchIcon = androidx.core.content.ContextCompat.getDrawable(context, android.R.drawable.ic_menu_search)
+                setCompoundDrawablesWithIntrinsicBounds(searchIcon, null, null, null)
+                compoundDrawablePadding = (8 * context.resources.displayMetrics.density).toInt()
+                val p = (10 * context.resources.displayMetrics.density).toInt()
+                setPadding(p, p, p, p)
+            }
+            container.addView(searchInput)
+
+            val adapterList = searchItems.map { it.displayText }.toMutableList()
+            val arrayAdapter = android.widget.ArrayAdapter(context, android.R.layout.simple_list_item_1, adapterList)
+
+            var filteredItems = searchItems.toList()
+
+            val listView = android.widget.ListView(context).apply {
+                adapter = arrayAdapter
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    (300 * context.resources.displayMetrics.density).toInt()
+                )
+            }
+            container.addView(listView)
+
+            val tvEmptyResult = android.widget.TextView(context).apply {
+                text = "No matching result found"
+                gravity = android.view.Gravity.CENTER
+                visibility = android.view.View.GONE
+                val p = (16 * context.resources.displayMetrics.density).toInt()
+                setPadding(p, p, p, p)
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium)
+            }
+            container.addView(tvEmptyResult)
+
+            val dialog = MaterialAlertDialogBuilder(context)
                 .setTitle("Select Household")
-                .setItems(hhNames, android.content.DialogInterface.OnClickListener { selectDialog, index ->
-                    selectDialog.dismiss()
-                    val selectedHh = hhList[index]
-                    showRelationshipSelectionDialog(benId, selectedHh.household.householdId)
-                })
-                .show()
+                .setView(container)
+                .setNegativeButton("Cancel", null)
+                .create()
+
+            searchInput.addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    val query = s.toString().trim()
+                    filteredItems = if (query.isEmpty()) {
+                        searchItems
+                    } else {
+                        searchItems.filter { item ->
+                            item.headName.contains(query, ignoreCase = true) ||
+                            item.famName.contains(query, ignoreCase = true) ||
+                            item.hhId.toString().contains(query, ignoreCase = true)
+                        }
+                    }
+                    arrayAdapter.clear()
+                    arrayAdapter.addAll(filteredItems.map { it.displayText })
+                    arrayAdapter.notifyDataSetChanged()
+
+                    if (filteredItems.isEmpty()) {
+                        listView.visibility = android.view.View.GONE
+                        tvEmptyResult.visibility = android.view.View.VISIBLE
+                    } else {
+                        listView.visibility = android.view.View.VISIBLE
+                        tvEmptyResult.visibility = android.view.View.GONE
+                    }
+                }
+                override fun afterTextChanged(s: android.text.Editable?) {}
+            })
+
+            listView.setOnItemClickListener { _, _, position, _ ->
+                dialog.dismiss()
+                if (position in filteredItems.indices) {
+                    val selected = filteredItems[position]
+                    showRelationshipSelectionDialog(benId, selected.hhId)
+                }
+            }
+
+            dialog.show()
         }
     }
 
     private fun showRelationshipSelectionDialog(benId: Long, hhId: Long) {
-        val relations = arrayOf("Self", "Spouse", "Son", "Daughter", "Mother", "Father", "Brother", "Sister", "Other")
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle("Select Relationship to HOF")
-            .setItems(relations, android.content.DialogInterface.OnClickListener { dialog, index ->
-                dialog.dismiss()
-                val selectedRelation = relations[index]
-                lifecycleScope.launch {
-                    val ben = viewModel.getBenFromId(benId) ?: return@launch
-                    val relationPos: Int
-                    val relationName: String
-                    when (selectedRelation) {
-                        "Self" -> {
-                            relationPos = 19
-                            relationName = "Self"
-                        }
-                        "Spouse" -> {
-                            if (ben.genderId == 1) {
-                                relationPos = 6
-                                relationName = "Husband"
-                            } else {
-                                relationPos = 5
-                                relationName = "Wife"
-                            }
-                        }
-                        "Son" -> {
-                            relationPos = 9
-                            relationName = "Son"
-                        }
-                        "Daughter" -> {
-                            relationPos = 10
-                            relationName = "Daughter"
-                        }
-                        "Mother" -> {
-                            relationPos = 1
-                            relationName = "Mother"
-                        }
-                        "Father" -> {
-                            relationPos = 2
-                            relationName = "Father"
-                        }
-                        "Brother" -> {
-                            relationPos = 3
-                            relationName = "Brother"
-                        }
-                        "Sister" -> {
-                            relationPos = 4
-                            relationName = "Sister"
-                        }
-                        else -> {
-                            relationPos = 21
-                            relationName = "Other"
-                        }
+        lifecycleScope.launch {
+            val ben = viewModel.getBenFromId(benId) ?: return@launch
+            val isFemale = ben.genderId == 2 || ben.gender?.name?.equals("FEMALE", ignoreCase = true) == true
+
+            val relations = if (isFemale) {
+                arrayOf(
+                    "Mother",
+                    "Sister",
+                    "Wife",
+                    "Niece",
+                    "Daughter",
+                    "Grand Mother",
+                    "Mother in Law",
+                    "Grand Daughter",
+                    "Daughter in Law",
+                    "Sister in Law",
+                    "Other"
+                )
+            } else {
+                arrayOf(
+                    "Father",
+                    "Brother",
+                    "Husband",
+                    "Nephew",
+                    "Son",
+                    "Grand Father",
+                    "Father in Law",
+                    "Grand Son",
+                    "Son in Law",
+                    "Other"
+                )
+            }
+
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Select Relationship to HOF")
+                .setItems(relations, android.content.DialogInterface.OnClickListener { dialog, index ->
+                    dialog.dismiss()
+                    val selectedRelation = relations[index]
+                    val (relationPos, relationName) = when (selectedRelation) {
+                        "Mother" -> Pair(1, "Mother")
+                        "Father" -> Pair(2, "Father")
+                        "Brother" -> Pair(3, "Brother")
+                        "Sister" -> Pair(4, "Sister")
+                        "Wife" -> Pair(5, "Wife")
+                        "Husband" -> Pair(6, "Husband")
+                        "Nephew" -> Pair(7, "Nephew")
+                        "Niece" -> Pair(8, "Niece")
+                        "Son" -> Pair(9, "Son")
+                        "Daughter" -> Pair(10, "Daughter")
+                        "Grand Father" -> Pair(11, "Grand Father")
+                        "Grand Mother" -> Pair(12, "Grand Mother")
+                        "Father in Law" -> Pair(13, "Father in Law")
+                        "Mother in Law" -> Pair(14, "Mother in Law")
+                        "Grand Son" -> Pair(15, "Grand Son")
+                        "Grand Daughter" -> Pair(16, "Grand Daughter")
+                        "Son in Law" -> Pair(17, "Son in Law")
+                        "Daughter in Law" -> Pair(18, "Daughter in Law")
+                        "Sister in Law" -> Pair(20, "Sister in Law")
+                        else -> Pair(21, "Other")
                     }
                     viewModel.linkBenToHousehold(hhId, relationPos, relationName)
                     Toast.makeText(requireContext(), "Linked to household successfully", Toast.LENGTH_SHORT).show()
                     org.piramalswasthya.stoptb.work.WorkerUtils.triggerAmritPushWorker(requireContext())
                     findNavController().navigateUp()
-                }
-            })
-            .show()
+                })
+                .show()
+        }
     }
 }

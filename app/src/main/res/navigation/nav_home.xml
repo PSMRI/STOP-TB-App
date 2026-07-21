@@ -560,7 +560,7 @@
     <fragment
         android:id="@+id/nonHHFragment"
         android:name="org.piramalswasthya.stoptb.ui.home_activity.non_hh.NonHHFragment"
-        android:label="Non-Household List">
+        android:label="Non Household Beneficiaries">
         <action
             android:id="@+id/action_nonHHFragment_to_currentLivingInfoFragment"
             app:destination="@id/currentLivingInfoFragment" />

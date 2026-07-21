@@ -128,6 +128,7 @@ class BenListAdapter(
             if (isNonHH) {
                 binding.ivIsHead.visibility = View.VISIBLE
                 binding.ivIsHead.setImageResource(R.drawable.ic_no_hh)
+                binding.ivIsHead.imageTintList = null
             } else {
                 binding.ivIsHead.setImageResource(R.drawable.ic__hh)
                 binding.ivIsHead.imageTintList = android.content.res.ColorStateList.valueOf(
