@@ -974,6 +974,19 @@
     <string name="dialog_no">नहीं</string>
     <string name="patient_registered_successfully">रोगी का पंजीकरण सफलतापूर्वक हुआ।</string>
     <string name="proceed_to_register_hof">क्या आप परिवार के मुखिया के पंजीकरण के साथ आगे बढ़ना चाहते हैं?</string>
+    <string name="care_context_creation_title">केयर कॉन्टेक्स्ट निर्माण</string>
+    <string name="care_context_creation_subtitle">प्रिस्क्रिप्शन सबमिट होने के बाद केयर कॉन्टेक्स्ट बनाने के लिए OTP सत्यापित करें।</string>
+    <string name="care_context_abha_label">आभा नंबर</string>
+    <string name="care_context_enter_otp_hint">OTP दर्ज करें</string>
+    <string name="care_context_enter_otp">कृपया OTP दर्ज करें।</string>
+    <string name="care_context_verify_otp">OTP सत्यापित करें</string>
+    <string name="care_context_visit_code_value">विजिट कोड: %1$d</string>
+    <string name="abha_care_context">आभा केयर कॉन्टेक्स्ट</string>
+    <string name="otp_sent">OTP सफलतापूर्वक भेजा गया।</string>
+    <string name="otp_verified_success">केयर कॉन्टेक्स्ट सफलतापूर्वक बन गया।</string>
+    <string name="care_context_confirmation_title">केयर कॉन्टेक्स्ट</string>
+    <string name="care_context_confirmation_message">क्या आप केयर कॉन्टेक्स्ट बनाना चाहते हैं?</string>
+    <string name="care_context_no_abha_message">कोई ABHA उपलब्ध नहीं है।</string>
 </resources>
 
 

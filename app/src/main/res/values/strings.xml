@@ -1149,6 +1149,19 @@
     <string name="duration">Duration</string>
     <string name="notes_remarks">Notes / Remarks</string>
     <string name="general_opd_submitted">General OPD submitted</string>
+    <string name="care_context_creation_title">Care Context Creation</string>
+    <string name="care_context_creation_subtitle">Prescription submit hone ke baad Care Context create karne ke liye OTP verify karein.</string>
+    <string name="care_context_abha_label">ABHA Number</string>
+    <string name="care_context_enter_otp_hint">Enter OTP</string>
+    <string name="care_context_enter_otp">Please enter OTP.</string>
+    <string name="care_context_verify_otp">Verify OTP</string>
+    <string name="care_context_visit_code_value">Visit Code: %1$d</string>
+    <string name="abha_care_context">ABHA Care Context</string>
+    <string name="otp_sent">OTP sent successfully.</string>
+    <string name="otp_verified_success">Care Context created successfully.</string>
+    <string name="care_context_confirmation_title">Care Context</string>
+    <string name="care_context_confirmation_message">Do you want to care context?</string>
+    <string name="care_context_no_abha_message">No ABHA present.</string>
     <string name="general_opd_medication_required_error">Medication is required when a chief complaint is selected.</string>
 
     <string-array name="general_opd_chief_complaint_array">

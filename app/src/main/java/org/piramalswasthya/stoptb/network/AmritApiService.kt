@@ -160,6 +160,20 @@ interface AmritApiService {
     @POST("fhir-api/healthID/getBenhealthID")
     suspend fun getBenHealthID(@Body getBenHealthIdRequest: GetBenHealthIdRequest): Response<ResponseBody>
 
+    @GET("common-api/facility/getWorklocationMappedAbdmFacility/{providerServiceMapId}")
+    suspend fun getWorklocationMappedAbdmFacility(
+        @Path("providerServiceMapId") providerServiceMapId: Int
+    ): Response<ResponseBody>
+
+    @POST("fhir-api/facility/saveAbdmFacilityId")
+    suspend fun saveAbdmFacilityId(@Body request: SaveAbdmFacilityIdRequest): Response<ResponseBody>
+
+    @POST("fhir-api/careContext/generateOTPForCareContext")
+    suspend fun generateOTPForCareContext(@Body request: CareContextGenerateOtpRequest): Response<ResponseBody>
+
+    @POST("fhir-api/careContext/validateOTPAndCreateCareContext")
+    suspend fun validateOTPAndCreateCareContext(@Body request: CareContextValidateOtpRequest): Response<ResponseBody>
+
     @POST("fhir-api/healthIDRecord/mapHealthIDToBeneficiary")
     suspend fun mapHealthIDToBeneficiary(@Body mapHIDtoBeneficiary: MapHIDtoBeneficiary): Response<ResponseBody>
 

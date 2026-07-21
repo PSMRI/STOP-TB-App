@@ -17,10 +17,12 @@ import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.network.AmritApiService
+import org.piramalswasthya.stoptb.network.AbdmMappedFacilityResponse
 import org.piramalswasthya.stoptb.network.GeneralOpdRequestDTO
 import org.piramalswasthya.stoptb.network.GeneralOpdSaveResponse
 import org.piramalswasthya.stoptb.network.GeneralOpdSaveRequest
 import org.piramalswasthya.stoptb.network.GetDataPaginatedRequest
+import org.piramalswasthya.stoptb.network.SaveAbdmFacilityIdRequest
 import org.piramalswasthya.stoptb.network.StopTbVillageRequest
 import org.piramalswasthya.stoptb.network.TBConfirmedRequestDTO
 import org.piramalswasthya.stoptb.network.TBDiagnosticsRequestDTO
@@ -41,6 +43,8 @@ class TBRepo @Inject constructor(
     private val userRepo: UserRepo,
     private val tmcNetworkApiService: AmritApiService
 ) {
+    private val gson = Gson()
+
 
     suspend fun getTBScreening(benId: Long): TBScreeningCache? {
         return withContext(Dispatchers.IO) {
@@ -1115,13 +1119,76 @@ class TBRepo @Inject constructor(
     }
 
     private suspend fun updateVisitCodeGeneralOpdFromSaveResponse(responseString: String) {
-        val payload = Gson().fromJson(responseString, GeneralOpdSaveResponse::class.java)
+        val payload = gson.fromJson(responseString, GeneralOpdSaveResponse::class.java)
+        val providerServiceMapId = preferenceDao.getLoggedInUser()?.serviceMapId
         payload?.data?.forEach { item ->
             val benRegId = item.beneficiaryRegID?.takeIf { it > 0L } ?: return@forEach
             val visitCode = item.visitCode?.takeIf { it > 0L } ?: return@forEach
             val ben = benDao.getBenByRegId(benRegId) ?: return@forEach
             val existing = tbDao.getGeneralOpd(ben.beneficiaryId) ?: return@forEach
             tbDao.saveGeneralOpd(existing.copy(visitCode = visitCode))
+            providerServiceMapId?.let {
+                saveAbdmFacilityIdAgainstVisit(visitCode, it)
+            }
+        }
+    }
+
+    private suspend fun saveAbdmFacilityIdAgainstVisit(
+        visitCode: Long,
+        providerServiceMapId: Int
+    ) {
+        val abdmFacilityId = resolveAbdmFacilityId(providerServiceMapId)
+        try {
+            val response = tmcNetworkApiService.saveAbdmFacilityId(
+                SaveAbdmFacilityIdRequest(
+                    visitCode = visitCode,
+                    abdmFacilityId = abdmFacilityId
+                )
+            )
+            if (!response.isSuccessful) {
+                Timber.w(
+                    "saveAbdmFacilityId failed for visitCode=$visitCode with HTTP ${response.code()} using abdmFacilityId=$abdmFacilityId"
+                )
+                return
+            }
+
+            val responseString = response.body()?.string().orEmpty()
+            Timber.d(
+                "saveAbdmFacilityId success for visitCode=$visitCode using abdmFacilityId=$abdmFacilityId response=$responseString"
+            )
+        } catch (e: Exception) {
+            Timber.w(
+                e,
+                "saveAbdmFacilityId exception for visitCode=$visitCode using abdmFacilityId=$abdmFacilityId"
+            )
+        }
+    }
+
+    private suspend fun resolveAbdmFacilityId(providerServiceMapId: Int): String {
+        return try {
+            val response = tmcNetworkApiService.getWorklocationMappedAbdmFacility(providerServiceMapId)
+            if (!response.isSuccessful) {
+                Timber.w(
+                    "getWorklocationMappedAbdmFacility failed for providerServiceMapId=$providerServiceMapId with HTTP ${response.code()}, using fallback"
+                )
+                return DEFAULT_ABDM_FACILITY_ID
+            }
+
+            val responseString = response.body()?.string().orEmpty()
+            val payload = gson.fromJson(responseString, AbdmMappedFacilityResponse::class.java)
+            payload?.data?.abdmFacilityID
+                ?.takeIf { it.isNotBlank() }
+                ?: DEFAULT_ABDM_FACILITY_ID.also {
+                    Timber.w(
+                        "ABDM facility mapping empty for providerServiceMapId=$providerServiceMapId, using fallback $it"
+                    )
+                }
+        } catch (e: Exception) {
+            Timber.w(
+                e,
+                "getWorklocationMappedAbdmFacility exception for providerServiceMapId=$providerServiceMapId, using fallback"
+            )
+            DEFAULT_ABDM_FACILITY_ID
         }
     }
 
@@ -1147,6 +1214,7 @@ class TBRepo @Inject constructor(
     }
 
     companion object {
+        private const val DEFAULT_ABDM_FACILITY_ID = "Test_HIP_Amrit"
         private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
         private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.ENGLISH)
         private fun getCurrentDate(millis: Long = System.currentTimeMillis()): String {

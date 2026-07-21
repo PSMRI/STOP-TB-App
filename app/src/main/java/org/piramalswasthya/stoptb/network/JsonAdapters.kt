@@ -77,6 +77,97 @@ data class GetDataPaginatedRequests(
 )
 
 @JsonClass(generateAdapter = true)
+data class AbdmMappedFacilityResponse(
+    val data: AbdmMappedFacilityData? = null,
+    val statusCode: Int? = null,
+    val errorMessage: String? = null,
+    val status: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AbdmMappedFacilityData(
+    val pSAddMapID: Int? = null,
+    val providerServiceMapID: Int? = null,
+    val districtID: Int? = null,
+    val address: String? = null,
+    val deleted: Boolean? = null,
+    val createdBy: String? = null,
+    val createdDate: String? = null,
+    val lastModDate: String? = null,
+    @SerializedName("abdmFacilityID")
+    val abdmFacilityID: String? = null,
+    @SerializedName("abdmFacilityName")
+    val abdmFacilityName: String? = null,
+    val locationName: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class SaveAbdmFacilityIdRequest(
+    val visitCode: Long,
+    val abdmFacilityId: String
+)
+
+@JsonClass(generateAdapter = true)
+data class SaveAbdmFacilityIdResponse(
+    val data: SaveAbdmFacilityIdData? = null,
+    val statusCode: Int? = null,
+    val errorMessage: String? = null,
+    val status: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class SaveAbdmFacilityIdData(
+    val response: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class CareContextGenerateOtpRequest(
+    val healthID: String,
+    val healthIdNumber: String,
+    val abdmFacilityId: String,
+    val abdmFacilityName: String
+)
+
+@JsonClass(generateAdapter = true)
+data class CareContextGenerateOtpResponse(
+    val data: CareContextGenerateOtpData? = null,
+    val statusCode: Int? = null,
+    val errorMessage: String? = null,
+    val status: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class CareContextGenerateOtpData(
+    val txnId: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class CareContextValidateOtpRequest(
+    val otp: String,
+    val txnId: String,
+    val beneficiaryID: Long,
+    val healthID: String,
+    val healthIdNumber: String,
+    val visitCode: Long,
+    val visitCategory: String,
+    val abdmFacilityId: String,
+    val abdmFacilityName: String
+)
+
+@JsonClass(generateAdapter = true)
+data class CareContextValidateOtpResponse(
+    val data: CareContextValidateOtpData? = null,
+    val statusCode: Int? = null,
+    val errorMessage: String? = null,
+    val status: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class CareContextValidateOtpData(
+    val response: String? = null
+)
+
+@JsonClass(generateAdapter = true)
 data class NurseWorklistRequest(
     val providerServiceMapID: Int,
     val villageId: Int,
