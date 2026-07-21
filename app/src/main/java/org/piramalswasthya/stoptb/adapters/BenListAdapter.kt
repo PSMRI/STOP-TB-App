@@ -424,11 +424,11 @@ class BenListAdapter(
                 Pair(filled, 4)
             }
             binding.btnExamine.text = "Examine ($examineFilledCount/$examineTotal)"
-            val allExamineFilled = examineFilledCount == examineTotal
+            val isExamineFilled = examineFilledCount > 0
             binding.btnExamine.setBackgroundTintList(
                 ContextCompat.getColorStateList(
                     binding.root.context,
-                    if (allExamineFilled) android.R.color.holo_green_dark else android.R.color.holo_red_dark
+                    if (isExamineFilled) android.R.color.holo_green_dark else android.R.color.holo_red_dark
                 )
             )
             binding.btnExamine.setTextColor(

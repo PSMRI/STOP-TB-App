@@ -58,7 +58,7 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     }
 
     private fun updateTitle() {
-        val title = "Non Household Beneficiaries"
+        val title = "All Non Household Beneficiaries"
         activity?.let {
             when (it) {
                 is HomeActivity -> it.updateActionBar(R.drawable.ic__ben, title)
