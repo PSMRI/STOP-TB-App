@@ -256,7 +256,7 @@ class NewBenRegFragment : Fragment() {
         viewModel.recordExists.observe(viewLifecycleOwner) { recordExists ->
             binding.fabEdit.visibility = if (recordExists && !isNurse) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (recordExists) View.GONE else View.VISIBLE
-            binding.btnLinkHousehold.visibility = if (viewModel.showLinkHouseholdButton) View.VISIBLE else View.GONE
+            binding.btnLinkHousehold.visibility = if (!recordExists && viewModel.showLinkHouseholdButton) View.VISIBLE else View.GONE
             adapter.isEnabled = !recordExists
             if (viewModel.isStandalone) {
                 binding.btnRefreshLocation.isEnabled = !recordExists
