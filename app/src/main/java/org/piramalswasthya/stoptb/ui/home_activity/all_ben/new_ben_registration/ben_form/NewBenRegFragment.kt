@@ -944,23 +944,27 @@ class NewBenRegFragment : Fragment() {
     }
 
     private fun showRelationshipSelectionDialog(benId: Long, hhId: Long) {
-        val relations = arrayOf("Self", "Spouse", "Son", "Daughter", "Mother", "Father", "Brother", "Sister", "Other")
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle("Select Relationship to HOF")
-            .setItems(relations, android.content.DialogInterface.OnClickListener { dialog, index ->
-                dialog.dismiss()
-                val selectedRelation = relations[index]
-                lifecycleScope.launch {
-                    val ben = viewModel.getBenFromId(benId) ?: return@launch
+        lifecycleScope.launch {
+            val ben = viewModel.getBenFromId(benId) ?: return@launch
+            val isMale = ben.genderId == 1 || ben.gender?.name?.equals("MALE", ignoreCase = true) == true
+            val isFemale = ben.genderId == 2 || ben.gender?.name?.equals("FEMALE", ignoreCase = true) == true
+
+            val relations = when {
+                isMale -> arrayOf("Spouse", "Son", "Father", "Brother", "Other")
+                isFemale -> arrayOf("Spouse", "Daughter", "Mother", "Sister", "Other")
+                else -> arrayOf("Spouse", "Son", "Daughter", "Mother", "Father", "Brother", "Sister", "Other")
+            }
+
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Select Relationship to HOF")
+                .setItems(relations, android.content.DialogInterface.OnClickListener { dialog, index ->
+                    dialog.dismiss()
+                    val selectedRelation = relations[index]
                     val relationPos: Int
                     val relationName: String
                     when (selectedRelation) {
-                        "Self" -> {
-                            relationPos = 19
-                            relationName = "Self"
-                        }
                         "Spouse" -> {
-                            if (ben.genderId == 1) {
+                            if (isMale) {
                                 relationPos = 6
                                 relationName = "Husband"
                             } else {
@@ -1001,8 +1005,8 @@ class NewBenRegFragment : Fragment() {
                     Toast.makeText(requireContext(), "Linked to household successfully", Toast.LENGTH_SHORT).show()
                     org.piramalswasthya.stoptb.work.WorkerUtils.triggerAmritPushWorker(requireContext())
                     findNavController().navigateUp()
-                }
-            })
-            .show()
+                })
+                .show()
+        }
     }
 }
