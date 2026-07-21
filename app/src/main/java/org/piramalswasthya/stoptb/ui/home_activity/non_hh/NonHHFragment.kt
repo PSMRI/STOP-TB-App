@@ -127,7 +127,11 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.nonHHList.collectLatest { list ->
-                benAdapter.submitList(list)
+                benAdapter.submitList(list) {
+                    if (_binding != null && list.isNotEmpty()) {
+                        binding.rvAny.scrollToPosition(0)
+                    }
+                }
                 if (_binding != null) {
                     if (list.isEmpty()) {
                         binding.flEmpty.visibility = View.VISIBLE
