@@ -115,6 +115,7 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 }
             ),
             showBeneficiaries = true,
+            showRegistrationDate = true,
             showSyncIcon = true,
             showCall = true,
             role = roleName?.let { if (it.isNurseRole()) 2 else 0 } ?: 0,
