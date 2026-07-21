@@ -141,28 +141,15 @@ class BenListAdapter(
             binding.btnAbove30.visibility = View.GONE
             binding.btnVitalScreen.visibility = when {
                 showResultButton && !item.isDeath && !item.isDeactivate -> View.VISIBLE
-                showActionButtons && !item.isDeath && !item.isDeactivate -> View.VISIBLE
                 else -> View.GONE
             }
-            binding.btnGeneralOpd.visibility = when {
-                !showActionButtons -> View.GONE
-                role == 1          -> View.GONE
-                hasDiagnosis       -> View.VISIBLE
-                hasTbScreening     -> View.VISIBLE
-                pref?.getLoggedInUser()?.role.isNurseRole() -> View.VISIBLE
-                else -> View.GONE
-            }
-            binding.llGeneralOpdRow.visibility = binding.btnGeneralOpd.visibility
-            binding.llGeneralOpdAction.visibility = binding.btnGeneralOpd.visibility
 
-            binding.btnAnthropometry.visibility = when {
-                !showActionButtons -> View.GONE
-                showAnthropometryButton -> View.VISIBLE
-                pref?.getLoggedInUser()?.role.isRegistrationOfficerRole() -> View.VISIBLE
-                pref?.getLoggedInUser()?.role.isNurseRole() -> View.VISIBLE
-                else -> View.GONE
-            }
-            binding.llAnthropometryAction.visibility = binding.btnAnthropometry.visibility
+            binding.btnGeneralOpd.visibility = View.GONE
+            binding.llGeneralOpdRow.visibility = View.GONE
+            binding.llGeneralOpdAction.visibility = View.GONE
+
+            binding.btnAnthropometry.visibility = View.GONE
+            binding.llAnthropometryAction.visibility = View.GONE
 
             if (binding.btnVitalScreen.visibility == View.VISIBLE) {
                 if (showResultButton) {
