@@ -589,7 +589,9 @@ class NewBenRegFragment : Fragment() {
     // ─── onStart ──────────────────────────────────────────────────────────
     override fun onStart() {
         super.onStart()
+        val isNonHH = viewModel.isNonHHArg || (viewModel.benIdFromArgs != 0L && viewModel.showLinkHouseholdButton)
         val title = when {
+            isNonHH                     -> "New Non-Household Beneficiary Registration"
             viewModel.relToHeadId == 18 -> getString(R.string.frag_nhhr_title)
             viewModel.relToHeadId > 0   -> getString(R.string.title_new_ben_reg_non_hof)
             else                        -> getString(R.string.frag_new_ben_reg_type_title)

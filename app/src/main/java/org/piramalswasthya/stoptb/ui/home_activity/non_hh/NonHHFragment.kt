@@ -9,7 +9,9 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
@@ -26,6 +28,8 @@ import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import androidx.core.os.bundleOf
 import javax.inject.Inject
+import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
+import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 
 @AndroidEntryPoint
 class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
@@ -46,6 +50,21 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         binding.searchView.setText(lowerValue)
         binding.searchView.setSelection(lowerValue.length)
         viewModel.filterText(lowerValue)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        updateTitle()
+    }
+
+    private fun updateTitle() {
+        val title = "Non Household Beneficiaries"
+        activity?.let {
+            when (it) {
+                is HomeActivity -> it.updateActionBar(R.drawable.ic__ben, title)
+                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ben, title)
+            }
+        }
     }
 
     override fun onCreateView(
@@ -124,6 +143,12 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             showActionButtons = false
         )
 
+        benAdapter.submitBenIds(viewModel.vitalBenIds.value)
+        benAdapter.submitTbScreeningBenIds(viewModel.tbScreeningBenIds.value)
+        benAdapter.submitGeneralOpdBenIds(viewModel.generalOpdBenIds.value)
+        benAdapter.submitAnthropometryBenIds(viewModel.anthropometryBenIds.value)
+        benAdapter.submitDiagnosisBenIds(viewModel.diagnosisBenIds.value)
+
         binding.rvAny.adapter = benAdapter
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -142,6 +167,16 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         binding.rvAny.visibility = View.VISIBLE
                     }
                 }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch { viewModel.vitalBenIds.collect { benAdapter.submitBenIds(it) } }
+                launch { viewModel.tbScreeningBenIds.collect { benAdapter.submitTbScreeningBenIds(it) } }
+                launch { viewModel.generalOpdBenIds.collect { benAdapter.submitGeneralOpdBenIds(it) } }
+                launch { viewModel.anthropometryBenIds.collect { benAdapter.submitAnthropometryBenIds(it) } }
+                launch { viewModel.diagnosisBenIds.collect { benAdapter.submitDiagnosisBenIds(it) } }
             }
         }
     }
@@ -419,6 +454,7 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     override fun onResume() {
         super.onResume()
+        updateTitle()
         val sh = findNavController().currentBackStackEntry?.savedStateHandle
         if (sh?.remove<Boolean>("examine_flow_done") == true) {
             pendingExamineBenId = null

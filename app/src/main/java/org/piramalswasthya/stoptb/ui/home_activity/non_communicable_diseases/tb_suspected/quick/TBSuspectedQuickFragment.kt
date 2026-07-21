@@ -131,27 +131,7 @@ class TBSuspectedQuickFragment : Fragment() {
                         Toast.LENGTH_SHORT
                     ).show()
                     WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
-                    if (viewModel.viewOnly) {
-                        findNavController().navigateUp()
-                    } else {
-                        // Signal AllBenFragment to clear pendingExamineBenId so the
-                        // BottomSheet does NOT re-open after the flow is complete.
-                        try {
-                            findNavController()
-                                .getBackStackEntry(R.id.allBenFragment)
-                                .savedStateHandle["examine_flow_done"] = true
-                        } catch (_: Exception) { /* AllBenFragment not in stack — edge case */ }
-
-                        // Pop all examine-flow forms off the back stack and return to the
-                        // existing AllBenFragment instance (not a new one).
-                        val returnedToList = findNavController().popBackStack(R.id.allBenFragment, false)
-                        if (!returnedToList) {
-                            val popped = findNavController().popBackStack()
-                            if (!popped) {
-                                findNavController().navigateUp()
-                            }
-                        }
-                    }
+                    findNavController().navigateUp()
                 }
 
                 TBSuspectedQuickViewModel.State.SAVE_FAILED -> {

@@ -11,11 +11,14 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.combine
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.HouseholdBasicCache
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
+import org.piramalswasthya.stoptb.repositories.TBRepo
+import org.piramalswasthya.stoptb.repositories.VitalRepo
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -23,8 +26,26 @@ import javax.inject.Inject
 class NonHHViewModel @Inject constructor(
     private val recordsRepo: RecordsRepo,
     private val benRepo: BenRepo,
+    private val vitalRepo: VitalRepo,
+    private val tbRepo: TBRepo,
     private val preferenceDao: PreferenceDao
 ) : ViewModel() {
+
+    // ── Examine form fill status ──────────────────────────────────────────────
+    val vitalBenIds: StateFlow<List<Long>> = vitalRepo.vitalBenIds
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val tbScreeningBenIds: StateFlow<List<Long>> = tbRepo.tbScreeningBenIds
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val generalOpdBenIds: StateFlow<List<Long>> = tbRepo.generalOpdBenIds
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val anthropometryBenIds: StateFlow<List<Long>> = recordsRepo.anthropometryFilledBenIds
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val diagnosisBenIds: StateFlow<List<Long>> = combine(
+        tbRepo.tbDiagnosticsBenIds,
+        tbRepo.tbSuspectedBenIds
+    ) { diagnostics, suspected -> (diagnostics + suspected).distinct() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> get() = _searchQuery
