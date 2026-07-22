@@ -238,6 +238,97 @@ class BenRepo @Inject constructor(
                 ben.syncState = SyncState.UNSYNCED
                 ben.processed = "U"
                 ben.serverUpdatedStatus = 2
+
+                // If linked as Wife (5) or Husband (6), back-link the spouse name of the Head of Family
+                if (relationPos == 5 || relationPos == 6) {
+                    val linkedFullName = listOfNotNull(ben.firstName?.trim(), ben.lastName?.trim())
+                        .filter { it.isNotBlank() }
+                        .joinToString(" ")
+                    if (linkedFullName.isNotBlank()) {
+                        // Find the HoF (relPosition = 19) in the same household
+                        benDao.getAllBenForHousehold(hhId).firstOrNull { it.familyHeadRelationPosition == 19 }?.let { hofBen ->
+                            // Update HoF's spouseName and set isSpouseAdded = true
+                            if (hofBen.genDetails == null) {
+                                hofBen.genDetails = BenRegGen(spouseName = linkedFullName)
+                            } else {
+                                hofBen.genDetails!!.spouseName = linkedFullName
+                            }
+                            hofBen.genDetails!!.maritalStatusId = 2
+                            hofBen.genDetails!!.maritalStatus = "Married"
+                            hofBen.isSpouseAdded = true
+                            hofBen.syncState = SyncState.UNSYNCED
+                            hofBen.processed = "U"
+                            hofBen.serverUpdatedStatus = 2
+                            benDao.updateBen(hofBen)
+
+                            // Also back-link the HoF's name as the spouseName of the linked member
+                            val hofFullName = listOfNotNull(hofBen.firstName?.trim(), hofBen.lastName?.trim())
+                                .filter { it.isNotBlank() }
+                                .joinToString(" ")
+                            if (hofFullName.isNotBlank()) {
+                                if (ben.genDetails == null) {
+                                    ben.genDetails = BenRegGen(spouseName = hofFullName)
+                                } else {
+                                    ben.genDetails!!.spouseName = hofFullName
+                                }
+                                ben.genDetails!!.maritalStatusId = 2
+                                ben.genDetails!!.maritalStatus = "Married"
+                                ben.isSpouseAdded = true
+                            }
+                        }
+                    }
+                }
+                // If linked as Son (9) or Daughter (10)
+                else if (relationPos == 9 || relationPos == 10) {
+                    benDao.getAllBenForHousehold(hhId).firstOrNull { it.familyHeadRelationPosition == 19 }?.let { hofBen ->
+                        val hofFullName = listOfNotNull(hofBen.firstName?.trim(), hofBen.lastName?.trim())
+                            .filter { it.isNotBlank() }
+                            .joinToString(" ")
+                        if (hofFullName.isNotBlank()) {
+                            if (hofBen.genderId == 1) { // Male HOF is Father
+                                ben.fatherName = hofFullName
+                                // If HOF is married, set motherName to HOF's Wife's name
+                                hofBen.genDetails?.spouseName?.takeIf { it.isNotBlank() && it != "Not Available" }?.let { mother ->
+                                    ben.motherName = mother
+                                }
+                            } else if (hofBen.genderId == 2) { // Female HOF is Mother
+                                ben.motherName = hofFullName
+                                // If HOF is married, set fatherName to HOF's Husband's name
+                                hofBen.genDetails?.spouseName?.takeIf { it.isNotBlank() && it != "Not Available" }?.let { father ->
+                                    ben.fatherName = father
+                                }
+                            }
+                        }
+                    }
+                }
+                // If linked as Mother (1) or Father (2)
+                else if (relationPos == 1 || relationPos == 2) {
+                    val linkedFullName = listOfNotNull(ben.firstName?.trim(), ben.lastName?.trim())
+                        .filter { it.isNotBlank() }
+                        .joinToString(" ")
+                    if (linkedFullName.isNotBlank()) {
+                        val householdMembers = benDao.getAllBenForHousehold(hhId)
+                        householdMembers.forEach { member ->
+                            // Update HOF (19) or Sibling (Son 9 / Daughter 10)
+                            if (member.familyHeadRelationPosition == 19 || member.familyHeadRelationPosition == 9 || member.familyHeadRelationPosition == 10) {
+                                var updated = false
+                                if (relationPos == 1) { // Linked member is Mother
+                                    member.motherName = linkedFullName
+                                    updated = true
+                                } else if (relationPos == 2) { // Linked member is Father
+                                    member.fatherName = linkedFullName
+                                    updated = true
+                                }
+                                if (updated) {
+                                    member.syncState = SyncState.UNSYNCED
+                                    member.processed = "U"
+                                    member.serverUpdatedStatus = 2
+                                    benDao.updateBen(member)
+                                }
+                            }
+                        }
+                    }
+                }
                 benDao.updateBen(ben)
             }
         }

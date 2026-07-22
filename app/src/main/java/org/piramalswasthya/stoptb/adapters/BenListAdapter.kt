@@ -429,7 +429,7 @@ class BenListAdapter(
             // Register Wife / Register Husband — Registrar only (hidden for Nurse & Counselling officer)
             val isNurseRole = currentRole.isNurseRole()
             when {
-                !isNurseRole && !isCounsellingOfficer && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
+                !isNurseRole && !isCounsellingOfficer && !item.isNonHH && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
                         && !item.isDeath && !item.isDeactivate -> {
                     binding.llAddSpouseBtn.visibility = View.VISIBLE
                     binding.btnAddSpouse.visibility = View.VISIBLE
@@ -438,7 +438,7 @@ class BenListAdapter(
                         clickListener?.onClickedWifeBen(item)
                     }
                 }
-                (!isNurseRole && !isCounsellingOfficer) && item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
+                (!isNurseRole && !isCounsellingOfficer) && !item.isNonHH && item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
                         && !item.isDeath && !item.isDeactivate -> {
                     binding.llAddSpouseBtn.visibility = View.VISIBLE
                     binding.btnAddSpouse.visibility = View.VISIBLE
@@ -477,21 +477,22 @@ class BenListAdapter(
                 iconRes?.let { binding.ivHhLogo.setImageResource(it) }
             }
 
-            // Relationship tags
-            if (!isNonHH) {
+            // Father/Husband/Spouse name display
+            if (showBeneficiaries) {
                 when {
-                    item.relToHeadId == 1 -> {
-                        binding.father = false; binding.husband = false; binding.spouse = false
+                    item.spouseName == "Not Available" && item.fatherName == "Not Available" -> {
+                        binding.father = true; binding.husband = false; binding.spouse = false
                     }
                     item.gender == "MALE" -> {
+                        binding.father = true; binding.husband = false; binding.spouse = false
+                    }
+                    item.gender == "FEMALE" && item.ageInt > 15 -> {
                         binding.father = item.fatherName != "Not Available" && item.spouseName == "Not Available"
                         binding.husband = item.spouseName != "Not Available"
                         binding.spouse = false
                     }
                     item.gender == "FEMALE" -> {
-                        binding.father = item.fatherName != "Not Available" && item.spouseName == "Not Available"
-                        binding.husband = item.spouseName != "Not Available"
-                        binding.spouse = false
+                        binding.father = true; binding.husband = false; binding.spouse = false
                     }
                     else -> {
                         binding.father = item.fatherName != "Not Available" && item.spouseName == "Not Available"
