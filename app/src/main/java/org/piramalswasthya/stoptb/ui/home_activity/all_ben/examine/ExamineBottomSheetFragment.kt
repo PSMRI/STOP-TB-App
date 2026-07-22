@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
+import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 
 @AndroidEntryPoint
@@ -59,6 +60,8 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
     /** True when logged-in user is Registrar — only Anthropometry form shown */
     private val isRegistrar: Boolean
         get() = prefDao.getLoggedInUser()?.role.isRegistrationOfficerRole()
+    private val isNurse: Boolean
+        get() = prefDao.getLoggedInUser()?.role.isNurseRole()
     private val isCounsellingOfficer : Boolean
         get() = prefDao.getLoggedInUser()?.role.isCounsellingOfficerRole()
 
