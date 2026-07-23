@@ -77,11 +77,4 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
 
-    <!-- 5. Diagnosis -->
-    <include
-        android:id="@+id/row_diagnosis"
-        layout="@layout/rv_item_examine_form"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-
 </LinearLayout>

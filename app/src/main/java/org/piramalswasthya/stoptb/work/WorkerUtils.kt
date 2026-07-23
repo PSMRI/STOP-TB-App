@@ -189,4 +189,22 @@ object WorkerUtils {
     fun cancelAllWork(context: Context) {
         WorkManager.getInstance(context).cancelAllWork()
     }
+
+    fun triggerDiagnosticResultPollWorker(context: Context) {
+        val workRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>().build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            DiagnosticResultPollWorker.name, ExistingWorkPolicy.REPLACE, workRequest
+        )
+    }
+
+    fun triggerTrueNatDiagnosticResultPollWorker(context: Context, useMockApi: Boolean = false) {
+        val initialDelay = if (useMockApi) 5L else 1L
+        val timeUnit = if (useMockApi) TimeUnit.SECONDS else TimeUnit.HOURS
+        val workRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>()
+            .setInitialDelay(initialDelay, timeUnit)
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            DiagnosticResultPollWorker.name + "_TRUENAT", ExistingWorkPolicy.REPLACE, workRequest
+        )
+    }
 }

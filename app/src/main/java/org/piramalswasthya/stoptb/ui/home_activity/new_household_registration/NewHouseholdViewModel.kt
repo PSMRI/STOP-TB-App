@@ -48,6 +48,7 @@ class NewHouseholdViewModel @Inject constructor(
     private val hhIdFromArgs = NewHouseholdFragmentArgs.fromSavedStateHandle(savedStateHandle).hhId
     private val isAshaFamily =
         NewHouseholdFragmentArgs.fromSavedStateHandle(savedStateHandle).isAshaFamily
+    val linkBenId = NewHouseholdFragmentArgs.fromSavedStateHandle(savedStateHandle).linkBenId
 
     private val _readRecord = MutableLiveData(hhIdFromArgs > 0)
     val readRecord: LiveData<Boolean> get() = _readRecord
@@ -216,8 +217,14 @@ class NewHouseholdViewModel @Inject constructor(
                         updatedTimeStamp = System.currentTimeMillis()
                         updatedBy = user.userName
                     }
+                    if (linkBenId != 0L) {
+                        household.benId = linkBenId
+                    }
                     householdRepo.persistRecord(household)
                     benRepo.updateBenToSync(household.householdId, SyncState.UNSYNCED)
+                    if (linkBenId != 0L) {
+                        benRepo.linkBenToHousehold(linkBenId, household.householdId, 19, "Self")
+                    }
                     _state.postValue(State.SAVE_SUCCESS)
                 } catch (e: Exception) {
                     Timber.e(e, "saving HH data failed")

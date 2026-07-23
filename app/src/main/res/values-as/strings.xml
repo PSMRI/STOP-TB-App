@@ -707,7 +707,7 @@
 
     <!-- Examine flow -->
     <string name="btn_examine">পৰীক্ষা কৰক</string>
-    <string name="btn_examine_count">পৰীক্ষা কৰক %1$d/5</string>
+    <string name="btn_examine_count">পৰীক্ষা কৰক %1$d/4</string>
     <string name="examine_bottomsheet_title">পৰীক্ষণ ফৰ্ম</string>
     <string name="examine_btn_fill">পূৰণ কৰক</string>
     <string name="examine_btn_view">চাওক</string>

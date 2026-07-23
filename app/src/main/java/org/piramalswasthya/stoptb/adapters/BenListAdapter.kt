@@ -19,7 +19,14 @@ import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.Gender
 import timber.log.Timber
+import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 
+data class ButtonConfig(
+    val text: String,
+    val colorRes: Int,
+    val action: String,
+    val type: String
+)
 
 class BenListAdapter(
     private val clickListener: BenClickListener? = null,
@@ -28,15 +35,15 @@ class BenListAdapter(
     private val showSyncIcon: Boolean = false,
     private val showAbha: Boolean = false,
     private val showCall: Boolean = false,
-    private val role: Int? = 0,
-    private val pref: PreferenceDao? = null,
-    var context: FragmentActivity,
     private val isSoftDeleteEnabled: Boolean = false,
-    private val showActionButtons: Boolean = false,
+    private val pref: PreferenceDao? = null,
+    private val context: FragmentActivity,
+    private val role: Int? = null,
+    private val showActionButtons: Boolean = true,
     private val showResultButton: Boolean = false,
     private val showAnthropometryButton: Boolean = false,
-) :
-    ListAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenDiffUtilCallBack) {
+    private val showExamineButton: Boolean = true
+) : ListAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenDiffUtilCallBack) {
 
     object BenDiffUtilCallBack : DiffUtil.ItemCallback<BenBasicDomain>() {
         override fun areItemsTheSame(
@@ -46,7 +53,6 @@ class BenListAdapter(
         override fun areContentsTheSame(
             oldItem: BenBasicDomain, newItem: BenBasicDomain
         ) = oldItem == newItem
-
     }
 
     class BenViewHolder private constructor(private val binding: RvItemBenBinding) :
@@ -79,7 +85,9 @@ class BenListAdapter(
             showActionButtons: Boolean = true,
             showResultButton: Boolean = false,
             showAnthropometryButton: Boolean = false,
-            showExamineButton: Boolean = true
+            showExamineButton: Boolean = true,
+            tbDiagnosticsList: List<TBDiagnosticsCache> = emptyList(),
+            source: Int = 0
         ) {
 
             binding.btnAbha.visibility = View.VISIBLE
@@ -114,45 +122,225 @@ class BenListAdapter(
             } else {
                 binding.root.context.getString(R.string.add_eye_surgery)
             }
-
-            // Hide unused UI elements upfront (no eye surgery / children buttons in StopTB)
-            val isHeadOfFamily = item.relToHeadId == 19
-            val hasFamilyHeadName = item.familyHeadName.isNotBlank() && item.familyHeadName != "Not Available"
+            val isNonHH = item.isNonHH
+            val isHeadOfFamily = if (isNonHH) false else item.relToHeadId == 19
+            val hasFamilyHeadName = !isNonHH && item.familyHeadName.isNotBlank() && item.familyHeadName != "Not Available"
             binding.HOF.visibility = View.GONE
-            binding.ivIsHead.visibility = if (isHeadOfFamily) View.VISIBLE else View.GONE
+            if (isNonHH) {
+                binding.ivIsHead.visibility = View.VISIBLE
+                binding.ivIsHead.setImageResource(R.drawable.ic_no_hh)
+                binding.ivIsHead.imageTintList = null
+            } else {
+                binding.ivIsHead.setImageResource(R.drawable.ic__hh)
+                binding.ivIsHead.imageTintList = android.content.res.ColorStateList.valueOf(
+                    ContextCompat.getColor(binding.root.context, R.color.md_theme_light_primary)
+                )
+                binding.ivIsHead.visibility = if (isHeadOfFamily) View.VISIBLE else View.GONE
+            }
             binding.head.visibility = if (isHeadOfFamily) View.VISIBLE else View.GONE
             binding.ncdHofName.visibility = if (!isHeadOfFamily && hasFamilyHeadName) View.VISIBLE else View.GONE
             binding.btnAbove30.visibility = View.GONE
             binding.btnVitalScreen.visibility = when {
                 showResultButton && !item.isDeath && !item.isDeactivate -> View.VISIBLE
-                showActionButtons && !item.isDeath && !item.isDeactivate -> View.VISIBLE
                 else -> View.GONE
             }
-            binding.btnGeneralOpd.visibility = when {
-                showResultButton -> View.GONE
-                showActionButtons && hasTbScreening && !item.isDeath && !item.isDeactivate -> View.VISIBLE
-                else -> View.GONE
-            }
-            binding.llGeneralOpdRow.visibility = binding.btnGeneralOpd.visibility
-            binding.llGeneralOpdAction.visibility = binding.btnGeneralOpd.visibility
-            binding.btnAnthropometry.visibility = when {
-                showAnthropometryButton && !item.isDeath && !item.isDeactivate -> View.VISIBLE
-                else -> View.GONE
-            }
-            binding.llAnthropometryAction.visibility = binding.btnAnthropometry.visibility
+
+            binding.btnGeneralOpd.visibility = View.GONE
+            binding.llGeneralOpdRow.visibility = View.GONE
+            binding.llGeneralOpdAction.visibility = View.GONE
+
+            binding.btnAnthropometry.visibility = View.GONE
+            binding.llAnthropometryAction.visibility = View.GONE
+
             if (binding.btnVitalScreen.visibility == View.VISIBLE) {
                 if (showResultButton) {
-                    binding.btnVitalScreen.text = binding.root.context.getString(R.string.result)
+                    val tbDiag = tbDiagnosticsList.find { it.benId == item.benId }
+                    val config = when (source) {
+                        6 -> {
+                            val status = tbDiag?.xrayOrderStatus
+                            val referred = tbDiag?.isReferredForDigitalChestXray
+                            when {
+                                status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PROCESSING", ignoreCase = true) || status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) -> {
+                                    ButtonConfig("FETCHING RESULT...", android.R.color.darker_gray, "POLL", "XRAY_CHEST")
+                                }
+                                status.equals("COMPLETED", ignoreCase = true) -> {
+                                    ButtonConfig("VIEW RESULT", android.R.color.holo_green_dark, "VIEW", "XRAY_CHEST")
+                                }
+                                status.equals("FAILED", ignoreCase = true) -> {
+                                    if (tbDiag?.xrayOrderId.isNullOrBlank()) {
+                                        ButtonConfig("RETRY REFERRAL", android.R.color.holo_red_dark, "REFER", "XRAY_CHEST")
+                                    } else {
+                                        ButtonConfig("RESULT UNAVAILABLE", android.R.color.darker_gray, "NO_RESULT", "XRAY_CHEST")
+                                    }
+                                }
+                                referred == false -> {
+                                    ButtonConfig("RETRY REFERRAL", android.R.color.holo_red_dark, "REFER", "XRAY_CHEST")
+                                }
+                                (referred == true && !status.equals("FAILED", ignoreCase = true)) || status.equals("PENDING", ignoreCase = true) || status.equals("CREATED", ignoreCase = true) || status.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) -> {
+                                    ButtonConfig("MARK X-RAY AS COMPLETED", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
+                                }
+                                else -> {
+                                    ButtonConfig("REFER FOR X-RAY", android.R.color.holo_blue_dark, "REFER", "XRAY_CHEST")
+                                }
+                            }
+                        }
+                        7 -> {
+                            val status = tbDiag?.trueNatOrderStatus
+                            val sputumCollected = tbDiag?.isSputumCollected
+                            val naatRes = tbDiag?.naatResult
+                            val rifRes = tbDiag?.trueNatRifResult
+                            when {
+                                status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PROCESSING", ignoreCase = true) || status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) -> {
+                                    ButtonConfig("FETCHING RESULT...", android.R.color.darker_gray, "POLL", "SPUTUM_TRUENAT")
+                                }
+                                status.equals("COMPLETED", ignoreCase = true) -> {
+                                    ButtonConfig("VIEW RESULT", android.R.color.holo_green_dark, "VIEW", "SPUTUM_TRUENAT")
+                                }
+                                status.equals("FAILED", ignoreCase = true) -> {
+                                    if (tbDiag?.trueNatOrderId.isNullOrBlank()) {
+                                        ButtonConfig("RETRY REFERRAL", android.R.color.holo_red_dark, "REFER", "SPUTUM_TRUENAT")
+                                    } else {
+                                        ButtonConfig("RESULT UNAVAILABLE", android.R.color.darker_gray, "NO_RESULT", "SPUTUM_TRUENAT")
+                                    }
+                                }
+                                sputumCollected == false -> {
+                                    ButtonConfig("RETRY REFERRAL", android.R.color.holo_red_dark, "REFER", "SPUTUM_TRUENAT")
+                                }
+                                (sputumCollected == true && !status.equals("FAILED", ignoreCase = true)) || status.equals("PENDING", ignoreCase = true) || status.equals("CREATED", ignoreCase = true) || status.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) -> {
+                                    ButtonConfig("MARK TRUENAT TEST AS COMPLETED", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
+                                }
+                                else -> {
+                                    ButtonConfig("REFER FOR SPUTUM", android.R.color.holo_blue_dark, "REFER", "SPUTUM_TRUENAT")
+                                }
+                            }
+                        }
+                        8 -> {
+                            val hasLc = !tbDiag?.liquidCultureResult.isNullOrBlank()
+                            if (hasLc) {
+                                ButtonConfig("VIEW/EDIT RESULT", android.R.color.holo_green_dark, "VIEW_LC", "LIQUID_CULTURE")
+                            } else {
+                                ButtonConfig("ENTER RESULT", android.R.color.holo_red_dark, "ENTER_LC", "LIQUID_CULTURE")
+                            }
+                        }
+                        else -> ButtonConfig("RESULT", android.R.color.holo_green_dark, "VIEW", "")
+                    }
+
+                    binding.btnVitalScreen.text = config.text
                     binding.btnVitalScreen.setBackgroundTintList(
-                        ContextCompat.getColorStateList(
-                            binding.root.context,
-                            android.R.color.holo_green_dark
-                        )
+                        ContextCompat.getColorStateList(binding.root.context, config.colorRes)
                     )
                     binding.btnVitalScreen.setTextColor(
                         ContextCompat.getColor(binding.root.context, android.R.color.white)
                     )
+
+                    val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
+                    val isViewAction = config.action == "VIEW" || config.action == "VIEW_LC" || config.action == "ENTER_LC"
+                    if (config.action == "POLL" || config.action == "NO_RESULT") {
+                        binding.btnVitalScreen.isEnabled = false
+                        binding.btnVitalScreen.alpha = 0.5f
+                    } else if (!isNurse && !isViewAction) {
+                        binding.btnVitalScreen.isEnabled = false
+                        binding.btnVitalScreen.alpha = 0.5f
+                    } else {
+                        binding.btnVitalScreen.isEnabled = true
+                        binding.btnVitalScreen.alpha = 1.0f
+                    }
+
+                    fun formatDenialReason(reason: String?, other: String?): String {
+                        if (reason.isNullOrBlank()) return ""
+                        return reason.split("|").joinToString("\n") { r ->
+                            if (r.equals("Other", ignoreCase = true) && !other.isNullOrBlank()) {
+                                "Other: $other"
+                            } else {
+                                r
+                            }
+                        }
+                    }
+
+                    val statusText = when (source) {
+                        6 -> {
+                            val status = tbDiag?.xrayOrderStatus
+                            val referred = tbDiag?.isReferredForDigitalChestXray
+                            when {
+                                referred == false -> {
+                                    val reasonStr = formatDenialReason(tbDiag.reasonForDenialChestXray, tbDiag.reasonForDenialChestXrayOther)
+                                    "Referral Status: Declined\nReason:\n$reasonStr"
+                                }
+                                 referred == true -> {
+                                    when {
+                                        status.equals("PENDING", ignoreCase = true) || status.equals("CREATED", ignoreCase = true) || status.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) -> {
+                                            "Referral Status: Referred\nOrder Status: Awaiting Test Completion"
+                                        }
+                                        status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PROCESSING", ignoreCase = true) || status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) -> {
+                                            "Referral Status: Referred\nOrder Status: Awaiting Provider Result\nFetching Digital Chest X-ray Result..."
+                                        }
+                                        status.equals("COMPLETED", ignoreCase = true) -> {
+                                            "Referral Status: Completed\nResult Status: Available"
+                                        }
+                                        status.equals("FAILED", ignoreCase = true) -> {
+                                            if (tbDiag?.xrayOrderId.isNullOrBlank()) {
+                                                "Referral Status: Order Push Failed (Retry Required)"
+                                            } else {
+                                                "Referral Status: Referred\nResult Status: Result Unavailable"
+                                            }
+                                        }
+                                        else -> "Referral Status: Referred"
+                                    }
+                                }
+                                else -> {
+                                    "Referral Status: Pending"
+                                }
+                            }
+                        }
+                        7 -> {
+                            val status = tbDiag?.trueNatOrderStatus
+                            val sputumCollected = tbDiag?.isSputumCollected
+                            when {
+                                sputumCollected == false -> {
+                                    val reasonStr = formatDenialReason(tbDiag.reasonForDenialSputum, tbDiag.reasonForDenialSputumOther)
+                                    "Referral Status: Declined\nReason:\n$reasonStr"
+                                }
+                                sputumCollected == true -> {
+                                    when {
+                                        status.equals("PENDING", ignoreCase = true) || status.equals("CREATED", ignoreCase = true) || status.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) -> {
+                                            "Referral Status: Referred\nOrder Status: Awaiting Test Completion"
+                                        }
+                                        status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PROCESSING", ignoreCase = true) || status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) -> {
+                                            "Referral Status: Referred\nOrder Status: Awaiting Provider Result\nFetching TrueNat Result..."
+                                        }
+                                        status.equals("COMPLETED", ignoreCase = true) -> {
+                                            "Referral Status: Completed\nResult Status: Available"
+                                        }
+                                        status.equals("FAILED", ignoreCase = true) -> {
+                                            if (tbDiag?.trueNatOrderId.isNullOrBlank()) {
+                                                "Referral Status: Order Push Failed (Retry Required)"
+                                            } else {
+                                                "Referral Status: Referred\nResult Status: Result Unavailable"
+                                            }
+                                        }
+                                        else -> "Referral Status: Referred"
+                                    }
+                                }
+                                else -> {
+                                    "Referral Status: Pending"
+                                }
+                            }
+                        }
+                        else -> null
+                    }
+
+                    if (statusText != null) {
+                        binding.tvOrderStatus.text = statusText
+                        binding.tvOrderStatus.visibility = View.VISIBLE
+                    } else {
+                        binding.tvOrderStatus.visibility = View.GONE
+                    }
+
+                    binding.btnVitalScreen.setOnClickListener {
+                        clickListener?.onClickOrderAction(item, config.action, config.type)
+                    }
                 } else {
+                    binding.tvOrderStatus.visibility = View.GONE
                     binding.btnVitalScreen.text = binding.root.context.getString(R.string.vital_screen)
                     val hasVitals = benIdList.contains(item.benId)
                     binding.btnVitalScreen.setBackgroundTintList(
@@ -164,6 +352,9 @@ class BenListAdapter(
                     binding.btnVitalScreen.setTextColor(
                         ContextCompat.getColor(binding.root.context, android.R.color.white)
                     )
+                    binding.btnVitalScreen.setOnClickListener {
+                        clickListener?.onClickVitalScreen(item)
+                    }
                 }
             }
             if (binding.btnGeneralOpd.visibility == View.VISIBLE) {
@@ -193,6 +384,8 @@ class BenListAdapter(
             // Registrar: Anthropometry + TB Screening
             // Nurse: Diagnosis hidden, so total stays 4
             // Others: all 5 forms
+            val currentRole = pref?.getLoggedInUser()?.role
+            val isCounsellingOfficer = currentRole.isCounsellingOfficerRole()
             val isRegistrar = pref?.getLoggedInUser()?.role.isRegistrationOfficerRole()
             val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
             val (examineFilledCount, examineTotal) = if (isRegistrar) {
@@ -201,23 +394,10 @@ class BenListAdapter(
                     hasTbScreening
                 ).count { it }
                 Pair(filled, 2)
-
-
-            } else if (isNurse) {
-
-                Timber.e(
-                    """
-                    benId=${item.benId}
-                    hasTbScreening=$hasTbScreening
-                    hasAnthropometry=$hasAnthropometry
-                    hasGeneralOpd=$hasGeneralOpd
-                    hasDiagnosis=$hasDiagnosis
-                    isMatched=$isMatched
-                    """.trimIndent()
-                )
+            } else if (isNurse || isCounsellingOfficer) {
                 val filled = listOf(
                     hasAnthropometry,
-                    isMatched,        // vitals/general exam
+                    isMatched,
                     hasTbScreening,
                     hasGeneralOpd
                 ).count { it }
@@ -225,12 +405,11 @@ class BenListAdapter(
             } else {
                 val filled = listOf(
                     hasAnthropometry,
-                    isMatched,        // vitals/general exam
+                    isMatched,
                     hasTbScreening,
-                    hasGeneralOpd,
-                    hasDiagnosis
+                    hasGeneralOpd
                 ).count { it }
-                Pair(filled, 5)
+                Pair(filled, 4)
             }
 
             binding.btnExamine.text = binding.root.context.getString(
@@ -240,6 +419,13 @@ class BenListAdapter(
                 binding.root.context,
                 if (examineFilledCount > 0) android.R.color.holo_green_dark
                 else android.R.color.holo_red_dark
+            binding.btnExamine.text = "Examine ($examineFilledCount/$examineTotal)"
+            val isExamineFilled = examineFilledCount > 0
+            binding.btnExamine.setBackgroundTintList(
+                ContextCompat.getColorStateList(
+                    binding.root.context,
+                    if (isExamineFilled) android.R.color.holo_green_dark else android.R.color.holo_red_dark
+                )
             )
             binding.btnExamine.setTextColor(
                 ContextCompat.getColor(binding.root.context, android.R.color.white)
@@ -250,11 +436,9 @@ class BenListAdapter(
             binding.btnAddChildren.visibility = View.GONE
 
             // Register Wife / Register Husband — Registrar only (hidden for Nurse & Counselling officer)
-            val currentRole = pref?.getLoggedInUser()?.role
             val isNurseRole = currentRole.isNurseRole()
-            val isCounsellingOfficer = currentRole.isCounsellingOfficerRole()
             when {
-                !isNurseRole && !isCounsellingOfficer && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
+                !isNurseRole && !isCounsellingOfficer && !item.isNonHH && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
                         && !item.isDeath && !item.isDeactivate -> {
                     binding.llAddSpouseBtn.visibility = View.VISIBLE
                     binding.btnAddSpouse.visibility = View.VISIBLE
@@ -263,7 +447,7 @@ class BenListAdapter(
                         clickListener?.onClickedWifeBen(item)
                     }
                 }
-                (!isNurseRole && !isCounsellingOfficer) && item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
+                (!isNurseRole && !isCounsellingOfficer) && !item.isNonHH && item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
                         && !item.isDeath && !item.isDeactivate -> {
                     binding.llAddSpouseBtn.visibility = View.VISIBLE
                     binding.btnAddSpouse.visibility = View.VISIBLE
@@ -362,6 +546,8 @@ class BenListAdapter(
     private val generalOpdIds     = mutableListOf<Long>()
     private val anthropometryIds  = mutableListOf<Long>()
     private val diagnosisIds      = mutableListOf<Long>()
+    private val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
+    var source: Int = 0
 
     override fun onBindViewHolder(holder: BenViewHolder, position: Int) {
         holder.bind(
@@ -383,7 +569,9 @@ class BenListAdapter(
             diagnosisIds,
             showActionButtons = showActionButtons,
             showResultButton = showResultButton,
-            showAnthropometryButton = showAnthropometryButton
+            showAnthropometryButton = showAnthropometryButton,
+            tbDiagnosticsList = tbDiagnosticsList,
+            source = source
         )
     }
 
@@ -400,6 +588,12 @@ class BenListAdapter(
                 if (item.benId in changed) notifyItemChanged(index)
             }
         }
+    }
+
+    fun submitTBDiagnostics(list: List<TBDiagnosticsCache>) {
+        tbDiagnosticsList.clear()
+        tbDiagnosticsList.addAll(list)
+        notifyDataSetChanged()
     }
 
     fun submitBenIds(list: List<Long>)           = applyIdList(benIds, list)
@@ -421,9 +615,11 @@ class BenListAdapter(
         private val softDeleteBen: (ben: BenBasicDomain) -> Unit,
         private val clickedVitalScreen: (item: BenBasicDomain, benId: Long, hhId: Long) -> Unit = { _, _, _ -> },
         private val clickedResult: (item: BenBasicDomain, benId: Long, hhId: Long) -> Unit = { _, _, _ -> },
+        private val clickedOrderAction: (item: BenBasicDomain, action: String, orderType: String) -> Unit = { _, _, _ -> },
         private val clickedGeneralOpd: (item: BenBasicDomain, benId: Long, hhId: Long, viewOnly: Boolean) -> Unit = { _, _, _, _ -> },
         private val clickedAnthropometry: (item: BenBasicDomain, benId: Long, hhId: Long, viewOnly: Boolean) -> Unit = { _, _, _, _ -> },
-        private val clickedExamine: (item: BenBasicDomain, benId: Long) -> Unit = { _, _ -> }
+        private val clickedExamine: (item: BenBasicDomain, benId: Long) -> Unit = { _, _ -> },
+        private val clickedNonHHHousehold: (item: BenBasicDomain) -> Unit = {}
     ) {
         fun onClickedBen(item: BenBasicDomain) = clickedBen(
             item,
@@ -463,6 +659,8 @@ class BenListAdapter(
             clickedVitalScreen(item, item.benId, item.hhId)
         fun onClickResult(item: BenBasicDomain) =
             clickedResult(item, item.benId, item.hhId)
+        fun onClickOrderAction(item: BenBasicDomain, action: String, orderType: String) =
+            clickedOrderAction(item, action, orderType)
         fun onClickGeneralOpd(item: BenBasicDomain, viewOnly: Boolean) =
             clickedGeneralOpd(item, item.benId, item.hhId, viewOnly)
         fun onClickAnthropometry(item: BenBasicDomain, viewOnly: Boolean) =
@@ -471,5 +669,6 @@ class BenListAdapter(
         fun onClickedForCall(item: BenBasicDomain) = callBen(item)
         fun onClickSoftDeleteBen(item: BenBasicDomain) = softDeleteBen(item)
         fun onClickExamine(item: BenBasicDomain) = clickedExamine(item, item.benId)
+        fun onClickNonHHHousehold(item: BenBasicDomain) = clickedNonHHHousehold(item)
     }
 }

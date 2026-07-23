@@ -141,26 +141,7 @@ class AnthropometryFragment : Fragment() {
                     binding.loadingOverlay.visibility = View.GONE
                     WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
                     Toast.makeText(requireContext(), R.string.save_successful, Toast.LENGTH_SHORT).show()
-                    when {
-                        openedFromHousehold -> {
-                            findNavController().navigateUp()
-                        }
-                        viewModel.examineFlow -> {
-                            // Examine flow — return to AllBenFragment so user picks the next form
-                            val popped = findNavController().popBackStack(R.id.allBenFragment, false)
-                            if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
-                        }
-                        viewModel.autoFlow -> {
-                            val returnedToList = findNavController().popBackStack(R.id.allBenFragment, false)
-                            if (!returnedToList) {
-                                findNavController().navigate(
-                                    R.id.allBenFragment,
-                                    bundleOf("source" to 0)
-                                )
-                            }
-                        }
-                        else -> findNavController().popBackStack()
-                    }
+                    findNavController().navigateUp()
                     viewModel.resetState()
                 }
                 AnthropometryViewModel.State.SAVE_FAILED -> {

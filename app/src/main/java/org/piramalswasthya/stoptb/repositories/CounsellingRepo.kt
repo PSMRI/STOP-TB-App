@@ -724,6 +724,31 @@ class CounsellingRepo @Inject constructor(
                 }
 
                 counsellingRepository.saveDraftSection(responseId, section.sectionId, null, answers)
+
+
+                val bulkSuccess = counsellingRepository.submitSectionBulk(responseId, section.sectionId)
+                if (!bulkSuccess) {
+                    val isCampMode = preferenceDao.isCampModeEnabled()
+                    val isHubConnected = preferenceDao.isCampHubConnected()
+                    val isInternet = isInternetAvailable(context)
+                    val isOffline = (isCampMode && !isHubConnected) || (!isCampMode && !isInternet)
+
+                    CounsellingSyncWorker.scheduleSync(context)
+
+                    if (isOffline) {
+                        Timber.d("saveGeneralInfoDraft: offline mode detected for sectionId=${section.sectionId}, saved locally for background sync retry")
+                    } else {
+                        Timber.d("saveGeneralInfoDraft: submitSectionBulk failed in online mode for sectionId=${section.sectionId}, saved locally for automatic background sync retry")
+                        withContext(Dispatchers.Main) {
+                            android.widget.Toast.makeText(
+                                context,
+                                "Saved locally. It will sync automatically in the background.",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                }
+
                 true
             } catch (e: Exception) {
                 Timber.e(e, "saveGeneralInfoDraft failed")

@@ -31,6 +31,8 @@ import org.piramalswasthya.stoptb.model.PreviewItem
 import org.piramalswasthya.stoptb.model.User
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import timber.log.Timber
+import kotlinx.coroutines.flow.Flow
+import org.piramalswasthya.stoptb.model.HouseholdBasicCache
 import javax.inject.Inject
 
 @HiltViewModel
@@ -58,6 +60,14 @@ class NewBenRegViewModel @Inject constructor(
     private val genderFromArgs = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).gender
 
     // StopTB has no HoF / spouse / child concept — kept for nav-graph compat
+    val isNonHHArg = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).isNonHH
+    val placeOfCurrentLivingArg = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).placeOfCurrentLiving
+    val otherPlaceArg = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).otherPlace
+    val institutionNameArg = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).institutionName
+
+    val showLinkHouseholdButton: Boolean
+        get() = benIdFromArgs != 0L && this::ben.isInitialized && ben.isNonHH
+
     val isHoF = false
     private val selectedBenIdFromArgs = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).selectedBenId
     private val isAddSpouseFromArgs   = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).isAddSpouse
@@ -176,7 +186,8 @@ class NewBenRegViewModel @Inject constructor(
                 subCentreName = user.subCentre,
                 // familyHeadRelationPosition is stored 1-indexed (getPosition = indexOf+1),
                 // but setUpPage uses it as 0-indexed with getOrNull(). Subtract 1 to align.
-                relToHeadId = (ben.familyHeadRelationPosition - 1).takeIf { it >= 0 } ?: relToHeadId
+                relToHeadId = (ben.familyHeadRelationPosition - 1).takeIf { it >= 0 } ?: relToHeadId,
+                isNonHH = ben.isNonHH
             )
         } else {
             val villageNames = user.villages.map { it.name }.toTypedArray()
@@ -264,7 +275,8 @@ class NewBenRegViewModel @Inject constructor(
                 user.villages,
                 user.subCentre,
                 relToHeadId = effectiveRelToHeadId,
-                spouseRegistrationRelToHeadId = relToHeadId
+                spouseRegistrationRelToHeadId = relToHeadId,
+                isNonHH = isNonHHArg
             )
         }
         // Restore/Inherit Location details
@@ -444,7 +456,7 @@ class NewBenRegViewModel @Inject constructor(
                             placeOfDeath   = "",
                             placeOfDeathId = -1,
                             otherPlaceOfDeath = "",
-                            householdId    = if (hhId > 0L) hhId else 0L,
+                            householdId    = if (hhId > 0L) hhId else null,
                             isAdult        = false,
                             isKid          = false,
                             isDraft        = true,
@@ -456,6 +468,10 @@ class NewBenRegViewModel @Inject constructor(
                             locationRecord = if (hhId > 0L && household.householdId > 0L)
                                 household.locationRecord else locationRecord,
                             isConsent      = isOtpVerified,
+                            isNonHH        = isNonHHArg,
+                            placeOfCurrentLiving = if (isNonHHArg) placeOfCurrentLivingArg else null,
+                            otherPlaceOfCurrentLiving = if (isNonHHArg) otherPlaceArg else null,
+                            institutionName = if (isNonHHArg) institutionNameArg else null
                         )
                     }
 
@@ -490,7 +506,16 @@ class NewBenRegViewModel @Inject constructor(
                     }
 
                     ben.apply {
-                        if (hhId > 0L) householdId = hhId
+                        if (hhId > 0L) {
+                            householdId = hhId
+                            isNonHH = false
+                        } else {
+                            householdId = null
+                            isNonHH = isNonHHArg
+                            placeOfCurrentLiving = if (isNonHHArg) placeOfCurrentLivingArg else null
+                            otherPlaceOfCurrentLiving = if (isNonHHArg) otherPlaceArg else null
+                            institutionName = if (isNonHHArg) institutionNameArg else null
+                        }
                         serverUpdatedStatus = if (beneficiaryId < 0L) 1 else 2
                         processed           = if (beneficiaryId < 0L) "N" else "U"
                         syncState           = SyncState.UNSYNCED
@@ -652,6 +677,23 @@ class NewBenRegViewModel @Inject constructor(
             out.add(PreviewItem(label = el.title ?: "", value = trimmed, isImage = false))
         }
         out
+    }
+
+    val hhList: Flow<List<HouseholdBasicCache>>
+        get() {
+            val location = preferenceDao.getLocationRecord()
+            val selectedVillage = location?.village?.id ?: 0
+            return benRepo.getHouseholds(selectedVillage)
+        }
+
+    fun linkBenToHousehold(hhId: Long, relationPos: Int, relationName: String) {
+        viewModelScope.launch {
+            benRepo.linkBenToHousehold(benIdFromArgs, hhId, relationPos, relationName)
+        }
+    }
+
+    suspend fun getBenFromId(benId: Long): BenRegCache? {
+        return benRepo.getBenFromId(benId)
     }
 
     override fun onCleared() {

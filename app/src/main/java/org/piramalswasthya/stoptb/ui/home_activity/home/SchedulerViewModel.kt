@@ -32,6 +32,7 @@ class SchedulerViewModel @Inject constructor(
     val rchIdCount: Flow<Int> = recordsRepo.benWithRchListCount
     val allBenCount: Flow<Int> = recordsRepo.allBenListCount
     val householdCount: Flow<Int> = recordsRepo.hhListCount
+    val nonHHCount: Flow<Int> = recordsRepo.nonHHListCount
     val tbCount: Flow<Int> = recordsRepo.tbScreeningListCount
     val ncdCount: Flow<Int> = recordsRepo.getNcdEligibleListCount
     val referralCount: Flow<Int> = recordsRepo.getNcdrefferedListCount

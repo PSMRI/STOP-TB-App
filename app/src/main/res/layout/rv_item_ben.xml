@@ -377,7 +377,7 @@
                            <ImageView
                                android:layout_width="wrap_content"
                                android:layout_height="wrap_content"
-                               android:src="@drawable/ic_icon_head_of_family" />
+                                android:src="@drawable/ic_no_hh" />
 
                             <TextView
                                 android:layout_width="wrap_content"
@@ -511,6 +511,17 @@
                             android:layout_weight="0"
                             android:orientation="vertical">
 
+                            <TextView
+                                android:id="@+id/tv_order_status"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginBottom="4dp"
+                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                android:textColor="?attr/colorOnPrimary"
+                                android:textStyle="bold"
+                                android:visibility="gone"
+                                tools:text="Status: Referred for X-ray" />
+
                             <com.google.android.material.button.MaterialButton
                                 android:id="@+id/btn_vital_screen"
                                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
@@ -522,7 +533,6 @@
                                 android:paddingHorizontal="@dimen/padding_small"
                                 android:maxLines="1"
                                 android:singleLine="true"
-                                android:onClick="@{()-> showActionButtons ? clickListener.onClickVitalScreen(ben) : clickListener.onClickResult(ben)}"
                                 android:text="@string/vital_screen"
                                 android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
                                 android:textSize="14sp"
@@ -639,6 +649,34 @@
                             app:strokeWidth="1dp" />
                     </LinearLayout>
                 </LinearLayout>
+            <!-- Household linking row for Non-HH beneficiaries -->
+            <LinearLayout
+                android:id="@+id/ll_household_action"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginHorizontal="@dimen/padding_normal"
+                android:layout_marginTop="@dimen/margin_small"
+                android:layout_marginBottom="@dimen/margin_small"
+                android:visibility="@{showActionButtons &amp;&amp; ben.isNonHH &amp;&amp; !ben.isDeath &amp;&amp; !ben.isDeactivate ? android.view.View.VISIBLE : android.view.View.GONE}">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_household"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="#7C5CC4"
+                    android:gravity="center"
+                    android:singleLine="true"
+                    android:onClick="@{()-> clickListener.onClickNonHHHousehold(ben)}"
+                    android:text="Household"
+                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                    android:textColor="@android:color/white"
+                    app:cornerRadius="@dimen/padding_normal"
+                    app:strokeColor="#7C5CC4" />
+            </LinearLayout>
+
             <!-- Examine + ABHA row — side by side, visible when ben is not dead/deactivated -->
             <LinearLayout
                 android:id="@+id/ll_examine_action"
