@@ -160,13 +160,13 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.ben_reg_address),
         arrayId = -1, required = true, etMaxLength = 2000
     )
-    private val pinCode = FormElement(
-        id = 22, inputType = EDIT_TEXT,
-        title = resources.getString(R.string.str_pincode),
-        arrayId = -1, required = true,
-        etInputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL,
-        etMaxLength = 6, min = 100000, max = 999999
-    )
+//    private val pinCode = FormElement(
+//        id = 22, inputType = EDIT_TEXT,
+//        title = resources.getString(R.string.str_pincode),
+//        arrayId = -1, required = true,
+//        etInputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL,
+//        etMaxLength = 6, min = 100000, max = 999999
+//    )
     private val villageHamlet = FormElement(
         id = 23, inputType = DROPDOWN,
         title = resources.getString(R.string.nbr_village),
@@ -236,7 +236,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             mohallaName.value = saved.mohallaName
             povertyLine.value = povertyLine.getStringFromPosition(saved.povertyLineId)
             address.value = saved.address?.takeIf { it.isNotBlank() } ?: villageHamlet.value
-            pinCode.value = saved.pinCode
+           // pinCode.value = saved.pinCode
         }
         setDefaultPovertyLineIfNeeded()
         setDefaultRegisteredAtCampSiteIfNeeded()
@@ -606,7 +606,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             }
 
             address.id -> validateEmptyOnEditText(address)
-            pinCode.id -> validatePincodeOnEditText(pinCode)
+           // pinCode.id -> validatePincodeOnEditText(pinCode)
             villageHamlet.id -> {
                 Timber.d("Selected village = ${villageHamlet.value}")
 
@@ -639,13 +639,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
 
     private fun mapValuesForPage1(cacheModel: FormDataModel) {
         val family = HouseholdFamily()
-        Timber.d("acfirstNameHeadOfFamily = ${firstNameHeadOfFamily.value}")
-        Timber.d("aclastNameHeadOfFamily = ${lastNameHeadOfFamily.value}")
-        Timber.d("actotalMembers = ${totalMembersInHousehold.value}")
-        Timber.d("acregisteredAtCampSite = ${registeredAtCampSite.value}")
-        Timber.d("acregisteredAtCampSite position = ${registeredAtCampSite.getPosition()}")
-        Timber.d("acaddress = ${address.value}")
-        Timber.d("acpinCode = ${pinCode.value}")
+
         family.let { family ->
             family.familyHeadName = firstNameHeadOfFamily.value
             family.totalHhMembers = totalMembersInHousehold.value?.toIntOrNull()
@@ -661,7 +655,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             family.povertyLine =
                 povertyLine.getEnglishStringFromPosition(family.povertyLineId)
             family.address = address.value              // ADD
-            family.pinCode = pinCode.value               // ADD
+           // family.pinCode = pinCode.value               // ADD
         }
         (cacheModel as HouseholdCache).family = family
 
