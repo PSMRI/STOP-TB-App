@@ -416,7 +416,7 @@ class NewBenRegViewModel @Inject constructor(
             genderId = genderFromArgs,
             contactNumber = family?.familyHeadPhoneNo,
             address = resolvedAddress,
-            pinCode = family?.pinCode?.trim()?.takeIf { it.isNotBlank() },
+          //  pinCode = family?.pinCode?.trim()?.takeIf { it.isNotBlank() },
             economicStatus = family?.povertyLine,
             economicStatusId = family?.povertyLineId,
             residentialArea = details?.residentialArea,

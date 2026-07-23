@@ -2248,7 +2248,7 @@ class BenRepo @Inject constructor(
                                 povertyLine = houseDataObj.optStringOrNull("type_bpl_apl"),
                                 povertyLineId = houseDataObj.optInt("bpl_aplId"),
                                 address = houseDataObj.optStringOrNull("address"),
-                                pinCode = houseDataObj.optInt("Pincode").takeIf { it > 0 }?.toString(),
+                             //   pinCode = houseDataObj.optInt("Pincode").takeIf { it > 0 }?.toString(),
                             ),
                             details = HouseholdDetails(
                                 residentialArea = houseDataObj.optStringOrNull("residentialArea"),
