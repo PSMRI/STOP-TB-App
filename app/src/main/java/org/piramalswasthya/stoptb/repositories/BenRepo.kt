@@ -704,6 +704,7 @@ class BenRepo @Inject constructor(
 
                 if (statusCode == 200) {
                     val responseString = response.body()?.string()
+                    Timber.d("PULL_HH_DEBUG: $responseString")
 
                     if (responseString != null) {
                         val jsonObj = JSONObject(responseString)
@@ -720,6 +721,8 @@ class BenRepo @Inject constructor(
                                 val pageSize = getResponseTotalPage(jsonObj)
 
                                 try {
+
+
                                     householdDao.upsert(
                                         *getHouseholdCacheFromServerResponse(
                                             responseString
@@ -2230,6 +2233,9 @@ class BenRepo @Inject constructor(
                             ashaId = jsonObject.optInt("ashaId"),
                             benId = jsonObject.optLong("benficieryid").takeIf { it > 0L },
                             family = HouseholdFamily(
+                                totalHhMembers = houseDataObj.optInt("totalHhMembers").takeIf { it > 0 },
+                                isRegisteredAtCampSite = houseDataObj.optStringOrNull("registeredAtCampSite"),
+                                isRegisteredAtCampSiteId = houseDataObj.optInt("registeredAtCampSiteId"),
                                 familyHeadName = houseDataObj.optStringOrNull("familyHeadName"),
                                 familyName = houseDataObj.optStringOrNull("familyName"),
                                 familyHeadPhoneNo = houseDataObj.optStringOrNull("familyHeadPhoneNo")
@@ -2241,6 +2247,8 @@ class BenRepo @Inject constructor(
 //                                rationCardDetails = houseDataObj.optStringOrNull("rationCardDetails"),
                                 povertyLine = houseDataObj.optStringOrNull("type_bpl_apl"),
                                 povertyLineId = houseDataObj.optInt("bpl_aplId"),
+                                address = houseDataObj.optStringOrNull("address"),
+                                pinCode = houseDataObj.optInt("Pincode").takeIf { it > 0 }?.toString(),
                             ),
                             details = HouseholdDetails(
                                 residentialArea = houseDataObj.optStringOrNull("residentialArea"),

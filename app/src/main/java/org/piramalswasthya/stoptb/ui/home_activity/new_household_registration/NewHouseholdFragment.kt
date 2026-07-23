@@ -143,7 +143,11 @@ class NewHouseholdFragment : Fragment() {
                         micClickedElementId = formId
                         sttContract.launch(Unit)
                     }
-                    else -> viewModel.updateListOnValueChanged(formId, index)
+                    else -> {
+                        viewModel.updateListOnValueChanged(formId, index)
+                        hardCodedListUpdate(formId)
+
+                    }
                 }
             },
             isEnabled = true
@@ -277,6 +281,24 @@ class NewHouseholdFragment : Fragment() {
             viewModel.gpsUnavailableReason.collect { reason ->
                 if (!reason.isNullOrBlank() && binding.acvReason.text.toString() != reason) {
                     binding.acvReason.setText(reason, false)
+                }
+            }
+        }
+    }
+
+
+    private fun hardCodedListUpdate(formId: Int) {
+        binding.form.rvInputForm.adapter?.apply {
+            when (formId) {
+
+                // Village dropdown changed
+                23 -> {      // <-- villageHamlet.id
+                    notifyDataSetChanged()
+                }
+
+                // Address changed
+                24 -> {      // <-- address.id
+                    notifyDataSetChanged()
                 }
             }
         }

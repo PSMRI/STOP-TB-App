@@ -24,6 +24,9 @@ data class HouseholdFamily(
     var rationCardDetails: String? = null,
     var povertyLine: String? = null,
     var povertyLineId: Int = 0,
+    var address: String? = null,
+    var pinCode: String? = null,
+
 )
 
 data class HouseholdDetails(
@@ -71,7 +74,7 @@ data class HouseholdCache(
     @Embedded(prefix = "fam_") var family: HouseholdFamily? = null,
     @Embedded(prefix = "det_") var details: HouseholdDetails? = null,
     @Embedded(prefix = "amn_") var amenities: HouseholdAmenities? = null,
-    @Embedded(prefix = "loc_") val locationRecord: LocationRecord,
+    @Embedded(prefix = "loc_") var locationRecord: LocationRecord,
     // GPS location captured at registration time
     var gpsLatitude: Double? = null,
     var gpsLongitude: Double? = null,
@@ -145,6 +148,9 @@ data class HouseholdCache(
             villageid = locationRecord.village.id,
             familyName = family?.familyName,
 
+            address = family?.address ?: "null",        // NEW
+            pincode = family?.pinCode?.toIntOrNull() ?: 0, // NEW — see note below
+
             wardNo = family?.wardNo,
             wardName = family?.wardName,
             mohallaName = family?.mohallaName,
@@ -181,6 +187,9 @@ data class HouseholdNetwork(
 
     val familyHeadPhoneNo: String,
     @Json(name = "houseno") val houseNo: String,
+
+    @Json(name = "address") val address: String? = null,   // NEW
+
 
     val wardNo: String? = null,
 
