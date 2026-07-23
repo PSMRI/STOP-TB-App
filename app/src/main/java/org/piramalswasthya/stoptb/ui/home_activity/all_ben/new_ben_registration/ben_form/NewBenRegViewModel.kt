@@ -377,7 +377,10 @@ class NewBenRegViewModel @Inject constructor(
 
         val family = household.family
         val details = household.details
-        val address = listOfNotNull(
+
+        // Prefer the Household form's own address field; fall back to the
+        // old scattered fields only if it wasn't captured.
+        val fallbackAddress = listOfNotNull(
             family?.houseNo,
             family?.mohallaName,
             family?.wardName,
@@ -386,6 +389,9 @@ class NewBenRegViewModel @Inject constructor(
         ).mapNotNull { value ->
             value.trim().takeIf { it.isNotEmpty() && !it.equals("null", ignoreCase = true) }
         }.joinToString(", ")
+
+        val resolvedAddress = family?.address?.takeIf { it.isNotBlank() }
+            ?: fallbackAddress.ifBlank { null }
 
         return BenRegCache(
             ashaId = user.userId,
@@ -421,8 +427,8 @@ class NewBenRegViewModel @Inject constructor(
             motherName = prefillMotherName,
             genderId = genderFromArgs,
             contactNumber = family?.familyHeadPhoneNo,
-            address = address.ifBlank { null },
-            pinCode = details?.pincode?.takeIf { it > 0 }?.toString(),
+            address = resolvedAddress,
+          //  pinCode = family?.pinCode?.trim()?.takeIf { it.isNotBlank() },
             economicStatus = family?.povertyLine,
             economicStatusId = family?.povertyLineId,
             residentialArea = details?.residentialArea,

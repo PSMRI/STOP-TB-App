@@ -924,6 +924,7 @@
     <string name="tb_referral_required">Referral Required</string>
     <string name="tb_referral_for">Referral For</string>
     <string name="tb_family_contact_screening_alert">Advise tracing and screening of all family members</string>
+    <string name="total_presumptive_tb">Presumptive TB Cases</string>
     <string name="tb_presumptive_alert_title">A Presumptive TB case!</string>
     <string name="tb_presumptive_alert_refer">Refer to X-ray and collect sputum for Truenat test</string>
     <string name="tb_presumptive_alert_family">Advise screening of all family members</string>

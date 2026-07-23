@@ -25,7 +25,7 @@
     <string name="nhhr_house_no">House No</string>
     <string name="nhhr_ward_no">Ward No</string>
     <string name="nhhr_ward_name">Ward Name</string>
-    <string name="nhhr_mohalla_name">Mohalla Name</string>
+    <string name="nhhr_mohalla_name">Mohalla / Street</string>
     <string name="nhhr_poverty_line">Socioeconomic Status</string>
     <string-array name="nhhr_poverty_line_array">
         <item>APL</item>
@@ -146,5 +146,13 @@
     <string name="add_asha_head">ASHA Household Registration</string>
     <string name="hh_no_members">Household EMPTY!</string>
     <string name="add_head_of_family_message">Would you like to add <b>%1s</b> as a HoF Beneficiary ?</string>
+
+    <string name="nhhr_total_members_hh">Total number of members living in the HH</string>
+    <string name="nhhr_registered_camp_site">Registration done at camp site</string>
+
+    <string-array name="nhhr_yes_no_array">
+        <item>Yes</item>
+        <item>No</item>
+    </string-array>
 
 </resources>
