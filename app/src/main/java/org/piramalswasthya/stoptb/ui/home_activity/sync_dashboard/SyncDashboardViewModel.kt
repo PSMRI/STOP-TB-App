@@ -64,7 +64,7 @@ class SyncDashboardViewModel @Inject constructor(
                 val outputError = workInfo.outputData.getString(BasePushWorker.KEY_ERROR)
                 // Fallback: extract class name from tags if outputData wasn't set
                 val name = outputName ?: workInfo.tags
-                    .firstOrNull { it.startsWith("org.piramalswasthya.sakhi.work.") }
+                    .firstOrNull { it.startsWith("org.piramalswasthya.stoptb.work.") }
                     ?.substringAfterLast(".")
                     ?: "Unknown Worker"
                 // Cascade detection: when WorkManager auto-fails a downstream worker

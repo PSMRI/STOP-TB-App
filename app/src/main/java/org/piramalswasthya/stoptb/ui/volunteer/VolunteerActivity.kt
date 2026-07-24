@@ -362,6 +362,12 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             true
         }
 
+        binding.navView.menu.findItem(R.id.syncDashboardFragment)?.setOnMenuItemClickListener {
+            navController.navigate(R.id.syncDashboardFragment)
+            binding.drawerLayout.close()
+            true
+        }
+
         // ── Create ABHA ID ───────────────────────────────────────────────
         refreshCampHubDrawerItem()
 
