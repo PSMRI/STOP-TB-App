@@ -206,7 +206,10 @@ class AllBenViewModel @Inject constructor(
             } else {
                 when (sourceFromArgs) {
                     6 -> tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST")
-                    7 -> tbRepo.fetchBeneficiariesByStatus("SPUTUM_TRUENAT")
+                    7 -> {
+                        tbRepo.fetchBeneficiariesByStatus("SPUTUM_TRUENAT")
+                        tbRepo.fetchBeneficiariesByStatus("MDR_RIF")
+                    }
                     else -> {}
                 }
             }
@@ -218,6 +221,7 @@ class AllBenViewModel @Inject constructor(
             _orderActionState.value = OrderActionResult.Loading
             when (val response = tbRepo.markTestCompleted(benId, orderType)) {
                 is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success -> {
+                    fetchBeneficiaryStatuses(orderType)
                     _orderActionState.value = OrderActionResult.Success("Test marked as completed. Status: ${response.data}", orderType)
                 }
                 is org.piramalswasthya.stoptb.helpers.NetworkResponse.Error -> {

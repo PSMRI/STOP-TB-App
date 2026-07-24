@@ -25,6 +25,7 @@ class TBSuspectedQuickDataset(
     private var vitalCache: VitalCache? = null
     private var referralMode = false
     private var referralType = 0
+    private var diagnosticsCache: TBDiagnosticsCache? = null
 
     private var lockDigitalChestXray = false
     private var lockTrueNat = false
@@ -237,6 +238,7 @@ class TBSuspectedQuickDataset(
         benCache = ben
         screeningCache = screening
         vitalCache = vital
+        diagnosticsCache = saved
         this.referralMode = referralMode
         this.referralType = referralType
 
@@ -306,18 +308,19 @@ class TBSuspectedQuickDataset(
         if (!isPregnant() && isNo(referredForDigitalChestXray) && reasonForDenialChestXray.value.isNullOrBlank()) {
             reasonForDenialChestXray.value = "0"
         }
+        val sputumVisible = referralType == 7 || shouldShowSputumCollected()
         // Sputum referral defaults to Yes when the section should be shown
-        if (shouldShowSputumCollected() && referredForSputumCollection.value.isNullOrBlank()) {
+        if (sputumVisible && referredForSputumCollection.value.isNullOrBlank()) {
             referredForSputumCollection.value = yesValue
         }
         // Sputum submitted-at defaults to TB Screening Camp when referred = Yes and blank
-        if (shouldShowSputumCollected() && isYes(referredForSputumCollection) &&
+        if (sputumVisible && isYes(referredForSputumCollection) &&
             sputumSampleSubmittedAt.value.isNullOrBlank()
         ) {
             sputumSampleSubmittedAt.value = sputumSampleSubmittedAt.entries?.firstOrNull()
         }
         // Sputum denial reason defaults to index 0 (Patient refused) when shown
-        if (shouldShowSputumCollected() && isNo(referredForSputumCollection) &&
+        if (sputumVisible && isNo(referredForSputumCollection) &&
             reasonForDenialSputum.value.isNullOrBlank()
         ) {
             reasonForDenialSputum.value = "0"
@@ -559,7 +562,8 @@ class TBSuspectedQuickDataset(
                 syncFieldStates()
                 if (index == 0) {
                     val addItems = mutableListOf<FormElement>(trueNatResult)
-                    if (isMtbDetected()) {
+                    val isRifCompleted = diagnosticsCache?.rifOrderStatus.equals("COMPLETED", ignoreCase = true)
+                    if (isMtbDetected() && isRifCompleted) {
                         addItems.add(trueNatRifResult)
                     }
                     triggerDependants(
@@ -582,8 +586,9 @@ class TBSuspectedQuickDataset(
                 trueNatResult.value = trueNatResult.entries?.getOrNull(index)
                 syncFieldStates()
                 val isMtb = isMtbDetected()
-                val addItems = if (isMtb) listOf(trueNatRifResult) else emptyList()
-                val removeItems = if (!isMtb) {
+                val isRifCompleted = diagnosticsCache?.rifOrderStatus.equals("COMPLETED", ignoreCase = true)
+                val addItems = if (isMtb && isRifCompleted) listOf(trueNatRifResult) else emptyList()
+                val removeItems = if (!isMtb || !isRifCompleted) {
                     resetField(trueNatRifResult)
                     listOf(trueNatRifResult)
                 } else emptyList()
@@ -673,18 +678,19 @@ class TBSuspectedQuickDataset(
 
             // Sputum Collection & TrueNAT (referralType == 0 or 7)
             if (referralType == 0 || referralType == 7) {
+                val sputumVisible = referralType == 7 || shouldShowSputumCollected()
                 form.isSputumCollected =
-                    if (shouldShowSputumCollected()) isYes(referredForSputumCollection) else null
+                    if (sputumVisible) isYes(referredForSputumCollection) else null
                 form.reasonForDenialSputum =
-                    if (shouldShowSputumCollected() && !isYes(referredForSputumCollection))
+                    if (sputumVisible && !isYes(referredForSputumCollection))
                         indexPipeToEnglishPipe(reasonForDenialSputum, R.array.tb_reason_for_denial_sputum)
                     else null
                 form.reasonForDenialSputumOther =
-                    if (shouldShowSputumCollected() && !isYes(referredForSputumCollection))
+                    if (sputumVisible && !isYes(referredForSputumCollection))
                         reasonForDenialSputumOther.value?.takeIf { it.isNotBlank() }
                     else null
                 form.sputumSubmittedAt =
-                    if (shouldShowSputumCollected() && isYes(referredForSputumCollection))
+                    if (sputumVisible && isYes(referredForSputumCollection))
                         getEnglishValueInArray(R.array.tb_diagnostics_sputum_submitted_at, sputumSampleSubmittedAt.value)
                     else null
 
@@ -774,7 +780,7 @@ class TBSuspectedQuickDataset(
 
         if (referralType == 0 || referralType == 7) {
             // Sputum & TrueNat Collection section
-            if (referralType == 0 || shouldShowSputumCollected()) {
+            if (referralType == 7 || referralType == 0 || shouldShowSputumCollected()) {
                 add(referredForSputumCollection)
                 if (isYes(referredForSputumCollection)) {
                     add(sputumSampleSubmittedAt)
@@ -782,7 +788,8 @@ class TBSuspectedQuickDataset(
                         add(trueNatConducted)
                         if (isYes(trueNatConducted)) {
                             add(trueNatResult)
-                            if (isMtbDetected()) {
+                            val isRifCompleted = diagnosticsCache?.rifOrderStatus.equals("COMPLETED", ignoreCase = true)
+                            if (isMtbDetected() && isRifCompleted) {
                                 add(trueNatRifResult)
                             }
                         } else if (!trueNatConducted.value.isNullOrBlank()) {
@@ -896,9 +903,10 @@ class TBSuspectedQuickDataset(
         }
 
         // Sputum section
-        referredForSputumCollection.isEnabled = shouldShowSputumCollected() && !referralMode
-        referredForSputumCollection.required = shouldShowSputumCollected() && !referralMode
-        if (!shouldShowSputumCollected()) resetField(referredForSputumCollection)
+        val sputumVisible = referralType == 7 || shouldShowSputumCollected()
+        referredForSputumCollection.isEnabled = sputumVisible && !referralMode
+        referredForSputumCollection.required = sputumVisible && !referralMode
+        if (!sputumVisible) resetField(referredForSputumCollection)
 
         val sputumReferred = isYes(referredForSputumCollection)
         val sputumDenied = isNo(referredForSputumCollection)
@@ -958,7 +966,8 @@ class TBSuspectedQuickDataset(
             resetField(trueNatResult)
         }
 
-        val showRif = shouldShowTrueNatConducted() && isYes(trueNatConducted) && isMtbDetected()
+        val isRifCompleted = diagnosticsCache?.rifOrderStatus.equals("COMPLETED", ignoreCase = true)
+        val showRif = shouldShowTrueNatConducted() && isYes(trueNatConducted) && isMtbDetected() && isRifCompleted
         trueNatRifResult.isEnabled = showRif && !lockTrueNat
         trueNatRifResult.required = showRif && !lockTrueNat
         if (!showRif) {
@@ -988,12 +997,22 @@ class TBSuspectedQuickDataset(
     private fun shouldShowDigitalChestXray(): Boolean =
         (referralMode || referralType == 0) && isYes(referredForDigitalChestXray) && !isPregnant()
 
-    /** Sputum section shown when patient has history/antiTB drugs/pregnant or X-Ray is positive */
+    /** Sputum section shown when patient has history/antiTB drugs/pregnant, X-Ray is positive, or any verbal symptoms are positive */
     private fun shouldShowSputumCollected(): Boolean =
         screeningCache?.historyOfTb == true ||
             isPregnant() ||
             screeningCache?.takingAntiTBDrugs == true ||
-            isPositive(getEnglishValueInArray(R.array.tb_test_result, digitalChestXrayResult.value))
+            isPositive(getEnglishValueInArray(R.array.tb_test_result, digitalChestXrayResult.value)) ||
+            screeningCache?.coughMoreThan2Weeks == true ||
+            screeningCache?.bloodInSputum == true ||
+            screeningCache?.feverMoreThan2Weeks == true ||
+            screeningCache?.lossOfWeight == true ||
+            screeningCache?.nightSweats == true ||
+            screeningCache?.familySufferingFromTB == true ||
+            screeningCache?.riseOfFever == true ||
+            screeningCache?.lossOfAppetite == true ||
+            screeningCache?.asymptomatic?.equals("NO", ignoreCase = true) == true ||
+            screeningCache?.recommendedForTruenatTest == true
 
     /** TrueNAT shown when xray positive, sputum referred, history of TB, anti-TB drugs, or pregnant */
     private fun shouldShowTrueNatConducted(): Boolean =
