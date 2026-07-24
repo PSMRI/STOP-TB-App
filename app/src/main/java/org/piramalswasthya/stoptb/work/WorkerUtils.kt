@@ -198,7 +198,7 @@ object WorkerUtils {
     }
 
     fun triggerTrueNatDiagnosticResultPollWorker(context: Context, useMockApi: Boolean = false) {
-        val delaySec = if (useMockApi) 5L else 3600L
+        val delaySec = if (useMockApi) 5L else 5L
         val workRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>()
             .setInitialDelay(delaySec, java.util.concurrent.TimeUnit.SECONDS)
             .build()
@@ -208,7 +208,7 @@ object WorkerUtils {
     }
 
     fun triggerRifDiagnosticResultPollWorker(context: Context, useMockApi: Boolean = false) {
-        val delaySec = if (useMockApi) 5L else 3600L
+        val delaySec = if (useMockApi) 5L else 5L
         val workRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>()
             .setInitialDelay(delaySec, java.util.concurrent.TimeUnit.SECONDS)
             .build()

@@ -821,7 +821,7 @@ abstract class InAppDb : RoomDatabase() {
                 val householdFamilyColumns = listOf(
                     "fam_totalHhMembers INTEGER DEFAULT NULL",
                     "fam_isRegisteredAtCampSite TEXT DEFAULT NULL",
-                    "fam_isRegisteredAtCampSiteId INTEGER NOT NULL DEFAULT 0"
+                    "fam_isRegisteredAtCampSiteId INTEGER DEFAULT 0"
                 )
                 householdFamilyColumns.forEach { columnDefinition ->
                     val columnName = columnDefinition.substringBefore(" ")
