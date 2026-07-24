@@ -94,6 +94,44 @@ class TBSuspectedQuickViewModel @Inject constructor(
                     address = legacySuspected.address
                 )
             }
+            if (viewOnly) {
+                val orderType = if (referralType == 6) "XRAY_CHEST" else "SPUTUM_TRUENAT"
+                val hasLocalResult = if (orderType == "XRAY_CHEST") {
+                    !tbDiagnostics.chestXRayResult.isNullOrBlank()
+                } else {
+                    !tbDiagnostics.naatResult.isNullOrBlank()
+                }
+                val isOrderActive = if (orderType == "XRAY_CHEST") {
+                    val status = tbDiagnostics.xrayOrderStatus
+                    status.equals("COMPLETED", ignoreCase = true) || status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true)
+                } else {
+                    val status = tbDiagnostics.trueNatOrderStatus
+                    status.equals("COMPLETED", ignoreCase = true) || status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true)
+                }
+                if (!hasLocalResult && isOrderActive) {
+                    try {
+                        tbRepo.fetchOrderResult(benId, orderType)
+                    } catch (e: Exception) {
+                        Timber.e(e, "Pre-fetching results failed for viewOnly mode ($orderType)")
+                    }
+                }
+                if (orderType == "SPUTUM_TRUENAT" && tbDiagnostics.naatResult.equals("MTB detected", ignoreCase = true)) {
+                    val hasLocalRifResult = !tbDiagnostics.trueNatRifResult.isNullOrBlank()
+                    val isRifActive = tbDiagnostics.rifOrderStatus.equals("COMPLETED", ignoreCase = true) ||
+                            tbDiagnostics.rifOrderStatus.equals("IN_PROGRESS", ignoreCase = true) ||
+                            tbDiagnostics.rifOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true)
+                    if (!hasLocalRifResult && isRifActive) {
+                        try {
+                            tbRepo.fetchOrderResult(benId, "MDR_RIF")
+                        } catch (e: Exception) {
+                            Timber.e(e, "Pre-fetching results failed for viewOnly mode (MDR_RIF)")
+                        }
+                    }
+                }
+                tbRepo.getTBDiagnostics(benId)?.let {
+                    tbDiagnostics = it
+                }
+            }
             dataset.setUpPage(
                 ben,
                 tbScreening,
@@ -167,14 +205,16 @@ class TBSuspectedQuickViewModel @Inject constructor(
                     val hasXrayOrder = !tbDiagnostics.xrayOrderId.isNullOrBlank() && !tbDiagnostics.xrayOrderStatus.equals("FAILED", ignoreCase = true)
                     val hasTrueNatOrder = !tbDiagnostics.trueNatOrderId.isNullOrBlank() && !tbDiagnostics.trueNatOrderStatus.equals("FAILED", ignoreCase = true)
 
-                    if (referralType == 6 && tbDiagnostics.isReferredForDigitalChestXray == true && !hasXrayOrder) {
-                        val response = tbRepo.createProdigiOrder(benId, "XRAY_CHEST")
+                    if (!viewOnly && referralType == 6 && tbDiagnostics.isReferredForDigitalChestXray != null && !hasXrayOrder) {
+                        val reason = if (tbDiagnostics.isReferredForDigitalChestXray == false) tbDiagnostics.reasonForDenialChestXray else null
+                        val response = tbRepo.createProdigiOrder(benId, "XRAY_CHEST", reasonForRefusal = reason)
                         if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Error) {
                             orderPushSuccess = false
                             orderPushError = response.message
                         }
-                    } else if (referralType == 7 && tbDiagnostics.isSputumCollected == true && !hasTrueNatOrder) {
-                        val response = tbRepo.createProdigiOrder(benId, "SPUTUM_TRUENAT")
+                    } else if (!viewOnly && referralType == 7 && tbDiagnostics.isSputumCollected != null && !hasTrueNatOrder) {
+                        val reason = if (tbDiagnostics.isSputumCollected == false) tbDiagnostics.reasonForDenialSputum else null
+                        val response = tbRepo.createProdigiOrder(benId, "SPUTUM_TRUENAT", reasonForRefusal = reason)
                         if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Error) {
                             orderPushSuccess = false
                             orderPushError = response.message

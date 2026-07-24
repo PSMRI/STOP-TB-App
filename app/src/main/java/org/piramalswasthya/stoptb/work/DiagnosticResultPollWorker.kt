@@ -40,6 +40,7 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 for (diag in activeList) {
                     val xrayInProgress = diag.xrayOrderStatus.equals("IN_PROGRESS", ignoreCase = true) || diag.xrayOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true)
                     val trueNatInProgress = diag.trueNatOrderStatus.equals("IN_PROGRESS", ignoreCase = true) || diag.trueNatOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true)
+                    val rifInProgress = diag.rifOrderStatus.equals("IN_PROGRESS", ignoreCase = true) || diag.rifOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true)
 
                     if (xrayInProgress) {
                         var actualStart = preferenceDao.getDiagPollActualStartTime(diag.benId, "XRAY_CHEST")
@@ -73,11 +74,27 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                             hasInProgress = true
                         }
                     }
+                    if (rifInProgress) {
+                        var actualStart = preferenceDao.getDiagPollActualStartTime(diag.benId, "MDR_RIF")
+                        if (actualStart <= 0L) {
+                            actualStart = now
+                            preferenceDao.setDiagPollActualStartTime(diag.benId, "MDR_RIF", now)
+                        }
+                        if (now - actualStart > 30 * 60 * 1000) { // 30 minutes
+                            Timber.d("Polling rif result timed out (30 mins) for benId=${diag.benId}")
+                            val updated = diag.copy(rifOrderStatus = "FAILED", syncState = SyncState.SYNCED)
+                            tbRepo.saveTBDiagnostics(updated)
+                        } else {
+                            Timber.d("Polling rif result for benId=${diag.benId}")
+                            tbRepo.fetchOrderResult(diag.benId, "MDR_RIF")
+                            hasInProgress = true
+                        }
+                    }
                 }
 
                 // If any test is still in progress, schedule another poll in 40 seconds
                 if (hasInProgress) {
-                    val pollDelaySec = if (tbRepo.useMockApi) 5L else 40L
+                    val pollDelaySec = 40L
                     Timber.d("Scheduling next DiagnosticResultPollWorker run in ${pollDelaySec}s")
                     val pollRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>()
                         .setInitialDelay(pollDelaySec, TimeUnit.SECONDS)

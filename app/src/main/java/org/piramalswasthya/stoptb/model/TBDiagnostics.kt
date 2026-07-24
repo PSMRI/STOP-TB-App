@@ -56,6 +56,8 @@ data class TBDiagnosticsCache(
     var trueNatOrderId: String? = null,
     var trueNatOrderStatus: String? = null,
     var trueNatRifResult: String? = null,
+    var rifOrderId: String? = null,
+    var rifOrderStatus: String? = null,
     // ── Meta ─────────────────────────────────────────────────────────────────
     var latitude: Double? = null,
     var longitude: Double? = null,
@@ -93,6 +95,8 @@ data class TBDiagnosticsCache(
         trueNatOrderId = trueNatOrderId,
         trueNatOrderStatus = trueNatOrderStatus,
         trueNatRifResult = trueNatRifResult,
+        rifOrderId = rifOrderId,
+        rifOrderStatus = rifOrderStatus,
         latitude = latitude,
         longitude = longitude,
         address = address
