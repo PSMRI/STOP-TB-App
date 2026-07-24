@@ -42,12 +42,13 @@ class CounsellingRepo @Inject constructor(
             try {
                 val ben = benDao.getBen(benId) ?: return@withContext NetworkResponse.Error("Beneficiary not found")
                 val tbDiag = tbDao.getTbDiagnosticsByBenId(benId)
+                val tbSuspected = tbDao.getTbSuspected(benId)   // <-- also pull the suspected-flow record
                 val loggedInUser = preferenceDao.getLoggedInUser()?.name ?: ""
 
                 val results = mutableListOf<String>()
-                tbDiag?.chestXRayResult?.let { results.add("X-Ray: $it") }
-                tbDiag?.naatResult?.let { results.add("NAAT: $it") }
-                tbDiag?.liquidCultureResult?.let { results.add("Liquid Culture: $it") }
+                (tbDiag?.chestXRayResult ?: tbSuspected?.chestXRayResult)?.let { results.add("X-Ray: $it") }
+                (tbDiag?.naatResult ?: tbSuspected?.naatResult)?.let { results.add("NAAT: $it") }
+                (tbDiag?.liquidCultureResult ?: tbSuspected?.liquidCultureResult)?.let { results.add("Liquid Culture: $it") }
                 val diagnosis = if (results.isNotEmpty()) results.joinToString(" / ") else "N/A"
 
                 val genderText = when (ben.gender) {

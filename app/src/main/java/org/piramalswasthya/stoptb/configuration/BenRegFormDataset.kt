@@ -773,11 +773,13 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             healthFacility.value = it.healthFacility?.name ?: ""
         }
 
-        // Household-level fields are already captured once on the household form;
-        // hide them here when this beneficiary is being added to an existing household.
-        if (relToHeadId >= 0 && relToHeadId != 18) {
+        // Household-level fields (address, pincode, village, residential area type,
+        // economic status) are captured once on the Household form itself.
+        // Always hide them here — for both the Head of Family and subsequent members —
+        // and rely on the background defaulting logic above to populate their values.
+        if (relToHeadId >= 0) {
             list.removeAll(
-                listOf(address, pinCode, villageHamlet, residentialAreaType, economicStatus)
+                listOf( address,pinCode, villageHamlet, residentialAreaType, economicStatus)
             )
             address.required = false
             pinCode.required = false
@@ -978,11 +980,19 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                             addItems = emptyList()
                         )
                     } else {
-                        // Normal case: remove all marital fields and re-add maritalStatus after villageHamlet
+                        // Normal case: remove all marital fields and re-add maritalStatus after villageHamlet.
+                        // Guard against villageHamlet being absent from the list (e.g. hidden for
+                        // household-member registrations) — indexOf would return -1, and the
+                        // generic fallback in triggerDependants would insert at position 0 (top of form).
+                        // Fall back to appending at the end instead.
+                        val villageIndex = getIndexOfElement(villageHamlet)
+                        val safePosition = if (villageIndex >= 0) villageIndex + 1 else -2 // -2 = append at end
+
                         triggerDependants(
                             source = villageHamlet,
                             removeItems = listOf(maritalStatus) + spouseFields,
-                            addItems = listOf(maritalStatus)
+                            addItems = listOf(maritalStatus),
+                            position = safePosition
                         )
                     }
 

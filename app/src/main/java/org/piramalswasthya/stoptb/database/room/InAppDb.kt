@@ -706,7 +706,22 @@ abstract class InAppDb : RoomDatabase() {
                 }
             }
         }
-
+     /*   private val MIGRATION_23_24 = object : Migration(23, 24) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val householdFamilyColumns = listOf(
+                    "fam_totalHhMembers INTEGER DEFAULT NULL",
+                    "fam_isRegisteredAtCampSite TEXT DEFAULT NULL",
+                    "fam_isRegisteredAtCampSiteId INTEGER NOT NULL DEFAULT 0"
+                )
+                householdFamilyColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "HOUSEHOLD", columnName)) {
+                        database.execSQL("ALTER TABLE HOUSEHOLD ADD COLUMN $columnDefinition")
+                    }
+                }
+            }
+        }
+*/
 
         private val MIGRATION_22_23 = object : Migration(22, 23) {
             override fun migrate(database: SupportSQLiteDatabase) {
@@ -802,6 +817,19 @@ abstract class InAppDb : RoomDatabase() {
 
         private val MIGRATION_23_24 = object : Migration(23, 24) {
             override fun migrate(database: SupportSQLiteDatabase) {
+
+                val householdFamilyColumns = listOf(
+                    "fam_totalHhMembers INTEGER DEFAULT NULL",
+                    "fam_isRegisteredAtCampSite TEXT DEFAULT NULL",
+                    "fam_isRegisteredAtCampSiteId INTEGER NOT NULL DEFAULT 0"
+                )
+                householdFamilyColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "HOUSEHOLD", columnName)) {
+                        database.execSQL("ALTER TABLE HOUSEHOLD ADD COLUMN $columnDefinition")
+                    }
+                }
+
                 if (!columnExists(database, "TB_DIAGNOSTICS", "xrayOrderId")) {
                     database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN xrayOrderId TEXT DEFAULT NULL")
                 }

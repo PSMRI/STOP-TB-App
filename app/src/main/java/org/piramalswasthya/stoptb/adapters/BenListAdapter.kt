@@ -18,6 +18,7 @@ import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.Gender
+import timber.log.Timber
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 
 data class ButtonConfig(
@@ -486,6 +487,16 @@ class BenListAdapter(
                 ).count { it }
                 Pair(filled, 4)
             }
+
+            binding.btnExamine.text = binding.root.context.getString(
+                R.string.btn_examine_count_of, examineFilledCount, examineTotal
+            )
+            binding.btnExamine.backgroundTintList = ContextCompat.getColorStateList(
+                binding.root.context,
+                if (examineFilledCount > 0) android.R.color.holo_green_dark
+                else android.R.color.holo_red_dark
+            )
+
             binding.btnExamine.text = "Examine ($examineFilledCount/$examineTotal)"
             val isExamineFilled = examineFilledCount > 0
             binding.btnExamine.setBackgroundTintList(
