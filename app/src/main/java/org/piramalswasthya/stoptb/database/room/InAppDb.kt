@@ -596,7 +596,7 @@ abstract class InAppDb : RoomDatabase() {
                         `answerText` TEXT, 
                         `createdAt` INTEGER NOT NULL, 
                         `updatedAt` INTEGER NOT NULL, 
-                        FOREIGN KEY(`sectionResponseId`) REcFERENCES `t_section_response`(`sectionResponseId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
+                        FOREIGN KEY(`sectionResponseId`) REFERENCES `t_section_response`(`sectionResponseId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
                         FOREIGN KEY(`questionId`) REFERENCES `t_section_question`(`questionId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
                         FOREIGN KEY(`optionId`) REFERENCES `t_question_option`(`optionId`) ON UPDATE NO ACTION ON DELETE SET NULL
                     )
