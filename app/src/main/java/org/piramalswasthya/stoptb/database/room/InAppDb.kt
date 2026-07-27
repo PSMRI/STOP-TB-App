@@ -104,7 +104,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class],
-    version = 25, exportSchema = false
+    version = 26, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -596,7 +596,7 @@ abstract class InAppDb : RoomDatabase() {
                         `answerText` TEXT, 
                         `createdAt` INTEGER NOT NULL, 
                         `updatedAt` INTEGER NOT NULL, 
-                        FOREIGN KEY(`sectionResponseId`) REcFERENCES `t_section_response`(`sectionResponseId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
+                        FOREIGN KEY(`sectionResponseId`) REFERENCES `t_section_response`(`sectionResponseId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
                         FOREIGN KEY(`questionId`) REFERENCES `t_section_question`(`questionId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
                         FOREIGN KEY(`optionId`) REFERENCES `t_question_option`(`optionId`) ON UPDATE NO ACTION ON DELETE SET NULL
                     )
@@ -925,6 +925,12 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_25_26 = object : Migration(25, 26) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                addTBScreeningRiskFactorColumns(database)
+            }
+        }
+
         private fun addTBScreeningRiskFactorColumns(database: SupportSQLiteDatabase) {
             val columns = listOf(
                 "keyPopulationRiskFactorIds TEXT DEFAULT NULL",
@@ -1010,6 +1016,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_22_23)
                         .addMigrations(MIGRATION_23_24)
                         .addMigrations(MIGRATION_24_25)
+                        .addMigrations(MIGRATION_25_26)
                         .fallbackToDestructiveMigration()
                         .build()
 
