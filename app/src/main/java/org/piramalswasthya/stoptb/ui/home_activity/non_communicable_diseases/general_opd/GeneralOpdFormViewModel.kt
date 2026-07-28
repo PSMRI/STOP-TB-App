@@ -151,7 +151,7 @@ class GeneralOpdFormViewModel @Inject constructor(
                 val benRegId = ben.benRegId.takeIf { it > 0L }
                     ?: run {
                         _careContextState.value = CareContextState.Unavailable(
-                            "Beneficiary sync pending. Care Context abhi create nahi ho sakta."
+                            "Beneficiary sync is pending. Care Context cannot be created yet."
                         )
                         return@launch
                     }
@@ -159,10 +159,29 @@ class GeneralOpdFormViewModel @Inject constructor(
                 val visitCode = waitForVisitCode()
                     ?: run {
                         _careContextState.value = CareContextState.Unavailable(
-                            "Visit code abhi sync nahi hua. Please try again after sync."
+                            "Visit code has not been synced yet. Please try again after sync."
                         )
                         return@launch
                     }
+
+                when (val facilityResult = abdmCareContextRepo.saveFacilityAgainstVisit(
+                    visitCode = visitCode,
+                    providerServiceMapId = providerServiceMapId
+                )) {
+                    is NetworkResult.Error -> {
+                        _careContextState.value = CareContextState.Unavailable(facilityResult.message)
+                        return@launch
+                    }
+
+                    NetworkResult.NetworkError -> {
+                        _careContextState.value = CareContextState.Unavailable(
+                            "Internet issue. Unable to save ABDM facility for visit."
+                        )
+                        return@launch
+                    }
+
+                    is NetworkResult.Success -> Unit
+                }
 
                 when (val healthResult = abdmCareContextRepo.getBeneficiaryHealthId(
                     beneficiaryRegID = benRegId,
@@ -179,7 +198,7 @@ class GeneralOpdFormViewModel @Inject constructor(
                                 val txnId = otpResult.data.txnId
                                 if (txnId.isNullOrBlank()) {
                                     _careContextState.value = CareContextState.Unavailable(
-                                        "Care Context OTP generate nahi ho paya."
+                                        "Unable to generate Care Context OTP."
                                     )
                                     return@launch
                                 }
@@ -204,7 +223,7 @@ class GeneralOpdFormViewModel @Inject constructor(
 
                             NetworkResult.NetworkError -> {
                                 _careContextState.value = CareContextState.Unavailable(
-                                    "Internet issue. Care Context OTP generate nahi ho paya."
+                                    "Internet issue. Unable to generate Care Context OTP."
                                 )
                             }
                         }
@@ -216,7 +235,7 @@ class GeneralOpdFormViewModel @Inject constructor(
 
                     NetworkResult.NetworkError -> {
                         _careContextState.value = CareContextState.Unavailable(
-                            "Internet issue. ABHA details fetch nahi ho payi."
+                            "Internet issue. Unable to fetch ABHA details."
                         )
                     }
                 }

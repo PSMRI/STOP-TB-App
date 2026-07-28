@@ -386,6 +386,7 @@ class TBRepo @Inject constructor(
                 continue
             }
             val cache = (existing ?: GeneralOpdCache(benId = ben.beneficiaryId)).copy(
+                visitCode = item.optLong("visitCode", 0L).takeIf { it > 0L } ?: existing?.visitCode,
                 chiefComplaints = item.optStringListOrNull("chiefComplaint"),
                 medications = item.optStringOrNull("medication")?.let { listOf(it) },
                 dosage = item.optStringOrNull("dosage"),
@@ -878,7 +879,10 @@ class TBRepo @Inject constructor(
                             val jsonObj = JSONObject(responseString)
                             when (val responseStatusCode = jsonObj.getInt("statusCode")) {
                                 200 -> {
-                                    updateSyncStatusGeneralOpd(chunk)
+                                    updateSyncStatusGeneralOpd(
+                                        chunk,
+                                        getGeneralOpdVisitCodes(jsonObj)
+                                    )
                                     successCount += chunk.size
                                 }
 
@@ -1127,8 +1131,27 @@ class TBRepo @Inject constructor(
         }
     }
 
-    private suspend fun updateSyncStatusGeneralOpd(opdList: List<GeneralOpdCache>) {
+    private fun getGeneralOpdVisitCodes(jsonObj: JSONObject): Map<Long, Long> {
+        val visitCodeMap = mutableMapOf<Long, Long>()
+        val dataArray = jsonObj.optJSONArray("data") ?: return visitCodeMap
+        for (index in 0 until dataArray.length()) {
+            val item = dataArray.optJSONObject(index) ?: continue
+            val benRegId = item.optLong("beneficiaryRegID", 0L)
+            val visitCode = item.optLong("visitCode", 0L)
+            if (benRegId > 0L && visitCode > 0L) {
+                visitCodeMap[benRegId] = visitCode
+            }
+        }
+        return visitCodeMap
+    }
+
+    private suspend fun updateSyncStatusGeneralOpd(
+        opdList: List<GeneralOpdCache>,
+        visitCodeByBenRegId: Map<Long, Long> = emptyMap()
+    ) {
         opdList.forEach {
+            val benRegId = benDao.getBen(it.benId)?.benRegId
+            it.visitCode = visitCodeByBenRegId[benRegId] ?: it.visitCode
             it.syncState = SyncState.SYNCED
             tbDao.saveGeneralOpd(it)
         }

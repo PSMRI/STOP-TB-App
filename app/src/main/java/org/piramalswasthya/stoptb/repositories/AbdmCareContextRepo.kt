@@ -51,7 +51,7 @@ class AbdmCareContextRepo @Inject constructor(
                         getMappedFacility(providerServiceMapId)
                     }
 
-                    else -> NetworkResult.Error(0, responseBody ?: "Unknown Error")
+                    else -> NetworkResult.Error(0, getErrorMessage(responseBody))
                 }
             } catch (e: IOException) {
                 NetworkResult.NetworkError
@@ -87,7 +87,7 @@ class AbdmCareContextRepo @Inject constructor(
                         saveFacilityAgainstVisit(visitCode, providerServiceMapId)
                     }
 
-                    else -> NetworkResult.Error(0, responseBody ?: "Unknown Error")
+                    else -> NetworkResult.Error(0, getErrorMessage(responseBody))
                 }
             } catch (e: IOException) {
                 NetworkResult.NetworkError
@@ -134,7 +134,7 @@ class AbdmCareContextRepo @Inject constructor(
                         getBeneficiaryHealthId(beneficiaryRegID, beneficiaryID)
                     }
 
-                    else -> NetworkResult.Error(0, responseBody ?: "Unknown Error")
+                    else -> NetworkResult.Error(0, getErrorMessage(responseBody))
                 }
             } catch (e: IOException) {
                 NetworkResult.NetworkError
@@ -178,7 +178,7 @@ class AbdmCareContextRepo @Inject constructor(
                         generateOtpForCareContext(healthID, healthIdNumber, providerServiceMapId)
                     }
 
-                    else -> NetworkResult.Error(0, responseBody ?: "Unknown Error")
+                    else -> NetworkResult.Error(0, getErrorMessage(responseBody))
                 }
             } catch (e: IOException) {
                 NetworkResult.NetworkError
@@ -241,7 +241,7 @@ class AbdmCareContextRepo @Inject constructor(
                         )
                     }
 
-                    else -> NetworkResult.Error(0, responseBody ?: "Unknown Error")
+                    else -> NetworkResult.Error(0, getErrorMessage(responseBody))
                 }
             } catch (e: IOException) {
                 NetworkResult.NetworkError
@@ -279,8 +279,19 @@ class AbdmCareContextRepo @Inject constructor(
             userRepo.refreshTokenTmc(user.userName, user.password)
             retry()
         } else {
-            NetworkResult.Error(0, errorMessage.ifBlank { responseBody ?: "Unknown Error" })
+            NetworkResult.Error(0, getErrorMessage(responseBody))
         }
+    }
+
+    private fun getErrorMessage(responseBody: String?): String {
+        if (responseBody.isNullOrBlank()) return "Unknown Error"
+        return runCatching {
+            val json = JSONObject(responseBody)
+            json.optString("errorMessage")
+                .ifBlank { json.optString("message") }
+                .ifBlank { json.optString("status") }
+                .ifBlank { responseBody }
+        }.getOrElse { responseBody }
     }
 
     companion object {

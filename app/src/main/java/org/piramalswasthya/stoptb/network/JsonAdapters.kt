@@ -353,6 +353,95 @@ data class AddHealthIdRecord(
     var ABHAProfile: ABHAProfile?, var isNew: Boolean?
 )
 
+@JsonClass(generateAdapter = true)
+data class AbdmMappedFacilityResponse(
+    val data: AbdmMappedFacilityData?,
+    val statusCode: Int?,
+    val errorMessage: String?,
+    val status: String?
+)
+
+@JsonClass(generateAdapter = true)
+data class AbdmMappedFacilityData(
+    val pSAddMapID: Int?,
+    val providerServiceMapID: Int?,
+    val districtID: Int?,
+    val address: String?,
+    val deleted: Boolean?,
+    val createdBy: String?,
+    val createdDate: String?,
+    val lastModDate: String?,
+    val locationName: String?,
+    val abdmFacilityID: String?,
+    val abdmFacilityName: String?
+)
+
+@JsonClass(generateAdapter = true)
+data class SaveAbdmFacilityIdRequest(
+    val visitCode: Long,
+    val abdmFacilityId: String
+)
+
+@JsonClass(generateAdapter = true)
+data class SaveAbdmFacilityIdResponse(
+    val data: SaveAbdmFacilityIdData?,
+    val statusCode: Int?,
+    val errorMessage: String?,
+    val status: String?
+)
+
+@JsonClass(generateAdapter = true)
+data class SaveAbdmFacilityIdData(
+    val response: String?
+)
+
+@JsonClass(generateAdapter = true)
+data class CareContextGenerateOtpRequest(
+    val healthID: String?,
+    val healthIdNumber: String?,
+    val abdmFacilityId: String,
+    val abdmFacilityName: String
+)
+
+@JsonClass(generateAdapter = true)
+data class CareContextGenerateOtpResponse(
+    val data: CareContextGenerateOtpData?,
+    val statusCode: Int?,
+    val errorMessage: String?,
+    val status: String?
+)
+
+@JsonClass(generateAdapter = true)
+data class CareContextGenerateOtpData(
+    val txnId: String?
+)
+
+@JsonClass(generateAdapter = true)
+data class CareContextValidateOtpRequest(
+    val otp: String,
+    val txnId: String,
+    val beneficiaryID: Long,
+    val healthID: String?,
+    val healthIdNumber: String?,
+    val visitCode: Long,
+    val visitCategory: String,
+    val abdmFacilityId: String,
+    val abdmFacilityName: String
+)
+
+@JsonClass(generateAdapter = true)
+data class CareContextValidateOtpResponse(
+    val data: CareContextValidateOtpData?,
+    val statusCode: Int?,
+    val errorMessage: String?,
+    val status: String?
+)
+
+@JsonClass(generateAdapter = true)
+data class CareContextValidateOtpData(
+    val response: String?
+)
+
 data class StopTbVillageRequest(val providerServiceMapID: Int, val villageID: Int)
 data class TBScreeningRequestDTO(val userId: Int, val tbScreeningList: List<TBScreeningDTO>)
 data class TBScreeningSaveRequest(
