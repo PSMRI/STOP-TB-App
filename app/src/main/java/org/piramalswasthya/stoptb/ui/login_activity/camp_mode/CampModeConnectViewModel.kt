@@ -9,6 +9,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.piramalswasthya.stoptb.BuildConfig
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import java.net.HttpURLConnection
 import java.net.URL
@@ -21,7 +22,6 @@ class CampModeConnectViewModel @Inject constructor(
 
     companion object {
         private const val TAG = "CampHub"
-        private const val DEFAULT_CAMP_HUB_URL = "https://stoptb.piramalswasthya.org/"
     }
 
     enum class CampHubStatus {
@@ -35,7 +35,14 @@ class CampModeConnectViewModel @Inject constructor(
     val campHubStatus: LiveData<CampHubStatus>
         get() = _campHubStatus
 
-    fun getCampHubUrl(): String = pref.getStoredCampHubUrl() ?: DEFAULT_CAMP_HUB_URL
+    fun getCampHubUrl(): String = pref.getStoredCampHubUrl() ?: getDefaultCampHubUrl()
+
+    private fun getDefaultCampHubUrl(): String =
+        if (BuildConfig.FLAVOR.equals("stoptbUat", ignoreCase = true)) {
+            "https://uatstoptb.piramalswasthya.org/"
+        } else {
+            "https://stoptb.piramalswasthya.org/"
+        }
 
     fun connectToCampHub(url: String) {
         val normalizedUrl = normalizeCampHubUrl(url)
