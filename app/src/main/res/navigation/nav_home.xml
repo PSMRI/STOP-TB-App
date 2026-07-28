@@ -163,6 +163,10 @@
             android:name="generalOpdFlow"
             android:defaultValue="false"
             app:argType="boolean" />
+        <argument
+            android:name="referralType"
+            android:defaultValue="0"
+            app:argType="integer" />
     </fragment>
 
     <fragment
@@ -556,7 +560,7 @@
     <fragment
         android:id="@+id/nonHHFragment"
         android:name="org.piramalswasthya.stoptb.ui.home_activity.non_hh.NonHHFragment"
-        android:label="Non-Household List">
+        android:label="Non Household Beneficiaries">
         <action
             android:id="@+id/action_nonHHFragment_to_currentLivingInfoFragment"
             app:destination="@id/currentLivingInfoFragment" />

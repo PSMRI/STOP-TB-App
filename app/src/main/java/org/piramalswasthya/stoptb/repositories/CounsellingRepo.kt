@@ -42,12 +42,13 @@ class CounsellingRepo @Inject constructor(
             try {
                 val ben = benDao.getBen(benId) ?: return@withContext NetworkResponse.Error("Beneficiary not found")
                 val tbDiag = tbDao.getTbDiagnosticsByBenId(benId)
+                val tbSuspected = tbDao.getTbSuspected(benId)   // <-- also pull the suspected-flow record
                 val loggedInUser = preferenceDao.getLoggedInUser()?.name ?: ""
 
                 val results = mutableListOf<String>()
-                tbDiag?.chestXRayResult?.let { results.add("X-Ray: $it") }
-                tbDiag?.naatResult?.let { results.add("NAAT: $it") }
-                tbDiag?.liquidCultureResult?.let { results.add("Liquid Culture: $it") }
+                (tbDiag?.chestXRayResult ?: tbSuspected?.chestXRayResult)?.let { results.add("X-Ray: $it") }
+                (tbDiag?.naatResult ?: tbSuspected?.naatResult)?.let { results.add("NAAT: $it") }
+                (tbDiag?.liquidCultureResult ?: tbSuspected?.liquidCultureResult)?.let { results.add("Liquid Culture: $it") }
                 val diagnosis = if (results.isNotEmpty()) results.joinToString(" / ") else "N/A"
 
                 val genderText = when (ben.gender) {
@@ -723,6 +724,31 @@ class CounsellingRepo @Inject constructor(
                 }
 
                 counsellingRepository.saveDraftSection(responseId, section.sectionId, null, answers)
+
+
+                val bulkSuccess = counsellingRepository.submitSectionBulk(responseId, section.sectionId)
+                if (!bulkSuccess) {
+                    val isCampMode = preferenceDao.isCampModeEnabled()
+                    val isHubConnected = preferenceDao.isCampHubConnected()
+                    val isInternet = isInternetAvailable(context)
+                    val isOffline = (isCampMode && !isHubConnected) || (!isCampMode && !isInternet)
+
+                    CounsellingSyncWorker.scheduleSync(context)
+
+                    if (isOffline) {
+                        Timber.d("saveGeneralInfoDraft: offline mode detected for sectionId=${section.sectionId}, saved locally for background sync retry")
+                    } else {
+                        Timber.d("saveGeneralInfoDraft: submitSectionBulk failed in online mode for sectionId=${section.sectionId}, saved locally for automatic background sync retry")
+                        withContext(Dispatchers.Main) {
+                            android.widget.Toast.makeText(
+                                context,
+                                "Saved locally. It will sync automatically in the background.",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                }
+
                 true
             } catch (e: Exception) {
                 Timber.e(e, "saveGeneralInfoDraft failed")

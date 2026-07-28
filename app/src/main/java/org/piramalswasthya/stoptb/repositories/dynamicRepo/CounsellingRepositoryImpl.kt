@@ -722,7 +722,8 @@ class CounsellingRepositoryImpl @Inject constructor(
                 val finalStatus = when {
                     apiResponse.status?.uppercase() == "REFUSED" -> "REFUSED"
                     hasPostSubmitAnswers || apiResponse.status?.uppercase() == "COMPLETE" || apiResponse.status?.uppercase() == "COMPLETED" -> "COMPLETE"
-                    allPreSubmitAnswered -> "SUBMITTED"
+
+                    apiResponse.status?.uppercase() == "SUBMITTED" || allPreSubmitAnswered -> "SUBMITTED"
                     else -> "DRAFT"
                 }
 

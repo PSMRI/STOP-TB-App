@@ -89,7 +89,11 @@ class NewHouseholdViewModel @Inject constructor(
                         registrationType = isAshaFamily,
                         locationRecord = locationRecord
                     )
-                dataset.setupPage(household)
+
+                val villageNames = user.villages.map { it.name }.toTypedArray()
+
+                dataset.setupPage(household, villageNames, user.villages)
+
 
                 // Restore previously saved location state if editing an existing record
                 household.let { hh ->

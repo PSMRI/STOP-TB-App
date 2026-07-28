@@ -153,6 +153,14 @@ class DashboardFragment : Fragment() {
 
         }
 
+        viewModel.presumptiveTb.observe(viewLifecycleOwner) { data ->
+            binding.tvPresumptiveTbTotal.text = data.total.toString()
+            binding.tvPresumptiveTbMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
+            binding.tvPresumptiveTbFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
+            binding.tvPresumptiveTbChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
+            binding.tvPresumptiveTbOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
+        }
+
         viewModel.pastHistoryTb.observe(viewLifecycleOwner) { data ->
             binding.tvPastHistoryTbTotal.text = data.total.total.toString()
             binding.tvPastHistoryTbMale.text = getString(

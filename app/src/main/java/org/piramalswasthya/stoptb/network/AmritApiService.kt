@@ -256,6 +256,27 @@ interface AmritApiService {
 //        @Path("formName") formName: String,
 //        @Body request: HBNCVisitRequest
 //    ): Response<HBNCVisitListResponse>
+    @POST("flw-api/diagnostic/order/push")
+    suspend fun pushDiagnosticOrder(
+        @Body request: DiagnosticOrderPushRequest
+    ): Response<ResponseBody>
 
+    @POST("flw-api/diagnostic/order/testCompleted")
+    suspend fun markTestCompleted(
+        @Query("benRegID") benRegID: Long,
+        @Query("orderType") orderType: String
+    ): Response<ResponseBody>
+
+    @POST("flw-api/diagnostic/order/result")
+    suspend fun fetchOrderResult(
+        @Query("benId") benId: Long,
+        @Query("orderType") orderType: String
+    ): Response<ResponseBody>
+
+    @GET("flw-api/diagnostic/order/getBeneficiariesByStatus")
+    suspend fun getBeneficiariesByStatus(
+        @Query("orderType") orderType: String,
+        @Query("villageId") villageId: Int,
+        @Query("providerServiceMapId") providerServiceMapId: Int
+    ): Response<ResponseBody>
 }
-

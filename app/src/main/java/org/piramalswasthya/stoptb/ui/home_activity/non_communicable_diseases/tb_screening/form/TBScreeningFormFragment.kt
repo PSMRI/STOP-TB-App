@@ -190,15 +190,7 @@ class TBScreeningFormFragment : Fragment() {
             requireContext(),
             resources.getString(R.string.tb_screening_submitted), Toast.LENGTH_SHORT
         ).show()
-        if (openedFromHousehold) {
-            findNavController().navigateUp()
-        } else if (viewModel.autoFlow) {
-            // Examine flow — return to AllBenFragment so user picks the next form
-            val popped = findNavController().popBackStack(R.id.allBenFragment, false)
-            if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
-        } else {
-            findNavController().navigateUp()
-        }
+        findNavController().navigateUp()
     }
 
     private fun validateCurrentPage(): Boolean {

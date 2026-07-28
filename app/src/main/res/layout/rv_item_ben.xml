@@ -506,31 +506,68 @@
 
                         <LinearLayout
                             android:id="@+id/ll_vital_action"
-                            android:layout_width="wrap_content"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_weight="0"
+                            android:layout_weight="1"
                             android:orientation="vertical">
 
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btn_vital_screen"
-                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            <TextView
+                                android:id="@+id/tv_order_status"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:backgroundTint="@android:color/holo_green_dark"
-                                android:gravity="center"
-                                android:minWidth="170dp"
-                                android:paddingHorizontal="@dimen/padding_small"
-                                android:maxLines="1"
-                                android:singleLine="true"
-                                android:onClick="@{()-> showActionButtons ? clickListener.onClickVitalScreen(ben) : clickListener.onClickResult(ben)}"
-                                android:text="@string/vital_screen"
+                                android:layout_marginBottom="4dp"
                                 android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                android:textSize="14sp"
                                 android:textColor="?attr/colorOnPrimary"
+                                android:textStyle="bold"
                                 android:visibility="gone"
-                                app:cornerRadius="@dimen/padding_normal"
-                                app:strokeColor="?attr/colorPrimary"
-                                app:strokeWidth="1dp" />
+                                tools:text="Status: Referred for X-ray" />
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal">
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btn_vital_screen"
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:layout_marginEnd="4dp"
+                                    android:backgroundTint="@android:color/holo_green_dark"
+                                    android:gravity="center"
+                                    android:paddingHorizontal="@dimen/padding_small"
+                                    android:maxLines="1"
+                                    android:singleLine="true"
+                                    android:text="@string/vital_screen"
+                                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                    android:textSize="14sp"
+                                    android:textColor="?attr/colorOnPrimary"
+                                    android:visibility="gone"
+                                    app:cornerRadius="@dimen/padding_normal"
+                                    app:strokeColor="?attr/colorPrimary"
+                                    app:strokeWidth="1dp" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btn_vital_screen_secondary"
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:layout_marginStart="4dp"
+                                    android:backgroundTint="@android:color/holo_green_dark"
+                                    android:gravity="center"
+                                    android:paddingHorizontal="@dimen/padding_small"
+                                    android:maxLines="1"
+                                    android:singleLine="true"
+                                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                    android:textSize="14sp"
+                                    android:textColor="?attr/colorOnPrimary"
+                                    android:visibility="gone"
+                                    app:cornerRadius="@dimen/padding_normal"
+                                    app:strokeColor="?attr/colorPrimary"
+                                    app:strokeWidth="1dp" />
+                            </LinearLayout>
                         </LinearLayout>
 
                         <LinearLayout

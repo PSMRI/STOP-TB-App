@@ -77,97 +77,6 @@ data class GetDataPaginatedRequests(
 )
 
 @JsonClass(generateAdapter = true)
-data class AbdmMappedFacilityResponse(
-    val data: AbdmMappedFacilityData? = null,
-    val statusCode: Int? = null,
-    val errorMessage: String? = null,
-    val status: String? = null
-)
-
-@JsonClass(generateAdapter = true)
-data class AbdmMappedFacilityData(
-    val pSAddMapID: Int? = null,
-    val providerServiceMapID: Int? = null,
-    val districtID: Int? = null,
-    val address: String? = null,
-    val deleted: Boolean? = null,
-    val createdBy: String? = null,
-    val createdDate: String? = null,
-    val lastModDate: String? = null,
-    @SerializedName("abdmFacilityID")
-    val abdmFacilityID: String? = null,
-    @SerializedName("abdmFacilityName")
-    val abdmFacilityName: String? = null,
-    val locationName: String? = null
-)
-
-@JsonClass(generateAdapter = true)
-data class SaveAbdmFacilityIdRequest(
-    val visitCode: Long,
-    val abdmFacilityId: String
-)
-
-@JsonClass(generateAdapter = true)
-data class SaveAbdmFacilityIdResponse(
-    val data: SaveAbdmFacilityIdData? = null,
-    val statusCode: Int? = null,
-    val errorMessage: String? = null,
-    val status: String? = null
-)
-
-@JsonClass(generateAdapter = true)
-data class SaveAbdmFacilityIdData(
-    val response: String? = null
-)
-
-@JsonClass(generateAdapter = true)
-data class CareContextGenerateOtpRequest(
-    val healthID: String,
-    val healthIdNumber: String,
-    val abdmFacilityId: String,
-    val abdmFacilityName: String
-)
-
-@JsonClass(generateAdapter = true)
-data class CareContextGenerateOtpResponse(
-    val data: CareContextGenerateOtpData? = null,
-    val statusCode: Int? = null,
-    val errorMessage: String? = null,
-    val status: String? = null
-)
-
-@JsonClass(generateAdapter = true)
-data class CareContextGenerateOtpData(
-    val txnId: String? = null
-)
-
-@JsonClass(generateAdapter = true)
-data class CareContextValidateOtpRequest(
-    val otp: String,
-    val txnId: String,
-    val beneficiaryID: Long,
-    val healthID: String,
-    val healthIdNumber: String,
-    val visitCode: Long,
-    val visitCategory: String,
-    val abdmFacilityId: String,
-    val abdmFacilityName: String
-)
-
-@JsonClass(generateAdapter = true)
-data class CareContextValidateOtpResponse(
-    val data: CareContextValidateOtpData? = null,
-    val statusCode: Int? = null,
-    val errorMessage: String? = null,
-    val status: String? = null
-)
-
-@JsonClass(generateAdapter = true)
-data class CareContextValidateOtpData(
-    val response: String? = null
-)
-
-@JsonClass(generateAdapter = true)
 data class NurseWorklistRequest(
     val providerServiceMapID: Int,
     val villageId: Int,
@@ -538,14 +447,37 @@ data class GeneralOpdSaveRequest(
         }
     }
 }
-
-data class GeneralOpdSaveResponseItem(
-    val beneficiaryRegID: Long?,
-    val visitCode: Long?
+data class PatientRequest(
+    val firstName: String,
+    val lastName: String,
+    val dateOfBirth: String,
+    val sex: String
 )
 
-data class GeneralOpdSaveResponse(
-    val data: List<GeneralOpdSaveResponseItem>?
+data class DiagnosticOrderPushRequest(
+    val benRegID: Long,
+    val visitCode: Int,
+    val providerServiceMapID: Int,
+    val orderType: String,
+    val orderEvent: String = "STOP_TB_REFERRAL",
+    val reasonForRefusal: String? = null,
+    val patient: PatientRequest
+)
+
+data class DiagnosticBeneficiaryStatusData(
+    val awaitingTestCompletion: List<Long>? = emptyList(),
+    val awaitingProviderResult: List<Long>? = emptyList(),
+    val completed: List<Long>? = emptyList(),
+    val pollingTimedOut: List<Long>? = emptyList(),
+    val failed: List<Long>? = emptyList(),
+    val refused: List<Long>? = emptyList()
+)
+
+data class DiagnosticBeneficiariesStatusResponse(
+    val success: Boolean? = true,
+    val message: String? = null,
+    val statusCode: Int? = null,
+    val data: DiagnosticBeneficiaryStatusData? = null
 )
 
 data class TBDiagnosticsSaveRequest(
@@ -574,7 +506,13 @@ data class TBDiagnosticsSaveRequest(
     // Liquid Culture
     val recommendedForLiquidCulture: Boolean?,
     val liquidCultureResult: String?,
-    val createdBy: String?
+    val createdBy: String?,
+    // Device Orders
+    val xrayOrderId: String? = null,
+    val xrayOrderStatus: String? = null,
+    val trueNatOrderId: String? = null,
+    val trueNatOrderStatus: String? = null,
+    val trueNatRifResult: String? = null
 ) {
     companion object {
         fun from(cache: TBDiagnosticsCache, benRegID: Long, providerServiceMapID: Int, createdBy: String?): TBDiagnosticsSaveRequest {
@@ -600,7 +538,12 @@ data class TBDiagnosticsSaveRequest(
                 truenatResult = cache.naatResult,
                 recommendedForLiquidCulture = cache.recommendedForLiquidCultureTest,
                 liquidCultureResult = cache.liquidCultureResult,
-                createdBy = createdBy
+                createdBy = createdBy,
+                xrayOrderId = cache.xrayOrderId,
+                xrayOrderStatus = cache.xrayOrderStatus,
+                trueNatOrderId = cache.trueNatOrderId,
+                trueNatOrderStatus = cache.trueNatOrderStatus,
+                trueNatRifResult = cache.trueNatRifResult
             )
         }
     }
@@ -674,7 +617,6 @@ data class TBScreeningDTO(
 data class GeneralOpdDTO(
     val id: Long,
     val benId: Long,
-    val visitCode: Long? = null,
     val visitDate: String?,
     val chiefComplaints: List<String>? = null,
     val medications: List<String>? = null,
@@ -686,7 +628,6 @@ data class GeneralOpdDTO(
 ) {
     fun toCache(): GeneralOpdCache = GeneralOpdCache(
         benId = benId,
-        visitCode = visitCode,
         visitDate = getLongFromDate(visitDate),
         chiefComplaints = chiefComplaints,
         medications = medications,
@@ -809,7 +750,15 @@ data class TBDiagnosticsDTO(
     val latitude: Double? = null,
     val longitude: Double? = null,
     val address: String? = null,
-    val updateDate: String? = null
+    val updateDate: String? = null,
+    // Device integration
+    val xrayOrderId: String? = null,
+    val xrayOrderStatus: String? = null,
+    val trueNatOrderId: String? = null,
+    val trueNatOrderStatus: String? = null,
+    val trueNatRifResult: String? = null,
+    val rifOrderId: String? = null,
+    val rifOrderStatus: String? = null
 ) {
     fun toCache(): TBDiagnosticsCache = TBDiagnosticsCache(
         benId = benId,
@@ -835,6 +784,13 @@ data class TBDiagnosticsDTO(
         liquidCultureResult = liquidCultureResult,
         isTBConfirmed = isTBConfirmed,
         isConfirmed = isConfirmed,
+        xrayOrderId = xrayOrderId,
+        xrayOrderStatus = xrayOrderStatus,
+        trueNatOrderId = trueNatOrderId,
+        trueNatOrderStatus = trueNatOrderStatus,
+        trueNatRifResult = trueNatRifResult,
+        rifOrderId = rifOrderId,
+        rifOrderStatus = rifOrderStatus,
         latitude = latitude,
         longitude = longitude,
         address = address,

@@ -471,7 +471,7 @@
     <string name="recommended_for_liquid_culture_test">লিকুইড কালচাৰ পৰীক্ষাৰ পৰামৰ্শ দিয়া হৈছে</string>
     <string name="reason_for_denial_for_getting_tested">পৰীক্ষা কৰাবলৈ অস্বীকাৰ কৰাৰ কাৰণ</string>
     <string name="risk_factors">ঝুঁকিৰ কাৰকসমূহ</string>
-
+    <string name="total_presumptive_tb">সন্দেহজনক টিবি কেছ</string>
 
     <string-array name="tb_reason_for_denial_testing">
         <item>ভয় আৰু উদ্বেগ</item>

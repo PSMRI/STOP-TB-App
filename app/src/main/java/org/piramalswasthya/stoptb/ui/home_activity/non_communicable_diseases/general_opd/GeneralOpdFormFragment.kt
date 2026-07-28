@@ -188,14 +188,9 @@ class GeneralOpdFormFragment : Fragment() {
     }
 
     private fun navigateToDiagnostics() {
-        if (openedFromHousehold) {
+        if (openedFromHousehold || isManagedFlow) {
             findNavController().navigateUp()
             return
-        }
-        if (isManagedFlow) {
-            // Examine flow — return to AllBenFragment so user picks the next form
-            val popped = findNavController().popBackStack(R.id.allBenFragment, false)
-            if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
         } else {
             findNavController().navigate(
                 R.id.TBSuspectedQuickFragment,

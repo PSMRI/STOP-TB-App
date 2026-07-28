@@ -337,17 +337,7 @@ class VitalScreenFragment : Fragment() {
     }
 
     private fun navigateAfterVitals() {
-        if (openedFromHousehold) {
-            findNavController().navigateUp()
-            return
-        }
-        if (!viewModel.autoFlow) {
-            findNavController().navigateUp()
-            return
-        }
-        // Examine flow — return to AllBenFragment so user picks the next form
-        val popped = findNavController().popBackStack(R.id.allBenFragment, false)
-        if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
+        findNavController().navigateUp()
     }
 
     private fun validateFields(): Boolean {

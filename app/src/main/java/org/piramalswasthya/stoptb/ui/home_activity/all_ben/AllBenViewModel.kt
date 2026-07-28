@@ -22,6 +22,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.repositories.ABHAGenratedRepo
@@ -40,13 +43,17 @@ class AllBenViewModel @Inject constructor(
     abhaGenratedRepo: ABHAGenratedRepo,
     private val benRepo: BenRepo,
     private val vitalRepo: VitalRepo,
-    private val tbRepo: TBRepo
+    val tbRepo: TBRepo
 ) : ViewModel() {
 
     private var sourceFromArgs = AllBenFragmentArgs.fromSavedStateHandle(savedStateHandle).source
 
     private val filterOrg = MutableStateFlow("")
     private val kindOrg = MutableStateFlow(0)
+
+    init {
+        fetchBeneficiaryStatuses()
+    }
 
     @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
     val benList: Flow<PagingData<BenBasicDomain>> = combine(filterOrg, kindOrg) { text, kind ->
@@ -161,4 +168,98 @@ class AllBenViewModel @Inject constructor(
         }
     }
 
+    val allTbDiagnostics: Flow<List<TBDiagnosticsCache>> = tbRepo.allTbDiagnostics
+
+    sealed class OrderActionResult {
+        object Idle : OrderActionResult()
+        object Loading : OrderActionResult()
+        data class Success(val message: String, val orderType: String = "") : OrderActionResult()
+        data class Error(val error: String) : OrderActionResult()
+    }
+
+    private val _orderActionState = MutableStateFlow<OrderActionResult>(OrderActionResult.Idle)
+    val orderActionState: StateFlow<OrderActionResult> = _orderActionState.asStateFlow()
+
+    fun resetOrderActionState() {
+        _orderActionState.value = OrderActionResult.Idle
+    }
+
+    fun initiateProdigiOrder(benId: Long, orderType: String) {
+        viewModelScope.launch {
+            _orderActionState.value = OrderActionResult.Loading
+            when (val response = tbRepo.createProdigiOrder(benId, orderType)) {
+                is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success -> {
+                    _orderActionState.value = OrderActionResult.Success("Order created successfully. Order ID: ${response.data}", orderType)
+                }
+                is org.piramalswasthya.stoptb.helpers.NetworkResponse.Error -> {
+                    _orderActionState.value = OrderActionResult.Error(response.message ?: "Failed to create order")
+                }
+                else -> {}
+            }
+        }
+    }
+
+    fun fetchBeneficiaryStatuses(orderType: String? = null) {
+        viewModelScope.launch {
+            if (orderType != null) {
+                tbRepo.fetchBeneficiariesByStatus(orderType)
+            } else {
+                when (sourceFromArgs) {
+                    6 -> tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST")
+                    7 -> {
+                        tbRepo.fetchBeneficiariesByStatus("SPUTUM_TRUENAT")
+                        tbRepo.fetchBeneficiariesByStatus("MDR_RIF")
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
+
+    fun markOrderTestCompleted(benId: Long, orderType: String) {
+        viewModelScope.launch {
+            _orderActionState.value = OrderActionResult.Loading
+            when (val response = tbRepo.markTestCompleted(benId, orderType)) {
+                is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success -> {
+                    fetchBeneficiaryStatuses(orderType)
+                    _orderActionState.value = OrderActionResult.Success("Test marked as completed. Status: ${response.data}", orderType)
+                }
+                is org.piramalswasthya.stoptb.helpers.NetworkResponse.Error -> {
+                    _orderActionState.value = OrderActionResult.Error(response.message ?: "Failed to mark test completed")
+                }
+                else -> {}
+            }
+        }
+    }
+
+    fun pollOrderResult(benId: Long, orderType: String) {
+        viewModelScope.launch {
+            _orderActionState.value = OrderActionResult.Loading
+            when (val response = tbRepo.fetchOrderResult(benId, orderType)) {
+                is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success -> {
+                    fetchBeneficiaryStatuses(orderType)
+                    _orderActionState.value = OrderActionResult.Success("Result fetched successfully. Status: ${response.data}", orderType)
+                }
+                is org.piramalswasthya.stoptb.helpers.NetworkResponse.Error -> {
+                    _orderActionState.value = OrderActionResult.Error(response.message ?: "Failed to fetch result")
+                }
+                else -> {}
+            }
+        }
+    }
+
+    fun repeatTest(benId: Long, orderType: String, customVisitCode: Int? = null) {
+        viewModelScope.launch {
+            _orderActionState.value = OrderActionResult.Loading
+            when (val response = tbRepo.createProdigiOrder(benId, orderType, customVisitCode)) {
+                is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success -> {
+                    _orderActionState.value = OrderActionResult.Success("Fresh repeat test order created. Status: ${response.data}", orderType)
+                }
+                is org.piramalswasthya.stoptb.helpers.NetworkResponse.Error -> {
+                    _orderActionState.value = OrderActionResult.Error(response.message ?: "Failed to create repeat test order")
+                }
+                else -> {}
+            }
+        }
+    }
 }

@@ -147,4 +147,13 @@
     <string name="add_head_of_family">এডিডি পৰিয়ালৰ মুৰব্বী</string>
     <string name="hh_no_members">ঘৰুৱা খালী!</string>
     <string name="add_head_of_family_message">Would you like to add <b>%1s</b> as a Head-of-Family Beneficiary?</string>
+
+    <string name="nhhr_total_members_hh">গৃহত বসবাস কৰা সদস্যৰ মুঠ সংখ্যা</string>
+    <string name="nhhr_registered_camp_site">কেম্প ছাইটত পঞ্জীয়ন কৰা হৈছে</string>
+
+    <string-array name="nhhr_yes_no_array">
+        <item>হয়</item>
+        <item>নহয়</item>
+    </string-array>
+
 </resources>

@@ -104,7 +104,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class],
-    version = 24, exportSchema = false
+    version = 26, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -596,7 +596,7 @@ abstract class InAppDb : RoomDatabase() {
                         `answerText` TEXT, 
                         `createdAt` INTEGER NOT NULL, 
                         `updatedAt` INTEGER NOT NULL, 
-                        FOREIGN KEY(`sectionResponseId`) REcFERENCES `t_section_response`(`sectionResponseId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
+                        FOREIGN KEY(`sectionResponseId`) REFERENCES `t_section_response`(`sectionResponseId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
                         FOREIGN KEY(`questionId`) REFERENCES `t_section_question`(`questionId`) ON UPDATE NO ACTION ON DELETE CASCADE, 
                         FOREIGN KEY(`optionId`) REFERENCES `t_question_option`(`optionId`) ON UPDATE NO ACTION ON DELETE SET NULL
                     )
@@ -706,15 +706,22 @@ abstract class InAppDb : RoomDatabase() {
                 }
             }
         }
-
-        private val MIGRATION_23_24 = object : Migration(23, 24) {
+     /*   private val MIGRATION_23_24 = object : Migration(23, 24) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                if (!columnExists(database, "GENERAL_OPD", "visitCode")) {
-                    database.execSQL("ALTER TABLE GENERAL_OPD ADD COLUMN visitCode INTEGER DEFAULT NULL")
+                val householdFamilyColumns = listOf(
+                    "fam_totalHhMembers INTEGER DEFAULT NULL",
+                    "fam_isRegisteredAtCampSite TEXT DEFAULT NULL",
+                    "fam_isRegisteredAtCampSiteId INTEGER NOT NULL DEFAULT 0"
+                )
+                householdFamilyColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "HOUSEHOLD", columnName)) {
+                        database.execSQL("ALTER TABLE HOUSEHOLD ADD COLUMN $columnDefinition")
+                    }
                 }
             }
         }
-
+*/
 
         private val MIGRATION_22_23 = object : Migration(22, 23) {
             override fun migrate(database: SupportSQLiteDatabase) {
@@ -808,6 +815,50 @@ abstract class InAppDb : RoomDatabase() {
             )
         }
 
+        private val MIGRATION_23_24 = object : Migration(23, 24) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+
+                val householdFamilyColumns = listOf(
+                    "fam_totalHhMembers INTEGER DEFAULT NULL",
+                    "fam_isRegisteredAtCampSite TEXT DEFAULT NULL",
+                    "fam_isRegisteredAtCampSiteId INTEGER DEFAULT 0"
+                )
+                householdFamilyColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "HOUSEHOLD", columnName)) {
+                        database.execSQL("ALTER TABLE HOUSEHOLD ADD COLUMN $columnDefinition")
+                    }
+                }
+
+                if (!columnExists(database, "TB_DIAGNOSTICS", "xrayOrderId")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN xrayOrderId TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "TB_DIAGNOSTICS", "xrayOrderStatus")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN xrayOrderStatus TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "TB_DIAGNOSTICS", "trueNatOrderId")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN trueNatOrderId TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "TB_DIAGNOSTICS", "trueNatOrderStatus")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN trueNatOrderStatus TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "TB_DIAGNOSTICS", "trueNatRifResult")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN trueNatRifResult TEXT DEFAULT NULL")
+                }
+            }
+        }
+
+        private val MIGRATION_24_25 = object : Migration(24, 25) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "TB_DIAGNOSTICS", "rifOrderId")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN rifOrderId TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "TB_DIAGNOSTICS", "rifOrderStatus")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN rifOrderStatus TEXT DEFAULT NULL")
+                }
+            }
+        }
+
         private fun addVitalGeneralExaminationColumns(database: SupportSQLiteDatabase) {
             val columns = listOf(
                 "benRegId INTEGER NOT NULL DEFAULT 0",
@@ -871,6 +922,12 @@ abstract class InAppDb : RoomDatabase() {
                 if (!columnExists(database, "TB_SCREENING", columnName)) {
                     database.execSQL("ALTER TABLE TB_SCREENING ADD COLUMN $columnDefinition")
                 }
+            }
+        }
+
+        private val MIGRATION_25_26 = object : Migration(25, 26) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                addTBScreeningRiskFactorColumns(database)
             }
         }
 
@@ -958,6 +1015,8 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_21_22)
                         .addMigrations(MIGRATION_22_23)
                         .addMigrations(MIGRATION_23_24)
+                        .addMigrations(MIGRATION_24_25)
+                        .addMigrations(MIGRATION_25_26)
                         .fallbackToDestructiveMigration()
                         .build()
 
