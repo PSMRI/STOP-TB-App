@@ -34,7 +34,6 @@ class BenListAdapter(
     private val showActionButtons: Boolean = false,
     private val showResultButton: Boolean = false,
     private val showAnthropometryButton: Boolean = false,
-    private val showTraceContactButton: Boolean = false,
 ) :
     ListAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenDiffUtilCallBack) {
 
@@ -79,8 +78,7 @@ class BenListAdapter(
             showActionButtons: Boolean = true,
             showResultButton: Boolean = false,
             showAnthropometryButton: Boolean = false,
-            showExamineButton: Boolean = true,
-            showTraceContactButton: Boolean = false
+            showExamineButton: Boolean = true
         ) {
 
             binding.btnAbha.visibility = View.VISIBLE
@@ -141,11 +139,6 @@ class BenListAdapter(
                 else -> View.GONE
             }
             binding.llAnthropometryAction.visibility = binding.btnAnthropometry.visibility
-
-            // Trace Contact — additive; hidden unless the hosting screen explicitly opts in.
-            binding.showTraceContactButton = showTraceContactButton && !item.isDeath && !item.isDeactivate
-            binding.btnTraceContact.visibility = if (binding.showTraceContactButton == true) View.VISIBLE else View.GONE
-            binding.llTraceContactAction.visibility = binding.btnTraceContact.visibility
             if (binding.btnVitalScreen.visibility == View.VISIBLE) {
                 if (showResultButton) {
                     binding.btnVitalScreen.text = binding.root.context.getString(R.string.result)
@@ -198,10 +191,16 @@ class BenListAdapter(
             // Examine button — show filled count X/total
             // Registrar: Anthropometry + TB Screening
             // Nurse: Diagnosis hidden, so total stays 4
+            // Counselling Officer: ExamineBottomSheetFragment only shows TB Screening + Followup, so total is 2
             // Others: all 5 forms
             val isRegistrar = pref?.getLoggedInUser()?.role.isRegistrationOfficerRole()
             val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
-            val (examineFilledCount, examineTotal) = if (isRegistrar) {
+            val isCounsellingOfficerForExamine = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
+            val (examineFilledCount, examineTotal) = if (isCounsellingOfficerForExamine) {
+                // Followup has no fill-tracking yet (placeholder row), so only TB Screening counts.
+                val filled = listOf(hasTbScreening).count { it }
+                Pair(filled, 2)
+            } else if (isRegistrar) {
                 val filled = listOf(
                     hasAnthropometry,
                     hasTbScreening
@@ -375,8 +374,7 @@ class BenListAdapter(
             diagnosisIds,
             showActionButtons = showActionButtons,
             showResultButton = showResultButton,
-            showAnthropometryButton = showAnthropometryButton,
-            showTraceContactButton = showTraceContactButton
+            showAnthropometryButton = showAnthropometryButton
         )
     }
 
@@ -416,8 +414,7 @@ class BenListAdapter(
         private val clickedResult: (item: BenBasicDomain, benId: Long, hhId: Long) -> Unit = { _, _, _ -> },
         private val clickedGeneralOpd: (item: BenBasicDomain, benId: Long, hhId: Long, viewOnly: Boolean) -> Unit = { _, _, _, _ -> },
         private val clickedAnthropometry: (item: BenBasicDomain, benId: Long, hhId: Long, viewOnly: Boolean) -> Unit = { _, _, _, _ -> },
-        private val clickedExamine: (item: BenBasicDomain, benId: Long) -> Unit = { _, _ -> },
-        private val clickedTraceContact: (item: BenBasicDomain, benId: Long, hhId: Long) -> Unit = { _, _, _ -> }
+        private val clickedExamine: (item: BenBasicDomain, benId: Long) -> Unit = { _, _ -> }
     ) {
         fun onClickedBen(item: BenBasicDomain) = clickedBen(
             item,
@@ -465,6 +462,5 @@ class BenListAdapter(
         fun onClickedForCall(item: BenBasicDomain) = callBen(item)
         fun onClickSoftDeleteBen(item: BenBasicDomain) = softDeleteBen(item)
         fun onClickExamine(item: BenBasicDomain) = clickedExamine(item, item.benId)
-        fun onClickTraceContact(item: BenBasicDomain) = clickedTraceContact(item, item.benId, item.hhId)
     }
 }

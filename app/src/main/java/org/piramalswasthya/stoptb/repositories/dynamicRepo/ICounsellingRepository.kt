@@ -1,6 +1,5 @@
 package org.piramalswasthya.stoptb.repositories.dynamicRepo
 
-import kotlinx.coroutines.flow.Flow
 import org.piramalswasthya.stoptb.model.dynamicEntity.*
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
@@ -21,7 +20,6 @@ interface ICounsellingRepository {
     suspend fun submitSectionF(responseId: Long, answers: List<QuestionResponseEntity>)
     suspend fun submitSectionGeneralInfo(responseId: Long, answers: List<QuestionResponseEntity>)
     suspend fun submitSectionBulk(responseId: Long, sectionId: Int): Boolean
-    suspend fun getCounsellingRecord(beneficiaryId: Long): Flow<CompleteFormResponse?>
     suspend fun syncUnsyncedRecords(): Boolean
     suspend fun fetchAndStoreCounsellingResponse(beneficiaryId: Long, formUuid: String): Boolean
     suspend fun fetchAndStoreCompletedBeneficiaries(): List<CompletedBeneficiaryStatus>?

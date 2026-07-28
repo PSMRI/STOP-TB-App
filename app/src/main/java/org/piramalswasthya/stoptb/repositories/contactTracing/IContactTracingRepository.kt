@@ -1,44 +1,88 @@
 package org.piramalswasthya.stoptb.repositories.contactTracing
 
 import kotlinx.coroutines.flow.Flow
-import org.piramalswasthya.stoptb.model.contactTracing.ContactTracingCompleteResponse
-import org.piramalswasthya.stoptb.model.contactTracing.ContactTracingQuestionResponseEntity
-import org.piramalswasthya.stoptb.model.contactTracing.ContactTracingResponseEntity
+import org.piramalswasthya.stoptb.helpers.NetworkResponse
+import org.piramalswasthya.stoptb.model.contactTracing.ContactTracingStatus
 import org.piramalswasthya.stoptb.model.dynamicEntity.CompleteFormDefinition
+import org.piramalswasthya.stoptb.model.dynamicEntity.CompleteFormResponse
+import org.piramalswasthya.stoptb.model.dynamicEntity.FormResponseEntity
+import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionResponseEntity
+import org.piramalswasthya.stoptb.ui.contact_tracing.RegimenAdvised
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
+import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
 
 interface IContactTracingRepository {
 
-    /**
-     * Parses the bundled static Contact Tracing JSON (a stand-in until the backend
-     * endpoints are deployed) and seeds it into the reused generic dynamic-form schema tables.
-     */
-    suspend fun seedFormsFromStaticJson(): Boolean
-
-    /** Reads a form's schema back via the unmodified, already-generic DynamicFormMetadataDao. */
+    // Reads a form's cached schema from local DB for the given form type.
     suspend fun getFormDefinition(formType: FormType): CompleteFormDefinition?
 
-    suspend fun getCompleteResponse(responseId: Long): ContactTracingCompleteResponse?
+    // Returns the form schema for formType, fetching and caching it from the server on a cache miss.
+    suspend fun getFormSchema(formType: FormType): NetworkResponse<CompleteFormDefinition>
 
-    fun getResponsesForIndexCase(indexCaseBenId: Long, contactType: String): Flow<List<ContactTracingResponseEntity>>
+    suspend fun getCompleteResponse(responseId: Long): CompleteFormResponse?
 
-    suspend fun getContactDisplayName(responseId: Long, nameQuestionUuid: String): String?
+    // Checks if a response already exists for this beneficiary+form, without creating one (used to decide View vs Fill mode).
+    suspend fun getExistingContactResponse(
+        indexCaseBenId: Long,
+        formVersionId: Int
+    ): FormResponseEntity?
 
     suspend fun getOrCreateContactResponse(
         indexCaseBenId: Long,
-        contactBenId: Long?,
-        contactType: String,
         formVersionId: Int
-    ): ContactTracingResponseEntity
+    ): FormResponseEntity
+
+    // Fetches the beneficiary's previously submitted answers for this form type from the server and stores them locally for prefill.
+    suspend fun fetchAndStoreContactResponse(
+        beneficiaryId: Long,
+        formType: FormType,
+        formVersionId: Int
+    ): Boolean
 
     suspend fun saveSectionAnswers(
         responseId: Long,
         sectionId: Int,
-        visitNumber: Int,
-        answers: List<ContactTracingQuestionResponseEntity>
+        answers: List<QuestionResponseEntity>,
+        status: String = "DRAFT"
     )
 
     suspend fun submitResponse(responseId: Long, finalStatus: String)
+    suspend fun submitResponseBulk(responseId: Long, phaseFilter: String? = null): Boolean
 
     suspend fun syncUnsyncedResponses(): Boolean
+
+    // Streams the beneficiary's current form status, used to decide Fill vs View for the Examine screen row.
+    fun observeResponseStatus(beneficiaryId: Long, formType: FormType): Flow<String?>
+
+    // Streams the beneficiary's saved TPT Follow-up history entries, latest first.
+    fun getTptHistory(beneficiaryId: Long, formVersionId: Int): Flow<List<CompleteFormResponse>>
+
+    // Fetches TPT Follow-up history from the server and refreshes local storage to match, avoiding duplicates.
+    suspend fun fetchAndRefreshTptHistory(beneficiaryId: Long, formVersionId: Int): Boolean
+
+    // Finds the beneficiary's current response for a given form phase, or null if a new one should be started.
+    suspend fun getExistingContactResponseForPhase(
+        beneficiaryId: Long,
+        formVersionId: Int,
+        phase: SectionPhase
+    ): FormResponseEntity?
+
+    // Creates a new response scoped to one phase's sections only, used for repeatable forms like TPT_FOLLOW_UP.
+    suspend fun createPhaseScopedResponse(
+        beneficiaryId: Long,
+        formVersionId: Int,
+        sectionIds: List<Int>
+    ): FormResponseEntity
+
+    // Reads back the beneficiary's already-selected TPT regimen answer and resolves it to a RegimenAdvised value.
+    suspend fun getRegimenAdvised(beneficiaryId: Long, formVersionId: Int): RegimenAdvised?
+
+    // Streams the beneficiary's completed TPT follow-up form count, computed live from submitted rows.
+    fun observeSubmittedFollowUpCount(beneficiaryId: Long, formVersionId: Int): Flow<Int>
+
+    // Checks whether the beneficiary has completed enough follow-up forms to meet their regimen's required count.
+    suspend fun isFollowUpTargetReached(beneficiaryId: Long, formVersionId: Int): Boolean
+
+    // Fetches Community and Occupational contact tracing completion status to drive the type bottom sheet's tick/cross indicators.
+    suspend fun getContactTracingStatus(beneficiaryId: Long): ContactTracingStatus
 }

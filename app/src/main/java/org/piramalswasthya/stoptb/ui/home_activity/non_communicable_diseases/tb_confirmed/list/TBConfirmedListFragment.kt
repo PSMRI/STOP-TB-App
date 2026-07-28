@@ -19,7 +19,7 @@ import org.piramalswasthya.stoptb.adapters.TbConfirmedListAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchRvButtonBinding
-import org.piramalswasthya.stoptb.ui.contact_tracing.ContactTracingActivity
+import org.piramalswasthya.stoptb.ui.contact_tracing.ContactTracingTypeBottomSheetFragment
 import org.piramalswasthya.stoptb.ui.counselling_activity.CounsellingActivity
 import org.piramalswasthya.stoptb.ui.counselling_activity.CounsellingViewModel
 import org.piramalswasthya.stoptb.model.BenWithTbSuspectedDomain
@@ -90,13 +90,13 @@ class TBConfirmedListFragment : Fragment() {
                     findNavController().navigate(
                         TBConfirmedListFragmentDirections
                             .actionTBConfirmedListFragmentToHouseholdMembersFragment(
-                                hhId = item.ben.hhId,
-                                indexCaseBenId = item.ben.benId
+                                hhId = item.ben.hhId
                             )
                     )
                 },
                 clickedContactTracing = { item ->
-                    ContactTracingActivity.start(requireContext(), item.ben.benId)
+                    ContactTracingTypeBottomSheetFragment.newInstance(item.ben.benId)
+                        .show(childFragmentManager, ContactTracingTypeBottomSheetFragment.TAG)
                 }
             ),
             pref = prefDao

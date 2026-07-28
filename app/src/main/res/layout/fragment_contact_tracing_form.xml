@@ -1,49 +1,116 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:layout_height="match_parent">
 
     <LinearLayout
+        android:id="@+id/ll_ct_content"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:padding="16dp">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/tv_ct_section_name"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:textAppearance="?attr/textAppearanceTitleMedium"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tv_ct_progress"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textAppearance="?attr/textAppearanceBodySmall" />
-    </LinearLayout>
-
-    <androidx.core.widget.NestedScrollView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rv_ct_form"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:clipToPadding="false"
-            android:nestedScrollingEnabled="false" />
-    </androidx.core.widget.NestedScrollView>
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="16dp">
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_ct_next"
-        android:layout_width="match_parent"
+            <TextView
+                android:id="@+id/tv_ct_section_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_ct_progress"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="?attr/textAppearanceBodySmall" />
+        </LinearLayout>
+
+        <org.piramalswasthya.stoptb.helpers.FocusStableNestedScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rv_ct_form"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clipToPadding="false"
+                android:nestedScrollingEnabled="false" />
+        </org.piramalswasthya.stoptb.helpers.FocusStableNestedScrollView>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_ct_next"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="16dp"
+            android:text="@string/next" />
+
+    </LinearLayout>
+
+    <!-- Edit FAB (visible in View Mode; tap to unlock the form for editing) -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_edit"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:text="@string/next" />
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="@dimen/padding_wide"
+        android:layout_marginBottom="88dp"
+        android:contentDescription="@string/edit"
+        android:visibility="gone"
+        app:backgroundTint="@color/md_theme_light_primary"
+        app:srcCompat="@drawable/ic_edit"
+        app:tint="@color/md_theme_light_onTertiary" />
 
-</LinearLayout>
+    <ProgressBar
+        android:id="@+id/pb_ct_loading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:visibility="gone" />
+
+    <!-- Error state — shown when the schema can't be resolved (e.g. first-time-offline with no
+         cached schema); mirrors CounsellingActivity's ll_error/tv_error_message/btn_retry. -->
+    <LinearLayout
+        android:id="@+id/ll_ct_error"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="32dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_exclamation_circle"
+            app:tint="@color/md_theme_light_error" />
+
+        <TextView
+            android:id="@+id/tv_ct_error_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:text="@string/contact_tracing_load_error"
+            android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+            android:textColor="@color/md_theme_light_onSurface" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_ct_retry"
+            style="@style/Widget.Sakhi.Button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/counselling_retry" />
+
+    </LinearLayout>
+
+</FrameLayout>

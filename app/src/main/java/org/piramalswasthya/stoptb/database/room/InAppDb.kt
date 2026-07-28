@@ -61,15 +61,12 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.SectionQuestionEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionOptionEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionValidationEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.OptionConditionEntity
+import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingFormResponseView
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormResponseEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.SectionResponseEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionResponseEntity
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.DynamicFormMetadataDao
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.CounsellingFormResponseDao
-import org.piramalswasthya.stoptb.database.room.dao.contactTracingDao.ContactTracingResponseDao
-import org.piramalswasthya.stoptb.model.contactTracing.ContactTracingResponseEntity
-import org.piramalswasthya.stoptb.model.contactTracing.ContactTracingSectionResponseEntity
-import org.piramalswasthya.stoptb.model.contactTracing.ContactTracingQuestionResponseEntity
 
 
 @Database(
@@ -105,13 +102,10 @@ import org.piramalswasthya.stoptb.model.contactTracing.ContactTracingQuestionRes
         OptionConditionEntity::class,
         FormResponseEntity::class,
         SectionResponseEntity::class,
-        QuestionResponseEntity::class,
-        ContactTracingResponseEntity::class,
-        ContactTracingSectionResponseEntity::class,
-        ContactTracingQuestionResponseEntity::class
+        QuestionResponseEntity::class
     ],
-    views = [BenBasicCache::class],
-    version = 24, exportSchema = false
+    views = [BenBasicCache::class, CounsellingFormResponseView::class],
+    version = 26, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -139,7 +133,6 @@ abstract class InAppDb : RoomDatabase() {
     abstract fun formResponseJsonDao(): FormResponseJsonDao
     abstract fun dynamicFormMetadataDao(): DynamicFormMetadataDao
     abstract fun counsellingFormResponseDao(): CounsellingFormResponseDao
-    abstract fun contactTracingResponseDao(): ContactTracingResponseDao
     abstract val syncDao: SyncDao
     abstract val vitalDao: VitalDao
 
@@ -852,6 +845,50 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        // Contact Tracing's own response tables (t_ct_*) are dropped — Contact Tracing now
+        // reuses the generic t_form_response family directly (same submitBulk payload for both
+        // modules, per the consolidation). That requires a beneficiary to be able to have more
+        // than one response row (Counselling + Community CT + Occupational CT), so the old
+        // beneficiaryId-only unique index is replaced with a composite one.
+        private val MIGRATION_24_25 = object : Migration(24, 25) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DROP INDEX IF EXISTS `index_t_form_response_beneficiaryId`")
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_t_form_response_beneficiaryId_formVersionId` " +
+                        "ON `t_form_response` (`beneficiaryId`, `formVersionId`)"
+                )
+
+                database.execSQL("DROP TABLE IF EXISTS `t_ct_question_response`")
+                database.execSQL("DROP TABLE IF EXISTS `t_ct_section_response`")
+                database.execSQL("DROP TABLE IF EXISTS `t_ct_response`")
+            }
+        }
+
+        // TPT Follow-up's PRE_SUBMIT/POST_SUBMIT split needs the backend's own responseId
+        // captured per response row, and its History feature caches read-only snapshot rows
+        // directly in t_form_response (isHistorySnapshot = true) rather than a separate table —
+        // which needs the prior unique (beneficiaryId, formVersionId) index relaxed, since a
+        // beneficiary can now have any number of historical rows for the same form/version
+        // alongside their one live row. Purely additive: no data loss, existing rows default to
+        // backendResponseId = NULL, isHistorySnapshot = 0 (i.e. classified as live, correct for
+        // every row that exists today).
+        private val MIGRATION_25_26 = object : Migration(25, 26) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "t_form_response", "backendResponseId")) {
+                    database.execSQL("ALTER TABLE t_form_response ADD COLUMN backendResponseId INTEGER DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_form_response", "isHistorySnapshot")) {
+                    database.execSQL("ALTER TABLE t_form_response ADD COLUMN isHistorySnapshot INTEGER NOT NULL DEFAULT 0")
+                }
+
+                database.execSQL("DROP INDEX IF EXISTS `index_t_form_response_beneficiaryId_formVersionId`")
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_t_form_response_beneficiaryId_formVersionId_isHistorySnapshot` " +
+                        "ON `t_form_response` (`beneficiaryId`, `formVersionId`, `isHistorySnapshot`)"
+                )
+            }
+        }
+
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(
@@ -1021,6 +1058,8 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_21_22)
                         .addMigrations(MIGRATION_22_23)
                         .addMigrations(MIGRATION_23_24)
+                        .addMigrations(MIGRATION_24_25)
+                        .addMigrations(MIGRATION_25_26)
                         .fallbackToDestructiveMigration()
                         .build()
 

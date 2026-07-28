@@ -11,15 +11,18 @@ import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import dagger.hilt.android.AndroidEntryPoint
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.dynamicAdapter.CounsellingDynamicAdapter
+import org.piramalswasthya.stoptb.databinding.FragmentContactTracingFormBinding
+import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
+import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
 
 /**
- * Generic staged-section form screen, reused for the Contact Tracing Selector and every
- * per-contact form (HHC/Community/Occupational) — they differ only by which FormType is
- * loaded and what happens on completion, both driven by ContactTracingFormViewModel.
+ * Generic staged-section form screen for Community/Occupational/TPT_followup / Contact_FollowUp Contact Tracing — they
+ * differ only by which FormType is loaded, both driven by ContactTracingFormViewModel.
  */
 @AndroidEntryPoint
 class ContactTracingFormFragment : Fragment() {
@@ -27,110 +30,244 @@ class ContactTracingFormFragment : Fragment() {
     private val viewModel: ContactTracingFormViewModel by viewModels()
     private lateinit var adapter: CounsellingDynamicAdapter
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
-        return inflater.inflate(R.layout.fragment_contact_tracing_form, container, false)
+    private var binding: FragmentContactTracingFormBinding? = null
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        binding = FragmentContactTracingFormBinding.inflate(inflater, container, false)
+        return binding!!.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val rv = view.findViewById<RecyclerView>(R.id.rv_ct_form)
-        rv.layoutManager = LinearLayoutManager(requireContext())
-        adapter = CounsellingDynamicAdapter(
-            questions = emptyList(),
-            onValueChanged = { updatedQ ->
-                viewModel.onQuestionValueChanged(updatedQ, reevaluate = updatedQ.questionType != "TEXT")
-            }
+        val formType = FormType.valueOf(
+            arguments?.getString(ARG_FORM_TYPE)
+                ?: FormType.COMMUNITY_CONTACT_TRACING.name
         )
-        rv.adapter = adapter
+        val indexCaseBenId = arguments?.getLong(ARG_INDEX_CASE_BEN_ID) ?: 0L
+        val contactType = arguments?.getString(ARG_CONTACT_TYPE) ?: "COMMUNITY"
+        val sectionPhase = arguments?.getString(ARG_SECTION_PHASE)
+            ?.let { runCatching { SectionPhase.valueOf(it) }.getOrNull() }
 
-        val tvSectionName = view.findViewById<TextView>(R.id.tv_ct_section_name)
-        val tvProgress = view.findViewById<TextView>(R.id.tv_ct_progress)
-        val btnNext = view.findViewById<MaterialButton>(R.id.btn_ct_next)
+        binding?.apply {
 
-        viewModel.activeQuestions.observe(viewLifecycleOwner) { adapter.submitList(it, true) }
-        viewModel.currentSectionName.observe(viewLifecycleOwner) { tvSectionName.text = it }
-        viewModel.progress.observe(viewLifecycleOwner) { (current, total) ->
-            tvProgress.text = getString(R.string.contact_tracing_section_progress, current, total)
-        }
-        viewModel.hasSubmitButton.observe(viewLifecycleOwner) { isSubmit ->
-            btnNext.text = if (isSubmit) getString(R.string.btn_submit) else getString(R.string.next)
-            btnNext.setOnClickListener {
-                if (isSubmit) viewModel.onSubmit() else viewModel.onNext()
+            rvCtForm.layoutManager = LinearLayoutManager(requireContext())
+            (rvCtForm.itemAnimator as? androidx.recyclerview.widget.SimpleItemAnimator)
+                ?.supportsChangeAnimations = false
+            adapter = CounsellingDynamicAdapter(
+                questions = emptyList(),
+                onValueChanged = { updatedQ ->
+                    val nonKeystrokeTypes = setOf(
+                        "RADIO", "MCQ", "CHECKBOX_MULTI", "CHECKBOX", "DATE", "DROPDOWN", "NUMBER_PICKER",
+                        "READONLY_NUMBER", "READONLY_TEXT"
+                    )
+                    val isKeystrokeInput = updatedQ.questionType !in nonKeystrokeTypes
+                    viewModel.onQuestionValueChanged(
+                        updatedQ,
+                        reevaluate = !isKeystrokeInput
+                    )
+                }
+            )
+            rvCtForm.adapter = adapter
+
+            fun renderQuestions() {
+                val questions = viewModel.activeQuestions.value ?: return
+                adapter.submitList(questions, viewModel.isEditable.value ?: true)
             }
-        }
-        viewModel.alertMessage.observe(viewLifecycleOwner) { message ->
-            if (!message.isNullOrBlank()) {
-                AlertDialog.Builder(requireContext())
-                    .setMessage(message)
-                    .setPositiveButton(android.R.string.ok) { _, _ -> viewModel.consumeAlert() }
-                    .setOnDismissListener { viewModel.consumeAlert() }
-                    .show()
+
+
+            fun updateNextButton() {
+                val editable = viewModel.isEditable.value ?: true
+                val (current, total) = viewModel.progress.value ?: (1 to 1)
+                val isLastSection = current >= total
+
+                val showContinueTpt = !editable && viewModel.showContinueTpt.value == true
+                val tptAlreadySubmitted = viewModel.tptPreSubmitAlreadySubmitted.value == true
+
+//                btnCtNext.visibility = if (editable || showContinueTpt ) View.VISIBLE else View.GONE
+                val hiddenSections = setOf("Contact & Exposure Details", "Occupation & Exposure Details")
+                btnCtNext.visibility = if (!editable && viewModel.currentSectionName.value in hiddenSections) View.GONE else View.VISIBLE
+                btnCtNext.text = when {
+                    showContinueTpt && tptAlreadySubmitted -> getString(R.string.view_tpt_follow_up)
+                    showContinueTpt -> getString(R.string.tpt_follow_up)
+                    isLastSection -> getString(R.string.btn_submit)
+                    else -> getString(R.string.next)
+                }
+                btnCtNext.setOnClickListener {
+                    when {
+                        showContinueTpt -> viewModel.continueToTpt()
+                        isLastSection -> viewModel.onSubmit()
+                        else -> viewModel.onNext()
+                    }
+                }
             }
-        }
-        viewModel.navigateToFormUuid.observe(viewLifecycleOwner) { formUuid ->
-            if (formUuid != null) {
-                handleOpenForm(formUuid)
-                viewModel.consumeNavigation()
+
+            viewModel.activeQuestions.observe(viewLifecycleOwner) {
+                renderQuestions()
             }
-        }
-        viewModel.formCompleted.observe(viewLifecycleOwner) { completed ->
-            if (completed == true) (requireActivity() as? ContactTracingNavigator)?.onFormCompleted()
-        }
-        viewModel.loadFailed.observe(viewLifecycleOwner) { failed ->
-            if (failed == true) {
-                android.widget.Toast.makeText(requireContext(), R.string.contact_tracing_load_error, android.widget.Toast.LENGTH_LONG).show()
+
+            viewModel.currentSectionName.observe(viewLifecycleOwner) {
+                tvCtSectionName.text = it
+            }
+
+            viewModel.progress.observe(viewLifecycleOwner) { (current, total) ->
+                tvCtProgress.text = getString(
+                    R.string.contact_tracing_section_progress,
+                    current,
+                    total
+                )
+                updateNextButton()
+            }
+
+            viewModel.isEditable.observe(viewLifecycleOwner) { editable ->
+
+                fabEdit.visibility = if (editable == true || formType == FormType.CONTACT_FOLLOW_UP || formType == FormType.TPT_FOLLOW_UP) {
+                    View.GONE
+                } else {
+                    View.VISIBLE
+                }
+                updateNextButton()
+                renderQuestions()
+            }
+
+            fabEdit.setOnClickListener {
+                viewModel.enterEditMode()
+            }
+
+            viewModel.showContinueTpt.observe(viewLifecycleOwner) {
+                updateNextButton()
+            }
+
+            viewModel.tptPreSubmitAlreadySubmitted.observe(viewLifecycleOwner) {
+                updateNextButton()
+            }
+
+            viewModel.alertMessage.observe(viewLifecycleOwner) { message ->
+                if (!message.isNullOrBlank()) {
+                    AlertDialog.Builder(requireContext())
+                        .setMessage(message)
+                        .setPositiveButton(android.R.string.ok) { _, _ ->
+                            viewModel.consumeAlert()
+                        }
+                        .setOnDismissListener {
+                            viewModel.consumeAlert()
+                        }
+                        .show()
+                }
+            }
+
+            viewModel.navigateToFormUuid.observe(viewLifecycleOwner) { formUuid ->
+                if (formUuid != null) {
+                    handleOpenForm(formUuid)
+                    viewModel.consumeNavigation()
+                }
+            }
+
+            viewModel.formCompleted.observe(viewLifecycleOwner) { completed ->
+                if (completed == true) {
+                    (requireActivity() as? ContactTracingNavigator)?.onFormCompleted()
+                }
+            }
+
+            viewModel.exitRequested.observe(viewLifecycleOwner) { requested ->
+                if (requested == true) {
+                    viewModel.consumeExit()
+                    (requireActivity() as? ContactTracingNavigator)?.onBackNavigation()
+                }
+            }
+
+            viewModel.formSchemaState.observe(viewLifecycleOwner) { state ->
+                when (state) {
+                    is NetworkResponse.Idle -> Unit
+                    is NetworkResponse.Loading -> {
+                        llCtContent.visibility = View.INVISIBLE
+                        llCtError.visibility = View.GONE
+                        pbCtLoading.visibility = View.VISIBLE
+                    }
+                    is NetworkResponse.Success -> {
+                        llCtContent.visibility = View.VISIBLE
+                        llCtError.visibility = View.GONE
+                        pbCtLoading.visibility = View.GONE
+                    }
+                    is NetworkResponse.Error -> {
+                        llCtContent.visibility = View.INVISIBLE
+                        pbCtLoading.visibility = View.GONE
+                        tvCtErrorMessage.text = state.message ?: getString(R.string.contact_tracing_load_error)
+                        btnCtRetry.setOnClickListener {
+                            viewModel.retryLoad()
+                        }
+                        llCtError.visibility = View.VISIBLE
+                    }
+                }
             }
         }
 
-        val existingResponseId = arguments?.getLong(ARG_EXISTING_RESPONSE_ID, -1L) ?: -1L
-        val formType = FormType.valueOf(arguments?.getString(ARG_FORM_TYPE) ?: FormType.CONTACT_TRACING_SELECTOR.name)
-        if (existingResponseId > 0) {
-            viewModel.resume(formType, existingResponseId)
-        } else {
-            val indexCaseBenId = arguments?.getLong(ARG_INDEX_CASE_BEN_ID) ?: 0L
-            val contactBenIdArg = arguments?.getLong(ARG_CONTACT_BEN_ID, -1L) ?: -1L
-            val contactBenId = if (contactBenIdArg > 0) contactBenIdArg else null
-            val contactType = arguments?.getString(ARG_CONTACT_TYPE) ?: "SELECTOR"
-            viewModel.start(formType, indexCaseBenId, contactBenId, contactType)
-        }
+        viewModel.open(formType, indexCaseBenId, contactType, sectionPhase)
+        viewModel.loadResultForm(indexCaseBenId)
+    }
+
+    /** Called by ContactTracingActivity's back-press handling - saves whatever's filled in */
+    fun saveDraftAndGoBack() {
+        viewModel.onBack()
     }
 
     private fun handleOpenForm(targetFormUuid: String) {
         val navigator = requireActivity() as? ContactTracingNavigator ?: return
+
         when (targetFormUuid) {
-            "HHC_CONTACT_TRACING" -> navigator.showHouseholdRoutingNote()
-            "COMMUNITY_CONTACT_TRACING" -> navigator.openMemberList("COMMUNITY")
-            "OCCUPATIONAL_CONTACT_TRACING" -> navigator.openMemberList("OCCUPATIONAL")
-            else -> Unit // TB_CONFIRMED_CASE_FORM / TB_PRESUMPTIVE_CASE: cross-module redirect, not yet built.
+            "COMMUNITY_CONTACT_TRACING" -> {
+                navigator.openContactForm(
+                    FormType.COMMUNITY_CONTACT_TRACING,
+                    "COMMUNITY"
+                )
+            }
+
+            "OCCUPATIONAL_CONTACT_TRACING" -> {
+                navigator.openContactForm(
+                    FormType.OCCUPATION_CONTACT_TRACING,
+                    "OCCUPATIONAL"
+                )
+            }
+
+            "TPT_FOLLOW_UP" -> {
+                navigator.openContactForm(
+                    FormType.TPT_FOLLOW_UP,
+                    "TPT_FOLLOW_UP",
+                    SectionPhase.PRE_SUBMIT,
+                    addToBackStack = true
+                )
+            }
+
+            else -> Unit
         }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        binding = null
     }
 
     companion object {
         private const val ARG_FORM_TYPE = "formType"
         private const val ARG_INDEX_CASE_BEN_ID = "indexCaseBenId"
-        private const val ARG_CONTACT_BEN_ID = "contactBenId"
         private const val ARG_CONTACT_TYPE = "contactType"
-        private const val ARG_EXISTING_RESPONSE_ID = "existingResponseId"
+        private const val ARG_SECTION_PHASE = "sectionPhase"
 
         fun newInstance(
             formType: FormType,
             indexCaseBenId: Long,
-            contactBenId: Long?,
-            contactType: String
+            contactType: String,
+            sectionPhase: SectionPhase? = null
         ) = ContactTracingFormFragment().apply {
             arguments = Bundle().apply {
                 putString(ARG_FORM_TYPE, formType.name)
                 putLong(ARG_INDEX_CASE_BEN_ID, indexCaseBenId)
-                contactBenId?.let { putLong(ARG_CONTACT_BEN_ID, it) }
                 putString(ARG_CONTACT_TYPE, contactType)
-            }
-        }
-
-        fun resumeInstance(formType: FormType, existingResponseId: Long) = ContactTracingFormFragment().apply {
-            arguments = Bundle().apply {
-                putString(ARG_FORM_TYPE, formType.name)
-                putLong(ARG_EXISTING_RESPONSE_ID, existingResponseId)
+                sectionPhase?.let { putString(ARG_SECTION_PHASE, it.name) }
             }
         }
     }

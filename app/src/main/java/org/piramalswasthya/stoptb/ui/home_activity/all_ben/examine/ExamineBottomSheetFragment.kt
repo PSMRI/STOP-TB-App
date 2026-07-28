@@ -12,6 +12,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
@@ -20,8 +21,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
+import org.piramalswasthya.stoptb.ui.contact_tracing.ContactTracingActivity
+import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
 
 @AndroidEntryPoint
 class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
@@ -109,6 +113,11 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
                 rowView.visibility = View.GONE
                 return@forEachIndexed
             }
+            // Counselling Officer: show ONLY TB Screening here (Followup is a separate row below).
+            if (isCounsellingOfficer && formIndex != FORM_TB_SCREENING) {
+                rowView.visibility = View.GONE
+                return@forEachIndexed
+            }
             rowView.visibility = View.VISIBLE
             rowView.findViewById<TextView>(R.id.tv_form_name).text = formName
             val btn = rowView.findViewById<MaterialButton>(R.id.btn_form_action)
@@ -168,6 +177,116 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
                 }
             } else {
                 observeFormStatus(fillStatusFlows[index], btn, notFilled, benId, formIndex)
+            }
+        }
+
+        // Shows Fill/View for the "TPT Followup" row based solely on isTptFollowUpPreSubmitDone, since PRE_SUBMIT completion already implies CONTACT_FOLLOW_UP was submitted.
+        val followupRow = view.findViewById<View>(R.id.row_followup)
+        if (isCounsellingOfficer) {
+            followupRow.visibility = View.VISIBLE
+            followupRow.findViewById<TextView>(R.id.tv_form_name).text = getString(R.string.contact_tracing_follow_up)
+            followupRow.findViewById<TextView>(R.id.tv_not_filled).visibility = View.GONE
+            val followupBtn = followupRow.findViewById<MaterialButton>(R.id.btn_form_action)
+            followupBtn.visibility = View.VISIBLE
+            followupBtn.isEnabled = true
+            viewLifecycleOwner.lifecycleScope.launch {
+                viewModel.isTptFollowUpPreSubmitDone.collect { filled ->
+                    if (filled) {
+                        followupBtn.text = getString(R.string.examine_btn_view)
+                        followupBtn.backgroundTintList = ContextCompat.getColorStateList(
+                            requireContext(), android.R.color.holo_green_dark
+                        )
+                    } else {
+                        followupBtn.text = getString(R.string.examine_btn_fill)
+                        followupBtn.backgroundTintList = ContextCompat.getColorStateList(
+                            requireContext(), android.R.color.holo_red_dark
+                        )
+                    }
+                    followupBtn.setOnClickListener {
+                        ContactTracingActivity.startForType(
+                            requireContext(), benId, ContactTracingActivity.CONTACT_TYPE_FOLLOW_UP
+                        )
+                    }
+                }
+            }
+        } else {
+            followupRow.visibility = View.GONE
+        }
+
+        // TPT Followup — Counselling Officer only.
+        val tptFollowupRow = view.findViewById<View>(R.id.row_tpt_followup)
+        if (isCounsellingOfficer) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                combine(
+                    viewModel.isTptFollowUpPreSubmitDone,
+                    viewModel.isTptFollowUpFillAvailable
+                ) { preSubmitDone, fillAvailable -> preSubmitDone to fillAvailable }
+                    .collect { (preSubmitDone, fillAvailable) ->
+                        tptFollowupRow.visibility = if (preSubmitDone) View.VISIBLE else View.GONE
+                        if (!preSubmitDone) return@collect
+
+                        tptFollowupRow.findViewById<TextView>(R.id.tv_form_name).text =
+                            getString(R.string.tpt_follow_up)
+                        tptFollowupRow.findViewById<TextView>(R.id.tv_not_filled).visibility = View.GONE
+
+
+                        val historyBtn = tptFollowupRow.findViewById<MaterialButton>(R.id.btn_form_history)
+                        historyBtn.visibility = View.VISIBLE
+                        historyBtn.text = getString(R.string.examine_btn_history)
+
+                        historyBtn.backgroundTintList = ContextCompat.getColorStateList(
+                            requireContext(), android.R.color.holo_green_dark
+                        )
+                        historyBtn.setOnClickListener {
+                            viewModel.onHistoryClicked()
+                        }
+
+                        val fillBtn = tptFollowupRow.findViewById<MaterialButton>(R.id.btn_form_action)
+                        if (!fillAvailable) {
+                            fillBtn.visibility = View.GONE
+                            return@collect
+                        }
+                        fillBtn.visibility = View.VISIBLE
+                        fillBtn.isEnabled = true
+                        fillBtn.text = getString(R.string.examine_btn_fill)
+                        fillBtn.backgroundTintList = ContextCompat.getColorStateList(
+                            requireContext(), android.R.color.holo_red_dark
+                        )
+                        fillBtn.setOnClickListener {
+                            ContactTracingActivity.startForType(
+                                requireContext(), benId, ContactTracingActivity.CONTACT_TYPE_TPT_FOLLOW_UP,
+                                SectionPhase.POST_SUBMIT
+                            )
+                        }
+                    }
+            }
+        } else {
+            tptFollowupRow.visibility = View.GONE
+        }
+
+        viewModel.historyState.observe(viewLifecycleOwner) { state ->
+            val historyBtn = tptFollowupRow.findViewById<MaterialButton>(R.id.btn_form_history)
+            when (state) {
+                is NetworkResponse.Idle -> Unit
+                is NetworkResponse.Loading -> {
+                    historyBtn.isEnabled = false
+                }
+                is NetworkResponse.Success -> {
+                    historyBtn.isEnabled = true
+                    android.widget.Toast.makeText(
+                        requireContext(), "History refreshed", android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+                is NetworkResponse.Error -> {
+                    historyBtn.isEnabled = true
+                    Snackbar.make(
+                        view,
+                        state.message ?: getString(R.string.contact_tracing_load_error),
+                        Snackbar.LENGTH_LONG
+                    ).setAction(getString(R.string.counselling_retry)) {
+                        viewModel.onHistoryClicked()
+                    }.show()
+                }
             }
         }
 

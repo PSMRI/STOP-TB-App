@@ -392,32 +392,36 @@ class CounsellingViewModel @Inject constructor(
                             val targetId = cond.targetQuestionId ?: return@forEach
                             val targetQ = activeSection.questions.find { it.questionId == targetId } ?: return@forEach
 
-                            when (cond.actionType) {
-                                "SHOW", "SHOW_QUESTION" -> {
+                            when (val actionType = ActionType.from(cond.actionType)) {
+                                ActionType.SHOW,
+                                ActionType.SHOW_QUESTION -> {
                                     if (!targetQ.visible) {
                                         targetQ.visible = true
                                         changed = true
                                     }
-                                    if (cond.actionType == "SHOW_QUESTION") {
-                                        if (!targetQ.isMandatory) {
-                                            targetQ.isMandatory = true
-                                            changed = true
-                                        }
+
+                                    if (actionType == ActionType.SHOW_QUESTION && !targetQ.isMandatory) {
+                                        targetQ.isMandatory = true
+                                        changed = true
                                     }
                                 }
-                                "MANDATORY" -> {
+
+                                ActionType.MANDATORY -> {
                                     if (!targetQ.isMandatory) {
                                         targetQ.isMandatory = true
                                         changed = true
                                     }
                                 }
-                                "DISABLE_SECTION_VALIDATION" -> {
+
+                                ActionType.DISABLE_SECTION_VALIDATION -> {
                                     val targetCode = cond.targetSectionUuid ?: return@forEach
                                     if (!disabledValidationSections.contains(targetCode)) {
                                         disabledValidationSections.add(targetCode)
                                         changed = true
                                     }
                                 }
+
+                                else -> Unit
                             }
                         }
                     }

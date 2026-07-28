@@ -16,8 +16,7 @@ class ContactTracingSyncWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        // syncUnsyncedResponses() is currently a stub: no submit/complete endpoints exist yet
-        // for Contact Tracing on the backend, so this always succeeds without pushing anything.
+
         val success = contactTracingRepository.syncUnsyncedResponses()
         return if (success) {
             Result.success()
