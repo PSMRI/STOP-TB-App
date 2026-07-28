@@ -576,7 +576,7 @@ class NewBenRegFragment : Fragment() {
     override fun onStart() {
         super.onStart()
         val title = when {
-            viewModel.relToHeadId == 18 -> getString(R.string.frag_nhhr_title)
+            viewModel.relToHeadId == 18 -> getString(R.string.title_new_ben_reg_hof)
             viewModel.relToHeadId > 0   -> getString(R.string.title_new_ben_reg_non_hof)
             else                        -> getString(R.string.frag_new_ben_reg_type_title)
         }
