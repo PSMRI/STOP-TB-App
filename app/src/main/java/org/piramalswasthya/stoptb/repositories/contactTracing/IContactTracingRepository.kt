@@ -93,4 +93,9 @@ interface IContactTracingRepository {
     fun observeContactFollowUpDoneBenIds(): Flow<List<Long>>
 
     fun observeTptFollowUpTargetReachedBenIds(): Flow<List<Long>>
+
+    // Beneficiaries whose CONTACT_FOLLOW_UP clinical screening answer is TPT_ELIGIBLE — drives
+    // whether the Counselling Officer's Examine badge total is x/2 (TB Screening + Contact
+    // Follow Up only) or x/3 (TPT Follow Up also required).
+    fun observeTptEligibleBenIds(): Flow<List<Long>>
 }

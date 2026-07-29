@@ -501,6 +501,12 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         }
 
         lifecycleScope.launch {
+            viewModel.tptEligibleBenIds.collectLatest { benIds ->
+                benAdapter.submitTptEligibleBenIds(benIds)
+            }
+        }
+
+        lifecycleScope.launch {
             viewModel.allTbDiagnostics.collectLatest { diagnosticsList ->
                 benAdapter.submitTBDiagnostics(diagnosticsList)
             }
