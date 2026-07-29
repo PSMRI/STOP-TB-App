@@ -90,7 +90,7 @@ class TBConfirmedListFragment : Fragment() {
                     findNavController().navigate(
                         TBConfirmedListFragmentDirections
                             .actionTBConfirmedListFragmentToHouseholdMembersFragment(
-                                hhId = item.ben.hhId
+                                hhId = item.ben.hhId ?: 0L
                             )
                     )
                 },
@@ -118,6 +118,9 @@ class TBConfirmedListFragment : Fragment() {
         })
         viewModel.totalSectionsFallback.observe(viewLifecycleOwner) { totalSections ->
             benAdapter.submitTotalSectionsFallback(totalSections)
+        }
+        viewModel.localFilledCounts.observe(viewLifecycleOwner) { counts ->
+            benAdapter.submitLocalFilledCounts(counts)
         }
 
         binding.ibSearch.setOnClickListener { sttContract.launch(Unit) }
@@ -149,6 +152,7 @@ class TBConfirmedListFragment : Fragment() {
         if (::benAdapter.isInitialized) {
             benAdapter.submitList(currentBenList)
         }
+        viewModel.fetchCompletedBeneficiaries()
     }
 
     override fun onStart() {

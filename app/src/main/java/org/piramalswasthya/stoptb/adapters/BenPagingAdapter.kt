@@ -5,6 +5,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.paging.PagingDataAdapter
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.BenBasicDomain
+import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 
 class BenPagingAdapter(
     private val clickListener: BenListAdapter.BenClickListener? = null,
@@ -21,6 +22,7 @@ class BenPagingAdapter(
     private val showResultButton: Boolean = false,
     private val showAnthropometryButton: Boolean = false,
     private val showExamineButton: Boolean = true,
+    private val source: Int = 0
 ) :
     PagingDataAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenListAdapter.BenDiffUtilCallBack) {
 
@@ -30,6 +32,7 @@ class BenPagingAdapter(
     private val anthropometryBenIds = mutableListOf<Long>()
     private val diagnosisIds = mutableListOf<Long>()
     private val childCountMap = mutableMapOf<Long, Int>()
+    private val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
 
     override fun onCreateViewHolder(
         parent: ViewGroup, viewType: Int
@@ -58,8 +61,16 @@ class BenPagingAdapter(
             showActionButtons = showActionButtons,
             showResultButton = showResultButton,
             showAnthropometryButton = showAnthropometryButton,
-            showExamineButton = showExamineButton
+            showExamineButton = showExamineButton,
+            tbDiagnosticsList = tbDiagnosticsList,
+            source = source
         )
+    }
+
+    fun submitTBDiagnostics(list: List<TBDiagnosticsCache>) {
+        tbDiagnosticsList.clear()
+        tbDiagnosticsList.addAll(list)
+        notifyDataSetChanged()
     }
 
     fun submitBenIds(list: List<Long>) {

@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
@@ -23,6 +24,7 @@ import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
+import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.ui.contact_tracing.ContactTracingActivity
 import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
@@ -38,7 +40,6 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
         const val FORM_GENERAL_EXAM  = 1
         const val FORM_TB_SCREENING  = 2
         const val FORM_GENERAL_OPD   = 3
-        const val FORM_DIAGNOSIS     = 4
 
         fun newInstance(benId: Long, autoFlow: Boolean = false) = ExamineBottomSheetFragment().apply {
             arguments = bundleOf("benId" to benId, "autoFlow" to autoFlow)
@@ -59,9 +60,12 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
     // Set to true when we dismiss programmatically for navigation (not user swipe)
     private var isDismissingForNavigation = false
 
-    /** True when logged-in user is Registrar — only Anthropometry form shown */
+    /** True when logged-in user is Registrar — Anthropometry and TB Screening forms shown */
     private val isRegistrar: Boolean
         get() = prefDao.getLoggedInUser()?.role.isRegistrationOfficerRole()
+
+    private val isNurse: Boolean
+        get() = prefDao.getLoggedInUser()?.role.isNurseRole()
     private val isCounsellingOfficer : Boolean
         get() = prefDao.getLoggedInUser()?.role.isCounsellingOfficerRole()
 
@@ -95,21 +99,30 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
             FormRow(view.findViewById(R.id.row_anthropometry),  getString(R.string.anthropometry_screen),  FORM_ANTHROPOMETRY),
             FormRow(view.findViewById(R.id.row_general_exam),   getString(R.string.vital_screen),           FORM_GENERAL_EXAM),
             FormRow(view.findViewById(R.id.row_tb_screening),   getString(R.string.tb_screening_form),      FORM_TB_SCREENING),
-            FormRow(view.findViewById(R.id.row_general_opd),    getString(R.string.general_opd),            FORM_GENERAL_OPD),
-            FormRow(view.findViewById(R.id.row_diagnosis),      getString(R.string.tb_suspected_quick_title), FORM_DIAGNOSIS)
+            FormRow(view.findViewById(R.id.row_general_opd),    getString(R.string.general_opd),            FORM_GENERAL_OPD)
         )
+
+        if (isRegistrar || isNurse) {
+            val container = view as? LinearLayout
+            val anthropometryRow = view.findViewById<View>(R.id.row_anthropometry)
+            val tbScreeningRow = view.findViewById<View>(R.id.row_tb_screening)
+            if (container != null && anthropometryRow != null && tbScreeningRow != null) {
+                container.removeView(tbScreeningRow)
+                val anthropometryIndex = container.indexOfChild(anthropometryRow)
+                container.addView(tbScreeningRow, anthropometryIndex.coerceAtLeast(0))
+            }
+        }
 
         val fillStatusFlows = listOf(
             viewModel.isAnthropometryFilled,
             viewModel.isGeneralExamFilled,
             viewModel.isTbScreeningFilled,
-            viewModel.isGeneralOpdFilled,
-            viewModel.isDiagnosisFilled
+            viewModel.isGeneralOpdFilled
         )
 
         rows.forEachIndexed { index, (rowView, formName, formIndex) ->
-            // Registrar role: show ONLY Anthropometry (index 0); Nurse: show all 5
-            if (isRegistrar && formIndex != FORM_ANTHROPOMETRY) {
+            // Registrar role: show Anthropometry and TB Screening; Nurse: show all 5
+            if (isRegistrar && formIndex != FORM_ANTHROPOMETRY && formIndex != FORM_TB_SCREENING) {
                 rowView.visibility = View.GONE
                 return@forEachIndexed
             }
@@ -123,54 +136,49 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
             val btn = rowView.findViewById<MaterialButton>(R.id.btn_form_action)
             val notFilled = rowView.findViewById<TextView>(R.id.tv_not_filled)
 
-            if (formIndex == FORM_DIAGNOSIS) {
-                // Diagnosis is only enabled after TB Screening is completed
+            if ((isRegistrar && formIndex == FORM_ANTHROPOMETRY) ||
+                (isNurse && formIndex != FORM_TB_SCREENING)
+            ) {
                 viewLifecycleOwner.lifecycleScope.launch {
                     combine(
                         viewModel.isTbScreeningFilled,
                         fillStatusFlows[index]
-                    ) { tbScreeningDone, diagnosisFilled ->
-                        Pair(tbScreeningDone, diagnosisFilled)
-                    }.collect { (tbScreeningDone, diagnosisFilled) ->
+                    ) { tbScreeningDone, currentFormFilled ->
+                        Pair(tbScreeningDone, currentFormFilled)
+                    }.collect { (tbScreeningDone, currentFormFilled) ->
                         if (!tbScreeningDone) {
-                            if(isCounsellingOfficer){
-                                btn.visibility = View.GONE
-                                notFilled.visibility = View.VISIBLE
-                            }else {
-                                btn.visibility = View.VISIBLE
-                                // TB Screening not done — show grey button, toast on click
-                                btn.text = getString(R.string.examine_btn_fill)
-                                btn.isEnabled = false
-                                btn.alpha = 1f
-                                btn.backgroundTintList = ContextCompat.getColorStateList(
-                                    requireContext(), android.R.color.darker_gray
-                                )
-                                // Allow tap to show hint message even when disabled
-                                btn.isEnabled = true
-                                btn.setOnClickListener {
-                                    android.widget.Toast.makeText(
-                                        requireContext(),
-                                        getString(R.string.diagnosis_locked_msg),
-                                        android.widget.Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                            }
-                        } else {
-                            // TB Screening done — normal behavior
+                            btn.text = getString(R.string.examine_btn_fill)
                             btn.isEnabled = true
                             btn.alpha = 1f
-                            if (diagnosisFilled) {
+                            btn.backgroundTintList = ContextCompat.getColorStateList(
+                                requireContext(), android.R.color.darker_gray
+                            )
+                            btn.setOnClickListener {
+                                android.widget.Toast.makeText(
+                                    requireContext(),
+                                    getString(R.string.tb_screening_locked_msg),
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        } else {
+                            btn.isEnabled = true
+                            btn.alpha = 1f
+                            if (currentFormFilled) {
                                 btn.text = getString(R.string.examine_btn_view)
                                 btn.backgroundTintList = ContextCompat.getColorStateList(
                                     requireContext(), android.R.color.holo_green_dark
                                 )
-                                btn.setOnClickListener { navigateToForm(benId, formIndex, viewOnly = true) }
+                                btn.setOnClickListener {
+                                    navigateToForm(benId, formIndex, viewOnly = true)
+                                }
                             } else {
                                 btn.text = getString(R.string.examine_btn_fill)
                                 btn.backgroundTintList = ContextCompat.getColorStateList(
                                     requireContext(), android.R.color.holo_red_dark
                                 )
-                                btn.setOnClickListener { navigateToForm(benId, formIndex, viewOnly = false) }
+                                btn.setOnClickListener {
+                                    navigateToForm(benId, formIndex, viewOnly = false)
+                                }
                             }
                         }
                     }
@@ -293,7 +301,29 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
         // Auto-flow: if opened with autoFlow=true, immediately navigate to next unfilled form
         if (autoFlow) {
             viewLifecycleOwner.lifecycleScope.launch {
-                val nextIndex = viewModel.nextUnfilledFormIndex.first()
+                val nextIndex = if (isRegistrar) {
+                    val tbFilled = viewModel.isTbScreeningFilled.first()
+                    val anthropometryFilled = viewModel.isAnthropometryFilled.first()
+                    when {
+                        !tbFilled -> FORM_TB_SCREENING
+                        !anthropometryFilled -> FORM_ANTHROPOMETRY
+                        else -> null
+                    }
+                } else if (isNurse) {
+                    val tbFilled = viewModel.isTbScreeningFilled.first()
+                    val anthropometryFilled = viewModel.isAnthropometryFilled.first()
+                    val generalExamFilled = viewModel.isGeneralExamFilled.first()
+                    val generalOpdFilled = viewModel.isGeneralOpdFilled.first()
+                    when {
+                        !tbFilled -> FORM_TB_SCREENING
+                        !anthropometryFilled -> FORM_ANTHROPOMETRY
+                        !generalExamFilled -> FORM_GENERAL_EXAM
+                        !generalOpdFilled -> FORM_GENERAL_OPD
+                        else -> null
+                    }
+                } else {
+                    viewModel.nextUnfilledFormIndex.first()
+                }
                 if (nextIndex != null) {
                     navigateToForm(benId, nextIndex, viewOnly = false)
                 } else {

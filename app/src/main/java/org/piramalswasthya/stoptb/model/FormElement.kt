@@ -42,4 +42,6 @@ data class FormElement(
     var selectedFiles: MutableList<String>? = null,
     val showDrawable: Boolean? = false,
     val showAsMultiSelectDialog: Boolean = false,
+    var exclusiveOptionIndices: Set<Int>? = null,
+
 )

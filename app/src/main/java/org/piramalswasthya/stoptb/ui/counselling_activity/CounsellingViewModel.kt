@@ -54,7 +54,11 @@ class CounsellingViewModel @Inject constructor(
     val isFormEditable: LiveData<Boolean> get() = _isFormEditable
 
     fun isSectionEditable(section: CounsellingSectionDto?): Boolean {
-        return _isFormEditable.value != false || section?.isEditable == true
+        // Backend's isEditable=true (only the last section) is an unconditional override — that
+        // section stays editable forever regardless of submitted/completed/refused state.
+        if (section?.isEditable == true) return true
+        if (section?.isSubmitted == true) return false
+        return _isFormEditable.value != false
     }
 
     private val _isGeneralInfoToggleOn = MutableLiveData(true)
@@ -68,6 +72,10 @@ class CounsellingViewModel @Inject constructor(
 
     private val _generalInfoRefusalSubmitted = MutableLiveData<Boolean>()
     val generalInfoRefusalSubmitted: LiveData<Boolean> get() = _generalInfoRefusalSubmitted
+
+
+    private val _generalInfoQuestionUpdated = MutableLiveData<Int>()
+    val generalInfoQuestionUpdated: LiveData<Int> get() = _generalInfoQuestionUpdated
 
     enum class CounsellingEntryMode {
         COUNSELLING,
@@ -156,8 +164,8 @@ class CounsellingViewModel @Inject constructor(
     fun evaluateGeneralInfoConditions(q: CounsellingQuestionDto) {
         val section = generalInfoSection ?: return
 
-        val beforeStates = section.questions.map {
-            Triple(it.questionId, it.visible, it.isMandatory) to it.errorMessage
+        val beforeStates = section.questions.associate {
+            it.questionId to Triple(it.visible, it.isMandatory, it.errorMessage)
         }
 
         evaluateAllConditions(section)
@@ -172,11 +180,21 @@ class CounsellingViewModel @Inject constructor(
             }
         }
 
-        val afterStates = section.questions.map {
-            Triple(it.questionId, it.visible, it.isMandatory) to it.errorMessage
+        val afterStates = section.questions.associate {
+            it.questionId to Triple(it.visible, it.isMandatory, it.errorMessage)
         }
 
-        if (beforeStates != afterStates) {
+        val changedIds = afterStates.filterKeys { id -> beforeStates[id] != afterStates[id] }.keys
+        if (changedIds.isEmpty()) return
+
+
+        val onlySelfChanged = changedIds.size == 1 && changedIds.first() == q.questionId &&
+            beforeStates[q.questionId]?.first == afterStates[q.questionId]?.first &&
+            beforeStates[q.questionId]?.second == afterStates[q.questionId]?.second
+
+        if (onlySelfChanged) {
+            _generalInfoQuestionUpdated.value = q.questionId
+        } else {
             _generalInfoQuestions.value = section.questions.toList()
         }
     }
@@ -572,6 +590,11 @@ class CounsellingViewModel @Inject constructor(
         viewModelScope.launch {
             val success = counsellingRepo.saveSectionAnswers(benId, formId, section, versionNumber)
             if (success) {
+                val persistedSection = counsellingRepo.getDraftResponse(benId)
+                    ?.sectionResponses?.find { it.sectionResponse.sectionId == section.sectionId }
+                if (persistedSection?.sectionResponse?.completedAt != null) {
+                    section.isSubmitted = true
+                }
                 if (current < (schemaData?.sections?.size ?: 1) - 1) {
                     loadSection(current + 1)
                 } else {
@@ -599,7 +622,8 @@ class CounsellingViewModel @Inject constructor(
             viewModelScope.launch {
                 val success = counsellingRepo.saveSectionAnswers(
                     benId, formId, section, versionNumber,
-                    overrideTargetSectionId = previousSectionId
+                    overrideTargetSectionId = previousSectionId,
+                    isBackNavigation = true
                 )
                 if (success) {
                     loadSection(current - 1)

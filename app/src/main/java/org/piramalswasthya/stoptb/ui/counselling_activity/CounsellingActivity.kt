@@ -107,38 +107,40 @@ class CounsellingActivity : AppCompatActivity() {
         binding.rvGeneralInfo.layoutManager = LinearLayoutManager(this)
         binding.rvGeneralInfo.adapter = generalInfoAdapter
 
-//        binding.etCounsellingDate.setOnClickListener {
-//            if (viewModel.isFormEditable.value == false) return@setOnClickListener
-//            val overviewData = (viewModel.overview.value as? NetworkResponse.Success)?.data ?: return@setOnClickListener
-//            val cal = Calendar.getInstance()
-//            val currentText = binding.etCounsellingDate.text.toString()
-//            val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
-//            try {
-//                sdf.parse(currentText)?.let {
-//                    cal.time = it
-//                }
-//            } catch (e: Exception) {}
-//
-//            val dpd = DatePickerDialog(
-//                this,
-//                { _, year, month, day ->
-//                    val selected = Calendar.getInstance().apply {
-//                        set(Calendar.HOUR_OF_DAY, 0)
-//                        set(Calendar.MINUTE, 0)
-//                        set(Calendar.SECOND, 0)
-//                        set(Calendar.MILLISECOND, 0)
-//                        set(year, month, day)
-//                    }
-//                    viewModel.updateCounsellingDate(selected.timeInMillis)
-//                },
-//                cal.get(Calendar.YEAR),
-//                cal.get(Calendar.MONTH),
-//                cal.get(Calendar.DAY_OF_MONTH)
-//            )
-//            dpd.datePicker.maxDate = System.currentTimeMillis()
-//            dpd.datePicker.minDate = overviewData.regDate
-//            dpd.show()
-//        }
+        /*
+        binding.etCounsellingDate.setOnClickListener {
+            if (viewModel.isFormEditable.value == false) return@setOnClickListener
+            val overviewData = (viewModel.overview.value as? NetworkResponse.Success)?.data ?: return@setOnClickListener
+            val cal = Calendar.getInstance()
+            val currentText = binding.etCounsellingDate.text.toString()
+            val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
+            try {
+                sdf.parse(currentText)?.let {
+                    cal.time = it
+                }
+            } catch (e: Exception) {}
+
+            val dpd = DatePickerDialog(
+                this,
+                { _, year, month, day ->
+                    val selected = Calendar.getInstance().apply {
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                        set(year, month, day)
+                    }
+                    viewModel.updateCounsellingDate(selected.timeInMillis)
+                },
+                cal.get(Calendar.YEAR),
+                cal.get(Calendar.MONTH),
+                cal.get(Calendar.DAY_OF_MONTH)
+            )
+            dpd.datePicker.maxDate = System.currentTimeMillis()
+            dpd.datePicker.minDate = overviewData.regDate
+            dpd.show()
+        }
+         */
     }
 
     private fun updateGeneralInfoUi() {
@@ -206,7 +208,11 @@ class CounsellingActivity : AppCompatActivity() {
                         }
                     }
                     consentAnswer?.equals("YES", ignoreCase = true) == true -> {
-                        binding.navigationFooter.btnNext.text = getString(R.string.counselling_start_button)
+                        binding.navigationFooter.btnNext.text = if (overviewData?.preSubmitInProgress == true) {
+                            getString(R.string.counselling_in_progress)
+                        } else {
+                            getString(R.string.counselling_start_button)
+                        }
                         binding.navigationFooter.btnNext.visibility = View.VISIBLE
                         binding.navigationFooter.btnNext.setOnClickListener {
                             viewModel.startCounselling()
@@ -228,6 +234,8 @@ class CounsellingActivity : AppCompatActivity() {
         binding.navigationFooter.root.visibility = View.VISIBLE
         if (overviewData?.preSubmitSubmitted == true) {
             binding.navigationFooter.btnNext.text = getString(R.string.counselled)
+        } else if (overviewData?.preSubmitInProgress == true) {
+            binding.navigationFooter.btnNext.text = getString(R.string.counselling_in_progress)
         } else {
             binding.navigationFooter.btnNext.text = getString(R.string.counselling_start_button)
         }
@@ -375,6 +383,10 @@ class CounsellingActivity : AppCompatActivity() {
         viewModel.generalInfoQuestions.observe(this) { updateGeneralInfoUi() }
         viewModel.isGeneralInfoToggleOn.observe(this) { updateGeneralInfoUi() }
         viewModel.isFormEditable.observe(this) { updateGeneralInfoUi() }
+
+        viewModel.generalInfoQuestionUpdated.observe(this) { questionId ->
+            generalInfoAdapter.notifyQuestionUpdated(questionId)
+        }
         viewModel.generalInfoRefusalSubmitted.observe(this) { submitted ->
             if (submitted == true) finish()
         }

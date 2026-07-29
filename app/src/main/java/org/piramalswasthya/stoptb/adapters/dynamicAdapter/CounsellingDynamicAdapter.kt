@@ -117,6 +117,7 @@ class CounsellingDynamicAdapter(
         if (position >= 0) notifyItemChanged(position)
     }
 
+
     override fun getItemViewType(position: Int): Int {
         return when (QuestionType.from(visibleQuestions[position].questionType)) {
             QuestionType.TEXT -> TYPE_TEXT
@@ -132,6 +133,11 @@ class CounsellingDynamicAdapter(
             QuestionType.MCQ,
             null -> TYPE_TEXT
         }
+
+    // rebinding the rest of the list, so an unrelated row's focus/keyboard isn't disturbed.
+    fun notifyQuestionUpdated(questionId: Int) {
+        val index = visibleQuestions.indexOfFirst { it.questionId == questionId }
+        if (index != -1) notifyItemChanged(index)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {

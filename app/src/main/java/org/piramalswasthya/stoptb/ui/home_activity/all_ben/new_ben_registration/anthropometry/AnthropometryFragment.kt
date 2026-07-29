@@ -23,6 +23,7 @@ import org.piramalswasthya.stoptb.databinding.FragmentAnthropometryBinding
 import org.piramalswasthya.stoptb.model.AgeUnit
 import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.Gender
+import org.piramalswasthya.stoptb.model.getAgeGenderDisplayString
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -52,6 +53,8 @@ class AnthropometryFragment : Fragment() {
     private var highTemperatureAlertShown = false
     private var isFormLocked = false
     private var isUpdatingTemperatureSelection = false
+    private val openedFromHousehold: Boolean
+        get() = arguments?.getBoolean("openedFromHousehold", false) == true
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -79,7 +82,7 @@ class AnthropometryFragment : Fragment() {
             ben ?: return@observe
             // Lock form FIRST so that setText below does not trigger the HWC alert in view mode
             lockFormIfExistingData(ben)
-            binding.tvAgeGender.text = formatAgeGender(ben)
+            binding.tvAgeGender.text = ben.getAgeGenderDisplayString()
             binding.etWeight.setText(ben.weight?.formatOneDecimal().orEmpty())
             binding.etHeight.setText(ben.height?.formatOneDecimal().orEmpty())
             binding.etBmi.setText(ben.bmi?.formatOneDecimal().orEmpty())
@@ -98,7 +101,13 @@ class AnthropometryFragment : Fragment() {
         binding.etTemperature.doAfterTextChanged {
             validateTemperature(showBlankError = false)
             selectTemperatureRange(binding.etTemperature.text?.toString()?.toDoubleOrNull())
-            if (isHighTemperature()) showHighTemperatureAlert()
+            if (isHighTemperature()) {
+                showHighTemperatureAlert()
+            } else {
+                // Temperature no longer high — allow the alert to fire again
+                // the next time it crosses back above the threshold.
+                highTemperatureAlertShown = false
+            }
         }
 
         binding.rgTemperature.setOnCheckedChangeListener { _, checkedId ->
@@ -132,23 +141,7 @@ class AnthropometryFragment : Fragment() {
                     binding.loadingOverlay.visibility = View.GONE
                     WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
                     Toast.makeText(requireContext(), R.string.save_successful, Toast.LENGTH_SHORT).show()
-                    when {
-                        viewModel.examineFlow -> {
-                            // Examine flow — return to AllBenFragment so user picks the next form
-                            val popped = findNavController().popBackStack(R.id.allBenFragment, false)
-                            if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
-                        }
-                        viewModel.autoFlow -> {
-                            val returnedToList = findNavController().popBackStack(R.id.allBenFragment, false)
-                            if (!returnedToList) {
-                                findNavController().navigate(
-                                    R.id.allBenFragment,
-                                    bundleOf("source" to 0)
-                                )
-                            }
-                        }
-                        else -> findNavController().popBackStack()
-                    }
+                    findNavController().navigateUp()
                     viewModel.resetState()
                 }
                 AnthropometryViewModel.State.SAVE_FAILED -> {
@@ -233,22 +226,6 @@ class AnthropometryFragment : Fragment() {
     private fun isWithinRange(value: String?, min: Double, max: Double): Boolean {
         val number = value?.trim()?.toDoubleOrNull() ?: return false
         return number in min..max
-    }
-
-    private fun formatAgeGender(ben: BenRegCache): String {
-        val ageUnit = when (ben.ageUnit) {
-            AgeUnit.DAYS -> getString(R.string.age_unit_days)
-            AgeUnit.MONTHS -> getString(R.string.age_unit_months)
-            AgeUnit.YEARS, null -> getString(R.string.age_unit_years)
-        }
-        val gender = when (ben.gender) {
-            Gender.MALE -> getString(R.string.gender_male)
-            Gender.FEMALE -> getString(R.string.gender_female)
-            Gender.TRANSGENDER -> getString(R.string.gender_transgender)
-            Gender.PREFER_NOT_TO_SAY -> getString(R.string.gender_prefer_not_to_say)
-            null -> ""
-        }
-        return getString(R.string.anthropometry_age_gender_format, ben.age, ageUnit, gender)
     }
 
     private fun isHighTemperature(): Boolean =

@@ -113,6 +113,7 @@ class SyncStatusTabFragment : Fragment() {
         val running = workInfoList.count { it.state == WorkInfo.State.RUNNING }
         val failed = workInfoList.filter { it.state == WorkInfo.State.FAILED }
         val succeeded = workInfoList.count { it.state == WorkInfo.State.SUCCEEDED }
+        val enqueued = workInfoList.count { it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.BLOCKED }
         val total = workInfoList.size
 
         when {
@@ -122,6 +123,14 @@ class SyncStatusTabFragment : Fragment() {
                 )
                 binding.tvWorkerDetails.visibility = View.GONE
                 binding.rvFailedWorkers.visibility = View.GONE
+            }
+            // Treat mixed success+failure as completed for the current cycle when nothing is running/enqueued.
+            // This prevents stale failed workers from older sync attempts from showing as an active issue.
+            succeeded > 0 && enqueued == 0 -> {
+                binding.tvWorkerStatus.text = getString(R.string.sync_dashboard_worker_complete)
+                binding.tvWorkerDetails.visibility = View.GONE
+                binding.rvFailedWorkers.visibility = View.GONE
+                failedExpanded = false
             }
             failed.isNotEmpty() -> {
                 binding.tvWorkerStatus.text = getString(R.string.sync_dashboard_worker_idle)

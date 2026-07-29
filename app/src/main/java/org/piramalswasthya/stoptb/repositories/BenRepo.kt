@@ -28,6 +28,8 @@ import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.helpers.dynamicMapper.PayloadBuilder
 import org.piramalswasthya.stoptb.model.*
+import org.piramalswasthya.stoptb.model.getPlaceOfCurrentLivingIndex
+import org.piramalswasthya.stoptb.model.getPlaceOfCurrentLivingCode
 import org.piramalswasthya.stoptb.network.*
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel
 import org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository
@@ -225,6 +227,118 @@ class BenRepo @Inject constructor(
         }
     }
 
+    suspend fun linkBenToHousehold(benId: Long, hhId: Long, relationPos: Int, relationName: String) {
+        withContext(Dispatchers.IO) {
+            val ben = benDao.getBen(benId)
+            if (ben != null) {
+                ben.householdId = hhId
+                ben.familyHeadRelationPosition = relationPos
+                ben.familyHeadRelation = relationName
+                ben.isNonHH = false
+                ben.syncState = SyncState.UNSYNCED
+                ben.processed = "U"
+                ben.serverUpdatedStatus = 2
+
+                // If linked as Wife (5) or Husband (6), back-link the spouse name of the Head of Family
+                if (relationPos == 5 || relationPos == 6) {
+                    val linkedFullName = listOfNotNull(ben.firstName?.trim(), ben.lastName?.trim())
+                        .filter { it.isNotBlank() }
+                        .joinToString(" ")
+                    if (linkedFullName.isNotBlank()) {
+                        // Find the HoF (relPosition = 19) in the same household
+                        benDao.getAllBenForHousehold(hhId).firstOrNull { it.familyHeadRelationPosition == 19 }?.let { hofBen ->
+                            // Update HoF's spouseName and set isSpouseAdded = true
+                            if (hofBen.genDetails == null) {
+                                hofBen.genDetails = BenRegGen(spouseName = linkedFullName)
+                            } else {
+                                hofBen.genDetails!!.spouseName = linkedFullName
+                            }
+                            hofBen.genDetails!!.maritalStatusId = 2
+                            hofBen.genDetails!!.maritalStatus = "Married"
+                            hofBen.isSpouseAdded = true
+                            hofBen.syncState = SyncState.UNSYNCED
+                            hofBen.processed = "U"
+                            hofBen.serverUpdatedStatus = 2
+                            benDao.updateBen(hofBen)
+
+                            // Also back-link the HoF's name as the spouseName of the linked member
+                            val hofFullName = listOfNotNull(hofBen.firstName?.trim(), hofBen.lastName?.trim())
+                                .filter { it.isNotBlank() }
+                                .joinToString(" ")
+                            if (hofFullName.isNotBlank()) {
+                                if (ben.genDetails == null) {
+                                    ben.genDetails = BenRegGen(spouseName = hofFullName)
+                                } else {
+                                    ben.genDetails!!.spouseName = hofFullName
+                                }
+                                ben.genDetails!!.maritalStatusId = 2
+                                ben.genDetails!!.maritalStatus = "Married"
+                                ben.isSpouseAdded = true
+                            }
+                        }
+                    }
+                }
+                // If linked as Son (9) or Daughter (10)
+                else if (relationPos == 9 || relationPos == 10) {
+                    benDao.getAllBenForHousehold(hhId).firstOrNull { it.familyHeadRelationPosition == 19 }?.let { hofBen ->
+                        val hofFullName = listOfNotNull(hofBen.firstName?.trim(), hofBen.lastName?.trim())
+                            .filter { it.isNotBlank() }
+                            .joinToString(" ")
+                        if (hofFullName.isNotBlank()) {
+                            if (hofBen.genderId == 1) { // Male HOF is Father
+                                ben.fatherName = hofFullName
+                                // If HOF is married, set motherName to HOF's Wife's name
+                                hofBen.genDetails?.spouseName?.takeIf { it.isNotBlank() && it != "Not Available" }?.let { mother ->
+                                    ben.motherName = mother
+                                }
+                            } else if (hofBen.genderId == 2) { // Female HOF is Mother
+                                ben.motherName = hofFullName
+                                // If HOF is married, set fatherName to HOF's Husband's name
+                                hofBen.genDetails?.spouseName?.takeIf { it.isNotBlank() && it != "Not Available" }?.let { father ->
+                                    ben.fatherName = father
+                                }
+                            }
+                        }
+                    }
+                }
+                // If linked as Mother (1) or Father (2)
+                else if (relationPos == 1 || relationPos == 2) {
+                    val linkedFullName = listOfNotNull(ben.firstName?.trim(), ben.lastName?.trim())
+                        .filter { it.isNotBlank() }
+                        .joinToString(" ")
+                    if (linkedFullName.isNotBlank()) {
+                        val householdMembers = benDao.getAllBenForHousehold(hhId)
+                        householdMembers.forEach { member ->
+                            // Update HOF (19) or Sibling (Son 9 / Daughter 10)
+                            if (member.familyHeadRelationPosition == 19 || member.familyHeadRelationPosition == 9 || member.familyHeadRelationPosition == 10) {
+                                var updated = false
+                                if (relationPos == 1) { // Linked member is Mother
+                                    member.motherName = linkedFullName
+                                    updated = true
+                                } else if (relationPos == 2) { // Linked member is Father
+                                    member.fatherName = linkedFullName
+                                    updated = true
+                                }
+                                if (updated) {
+                                    member.syncState = SyncState.UNSYNCED
+                                    member.processed = "U"
+                                    member.serverUpdatedStatus = 2
+                                    benDao.updateBen(member)
+                                }
+                            }
+                        }
+                    }
+                }
+                benDao.updateBen(ben)
+            }
+        }
+    }
+
+    fun getHouseholds(selectedVillage: Int): Flow<List<HouseholdBasicCache>> {
+        return householdDao.getAllHouseholdWithNumMembers(selectedVillage)
+    }
+
+
     suspend fun getBenFromRegId(benRegId: Long): BenRegCache? {
         return withContext(Dispatchers.IO) {
             benDao.getBenByRegId(benRegId)
@@ -348,7 +462,7 @@ class BenRepo @Inject constructor(
     private suspend fun createBenIdAtServerByBeneficiarySending(
         ben: BenRegCache, user: User, locationRecord: LocationRecord
     ): Boolean {
-        val household = if (ben.householdId > 0L) householdDao.getHousehold(ben.householdId) else null
+        val household = if (ben.householdId != null && ben.householdId!! > 0L) householdDao.getHousehold(ben.householdId!!) else null
         val sendingData = ben.asNetworkSendingModel(user, locationRecord, context, household)
         Timber.d("Amrit push beneficiary registration: benId=${ben.beneficiaryId}, hhId=${ben.householdId}")
         try {
@@ -377,11 +491,13 @@ class BenRepo @Inject constructor(
                         oldBenId = ben.beneficiaryId,
                         newBenId = newBenId
                     )
-                    householdDao.getHousehold(ben.householdId)
-                        ?.takeIf { it.benId == ben.beneficiaryId }?.let {
-                            it.benId = newBenId
-                            householdDao.update(it)
-                        }
+                    ben.householdId?.let { hhId ->
+                        householdDao.getHousehold(hhId)
+                            ?.takeIf { it.benId == ben.beneficiaryId }?.let {
+                                it.benId = newBenId
+                                householdDao.update(it)
+                            }
+                    }
                     ben.beneficiaryId = newBenId
                     return true
                 }
@@ -429,7 +545,7 @@ class BenRepo @Inject constructor(
             val updateBenList = benDao.getAllBenForSyncWithServer()
             updateBenList.forEach {
                 benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.SYNCING)
-                val household = if (it.householdId > 0L) householdDao.getHousehold(it.householdId) else null
+                val household = it.householdId?.let { hhId -> if (hhId > 0L) householdDao.getHousehold(hhId) else null }
                 benNetworkPostList.add(it.asNetworkPostModel(context, user, household))
                 household?.let { hh ->
                     householdNetworkPostList.add(hh.asNetworkModel(user))
@@ -554,7 +670,7 @@ class BenRepo @Inject constructor(
         val user = preferenceDao.getLoggedInUser() ?: throw IllegalStateException("No user logged in!!")
         val benNetworkPostList: List<BenPost> =
             benNetworkPostSet.map {
-                val household = if (it.householdId > 0L) householdDao.getHousehold(it.householdId) else null
+                val household = it.householdId?.let { hhId -> if (hhId > 0L) householdDao.getHousehold(hhId) else null }
                 it.asNetworkPostModel(context, user, household)
             }
 
@@ -620,7 +736,7 @@ class BenRepo @Inject constructor(
         val user = preferenceDao.getLoggedInUser() ?: throw IllegalStateException("No user logged in!!")
         val benNetworkPostList: List<BenPost> =
             benNetworkPostSet.map {
-                val household = if (it.householdId > 0L) householdDao.getHousehold(it.householdId) else null
+                val household = it.householdId?.let { hhId -> if (hhId > 0L) householdDao.getHousehold(hhId) else null }
                 it.asNetworkPostModel(context, user, household)
             }
 
@@ -704,6 +820,7 @@ class BenRepo @Inject constructor(
 
                 if (statusCode == 200) {
                     val responseString = response.body()?.string()
+                    Timber.d("PULL_HH_DEBUG: $responseString")
 
                     if (responseString != null) {
                         val jsonObj = JSONObject(responseString)
@@ -720,6 +837,8 @@ class BenRepo @Inject constructor(
                                 val pageSize = getResponseTotalPage(jsonObj)
 
                                 try {
+
+
                                     householdDao.upsert(
                                         *getHouseholdCacheFromServerResponse(
                                             responseString
@@ -732,7 +851,7 @@ class BenRepo @Inject constructor(
                                 val benCacheList =
                                     getBenCacheFromServerResponse(responseString)
 
-                                benDao.upsert(*benCacheList.toTypedArray())
+                                upsertServerBeneficiariesSafely(benCacheList)
 
                                 Timber.d("GeTBenDataList: $pageSize")
 
@@ -782,6 +901,17 @@ class BenRepo @Inject constructor(
             }
 
             -1
+        }
+    }
+
+    private suspend fun upsertServerBeneficiariesSafely(benCacheList: List<BenRegCache>) {
+        benCacheList.forEach { serverBen ->
+            val existingBen = benDao.getBen(serverBen.beneficiaryId)
+            if (existingBen != null) {
+                benDao.updateBen(serverBen)
+            } else {
+                benDao.upsert(serverBen)
+            }
         }
     }
 
@@ -1726,11 +1856,27 @@ class BenRepo @Inject constructor(
                             BenRegCache(
                                 householdId = run {
                                     // Server sends key with typo ("houseoldId") or correct ("householdId") — check both
-                                    val fromTypo = if (jsonObject.has("houseoldId")) jsonObject.getLong("houseoldId").takeIf { it > 0L } else null
-                                    val fromCorrect = if (jsonObject.has("householdId")) jsonObject.getLong("householdId").takeIf { it > 0L } else null
-                                    // Prefer server value; fall back to existing local value (helps non-reinstall flow); last resort -1L
-                                    fromTypo ?: fromCorrect ?: existingBen?.householdId?.takeIf { it > 0L } ?: -1L
+                                    val fromTypo = if (jsonObject.has("houseoldId") && !jsonObject.isNull("houseoldId")) jsonObject.getLong("houseoldId").takeIf { it > 0L } else null
+                                    val fromCorrect = if (jsonObject.has("householdId") && !jsonObject.isNull("householdId")) jsonObject.getLong("householdId").takeIf { it > 0L } else null
+                                    // Prefer server value; fall back to existing local value (helps non-reinstall flow)
+                                    fromTypo ?: fromCorrect ?: existingBen?.householdId?.takeIf { it > 0L }
                                 },
+
+                                isNonHH = run {
+                                    val fromTypo = if (jsonObject.has("houseoldId") && !jsonObject.isNull("houseoldId")) jsonObject.getLong("houseoldId").takeIf { it > 0L } else null
+                                    val fromCorrect = if (jsonObject.has("householdId") && !jsonObject.isNull("householdId")) jsonObject.getLong("householdId").takeIf { it > 0L } else null
+                                    val hhIdVal = fromTypo ?: fromCorrect
+                                    hhIdVal == null
+                                },
+
+                                placeOfCurrentLiving = if (jsonObject.has("placeOfCurrentLiving") && !jsonObject.isNull("placeOfCurrentLiving")) {
+                                    val code = jsonObject.optString("placeOfCurrentLiving", "")
+                                    getPlaceOfCurrentLivingIndex(code.takeIf { it.isNotEmpty() })
+                                } else null,
+
+                                otherPlaceOfCurrentLiving = jsonObject.optStringOrNull("otherPlaceOfCurrentLiving"),
+
+                                institutionName = jsonObject.optStringOrNull("institutionName"),
 
                                 beneficiaryId = jsonObject.getLong("benficieryid"),
 
@@ -1808,6 +1954,11 @@ class BenRepo @Inject constructor(
                                     .ifEmpty { benDataObj.optString("address") }
                                     .ifEmpty { jsonObject.optString("addressLine1") }
                                     .ifEmpty { jsonObject.optString("address") },
+
+                                pinCode = demographicsObj.optString("pinCode")
+                                    .ifEmpty { benDataObj.optString("pinCode") }
+                                    .ifEmpty { jsonObject.optString("pinCode") }
+                                    .ifEmpty { null },
 
                                 genderId = benDataObj.optInt(
                                     "genderId",
@@ -2214,6 +2365,9 @@ class BenRepo @Inject constructor(
                             ashaId = jsonObject.optInt("ashaId"),
                             benId = jsonObject.optLong("benficieryid").takeIf { it > 0L },
                             family = HouseholdFamily(
+                                totalHhMembers = houseDataObj.optInt("totalHhMembers").takeIf { it > 0 },
+                                isRegisteredAtCampSite = houseDataObj.optStringOrNull("registeredAtCampSite"),
+                                isRegisteredAtCampSiteId = houseDataObj.optInt("registeredAtCampSiteId"),
                                 familyHeadName = houseDataObj.optStringOrNull("familyHeadName"),
                                 familyName = houseDataObj.optStringOrNull("familyName"),
                                 familyHeadPhoneNo = houseDataObj.optStringOrNull("familyHeadPhoneNo")
@@ -2225,6 +2379,8 @@ class BenRepo @Inject constructor(
 //                                rationCardDetails = houseDataObj.optStringOrNull("rationCardDetails"),
                                 povertyLine = houseDataObj.optStringOrNull("type_bpl_apl"),
                                 povertyLineId = houseDataObj.optInt("bpl_aplId"),
+                                address = houseDataObj.optStringOrNull("address"),
+                             //   pinCode = houseDataObj.optInt("Pincode").takeIf { it > 0 }?.toString(),
                             ),
                             details = HouseholdDetails(
                                 residentialArea = houseDataObj.optStringOrNull("residentialArea"),
@@ -2475,6 +2631,29 @@ class BenRepo @Inject constructor(
     suspend fun getMinBenId(): Long {
         return withContext(Dispatchers.IO) {
             benDao.getMinBenId() ?: 0L
+        }
+    }
+
+    private fun getPlaceOfCurrentLivingIndex(code: String?): Int? {
+        return when (code?.uppercase()) {
+            "FOOTPATH" -> 1
+            "RAILWAY_PLATFORM" -> 2
+            "BUS_STATION" -> 3
+            "UNDER_TREE" -> 4
+            "TEMPLE" -> 5
+            "MOSQUE" -> 6
+            "CHURCH" -> 7
+            "OTHER_PRAYING_PLACE" -> 8
+            "EDUCATIONAL_INSTITUTION" -> 9
+            "EKALAVYA_SCHOOL" -> 10
+            "REHABILITATION_CENTRE" -> 11
+            "ORPHANAGE" -> 12
+            "OLD_AGE_HOME" -> 13
+            "PRIVATE_HOSTEL" -> 14
+            "GOVT_HOSTEL" -> 15
+            "NGO_HOSTEL" -> 16
+            "OTHER" -> 17
+            else -> null
         }
     }
 }

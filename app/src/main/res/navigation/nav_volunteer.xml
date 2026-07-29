@@ -30,6 +30,9 @@
         <action
             android:id="@+id/action_volunteerHomeFragment_to_allHouseholdFragment"
             app:destination="@id/allHouseholdFragment" />
+        <action
+            android:id="@+id/action_volunteerHomeFragment_to_nonHHFragment"
+            app:destination="@id/nonHHFragment" />
     </fragment>
 
     <fragment
@@ -59,6 +62,10 @@
             android:name="isAshaFamily"
             android:defaultValue="No"
             app:argType="string" />
+        <argument
+            android:name="linkBenId"
+            android:defaultValue="0L"
+            app:argType="long" />
         <action
             android:id="@+id/action_newHouseholdFragment_to_newBenRegFragment"
             app:destination="@id/newBenRegFragment" />
@@ -99,6 +106,13 @@
         <argument android:name="benId" app:argType="long" android:defaultValue="0L" />
         <argument android:name="selectedBenId" app:argType="long" android:defaultValue="0L" />
         <argument android:name="isAddSpouse" app:argType="integer" android:defaultValue="0" />
+        <argument android:name="isNonHH" app:argType="boolean" android:defaultValue="false" />
+        <argument android:name="placeOfCurrentLiving" app:argType="integer" android:defaultValue="0" />
+        <argument android:name="otherPlace" app:argType="string" android:defaultValue="@null" app:nullable="true" />
+        <argument android:name="institutionName" app:argType="string" android:defaultValue="@null" app:nullable="true" />
+        <action
+            android:id="@+id/action_newBenRegFragment_to_newHouseholdFragment"
+            app:destination="@id/newHouseholdFragment" />
     </fragment>
 
     <fragment
@@ -221,6 +235,12 @@
         android:label="TB Confirmed Form">
         <argument android:name="benId" app:argType="long" />
     </fragment>
+
+    <fragment
+        android:id="@+id/syncDashboardFragment"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.sync_dashboard.SyncDashboardFragment"
+        android:label="@string/sync_dashboard"
+        tools:layout="@layout/fragment_sync_dashboard" />
 
     <!-- NCD -->
     <fragment
@@ -361,6 +381,10 @@
             android:name="generalOpdFlow"
             android:defaultValue="false"
             app:argType="boolean" />
+        <argument
+            android:name="referralType"
+            android:defaultValue="0"
+            app:argType="integer" />
     </fragment>
 
     <fragment
@@ -373,6 +397,30 @@
         <argument android:name="selectedBenId" android:defaultValue="0L" app:argType="long" />
         <argument android:name="gender" android:defaultValue="0" app:argType="integer" />
         <argument android:name="isAddSpouse" android:defaultValue="0" app:argType="integer" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/nonHHFragment"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.non_hh.NonHHFragment"
+        android:label="Non-Household List">
+        <action
+            android:id="@+id/action_nonHHFragment_to_currentLivingInfoFragment"
+            app:destination="@id/currentLivingInfoFragment" />
+        <action
+            android:id="@+id/action_nonHHFragment_to_newBenRegFragment"
+            app:destination="@id/newBenRegFragment" />
+        <action
+            android:id="@+id/action_nonHHFragment_to_newHouseholdFragment"
+            app:destination="@id/newHouseholdFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/currentLivingInfoFragment"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.non_hh.CurrentLivingInfoFragment"
+        android:label="Current Living Information">
+        <action
+            android:id="@+id/action_currentLivingInfoFragment_to_newBenRegFragment"
+            app:destination="@id/newBenRegFragment" />
     </fragment>
 
 </navigation>

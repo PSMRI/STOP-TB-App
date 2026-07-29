@@ -49,6 +49,22 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         return pref.getString(prefKey, null)
     }
 
+    fun getDiagPollStartTime(benId: Long, orderType: String): Long {
+        return pref.getLong("diag_poll_start_${benId}_${orderType}", 0L)
+    }
+
+    fun setDiagPollStartTime(benId: Long, orderType: String, time: Long) {
+        pref.edit().putLong("diag_poll_start_${benId}_${orderType}", time).apply()
+    }
+
+    fun getDiagPollActualStartTime(benId: Long, orderType: String): Long {
+        return pref.getLong("diag_poll_actual_start_${benId}_${orderType}", 0L)
+    }
+
+    fun setDiagPollActualStartTime(benId: Long, orderType: String, time: Long) {
+        pref.edit().putLong("diag_poll_actual_start_${benId}_${orderType}", time).apply()
+    }
+
     fun registerJWTAmritToken(token: String) {
         val editor = pref.edit()
         val prefKey = context.getString(R.string.PREF_primary_JWT_API_KEY)

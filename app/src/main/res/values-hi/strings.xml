@@ -192,6 +192,9 @@
     <string name="follow_up_date">फॉलो-अप तिथि</string>
     <string name="follow_up_history">फॉलो-अप रिकॉर्ड </string>
 
+    <string name="risk_factors">जोखिम कारक</string>
+    <string name="total_presumptive_tb">प्रकल्पित टीबी मामले</string>
+
     <string name="pending">बाकी है</string>
 
     <string-array name="leprosy_status">
@@ -845,7 +848,7 @@
 
     <!-- Examine flow -->
     <string name="btn_examine">जांचें</string>
-    <string name="btn_examine_count">जांचें %1$d/5</string>
+    <string name="btn_examine_count">जांचें %1$d/4</string>
     <string name="examine_bottomsheet_title">परीक्षण फॉर्म</string>
     <string name="examine_btn_fill">भरें</string>
     <string name="examine_btn_view">देखें</string>

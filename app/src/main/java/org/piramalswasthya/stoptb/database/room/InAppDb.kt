@@ -611,7 +611,7 @@ abstract class InAppDb : RoomDatabase() {
                 if (!columnExists(database, "t_section_question", "questionUuid")) {
                     database.execSQL("ALTER TABLE t_section_question ADD COLUMN questionUuid TEXT DEFAULT NULL")
                 }
-                val householdColumns = listOf(
+                val householdColumns =  listOf(
                     "gpsLatitude REAL DEFAULT NULL",
                     "gpsLongitude REAL DEFAULT NULL",
                     "digipin TEXT DEFAULT NULL",
@@ -690,20 +690,92 @@ abstract class InAppDb : RoomDatabase() {
 
         private val MIGRATION_21_22 = object : Migration(21, 22) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                if (!columnExists(database, "t_form_section", "isEditable")) {
-                    database.execSQL("ALTER TABLE t_form_section ADD COLUMN isEditable INTEGER NOT NULL DEFAULT 0")
-                }
-            }
-        }
-
-        private val MIGRATION_22_23 = object : Migration(22, 23) {
-            override fun migrate(database: SupportSQLiteDatabase) {
                 if (!columnExists(database, "t_form_response", "sectionsFilled")) {
                     database.execSQL("ALTER TABLE t_form_response ADD COLUMN sectionsFilled INTEGER DEFAULT NULL")
                 }
                 if (!columnExists(database, "t_form_response", "totalSections")) {
                     database.execSQL("ALTER TABLE t_form_response ADD COLUMN totalSections INTEGER DEFAULT NULL")
                 }
+                
+               if (!columnExists(database, "BENEFICIARY", "pinCode")) {
+                    database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN pinCode TEXT")
+                }
+                
+                
+                 if (!columnExists(database, "t_form_section", "isEditable")) {
+                    database.execSQL("ALTER TABLE t_form_section ADD COLUMN isEditable INTEGER NOT NULL DEFAULT 0")
+                }
+            }
+        }
+     /*   private val MIGRATION_23_24 = object : Migration(23, 24) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val householdFamilyColumns = listOf(
+                    "fam_totalHhMembers INTEGER DEFAULT NULL",
+                    "fam_isRegisteredAtCampSite TEXT DEFAULT NULL",
+                    "fam_isRegisteredAtCampSiteId INTEGER NOT NULL DEFAULT 0"
+                )
+                householdFamilyColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "HOUSEHOLD", columnName)) {
+                        database.execSQL("ALTER TABLE HOUSEHOLD ADD COLUMN $columnDefinition")
+                    }
+                }
+            }
+        }
+*/
+
+        private val MIGRATION_22_23 = object : Migration(22, 23) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                var originalSql = ""
+                database.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='BENEFICIARY'").use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        originalSql = cursor.getString(0)
+                    }
+                }
+                
+                if (originalSql.isNotEmpty()) {
+                    var newSql = originalSql.replace("CREATE TABLE `BENEFICIARY`", "CREATE TABLE `BENEFICIARY_new`")
+                    newSql = newSql.replace("CREATE TABLE BENEFICIARY", "CREATE TABLE BENEFICIARY_new")
+                    newSql = newSql.replace("`householdId` INTEGER NOT NULL", "`householdId` INTEGER")
+                    newSql = newSql.replace("householdId INTEGER NOT NULL", "householdId INTEGER")
+                    
+                    database.execSQL(newSql)
+                    
+                    database.execSQL("ALTER TABLE `BENEFICIARY_new` ADD COLUMN `isNonHH` INTEGER NOT NULL DEFAULT 0")
+                    database.execSQL("ALTER TABLE `BENEFICIARY_new` ADD COLUMN `placeOfCurrentLiving` INTEGER DEFAULT NULL")
+                    database.execSQL("ALTER TABLE `BENEFICIARY_new` ADD COLUMN `otherPlaceOfCurrentLiving` TEXT DEFAULT NULL")
+                    database.execSQL("ALTER TABLE `BENEFICIARY_new` ADD COLUMN `institutionName` TEXT DEFAULT NULL")
+                    
+                    val columns = ArrayList<String>()
+                    database.query("PRAGMA table_info(`BENEFICIARY`)").use { cursor ->
+                        val nameIndex = cursor.getColumnIndex("name")
+                        while (cursor.moveToNext()) {
+                            columns.add(cursor.getString(nameIndex))
+                        }
+                    }
+                    val columnsCsv = columns.joinToString(", ") { "`$it`" }
+                    
+                    database.execSQL("INSERT INTO `BENEFICIARY_new` ($columnsCsv) SELECT $columnsCsv FROM `BENEFICIARY`")
+                    
+                    val indexSqls = ArrayList<String>()
+                    database.query("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='BENEFICIARY' AND sql IS NOT NULL").use { cursor ->
+                        while (cursor.moveToNext()) {
+                            indexSqls.add(cursor.getString(0))
+                        }
+                    }
+                    
+                    database.execSQL("DROP TABLE `BENEFICIARY`")
+                    database.execSQL("ALTER TABLE `BENEFICIARY_new` RENAME TO `BENEFICIARY`")
+                    
+                    for (indexSql in indexSqls) {
+                        try {
+                            database.execSQL(indexSql)
+                        } catch (e: Exception) {
+                            // in case the index already got created, ignore
+                        }
+                    }
+                }
+                recreateBenBasicCacheView(database)
             }
         }
 
@@ -914,6 +986,10 @@ abstract class InAppDb : RoomDatabase() {
                     ", NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState" +
                     ", 0 as isDelivered, 0 as pwHrp" +
                     ", 0 as irFilled, 0 as crFilled, 0 as doFilled" +
+                    ", b.isNonHH" +
+                    ", b.placeOfCurrentLiving" +
+                    ", b.otherPlaceOfCurrentLiving" +
+                    ", b.institutionName" +
                     " FROM BENEFICIARY b " +
                     "LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId " +
                     "LEFT OUTER JOIN CBAC cbac ON b.beneficiaryId = cbac.benId " +
@@ -921,6 +997,50 @@ abstract class InAppDb : RoomDatabase() {
                     "LEFT OUTER JOIN TB_SUSPECTED tbsp ON b.beneficiaryId = tbsp.benId " +
                     "WHERE b.isDraft = 0 GROUP BY b.beneficiaryId ORDER BY b.updatedDate DESC"
             )
+        }
+
+        private val MIGRATION_23_24 = object : Migration(23, 24) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+
+                val householdFamilyColumns = listOf(
+                    "fam_totalHhMembers INTEGER DEFAULT NULL",
+                    "fam_isRegisteredAtCampSite TEXT DEFAULT NULL",
+                    "fam_isRegisteredAtCampSiteId INTEGER DEFAULT 0"
+                )
+                householdFamilyColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "HOUSEHOLD", columnName)) {
+                        database.execSQL("ALTER TABLE HOUSEHOLD ADD COLUMN $columnDefinition")
+                    }
+                }
+
+                if (!columnExists(database, "TB_DIAGNOSTICS", "xrayOrderId")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN xrayOrderId TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "TB_DIAGNOSTICS", "xrayOrderStatus")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN xrayOrderStatus TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "TB_DIAGNOSTICS", "trueNatOrderId")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN trueNatOrderId TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "TB_DIAGNOSTICS", "trueNatOrderStatus")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN trueNatOrderStatus TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "TB_DIAGNOSTICS", "trueNatRifResult")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN trueNatRifResult TEXT DEFAULT NULL")
+                }
+            }
+        }
+
+        private val MIGRATION_24_25 = object : Migration(24, 25) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "TB_DIAGNOSTICS", "rifOrderId")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN rifOrderId TEXT DEFAULT NULL")
+                }
+                if (!columnExists(database, "TB_DIAGNOSTICS", "rifOrderStatus")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN rifOrderStatus TEXT DEFAULT NULL")
+                }
+            }
         }
 
         private fun addVitalGeneralExaminationColumns(database: SupportSQLiteDatabase) {
@@ -980,6 +1100,27 @@ abstract class InAppDb : RoomDatabase() {
                 "recommendedForTruenatTest INTEGER DEFAULT NULL",
                 "recommendedForLiquidCultureTest INTEGER DEFAULT NULL",
                 "reasonForDenialForGettingTested TEXT DEFAULT NULL"
+            )
+            columns.forEach { columnDefinition ->
+                val columnName = columnDefinition.substringBefore(" ")
+                if (!columnExists(database, "TB_SCREENING", columnName)) {
+                    database.execSQL("ALTER TABLE TB_SCREENING ADD COLUMN $columnDefinition")
+                }
+            }
+        }
+
+        private val MIGRATION_25_26 = object : Migration(25, 26) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                addTBScreeningRiskFactorColumns(database)
+            }
+        }
+
+        private fun addTBScreeningRiskFactorColumns(database: SupportSQLiteDatabase) {
+            val columns = listOf(
+                "keyPopulationRiskFactorIds TEXT DEFAULT NULL",
+                "keyPopulationRiskFactors TEXT DEFAULT NULL",
+                "hivStatusId INTEGER DEFAULT NULL",
+                "hivStatus TEXT DEFAULT NULL"
             )
             columns.forEach { columnDefinition ->
                 val columnName = columnDefinition.substringBefore(" ")

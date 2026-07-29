@@ -32,6 +32,10 @@ class TBConfirmedListViewModel @Inject constructor(
     private val _totalSectionsFallback: MutableLiveData<Int> = MutableLiveData()
     val totalSectionsFallback: LiveData<Int> = _totalSectionsFallback
 
+
+    private val _localFilledCounts: MutableLiveData<Map<Long, Int>> = MutableLiveData(emptyMap())
+    val localFilledCounts: LiveData<Map<Long, Int>> = _localFilledCounts
+
     val benList = allBenList.combine(filter) { list, filter ->
         filterTbSuspectedList(list, filter)
     }
@@ -48,6 +52,17 @@ class TBConfirmedListViewModel @Inject constructor(
                     ?.map { it.beneficiaryId }
             } catch (e: Exception) {
                 // Ignore or log error
+            }
+        }
+        fetchLocalFilledCounts()
+    }
+
+    private fun fetchLocalFilledCounts() {
+        viewModelScope.launch {
+            try {
+                _localFilledCounts.value = counsellingRepository.getLocalPreSubmitFilledCounts()
+            } catch (e: Exception) {
+                // Ignore; the adapter simply falls back to the API's sectionsFilled alone
             }
         }
     }

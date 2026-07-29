@@ -67,7 +67,7 @@ object WorkerUtils {
 
         val groupTB = listOf(
             syncRequestBuilder<PushTBToAmritWorker>().addTag("push_group5_tb").build(),
-        )
+        ) 
 
         val groupAbha = syncRequestBuilder<PushMapAbhatoBenficiaryWorker>()
             .addTag("push_group9_digital_health").build()
@@ -188,5 +188,32 @@ object WorkerUtils {
 
     fun cancelAllWork(context: Context) {
         WorkManager.getInstance(context).cancelAllWork()
+    }
+
+    fun triggerDiagnosticResultPollWorker(context: Context) {
+        val workRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>().build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            DiagnosticResultPollWorker.name, ExistingWorkPolicy.REPLACE, workRequest
+        )
+    }
+
+    fun triggerTrueNatDiagnosticResultPollWorker(context: Context, useMockApi: Boolean = false) {
+        val delaySec = if (useMockApi) 5L else 5L
+        val workRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>()
+            .setInitialDelay(delaySec, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            DiagnosticResultPollWorker.name + "_TRUENAT", ExistingWorkPolicy.REPLACE, workRequest
+        )
+    }
+
+    fun triggerRifDiagnosticResultPollWorker(context: Context, useMockApi: Boolean = false) {
+        val delaySec = if (useMockApi) 5L else 5L
+        val workRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>()
+            .setInitialDelay(delaySec, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            DiagnosticResultPollWorker.name + "_RIF", ExistingWorkPolicy.KEEP, workRequest
+        )
     }
 }

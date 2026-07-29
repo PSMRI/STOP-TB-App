@@ -44,12 +44,13 @@ class CounsellingRepo @Inject constructor(
             try {
                 val ben = benDao.getBen(benId) ?: return@withContext NetworkResponse.Error("Beneficiary not found")
                 val tbDiag = tbDao.getTbDiagnosticsByBenId(benId)
+                val tbSuspected = tbDao.getTbSuspected(benId)   // <-- also pull the suspected-flow record
                 val loggedInUser = preferenceDao.getLoggedInUser()?.name ?: ""
 
                 val results = mutableListOf<String>()
-                tbDiag?.chestXRayResult?.let { results.add("X-Ray: $it") }
-                tbDiag?.naatResult?.let { results.add("NAAT: $it") }
-                tbDiag?.liquidCultureResult?.let { results.add("Liquid Culture: $it") }
+                (tbDiag?.chestXRayResult ?: tbSuspected?.chestXRayResult)?.let { results.add("X-Ray: $it") }
+                (tbDiag?.naatResult ?: tbSuspected?.naatResult)?.let { results.add("NAAT: $it") }
+                (tbDiag?.liquidCultureResult ?: tbSuspected?.liquidCultureResult)?.let { results.add("Liquid Culture: $it") }
                 val diagnosis = if (results.isNotEmpty()) results.joinToString(" / ") else "N/A"
 
                 val genderText = when (ben.gender) {
@@ -88,6 +89,7 @@ class CounsellingRepo @Inject constructor(
                 val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
                 var displayDateStr = sdf.format(java.util.Date())
 
+                var preSubmitAnsweredCount = 0
                 if (formResponse != null) {
                     status = formResponse.formResponse.status
                     displayDateStr = sdf.format(java.util.Date(formResponse.formResponse.createdAt))
@@ -103,6 +105,15 @@ class CounsellingRepo @Inject constructor(
                         }
                     }
                     completedSteps = formResponse.sectionResponses.count { it.questionResponses.isNotEmpty() }
+
+
+                    val preSubmitSectionIds = sections
+                        .filter { it.section.sectionPhase == "PRE_SUBMIT" }
+                        .map { it.section.sectionId }
+                        .toSet()
+                    preSubmitAnsweredCount = formResponse.sectionResponses.count {
+                        it.sectionResponse.sectionId in preSubmitSectionIds && it.questionResponses.isNotEmpty()
+                    }
                 }
 
                 // A separate status-filtered query drives the Follow-Up button. This is
@@ -111,6 +122,8 @@ class CounsellingRepo @Inject constructor(
                 // either one, making the status unreliable for button-visibility decisions.
                 val preSubmitSubmitted = db.counsellingFormResponseDao()
                     .getSubmittedOrCompleteResponseForBeneficiary(benId, activeFormVersionId) != null
+                val preSubmitInProgress = !preSubmitSubmitted && preSubmitAnsweredCount > 0
+
 
                 val overviewData = CounsellingOverviewData(
                     benId = benId,
@@ -125,7 +138,8 @@ class CounsellingRepo @Inject constructor(
                     currentStep = currentStep,
                     completedSteps = completedSteps,
                     status = status,
-                    preSubmitSubmitted = preSubmitSubmitted
+                    preSubmitSubmitted = preSubmitSubmitted,
+                    preSubmitInProgress = preSubmitInProgress
                 )
                 NetworkResponse.Success(overviewData)
             } catch (e: Exception) {
@@ -275,6 +289,7 @@ class CounsellingRepo @Inject constructor(
                 schemaDto.sections.forEach { sec ->
                     val secResponse = draftResponse.sectionResponses.find { it.sectionResponse.sectionId == sec.sectionId }
                     if (secResponse != null) {
+                        sec.isSubmitted = secResponse.sectionResponse.completedAt != null
                         sec.questions.forEach { q ->
                             val qResponses = secResponse.questionResponses.filter { it.questionId == q.questionId }
                             if (qResponses.isNotEmpty()) {
@@ -323,7 +338,8 @@ class CounsellingRepo @Inject constructor(
         formId: Int,
         section: CounsellingSectionDto,
         formVersionNumber: Int,
-        overrideTargetSectionId: Int? = null
+        overrideTargetSectionId: Int? = null,
+        isBackNavigation: Boolean = false
     ): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -381,6 +397,11 @@ class CounsellingRepo @Inject constructor(
                             }
                         }
                     }
+                }
+                if (isBackNavigation) {
+                    Timber.d("saveSectionAnswers: back navigation for sectionId=${section.sectionId}, saving draft only (no submit), targetSectionId=$overrideTargetSectionId")
+                    counsellingRepository.saveDraftSection(responseId, section.sectionId, overrideTargetSectionId, answers)
+                    return@withContext true
                 }
 
                 val completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING_V2)
@@ -630,20 +651,20 @@ class CounsellingRepo @Inject constructor(
         }
     }
 
-//    suspend fun updateCounsellingDate(benId: Long, dateMillis: Long) {
-//        withContext(Dispatchers.IO) {
-//            val response = db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId)
-//            if (response != null) {
-//                db.counsellingFormResponseDao().updateFormResponse(
-//                    response.formResponse.copy(
-//                        createdAt = dateMillis,
-//                        updatedAt = System.currentTimeMillis()
-//                    )
-//                )
-//            }
-//        }
-//    }
-
+/*    suspend fun updateCounsellingDate(benId: Long, dateMillis: Long) {
+        withContext(Dispatchers.IO) {
+            val response = db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId)
+            if (response != null) {
+                db.counsellingFormResponseDao().updateFormResponse(
+                    response.formResponse.copy(
+                        createdAt = dateMillis,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+            }
+        }
+    }
+*/
     suspend fun revertFormStatus(responseId: Long, status: String) {
         withContext(Dispatchers.IO) {
             counsellingRepository.revertFormStatus(responseId, status)
@@ -728,6 +749,31 @@ class CounsellingRepo @Inject constructor(
                 }
 
                 counsellingRepository.saveDraftSection(responseId, section.sectionId, null, answers)
+
+
+                val bulkSuccess = counsellingRepository.submitSectionBulk(responseId, section.sectionId)
+                if (!bulkSuccess) {
+                    val isCampMode = preferenceDao.isCampModeEnabled()
+                    val isHubConnected = preferenceDao.isCampHubConnected()
+                    val isInternet = isInternetAvailable(context)
+                    val isOffline = (isCampMode && !isHubConnected) || (!isCampMode && !isInternet)
+
+                    CounsellingSyncWorker.scheduleSync(context)
+
+                    if (isOffline) {
+                        Timber.d("saveGeneralInfoDraft: offline mode detected for sectionId=${section.sectionId}, saved locally for background sync retry")
+                    } else {
+                        Timber.d("saveGeneralInfoDraft: submitSectionBulk failed in online mode for sectionId=${section.sectionId}, saved locally for automatic background sync retry")
+                        withContext(Dispatchers.Main) {
+                            android.widget.Toast.makeText(
+                                context,
+                                "Saved locally. It will sync automatically in the background.",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                }
+
                 true
             } catch (e: Exception) {
                 Timber.e(e, "saveGeneralInfoDraft failed")

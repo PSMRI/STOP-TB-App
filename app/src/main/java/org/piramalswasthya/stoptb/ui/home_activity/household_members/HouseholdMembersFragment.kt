@@ -182,7 +182,12 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
             ExamineBottomSheetFragment.FORM_ANTHROPOMETRY -> {
                 findNavController().navigate(
                     R.id.anthropometryFragment,
-                    bundleOf("benId" to benId, "autoFlow" to false, "examineFlow" to !viewOnly)
+                    bundleOf(
+                        "benId" to benId,
+                        "autoFlow" to false,
+                        "examineFlow" to !viewOnly,
+                        "openedFromHousehold" to true
+                    )
                 )
             }
             ExamineBottomSheetFragment.FORM_GENERAL_EXAM -> {
@@ -190,7 +195,12 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
                     val benRegId = viewModel.getBenRegId(benId)
                     findNavController().navigate(
                         R.id.vitalScreenFragment,
-                        bundleOf("benId" to benId, "benRegId" to benRegId, "autoFlow" to !viewOnly)
+                        bundleOf(
+                            "benId" to benId,
+                            "benRegId" to benRegId,
+                            "autoFlow" to !viewOnly,
+                            "openedFromHousehold" to true
+                        )
                     )
                 }
             }
@@ -211,16 +221,18 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
                         "benId" to benId,
                         "viewOnly" to viewOnly,
                         "autoFlow" to !viewOnly,
-                        "generalOpdFlow" to !viewOnly
+                        "generalOpdFlow" to !viewOnly,
+                        "openedFromHousehold" to true
                     )
                 )
             }
-            ExamineBottomSheetFragment.FORM_DIAGNOSIS -> {
+            /*ExamineBottomSheetFragment.FORM_DIAGNOSIS -> {
                 findNavController().navigate(
                     R.id.TBSuspectedQuickFragment,
                     bundleOf("benId" to benId, "viewOnly" to viewOnly)
                 )
             }
+             */
         }
     }
 

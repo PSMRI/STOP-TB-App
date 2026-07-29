@@ -377,7 +377,11 @@ data class TBScreeningSaveRequest(
     val recommendedForTruenat: Boolean?,
     val recommendedForLiquidCulture: Boolean?,
     val testDenialReasons: Any?,
-    val createdBy: String?
+    val createdBy: String?,
+    val keyPopulationRiskFactorIds: List<Int>? = null,
+    val keyPopulationRiskFactors: List<String>? = null,
+    val hivStatusId: Int? = null,
+    val hivStatus: String? = null
 ) {
     companion object {
         fun from(cache: TBScreeningCache, beneficiaryRegID: Long, providerServiceMapID: Int, createdBy: String?): TBScreeningSaveRequest {
@@ -405,7 +409,11 @@ data class TBScreeningSaveRequest(
                 testDenialReasons = cache.reasonForDenialForGettingTested?.let {
                     if (it.size == 1) it.first() else it
                 },
-                createdBy = createdBy
+                createdBy = createdBy,
+                keyPopulationRiskFactorIds = cache.keyPopulationRiskFactorIds,
+                keyPopulationRiskFactors = cache.keyPopulationRiskFactors,
+                hivStatusId = cache.hivStatusId,
+                hivStatus = cache.hivStatus
             )
         }
     }
@@ -439,6 +447,39 @@ data class GeneralOpdSaveRequest(
         }
     }
 }
+data class PatientRequest(
+    val firstName: String,
+    val lastName: String,
+    val dateOfBirth: String,
+    val sex: String
+)
+
+data class DiagnosticOrderPushRequest(
+    val benRegID: Long,
+    val visitCode: Int,
+    val providerServiceMapID: Int,
+    val orderType: String,
+    val orderEvent: String = "STOP_TB_REFERRAL",
+    val reasonForRefusal: String? = null,
+    val patient: PatientRequest
+)
+
+data class DiagnosticBeneficiaryStatusData(
+    val awaitingTestCompletion: List<Long>? = emptyList(),
+    val awaitingProviderResult: List<Long>? = emptyList(),
+    val completed: List<Long>? = emptyList(),
+    val pollingTimedOut: List<Long>? = emptyList(),
+    val failed: List<Long>? = emptyList(),
+    val refused: List<Long>? = emptyList()
+)
+
+data class DiagnosticBeneficiariesStatusResponse(
+    val success: Boolean? = true,
+    val message: String? = null,
+    val statusCode: Int? = null,
+    val data: DiagnosticBeneficiaryStatusData? = null
+)
+
 data class TBDiagnosticsSaveRequest(
     val benRegID: Long,
     val providerServiceMapID: Int,
@@ -465,7 +506,13 @@ data class TBDiagnosticsSaveRequest(
     // Liquid Culture
     val recommendedForLiquidCulture: Boolean?,
     val liquidCultureResult: String?,
-    val createdBy: String?
+    val createdBy: String?,
+    // Device Orders
+    val xrayOrderId: String? = null,
+    val xrayOrderStatus: String? = null,
+    val trueNatOrderId: String? = null,
+    val trueNatOrderStatus: String? = null,
+    val trueNatRifResult: String? = null
 ) {
     companion object {
         fun from(cache: TBDiagnosticsCache, benRegID: Long, providerServiceMapID: Int, createdBy: String?): TBDiagnosticsSaveRequest {
@@ -491,7 +538,12 @@ data class TBDiagnosticsSaveRequest(
                 truenatResult = cache.naatResult,
                 recommendedForLiquidCulture = cache.recommendedForLiquidCultureTest,
                 liquidCultureResult = cache.liquidCultureResult,
-                createdBy = createdBy
+                createdBy = createdBy,
+                xrayOrderId = cache.xrayOrderId,
+                xrayOrderStatus = cache.xrayOrderStatus,
+                trueNatOrderId = cache.trueNatOrderId,
+                trueNatOrderStatus = cache.trueNatOrderStatus,
+                trueNatRifResult = cache.trueNatRifResult
             )
         }
     }
@@ -698,7 +750,15 @@ data class TBDiagnosticsDTO(
     val latitude: Double? = null,
     val longitude: Double? = null,
     val address: String? = null,
-    val updateDate: String? = null
+    val updateDate: String? = null,
+    // Device integration
+    val xrayOrderId: String? = null,
+    val xrayOrderStatus: String? = null,
+    val trueNatOrderId: String? = null,
+    val trueNatOrderStatus: String? = null,
+    val trueNatRifResult: String? = null,
+    val rifOrderId: String? = null,
+    val rifOrderStatus: String? = null
 ) {
     fun toCache(): TBDiagnosticsCache = TBDiagnosticsCache(
         benId = benId,
@@ -724,6 +784,13 @@ data class TBDiagnosticsDTO(
         liquidCultureResult = liquidCultureResult,
         isTBConfirmed = isTBConfirmed,
         isConfirmed = isConfirmed,
+        xrayOrderId = xrayOrderId,
+        xrayOrderStatus = xrayOrderStatus,
+        trueNatOrderId = trueNatOrderId,
+        trueNatOrderStatus = trueNatOrderStatus,
+        trueNatRifResult = trueNatRifResult,
+        rifOrderId = rifOrderId,
+        rifOrderStatus = rifOrderStatus,
         latitude = latitude,
         longitude = longitude,
         address = address,

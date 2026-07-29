@@ -354,6 +354,7 @@ class VitalRepo @Inject constructor(
     private fun JSONObject.optLongOrNull(name: String): Long? =
         if (!has(name) || isNull(name)) null else optLong(name)
 
+
     private fun JSONObject.optIntOrNull(name: String): Int? =
         if (!has(name) || isNull(name)) null else optInt(name)
 

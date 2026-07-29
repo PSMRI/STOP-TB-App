@@ -17,5 +17,6 @@ data class CounsellingOverviewData(
     val currentStep: Int = 0,
     val completedSteps: Int = 0,
     val status: String = "DRAFT",
-    val preSubmitSubmitted: Boolean = false
+    val preSubmitSubmitted: Boolean = false,
+    val preSubmitInProgress: Boolean = false
 ) : Parcelable

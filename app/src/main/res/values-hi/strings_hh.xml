@@ -150,4 +150,12 @@
     <string name="hh_no_members">परिवार की जानकारी खाली है</string>
     <string name="add_mda">एमडीए जोड़ें</string>
 
+    <string name="nhhr_total_members_hh">घर में रहने वाले सदस्यों की कुल संख्या</string>
+    <string name="nhhr_registered_camp_site">कैंप स्थल पर पंजीकरण किया गया</string>
+
+    <string-array name="nhhr_yes_no_array">
+        <item>हाँ</item>
+        <item>नहीं</item>
+    </string-array>
+
 </resources>
