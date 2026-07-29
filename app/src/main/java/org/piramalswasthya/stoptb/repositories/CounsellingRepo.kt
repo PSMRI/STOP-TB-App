@@ -21,7 +21,9 @@ import javax.inject.Singleton
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.piramalswasthya.stoptb.helpers.isInternetAvailable
+import org.piramalswasthya.stoptb.ui.counselling_activity.ActionType
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
+import org.piramalswasthya.stoptb.ui.counselling_activity.QuestionType
 import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
 import org.piramalswasthya.stoptb.work.CounsellingSyncWorker
 import org.piramalswasthya.stoptb.work.WorkerUtils
@@ -65,17 +67,21 @@ class CounsellingRepo @Inject constructor(
                 }
                 val ageGender = "${ben.age} $ageUnitText / $genderText"
 
+                var completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING_V2)
                 try {
                     counsellingRepository.downloadAndStoreAllForms()
-                    val completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING_V2)
+                    completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING_V2)
                     completeForm?.form?.formUuid?.let { formUuid ->
                         counsellingRepository.fetchAndStoreCounsellingResponse(benId, formUuid)
                     }
                 } catch (e: Exception) {
                     Timber.w(e, "fetchAndStoreCounsellingResponse failed during overview pull for benId=$benId")
                 }
+                val activeFormVersionId = completeForm?.versions?.find { it.version.isActive }?.version?.versionId
+                    ?: completeForm?.versions?.maxByOrNull { it.version.versionNumber }?.version?.versionId
+                    ?: return@withContext NetworkResponse.Error("Schema definition not found")
 
-                val formResponse = db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId)
+                val formResponse = db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId, activeFormVersionId)
                 var currentStep = 0
                 var completedSteps = 0
                 var status = "DRAFT"
@@ -115,8 +121,9 @@ class CounsellingRepo @Inject constructor(
                 // beneficiaryId and getFormResponseForBeneficiary (LIMIT 1) may return
                 // either one, making the status unreliable for button-visibility decisions.
                 val preSubmitSubmitted = db.counsellingFormResponseDao()
-                    .getSubmittedOrCompleteResponseForBeneficiary(benId) != null
+                    .getSubmittedOrCompleteResponseForBeneficiary(benId, activeFormVersionId) != null
                 val preSubmitInProgress = !preSubmitSubmitted && preSubmitAnsweredCount > 0
+
 
                 val overviewData = CounsellingOverviewData(
                     benId = benId,
@@ -173,7 +180,8 @@ class CounsellingRepo @Inject constructor(
                     sec.questions.forEach { q ->
                         q.options.forEach { opt ->
                             opt.conditions.forEach { cond ->
-                                if (cond.actionType == "SHOW" || cond.actionType == "SHOW_QUESTION") {
+                                val actionType = ActionType.from(cond.actionType)
+                                if (actionType == ActionType.SHOW || actionType == ActionType.SHOW_QUESTION) {
                                     cond.targetQuestionId.let { showConditionTargets.add(it) }
                                 }
                             }
@@ -285,20 +293,28 @@ class CounsellingRepo @Inject constructor(
                         sec.questions.forEach { q ->
                             val qResponses = secResponse.questionResponses.filter { it.questionId == q.questionId }
                             if (qResponses.isNotEmpty()) {
-                                when (q.questionType) {
-                                    "RADIO", "DROPDOWN" -> {
+                                when (QuestionType.from(q.questionType)) {
+                                    QuestionType.RADIO, QuestionType.DROPDOWN -> {
                                         val optId = qResponses.first().optionId
                                         val opt = q.options?.find { it.optionId == optId }
                                         q.value = opt?.optionValue
                                     }
-                                    "MCQ", "CHECKBOX" -> {
+                                    QuestionType.MCQ,  QuestionType.CHECKBOX -> {
                                         val selectedVals = qResponses.mapNotNull { resp ->
                                             q.options?.find { it.optionId == resp.optionId }?.optionValue
                                         }
                                         q.value = selectedVals
                                     }
-                                    "TEXT", "DATE", "NUMBER" -> {
+                                    QuestionType.TEXT, QuestionType.DATE, QuestionType.NUMBER -> {
                                         q.value = qResponses.first().answerText
+                                    }
+
+                                    QuestionType.CHECKBOX_MULTI,
+                                    QuestionType.READONLY_NUMBER,
+                                    QuestionType.READONLY_TEXT,
+                                    QuestionType.NUMBER_PICKER,
+                                    null -> {
+                                        // No action required
                                     }
                                 }
                             }
@@ -597,21 +613,30 @@ class CounsellingRepo @Inject constructor(
 
     suspend fun getDraftResponse(benId: Long): CompleteFormResponse? {
         return withContext(Dispatchers.IO) {
-            db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId)
+            val versionId = db.dynamicFormMetadataDao().getActiveVersionId(FormType.TB_COUNSELLING_V2)
+                ?: return@withContext null
+            db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId, versionId)
         }
     }
 
     suspend fun hasPreSubmitBeenSubmitted(benId: Long): Boolean {
         return withContext(Dispatchers.IO) {
+            val versionId = db.dynamicFormMetadataDao().getActiveVersionId(FormType.TB_COUNSELLING_V2)
+                ?: return@withContext false
             db.counsellingFormResponseDao()
-                .getSubmittedOrCompleteResponseForBeneficiary(benId) != null
+                .getSubmittedOrCompleteResponseForBeneficiary(benId, versionId) != null
         }
     }
 
     suspend fun getFollowUpStatus(benId: Long, formId: Int): FollowUpStatus {
         return withContext(Dispatchers.IO) {
-            val response = db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId)
             val form = db.dynamicFormMetadataDao().getFormById(formId)
+            val versionNumber = db.dynamicFormMetadataDao().getActiveVersionNumber(formId)
+            val response = if (versionNumber != null) {
+                db.counsellingFormResponseDao().getFormResponseForBeneficiary(benId, formId * 1000 + versionNumber)
+            } else {
+                null
+            }
             
             val delay = if (form?.followUpDelayDays == null || form.followUpDelayDays == -1) {
                 15

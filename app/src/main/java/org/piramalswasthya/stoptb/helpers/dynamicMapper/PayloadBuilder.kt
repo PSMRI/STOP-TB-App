@@ -1,6 +1,7 @@
 package org.piramalswasthya.stoptb.helpers.dynamicMapper
 
 import org.piramalswasthya.stoptb.model.dynamicEntity.*
+import org.piramalswasthya.stoptb.ui.counselling_activity.QuestionType
 
 object PayloadBuilder {
 
@@ -89,18 +90,18 @@ object PayloadBuilder {
                             optionValue = optId?.let { optionsMap[it] }
                         )
                     }
-                    "MCQ", "CHECKBOX" -> {
+                    /*"MCQ", "CHECKBOX", "CHECKBOX_MULTI" -> {
                         val optionValues = responses.mapNotNull { it.optionId?.let { optId -> optionsMap[optId] } }
                         AnswerPayload(
                             questionCode = qCode,
                             optionValues = optionValues
                         )
-                    }
+                    }*/
                     "NUMBER" -> {
                         val numText = responses.firstOrNull()?.answerText
                         AnswerPayload(
                             questionCode = qCode,
-                            answerNumber = numText?.toDoubleOrNull()
+                            answerText = numText
                         )
                     }
                     "DATE" -> {
@@ -188,43 +189,56 @@ object PayloadBuilder {
             val groupedResponses = secResponseWithQuestions.questionResponses.groupBy { it.questionId }
 
             val answersPayload = groupedResponses.map { (questionId, responses) ->
-                val qType = questionsMap[questionId]
-                val qUuid = questionsUuidMap[questionId] ?: getQuestionCode(questionId)
+                val questionUuid = questionsUuidMap[questionId] ?: getQuestionCode(questionId)
+                val optionIds = responses.map { it.optionId }
+                val answerTexts = responses.map { it.answerText }
 
-                when (qType) {
-                    "RADIO", "DROPDOWN" -> {
-                        val optId = responses.firstOrNull()?.optionId
+                when (QuestionType.from(questionsMap[questionId])) {
+                    QuestionType.RADIO,
+                    QuestionType.DROPDOWN -> {
+                        val optId = optionIds.firstOrNull()
                         BulkAnswerPayload(
-                            questionUuid = qUuid,
+                            questionUuid = questionUuid,
                             optionValue = optId?.let { optionsMap[it] }
                         )
                     }
-                    "MCQ", "CHECKBOX" -> {
-                        val optionValues = responses
-                            .mapNotNull { it.optionId?.let { optId -> optionsMap[optId] } }
-                            .joinToString("")
+
+                    QuestionType.CHECKBOX -> {
+                        val optionValue = optionIds.firstOrNull()?.let { optionsMap[it] }
                         BulkAnswerPayload(
-                            questionUuid = qUuid,
-                            optionValue = optionValues
+                            questionUuid = questionUuid,
+                            optionValue = optionValue
                         )
                     }
-                    "NUMBER" -> {
-                        val numText = responses.firstOrNull()?.answerText
+
+                    QuestionType.CHECKBOX_MULTI -> {
+                        val optionValues = optionIds.mapNotNull { it?.let { id -> optionsMap[id] } }
                         BulkAnswerPayload(
-                            questionUuid = qUuid,
-                            answerNumber = numText?.toDoubleOrNull()
+                            questionUuid = questionUuid,
+                            optionValues = optionValues
                         )
                     }
-                    "DATE" -> {
+
+                    QuestionType.NUMBER,
+                    QuestionType.NUMBER_PICKER -> {
+                        val numText = answerTexts.firstOrNull()
                         BulkAnswerPayload(
-                            questionUuid = qUuid,
-                            answerDate = responses.firstOrNull()?.answerText
+                            questionUuid = questionUuid,
+                            answerText = numText
                         )
                     }
+
+                    QuestionType.DATE -> {
+                        BulkAnswerPayload(
+                            questionUuid = questionUuid,
+                            answerDate = answerTexts.firstOrNull()
+                        )
+                    }
+
                     else -> {
                         BulkAnswerPayload(
-                            questionUuid = qUuid,
-                            answerText = responses.firstOrNull()?.answerText
+                            questionUuid = questionUuid,
+                            answerText = answerTexts.firstOrNull()
                         )
                     }
                 }

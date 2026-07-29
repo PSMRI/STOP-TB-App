@@ -309,4 +309,10 @@ object AppModule {
     fun provideCounsellingRepository(
         impl: org.piramalswasthya.stoptb.repositories.dynamicRepo.CounsellingRepositoryImpl
     ): org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository = impl
+
+    @Singleton
+    @Provides
+    fun provideContactTracingRepository(
+        impl: org.piramalswasthya.stoptb.repositories.contactTracing.ContactTracingRepositoryImpl
+    ): org.piramalswasthya.stoptb.repositories.contactTracing.IContactTracingRepository = impl
 }

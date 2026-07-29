@@ -26,5 +26,7 @@ data class QuestionOptionEntity(
     val optionTextHindi: String? = null,
     val serverOptionId: Int? = null,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    // Contact Tracing field (unused by existing forms)
+    val isExclusive: Boolean = false
 )

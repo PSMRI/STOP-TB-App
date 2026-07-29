@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.helpers.dynamicEngine
 
 import org.piramalswasthya.stoptb.model.dynamicEntity.CompleteFormDefinition
 import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionResponseEntity
+import org.piramalswasthya.stoptb.ui.counselling_activity.ActionType
 
 class ConditionalLogicEngine(
     private val formDefinition: CompleteFormDefinition
@@ -30,8 +31,13 @@ class ConditionalLogicEngine(
                         val targetId = cond.targetQuestionId
                         val currentState = visibilityMap[targetId] ?: FieldVisibilityState(visible = true, required = false)
 
-                        val isVisibleAction = cond.actionType == "VISIBLE" || cond.actionType == "SHOW"
-                        val isMandatoryAction = cond.actionType == "MANDATORY" || cond.actionType == "SHOW_QUESTION"
+                        val actionType = ActionType.from(cond.actionType)
+
+                        val isVisibleAction = actionType == ActionType.SHOW ||
+                                actionType == ActionType.VISIBLE
+
+                        val isMandatoryAction = actionType == ActionType.MANDATORY ||
+                                actionType == ActionType.SHOW_QUESTION
 
                         if (isSelected) {
                             val newVisible = if (isVisibleAction) cond.isFulfilledValue else currentState.visible

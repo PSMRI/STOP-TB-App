@@ -28,5 +28,20 @@ data class SectionQuestionEntity(
     val questionUuid: String? = null,
     val serverQuestionId: Int? = null,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    // Contact Tracing fields (nullable/defaulted, unused by existing forms)
+    val allowMultiple: Boolean = false,
+    val containsPii: Boolean = false,
+    val visibleByDefault: Boolean = true,
+    val maxLength: Int? = null,
+    val enabledIfJson: String? = null,
+    val disabledIfJson: String? = null,
+    val mandatoryIfJson: String? = null,
+    val autoPopulated: Boolean = false,
+    val autoPopulateLogic: String? = null,
+    val autoPopulateNote: String? = null,
+    val unit: String? = null,
+    val exampleValuesJson: String? = null,
+    val note: String? = null,
+    val displayFormat: String? = null
 )

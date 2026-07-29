@@ -56,4 +56,9 @@ interface DynamicFormMetadataDao {
 
     @Query("SELECT COUNT(*) FROM t_question_option WHERE serverOptionId IS NULL")
     suspend fun getOptionsWithNullServerIdCount(): Int
+
+    @Query("SELECT sectionUuid, sectionId, sectionPhase FROM t_form_section WHERE sectionUuid IN (:sectionUuids)")
+    suspend fun getSectionInfoByUuids(sectionUuids: List<String>): List<SectionUuidPhase>
 }
+
+data class SectionUuidPhase(val sectionUuid: String, val sectionId: Int, val sectionPhase: String)

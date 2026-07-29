@@ -59,6 +59,10 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
         <activity
+            android:name=".ui.contact_tracing.ContactTracingActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
             android:name=".ui.service_location_activity.ServiceLocationActivity"
             android:exported="false" />
         <activity
