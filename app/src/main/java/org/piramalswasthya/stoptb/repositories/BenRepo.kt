@@ -383,6 +383,7 @@ class BenRepo @Inject constructor(
                             householdDao.update(it)
                         }
                     ben.beneficiaryId = newBenId
+                    ben.benRegId = newBenRegId
                     return true
                 }
                 Timber.e("Amrit push beneficiary registration failed: statusCode=$responseStatusCode, error=$errorMessage, benId=${ben.beneficiaryId}")
@@ -414,6 +415,9 @@ class BenRepo @Inject constructor(
                 preferenceDao.getLoggedInUser()
                     ?: throw IllegalStateException("No user logged in!!")
 
+            benDao.resetSyncingToUnsynced()
+            benDao.requeueTempBeneficiariesForRegistration()
+
             val benList = benDao.getAllUnprocessedBen()
             Timber.d("YTR 419 $benList")
 
@@ -422,12 +426,20 @@ class BenRepo @Inject constructor(
             val kidNetworkPostList = mutableSetOf<BenRegKidNetwork>()
 
             benList.forEach {
-                createBenIdAtServerByBeneficiarySending(it, user, it.locationRecord)
+                val idGenerated = createBenIdAtServerByBeneficiarySending(it, user, it.locationRecord)
+                if (!idGenerated) {
+                    Timber.w("Amrit push beneficiary registration pending retry: benId=${it.beneficiaryId}, benRegId=${it.benRegId}, hhId=${it.householdId}")
+                }
                 Timber.d("YTR 429 $it")
             }
 
             val updateBenList = benDao.getAllBenForSyncWithServer()
             updateBenList.forEach {
+                if (it.beneficiaryId <= 0L || it.benRegId <= 0L) {
+                    benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.UNSYNCED)
+                    Timber.w("Skipping beneficiary final sync until real IDs are available: benId=${it.beneficiaryId}, benRegId=${it.benRegId}, hhId=${it.householdId}")
+                    return@forEach
+                }
                 benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.SYNCING)
                 val household = if (it.householdId > 0L) householdDao.getHousehold(it.householdId) else null
                 benNetworkPostList.add(it.asNetworkPostModel(context, user, household))

@@ -125,7 +125,18 @@ class VolunteerHomeFragment : Fragment() {
                     return@observe
                 }
 
-                val filteredInfos = workInfos.filter { manualRefreshWorkIds.contains(it.id) }
+                val activeInfos = workInfos.filter {
+                    it.state == WorkInfo.State.ENQUEUED ||
+                            it.state == WorkInfo.State.RUNNING ||
+                            it.state == WorkInfo.State.BLOCKED
+                }
+                val filteredInfos = workInfos
+                    .filter { manualRefreshWorkIds.contains(it.id) }
+                    .ifEmpty {
+                        // ExistingWorkPolicy.KEEP can reuse an already active sync instead of
+                        // enqueuing the fresh IDs returned for this click.
+                        activeInfos
+                    }
                 if (filteredInfos.isEmpty()) return@observe
 
                 val isRunning = filteredInfos.any {
