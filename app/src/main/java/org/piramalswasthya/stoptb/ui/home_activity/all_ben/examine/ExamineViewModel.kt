@@ -179,10 +179,10 @@ class ExamineViewModel @Inject constructor(
 
                 if (formVersionId == null) {
                     NetworkResponse.Error("Schema definition not found")
-                } else if (contactTracingRepo.fetchAndRefreshTptHistory(benId, formVersionId)) {
-                    NetworkResponse.Success(Unit)
                 } else {
-                    NetworkResponse.Error("Failed to fetch TPT follow-up history. Please try again.")
+                    // fetch history form list from room-db when offline
+                    contactTracingRepo.fetchAndRefreshTptHistory(benId, formVersionId)
+                    NetworkResponse.Success(Unit)
                 }
             } catch (e: Exception) {
                 Timber.e(e, "onHistoryClicked failed for benId=$benId")

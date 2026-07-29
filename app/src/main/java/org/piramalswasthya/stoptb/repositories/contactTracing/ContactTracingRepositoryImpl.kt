@@ -7,6 +7,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
@@ -552,50 +553,67 @@ class ContactTracingRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getContactTracingStatus(beneficiaryId: Long): ContactTracingStatus = coroutineScope {
-        val authHeader = preferenceDao.getJWTAmritToken() ?: run {
-            Timber.w("getContactTracingStatus: JWT token is null")
-            return@coroutineScope ContactTracingStatus()
+        // Local-first: a form submitted offline is written to Room immediately (see
+        // submitResponse), well before it ever syncs to the backend.
+        val localCommunityDeferred = async {
+            responseDao.isFormSubmittedLocally(beneficiaryId, FormType.COMMUNITY_CONTACT_TRACING.name)
         }
-        val villageId = preferenceDao.getLocationRecord()?.village?.id ?: run {
-            Timber.w("getContactTracingStatus: LocationRecord/Village is null")
-            return@coroutineScope ContactTracingStatus()
-        }
-        val providerServiceMapId = preferenceDao.getLoggedInUser()?.serviceMapId ?: run {
-            Timber.w("getContactTracingStatus: Logged-in user is null")
-            return@coroutineScope ContactTracingStatus()
+        val localOccupationalDeferred = async {
+            responseDao.isFormSubmittedLocally(beneficiaryId, FormType.OCCUPATION_CONTACT_TRACING.name)
         }
 
-        val communityDeferred = async {
-            runCatching {
-                amritApiService.getCompletedBeneficiaries(
-                    authHeader = authHeader,
-                    formType = FormType.COMMUNITY_CONTACT_TRACING.name,
-                    villageId = villageId,
-                    providerServiceMapId = providerServiceMapId
-                )
-            }.onFailure { Timber.e(it, "getContactTracingStatus: COMMUNITY_CONTACT_TRACING call failed") }
-                .getOrNull()
-        }
-        val occupationalDeferred = async {
-            runCatching {
-                amritApiService.getCompletedBeneficiaries(
-                    authHeader = authHeader,
-                    formType = FormType.OCCUPATION_CONTACT_TRACING.name,
-                    villageId = villageId,
-                    providerServiceMapId = providerServiceMapId
-                )
-            }.onFailure { Timber.e(it, "getContactTracingStatus: OCCUPATION_CONTACT_TRACING call failed") }
-                .getOrNull()
+        val authHeader = preferenceDao.getJWTAmritToken()
+        val villageId = preferenceDao.getLocationRecord()?.village?.id
+        val providerServiceMapId = preferenceDao.getLoggedInUser()?.serviceMapId
+
+        var remoteCommunitySubmitted = false
+        var remoteOccupationalSubmitted = false
+
+        if (authHeader == null || villageId == null || providerServiceMapId == null) {
+            Timber.w("getContactTracingStatus: missing JWT/village/logged-in user - skipping remote check")
+        } else {
+            val communityDeferred = async {
+                runCatching {
+                    amritApiService.getCompletedBeneficiaries(
+                        authHeader = authHeader,
+                        formType = FormType.COMMUNITY_CONTACT_TRACING.name,
+                        villageId = villageId,
+                        providerServiceMapId = providerServiceMapId
+                    )
+                }.onFailure { Timber.e(it, "getContactTracingStatus: COMMUNITY_CONTACT_TRACING call failed") }
+                    .getOrNull()
+            }
+            val occupationalDeferred = async {
+                runCatching {
+                    amritApiService.getCompletedBeneficiaries(
+                        authHeader = authHeader,
+                        formType = FormType.OCCUPATION_CONTACT_TRACING.name,
+                        villageId = villageId,
+                        providerServiceMapId = providerServiceMapId
+                    )
+                }.onFailure { Timber.e(it, "getContactTracingStatus: OCCUPATION_CONTACT_TRACING call failed") }
+                    .getOrNull()
+            }
+
+            // Any failure (exception, or a non-2xx response - e.g. no connectivity) falls back to
+            // an empty list here, leaving the final status to whatever the local check above found.
+            remoteCommunitySubmitted = communityDeferred.await()?.takeIf { it.isSuccessful }?.body()?.data
+                ?.any { it.beneficiaryId == beneficiaryId } ?: false
+            remoteOccupationalSubmitted = occupationalDeferred.await()?.takeIf { it.isSuccessful }?.body()?.data
+                ?.any { it.beneficiaryId == beneficiaryId } ?: false
         }
 
-        // Any failure (exception, or a non-2xx response) falls back to an empty list here,
-        // which naturally yields isSubmitted=false — the red-cross default.
-        val communityList = communityDeferred.await()?.takeIf { it.isSuccessful }?.body()?.data ?: emptyList()
-        val occupationalList = occupationalDeferred.await()?.takeIf { it.isSuccessful }?.body()?.data ?: emptyList()
+        val localCommunitySubmitted = localCommunityDeferred.await()
+        val localOccupationalSubmitted = localOccupationalDeferred.await()
+        /*Timber.d(
+            "getContactTracingStatus: beneficiaryId=$beneficiaryId " +
+                "localCommunity=$localCommunitySubmitted remoteCommunity=$remoteCommunitySubmitted " +
+                "localOccupational=$localOccupationalSubmitted remoteOccupational=$remoteOccupationalSubmitted"
+        )*/
 
         ContactTracingStatus(
-            isCommunitySubmitted = communityList.any { it.beneficiaryId == beneficiaryId },
-            isOccupationalSubmitted = occupationalList.any { it.beneficiaryId == beneficiaryId }
+            isCommunitySubmitted = localCommunitySubmitted || remoteCommunitySubmitted,
+            isOccupationalSubmitted = localOccupationalSubmitted || remoteOccupationalSubmitted
         )
     }
 
@@ -633,6 +651,15 @@ class ContactTracingRepositoryImpl @Inject constructor(
                 c.beneficiaryId.takeIf { required != null && c.submittedCount >= required }
             }.distinct()
         }
+
+    override fun observeTptEligibleBenIds(): Flow<List<Long>> =
+        responseDao.getAllClinicalScreeningStatusAnswers(QUESTION_UUID_CLINICAL_SCREENING_STATUS)
+            .map { answers ->
+                answers
+                    .filter { ClinicalScreeningStatus.fromValue(it.optionValue) == ClinicalScreeningStatus.TPT_ELIGIBLE }
+                    .map { it.beneficiaryId }
+                    .distinct()
+            }
 
     private companion object {
         private const val DEFAULT_OFFICER_ID = 501L
