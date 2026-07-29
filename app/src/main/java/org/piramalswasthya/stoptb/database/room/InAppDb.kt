@@ -105,7 +105,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 26, exportSchema = false
+    version = 27, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -821,6 +821,21 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        // Tracks the backend's own sectionResponseId on each locally-stored section response, so
+        // ContactTracingRepositoryImpl.fetchAndRefreshTptHistory can detect a section already
+        // bootstrapped from a previous API fetch and skip re-inserting it as a duplicate row.
+        private val MIGRATION_26_27 = object : Migration(26, 27) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "t_section_response", "backendSectionResponseId")) {
+                    database.execSQL("ALTER TABLE t_section_response ADD COLUMN backendSectionResponseId INTEGER DEFAULT NULL")
+                }
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_t_section_response_backendSectionResponseId` " +
+                        "ON `t_section_response` (`backendSectionResponseId`)"
+                )
+            }
+        }
+
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(
@@ -1066,6 +1081,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_23_24)
                         .addMigrations(MIGRATION_24_25)
                         .addMigrations(MIGRATION_25_26)
+                        .addMigrations(MIGRATION_26_27)
                         .fallbackToDestructiveMigration()
                         .build()
 

@@ -6,6 +6,7 @@ import androidx.room.withTransaction
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
@@ -17,8 +18,11 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.FormResponseEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionResponseEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.SectionResponseEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.ServerCounsellingResponseDto
+import org.piramalswasthya.stoptb.model.dynamicEntity.ServerSectionResponseDto
 import org.piramalswasthya.stoptb.network.AmritApiService
 import org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository
+import org.piramalswasthya.stoptb.ui.contact_tracing.ClinicalScreeningStatus
+import org.piramalswasthya.stoptb.ui.contact_tracing.QUESTION_UUID_CLINICAL_SCREENING_STATUS
 import org.piramalswasthya.stoptb.ui.contact_tracing.QUESTION_UUID_REGIMEN_ADVISED
 import org.piramalswasthya.stoptb.ui.contact_tracing.RegimenAdvised
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
@@ -152,10 +156,13 @@ class ContactTracingRepositoryImpl @Inject constructor(
                 )
                 val responseId = responseDao.insertFormResponse(formResponse)
 
+                val backendSectionResponseIdBySectionId = apiResponse.sections
+                    .associate { it.sectionId to it.sectionResponseId }
                 val sectionResponses = activeVersion.sections.map {
                     SectionResponseEntity(
                         formResponseId = responseId,
-                        sectionId = it.section.sectionId
+                        sectionId = it.section.sectionId,
+                        backendSectionResponseId = backendSectionResponseIdBySectionId[it.section.sectionId]
                     )
                 }
                 responseDao.insertSectionResponses(sectionResponses)
@@ -297,6 +304,19 @@ class ContactTracingRepositoryImpl @Inject constructor(
                         if (jsonObj.has("responseId")) {
                             responseDao.updateBackendResponseId(responseId, jsonObj.optLong("responseId"))
                         }
+                       //store backendSectionResponse id inside t_section_response for history list purpose
+                        val sectionsArray = jsonObj.optJSONArray("sections")
+                        if (sectionsArray != null) {
+                            for (i in 0 until sectionsArray.length()) {
+                                val sectionObj = sectionsArray.optJSONObject(i) ?: continue
+                                val sectionUuid = sectionObj.optString("sectionUuid", "")
+                                val backendSectionResponseId = sectionObj.optLong("sectionResponseId", -1L)
+                                if (sectionUuid.isBlank() || backendSectionResponseId <= 0) continue
+                                val localSectionId = metadataDao.getSectionInfoByUuids(listOf(sectionUuid))
+                                    .firstOrNull()?.sectionId ?: continue
+                                responseDao.updateBackendSectionResponseId(responseId, localSectionId, backendSectionResponseId)
+                            }
+                        }
                         Timber.d("submitResponseBulk: responseId=$responseId success")
                         true
                     } else {
@@ -356,48 +376,119 @@ class ContactTracingRepositoryImpl @Inject constructor(
 
         if (apiRecords.isEmpty()) return true
 
+
+        val activeVersion = metadataDao.getFormDefinition(FormType.TPT_FOLLOW_UP)
+            ?.versions?.find { it.version.versionId == formVersionId }
+            ?: return false
+
+        val questionsMap = activeVersion.sections
+            .flatMap { it.questions }
+            .filter { it.question.serverQuestionId != null }
+            .associateBy { it.question.serverQuestionId!! }
+
+        val optionsMap = mutableMapOf<Pair<Int, Int>, Int>()
+        activeVersion.sections.forEach { sec ->
+            sec.questions.forEach { qDetails ->
+                val serverQId = qDetails.question.serverQuestionId
+                if (serverQId != null) {
+                    qDetails.options.forEach { optDetails ->
+                        val serverOptId = optDetails.option.serverOptionId
+                        if (serverOptId != null) {
+                            optionsMap[Pair(serverQId, serverOptId)] = optDetails.option.optionId
+                        }
+                    }
+                }
+            }
+        }
+
         val allUuids = apiRecords.flatMap { it.sections }.map { it.sectionUuid }.distinct()
         val infoByUuid = metadataDao.getSectionInfoByUuids(allUuids).associateBy { it.sectionUuid }
 
-        db.withTransaction {
-            // Deletes matching historical rows by responseId before reinserting, preventing stale/duplicate history (cascades to related section/question rows).
-            responseDao.deleteHistoryByBackendResponseIds(apiRecords.map { it.responseId })
 
-            apiRecords.forEach { record ->
-                val postSubmitSections = record.sections.filter {
-                    infoByUuid[it.sectionUuid]?.sectionPhase == SectionPhase.POST_SUBMIT.value
-                }
-
-                if (postSubmitSections.isEmpty()) return@forEach
-
-                val newResponseId = responseDao.insertFormResponse(
-                    FormResponseEntity(
-                        beneficiaryId = beneficiaryId,
-                        formVersionId = formVersionId,
-                        status = record.status ?: "COMPLETE",
-                        lastVisitedSectionId = null,
-                        syncStatus = "SYNCED",
-                        backendResponseId = record.responseId,
-                        isHistorySnapshot = true
-                    )
+        suspend fun insertSingleSectionResponse(formResponseId: Long, sectionDto: ServerSectionResponseDto) {
+            val sectionId = infoByUuid[sectionDto.sectionUuid]?.sectionId ?: return
+            val sectionResponseId = responseDao.insertSectionResponse(
+                SectionResponseEntity(
+                    formResponseId = formResponseId,
+                    sectionId = sectionId,
+                    backendSectionResponseId = sectionDto.sectionResponseId
                 )
-                postSubmitSections.forEach { sectionDto ->
-                    val sectionId = infoByUuid[sectionDto.sectionUuid]?.sectionId ?: return@forEach
-                    val sectionResponseId = responseDao.insertSectionResponse(
-                        SectionResponseEntity(formResponseId = newResponseId, sectionId = sectionId)
-                    )
-                    if (sectionDto.answers.isNotEmpty()) {
-                        responseDao.insertQuestionResponses(
-                            sectionDto.answers.map { a ->
-                                QuestionResponseEntity(
-                                    sectionResponseId = sectionResponseId,
-                                    questionId = a.questionId,
-                                    optionId = a.optionId,
-                                    answerText = a.answerText
-                                )
-                            }
+            )
+            val questionResponses = sectionDto.answers.mapNotNull { a ->
+                val qDetails = questionsMap[a.questionId]
+                if (qDetails == null) {
+                    Timber.w("fetchAndRefreshTptHistory: No local question found for serverQuestionId=${a.questionId}")
+                    return@mapNotNull null
+                }
+                val localOptId = a.optionId?.let { optionsMap[Pair(a.questionId, it)] }
+                QuestionResponseEntity(
+                    sectionResponseId = sectionResponseId,
+                    questionId = qDetails.question.questionId,
+                    optionId = localOptId,
+                    answerText = a.answerText
+                )
+            }
+            if (questionResponses.isNotEmpty()) {
+                responseDao.insertQuestionResponses(questionResponses)
+            }
+        }
+
+        db.withTransaction {
+
+            val postSubmitSectionDtos = apiRecords.flatMap { record ->
+                record.sections.filter { infoByUuid[it.sectionUuid]?.sectionPhase == SectionPhase.POST_SUBMIT.value }
+                    .map { record to it }
+            }
+            if (postSubmitSectionDtos.isNotEmpty()) {
+
+                val candidateIds = postSubmitSectionDtos.map { it.second.sectionResponseId }
+                val alreadyStored = responseDao.getExistingBackendSectionResponseIds(candidateIds).toSet()
+
+                postSubmitSectionDtos.forEach { (record, sectionDto) ->
+                    if (sectionDto.sectionResponseId in alreadyStored) {
+                        Timber.d(
+                            "fetchAndRefreshTptHistory: sectionResponseId=${sectionDto.sectionResponseId} " +
+                                "already stored locally, skipping"
                         )
+                        return@forEach
                     }
+                    val newResponseId = responseDao.insertFormResponse(
+                        FormResponseEntity(
+                            beneficiaryId = beneficiaryId,
+                            formVersionId = formVersionId,
+                            status = "COMPLETE",
+                            lastVisitedSectionId = null,
+                            syncStatus = "SYNCED",
+                            backendResponseId = record.responseId,
+                            isHistorySnapshot = true
+                        )
+                    )
+                    insertSingleSectionResponse(newResponseId, sectionDto)
+                }
+            }
+
+
+            val hasLivePreSubmit = responseDao.getLatestResponseForPhase(
+                beneficiaryId, formVersionId, SectionPhase.PRE_SUBMIT.value
+            ) != null
+            if (!hasLivePreSubmit) {
+                val preSubmitRecord = apiRecords.maxByOrNull { it.responseId }
+                val preSubmitSections = preSubmitRecord?.sections?.filter {
+                    infoByUuid[it.sectionUuid]?.sectionPhase == SectionPhase.PRE_SUBMIT.value
+                }
+                if (!preSubmitSections.isNullOrEmpty()) {
+                    val liveResponseId = responseDao.insertFormResponse(
+                        FormResponseEntity(
+                            beneficiaryId = beneficiaryId,
+                            formVersionId = formVersionId,
+                            status = preSubmitRecord.status ?: "SUBMITTED",
+                            lastVisitedSectionId = null,
+                            syncStatus = "SYNCED",
+                            backendResponseId = preSubmitRecord.responseId,
+                            isHistorySnapshot = false
+                        )
+                    )
+                    preSubmitSections.forEach { sectionDto -> insertSingleSectionResponse(liveResponseId, sectionDto) }
                 }
             }
         }
@@ -442,6 +533,13 @@ class ContactTracingRepositoryImpl @Inject constructor(
             beneficiaryId, formVersionId, SectionPhase.PRE_SUBMIT.value, QUESTION_UUID_REGIMEN_ADVISED
         )
         return RegimenAdvised.fromValue(optionValue)
+    }
+
+    override suspend fun getClinicalScreeningStatus(beneficiaryId: Long, formVersionId: Int): ClinicalScreeningStatus? {
+        val optionValue = responseDao.getAnsweredOptionValueAnyPhase(
+            beneficiaryId, formVersionId, QUESTION_UUID_CLINICAL_SCREENING_STATUS
+        )
+        return ClinicalScreeningStatus.fromValue(optionValue)
     }
 
     override fun observeSubmittedFollowUpCount(beneficiaryId: Long, formVersionId: Int): Flow<Int> =
@@ -519,6 +617,22 @@ class ContactTracingRepositoryImpl @Inject constructor(
         }
         return allSuccess
     }
+
+    override fun observeContactFollowUpDoneBenIds(): Flow<List<Long>> =
+        responseDao.getFormDoneBenIds(FormType.CONTACT_FOLLOW_UP.name)
+
+    override fun observeTptFollowUpTargetReachedBenIds(): Flow<List<Long>> =
+        combine(
+            responseDao.getAllSubmittedFollowUpCounts(),
+            responseDao.getAllRegimenAnswers(QUESTION_UUID_REGIMEN_ADVISED)
+        ) { counts, regimens ->
+            val regimenByKey = regimens.associateBy { it.beneficiaryId to it.formVersionId }
+            counts.mapNotNull { c ->
+                val required = RegimenAdvised.fromValue(regimenByKey[c.beneficiaryId to c.formVersionId]?.optionValue)
+                    ?.requiredFollowUpCount
+                c.beneficiaryId.takeIf { required != null && c.submittedCount >= required }
+            }.distinct()
+        }
 
     private companion object {
         private const val DEFAULT_OFFICER_ID = 501L

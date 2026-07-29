@@ -39,7 +39,8 @@ class ContactTracingActivity : AppCompatActivity(), ContactTracingNavigator {
         }
         val sectionPhase = intent.getStringExtra(EXTRA_SECTION_PHASE)
             ?.let { runCatching { SectionPhase.valueOf(it) }.getOrNull() }
-        openContactForm(formType, contactType, sectionPhase)
+        val viewHistory = intent.getBooleanExtra(EXTRA_VIEW_HISTORY, false)
+        openContactForm(formType, contactType, sectionPhase, viewHistory = viewHistory)
     }
 
     private fun setupBackPressHandling() {
@@ -71,9 +72,12 @@ class ContactTracingActivity : AppCompatActivity(), ContactTracingNavigator {
         formType: FormType,
         contactType: String,
         sectionPhase: SectionPhase?,
-        addToBackStack: Boolean
+        addToBackStack: Boolean,
+        viewHistory: Boolean
     ) {
-        title = when (formType) {
+        title = if (viewHistory) {
+            getString(R.string.follow_up_history)
+        } else when (formType) {
             FormType.OCCUPATION_CONTACT_TRACING -> getString(R.string.occupational_contact_tracing)
             FormType.CONTACT_FOLLOW_UP -> getString(R.string.contact_tracing_follow_up)
             FormType.TPT_FOLLOW_UP -> getString(R.string.tpt_follow_up)
@@ -83,7 +87,7 @@ class ContactTracingActivity : AppCompatActivity(), ContactTracingNavigator {
         val transaction = supportFragmentManager.beginTransaction()
             .replace(
                 R.id.fragment_container,
-                ContactTracingFormFragment.newInstance(formType, indexCaseBenId, contactType, sectionPhase)
+                ContactTracingFormFragment.newInstance(formType, indexCaseBenId, contactType, sectionPhase, viewHistory)
             )
         if (addToBackStack) {
             transaction.addToBackStack(null)
@@ -112,6 +116,7 @@ class ContactTracingActivity : AppCompatActivity(), ContactTracingNavigator {
         const val EXTRA_BEN_ID = "contact_tracing_index_case_ben_id"
         const val EXTRA_CONTACT_TYPE = "contact_tracing_contact_type"
         const val EXTRA_SECTION_PHASE = "contact_tracing_section_phase"
+        const val EXTRA_VIEW_HISTORY = "contact_tracing_view_history"
 
         const val CONTACT_TYPE_COMMUNITY = "COMMUNITY"
         const val CONTACT_TYPE_OCCUPATIONAL = "OCCUPATIONAL"
@@ -122,13 +127,15 @@ class ContactTracingActivity : AppCompatActivity(), ContactTracingNavigator {
             context: Context,
             indexCaseBenId: Long,
             contactType: String,
-            sectionPhase: SectionPhase? = null
+            sectionPhase: SectionPhase? = null,
+            viewHistory: Boolean = false
         ) {
             context.startActivity(
                 Intent(context, ContactTracingActivity::class.java).apply {
                     putExtra(EXTRA_BEN_ID, indexCaseBenId)
                     putExtra(EXTRA_CONTACT_TYPE, contactType)
                     sectionPhase?.let { putExtra(EXTRA_SECTION_PHASE, it.name) }
+                    putExtra(EXTRA_VIEW_HISTORY, viewHistory)
                 }
             )
         }

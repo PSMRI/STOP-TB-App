@@ -19,6 +19,7 @@ import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
 import org.piramalswasthya.stoptb.repositories.contactTracing.IContactTracingRepository
+import org.piramalswasthya.stoptb.ui.contact_tracing.ClinicalScreeningStatus
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import timber.log.Timber
 import javax.inject.Inject
@@ -101,11 +102,54 @@ class ExamineViewModel @Inject constructor(
     val isTptFollowUpPreSubmitDone: Flow<Boolean> =
         tptFollowUpStatus.map { it == "SUBMITTED" || it == "COMPLETE" }
 
+    private val contactFollowUpStatus: Flow<String?> =
+        contactTracingRepo.observeResponseStatus(benId, FormType.CONTACT_FOLLOW_UP)
+
+    private val contactFollowUpFormVersionId: Flow<Int?> = flow {
+        val definition = (contactTracingRepo.getFormSchema(FormType.CONTACT_FOLLOW_UP) as? NetworkResponse.Success)?.data
+        val activeVersion = definition?.versions?.firstOrNull { it.version.isActive }
+            ?: definition?.versions?.maxByOrNull { it.version.versionNumber }
+        val versionId = activeVersion?.version?.versionId
+        if (versionId != null) {
+            contactTracingRepo.fetchAndStoreContactResponse(benId, FormType.CONTACT_FOLLOW_UP, versionId)
+        }
+        emit(versionId)
+    }
+
+    /**
+     * Drives the "Contact Followup" row's Fill/View state.
+     * Full Treatment and No Treatment complete as soon as CONTACT_FOLLOW_UP itself is submitted.
+     * Tpt Eligible additionally requires the follow-on TPT_FOLLOW_UP PRE_SUBMIT to be submitted,
+     * since selecting it only redirects to that next form rather than finishing the flow.
+     */
+    val isContactFollowUpDone: Flow<Boolean> =
+        combine(
+            contactFollowUpStatus,
+            contactFollowUpFormVersionId,
+            tptFollowUpStatus
+        ) { cfuStatus, cfuVersionId, tptStatus ->
+            val cfuSubmitted = cfuStatus == "SUBMITTED" || cfuStatus == "COMPLETE"
+            if (!cfuSubmitted || cfuVersionId == null) {
+                false
+            } else {
+                val screeningStatus = contactTracingRepo.getClinicalScreeningStatus(benId, cfuVersionId)
+                if (screeningStatus == ClinicalScreeningStatus.TPT_ELIGIBLE) {
+                    tptStatus == "SUBMITTED" || tptStatus == "COMPLETE"
+                } else {
+                    true
+                }
+            }
+        }
+
     private val tptFormVersionId: Flow<Int?> = flow {
-        emit(
-            contactTracingRepo.getFormDefinition(FormType.TPT_FOLLOW_UP)
-                ?.versions?.firstOrNull { it.version.isActive }?.version?.versionId
-        )
+        val definition = (contactTracingRepo.getFormSchema(FormType.TPT_FOLLOW_UP) as? NetworkResponse.Success)?.data
+        val activeVersion = definition?.versions?.firstOrNull { it.version.isActive }
+            ?: definition?.versions?.maxByOrNull { it.version.versionNumber }
+        val versionId = activeVersion?.version?.versionId
+        if (versionId != null) {
+            contactTracingRepo.fetchAndRefreshTptHistory(benId, versionId)
+        }
+        emit(versionId)
     }
     val requiredFollowUpCount: Flow<Int?> = tptFormVersionId.map { versionId ->
         versionId?.let { contactTracingRepo.getRegimenAdvised(benId, it) }?.requiredFollowUpCount

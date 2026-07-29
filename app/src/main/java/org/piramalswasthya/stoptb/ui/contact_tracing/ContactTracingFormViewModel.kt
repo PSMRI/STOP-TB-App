@@ -8,7 +8,9 @@ import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.dynamicEntity.CompleteFormResponse
 import org.piramalswasthya.stoptb.model.dynamicEntity.ConditionRefDto
@@ -64,6 +66,12 @@ class ContactTracingFormViewModel @Inject constructor(
 
     private var lastIndexCaseBenId: Long = 0L
     private var lastContactType: String = "COMMUNITY"
+    private var lastViewHistory: Boolean = false
+    private var isHistoryMode: Boolean = false
+    private var historyResponses: List<CompleteFormResponse> = emptyList()
+    private var historyResponseIndex: Int = 0
+    private var historyVisitIndex: Int = 0
+    private var historyVisitCounts: List<Int> = emptyList()
 
     private val _activeQuestions = MutableLiveData<List<CounsellingQuestionDto>>()
     val activeQuestions: LiveData<List<CounsellingQuestionDto>> get() = _activeQuestions
@@ -101,12 +109,15 @@ class ContactTracingFormViewModel @Inject constructor(
         formType: FormType,
         indexCaseBenId: Long,
         @Suppress("UNUSED_PARAMETER") contactType: String,
-        sectionPhase: SectionPhase? = null
+        sectionPhase: SectionPhase? = null,
+        viewHistory: Boolean = false
     ) {
         currentFormType = formType
         currentSectionPhase = sectionPhase
         lastIndexCaseBenId = indexCaseBenId
         lastContactType = contactType
+        lastViewHistory = viewHistory
+        isHistoryMode = viewHistory
         _formSchemaState.value = NetworkResponse.Loading()
         viewModelScope.launch {
             val response = repository.getFormSchema(formType)
@@ -136,6 +147,32 @@ class ContactTracingFormViewModel @Inject constructor(
 
             pendingIndexCaseBenId = indexCaseBenId
             pendingFormVersionId = activeVersion.version.versionId
+
+            if (viewHistory) {
+                historyResponses = repository.getTptHistory(indexCaseBenId, activeVersion.version.versionId).first()
+                if (historyResponses.isEmpty()) {
+                    _formSchemaState.value = NetworkResponse.Error(
+                        context.getString(R.string.tpt_history_empty)
+                    )
+                    return@launch
+                }
+                val sectionIds = sections.map { it.section.sectionId }.toSet()
+                historyVisitCounts = historyResponses.map { resp ->
+                    resp.sectionResponses
+                        .filter { it.sectionResponse.sectionId in sectionIds }
+                        .groupBy { it.sectionResponse.sectionId }
+                        .values
+                        .maxOfOrNull { it.size } ?: 1
+                }
+                historyResponseIndex = 0
+                historyVisitIndex = 0
+                responseId = historyResponses[historyResponseIndex].formResponse.responseId
+                persistedStatus = "COMPLETE"
+                _isEditable.value = false
+                currentSectionIndex = 0
+                loadSection(currentSectionIndex)
+                return@launch
+            }
 
             if (formType == FormType.TPT_FOLLOW_UP) {
                 repository.fetchAndRefreshTptHistory(indexCaseBenId, activeVersion.version.versionId)
@@ -182,7 +219,7 @@ class ContactTracingFormViewModel @Inject constructor(
     }
     fun retryLoad() {
         val formType = currentFormType ?: return
-        open(formType, lastIndexCaseBenId, lastContactType, currentSectionPhase)
+        open(formType, lastIndexCaseBenId, lastContactType, currentSectionPhase, lastViewHistory)
     }
     fun continueToTpt() {
         _navigateToFormUuid.value = "TPT_FOLLOW_UP"
@@ -204,13 +241,55 @@ class ContactTracingFormViewModel @Inject constructor(
         } ?: answerRow.answerText
         if (ClinicalScreeningStatus.fromValue(optionValue) != ClinicalScreeningStatus.TPT_ELIGIBLE) return false to false
 
-        val tptDefinition = repository.getFormDefinition(FormType.TPT_FOLLOW_UP) ?: return true to false
+        val tptDefinition = (repository.getFormSchema(FormType.TPT_FOLLOW_UP) as? NetworkResponse.Success)?.data
+            ?: return true to false
         val tptVersion = tptDefinition.versions.firstOrNull { it.version.isActive }
             ?: tptDefinition.versions.maxByOrNull { it.version.versionNumber } ?: return true to false
-        val preSubmitResponse = repository.getExistingContactResponseForPhase(
+
+        var preSubmitResponse = repository.getExistingContactResponseForPhase(
             benId, tptVersion.version.versionId, SectionPhase.PRE_SUBMIT
         )
+        if (preSubmitResponse == null) {
+
+            repository.fetchAndRefreshTptHistory(benId, tptVersion.version.versionId)
+            preSubmitResponse = repository.getExistingContactResponseForPhase(
+                benId, tptVersion.version.versionId, SectionPhase.PRE_SUBMIT
+            )
+        }
         return true to (preSubmitResponse?.status == "SUBMITTED")
+    }
+
+    /** Moves to the next visit within the current history response, or into the next response
+     * if this one is exhausted. Returns false once there's nothing further (last visit overall). */
+    private fun advanceToNextHistoryVisit(): Boolean {
+        val visitsInCurrentResponse = historyVisitCounts.getOrNull(historyResponseIndex) ?: 1
+        if (historyVisitIndex < visitsInCurrentResponse - 1) {
+            historyVisitIndex++
+            return true
+        }
+        if (historyResponseIndex < historyResponses.size - 1) {
+            historyResponseIndex++
+            historyVisitIndex = 0
+            responseId = historyResponses[historyResponseIndex].formResponse.responseId
+            return true
+        }
+        return false
+    }
+
+    /** Symmetric counterpart of advanceToNextHistoryVisit — steps back a visit, crossing into
+     * the previous response's last visit if the current one is already at its first. */
+    private fun retreatToPreviousHistoryVisit(): Boolean {
+        if (historyVisitIndex > 0) {
+            historyVisitIndex--
+            return true
+        }
+        if (historyResponseIndex > 0) {
+            historyResponseIndex--
+            historyVisitIndex = (historyVisitCounts.getOrNull(historyResponseIndex) ?: 1) - 1
+            responseId = historyResponses[historyResponseIndex].formResponse.responseId
+            return true
+        }
+        return false
     }
 
     private fun loadSection(index: Int) {
@@ -227,15 +306,31 @@ class ContactTracingFormViewModel @Inject constructor(
         questionsByUuid = questionsByUuid + builtQuestions.associateBy { it.questionUuid }
 
         viewModelScope.launch {
-            val existing = repository.getCompleteResponse(responseId)
-            populateAnswers(builtQuestions, sectionWithQuestions.section.sectionId, existing)
+            val existing = if (isHistoryMode) {
+                historyResponses.getOrNull(historyResponseIndex)
+            } else {
+                repository.getCompleteResponse(responseId)
+            }
+            populateAnswers(builtQuestions, sectionWithQuestions.section.sectionId, existing, historyVisitIndex)
             questionsByUuid = questionsByUuid + builtQuestions.associateBy { it.questionUuid }
             evaluateAllConditions(builtQuestions)
             ensureTptRegistrationDate(builtQuestions, sectionWithQuestions.section.sectionId)
 
             _activeQuestions.value = builtQuestions.filter { it.visible }
-            _currentSectionName.value = sectionWithQuestions.section.sectionName
-            _progress.value = (index + 1) to sections.size
+            if (isHistoryMode) {
+                val visitsBeforeThisResponse = historyVisitCounts.take(historyResponseIndex).sum()
+                val totalVisits = historyVisitCounts.sum().coerceAtLeast(1)
+                val followUpNumber = visitsBeforeThisResponse + historyVisitIndex + 1
+                _currentSectionName.value = context.getString(
+                    R.string.tpt_history_section_label,
+                    sectionWithQuestions.section.sectionName, followUpNumber, totalVisits
+                )
+                _progress.value = ((followUpNumber - 1) * sections.size + index + 1) to
+                    (totalVisits * sections.size)
+            } else {
+                _currentSectionName.value = sectionWithQuestions.section.sectionName
+                _progress.value = (index + 1) to sections.size
+            }
             _formSchemaState.value = NetworkResponse.Success(Unit)
         }
     }
@@ -278,6 +373,9 @@ class ContactTracingFormViewModel @Inject constructor(
             val totalSections = sections.size
             if (currentSectionIndex < totalSections - 1) {
                 currentSectionIndex++
+                loadSection(currentSectionIndex)
+            } else if (isHistoryMode && advanceToNextHistoryVisit()) {
+                currentSectionIndex = 0
                 loadSection(currentSectionIndex)
             }
             return
@@ -370,6 +468,9 @@ class ContactTracingFormViewModel @Inject constructor(
             if (currentSectionIndex > 0) {
                 currentSectionIndex--
                 loadSection(currentSectionIndex)
+            } else if (isHistoryMode && retreatToPreviousHistoryVisit()) {
+                currentSectionIndex = sections.size - 1
+                loadSection(currentSectionIndex)
             } else {
                 _exitRequested.value = true
             }
@@ -439,10 +540,14 @@ class ContactTracingFormViewModel @Inject constructor(
     private fun populateAnswers(
         questions: List<CounsellingQuestionDto>,
         sectionId: Int,
-        existing: CompleteFormResponse?
+        existing: CompleteFormResponse?,
+        visitIndex: Int = 0
     ) {
-        val sectionResponse = existing?.sectionResponses
-            ?.firstOrNull { it.sectionResponse.sectionId == sectionId }
+        val matches = existing?.sectionResponses
+            ?.filter { it.sectionResponse.sectionId == sectionId }
+            ?.sortedBy { it.sectionResponse.sectionResponseId }
+            ?: emptyList()
+        val sectionResponse = if (matches.isEmpty()) null else matches[visitIndex.coerceIn(0, matches.size - 1)]
         val answersByQuestionId = sectionResponse?.questionResponses?.groupBy { it.questionId } ?: emptyMap()
         questions.forEach { q ->
             val rows = answersByQuestionId[q.questionId] ?: return@forEach

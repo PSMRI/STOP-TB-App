@@ -52,6 +52,7 @@ class ContactTracingFormFragment : Fragment() {
         val contactType = arguments?.getString(ARG_CONTACT_TYPE) ?: "COMMUNITY"
         val sectionPhase = arguments?.getString(ARG_SECTION_PHASE)
             ?.let { runCatching { SectionPhase.valueOf(it) }.getOrNull() }
+        val viewHistory = arguments?.getBoolean(ARG_VIEW_HISTORY) ?: false
 
         binding?.apply {
 
@@ -206,7 +207,7 @@ class ContactTracingFormFragment : Fragment() {
             }
         }
 
-        viewModel.open(formType, indexCaseBenId, contactType, sectionPhase)
+        viewModel.open(formType, indexCaseBenId, contactType, sectionPhase, viewHistory)
         viewModel.loadResultForm(indexCaseBenId)
     }
 
@@ -256,18 +257,21 @@ class ContactTracingFormFragment : Fragment() {
         private const val ARG_INDEX_CASE_BEN_ID = "indexCaseBenId"
         private const val ARG_CONTACT_TYPE = "contactType"
         private const val ARG_SECTION_PHASE = "sectionPhase"
+        private const val ARG_VIEW_HISTORY = "viewHistory"
 
         fun newInstance(
             formType: FormType,
             indexCaseBenId: Long,
             contactType: String,
-            sectionPhase: SectionPhase? = null
+            sectionPhase: SectionPhase? = null,
+            viewHistory: Boolean = false
         ) = ContactTracingFormFragment().apply {
             arguments = Bundle().apply {
                 putString(ARG_FORM_TYPE, formType.name)
                 putLong(ARG_INDEX_CASE_BEN_ID, indexCaseBenId)
                 putString(ARG_CONTACT_TYPE, contactType)
                 sectionPhase?.let { putString(ARG_SECTION_PHASE, it.name) }
+                putBoolean(ARG_VIEW_HISTORY, viewHistory)
             }
         }
     }

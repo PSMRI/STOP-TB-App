@@ -81,6 +81,8 @@ class BenListAdapter(
             generalOpdBenIds: List<Long> = emptyList(),
             anthropometryBenIds: List<Long> = emptyList(),
             tbSuspectedBenIds: List<Long> = emptyList(),
+            contactFollowUpDoneBenIds: List<Long> = emptyList(),
+            tptFollowUpDoneBenIds: List<Long> = emptyList(),
             childCountMap: Map<Long, Int> = emptyMap(),
             showActionButtons: Boolean = true,
             showResultButton: Boolean = false,
@@ -114,6 +116,8 @@ class BenListAdapter(
             val hasGeneralOpd = generalOpdBenIds.contains(item.benId)
             val hasAnthropometry = anthropometryBenIds.contains(item.benId)
             val hasDiagnosis = tbSuspectedBenIds.contains(item.benId)
+            val hasContactFollowUpDone = contactFollowUpDoneBenIds.contains(item.benId)
+            val hasTptFollowUpDone = tptFollowUpDoneBenIds.contains(item.benId)
             binding.isGeneralOpdDone = hasGeneralOpd
             binding.isAnthropometryDone = hasAnthropometry
 
@@ -467,9 +471,8 @@ class BenListAdapter(
             val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
             val isCounsellingOfficerForExamine = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
             val (examineFilledCount, examineTotal) = if (isCounsellingOfficerForExamine) {
-                // Followup has no fill-tracking yet (placeholder row), so only TB Screening counts.
-                val filled = listOf(hasTbScreening).count { it }
-                Pair(filled, 2)
+                val filled = listOf(hasTbScreening, hasContactFollowUpDone, hasTptFollowUpDone).count { it }
+                Pair(filled, 3)
             } else if (isRegistrar) {
                 val filled = listOf(
                     hasAnthropometry,
@@ -630,6 +633,8 @@ class BenListAdapter(
     private val generalOpdIds     = mutableListOf<Long>()
     private val anthropometryIds  = mutableListOf<Long>()
     private val diagnosisIds      = mutableListOf<Long>()
+    private val contactFollowUpDoneIds = mutableListOf<Long>()
+    private val tptFollowUpDoneIds     = mutableListOf<Long>()
     private val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
     var source: Int = 0
 
@@ -651,6 +656,8 @@ class BenListAdapter(
             generalOpdIds,
             anthropometryIds,
             diagnosisIds,
+            contactFollowUpDoneIds,
+            tptFollowUpDoneIds,
             showActionButtons = showActionButtons,
             showResultButton = showResultButton,
             showAnthropometryButton = showAnthropometryButton,
@@ -685,6 +692,8 @@ class BenListAdapter(
     fun submitGeneralOpdBenIds(list: List<Long>)  = applyIdList(generalOpdIds, list)
     fun submitAnthropometryBenIds(list: List<Long>) = applyIdList(anthropometryIds, list)
     fun submitDiagnosisBenIds(list: List<Long>)   = applyIdList(diagnosisIds, list)
+    fun submitContactFollowUpDoneBenIds(list: List<Long>) = applyIdList(contactFollowUpDoneIds, list)
+    fun submitTptFollowUpDoneBenIds(list: List<Long>)      = applyIdList(tptFollowUpDoneIds, list)
 
 
     class BenClickListener(
