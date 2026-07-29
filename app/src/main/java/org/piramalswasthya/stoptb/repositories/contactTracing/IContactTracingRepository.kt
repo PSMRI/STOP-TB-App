@@ -7,6 +7,7 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.CompleteFormDefinition
 import org.piramalswasthya.stoptb.model.dynamicEntity.CompleteFormResponse
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormResponseEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionResponseEntity
+import org.piramalswasthya.stoptb.ui.contact_tracing.ClinicalScreeningStatus
 import org.piramalswasthya.stoptb.ui.contact_tracing.RegimenAdvised
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
@@ -77,6 +78,9 @@ interface IContactTracingRepository {
     // Reads back the beneficiary's already-selected TPT regimen answer and resolves it to a RegimenAdvised value.
     suspend fun getRegimenAdvised(beneficiaryId: Long, formVersionId: Int): RegimenAdvised?
 
+    // Reads back the beneficiary's CONTACT_FOLLOW_UP clinical screening status answer (Tpt Eligible / Full Treatment / No Treatment).
+    suspend fun getClinicalScreeningStatus(beneficiaryId: Long, formVersionId: Int): ClinicalScreeningStatus?
+
     // Streams the beneficiary's completed TPT follow-up form count, computed live from submitted rows.
     fun observeSubmittedFollowUpCount(beneficiaryId: Long, formVersionId: Int): Flow<Int>
 
@@ -85,4 +89,8 @@ interface IContactTracingRepository {
 
     // Fetches Community and Occupational contact tracing completion status to drive the type bottom sheet's tick/cross indicators.
     suspend fun getContactTracingStatus(beneficiaryId: Long): ContactTracingStatus
+
+    fun observeContactFollowUpDoneBenIds(): Flow<List<Long>>
+
+    fun observeTptFollowUpTargetReachedBenIds(): Flow<List<Long>>
 }

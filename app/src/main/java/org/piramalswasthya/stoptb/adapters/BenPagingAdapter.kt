@@ -31,6 +31,8 @@ class BenPagingAdapter(
     private val generalOpdBenIds = mutableListOf<Long>()
     private val anthropometryBenIds = mutableListOf<Long>()
     private val diagnosisIds = mutableListOf<Long>()
+    private val contactFollowUpDoneIds = mutableListOf<Long>()
+    private val tptFollowUpDoneIds = mutableListOf<Long>()
     private val childCountMap = mutableMapOf<Long, Int>()
     private val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
 
@@ -57,6 +59,8 @@ class BenPagingAdapter(
             generalOpdBenIds,
             anthropometryBenIds,
             diagnosisIds,
+            contactFollowUpDoneIds,
+            tptFollowUpDoneIds,
             childCountMap,
             showActionButtons = showActionButtons,
             showResultButton = showResultButton,
@@ -115,6 +119,20 @@ class BenPagingAdapter(
         diagnosisIds.clear()
         diagnosisIds.addAll(list)
         notifyChangedIds(oldIds, diagnosisIds.toSet())
+    }
+
+    fun submitContactFollowUpDoneBenIds(list: List<Long>) {
+        val oldIds = contactFollowUpDoneIds.toSet()
+        contactFollowUpDoneIds.clear()
+        contactFollowUpDoneIds.addAll(list)
+        notifyChangedIds(oldIds, contactFollowUpDoneIds.toSet())
+    }
+
+    fun submitTptFollowUpDoneBenIds(list: List<Long>) {
+        val oldIds = tptFollowUpDoneIds.toSet()
+        tptFollowUpDoneIds.clear()
+        tptFollowUpDoneIds.addAll(list)
+        notifyChangedIds(oldIds, tptFollowUpDoneIds.toSet())
     }
 
     private fun notifyChangedIds(oldIds: Set<Long>, newIds: Set<Long>) {

@@ -80,6 +80,14 @@ interface CounsellingFormResponseDao {
     suspend fun deleteQuestionResponsesForSection(sectionResponseId: Long)
 
 
+    @Query("SELECT backendSectionResponseId FROM t_section_response WHERE backendSectionResponseId IN (:backendSectionResponseIds)")
+    suspend fun getExistingBackendSectionResponseIds(backendSectionResponseIds: List<Long>): List<Long>
+
+
+    @Query("UPDATE t_section_response SET backendSectionResponseId = :backendSectionResponseId WHERE formResponseId = :formResponseId AND sectionId = :sectionId")
+    suspend fun updateBackendSectionResponseId(formResponseId: Long, sectionId: Int, backendSectionResponseId: Long)
+
+
     // Captures the backend's own responseId (from submitBulkCounselling's response) onto the
     // live row that was just pushed — see ContactTracingRepositoryImpl.submitResponseBulk.
     @Query("UPDATE t_form_response SET backendResponseId = :backendResponseId WHERE responseId = :responseId")
@@ -99,25 +107,22 @@ interface CounsellingFormResponseDao {
     fun observeFormResponseStatus(beneficiaryId: Long, formType: String): Flow<String?>
 
     // TPT Follow-up History — read-only snapshot rows (isHistorySnapshot = 1) synced in from the
-    // History API, see ContactTracingRepositoryImpl.refreshTptHistory. Sorted by the backend's
-    // own numeric responseId (INTEGER column, so this is a correct numeric sort, not
-    // lexicographic) descending — latest submission first.
+    // History API, see ContactTracingRepositoryImpl.fetchAndRefreshTptHistory. Each row represents
+    // exactly ONE backend POST_SUBMIT section-response instance (one visit), not the shared
+    // form-level backendResponseId — that container id is the SAME value across every visit for a
+    // beneficiary, so it can't discriminate between them. Ordered by the visit's own
+    // backendSectionResponseId (an increasing backend id) descending — latest visit first.
     @Transaction
     @Query(
         """
-        SELECT * FROM t_form_response
-        WHERE beneficiaryId = :beneficiaryId AND formVersionId = :formVersionId AND isHistorySnapshot = 1
-        ORDER BY backendResponseId DESC
+        SELECT * FROM t_form_response r
+        WHERE r.beneficiaryId = :beneficiaryId AND r.formVersionId = :formVersionId AND r.isHistorySnapshot = 1
+        ORDER BY (
+            SELECT MAX(sr.backendSectionResponseId) FROM t_section_response sr WHERE sr.formResponseId = r.responseId
+        ) DESC
         """
     )
     fun getTptHistory(beneficiaryId: Long, formVersionId: Int): Flow<List<CompleteFormResponse>>
-
-    // Delete-then-reinsert refresh: wipes only the exact historical rows the fresh History API
-    // fetch is about to replace (matched by the backend's own responseId), cascading via the
-    // existing FK(formResponseId -> responseId, CASCADE) on t_section_response to also clear
-    // their section/question rows. Never touches a live (isHistorySnapshot = 0) row.
-    @Query("DELETE FROM t_form_response WHERE isHistorySnapshot = 1 AND backendResponseId IN (:backendResponseIds)")
-    suspend fun deleteHistoryByBackendResponseIds(backendResponseIds: List<Long>)
 
     // Phase-aware "existing response" lookup for TPT_FOLLOW_UP: unlike every other Contact
     // Tracing form (at most one live row per beneficiary+formVersion), TPT_FOLLOW_UP's
@@ -140,25 +145,52 @@ interface CounsellingFormResponseDao {
     // Count of completed POST_SUBMIT follow-up forms for this beneficiary — computed fresh from
     // actual submitted rows (not a manually-incremented counter), matching TPT_FOLLOW_UP's
     // repeatable, count-target follow-up model (see RegimenAdvised.requiredFollowUpCount).
+    //
+    // Takes MAX(live count, history-snapshot count) rather than either alone. After a reinstall
+    // the local DAO has NO live (isHistorySnapshot = 0) rows at all — those visits only exist
+    // locally as isHistorySnapshot = 1 history-snapshot rows once
+    // ContactTracingRepositoryImpl.fetchAndRefreshTptHistory bootstraps them from the backend —
+    // so counting isHistorySnapshot = 0 alone always reports 0 after reinstall regardless of how
+    // many were actually completed, leaving the Fill button visible forever. The history count is
+    // always an accurate reflection of the backend's confirmed total (deduped 1:1 against the
+    // backend's own sectionResponseId — see fetchAndRefreshTptHistory), while the live count is
+    // only ever ahead of it in the brief window right after a fresh local submission, before the
+    // next background refresh catches up — so MAX (not SUM) avoids ever double-counting the same
+    // real-world visit if it's briefly represented both ways.
     @Query("""
-        SELECT COUNT(DISTINCT r.responseId) FROM t_form_response r
-        JOIN t_section_response sr ON sr.formResponseId = r.responseId
-        JOIN t_form_section fs ON fs.sectionId = sr.sectionId
-        WHERE r.beneficiaryId = :beneficiaryId AND r.formVersionId = :formVersionId
-          AND r.isHistorySnapshot = 0 AND r.status = 'COMPLETE' AND fs.sectionPhase = 'POST_SUBMIT'
+        SELECT MAX(
+            (SELECT COUNT(DISTINCT r.responseId) FROM t_form_response r
+             JOIN t_section_response sr ON sr.formResponseId = r.responseId
+             JOIN t_form_section fs ON fs.sectionId = sr.sectionId
+             WHERE r.beneficiaryId = :beneficiaryId AND r.formVersionId = :formVersionId
+               AND r.isHistorySnapshot = 0 AND r.status = 'COMPLETE' AND fs.sectionPhase = 'POST_SUBMIT'),
+            (SELECT COUNT(DISTINCT r.responseId) FROM t_form_response r
+             JOIN t_section_response sr ON sr.formResponseId = r.responseId
+             JOIN t_form_section fs ON fs.sectionId = sr.sectionId
+             WHERE r.beneficiaryId = :beneficiaryId AND r.formVersionId = :formVersionId
+               AND r.isHistorySnapshot = 1 AND fs.sectionPhase = 'POST_SUBMIT')
+        )
     """)
     fun observeSubmittedFollowUpCount(beneficiaryId: Long, formVersionId: Int): Flow<Int>
 
     // One-shot variant of observeSubmittedFollowUpCount (same query, suspend instead of Flow) —
     // used by ContactTracingRepositoryImpl.isFollowUpTargetReached to enforce the regimen's
     // requiredFollowUpCount at form-open time itself, not just via the Examine row's Fill
-    // button visibility (a hidden button alone can't stop a submission already in flight).
+    // button visibility (a hidden button alone can't stop a submission already in flight). Same
+    // MAX(live, history) reasoning as observeSubmittedFollowUpCount above.
     @Query("""
-        SELECT COUNT(DISTINCT r.responseId) FROM t_form_response r
-        JOIN t_section_response sr ON sr.formResponseId = r.responseId
-        JOIN t_form_section fs ON fs.sectionId = sr.sectionId
-        WHERE r.beneficiaryId = :beneficiaryId AND r.formVersionId = :formVersionId
-          AND r.isHistorySnapshot = 0 AND r.status = 'COMPLETE' AND fs.sectionPhase = 'POST_SUBMIT'
+        SELECT MAX(
+            (SELECT COUNT(DISTINCT r.responseId) FROM t_form_response r
+             JOIN t_section_response sr ON sr.formResponseId = r.responseId
+             JOIN t_form_section fs ON fs.sectionId = sr.sectionId
+             WHERE r.beneficiaryId = :beneficiaryId AND r.formVersionId = :formVersionId
+               AND r.isHistorySnapshot = 0 AND r.status = 'COMPLETE' AND fs.sectionPhase = 'POST_SUBMIT'),
+            (SELECT COUNT(DISTINCT r.responseId) FROM t_form_response r
+             JOIN t_section_response sr ON sr.formResponseId = r.responseId
+             JOIN t_form_section fs ON fs.sectionId = sr.sectionId
+             WHERE r.beneficiaryId = :beneficiaryId AND r.formVersionId = :formVersionId
+               AND r.isHistorySnapshot = 1 AND fs.sectionPhase = 'POST_SUBMIT')
+        )
     """)
     suspend fun getSubmittedFollowUpCount(beneficiaryId: Long, formVersionId: Int): Int
 
@@ -179,6 +211,21 @@ interface CounsellingFormResponseDao {
     """)
     suspend fun getAnsweredOptionValue(beneficiaryId: Long, formVersionId: Int, phase: String, questionUuid: String): String?
 
+    // Phase-agnostic variant of getAnsweredOptionValue, for forms like CONTACT_FOLLOW_UP that
+    // have no PRE_SUBMIT/POST_SUBMIT phase split of their own (unlike TPT_FOLLOW_UP), so there is
+    // no single phase value to filter on.
+    @Query("""
+        SELECT qo.optionValue FROM t_form_response r
+        JOIN t_section_response sr ON sr.formResponseId = r.responseId
+        JOIN t_question_response qr ON qr.sectionResponseId = sr.sectionResponseId
+        JOIN t_section_question sq ON sq.questionId = qr.questionId
+        JOIN t_question_option qo ON qo.optionId = qr.optionId
+        WHERE r.beneficiaryId = :beneficiaryId AND r.formVersionId = :formVersionId
+          AND r.isHistorySnapshot = 0 AND sq.questionUuid = :questionUuid
+        ORDER BY r.responseId DESC LIMIT 1
+    """)
+    suspend fun getAnsweredOptionValueAnyPhase(beneficiaryId: Long, formVersionId: Int, questionUuid: String): String?
+
     @Query(
         """
         SELECT fr.beneficiaryId AS beneficiaryId, COUNT(DISTINCT sr.sectionId) AS filledCount
@@ -195,9 +242,77 @@ interface CounsellingFormResponseDao {
         """
     )
     suspend fun getLocalPreSubmitFilledCounts(): List<BeneficiaryPreSubmitFilledCount>
+
+    @Query(
+        """
+        SELECT DISTINCT r.beneficiaryId FROM t_form_response r
+        JOIN t_form_version v ON r.formVersionId = v.versionId
+        JOIN t_dynamic_form f ON v.formId = f.formId
+        WHERE f.formType = :formType AND r.isHistorySnapshot = 0
+          AND (r.status = 'SUBMITTED' OR r.status = 'COMPLETE' OR r.status = 'COMPLETED')
+        """
+    )
+    fun getFormDoneBenIds(formType: String): Flow<List<Long>>
+
+    // Same MAX(live, history) reasoning as observeSubmittedFollowUpCount above, applied across all
+    // beneficiaries — feeds the beneficiary list's Examine badge (see
+    // IContactTracingRepository.observeTptFollowUpTargetReachedBenIds), which would otherwise
+    // wrongly report a reinstalled beneficiary's TPT Followup as incomplete. Unions the live-only
+    // and history-only per-beneficiary+version counts, then takes the max of whichever rows exist
+    // for that key in the outer GROUP BY (a key present on only one side is unaffected — MAX of a
+    // single value is that value).
+    @Query(
+        """
+        SELECT beneficiaryId, formVersionId, MAX(submittedCount) AS submittedCount FROM (
+            SELECT r.beneficiaryId AS beneficiaryId, r.formVersionId AS formVersionId, COUNT(DISTINCT r.responseId) AS submittedCount
+            FROM t_form_response r
+            JOIN t_section_response sr ON sr.formResponseId = r.responseId
+            JOIN t_form_section fs ON fs.sectionId = sr.sectionId
+            WHERE r.isHistorySnapshot = 0 AND r.status = 'COMPLETE' AND fs.sectionPhase = 'POST_SUBMIT'
+            GROUP BY r.beneficiaryId, r.formVersionId
+
+            UNION ALL
+
+            SELECT r.beneficiaryId AS beneficiaryId, r.formVersionId AS formVersionId, COUNT(DISTINCT r.responseId) AS submittedCount
+            FROM t_form_response r
+            JOIN t_section_response sr ON sr.formResponseId = r.responseId
+            JOIN t_form_section fs ON fs.sectionId = sr.sectionId
+            WHERE r.isHistorySnapshot = 1 AND fs.sectionPhase = 'POST_SUBMIT'
+            GROUP BY r.beneficiaryId, r.formVersionId
+        )
+        GROUP BY beneficiaryId, formVersionId
+        """
+    )
+    fun getAllSubmittedFollowUpCounts(): Flow<List<BeneficiaryFollowUpCount>>
+
+    @Query(
+        """
+        SELECT r.beneficiaryId AS beneficiaryId, r.formVersionId AS formVersionId, qo.optionValue AS optionValue
+        FROM t_form_response r
+        JOIN t_section_response sr ON sr.formResponseId = r.responseId
+        JOIN t_form_section fs ON fs.sectionId = sr.sectionId
+        JOIN t_question_response qr ON qr.sectionResponseId = sr.sectionResponseId
+        JOIN t_section_question sq ON sq.questionId = qr.questionId
+        JOIN t_question_option qo ON qo.optionId = qr.optionId
+        WHERE r.isHistorySnapshot = 0 AND fs.sectionPhase = 'PRE_SUBMIT' AND sq.questionUuid = :questionUuid
+        """
+    )
+    fun getAllRegimenAnswers(questionUuid: String): Flow<List<BeneficiaryRegimenAnswer>>
 }
 
 data class BeneficiaryPreSubmitFilledCount(
     val beneficiaryId: Long,
     val filledCount: Int
+)
+
+data class BeneficiaryFollowUpCount(
+    val beneficiaryId: Long,
+    val formVersionId: Int,
+    val submittedCount: Int
+)
+
+data class BeneficiaryRegimenAnswer(
+    val beneficiaryId: Long,
+    val formVersionId: Int,
+    val optionValue: String
 )

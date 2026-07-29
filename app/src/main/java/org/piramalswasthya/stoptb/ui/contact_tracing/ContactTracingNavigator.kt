@@ -11,7 +11,8 @@ interface ContactTracingNavigator {
         formType: FormType,
         contactType: String,
         sectionPhase: SectionPhase? = null,
-        addToBackStack: Boolean = false
+        addToBackStack: Boolean = false,
+        viewHistory: Boolean = false
     )
     fun onFormCompleted()
 
