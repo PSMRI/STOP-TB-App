@@ -133,6 +133,7 @@ class CounsellingDynamicAdapter(
             QuestionType.MCQ,
             null -> TYPE_TEXT
         }
+    }
 
     // rebinding the rest of the list, so an unrelated row's focus/keyboard isn't disturbed.
     fun notifyQuestionUpdated(questionId: Int) {
