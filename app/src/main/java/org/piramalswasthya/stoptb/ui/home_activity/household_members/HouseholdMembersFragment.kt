@@ -148,6 +148,21 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
                 viewModel.diagnosisBenIds.collect { benAdapter.submitDiagnosisBenIds(it) }
             }
         }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.contactFollowUpDoneBenIds.collect { benAdapter.submitContactFollowUpDoneBenIds(it) }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.tptFollowUpDoneBenIds.collect { benAdapter.submitTptFollowUpDoneBenIds(it) }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.tptEligibleBenIds.collect { benAdapter.submitTptEligibleBenIds(it) }
+            }
+        }
 
         // Nurse role: invisible (takes space but not visible/clickable)
         // Nurse & Counselling officer role: invisible (takes space but not visible/clickable)

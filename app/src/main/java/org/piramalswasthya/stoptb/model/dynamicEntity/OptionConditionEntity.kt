@@ -30,5 +30,12 @@ data class OptionConditionEntity(
     val actionType: String, // "VISIBLE", "MANDATORY"
     val isFulfilledValue: Boolean, // e.g. true for show, false for hide
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    // Contact Tracing fields (nullable, unused by existing forms)
+    val targetFormUuid: String? = null,
+    val alertMessage: String? = null,
+    val targetList: String? = null,
+    val actionValue: String? = null,
+    val note: String? = null,
+    val reEnableCondition: String? = null
 )

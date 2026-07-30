@@ -59,7 +59,10 @@ data class ServerSectionResponseDto(
     @SerializedName("sectionResponseId") val sectionResponseId: Long,
     @SerializedName("sectionId") val sectionId: Int,
     @SerializedName("status") val status: String? = null,
-    @SerializedName("answers") val answers: List<ServerAnswerDto> = emptyList()
+    @SerializedName("answers") val answers: List<ServerAnswerDto> = emptyList(),
+    @SerializedName("sectionUuid") val sectionUuid: String,
+    @SerializedName("isEditable") val isEditable: Boolean? = null,
+
 )
 
 data class ServerAnswerDto(

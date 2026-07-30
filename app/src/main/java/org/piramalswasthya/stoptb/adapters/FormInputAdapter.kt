@@ -424,6 +424,8 @@ class FormInputAdapter(
 
             binding.actvRvDropdown.setOnItemClickListener { _, _, index, _ ->
                 hideKeyboardWithRetry()
+                binding.actvRvDropdown.clearFocus()
+                binding.root.parent?.requestDisallowInterceptTouchEvent(false)
                 item.value = item.entries?.get(index)
                 Timber.d("Item DD : $item")
 //                if (item.hasDependants || item.hasAlertError) {
@@ -434,7 +436,8 @@ class FormInputAdapter(
             }
 
             binding.actvRvDropdown.setOnClickListener {
-                hideKeyboardWithRetry()
+                binding.root.context.findFragmentActivity()?.currentFocus?.clearFocus()
+                hideKeyboardImmediately()
             }
 
             item.errorText?.let { binding.tilRvDropdown.error = it }

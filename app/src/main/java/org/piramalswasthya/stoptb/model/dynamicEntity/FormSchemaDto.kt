@@ -121,6 +121,18 @@ data class FormFieldDto(
     @SerializedName("displayOrder")
     val displayOrder: Int? = null,
 
+    @SerializedName("visibleByDefault")
+    val visibleByDefault: Boolean = true,
+
+    @SerializedName("enabledIf")
+    val enabledIf: ConditionRefDto? = null,
+
+    @SerializedName("disabledIf")
+    val disabledIf: ConditionRefDto? = null,
+
+    @SerializedName("mandatoryIf")
+    val mandatoryIf: ConditionRefDto? = null,
+
     @Transient var visible: Boolean = true,
     @Transient var errorMessage: String? = null,
     @Transient var isEditable: Boolean = true
@@ -152,7 +164,10 @@ data class FormFieldDto(
                                 targetQuestionId = (condMap["targetQuestionId"] as? Number)?.toInt(),
                                 targetSectionId = (condMap["targetSectionId"] as? Number)?.toInt(),
                                 targetQuestionUuid = condMap["targetQuestionUuid"]?.toString(),
-                                targetSectionUuid = condMap["targetSectionUuid"]?.toString()
+                                targetSectionUuid = condMap["targetSectionUuid"]?.toString(),
+                                targetFormUuid = condMap["targetFormUuid"]?.toString(),
+                                alertMessage = condMap["alertMessage"]?.toString(),
+                                actionValue = condMap["value"]?.toString()
                             )
                         } else null
                     } ?: emptyList()
@@ -249,7 +264,21 @@ data class ConditionDto(
     val targetQuestionId: Int?,
     val targetSectionId: Int?,
     val targetQuestionUuid: String?,
-    val targetSectionUuid: String?
+    val targetSectionUuid: String?,
+    val targetFormUuid: String? = null,
+    val alertMessage: String? = null,
+    val actionValue: String? = null
+)
+
+// A question's enabledIf/disabledIf/mandatoryIf reference — moved here (was
+// ContactTracingConditionRefDto) since it's not actually Contact-Tracing-specific: it drives
+// the shared conditional show/hide/mandatory engine any dynamic form question can use.
+data class ConditionRefDto(
+    @SerializedName("questionUuid") val questionUuid: String,
+    @SerializedName("equals") val equalsValue: String? = null,
+    @SerializedName("inValues") val inValues: List<String>? = null,
+    @SerializedName("containsValue") val containsValue: String? = null,
+    @SerializedName("isNotEmpty") val isNotEmpty: Boolean? = null
 )
 
 data class ValidationItemDto(

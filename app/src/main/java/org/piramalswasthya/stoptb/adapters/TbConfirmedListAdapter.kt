@@ -64,9 +64,13 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             val isCounselledByProgress = !isRefused && totalSections > 0 && sectionsFilled >= totalSections
             val isBenAlreadyCounselled = (benIdList != null && benIdList.contains(item.ben.benId)) &&
                     sectionsFilled == 0
+            val role = pref?.getLoggedInUser()?.role
+
             binding.ivSyncState.visibility = if (item.tbConfirmedList == null) View.INVISIBLE else View.VISIBLE
 
             binding.counsellingSectionProgress.setProgress(sectionsFilled, totalSections)
+            binding.counsellingSectionProgress.visibility = if(role.isCounsellingOfficerRole()) View.VISIBLE else View.INVISIBLE
+            binding.btnContactTracing.visibility = if(role.isCounsellingOfficerRole()) View.VISIBLE else View.GONE
 
             if (isRefused) {
                 binding.btnCounselling.visibility = View.GONE
@@ -86,7 +90,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
                 binding.btnCounselling.text = binding.root.context.getString(org.piramalswasthya.stoptb.R.string.counselling_start_button)
             }
 
-            val role = pref?.getLoggedInUser()?.role
+
             if (role != null) {
                 checkIfCounsellingOfficerOrNot(role, (item.isCounselled || isCounselledByProgress || isRefused || isBenAlreadyCounselled))
             } else {
@@ -178,7 +182,8 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
         private val clickedForm: ((hhId: Long, benId: Long) -> Unit)? = null,
         private val clickedCounselling: ((item: BenWithTbSuspectedDomain) -> Unit)? = null,
         private val clickedCounselled: ((item: BenWithTbSuspectedDomain) -> Unit)? = null,
-        private val clickedViewMember : ((item : BenWithTbSuspectedDomain) -> Unit)? = null
+        private val clickedViewMember : ((item : BenWithTbSuspectedDomain) -> Unit)? = null,
+        private val clickedContactTracing: ((item: BenWithTbSuspectedDomain) -> Unit)? = null
     ) {
         fun onClickForm(item: BenWithTbSuspectedDomain) =
             clickedForm?.let { it(item.ben.hhId, item.ben.benId) }
@@ -188,6 +193,8 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             clickedCounselled?.let { it(item) }
         fun onClickViewMember(item : BenWithTbSuspectedDomain) =
             clickedViewMember?.let { it(item) }
+        fun onClickContactTracing(item: BenWithTbSuspectedDomain) =
+            clickedContactTracing?.let { it(item) }
     }
     fun submitBenIds(list: List<Long>?) {
         if (list != null) {

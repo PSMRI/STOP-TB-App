@@ -13,10 +13,12 @@
         xmlns:app="http://schemas.android.com/apk/res-auto"
         app:counterEnabled="true">
 
-        <com.google.android.material.textfield.TextInputEditText
+        <androidx.appcompat.widget.AppCompatEditText
             android:id="@+id/et_input"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:inputType="textMultiLine" />
+
     </com.google.android.material.textfield.TextInputLayout>
     <TextView
         android:id="@+id/tv_error"

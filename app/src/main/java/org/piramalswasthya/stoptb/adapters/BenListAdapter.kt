@@ -81,6 +81,9 @@ class BenListAdapter(
             generalOpdBenIds: List<Long> = emptyList(),
             anthropometryBenIds: List<Long> = emptyList(),
             tbSuspectedBenIds: List<Long> = emptyList(),
+            contactFollowUpDoneBenIds: List<Long> = emptyList(),
+            tptFollowUpDoneBenIds: List<Long> = emptyList(),
+            tptEligibleBenIds: List<Long> = emptyList(),
             childCountMap: Map<Long, Int> = emptyMap(),
             showActionButtons: Boolean = true,
             showResultButton: Boolean = false,
@@ -114,6 +117,9 @@ class BenListAdapter(
             val hasGeneralOpd = generalOpdBenIds.contains(item.benId)
             val hasAnthropometry = anthropometryBenIds.contains(item.benId)
             val hasDiagnosis = tbSuspectedBenIds.contains(item.benId)
+            val hasContactFollowUpDone = contactFollowUpDoneBenIds.contains(item.benId)
+            val hasTptFollowUpDone = tptFollowUpDoneBenIds.contains(item.benId)
+            val isTptEligible = tptEligibleBenIds.contains(item.benId)
             binding.isGeneralOpdDone = hasGeneralOpd
             binding.isAnthropometryDone = hasAnthropometry
 
@@ -459,12 +465,24 @@ class BenListAdapter(
             // Examine button — show filled count X/total
             // Registrar: Anthropometry + TB Screening
             // Nurse: Diagnosis hidden, so total stays 4
+            // Counselling Officer: TB Screening + Contact Follow Up are always required (total = 2);
+            // TPT Follow Up becomes a 3rd required item (total = 3) only when this beneficiary's
+            // ClinicalScreeningStatus answer is TPT_ELIGIBLE (see IContactTracingRepository.observeTptEligibleBenIds) —
+            // otherwise FULL_TREATMENT/NO_TREATMENT beneficiaries would incorrectly get stuck at x/3.
             // Others: all 5 forms
             val currentRole = pref?.getLoggedInUser()?.role
             val isCounsellingOfficer = currentRole.isCounsellingOfficerRole()
             val isRegistrar = pref?.getLoggedInUser()?.role.isRegistrationOfficerRole()
             val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
-            val (examineFilledCount, examineTotal) = if (isRegistrar) {
+            val isCounsellingOfficerForExamine = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
+            val (examineFilledCount, examineTotal) = if (isCounsellingOfficerForExamine) {
+                val requiredItems = if (isTptEligible) {
+                    listOf(hasTbScreening, hasContactFollowUpDone, hasTptFollowUpDone)
+                } else {
+                    listOf(hasTbScreening, hasContactFollowUpDone)
+                }
+                Pair(requiredItems.count { it }, requiredItems.size)
+            } else if (isRegistrar) {
                 val filled = listOf(
                     hasAnthropometry,
                     hasTbScreening
@@ -487,15 +505,6 @@ class BenListAdapter(
                 ).count { it }
                 Pair(filled, 4)
             }
-
-            binding.btnExamine.text = binding.root.context.getString(
-                R.string.btn_examine_count_of, examineFilledCount, examineTotal
-            )
-            binding.btnExamine.backgroundTintList = ContextCompat.getColorStateList(
-                binding.root.context,
-                if (examineFilledCount > 0) android.R.color.holo_green_dark
-                else android.R.color.holo_red_dark
-            )
 
             binding.btnExamine.text = "Examine ($examineFilledCount/$examineTotal)"
             val isExamineFilled = examineFilledCount > 0
@@ -624,6 +633,9 @@ class BenListAdapter(
     private val generalOpdIds     = mutableListOf<Long>()
     private val anthropometryIds  = mutableListOf<Long>()
     private val diagnosisIds      = mutableListOf<Long>()
+    private val contactFollowUpDoneIds = mutableListOf<Long>()
+    private val tptFollowUpDoneIds     = mutableListOf<Long>()
+    private val tptEligibleIds         = mutableListOf<Long>()
     private val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
     var source: Int = 0
 
@@ -645,6 +657,9 @@ class BenListAdapter(
             generalOpdIds,
             anthropometryIds,
             diagnosisIds,
+            contactFollowUpDoneIds,
+            tptFollowUpDoneIds,
+            tptEligibleIds,
             showActionButtons = showActionButtons,
             showResultButton = showResultButton,
             showAnthropometryButton = showAnthropometryButton,
@@ -679,6 +694,9 @@ class BenListAdapter(
     fun submitGeneralOpdBenIds(list: List<Long>)  = applyIdList(generalOpdIds, list)
     fun submitAnthropometryBenIds(list: List<Long>) = applyIdList(anthropometryIds, list)
     fun submitDiagnosisBenIds(list: List<Long>)   = applyIdList(diagnosisIds, list)
+    fun submitContactFollowUpDoneBenIds(list: List<Long>) = applyIdList(contactFollowUpDoneIds, list)
+    fun submitTptFollowUpDoneBenIds(list: List<Long>)      = applyIdList(tptFollowUpDoneIds, list)
+    fun submitTptEligibleBenIds(list: List<Long>)          = applyIdList(tptEligibleIds, list)
 
 
     class BenClickListener(

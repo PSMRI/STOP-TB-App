@@ -77,4 +77,27 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
 
+    <!-- 5. Diagnosis -->
+    <!--<include
+        android:id="@+id/row_diagnosis"
+        layout="@layout/rv_item_examine_form"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />-->
+
+    <!-- 6. Followup — Counselling Officer only. -->
+    <include
+        android:id="@+id/row_followup"
+        layout="@layout/rv_item_examine_form"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <!-- 7. TPT Followup — Counselling Officer only; hidden until TPT_FOLLOW_UP's PRE_SUBMIT
+         phase has been submitted (see ExamineViewModel.isTptFollowUpPreSubmitDone). -->
+    <include
+        android:id="@+id/row_tpt_followup"
+        layout="@layout/rv_item_examine_form"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
 </LinearLayout>

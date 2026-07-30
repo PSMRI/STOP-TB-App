@@ -32,6 +32,7 @@ import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
+import org.piramalswasthya.stoptb.repositories.contactTracing.IContactTracingRepository
 import java.io.File
 import java.io.FileWriter
 import javax.inject.Inject
@@ -43,7 +44,8 @@ class AllBenViewModel @Inject constructor(
     abhaGenratedRepo: ABHAGenratedRepo,
     private val benRepo: BenRepo,
     private val vitalRepo: VitalRepo,
-    val tbRepo: TBRepo
+    val tbRepo: TBRepo,
+    private val contactTracingRepo: IContactTracingRepository
 ) : ViewModel() {
 
     private var sourceFromArgs = AllBenFragmentArgs.fromSavedStateHandle(savedStateHandle).source
@@ -75,6 +77,9 @@ class AllBenViewModel @Inject constructor(
     val tbScreeningBenIds: Flow<List<Long>> = tbRepo.tbScreeningBenIds
     val generalOpdBenIds: Flow<List<Long>> = tbRepo.generalOpdBenIds
     val anthropometryFilledBenIds: Flow<List<Long>> = recordsRepo.anthropometryFilledBenIds
+    val contactFollowUpDoneBenIds: Flow<List<Long>> = contactTracingRepo.observeContactFollowUpDoneBenIds()
+    val tptFollowUpDoneBenIds: Flow<List<Long>> = contactTracingRepo.observeTptFollowUpTargetReachedBenIds()
+    val tptEligibleBenIds: Flow<List<Long>> = contactTracingRepo.observeTptEligibleBenIds()
 
     /** Diagnosis = TB_DIAGNOSTICS (new saves) OR TB_SUSPECTED (legacy saves) */
     val diagnosisBenIds: Flow<List<Long>> = combine(

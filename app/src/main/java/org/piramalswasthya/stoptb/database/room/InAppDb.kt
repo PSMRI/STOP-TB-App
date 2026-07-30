@@ -61,6 +61,7 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.SectionQuestionEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionOptionEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionValidationEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.OptionConditionEntity
+import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingFormResponseView
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormResponseEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.SectionResponseEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionResponseEntity
@@ -103,8 +104,8 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         SectionResponseEntity::class,
         QuestionResponseEntity::class
     ],
-    views = [BenBasicCache::class],
-    version = 26, exportSchema = false
+    views = [BenBasicCache::class, CounsellingFormResponseView::class],
+    version = 27, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -777,6 +778,64 @@ abstract class InAppDb : RoomDatabase() {
                 recreateBenBasicCacheView(database)
             }
         }
+
+
+        /*private val MIGRATION_24_25 = object : Migration(24, 25) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DROP INDEX IF EXISTS `index_t_form_response_beneficiaryId`")
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_t_form_response_beneficiaryId_formVersionId` " +
+                        "ON `t_form_response` (`beneficiaryId`, `formVersionId`)"
+                )
+
+                database.execSQL("DROP TABLE IF EXISTS `t_ct_question_response`")
+                database.execSQL("DROP TABLE IF EXISTS `t_ct_section_response`")
+                database.execSQL("DROP TABLE IF EXISTS `t_ct_response`")
+            }
+        }*/
+
+        // TPT Follow-up's PRE_SUBMIT/POST_SUBMIT split needs the backend's own responseId
+        // captured per response row, and its History feature caches read-only snapshot rows
+        // directly in t_form_response (isHistorySnapshot = true) rather than a separate table —
+        // which needs the prior unique (beneficiaryId, formVersionId) index relaxed, since a
+        // beneficiary can now have any number of historical rows for the same form/version
+        // alongside their one live row. Purely additive: no data loss, existing rows default to
+        // backendResponseId = NULL, isHistorySnapshot = 0 (i.e. classified as live, correct for
+        // every row that exists today).
+        private val MIGRATION_25_26 = object : Migration(25, 26) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                addTBScreeningRiskFactorColumns(database)
+
+                if (!columnExists(database, "t_form_response", "backendResponseId")) {
+                    database.execSQL("ALTER TABLE t_form_response ADD COLUMN backendResponseId INTEGER DEFAULT NULL")
+                }
+                if (!columnExists(database, "t_form_response", "isHistorySnapshot")) {
+                    database.execSQL("ALTER TABLE t_form_response ADD COLUMN isHistorySnapshot INTEGER NOT NULL DEFAULT 0")
+                }
+
+                database.execSQL("DROP INDEX IF EXISTS `index_t_form_response_beneficiaryId_formVersionId`")
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_t_form_response_beneficiaryId_formVersionId_isHistorySnapshot` " +
+                        "ON `t_form_response` (`beneficiaryId`, `formVersionId`, `isHistorySnapshot`)"
+                )
+            }
+        }
+
+        // Tracks the backend's own sectionResponseId on each locally-stored section response, so
+        // ContactTracingRepositoryImpl.fetchAndRefreshTptHistory can detect a section already
+        // bootstrapped from a previous API fetch and skip re-inserting it as a duplicate row.
+        private val MIGRATION_26_27 = object : Migration(26, 27) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "t_section_response", "backendSectionResponseId")) {
+                    database.execSQL("ALTER TABLE t_section_response ADD COLUMN backendSectionResponseId INTEGER DEFAULT NULL")
+                }
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_t_section_response_backendSectionResponseId` " +
+                        "ON `t_section_response` (`backendSectionResponseId`)"
+                )
+            }
+        }
+
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(
@@ -850,6 +909,11 @@ abstract class InAppDb : RoomDatabase() {
 
         private val MIGRATION_24_25 = object : Migration(24, 25) {
             override fun migrate(database: SupportSQLiteDatabase) {
+                /*database.execSQL("DROP INDEX IF EXISTS `index_t_form_response_beneficiaryId`")
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_t_form_response_beneficiaryId_formVersionId` " +
+                            "ON `t_form_response` (`beneficiaryId`, `formVersionId`)"
+                )*/
                 if (!columnExists(database, "TB_DIAGNOSTICS", "rifOrderId")) {
                     database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN rifOrderId TEXT DEFAULT NULL")
                 }
@@ -925,11 +989,11 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_25_26 = object : Migration(25, 26) {
+        /*private val MIGRATION_25_26 = object : Migration(25, 26) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 addTBScreeningRiskFactorColumns(database)
             }
-        }
+        }*/
 
         private fun addTBScreeningRiskFactorColumns(database: SupportSQLiteDatabase) {
             val columns = listOf(
@@ -1017,6 +1081,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_23_24)
                         .addMigrations(MIGRATION_24_25)
                         .addMigrations(MIGRATION_25_26)
+                        .addMigrations(MIGRATION_26_27)
                         .fallbackToDestructiveMigration()
                         .build()
 
