@@ -3,11 +3,12 @@ package org.piramalswasthya.stoptb.repositories.dynamicRepo
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.room.withTransaction
-import kotlinx.coroutines.flow.Flow
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.model.dynamicEntity.*
 import org.piramalswasthya.stoptb.network.AmritApiService
 import org.piramalswasthya.stoptb.helpers.dynamicMapper.PayloadBuilder
+import org.piramalswasthya.stoptb.helpers.dynamicMapper.QuestionIdStrategy
+import org.piramalswasthya.stoptb.helpers.dynamicMapper.storeFormSchemaInDb
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
@@ -74,139 +75,22 @@ class CounsellingRepositoryImpl @Inject constructor(
         }
     }
 
+    private val gson = com.google.gson.Gson()
+
     private suspend fun storeFormSchemaInDb(apiSchema: FormSchemaDto) {
-        val formId = apiSchema.formId.toIntOrNull() ?: 0
-        val formUuid = apiSchema.formUuid ?: "FORM_${formId}"
-        val followUpDelayDays =  apiSchema.followUpDelayDays
-        Timber.d("storeFormSchemaInDb: Inserting formId = $formId, formUuid = $formUuid, formName = ${apiSchema.formName}")
-        val formEntity = DynamicFormEntity(
-            formId = formId,
-            formUuid = formUuid,
-            formName = apiSchema.formName,
-            formType = apiSchema.formType ?: "",
-            followUpDelayDays = followUpDelayDays
+        storeFormSchemaInDb(
+            metadataDao = metadataDao,
+            gson = gson,
+            apiSchema = apiSchema,
+            idStrategy = QuestionIdStrategy.HASH_BASED,
+            wipeExistingVersions = true
         )
-        metadataDao.deleteVersionsByFormId(formId)
-        metadataDao.insertForm(formEntity)
-
-        val versionId = formId * 1000 + apiSchema.versionNumber
-        Timber.d("storeFormSchemaInDb: Inserting versionId = $versionId, versionNumber = ${apiSchema.versionNumber}")
-        val versionEntity = FormVersionEntity(
-            versionId = versionId,
-            formId = formId,
-            versionNumber = apiSchema.versionNumber,
-            isActive = apiSchema.isActive
-        )
-        metadataDao.insertVersion(versionEntity)
-
-        val sectionsToInsert = mutableListOf<FormSectionEntity>()
-        val questionsToInsert = mutableListOf<SectionQuestionEntity>()
-        val optionsToInsert = mutableListOf<QuestionOptionEntity>()
-        val conditionsToInsert = mutableListOf<OptionConditionEntity>()
-        val validationsToInsert = mutableListOf<QuestionValidationEntity>()
-
-        // Build questionId -> fieldId map for mapping condition target IDs
-        val questionIdToFieldIdMap = mutableMapOf<Int, String>()
-        apiSchema.sections.forEach { sectionDto ->
-            sectionDto.questions.forEach { questionDto ->
-                questionDto.questionId?.let { qId ->
-                    questionIdToFieldIdMap[qId] = questionDto.fieldId
-                }
-            }
-        }
-
-        Timber.d("storeFormSchemaInDb: Mapping ${apiSchema.sections.size} sections...")
-        apiSchema.sections.forEach { sectionDto ->
-            val sectionIdInt = sectionDto.sectionId.toIntOrNull() ?: 0
-            val sectionEntity = FormSectionEntity(
-                sectionId = sectionIdInt,
-                versionId = versionId,
-                sectionName = sectionDto.sectionName,
-                sectionNameHindi = sectionDto.sectionNameHindi,
-                sectionOrder = sectionDto.displayOrder ?: 0,
-                sectionPhase = sectionDto.sectionPhase ?: "",
-                sectionUuid = sectionDto.sectionUuid,
-                isEditable = sectionDto.isEditable
-            )
-            sectionsToInsert.add(sectionEntity)
-
-            Timber.d("storeFormSchemaInDb: Mapping ${sectionDto.questions.size} questions for section $sectionIdInt...")
-            sectionDto.questions.forEach { questionDto ->
-                val questionIdInt = questionDto.fieldId.hashCode()
-                val questionEntity = SectionQuestionEntity(
-                    questionId = questionIdInt,
-                    sectionId = sectionIdInt,
-                    questionText = questionDto.label,
-                    questionTextHindi = questionDto.labelHindi,
-                    questionType = questionDto.type,
-                    questionOrder = questionDto.displayOrder ?: 0,
-                    isRequired = questionDto.isMandatory,
-                    questionUuid = questionDto.fieldId,
-                    serverQuestionId = questionDto.questionId
-                )
-                questionsToInsert.add(questionEntity)
-
-                val optionItems = questionDto.getOptionItems()
-                Timber.d("storeFormSchemaInDb: Mapping ${optionItems.size} options for question $questionIdInt...")
-                optionItems.forEach { optionDto ->
-                    val optionIdInt = (questionDto.fieldId + "_" + optionDto.optionValue).hashCode()
-                    val optionEntity = QuestionOptionEntity(
-                        optionId = optionIdInt,
-                        questionId = questionIdInt,
-                        optionText = optionDto.optionLabel,
-                        optionTextHindi = optionDto.optionLabelHindi,
-                        optionValue = optionDto.optionValue,
-                        optionOrder = optionDto.displayOrder,
-                        serverOptionId = optionDto.optionId
-                    )
-                    optionsToInsert.add(optionEntity)
-
-                    optionDto.conditions.forEach conditionLoop@{ conditionDto ->
-                        val targetQId = conditionDto.targetQuestionId ?: return@conditionLoop
-                        val mappedTargetQId = conditionDto.targetQuestionUuid?.hashCode()
-                            ?: questionIdToFieldIdMap[targetQId]?.hashCode()
-                            ?: run {
-                                Timber.w("conditionLoop: cannot map targetQId=$targetQId for option ${optionDto.optionValue}, skipping condition")
-                                return@conditionLoop
-                            }
-                        val conditionIdInt = (questionDto.fieldId + "_" + optionDto.optionValue + "_" + targetQId).hashCode()
-                        val conditionEntity = OptionConditionEntity(
-                            conditionId = conditionIdInt,
-                            optionId = optionIdInt,
-                            targetQuestionId = mappedTargetQId,
-                            actionType = conditionDto.actionType,
-                            isFulfilledValue = true
-                        )
-                        conditionsToInsert.add(conditionEntity)
-                    }
-                }
-
-                questionDto.validations.forEach { validationDto ->
-                    val validationIdInt = (questionDto.fieldId + "_" + validationDto.validationType).hashCode()
-                    val validationEntity = QuestionValidationEntity(
-                        validationId = validationIdInt,
-                        questionId = questionIdInt,
-                        validationType = validationDto.validationType,
-                        validationValue = validationDto.validationParam,
-                        errorMessage = validationDto.errorMessage
-                    )
-                    validationsToInsert.add(validationEntity)
-                }
-            }
-        }
-
-        Timber.d("storeFormSchemaInDb: Inserting sections: ${sectionsToInsert.size}, questions: ${questionsToInsert.size}, options: ${optionsToInsert.size}, conditions: ${conditionsToInsert.size}, validations: ${validationsToInsert.size}")
-        if (sectionsToInsert.isNotEmpty()) metadataDao.insertSections(sectionsToInsert)
-        if (questionsToInsert.isNotEmpty()) metadataDao.insertQuestions(questionsToInsert)
-        if (optionsToInsert.isNotEmpty()) metadataDao.insertOptions(optionsToInsert)
-        if (conditionsToInsert.isNotEmpty()) metadataDao.insertConditions(conditionsToInsert)
-        if (validationsToInsert.isNotEmpty()) metadataDao.insertValidations(validationsToInsert)
     }
 
 
     override suspend fun getOrCreateDraft(beneficiaryId: Long, formVersionId: Int): CompleteFormResponse {
         return db.withTransaction {
-            val existing = responseDao.getFormResponseForBeneficiary(beneficiaryId)
+            val existing = responseDao.getFormResponseForBeneficiary(beneficiaryId, formVersionId)
             if (existing != null) {
                 existing
             } else {
@@ -231,7 +115,7 @@ class CounsellingRepositoryImpl @Inject constructor(
                 }
                 responseDao.insertSectionResponses(sectionResponses)
 
-                responseDao.getFormResponseForBeneficiary(beneficiaryId)!!
+                responseDao.getFormResponseForBeneficiary(beneficiaryId, formVersionId)!!
             }
         }
     }
@@ -413,10 +297,6 @@ class CounsellingRepositoryImpl @Inject constructor(
         return SectionClassification(finalSectionId, nonFinalSectionIdsInOrder)
     }
 
-    override suspend fun getCounsellingRecord(beneficiaryId: Long): Flow<CompleteFormResponse?> {
-        return responseDao.getFormResponseForBeneficiaryFlow(beneficiaryId)
-    }
-
     override suspend fun syncUnsyncedRecords(): Boolean {
         Timber.d("syncUnsyncedRecords: querying all local form responses for debugging...")
         val allResponses = responseDao.getAllFormResponses()
@@ -426,7 +306,9 @@ class CounsellingRepositoryImpl @Inject constructor(
         Timber.d("syncUnsyncedRecords: ALL records currently in DB: $allDetails")
 
         Timber.d("syncUnsyncedRecords: querying unsynced records...")
-        val unsynced = responseDao.getUnsyncedFormResponses()
+        val unsynced = responseDao.getUnsyncedFormResponsesForTypes(
+            listOf(FormType.TB_COUNSELLING_V2.name, FormType.TB_COUNSELLING.name)
+        )
         Timber.d("syncUnsyncedRecords: found ${unsynced.size} unsynced records")
         if (unsynced.isNotEmpty()) {
             val unsyncedDetails = unsynced.map {
@@ -568,7 +450,13 @@ class CounsellingRepositoryImpl @Inject constructor(
         formUuid: String
     ): Boolean {
         try {
-            val localResponse = responseDao.getFormResponseForBeneficiary(beneficiaryId)
+            val formDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING_V2) ?: return false
+            val activeVersion = formDef.versions.find { it.version.isActive }
+                ?: formDef.versions.maxByOrNull { it.version.versionNumber }
+                ?: return false
+            val formVersionId = activeVersion.version.versionId
+
+            val localResponse = responseDao.getFormResponseForBeneficiary(beneficiaryId, formVersionId)
             val hasLocalAnswers = localResponse?.sectionResponses?.any { it.questionResponses.isNotEmpty() } == true
             if (localResponse != null && localResponse.formResponse.syncStatus == "SYNCED" &&
                 (localResponse.formResponse.status == "SUBMITTED" || localResponse.formResponse.status == "COMPLETE" || localResponse.formResponse.status == "COMPLETED" || localResponse.formResponse.status == "REFUSED") &&
@@ -578,13 +466,8 @@ class CounsellingRepositoryImpl @Inject constructor(
                 return true
             }
 
-            val formDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING_V2) ?: return false
-            val activeVersion = formDef.versions.find { it.version.isActive }
-                ?: formDef.versions.maxByOrNull { it.version.versionNumber }
-                ?: return false
-
             val jwt = preferenceDao.getJWTAmritToken() ?: return false
-            val response = amritApiService.getCounsellingResponse(jwt, beneficiaryId, formUuid)
+            val response = amritApiService.getBeneficiaryFormResponses(jwt, beneficiaryId, formUuid)
             if (!response.isSuccessful) return false
             val apiResponses = response.body()?.data
             if (apiResponses.isNullOrEmpty()) return false
@@ -592,13 +475,13 @@ class CounsellingRepositoryImpl @Inject constructor(
             db.withTransaction {
                 // Preserve any locally edited (UNSYNCED) responses — do not overwrite them
                 // with server data, as that would permanently discard unsaved user edits.
-                val unsyncedLocal = responseDao.getUnsyncedResponseForBeneficiary(beneficiaryId)
+                val unsyncedLocal = responseDao.getUnsyncedResponseForBeneficiary(beneficiaryId, formVersionId)
                 if (unsyncedLocal != null) return@withTransaction
 
-                val existingCreatedAt = responseDao.getFormResponseForBeneficiary(beneficiaryId)
+                val existingCreatedAt = responseDao.getFormResponseForBeneficiary(beneficiaryId, formVersionId)
                     ?.formResponse?.createdAt
 
-                responseDao.deleteFormResponseForBeneficiary(beneficiaryId)
+                responseDao.deleteFormResponseForBeneficiary(beneficiaryId, formVersionId)
 
                 val apiResponse = apiResponses.first()
 
@@ -786,7 +669,7 @@ class CounsellingRepositoryImpl @Inject constructor(
                                 item.totalSections > 0 && item.sectionsFilled == item.totalSections -> "COMPLETE"
                                 else -> null // in-progress: keep whatever local status already exists
                             }
-                            val existing = responseDao.getFormResponseForBeneficiary(benId)
+                            val existing = responseDao.getFormResponseForBeneficiary(benId, versionId)
                             if (existing == null) {
                                 responseDao.insertFormResponse(
                                     FormResponseEntity(

@@ -10,7 +10,7 @@ import org.piramalswasthya.stoptb.configuration.FormDataModel
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.network.TBSuspectedDTO
 import kotlin.Boolean
-import org.piramalswasthya.stoptb.model.dynamicEntity.FormResponseEntity
+import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingFormResponseView
 
 @Entity(
     tableName = "TB_SUSPECTED",
@@ -116,7 +116,7 @@ data class BenWithTbSuspectedCache(
         parentColumn = "benId",
         entityColumn = "beneficiaryId"
     )
-    val formResponse: FormResponseEntity?
+    val formResponse: CounsellingFormResponseView?
 )
 {
     fun asTbSuspectedDomainModel(): BenWithTbSuspectedDomain {
@@ -134,7 +134,7 @@ data class BenWithTbSuspectedDomain(
     val ben: BenBasicDomain,
     val tbSuspected: TBSuspectedCache?,
     val tbConfirmedList: List<TBConfirmedTreatmentCache>,
-    val formResponse: FormResponseEntity? = null
+    val formResponse: CounsellingFormResponseView? = null
 ) {
     val latestTbSyncState: SyncState?
         get() = tbConfirmedList

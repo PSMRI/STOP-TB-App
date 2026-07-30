@@ -24,7 +24,8 @@ import androidx.room.PrimaryKey
     indices = [
         Index("formResponseId"),
         Index("sectionId"),
-        Index(value = ["formResponseId", "sectionId"], unique = true)
+        Index(value = ["formResponseId", "sectionId"], unique = true),
+        Index("backendSectionResponseId")
     ]
 )
 data class SectionResponseEntity(
@@ -33,5 +34,8 @@ data class SectionResponseEntity(
     val sectionId: Int,
     val completedAt: Long? = null,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    // sectionResponseId from backend side — used to detect a section response already bootstrapped
+    // locally from a previous API fetch, so it isn't re-inserted as a duplicate row.
+    val backendSectionResponseId: Long? = null
 )

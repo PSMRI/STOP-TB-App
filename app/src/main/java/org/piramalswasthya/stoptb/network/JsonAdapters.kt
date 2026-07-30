@@ -460,6 +460,7 @@ data class DiagnosticOrderPushRequest(
     val providerServiceMapID: Int,
     val orderType: String,
     val orderEvent: String = "STOP_TB_REFERRAL",
+    val reasonForRefusal: String? = null,
     val patient: PatientRequest
 )
 
@@ -468,7 +469,8 @@ data class DiagnosticBeneficiaryStatusData(
     val awaitingProviderResult: List<Long>? = emptyList(),
     val completed: List<Long>? = emptyList(),
     val pollingTimedOut: List<Long>? = emptyList(),
-    val failed: List<Long>? = emptyList()
+    val failed: List<Long>? = emptyList(),
+    val refused: List<Long>? = emptyList()
 )
 
 data class DiagnosticBeneficiariesStatusResponse(
@@ -754,7 +756,9 @@ data class TBDiagnosticsDTO(
     val xrayOrderStatus: String? = null,
     val trueNatOrderId: String? = null,
     val trueNatOrderStatus: String? = null,
-    val trueNatRifResult: String? = null
+    val trueNatRifResult: String? = null,
+    val rifOrderId: String? = null,
+    val rifOrderStatus: String? = null
 ) {
     fun toCache(): TBDiagnosticsCache = TBDiagnosticsCache(
         benId = benId,
@@ -785,6 +789,8 @@ data class TBDiagnosticsDTO(
         trueNatOrderId = trueNatOrderId,
         trueNatOrderStatus = trueNatOrderStatus,
         trueNatRifResult = trueNatRifResult,
+        rifOrderId = rifOrderId,
+        rifOrderStatus = rifOrderStatus,
         latitude = latitude,
         longitude = longitude,
         address = address,

@@ -16,6 +16,7 @@
     <string name="notification_sync_channel_id">sakhi-sync0</string>
     <string name="btn_submit">জমা দিব</string>
     <string name="btn_skip">এৰি যাওক</string>
+    <string name="contact_tracing">সংস্পৰ্শ অনুসৰণ</string>
     <string name="long_to_string">%d</string>
     <string name="tv_reg_date_ph">নিবন্ধনৰ তাৰিখ</string>
     <string name="tv_ben_name_ph">উপকাৰীৰ নাম</string>
@@ -471,7 +472,7 @@
     <string name="recommended_for_liquid_culture_test">লিকুইড কালচাৰ পৰীক্ষাৰ পৰামৰ্শ দিয়া হৈছে</string>
     <string name="reason_for_denial_for_getting_tested">পৰীক্ষা কৰাবলৈ অস্বীকাৰ কৰাৰ কাৰণ</string>
     <string name="risk_factors">ঝুঁকিৰ কাৰকসমূহ</string>
-
+    <string name="total_presumptive_tb">সন্দেহজনক টিবি কেছ</string>
 
     <string-array name="tb_reason_for_denial_testing">
         <item>ভয় আৰু উদ্বেগ</item>

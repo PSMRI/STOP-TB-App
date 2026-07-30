@@ -81,6 +81,9 @@ class DashboardViewModel @Inject constructor(
     private val _tbScreening = MutableLiveData(TbGenderBreakdown())
     val tbScreening: LiveData<TbGenderBreakdown> get() = _tbScreening
 
+    private val _presumptiveTb = MutableLiveData(TbGenderBreakdown())
+    val presumptiveTb: LiveData<TbGenderBreakdown> get() = _presumptiveTb
+
     private val _pastHistoryTb = MutableLiveData(TbPositiveNegativeBreakdown())
     val pastHistoryTb: LiveData<TbPositiveNegativeBreakdown> get() = _pastHistoryTb
 
@@ -191,6 +194,7 @@ class DashboardViewModel @Inject constructor(
         val assignedVillageIds = getAssignedVillageIds()
 
         _tbScreening.value = TbGenderBreakdown()
+        _presumptiveTb.value = TbGenderBreakdown()
         _pastHistoryTb.value = TbPositiveNegativeBreakdown()
         _antiTbDrugs.value = TbPositiveNegativeBreakdown()
         _tbSuspected.value = TbGenderBreakdown()
@@ -268,6 +272,39 @@ class DashboardViewModel @Inject constructor(
                 )
             }
         )
+
+
+        // Presumptive TB breakdown
+        collectJobs += viewModelScope.launch {
+            tbDao.getDashboardPresumptiveTbCount(village, assignedVillageIds, startTime, endTime, "", 0).collect { total ->
+                val current = _presumptiveTb.value ?: TbGenderBreakdown()
+                _presumptiveTb.value = current.copy(total = total)
+            }
+        }
+        collectJobs += viewModelScope.launch {
+            tbDao.getDashboardPresumptiveTbCount(village, assignedVillageIds, startTime, endTime, "MALE", 0).collect { male ->
+                val current = _presumptiveTb.value ?: TbGenderBreakdown()
+                _presumptiveTb.value = current.copy(male = male)
+            }
+        }
+        collectJobs += viewModelScope.launch {
+            tbDao.getDashboardPresumptiveTbCount(village, assignedVillageIds, startTime, endTime, "FEMALE", 0).collect { female ->
+                val current = _presumptiveTb.value ?: TbGenderBreakdown()
+                _presumptiveTb.value = current.copy(female = female)
+            }
+        }
+        collectJobs += viewModelScope.launch {
+            tbDao.getDashboardPresumptiveTbCount(village, assignedVillageIds, startTime, endTime, "", 1).collect { children ->
+                val current = _presumptiveTb.value ?: TbGenderBreakdown()
+                _presumptiveTb.value = current.copy(children = children)
+            }
+        }
+        collectJobs += viewModelScope.launch {
+            tbDao.getDashboardPresumptiveTbCount(village, assignedVillageIds, startTime, endTime, "OTHERS", 0).collect { others ->
+                val current = _presumptiveTb.value ?: TbGenderBreakdown()
+                _presumptiveTb.value = current.copy(others = others)
+            }
+        }
 
         // TB Suspected breakdown
         collectJobs += viewModelScope.launch {

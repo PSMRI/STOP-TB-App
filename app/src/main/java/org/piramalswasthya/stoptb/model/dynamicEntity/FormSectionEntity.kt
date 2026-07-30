@@ -27,5 +27,7 @@ data class FormSectionEntity(
     val sectionUuid: String? = null,
     val isEditable: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    // Contact Tracing field (unused by existing forms)
+    val hasSubmitButton: Boolean = false
 )

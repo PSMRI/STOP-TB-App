@@ -315,7 +315,7 @@
                     android:onClick="@{()-> clickListener.onClickCounselling(benWithTb)}"
                     android:textColor="?attr/colorOnPrimary"
                     android:backgroundTint="@android:color/holo_green_dark"
-                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintBottom_toTopOf="@id/btn_contact_tracing"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@id/counselling_section_progress" />
 
@@ -330,7 +330,7 @@
                     android:onClick="@{()->clickListener.onClickCounselled(benWithTb)}"
                     android:textColor="?attr/colorOnPrimary"
                     android:backgroundTint="@android:color/holo_green_dark"
-                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintBottom_toTopOf="@id/btn_contact_tracing"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@id/counselling_section_progress" />
 
@@ -344,10 +344,30 @@
                     android:text="@string/follow_up"
                     android:onClick="@{()-> clickListener.onClickForm(benWithTb)}"
                     android:textColor="?attr/colorOnPrimary"
-                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintBottom_toTopOf="@id/btn_contact_tracing"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintTop_toBottomOf="@id/counselling_section_progress"
                     tools:backgroundTint="@android:color/holo_red_dark" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_contact_tracing"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="@dimen/margin_normal"
+                    android:layout_marginBottom="@dimen/margin_normal"
+                    android:onClick="@{()-> clickListener.onClickContactTracing(benWithTb)}"
+                    android:text="@string/contact_tracing"
+                    android:textSize="16sp"
+                    android:textAllCaps="false"
+                    android:letterSpacing="0"
+                    app:iconGravity="textStart"
+                    android:textColor="?attr/colorOnPrimary"
+                    app:strokeColor="?attr/colorOnPrimary"
+                    app:cornerRadius="@dimen/padding_small"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent" />
 
             </androidx.constraintlayout.widget.ConstraintLayout>
 

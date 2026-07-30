@@ -12,7 +12,7 @@
     <string name="notification_sync_channel_id">sakhi-sync0</string>
 <string name="long_to_string">%d</string>
     <string name="preview_title">पूर्वावलोकन</string>
-
+    <string name="contact_tracing">संपर्क अनुरेखण</string>
     <string name="tv_reg_date_ph">पंजीकरण तिथि</string>
     <string name="reg_date">पंजी. तिथि</string>
     <string name="tv_ben_name_ph">लाभार्थी का नाम</string>
@@ -193,6 +193,7 @@
     <string name="follow_up_history">फॉलो-अप रिकॉर्ड </string>
 
     <string name="risk_factors">जोखिम कारक</string>
+    <string name="total_presumptive_tb">प्रकल्पित टीबी मामले</string>
 
     <string name="pending">बाकी है</string>
 

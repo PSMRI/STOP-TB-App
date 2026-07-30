@@ -20,6 +20,20 @@
         tools:text="Anthropometric" />
 
     <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_form_history"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:minWidth="90dp"
+        android:layout_marginEnd="8dp"
+        android:visibility="gone"
+        android:textColor="@android:color/white"
+        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+        app:cornerRadius="8dp"
+        tools:backgroundTint="@android:color/holo_green_dark"
+        tools:text="History" />
+
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_form_action"
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
         android:layout_width="wrap_content"

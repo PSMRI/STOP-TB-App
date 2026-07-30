@@ -276,8 +276,22 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                                 .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
                                 .show()
                         }
+                        "COMPLETE_RIF" -> {
+                            androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                                .setTitle("Confirm RIF Test Completion?")
+                                .setMessage("Please confirm that the beneficiary has completed the TrueNat Rif Resistance test.")
+                                .setPositiveButton("CONFIRM") { d, _ ->
+                                    d.dismiss()
+                                    viewModel.markOrderTestCompleted(item.benId, "MDR_RIF")
+                                }
+                                .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
+                                .show()
+                        }
                         "POLL", "RETRY_POLL" -> {
                             viewModel.pollOrderResult(item.benId, orderType)
+                        }
+                        "RETRY_RIF_POLL" -> {
+                            viewModel.pollOrderResult(item.benId, "MDR_RIF")
                         }
                         "REPEAT_TEST" -> {
                             lifecycleScope.launch {
@@ -317,13 +331,52 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                             }
                         }
                         "VIEW" -> {
-                            findNavController().navigate(
-                                AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
-                                    benId = item.benId,
-                                    viewOnly = true,
-                                    referralType = if (orderType == "XRAY_CHEST") 6 else 7
-                                )
-                            )
+                            lifecycleScope.launch {
+                                val diag = viewModel.tbRepo.getTBDiagnosticsById(item.benId)
+                                if (diag?.naatResult.equals("Invalid", ignoreCase = true)) {
+                                    androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                                        .setTitle("Invalid Test Result")
+                                        .setMessage("The test result is invalid. Please repeat the test.")
+                                        .setPositiveButton("REPEAT TEST") { d, _ ->
+                                            d.dismiss()
+                                            viewModel.repeatTest(item.benId, "MTB_PLUS")
+                                        }
+                                        .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
+                                        .show()
+                                } else {
+                                    findNavController().navigate(
+                                        AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                            benId = item.benId,
+                                            viewOnly = true,
+                                            referralType = if (orderType == "XRAY_CHEST") 6 else 7
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                        "VIEW_RIF" -> {
+                            lifecycleScope.launch {
+                                val diag = viewModel.tbRepo.getTBDiagnosticsById(item.benId)
+                                if (diag?.trueNatRifResult.equals("Indeterminate", ignoreCase = true)) {
+                                    androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                                        .setTitle("Indeterminate Test Result")
+                                        .setMessage("The test result is indeterminate. Please repeat the test.")
+                                        .setPositiveButton("REPEAT TEST") { d, _ ->
+                                            d.dismiss()
+                                            viewModel.repeatTest(item.benId, "MDR_RIF")
+                                        }
+                                        .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
+                                        .show()
+                                } else {
+                                    findNavController().navigate(
+                                        AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                            benId = item.benId,
+                                            viewOnly = true,
+                                            referralType = 7
+                                        )
+                                    )
+                                }
+                            }
                         }
                         "ENTER_LC", "VIEW_LC" -> {
                             findNavController().navigate(
@@ -412,6 +465,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
         lifecycleScope.launch {
             viewModel.tbScreeningBenIds.collectLatest { benIds ->
+                Timber.e("TB Screening IDs: $benIds")
                 benAdapter.submitTbScreeningBenIds(benIds)
             }
         }
@@ -435,6 +489,24 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         }
 
         lifecycleScope.launch {
+            viewModel.contactFollowUpDoneBenIds.collectLatest { benIds ->
+                benAdapter.submitContactFollowUpDoneBenIds(benIds)
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.tptFollowUpDoneBenIds.collectLatest { benIds ->
+                benAdapter.submitTptFollowUpDoneBenIds(benIds)
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.tptEligibleBenIds.collectLatest { benIds ->
+                benAdapter.submitTptEligibleBenIds(benIds)
+            }
+        }
+
+        lifecycleScope.launch {
             viewModel.allTbDiagnostics.collectLatest { diagnosticsList ->
                 benAdapter.submitTBDiagnostics(diagnosticsList)
             }
@@ -449,7 +521,9 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         Toast.makeText(requireContext(), state.message, Toast.LENGTH_LONG).show()
                         viewModel.resetOrderActionState()
                         if (state.message.contains("completed", ignoreCase = true) || state.orderType.equals("MDR_RIF", ignoreCase = true)) {
-                            if (state.orderType.equals("SPUTUM_TRUENAT", ignoreCase = true) || state.orderType.equals("MTB_PLUS", ignoreCase = true) || state.orderType.equals("MDR_RIF", ignoreCase = true)) {
+                            if (state.orderType.equals("MDR_RIF", ignoreCase = true)) {
+                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(requireContext(), viewModel.tbRepo.useMockApi)
+                            } else if (state.orderType.equals("SPUTUM_TRUENAT", ignoreCase = true) || state.orderType.equals("MTB_PLUS", ignoreCase = true)) {
                                 org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext(), viewModel.tbRepo.useMockApi)
                             } else {
                                 org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(requireContext())
@@ -465,7 +539,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         }
 
         org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(requireContext())
-        org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext())
+        org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext(), viewModel.tbRepo.useMockApi)
+        org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(requireContext(), viewModel.tbRepo.useMockApi)
 
         binding.ibSearch.visibility = View.VISIBLE
         binding.ibSearch.setOnClickListener { sttContract.launch(Unit) }

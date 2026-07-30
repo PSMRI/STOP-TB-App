@@ -1307,6 +1307,9 @@ interface BenDao {
     @Query("UPDATE BENEFICIARY SET syncState = 0 WHERE syncState = 1")
     suspend fun resetSyncingToUnsynced()
 
+    @Query("UPDATE BENEFICIARY SET processed = 'N', syncState = 0 WHERE isDraft = 0 AND syncState != 2 AND (beneficiaryId <= 0 OR benRegId <= 0)")
+    suspend fun requeueTempBeneficiariesForRegistration()
+
     @Query("SELECT * FROM BEN_BASIC_CACHE WHERE villageId = :selectedVillage AND isDeactivate = 0 AND isNonHH = 1")
     fun getNonHHBeneficiaries(selectedVillage: Int): Flow<List<BenBasicCache>>
 

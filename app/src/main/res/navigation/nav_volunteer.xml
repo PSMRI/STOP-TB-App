@@ -236,6 +236,12 @@
         <argument android:name="benId" app:argType="long" />
     </fragment>
 
+    <fragment
+        android:id="@+id/syncDashboardFragment"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.sync_dashboard.SyncDashboardFragment"
+        android:label="@string/sync_dashboard"
+        tools:layout="@layout/fragment_sync_dashboard" />
+
     <!-- NCD -->
     <fragment
         android:id="@+id/ncdFragment"
