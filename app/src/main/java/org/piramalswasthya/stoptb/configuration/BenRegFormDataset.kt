@@ -8,7 +8,6 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.model.LocationEntity
 import org.piramalswasthya.stoptb.helpers.Languages
-import org.piramalswasthya.stoptb.helpers.setToStartOfTheDay
 import org.piramalswasthya.stoptb.model.AgeUnit
 import org.piramalswasthya.stoptb.model.BenBasicCache.Companion.getAgeFromDob
 import org.piramalswasthya.stoptb.model.BenBasicCache.Companion.getYearsFromDate
@@ -773,9 +772,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             healthFacility.value = it.healthFacility?.name ?: ""
         }
 
-        // Household-level fields are already captured once on the household form;
-        // hide them here when this beneficiary is being added to an existing household.
-        if (relToHeadId >= 0 && relToHeadId != 18) {
+        if (isNonHH) {
+            list.remove(pinCode)
+            pinCode.required = false
+        } else if (relToHeadId >= 0 && relToHeadId != 18) {
             list.removeAll(
                 listOf(address, pinCode, villageHamlet, residentialAreaType, economicStatus)
             )
@@ -785,7 +785,6 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             residentialAreaType.required = false
             economicStatus.required = false
         }
-
 
         setUpPage(list)
 
