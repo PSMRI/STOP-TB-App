@@ -685,12 +685,13 @@ class CounsellingRepo @Inject constructor(
         }
     }
 
-    suspend fun saveGeneralInfoDraft(
+    /// Saves General Info answers locally without syncing to the backend.
+    suspend fun saveGeneralInfoDraftLocal(
         benId: Long,
         formId: Int,
         section: CounsellingSectionDto,
         formVersionNumber: Int
-    ): Boolean {
+    ): Long? {
         return withContext(Dispatchers.IO) {
             try {
                 val versionId = formId * 1000 + formVersionNumber
@@ -749,8 +750,25 @@ class CounsellingRepo @Inject constructor(
                 }
 
                 counsellingRepository.saveDraftSection(responseId, section.sectionId, null, answers)
+                responseId
+            } catch (e: Exception) {
+                Timber.e(e, "saveGeneralInfoDraftLocal failed")
+                null
+            }
+        }
+    }
 
-
+    /// Saves General Info locally and syncs it with the backend.
+    suspend fun saveGeneralInfoDraft(
+        benId: Long,
+        formId: Int,
+        section: CounsellingSectionDto,
+        formVersionNumber: Int
+    ): Boolean {
+        val responseId = saveGeneralInfoDraftLocal(benId, formId, section, formVersionNumber)
+            ?: return false
+        return withContext(Dispatchers.IO) {
+            try {
                 val bulkSuccess = counsellingRepository.submitSectionBulk(responseId, section.sectionId)
                 if (!bulkSuccess) {
                     val isCampMode = preferenceDao.isCampModeEnabled()

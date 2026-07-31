@@ -85,6 +85,9 @@ class CounsellingViewModel @Inject constructor(
     private var lastEntryMode: CounsellingEntryMode = CounsellingEntryMode.COUNSELLING
     private var lastRequestedPhase: SectionPhase = SectionPhase.PRE_SUBMIT
 
+    // Tracks whether General Info has been submitted to the backend during the current counselling attempt.
+    private var generalInfoSubmittedThisSession = false
+
     var schemaData: CounsellingFormSchemaDto? = null
     private val disabledValidationSections = mutableSetOf<String>()
 
@@ -268,6 +271,7 @@ class CounsellingViewModel @Inject constructor(
 
     fun startCounselling() {
         lastEntryMode = CounsellingEntryMode.COUNSELLING
+        generalInfoSubmittedThisSession = false
         viewModelScope.launch {
             val currentResponse = counsellingRepo.getDraftResponse(benId)
             if (currentResponse != null) {
@@ -277,7 +281,7 @@ class CounsellingViewModel @Inject constructor(
                 counsellingRepo.resetLastVisitedSection(currentResponse.formResponse.responseId)
             }
             generalInfoSection?.let { sec ->
-                counsellingRepo.saveGeneralInfoDraft(benId, generalInfoFormId, sec, generalInfoFormVersionNumber)
+                counsellingRepo.saveGeneralInfoDraftLocal(benId, generalInfoFormId, sec, generalInfoFormVersionNumber)
             }
             _isFormEditable.value = !counsellingRepo.hasPreSubmitBeenSubmitted(benId)
             loadFormSchema(SectionPhase.PRE_SUBMIT)
@@ -588,6 +592,14 @@ class CounsellingViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            if (current == 0 && lastEntryMode == CounsellingEntryMode.COUNSELLING && !generalInfoSubmittedThisSession) {
+                generalInfoSection?.let { giSection ->
+                    val submitted = counsellingRepo.saveGeneralInfoDraft(
+                        benId, generalInfoFormId, giSection, generalInfoFormVersionNumber
+                    )
+                    if (submitted) generalInfoSubmittedThisSession = true
+                }
+            }
             val success = counsellingRepo.saveSectionAnswers(benId, formId, section, versionNumber)
             if (success) {
                 val persistedSection = counsellingRepo.getDraftResponse(benId)

@@ -457,7 +457,12 @@ class CounsellingRepositoryImpl @Inject constructor(
             val formVersionId = activeVersion.version.versionId
 
             val localResponse = responseDao.getFormResponseForBeneficiary(beneficiaryId, formVersionId)
-            val hasLocalAnswers = localResponse?.sectionResponses?.any { it.questionResponses.isNotEmpty() } == true
+            // hasLocalAnswers ~ Checks only for actual pre-submit screening answers, excluding General Info-only data.
+            val hasLocalAnswers = localResponse?.sectionResponses?.any { sr ->
+                sr.questionResponses.isNotEmpty() &&
+                    activeVersion.sections.find { it.section.sectionId == sr.sectionResponse.sectionId }
+                        ?.section?.sectionPhase == SectionPhase.PRE_SUBMIT.name
+            } == true
             if (localResponse != null && localResponse.formResponse.syncStatus == "SYNCED" &&
                 (localResponse.formResponse.status == "SUBMITTED" || localResponse.formResponse.status == "COMPLETE" || localResponse.formResponse.status == "COMPLETED" || localResponse.formResponse.status == "REFUSED") &&
                 hasLocalAnswers
@@ -602,16 +607,21 @@ class CounsellingRepositoryImpl @Inject constructor(
                 val allPreSubmitAnswered = preSubmitSectionIds.isNotEmpty() &&
                         preSubmitSectionIds.all { it in answeredSectionIds }
 
+                // Determines SUBMITTED status only when actual PRE_SUBMIT screening answers are complete.
                 val finalStatus = when {
                     apiResponse.status?.uppercase() == "REFUSED" -> "REFUSED"
                     hasPostSubmitAnswers || apiResponse.status?.uppercase() == "COMPLETE" || apiResponse.status?.uppercase() == "COMPLETED" -> "COMPLETE"
-
-                    apiResponse.status?.uppercase() == "SUBMITTED" || allPreSubmitAnswered -> "SUBMITTED"
+                    allPreSubmitAnswered -> "SUBMITTED"
                     else -> "DRAFT"
                 }
 
                 responseDao.updateFormResponse(
-                    formResponse.copy(responseId = responseId, status = finalStatus)
+                    formResponse.copy(
+                        responseId = responseId,
+                        status = finalStatus,
+                        sectionsFilled = preSubmitSectionIds.count { it in answeredSectionIds },
+                        totalSections = preSubmitSectionIds.size
+                    )
                 )
             }
             return true
@@ -653,15 +663,16 @@ class CounsellingRepositoryImpl @Inject constructor(
                     ?: formDef?.versions?.maxByOrNull { it.version.versionNumber }
                 val versionId = activeVersion?.version?.versionId
 
+                val excludedBenIds = mutableSetOf<Long>()
                 if (versionId != null) {
                     val statusesByBenId = statuses.groupBy { it.beneficiaryId }
                     db.withTransaction {
                         for ((benId, items) in statusesByBenId) {
                             val item = items.find { it.refused } ?: items.first()
                             Timber.d("fetchAndStoreCompletedBeneficiaries: benId=$benId, entries=${items.size}, chosen refused=${item.refused}, sectionsFilled=${item.sectionsFilled}, totalSections=${item.totalSections}")
-                            // Untouched beneficiaries (sectionsFilled == 0, not refused) keep the
-                            // current behavior of having no Room row at all unless one already exists.
+                            // Excludes untouched beneficiaries from counselling status and Room records unless already present.
                             if (!item.refused && item.sectionsFilled == 0) {
+                                excludedBenIds.add(benId)
                                 continue
                             }
                             val newStatus = when {
@@ -716,7 +727,7 @@ class CounsellingRepositoryImpl @Inject constructor(
                         }
                     }
                 }
-                return statuses
+                return statuses.filterNot { it.beneficiaryId in excludedBenIds }
             } else {
                 Timber.w("fetchAndStoreCompletedBeneficiaries failed: status code ${response.code()}")
                 return null
