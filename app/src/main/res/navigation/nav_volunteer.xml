@@ -33,7 +33,21 @@
         <action
             android:id="@+id/action_volunteerHomeFragment_to_nonHHFragment"
             app:destination="@id/nonHHFragment" />
+
+        <action
+            android:id="@+id/action_volunteerHomeFragment_to_unScreenedPeople"
+            app:destination="@id/unScreenedPeople" />
+
     </fragment>
+
+    <fragment
+        android:id="@+id/unScreenedPeople"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.unscreened_people.UnScreenedPeople"
+        android:label="@string/icon_title_unscreened">
+
+    </fragment>
+
+
 
     <fragment
         android:id="@+id/allHouseholdFragment"

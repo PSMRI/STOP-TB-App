@@ -154,6 +154,7 @@
     <string name="delivery_outcome_list">प्रसव परिणाम सूची</string>
     <string name="communicable_diseases">संचारी (संक्रामक) रोग</string>
     <string name="dashboard">डैशबोर्ड</string>
+    <string name="total_unscreened">अस्क्रीन किए गए लाभार्थी</string>
     <string name="sign_in">साइन इन</string>
     <string name="save_successful">सफलतापूर्वक सहेजें</string>
     <string name="something_wend_wong_contact_testing">कुछ गड़बड़ है! संपर्क परीक्षण!</string>

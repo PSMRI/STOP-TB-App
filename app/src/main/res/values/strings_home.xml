@@ -25,6 +25,8 @@
     <string name="til_hint_selected_village">Selected Village</string>
     <string name="icon_title_household">All Household</string>
     <string name="icon_title_ben">All Beneficiaries</string>
+    <string name="icon_title_unscreened">Unscreened Population</string>
+    <string name="home_card_unscreened_subtitle">Beneficiaries pending TB screening</string>
     <string name="icon_title_ec">Eligible Couple List</string>
     <string name="icon_title_mc">Maternal Health</string>
     <string name="icon_title_cc">Child Care</string>

@@ -14,6 +14,10 @@
     <string name="enter_aadhaar_number_ben">आधार नंबर दर्ज करें</string>
     <string name="reproductive_status">क्या आप गर्भवती हैं?</string>
 
+    <string name="available_for_camp">क्या आप शिविर में भाग लेने के लिए उपलब्ध हैं?</string>
+    <string name="reason_not_attending_camp">शिविर में भाग न लेने का कारण</string>
+    <string name="other_reason_not_attending_camp">अन्य कारण</string>
+
     <string name="birth_certificate_number">Birth Certificate No.</string>
     <string name="beneficiary_details">लाभार्थी विवरण</string>
     <string name="wife_s_name">पत्नी का नाम</string>
@@ -107,6 +111,11 @@
         <item>निष्क्रिय (सामान्य कार्यक्रम)</item>
         <item>सक्रिय (सक्रिय केस खोज)</item>
     </string-array>
+
+    <string name="status_pending">বাকী আছে</string>
+    <string name="status_symptoms_screened">লক্ষণ পৰীক্ষা কৰা হৈছে</string>
+    <string name="status_xray_done">বুকৰ এক্স-ৰে সম্পূৰ্ণ</string>
+    <string name="status_trunat_done">ট্ৰুনেট পৰীক্ষা সম্পূৰ্ণ</string>
 
 
     <string name="dd_ec">लक्ष्य दम्पति</string>

@@ -317,6 +317,102 @@
                                 android:layout_height="30dp"
                                 android:layout_gravity="center"
                                 android:contentDescription="@null"
+                                android:src="@drawable/ic__ben"
+                                app:tint="@android:color/white" />
+                        </FrameLayout>
+
+                        <TextView
+                            android:id="@+id/tvUnscreenedTotal"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true"
+                            android:textColor="#139A90"
+                            android:textSize="30sp"
+                            android:textStyle="bold"
+                            tools:text="9" />
+                    </RelativeLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:text="@string/total_unscreened"
+                        android:textColor="#223233"
+                        android:textSize="21sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvUnscreenedMale"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:textColor="#4E5D5F"
+                        android:textSize="12sp"
+                        tools:text="Male: 4" />
+
+                    <TextView
+                        android:id="@+id/tvUnscreenedFemale"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="#4E5D5F"
+                        android:textSize="12sp"
+                        tools:text="Female: 3" />
+
+                    <TextView
+                        android:id="@+id/tvUnscreenedChildren"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="#4E5D5F"
+                        android:textSize="12sp"
+                        tools:text="Children(&lt;15y): 1" />
+
+                    <TextView
+                        android:id="@+id/tvUnscreenedOthers"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="#4E5D5F"
+                        android:textSize="12sp"
+                        tools:text="Others: 1" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_columnWeight="1"
+                android:layout_marginStart="8dp"
+                android:layout_marginBottom="16dp"
+                android:backgroundTint="#E3F3EE"
+                app:cardCornerRadius="22dp"
+                app:cardElevation="0dp"
+                app:strokeColor="#D9F1EB"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="220dp"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
+
+                        <FrameLayout
+                            android:layout_width="64dp"
+                            android:layout_height="64dp"
+                            android:background="@drawable/bg_dashboard_icon_teal">
+
+                            <ImageView
+                                android:layout_width="30dp"
+                                android:layout_height="30dp"
+                                android:layout_gravity="center"
+                                android:contentDescription="@null"
                                 android:src="@drawable/ic__ncd"
                                 app:tint="@android:color/white" />
                         </FrameLayout>

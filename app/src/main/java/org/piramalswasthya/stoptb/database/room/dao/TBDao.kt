@@ -402,4 +402,23 @@ interface TBDao {
         )
     """)
     fun getDashboardHwcReferralCount(villageId: Int, assignedVillageIds: List<Int>, startTime: Long, endTime: Long, gender: String, isChild: Int,isSeniorCitizen: Int): Flow<Int>
+
+        // Dashboard query - Unscreened: beneficiary has no TB_SCREENING record at all
+        @Query("""
+        SELECT COUNT(*) FROM beneficiary b
+        WHERE b.beneficiaryId NOT IN (SELECT benId FROM TB_SCREENING)
+        AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+        AND (:startTime = 0 OR b.updatedDate >= :startTime)
+        AND (:endTime = 0 OR b.updatedDate <= :endTime)
+        AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
+        AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+    """)
+        fun getDashboardUnscreenedCount(
+            villageId: Int,
+            assignedVillageIds: List<Int>,
+            startTime: Long,
+            endTime: Long,
+            gender: String,
+            isChild: Int
+        ): Flow<Int>
 }

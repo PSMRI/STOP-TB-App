@@ -55,6 +55,9 @@ class DashboardViewModel @Inject constructor(
     private val preferenceDao: PreferenceDao,
 ) : ViewModel() {
 
+    private val _unscreened = MutableLiveData(TbGenderBreakdown())
+    val unscreened: LiveData<TbGenderBreakdown> get() = _unscreened
+
     // Filter state
     private val _selectedTimePeriod = MutableLiveData("Today")
     val selectedTimePeriod: LiveData<String> get() = _selectedTimePeriod
@@ -195,6 +198,7 @@ class DashboardViewModel @Inject constructor(
 
         _tbScreening.value = TbGenderBreakdown()
         _presumptiveTb.value = TbGenderBreakdown()
+        _unscreened.value = TbGenderBreakdown()   // ADD THIS
         _pastHistoryTb.value = TbPositiveNegativeBreakdown()
         _antiTbDrugs.value = TbPositiveNegativeBreakdown()
         _tbSuspected.value = TbGenderBreakdown()
@@ -303,6 +307,38 @@ class DashboardViewModel @Inject constructor(
             tbDao.getDashboardPresumptiveTbCount(village, assignedVillageIds, startTime, endTime, "OTHERS", 0).collect { others ->
                 val current = _presumptiveTb.value ?: TbGenderBreakdown()
                 _presumptiveTb.value = current.copy(others = others)
+            }
+        }
+
+        // Unscreened breakdown
+        collectJobs += viewModelScope.launch {
+            tbDao.getDashboardUnscreenedCount(village, assignedVillageIds, startTime, endTime, "", 0).collect { total ->
+                val current = _unscreened.value ?: TbGenderBreakdown()
+                _unscreened.value = current.copy(total = total)
+            }
+        }
+        collectJobs += viewModelScope.launch {
+            tbDao.getDashboardUnscreenedCount(village, assignedVillageIds, startTime, endTime, "MALE", 0).collect { male ->
+                val current = _unscreened.value ?: TbGenderBreakdown()
+                _unscreened.value = current.copy(male = male)
+            }
+        }
+        collectJobs += viewModelScope.launch {
+            tbDao.getDashboardUnscreenedCount(village, assignedVillageIds, startTime, endTime, "FEMALE", 0).collect { female ->
+                val current = _unscreened.value ?: TbGenderBreakdown()
+                _unscreened.value = current.copy(female = female)
+            }
+        }
+        collectJobs += viewModelScope.launch {
+            tbDao.getDashboardUnscreenedCount(village, assignedVillageIds, startTime, endTime, "", 1).collect { children ->
+                val current = _unscreened.value ?: TbGenderBreakdown()
+                _unscreened.value = current.copy(children = children)
+            }
+        }
+        collectJobs += viewModelScope.launch {
+            tbDao.getDashboardUnscreenedCount(village, assignedVillageIds, startTime, endTime, "OTHERS", 0).collect { others ->
+                val current = _unscreened.value ?: TbGenderBreakdown()
+                _unscreened.value = current.copy(others = others)
             }
         }
 

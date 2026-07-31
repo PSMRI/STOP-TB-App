@@ -4,7 +4,9 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <data>
+
         <import type="android.view.View" />
+
         <variable
             name="ben"
             type="org.piramalswasthya.stoptb.model.BenBasicDomain" />
@@ -28,28 +30,35 @@
         <variable
             name="showRegistrationDate"
             type="Boolean" />
+
         <variable
             name="father"
             type="Boolean" />
+
         <variable
             name="husband"
             type="Boolean" />
+
         <variable
             name="spouse"
-            type="Boolean"/>
+            type="Boolean" />
 
         <variable
             name="role"
             type="Integer" />
+
         <variable
             name="isMatched"
             type="Boolean" />
+
         <variable
             name="isGeneralOpdDone"
             type="Boolean" />
+
         <variable
             name="isAnthropometryDone"
             type="Boolean" />
+
         <variable
             name="showActionButtons"
             type="Boolean" />
@@ -71,621 +80,729 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:minHeight="0dp"
+            android:onClick="@{() -> clickListener.onClickedBen(ben)}"
             android:paddingTop="@dimen/padding_tiny"
-            android:paddingBottom="0dp"
-            android:onClick="@{() -> clickListener.onClickedBen(ben)}">
+            android:paddingBottom="0dp">
 
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/ll_title_bar"
+            <androidx.cardview.widget.CardView
+                android:id="@+id/ll_title_bar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/padding_normal"
+                android:layout_marginTop="@dimen/margin_normal"
+                android:background="?attr/colorOnPrimary"
+                android:paddingHorizontal="@dimen/padding_tiny"
+                app:cardCornerRadius="@dimen/padding_normal"
+                app:layout_constraintTop_toTopOf="parent">
+
+                <LinearLayout
+                    android:id="@+id/ll_title_bar_ll"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="@dimen/padding_normal"
-                    android:layout_marginTop="@dimen/margin_normal"
-                    android:background="?attr/colorOnPrimary"
-                    android:paddingHorizontal="@dimen/padding_tiny"
-                    app:cardCornerRadius="@dimen/padding_normal"
-                    app:layout_constraintTop_toTopOf="parent">
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:id="@+id/iv_hh_logo"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_vertical"
+                        android:layout_marginStart="10dp"
+                        android:paddingVertical="@dimen/padding_normal"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:tint="?attr/colorPrimary" />
+
+                    <TextView
+                        android:id="@+id/tv_hh_id"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_vertical"
+                        android:layout_marginEnd="@dimen/padding_small"
+                        android:layout_weight="1"
+                        android:drawablePadding="@dimen/padding_small"
+                        android:ellipsize="end"
+                        android:gravity="center_vertical"
+                        android:padding="@dimen/padding_small"
+                        android:text="@{ben.benFullName}"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorPrimaryVariant"
+                        android:textStyle="bold"
+                        app:drawableTint="?attr/colorPrimary"
+                        tools:text="Hello Meister" />
+
+                    <Button
+                        android:id="@+id/btn_new_ben"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="@dimen/margin_small"
+                        android:drawableStart="@drawable/ic_person"
+                        android:onClick="@{()-> clickListener.onClickedHouseHold(ben)}"
+                        android:paddingHorizontal="@dimen/padding_tiny"
+                        android:text="@string/btn_rv_item_hh_add_ben"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:visibility="gone"
+                        app:cornerRadius="@dimen/padding_small"
+                        app:layout_constraintBottom_toBottomOf="@+id/tv_hh_id" />
+                    <TextView
+                        android:id="@+id/head"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_vertical|end"
+                        android:text="@string/hof"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorPrimaryVariant"
+                        android:textStyle="bold"
+                        android:visibility="gone"
+                        app:drawableTint="?attr/colorPrimary" />
+
+                    <ImageView
+                        android:id="@+id/iv_isHead"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="center_vertical|end"
+                        android:layout_marginHorizontal="@dimen/padding_small"
+                        android:src="@drawable/ic__hh"
+                        android:visibility="gone"
+                        app:tint="?attr/colorPrimary" />
+
+                    <ImageView
+                        android:id="@+id/iv_isDeath"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="center_vertical|end"
+                        android:layout_marginHorizontal="@dimen/padding_small"
+                        android:contentDescription="@string/iv_death_indicator"
+                        android:src="@drawable/ic_death"
+                        android:visibility="@{ben.isDeath == true ? View.VISIBLE : View.GONE}" />
+
+                    <ImageView
+                        android:id="@+id/iv_call"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:layout_gravity="center"
+                        android:layout_marginEnd="4dp"
+                        android:background="?selectableItemBackgroundBorderless"
+                        android:onClick="@{()->clickListener.onClickedForCall(ben)}"
+                        android:padding="4dp"
+                        android:src="@drawable/ic_call_icon"
+                        android:visibility="gone" />
+
+                    <ImageView
+                        android:id="@+id/ivSoftDelete"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="center_vertical|end"
+                        android:layout_marginHorizontal="@dimen/padding_small"
+                        android:contentDescription="@string/str_duplicate_record"
+                        android:onClick="@{()->clickListener.onClickSoftDeleteBen(ben)}"
+                        android:src="@drawable/ic_delete" />
+
+                    <ImageView
+                        android:id="@+id/iv_sync_state"
+                        android:layout_width="24dp"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_vertical|end"
+                        android:layout_marginHorizontal="@dimen/padding_small"
+                        android:contentDescription="@string/iv_sync_state_tv"
+                        app:syncState="@{ben.syncState}"
+                        tools:src="@drawable/ic_synced" />
+
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <LinearLayout
+                android:id="@+id/ncd_hof_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/padding_normal"
+                android:layout_marginTop="@dimen/padding_small"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="@dimen/padding_small"
+                android:paddingTop="@dimen/padding_tiny"
+                android:visibility="gone"
+                app:layout_constraintTop_toBottomOf="@+id/ll_title_bar">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/tv_family_head_name_ph"
+                    android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/padding_small"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="@{ben.familyHeadName}"
+                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                    android:textColor="?attr/colorOnPrimary"
+                    tools:text="AKHABAR" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/ll_ben_details"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/padding_normal"
+                android:layout_marginTop="@dimen/margin_small"
+                android:baselineAligned="false"
+                android:orientation="horizontal"
+                app:layout_constraintTop_toBottomOf="@+id/ncd_hof_name">
+
+                <LinearLayout
+                    android:id="@+id/ncd_husband_name"
+                    showLayout="@{husband}"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:padding="@dimen/padding_small">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/tv_husband_name_ph"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                        android:textColor="?attr/colorOnPrimary" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@{ben.spouseName}"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorOnPrimary"
+                        tools:text="Dummy" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/ncd_father_name"
+                    showLayout="@{father}"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:padding="@dimen/padding_small">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/tv_father_name_ph"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                        android:textColor="?attr/colorOnPrimary" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@{ben.fatherName}"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorOnPrimary"
+                        tools:text="Dummy" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/ncd_spouse_name"
+                    showLayout="@{spouse}"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:padding="@dimen/padding_small">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/tv_spouse_name_ph"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                        android:textColor="?attr/colorOnPrimary" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@{ben.spouseName}"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorOnPrimary"
+                        tools:text="Dummy" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:padding="@dimen/padding_small">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/age_ben"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                        android:textColor="?attr/colorOnPrimary" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@{ben.age}"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorOnPrimary"
+                        tools:text="45 Years" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:padding="@dimen/padding_small">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/gender"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                        android:textColor="?attr/colorOnPrimary" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@{ben.gender}"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorOnPrimary"
+                        tools:text="Female" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/HOF"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:padding="@dimen/padding_small">
+
+                    <ImageView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:src="@drawable/ic_no_hh" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/hof"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/ll_ben_details_2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/padding_normal"
+                android:baselineAligned="false"
+                app:layout_constraintTop_toBottomOf="@+id/ll_ben_details">
+
+                <LinearLayout
+                    android:id="@+id/registration_date"
+                    showLayout="@{showRegistrationDate}"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:padding="@dimen/padding_small">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/registration_date"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                        android:textColor="?attr/colorOnPrimary" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@{ben.regDate}"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorOnPrimary"
+                        tools:text="12-12-4523" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/padding_small"
+                        android:text="@string/nikshay_id"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                        android:textColor="?attr/colorOnPrimary" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@{ben.nikshayIdDisplay}"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorOnPrimary"
+                        tools:text="N/A" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:padding="@dimen/padding_small">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/beneficiary_id"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                        android:textColor="?attr/colorOnPrimary" />
+
+                    <TextView
+                        benIdText="@{ben.benId}"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorOnPrimary"
+                        tools:text="Lala Land" />
+                </LinearLayout>
+
+                <RelativeLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:padding="@dimen/padding_small">
+
+                    <TextView
+                        android:id="@+id/mob"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/mobile_number"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                        android:textColor="?attr/colorOnPrimary" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_below="@+id/mob"
+                        android:text="@{ben.mobileNoDisplay}"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorOnPrimary"
+                        tools:text="0123456789" />
+
+                    <ImageView
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:layout_marginStart="5dp"
+                        android:layout_toRightOf="@+id/mob"
+                        android:src="@{ben.isConsent ? @drawable/verified : @drawable/not_verified}"
+                        android:visibility="gone" />
+                </RelativeLayout>
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/ll_screening_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/padding_normal"
+                android:layout_marginTop="@dimen/padding_small"
+                android:layout_marginBottom="@dimen/padding_small"
+                android:orientation="horizontal"
+                android:weightSum="3"
+                app:layout_constraintTop_toBottomOf="@id/ll_ben_details_2">
+
+                <!-- Symptoms -->
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <ImageView
+                        android:id="@+id/ivSymptoms"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:src="@drawable/ic__ben"/>
+
+                    <TextView
+                        android:id="@+id/tvSymptomsStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Pending"
+                        android:textStyle="bold"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"/>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Symptoms"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"/>
+                </LinearLayout>
+
+                <!-- X-Ray -->
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <ImageView
+                        android:id="@+id/ivXray"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:src="@drawable/ic__ben"/>
+
+                    <TextView
+                        android:id="@+id/tvXrayStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Pending"
+                        android:textStyle="bold"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"/>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="X-Ray"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"/>
+                </LinearLayout>
+
+                <!-- TruNat -->
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <ImageView
+                        android:id="@+id/ivTruenat"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:src="@drawable/ic__ben"/>
+
+                    <TextView
+                        android:id="@+id/tvTruenatStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Pending"
+                        android:textStyle="bold"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"/>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="TruNat"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"/>
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/ll_ben_details_3"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/padding_normal"
+                android:orientation="horizontal"
+                app:layout_constraintTop_toBottomOf="@id/ll_screening_status">
+
+                <LinearLayout
+                    android:id="@+id/ll_vital_action"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tv_order_status"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="4dp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:textStyle="bold"
+                        android:visibility="gone"
+                        tools:text="Status: Referred for X-ray" />
+
                     <LinearLayout
-                        android:id="@+id/ll_title_bar_ll"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal">
 
-                        <ImageView
-                            android:id="@+id/iv_hh_logo"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_gravity="center_vertical"
-                            android:layout_marginStart="10dp"
-                            android:paddingVertical="@dimen/padding_normal"
-                            app:layout_constraintBottom_toBottomOf="parent"
-                            app:layout_constraintStart_toStartOf="parent"
-                            app:layout_constraintTop_toTopOf="parent"
-                            app:tint="?attr/colorPrimary" />
-
-                        <TextView
-                            android:id="@+id/tv_hh_id"
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_vital_screen"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_gravity="center_vertical"
+                            android:layout_marginEnd="4dp"
                             android:layout_weight="1"
-                            android:drawablePadding="@dimen/padding_small"
-                            android:gravity="center_vertical"
-                            android:padding="@dimen/padding_small"
-                            android:text="@{ben.benFullName}"
-                            android:textStyle="bold"
-                            android:ellipsize="end"
-                            android:layout_marginEnd="@dimen/padding_small"
+                            android:backgroundTint="@android:color/holo_green_dark"
+                            android:gravity="center"
+                            android:maxLines="1"
+                            android:paddingHorizontal="@dimen/padding_small"
+                            android:singleLine="true"
+                            android:text="@string/vital_screen"
                             android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                            android:textColor="?attr/colorPrimaryVariant"
-                            app:drawableTint="?attr/colorPrimary"
-                            tools:text="Hello Meister" />
-
-                        <Button
-                            android:id="@+id/btn_new_ben"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginHorizontal="@dimen/margin_small"
-                            android:drawableStart="@drawable/ic_person"
-                            android:onClick="@{()-> clickListener.onClickedHouseHold(ben)}"
-                            android:paddingHorizontal="@dimen/padding_tiny"
-                            android:text="@string/btn_rv_item_hh_add_ben"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                            android:textColor="?attr/colorOnPrimary"
+                            android:textSize="14sp"
                             android:visibility="gone"
-                            app:cornerRadius="@dimen/padding_small"
-                            app:layout_constraintBottom_toBottomOf="@+id/tv_hh_id" />
-                        <TextView
-                            android:id="@+id/head"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/hof"
-                            android:visibility="gone"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                            android:textColor="?attr/colorPrimaryVariant"
-                            app:drawableTint="?attr/colorPrimary"
-                            android:layout_gravity="center_vertical|end"
-                            android:textStyle="bold"/>
-
-                        <ImageView
-                            android:id="@+id/iv_isHead"
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:visibility="gone"
-                            app:tint="?attr/colorPrimary"
-                            android:layout_gravity="center_vertical|end"
-                            android:layout_marginHorizontal="@dimen/padding_small"
-                            android:src="@drawable/ic__hh" />
-
-                        <ImageView
-                            android:id="@+id/iv_isDeath"
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:layout_gravity="center_vertical|end"
-                            android:layout_marginHorizontal="@dimen/padding_small"
-                            android:visibility="@{ben.isDeath == true ? View.VISIBLE : View.GONE}"
-                            android:contentDescription="@string/iv_death_indicator"
-                            android:src="@drawable/ic_death" />
-
-                        <ImageView
-                            android:id="@+id/iv_call"
-                            android:layout_width="28dp"
-                            android:layout_height="28dp"
-                            android:padding="4dp"
-                            android:visibility="gone"
-                            android:src="@drawable/ic_call_icon"
-                            android:layout_gravity="center"
-                            android:onClick="@{()->clickListener.onClickedForCall(ben)}"
-                            android:background="?selectableItemBackgroundBorderless"
-                            android:layout_marginEnd="4dp" />
-
-                        <ImageView
-                            android:id="@+id/ivSoftDelete"
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:src="@drawable/ic_delete"
-                            android:layout_gravity="center_vertical|end"
-                            android:contentDescription="@string/str_duplicate_record"
-                            android:layout_marginHorizontal="@dimen/padding_small"
-                            android:onClick="@{()->clickListener.onClickSoftDeleteBen(ben)}" />
-
-                        <ImageView
-                            android:id="@+id/iv_sync_state"
-                            android:layout_width="24dp"
-                            android:layout_height="wrap_content"
-                            android:layout_gravity="center_vertical|end"
-                            android:layout_marginHorizontal="@dimen/padding_small"
-                            android:contentDescription="@string/iv_sync_state_tv"
-                            app:syncState="@{ben.syncState}"
-                            tools:src="@drawable/ic_synced" />
-
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-
-                <LinearLayout
-                    android:id="@+id/ncd_hof_name"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="@dimen/padding_normal"
-                    android:layout_marginTop="@dimen/padding_small"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="@dimen/padding_small"
-                    android:paddingTop="@dimen/padding_tiny"
-                    android:visibility="gone"
-                    app:layout_constraintTop_toBottomOf="@+id/ll_title_bar">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/tv_family_head_name_ph"
-                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                        android:textColor="?attr/colorOnPrimary"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/padding_small"
-                        android:layout_weight="1"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:text="@{ben.familyHeadName}"
-                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                        android:textColor="?attr/colorOnPrimary"
-                        tools:text="AKHABAR" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/ll_ben_details"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:baselineAligned="false"
-                    android:orientation="horizontal"
-                    android:layout_marginHorizontal="@dimen/padding_normal"
-                    android:layout_marginTop="@dimen/margin_small"
-                    app:layout_constraintTop_toBottomOf="@+id/ncd_hof_name">
-
-                        <LinearLayout
-                            android:id="@+id/ncd_husband_name"
-                            showLayout="@{husband}"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
-                            android:padding="@dimen/padding_small">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/tv_husband_name_ph"
-                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                                android:textColor="?attr/colorOnPrimary" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@{ben.spouseName}"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                android:textColor="?attr/colorOnPrimary"
-                                tools:text="Dummy" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:id="@+id/ncd_father_name"
-                            showLayout="@{father}"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
-                            android:padding="@dimen/padding_small">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/tv_father_name_ph"
-                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                                android:textColor="?attr/colorOnPrimary" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@{ben.fatherName}"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                android:textColor="?attr/colorOnPrimary"
-                                tools:text="Dummy" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:id="@+id/ncd_spouse_name"
-                            showLayout="@{spouse}"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
-                            android:padding="@dimen/padding_small">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/tv_spouse_name_ph"
-                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                                android:textColor="?attr/colorOnPrimary" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@{ben.spouseName}"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                android:textColor="?attr/colorOnPrimary"
-                                tools:text="Dummy" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
-                            android:padding="@dimen/padding_small">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/age_ben"
-                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                                android:textColor="?attr/colorOnPrimary" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@{ben.age}"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                android:textColor="?attr/colorOnPrimary"
-                                tools:text="45 Years" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
-                            android:padding="@dimen/padding_small">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/gender"
-                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                                android:textColor="?attr/colorOnPrimary" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@{ben.gender}"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                android:textColor="?attr/colorOnPrimary"
-                                tools:text="Female" />
-                        </LinearLayout>
-                        <LinearLayout
-                            android:id="@+id/HOF"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
-                            android:padding="@dimen/padding_small">
-
-                           <ImageView
-                               android:layout_width="wrap_content"
-                               android:layout_height="wrap_content"
-                                android:src="@drawable/ic_no_hh" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/hof"
-                                android:textStyle="bold"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                android:textColor="?attr/colorOnPrimary" />
-                        </LinearLayout>
-
-                    </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/ll_ben_details_2"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:baselineAligned="false"
-                    android:layout_marginHorizontal="@dimen/padding_normal"
-                    app:layout_constraintTop_toBottomOf="@+id/ll_ben_details">
-
-                        <LinearLayout
-                            android:id="@+id/registration_date"
-                            showLayout="@{showRegistrationDate}"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
-                            android:padding="@dimen/padding_small">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/registration_date"
-                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                                android:textColor="?attr/colorOnPrimary" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@{ben.regDate}"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                android:textColor="?attr/colorOnPrimary"
-                                tools:text="12-12-4523" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/padding_small"
-                                android:text="@string/nikshay_id"
-                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                                android:textColor="?attr/colorOnPrimary" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@{ben.nikshayIdDisplay}"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                android:textColor="?attr/colorOnPrimary"
-                                tools:text="N/A" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
-                            android:padding="@dimen/padding_small">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/beneficiary_id"
-                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                                android:textColor="?attr/colorOnPrimary" />
-
-                            <TextView
-                                benIdText="@{ben.benId}"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                android:textColor="?attr/colorOnPrimary"
-                                tools:text="Lala Land" />
-                        </LinearLayout>
-
-                        <RelativeLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
-                            android:padding="@dimen/padding_small">
-
-                            <TextView
-                                android:id="@+id/mob"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/mobile_number"
-                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                                android:textColor="?attr/colorOnPrimary" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@{ben.mobileNoDisplay}"
-                                android:layout_below="@+id/mob"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                android:textColor="?attr/colorOnPrimary"
-                                tools:text="0123456789" />
-                            <ImageView
-                                android:layout_width="30dp"
-                                android:layout_height="30dp"
-                                android:src="@{ben.isConsent ? @drawable/verified : @drawable/not_verified}"
-                                android:layout_toRightOf="@+id/mob"
-                                android:layout_marginStart="5dp"
-                                android:visibility="gone" />
-                        </RelativeLayout>
-
-                    </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/ll_ben_details_3"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginHorizontal="@dimen/padding_normal"
-                    app:layout_constraintTop_toBottomOf="@id/ll_ben_details_2">
-
-                        <LinearLayout
-                            android:id="@+id/ll_vital_action"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:id="@+id/tv_order_status"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginBottom="4dp"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                android:textColor="?attr/colorOnPrimary"
-                                android:textStyle="bold"
-                                android:visibility="gone"
-                                tools:text="Status: Referred for X-ray" />
-
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:orientation="horizontal">
-
-                                <com.google.android.material.button.MaterialButton
-                                    android:id="@+id/btn_vital_screen"
-                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:layout_marginEnd="4dp"
-                                    android:backgroundTint="@android:color/holo_green_dark"
-                                    android:gravity="center"
-                                    android:paddingHorizontal="@dimen/padding_small"
-                                    android:maxLines="1"
-                                    android:singleLine="true"
-                                    android:text="@string/vital_screen"
-                                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                    android:textSize="14sp"
-                                    android:textColor="?attr/colorOnPrimary"
-                                    android:visibility="gone"
-                                    app:cornerRadius="@dimen/padding_normal"
-                                    app:strokeColor="?attr/colorPrimary"
-                                    app:strokeWidth="1dp" />
-
-                                <com.google.android.material.button.MaterialButton
-                                    android:id="@+id/btn_vital_screen_secondary"
-                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:layout_marginStart="4dp"
-                                    android:backgroundTint="@android:color/holo_green_dark"
-                                    android:gravity="center"
-                                    android:paddingHorizontal="@dimen/padding_small"
-                                    android:maxLines="1"
-                                    android:singleLine="true"
-                                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                    android:textSize="14sp"
-                                    android:textColor="?attr/colorOnPrimary"
-                                    android:visibility="gone"
-                                    app:cornerRadius="@dimen/padding_normal"
-                                    app:strokeColor="?attr/colorPrimary"
-                                    app:strokeWidth="1dp" />
-                            </LinearLayout>
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:id="@+id/ll_anthropometry_action"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="0"
-                            android:gravity="start"
-                            android:orientation="vertical"
-                            android:visibility="gone">
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btn_anthropometry"
-                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:backgroundTint="@android:color/holo_red_dark"
-                                android:gravity="center"
-                                android:minWidth="170dp"
-                                android:maxLines="1"
-                                android:singleLine="true"
-                                android:onClick="@{()-> clickListener.onClickAnthropometry(ben, isAnthropometryDone)}"
-                                android:paddingHorizontal="@dimen/padding_normal"
-                                android:text="@string/anthropometry_screen"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                android:textColor="?attr/colorOnPrimary"
-                                android:textSize="14sp"
-                                android:visibility="gone"
-                                app:cornerRadius="@dimen/padding_normal"
-                                app:strokeColor="?attr/colorPrimary"
-                                app:strokeWidth="1dp" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
-                            android:visibility="@{ben.isDeath ? View.VISIBLE : View.GONE}"
-                            android:padding="@dimen/padding_small">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/date_of_death"
-                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                                android:textColor="?attr/colorOnPrimary" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@{ben.dateOfDeath}"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                android:textColor="?attr/colorOnPrimary"
-                                tools:text="" />
-                        </LinearLayout>
-                        <TextView
-                            android:id="@+id/tvTitleDuplicaterecord"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="3dp"
-                            android:layout_marginEnd="3dp"
-                            android:layout_gravity="center_vertical"
-                            android:textColor="@color/md_theme_light_onTertiary"
-                            android:fontFamily="@font/roboto_bold"
-                            android:textSize="@dimen/_12sdp"
-                            android:visibility="gone"
-                            android:text="@string/str_duplicate_record" />
-                    </LinearLayout>
-                <LinearLayout
-                    android:id="@+id/ll_general_opd_row"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="start"
-                    android:layout_marginHorizontal="@dimen/padding_normal"
-                    android:layout_marginTop="@dimen/margin_small"
-                    android:visibility="gone"
-                    app:layout_constraintTop_toBottomOf="@id/ll_ben_details_3">
-
-                    <LinearLayout
-                        android:id="@+id/ll_general_opd_action"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:orientation="vertical">
+                            app:cornerRadius="@dimen/padding_normal"
+                            app:strokeColor="?attr/colorPrimary"
+                            app:strokeWidth="1dp" />
 
                         <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btn_general_opd"
+                            android:id="@+id/btn_vital_screen_secondary"
                             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                            android:layout_width="wrap_content"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:backgroundTint="@android:color/holo_red_dark"
+                            android:layout_marginStart="4dp"
+                            android:layout_weight="1"
+                            android:backgroundTint="@android:color/holo_green_dark"
                             android:gravity="center"
-                            android:minWidth="140dp"
-                            android:paddingHorizontal="@dimen/padding_normal"
                             android:maxLines="1"
+                            android:paddingHorizontal="@dimen/padding_small"
                             android:singleLine="true"
-                            android:onClick="@{()-> clickListener.onClickGeneralOpd(ben, isGeneralOpdDone)}"
-                            android:text="@string/general_opd"
                             android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                            android:textSize="14sp"
                             android:textColor="?attr/colorOnPrimary"
-                        android:visibility="gone"
+                            android:textSize="14sp"
+                            android:visibility="gone"
                             app:cornerRadius="@dimen/padding_normal"
                             app:strokeColor="?attr/colorPrimary"
                             app:strokeWidth="1dp" />
                     </LinearLayout>
                 </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/ll_anthropometry_action"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:gravity="start"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_anthropometry"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:backgroundTint="@android:color/holo_red_dark"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:minWidth="170dp"
+                        android:onClick="@{()-> clickListener.onClickAnthropometry(ben, isAnthropometryDone)}"
+                        android:paddingHorizontal="@dimen/padding_normal"
+                        android:singleLine="true"
+                        android:text="@string/anthropometry_screen"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:textSize="14sp"
+                        android:visibility="gone"
+                        app:cornerRadius="@dimen/padding_normal"
+                        app:strokeColor="?attr/colorPrimary"
+                        app:strokeWidth="1dp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:padding="@dimen/padding_small"
+                    android:visibility="@{ben.isDeath ? View.VISIBLE : View.GONE}">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/date_of_death"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                        android:textColor="?attr/colorOnPrimary" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@{ben.dateOfDeath}"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorOnPrimary"
+                        tools:text="" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvTitleDuplicaterecord"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginStart="3dp"
+                    android:layout_marginEnd="3dp"
+                    android:fontFamily="@font/roboto_bold"
+                    android:text="@string/str_duplicate_record"
+                    android:textColor="@color/md_theme_light_onTertiary"
+                    android:textSize="@dimen/_12sdp"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/ll_general_opd_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/padding_normal"
+                android:layout_marginTop="@dimen/margin_small"
+                android:gravity="start"
+                android:visibility="gone"
+                app:layout_constraintTop_toBottomOf="@id/ll_ben_details_3">
+
+                <LinearLayout
+                    android:id="@+id/ll_general_opd_action"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_general_opd"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:backgroundTint="@android:color/holo_red_dark"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:minWidth="140dp"
+                        android:onClick="@{()-> clickListener.onClickGeneralOpd(ben, isGeneralOpdDone)}"
+                        android:paddingHorizontal="@dimen/padding_normal"
+                        android:singleLine="true"
+                        android:text="@string/general_opd"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:textSize="14sp"
+                        android:visibility="gone"
+                        app:cornerRadius="@dimen/padding_normal"
+                        app:strokeColor="?attr/colorPrimary"
+                        app:strokeWidth="1dp" />
+                </LinearLayout>
+            </LinearLayout>
             <!-- Household linking row for Non-HH beneficiaries -->
             <LinearLayout
                 android:id="@+id/ll_household_action"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
                 android:layout_marginHorizontal="@dimen/padding_normal"
                 android:layout_marginTop="@dimen/margin_small"
                 android:layout_marginBottom="@dimen/margin_small"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
                 android:visibility="@{showActionButtons &amp;&amp; ben.isNonHH &amp;&amp; !ben.isDeath &amp;&amp; !ben.isDeactivate ? android.view.View.VISIBLE : android.view.View.GONE}">
 
                 <com.google.android.material.button.MaterialButton
@@ -695,8 +812,8 @@
                     android:layout_height="wrap_content"
                     android:backgroundTint="#7C5CC4"
                     android:gravity="center"
-                    android:singleLine="true"
                     android:onClick="@{()-> clickListener.onClickNonHHHousehold(ben)}"
+                    android:singleLine="true"
                     android:text="Household"
                     android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
                     android:textColor="@android:color/white"
@@ -709,11 +826,11 @@
                 android:id="@+id/ll_examine_action"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
                 android:layout_marginHorizontal="@dimen/padding_normal"
                 android:layout_marginTop="@dimen/margin_small"
                 android:layout_marginBottom="@dimen/margin_small"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
                 android:visibility="@{(ben.isDeath == true || ben.isDeactivate == true) ? View.GONE : View.VISIBLE}"
                 app:layout_constraintTop_toBottomOf="@id/ll_general_opd_row">
 
@@ -727,9 +844,9 @@
                     android:backgroundTint="?attr/colorPrimary"
                     android:gravity="center"
                     android:maxLines="1"
-                    android:singleLine="true"
                     android:onClick="@{()-> clickListener.onClickExamine(ben)}"
                     android:paddingHorizontal="@dimen/padding_normal"
+                    android:singleLine="true"
                     android:text="@string/btn_examine"
                     android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
                     android:textColor="@android:color/white"
@@ -743,8 +860,8 @@
                     showLayout="@{showAbha? !hasAbha : showAbha}"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:layout_marginStart="8dp"
+                    android:layout_weight="1"
                     android:gravity="end"
                     android:orientation="vertical">
 
@@ -757,9 +874,9 @@
                         android:onClick="@{()-> clickListener.onClickABHA(ben)}"
                         android:singleLine="true"
                         android:text="@string/abha"
-                        android:visibility="@{ben.isDeath == true ? View.GONE : View.VISIBLE}"
                         android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
                         android:textColor="?attr/colorOnPrimary"
+                        android:visibility="@{ben.isDeath == true ? View.GONE : View.VISIBLE}"
                         app:cornerRadius="@dimen/padding_normal"
                         app:strokeColor="?attr/colorPrimary" />
                 </LinearLayout>
@@ -769,8 +886,8 @@
                     showLayout="@{showAbha? hasAbha: showAbha}"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:layout_marginStart="8dp"
+                    android:layout_weight="1"
                     android:orientation="vertical"
                     android:padding="@dimen/padding_small">
 
@@ -810,67 +927,68 @@
                 android:id="@+id/ll_ben_details_4"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="end"
-                android:orientation="horizontal"
                 android:layout_marginHorizontal="@dimen/padding_normal"
                 android:layout_marginBottom="0dp"
+                android:gravity="end"
+                android:orientation="horizontal"
                 android:visibility="gone"
                 app:layout_constraintTop_toBottomOf="@id/ll_examine_action">
 
-                        <Button
-                            style="@style/Widget.Material3.Button.TonalButton"
-                            android:id="@+id/btn_above_30"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:visibility="gone"
-                            android:onClick="@{()-> clickListener.clickedAddAllBenBtn(ben,isMatched,false)}"
-                            android:text="@string/add_eye_surgery"
-                            tools:ignore="NestedWeights"/>
+                <Button
+                    android:id="@+id/btn_above_30"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:onClick="@{()-> clickListener.clickedAddAllBenBtn(ben,isMatched,false)}"
+                    android:text="@string/add_eye_surgery"
+                    android:visibility="gone"
+                    tools:ignore="NestedWeights" />
 
-                    </LinearLayout>
+            </LinearLayout>
+
             <LinearLayout
                 android:id="@+id/ll_add_spouse_btn"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center"
-                android:visibility="gone"
-                android:orientation="horizontal"
                 android:layout_marginHorizontal="@dimen/padding_normal"
-                app:layout_constraintTop_toBottomOf="@id/ll_ben_details_4"
-                app:layout_constraintBottom_toBottomOf="parent">
-                
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btn_add_children"
-                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/add_children"
-                            android:visibility="gone"
-                            android:layout_marginEnd="5dp"
-                            android:backgroundTint="@android:color/holo_green_dark"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                            android:textColor="?attr/colorOnPrimary"
-                            app:cornerRadius="@dimen/padding_small"
-                            app:strokeColor="?attr/colorPrimary"
-                            app:strokeWidth="1dp"/>
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:visibility="gone"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/ll_ben_details_4">
 
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btn_add_spouse"
-                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginStart="5dp"
-                            android:visibility="gone"
-                            android:text="@string/add_wife"
-                            android:backgroundTint="@android:color/holo_green_dark"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                            android:textColor="?attr/colorOnPrimary"
-                            app:cornerRadius="@dimen/padding_small"
-                            app:strokeColor="?attr/colorPrimary"
-                            app:strokeWidth="1dp"/>
-                </LinearLayout>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_add_children"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="5dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="@android:color/holo_green_dark"
+                    android:text="@string/add_children"
+                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:visibility="gone"
+                    app:cornerRadius="@dimen/padding_small"
+                    app:strokeColor="?attr/colorPrimary"
+                    app:strokeWidth="1dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_add_spouse"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="5dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="@android:color/holo_green_dark"
+                    android:text="@string/add_wife"
+                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:visibility="gone"
+                    app:cornerRadius="@dimen/padding_small"
+                    app:strokeColor="?attr/colorPrimary"
+                    app:strokeWidth="1dp" />
+            </LinearLayout>
 
         </androidx.constraintlayout.widget.ConstraintLayout>
     </androidx.cardview.widget.CardView>

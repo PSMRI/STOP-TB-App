@@ -86,6 +86,10 @@ class BenRepo @Inject constructor(
             benDao.updateHofSpouseAdded(householdId = householdId,unsynced,"U",2)
         }
     }
+
+    fun getUnscreenedList(selectedVillage: Int): Flow<List<BenBasicCache>> =
+        benDao.getUnscreenedList(selectedVillage)
+
     suspend fun updateBeneficiarySpouseAdded(householdId: Long,benID: Long,unsynced: SyncState) {
         withContext(Dispatchers.IO) {
             val processState = if (benID < 0L) "N" else "U"

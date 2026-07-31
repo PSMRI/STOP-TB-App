@@ -28,6 +28,7 @@ import org.piramalswasthya.stoptb.model.InputType.IMAGE_VIEW
 import org.piramalswasthya.stoptb.model.InputType.RADIO
 import org.piramalswasthya.stoptb.model.InputType.TEXT_VIEW
 import org.piramalswasthya.stoptb.model.LocationRecord
+import org.piramalswasthya.stoptb.model.ScreeningStatus
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel.Companion.isOtpVerified
 import org.piramalswasthya.stoptb.utils.Log
 import java.text.SimpleDateFormat
@@ -129,6 +130,29 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         arrayId = R.array.beneficiary_status,
         entries = resources.getStringArray(R.array.beneficiary_status),
         required = false, hasDependants = true
+    )
+
+    // Camp attendance / screening intake
+    private val availableForCamp = FormElement(
+        id = 60, inputType = RADIO,
+        title = resources.getString(R.string.available_for_camp),
+        arrayId = R.array.nhhr_yes_no_array,
+        entries = resources.getStringArray(R.array.nhhr_yes_no_array),
+        required = true, hasDependants = true
+    )
+
+    private val reasonForNotAttending = FormElement(
+        id = 61, inputType = DROPDOWN,
+        title = resources.getString(R.string.reason_not_attending_camp),
+        arrayId = R.array.reason_not_attending_camp_array,
+        entries = resources.getStringArray(R.array.reason_not_attending_camp_array),
+        required = true, hasDependants = true
+    )
+
+    private val otherReasonForNotAttending = FormElement(
+        id = 62, inputType = EDIT_TEXT,
+        title = resources.getString(R.string.other_reason_not_attending_camp),
+        arrayId = -1, required = true, etMaxLength = 50
     )
 
     private val personFrom = FormElement(
@@ -567,6 +591,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         ben?.takeIf { !it.isDraft }?.let { saved ->
             // Beneficiary Status (death)
             list.add(list.indexOf(lastName) + 1, beneficiaryStatus)
+            list.add(list.indexOf(agePopup) + 1, availableForCamp)
             if (saved.isDeath) {
                 list.add(list.indexOf(beneficiaryStatus) + 1, dateOfDeath)
                 list.add(list.indexOf(dateOfDeath) + 1, timeOfDeath)
@@ -927,6 +952,32 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                     else
                         listOf(dateOfDeath, timeOfDeath, reasonOfDeath, placeOfDeath, otherPlaceOfDeath)
                 )
+            }
+
+            availableForCamp.id -> {
+                val isNo = index == 1 // entries = ["Yes","No"], index 1 = "No"
+                triggerDependants(
+                    source = availableForCamp,
+                    passedIndex = if (isNo) 1 else 0,
+                    triggerIndex = 1,
+                    target = listOf(reasonForNotAttending)
+                )
+            }
+
+            reasonForNotAttending.id -> {
+                val i = reasonForNotAttending.entries?.indexOf(reasonForNotAttending.value).takeIf { it != null && it >= 0 } ?: return -1
+                triggerDependants(
+                    source = reasonForNotAttending,
+                    passedIndex = i,
+                    triggerIndex = reasonForNotAttending.entries!!.size - 1, // "Other" is last item
+                    target = otherReasonForNotAttending
+                )
+            }
+
+            otherReasonForNotAttending.id -> {
+                validateEmptyOnEditText(otherReasonForNotAttending)
+                // alphabets only
+                validateAllAlphabetsSpaceOnEditText(otherReasonForNotAttending)
             }
 
             placeOfDeath.id -> {
@@ -1390,6 +1441,17 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                         name = selectedSubCentre
                     )
                 )
+            }
+
+            ben.isAvailableForCamp = availableForCamp.getPosition() == 1  // 1="Yes"
+            ben.reasonForNotAttendingCamp = reasonForNotAttending.value.takeIf { !ben.isAvailableForCamp }
+            ben.otherReasonForNotAttendingCamp = otherReasonForNotAttending.value.takeIf {
+                !ben.isAvailableForCamp && reasonForNotAttending.value == reasonForNotAttending.entries?.lastOrNull()
+            }
+
+            // Core rule: "No" → Unscreened
+            if (!ben.isAvailableForCamp) {
+                ben.screeningStatus = ScreeningStatus.UNSCREENED
             }
 
             // Occupation

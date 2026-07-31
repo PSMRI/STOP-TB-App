@@ -427,6 +427,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             showResultButton = showResultButton,
             showAnthropometryButton = false,
             showExamineButton = !isReadOnlyReferralList,
+            showScreeningStatus = true,
             source = args.source
         )
 

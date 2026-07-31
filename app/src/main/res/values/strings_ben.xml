@@ -144,10 +144,26 @@ personal health profile.</string>
         <item>Private Sector</item>
     </string-array>
 
+    <string name="available_for_camp">Are you available to attend the camp?</string>
+    <string name="reason_not_attending_camp">Reason for not attending the camp</string>
+    <string name="other_reason_not_attending_camp">Other reason</string>
+
+    <string-array name="reason_not_attending_camp_array">
+        <item>Out of Station</item>
+        <item>Bed ridden</item>
+        <item>Disabled/Handicapped person</item>
+        <item>Other</item>
+    </string-array>
+
     <string-array name="type_of_case_finding_array">
         <item>Passive (Routine programme)</item>
         <item>Active (Active Case Finding)</item>
     </string-array>
+
+    <string name="status_pending">Pending</string>
+    <string name="status_symptoms_screened">Symptoms Screened</string>
+    <string name="status_xray_done">Chest X-Ray Done</string>
+    <string name="status_trunat_done">Trunat Test Done</string>
 
 
 

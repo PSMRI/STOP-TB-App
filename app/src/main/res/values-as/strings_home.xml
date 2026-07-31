@@ -104,6 +104,10 @@
     <string name="no_of_individuals">Number of Individuals</string>
     <string name="no_of_familes">Number of Families</string>
 
+
+    <string name="icon_title_unscreened">অস্ক্ৰিন কৰা নোহোৱা জনসংখ্যা</string>
+    <string name="home_card_unscreened_subtitle">টিবি স্ক্ৰিনিংৰ বাবে অপেক্ষমাণ হিতাধিকাৰী</string>
+
     <string name="navigation_drawer_open">নেভিগেশ্বন ড্ৰয়াৰ খোলক</string>
     <string name="navigation_drawer_close">নেভিগেশ্বন ড্ৰয়াৰ বন্ধ কৰক</string>
     <string name="frag_service_type_title">গাঁও বাছনি কৰক</string>

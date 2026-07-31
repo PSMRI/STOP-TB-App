@@ -11,6 +11,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import org.piramalswasthya.stoptb.database.converters.GenderConverter
 import org.piramalswasthya.stoptb.database.converters.LocationEntityListConverter
+import org.piramalswasthya.stoptb.database.converters.ScreeningStatusConverter
 import org.piramalswasthya.stoptb.database.converters.StringListConverter
 import org.piramalswasthya.stoptb.database.converters.SyncStateConverter
 import org.piramalswasthya.stoptb.database.room.dao.ABHAGenratedDao
@@ -104,13 +105,16 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class],
-    version = 25, exportSchema = false
+    version = 26, exportSchema = false
+
 )
 @TypeConverters(
     LocationEntityListConverter::class,
     SyncStateConverter::class,
     StringListConverter::class,
-    GenderConverter::class
+    GenderConverter::class,
+    ScreeningStatusConverter::class
+
 )
 abstract class InAppDb : RoomDatabase() {
 
@@ -803,6 +807,13 @@ abstract class InAppDb : RoomDatabase() {
                     ", 0 as isDelivered, 0 as pwHrp" +
                     ", 0 as irFilled, 0 as crFilled, 0 as doFilled" +
                     ", b.isNonHH" +
+                    ", b.isAvailableForCamp" +
+                    ", b.reasonForNotAttendingCamp" +
+                    ", b.otherReasonForNotAttendingCamp" +
+                    ", b.screeningStatus" +
+                    ", b.symptomsScreenedDate" +
+                    ", b.chestXrayDoneDate" +
+                    ", b.trunatTestDoneDate" +
                     ", b.placeOfCurrentLiving" +
                     ", b.otherPlaceOfCurrentLiving" +
                     ", b.institutionName" +
@@ -856,6 +867,27 @@ abstract class InAppDb : RoomDatabase() {
                 if (!columnExists(database, "TB_DIAGNOSTICS", "rifOrderStatus")) {
                     database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN rifOrderStatus TEXT DEFAULT NULL")
                 }
+            }
+        }
+
+        private val MIGRATION_25_26 = object : Migration(25, 26) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val newColumns = listOf(
+                    "isAvailableForCamp INTEGER NOT NULL DEFAULT 1",
+                    "reasonForNotAttendingCamp TEXT DEFAULT NULL",
+                    "otherReasonForNotAttendingCamp TEXT DEFAULT NULL",
+                    "screeningStatus TEXT NOT NULL DEFAULT 'UNSCREENED'",
+                    "symptomsScreenedDate INTEGER DEFAULT NULL",
+                    "chestXrayDoneDate INTEGER DEFAULT NULL",
+                    "trunatTestDoneDate INTEGER DEFAULT NULL"
+                )
+                newColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "BENEFICIARY", columnName)) {
+                        database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN $columnDefinition")
+                    }
+                }
+                recreateBenBasicCacheView(database)
             }
         }
 
@@ -1010,6 +1042,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_22_23)
                         .addMigrations(MIGRATION_23_24)
                         .addMigrations(MIGRATION_24_25)
+                        .addMigrations(MIGRATION_25_26)
                         .fallbackToDestructiveMigration()
                         .build()
 

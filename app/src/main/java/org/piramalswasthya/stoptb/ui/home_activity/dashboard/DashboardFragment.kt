@@ -161,6 +161,14 @@ class DashboardFragment : Fragment() {
             binding.tvPresumptiveTbOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
         }
 
+        viewModel.unscreened.observe(viewLifecycleOwner) { data ->
+            binding.tvUnscreenedTotal.text = data.total.toString()
+            binding.tvUnscreenedMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
+            binding.tvUnscreenedFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
+            binding.tvUnscreenedChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
+            binding.tvUnscreenedOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
+        }
+
         viewModel.pastHistoryTb.observe(viewLifecycleOwner) { data ->
             binding.tvPastHistoryTbTotal.text = data.total.total.toString()
             binding.tvPastHistoryTbMale.text = getString(

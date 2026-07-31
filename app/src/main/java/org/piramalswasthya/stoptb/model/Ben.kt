@@ -57,6 +57,13 @@ enum class BenStatus {
     Death,
 }
 
+enum class ScreeningStatus {
+    UNSCREENED,
+    SYMPTOMS_SCREENED,
+    CHEST_XRAY_DONE,
+    TRUNAT_TEST_DONE
+}
+
 // In your BenBasicCache.kt file, REPLACE the old @DatabaseView with this one.
 @DatabaseView(
     viewName = "BEN_BASIC_CACHE",
@@ -83,6 +90,13 @@ enum class BenStatus {
             ", 0 as isDelivered, 0 as pwHrp" +
             ", 0 as irFilled, 0 as crFilled, 0 as doFilled" +
             ", b.isNonHH" +
+            ", b.isAvailableForCamp" +
+            ", b.reasonForNotAttendingCamp" +
+            ", b.otherReasonForNotAttendingCamp" +
+            ", b.screeningStatus" +
+            ", b.symptomsScreenedDate" +
+            ", b.chestXrayDoneDate" +
+            ", b.trunatTestDoneDate" +
             ", b.placeOfCurrentLiving" +
             ", b.otherPlaceOfCurrentLiving" +
             ", b.institutionName" +
@@ -179,6 +193,15 @@ data class BenBasicCache(
     var isDeactivate: Boolean =false,
     val isNonHH: Boolean = false,
     val placeOfCurrentLiving: Int? = null,
+
+    val isAvailableForCamp: Boolean = true,
+    val reasonForNotAttendingCamp: String? = null,
+    val otherReasonForNotAttendingCamp: String? = null,
+    val screeningStatus: ScreeningStatus = ScreeningStatus.UNSCREENED,
+    val symptomsScreenedDate: Long? = null,
+    val chestXrayDoneDate: Long? = null,
+    val trunatTestDoneDate: Long? = null,
+
     val otherPlaceOfCurrentLiving: String? = null,
     val institutionName: String? = null
 ) : Parcelable {
@@ -299,6 +322,13 @@ data class BenBasicCache(
             doYouHavechildren = doYouHavechildren,
             isDeactivate = isDeactivate,
             isNonHH = isNonHH,
+            isAvailableForCamp = isAvailableForCamp,
+            reasonForNotAttendingCamp = reasonForNotAttendingCamp,
+            otherReasonForNotAttendingCamp = otherReasonForNotAttendingCamp,
+            screeningStatus = screeningStatus,
+            symptomsScreenedDate = symptomsScreenedDate,
+            chestXrayDoneDate = chestXrayDoneDate,
+            trunatTestDoneDate = trunatTestDoneDate,
             placeOfCurrentLiving = placeOfCurrentLiving,
             otherPlaceOfCurrentLiving = otherPlaceOfCurrentLiving,
             institutionName = institutionName
@@ -335,6 +365,15 @@ data class BenBasicCache(
             doYouHavechildren = doYouHavechildren,
             reproductiveStatusId = reproductiveStatusId,
             isNonHH = isNonHH,
+
+            isAvailableForCamp = isAvailableForCamp,
+            reasonForNotAttendingCamp = reasonForNotAttendingCamp,
+            otherReasonForNotAttendingCamp = otherReasonForNotAttendingCamp,
+            screeningStatus = screeningStatus,
+            symptomsScreenedDate = symptomsScreenedDate,
+            chestXrayDoneDate = chestXrayDoneDate,
+            trunatTestDoneDate = trunatTestDoneDate,
+
             placeOfCurrentLiving = placeOfCurrentLiving,
             otherPlaceOfCurrentLiving = otherPlaceOfCurrentLiving,
             institutionName = institutionName
@@ -914,6 +953,15 @@ data class BenBasicDomain(
     var noOfAliveChildren: Int = 0,
     var isDeactivate: Boolean =false,
     val isNonHH: Boolean = false,
+
+    val isAvailableForCamp: Boolean = true,
+    val reasonForNotAttendingCamp: String? = null,
+    val otherReasonForNotAttendingCamp: String? = null,
+    val screeningStatus: ScreeningStatus = ScreeningStatus.UNSCREENED,
+    val symptomsScreenedDate: Long? = null,
+    val chestXrayDoneDate: Long? = null,
+    val trunatTestDoneDate: Long? = null,
+
     val placeOfCurrentLiving: Int? = null,
     val otherPlaceOfCurrentLiving: String? = null,
     val institutionName: String? = null
@@ -1220,6 +1268,15 @@ data class BenRegCache(
     var placeOfDeathId: Int,
     var otherPlaceOfDeath: String? = null,
 
+    var isAvailableForCamp: Boolean = true,
+    var reasonForNotAttendingCamp: String? = null,
+    var otherReasonForNotAttendingCamp: String? = null,
+    var screeningStatus: ScreeningStatus = ScreeningStatus.UNSCREENED,
+    var symptomsScreenedDate: Long? = null,
+    var chestXrayDoneDate: Long? = null,
+    var trunatTestDoneDate: Long? = null,
+
+
 
     var benRegId: Long = 0,
 
@@ -1361,6 +1418,8 @@ data class BenRegCache(
     var confirmedNcdDiseases: String? = null,
 
     var diagnosisStatus: String? = null,
+
+
 
 
     /*

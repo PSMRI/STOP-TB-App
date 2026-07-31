@@ -103,6 +103,7 @@
     <string name="delivery_outcome_list">প্ৰসৱ সম্পূৰ্ণ হোৱাৰ ফল তালিকা</string>
     <string name="communicable_diseases">সংক্রামণ পৰামৰ্শযোগ্য পৰাৰ তালিকা</string>
     <string name="dashboard">ডেশবৰ্ড</string>
+    <string name="total_unscreened">স্ক্ৰীনিং নকৰা হিতাধিকাৰী</string>
     <string name="sign_in">ছাইন ইন কৰক</string>
     <string-array name="sync_records">
         <item>লাভানী</item>

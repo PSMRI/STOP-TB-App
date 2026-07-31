@@ -14,6 +14,10 @@
     <string name="enter_aadhaar_number_ben">আধাৰ নম্বৰ লিখক</string>
     <string name="reproductive_status">আপুনি গৰ্ভৱতী নেকি?</string>
 
+    <string name="available_for_camp">আপুনি শিবিৰত অংশগ্ৰহণ কৰিবলৈ উপলব্ধ নেকি?</string>
+    <string name="reason_not_attending_camp">শিবিৰত অংশগ্ৰহণ নকৰাৰ কাৰণ</string>
+    <string name="other_reason_not_attending_camp">আন কাৰণ</string>
+
     <string name="birth_certificate_number">Birth Certificate No.</string>
     <string name="beneficiary_details">সুবিধা প্ৰাপ্তবোৰ বিৱৰণ</string>
     <string name="wife_s_name">বাইৰ নাম</string>
@@ -419,6 +423,11 @@
     <string-array name="mobile_not_available_array">
         <item>উপলব্ধ নহয়</item>
     </string-array>
+
+    <string name="status_pending">लंबित</string>
+    <string name="status_symptoms_screened">लक्षण जांचे गए</string>
+    <string name="status_xray_done">छाती एक्स-रे पूर्ण</string>
+    <string name="status_trunat_done">ट्रूनैट परीक्षण पूर्ण</string>
 
 
 

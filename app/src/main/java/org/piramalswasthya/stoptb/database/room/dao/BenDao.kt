@@ -1319,4 +1319,28 @@ interface BenDao {
         AND (:query = '' OR benName LIKE '%' || :query || '%' OR benSurname LIKE '%' || :query || '%' OR (benName || ' ' || benSurname) LIKE '%' || :query || '%' OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%')
     """)
     fun searchNonHHBeneficiaries(selectedVillage: Int, query: String): Flow<List<BenBasicCache>>
+
+    @Query("""
+        SELECT COUNT(*) FROM BEN_BASIC_CACHE
+        WHERE villageId = :selectedVillage AND isDeactivate = 0 AND screeningStatus = 'UNSCREENED'
+    """)
+    fun getUnscreenedCount(selectedVillage: Int): Flow<Int>
+
+    @Query("""
+        SELECT * FROM BEN_BASIC_CACHE
+        WHERE villageId = :selectedVillage AND isDeactivate = 0 AND screeningStatus = 'UNSCREENED'
+    """)
+    fun getUnscreenedList(selectedVillage: Int): Flow<List<BenBasicCache>>
+
+    @Query("UPDATE BENEFICIARY SET screeningStatus = :status, syncState = :unsynced, processed = 'U', serverUpdatedStatus = 2 WHERE beneficiaryId = :benId")
+    suspend fun updateScreeningStatus(benId: Long, status: String, unsynced: SyncState = SyncState.UNSYNCED)
+
+    @Query("UPDATE BENEFICIARY SET symptomsScreenedDate = :date, screeningStatus = 'SYMPTOMS_SCREENED', syncState = :unsynced, processed = 'U', serverUpdatedStatus = 2 WHERE beneficiaryId = :benId")
+    suspend fun markSymptomsScreened(benId: Long, date: Long = System.currentTimeMillis(), unsynced: SyncState = SyncState.UNSYNCED)
+
+    @Query("UPDATE BENEFICIARY SET chestXrayDoneDate = :date, screeningStatus = 'CHEST_XRAY_DONE', syncState = :unsynced, processed = 'U', serverUpdatedStatus = 2 WHERE beneficiaryId = :benId")
+    suspend fun markChestXrayDone(benId: Long, date: Long = System.currentTimeMillis(), unsynced: SyncState = SyncState.UNSYNCED)
+
+    @Query("UPDATE BENEFICIARY SET trunatTestDoneDate = :date, screeningStatus = 'TRUNAT_TEST_DONE', syncState = :unsynced, processed = 'U', serverUpdatedStatus = 2 WHERE beneficiaryId = :benId")
+    suspend fun markTrunatTestDone(benId: Long, date: Long = System.currentTimeMillis(), unsynced: SyncState = SyncState.UNSYNCED)
 }

@@ -18,6 +18,9 @@
     <string name="menu_home_scheduler">डैशबोर्ड</string>
     <string name="til_hint_selected_village">Selected Village</string>
 
+    <string name="icon_title_unscreened">अस्क्रीनित जनसंख्या</string>
+    <string name="home_card_unscreened_subtitle">टीबी स्क्रीनिंग के लिए लंबित लाभार्थी</string>
+
     <string name="icon_title_household">सभी घरेलू सूची</string>
     <string name="icon_title_ben">सभी लाभार्थियों की सूची</string>
     <string name="icon_title_ec">पात्र युगल सूची</string>
