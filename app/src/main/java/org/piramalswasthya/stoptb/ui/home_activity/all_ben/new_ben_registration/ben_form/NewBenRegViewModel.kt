@@ -538,6 +538,7 @@ class NewBenRegViewModel @Inject constructor(
                     }
                     spouseLinkBenId?.let { linkedBenId ->
                         benRepo.updateBeneficiarySpouseAdded(hhId, linkedBenId, SyncState.UNSYNCED)
+                        updateLinkedSpouseNameIfBlank(linkedBenId, ben)
                     }
 
                     _state.postValue(State.SAVE_SUCCESS)
@@ -611,7 +612,9 @@ class NewBenRegViewModel @Inject constructor(
                 }
         }
 
-        return matches.singleOrNull()?.beneficiaryId
+        matches.singleOrNull()?.beneficiaryId?.let { return it }
+
+        return findHouseholdHeadSpouseFallback()
     }
 
     private fun String?.normalizeNameForMatch(): String =
@@ -619,6 +622,36 @@ class NewBenRegViewModel @Inject constructor(
             ?.replace(Regex("\\s+"), " ")
             ?.uppercase()
             .orEmpty()
+
+    private suspend fun findHouseholdHeadSpouseFallback(): Long? {
+        val expectedGenderId = if (relToHeadId == 4) 1 else 2
+        val householdHead = benRepo.getBenListFromHousehold(hhId).singleOrNull { existing ->
+            existing.familyHeadRelationPosition == 19 &&
+                existing.genderId == expectedGenderId &&
+                existing.isMarried &&
+                !existing.isSpouseAdded
+        }
+        return householdHead?.beneficiaryId
+    }
+
+    private suspend fun updateLinkedSpouseNameIfBlank(linkedBenId: Long, newBen: BenRegCache) {
+        val newSpouseName = newBen.fullName()?.takeIf { it.isNotBlank() } ?: return
+        benRepo.getBeneficiaryRecord(linkedBenId, hhId)?.let { linkedBen ->
+            if (linkedBen.genDetails?.spouseName.isNullOrBlank()) {
+                if (linkedBen.genDetails == null) {
+                    linkedBen.genDetails = BenRegGen(spouseName = newSpouseName)
+                } else {
+                    linkedBen.genDetails!!.spouseName = newSpouseName
+                }
+                linkedBen.syncState = SyncState.UNSYNCED
+                linkedBen.serverUpdatedStatus = 2
+                linkedBen.processed = "U"
+                linkedBen.updatedDate = System.currentTimeMillis()
+                linkedBen.updatedBy = user.userName
+                benRepo.persistRecord(linkedBen, updateIfExists = true)
+            }
+        }
+    }
 
     // ─── Preview ─────────────────────────────────────────────────────────
     suspend fun getFormPreviewData(): List<PreviewItem> = withContext(Dispatchers.Default) {
