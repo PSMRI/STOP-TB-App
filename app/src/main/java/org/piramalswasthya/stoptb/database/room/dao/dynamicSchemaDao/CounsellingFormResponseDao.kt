@@ -233,18 +233,30 @@ interface CounsellingFormResponseDao {
 
     @Query(
         """
-        SELECT fr.beneficiaryId AS beneficiaryId, COUNT(DISTINCT sr.sectionId) AS filledCount
-        FROM t_form_response fr
-        JOIN t_section_response sr ON sr.formResponseId = fr.responseId
-        JOIN t_form_section fs ON fs.sectionId = sr.sectionId AND fs.versionId = fr.formVersionId
-        WHERE fs.sectionPhase = 'PRE_SUBMIT'
-          AND (
-            fr.status IN ('SUBMITTED', 'COMPLETE', 'COMPLETED')
-            OR sr.completedAt IS NOT NULL
-            OR EXISTS (SELECT 1 FROM t_question_response qr WHERE qr.sectionResponseId = sr.sectionResponseId)
-          )
-        GROUP BY fr.beneficiaryId
-        """
+    SELECT fr.beneficiaryId AS beneficiaryId, COUNT(DISTINCT sr.sectionId) AS filledCount
+    FROM t_form_response fr
+    JOIN t_section_response sr
+        ON sr.formResponseId = fr.responseId
+    JOIN t_form_section fs
+        ON fs.sectionId = sr.sectionId
+        AND fs.versionId = fr.formVersionId
+    JOIN t_form_version fv
+        ON fv.versionId = fr.formVersionId
+    JOIN t_dynamic_form df
+        ON df.formID = fv.formId
+    WHERE fs.sectionPhase = 'PRE_SUBMIT'
+      AND df.formType = 'TB_COUNSELLING_V2'
+      AND (
+        fr.status IN ('SUBMITTED', 'COMPLETE', 'COMPLETED')
+        OR sr.completedAt IS NOT NULL
+        OR EXISTS (
+            SELECT 1
+            FROM t_question_response qr
+            WHERE qr.sectionResponseId = sr.sectionResponseId
+        )
+      )
+    GROUP BY fr.beneficiaryId
+    """
     )
     suspend fun getLocalPreSubmitFilledCounts(): List<BeneficiaryPreSubmitFilledCount>
 

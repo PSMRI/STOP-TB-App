@@ -64,6 +64,8 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             val isCounselledByProgress = !isRefused && totalSections > 0 && sectionsFilled >= totalSections
             val isBenAlreadyCounselled = (benIdList != null && benIdList.contains(item.ben.benId)) &&
                     sectionsFilled == 0
+            // Provides a single source of truth for determining whether a row should show “Counselled.”
+            val isCounselledFinal = !isRefused && (isCounselledByProgress || item.isCounselled || isBenAlreadyCounselled)
             val role = pref?.getLoggedInUser()?.role
 
             binding.ivSyncState.visibility = if (item.tbConfirmedList == null) View.INVISIBLE else View.VISIBLE
@@ -80,19 +82,21 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
                 binding.btnCounselled.visibility = View.GONE
                 binding.btnCounselling.visibility = View.VISIBLE
                 binding.btnCounselling.text = binding.root.context.getString(org.piramalswasthya.stoptb.R.string.counselling_in_progress)
-            } else if (isCounselledByProgress) {
+            } else if (isCounselledFinal) {
                 binding.btnCounselling.visibility = View.GONE
                 binding.btnCounselled.text = binding.root.context.getString(org.piramalswasthya.stoptb.R.string.counselled)
                 binding.btnCounselled.setBackgroundColor(binding.root.resources.getColor(android.R.color.holo_green_dark))
             } else {
                 binding.btnCounselled.visibility = View.GONE
+                binding.btnCounselled.text = binding.root.context.getString(org.piramalswasthya.stoptb.R.string.counselled)
+                binding.btnCounselled.setBackgroundColor(binding.root.resources.getColor(android.R.color.holo_green_dark))
                 binding.btnCounselling.visibility = View.VISIBLE
                 binding.btnCounselling.text = binding.root.context.getString(org.piramalswasthya.stoptb.R.string.counselling_start_button)
             }
 
 
             if (role != null) {
-                checkIfCounsellingOfficerOrNot(role, (item.isCounselled || isCounselledByProgress || isRefused || isBenAlreadyCounselled))
+                checkIfCounsellingOfficerOrNot(role, (isRefused || isCounselledFinal))
             } else {
                 binding.btnFormTb.visibility = View.GONE
                 binding.btnCounselling.visibility = View.GONE
