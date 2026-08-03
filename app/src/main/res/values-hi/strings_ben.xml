@@ -48,6 +48,7 @@
     <string name="nbr_nb_last_name">अंतिम नाम / उपनाम</string>
     <string name="title_new_ben_reg_hof">परिवार मुखिया पंजीकरण</string>
     <string name="title_new_ben_reg_non_hof">परिवार सदस्य पंजीकरण</string>
+    <string name="title_new_non_hh_reg">नया गैर-पारिवारिक पंजीकरण</string>
     <string name="icon_title_abortion">गर्भपात सूची</string>
     <string name="icon_title_pmsma">ई-पीएमएसएमए सूची</string>
     <string name="mother_rch_id">मां की RCH आईडी</string>
