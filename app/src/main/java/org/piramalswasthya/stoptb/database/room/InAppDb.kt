@@ -835,6 +835,22 @@ abstract class InAppDb : RoomDatabase() {
                 )
             }
         }
+        private val MIGRATION_27_28 = object : Migration(27, 28) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+
+                if (!columnExists(db, "HOUSEHOLD", "fam_address")) {
+                    db.execSQL(
+                        "ALTER TABLE HOUSEHOLD ADD COLUMN fam_address TEXT DEFAULT NULL"
+                    )
+                }
+
+                if (!columnExists(db, "HOUSEHOLD", "fam_pinCode")) {
+                    db.execSQL(
+                        "ALTER TABLE HOUSEHOLD ADD COLUMN fam_pinCode TEXT DEFAULT NULL"
+                    )
+                }
+            }
+        }
 
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
@@ -1082,6 +1098,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_24_25)
                         .addMigrations(MIGRATION_25_26)
                         .addMigrations(MIGRATION_26_27)
+                        .addMigrations(MIGRATION_27_28)
                         .fallbackToDestructiveMigration()
                         .build()
 
