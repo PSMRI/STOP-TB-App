@@ -105,7 +105,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 27, exportSchema = false
+    version = 28, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
