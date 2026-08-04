@@ -598,20 +598,56 @@ class TBRepo @Inject constructor(
         val requestDTO = Gson().fromJson(dataObj, TBSuspectedRequestDTO::class.java)
         requestDTO?.tbSuspectedList?.forEach { tbSuspectedDTO ->
             tbSuspectedDTO.visitDate?.let {
-                val tbSuspectedCache: TBSuspectedCache? =
+                val matchedByVisitDate: TBSuspectedCache? =
                     tbDao.getTbSuspected(
                         tbSuspectedDTO.benId,
                         getLongFromDate(tbSuspectedDTO.visitDate),
                         getLongFromDate(tbSuspectedDTO.visitDate) - 19_800_000
                     )
+                val tbSuspectedCache = matchedByVisitDate ?: tbDao.getTbSuspected(tbSuspectedDTO.benId)
+                val cache = tbSuspectedDTO.toCache().let { incoming ->
+                    tbSuspectedCache?.copy(
+                        visitDate = incoming.visitDate,
+                        visitLabel = incoming.visitLabel,
+                        typeOfTBCase = incoming.typeOfTBCase,
+                        reasonForSuspicion = incoming.reasonForSuspicion,
+                        hasSymptoms = incoming.hasSymptoms,
+                        isSputumCollected = incoming.isSputumCollected,
+                        sputumSubmittedAt = incoming.sputumSubmittedAt,
+                        nikshayId = incoming.nikshayId,
+                        sputumTestResult = incoming.sputumTestResult,
+                        isChestXRayDone = incoming.isChestXRayDone,
+                        chestXRayResult = incoming.chestXRayResult,
+                        isAICoughAssessmentDone = incoming.isAICoughAssessmentDone,
+                        aiCoughAssessmentResult = incoming.aiCoughAssessmentResult,
+                        isNaatConducted = incoming.isNaatConducted,
+                        naatResult = incoming.naatResult,
+                        recommendedForLiquidCultureTest = incoming.recommendedForLiquidCultureTest,
+                        isLiquidCultureConducted = incoming.isLiquidCultureConducted,
+                        liquidCultureResult = incoming.liquidCultureResult,
+                        referralFacility = incoming.referralFacility,
+                        isTBConfirmed = incoming.isTBConfirmed,
+                        isDRTBConfirmed = incoming.isDRTBConfirmed,
+                        otherReasonForSuspicion = incoming.otherReasonForSuspicion,
+                        isConfirmed = incoming.isConfirmed,
+                        latitude = incoming.latitude,
+                        longitude = incoming.longitude,
+                        address = incoming.address,
+                        referred = incoming.referred,
+                        followUps = incoming.followUps,
+                        serverUpdatedDate = incoming.serverUpdatedDate,
+                        syncState = SyncState.SYNCED
+                    ) ?: incoming
+                }
                 if (shouldApplyServerRecord(
                         tbSuspectedCache?.syncState,
                         tbSuspectedCache?.serverUpdatedDate,
-                        tbSuspectedDTO.toCache().serverUpdatedDate ?: 0L
+                        cache.serverUpdatedDate ?: 0L
                     )
                 ) {
                     benDao.getBen(tbSuspectedDTO.benId)?.let {
-                        tbDao.saveTbSuspected(tbSuspectedDTO.toCache())
+                        tbDao.saveTbSuspected(cache)
+                        tbSuspectedList.add(cache)
                     }
                 }
             }
