@@ -1047,6 +1047,7 @@ class FormInputAdapter(
                     )
                 }
                 agePicker.setOnDismissListener {
+                    if (!agePicker.consumeSelectionConfirmed()) return@setOnDismissListener
                     binding.etNum.setText(getAgeStrFromAgeUnit(ageUnitDTO))
                     calDob.timeInMillis =
                         getDobFromAge(ageUnitDTO)
@@ -1085,6 +1086,15 @@ class FormInputAdapter(
                     ?: return@setOnClickListener
                 val originalLocale = Locale.getDefault()
                 HelperUtil.setEnLocaleForDatePicker(activity)
+                val yesterdayMax = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                    add(Calendar.MILLISECOND, -1)
+                }.timeInMillis
+                val effectiveMin = item.min
+                val effectiveMax = item.max?.coerceAtMost(yesterdayMax) ?: yesterdayMax
 
                 parseFormDate(item.value)?.let { selectedDate ->
                     thisYear = selectedDate.get(Calendar.YEAR)
@@ -1099,10 +1109,10 @@ class FormInputAdapter(
                             set(Calendar.DAY_OF_MONTH, day)
                         }
                         val millis = millisCal.timeInMillis
-                        if (item.min != null && millis < item.min!!) {
-                            item.value = getDateString(item.min)
-                        } else if (item.max != null && millis > item.max!!)
-                            item.value = getDateString(item.max)
+                        if (effectiveMin != null && millis < effectiveMin) {
+                            item.value = getDateString(effectiveMin)
+                        } else if (millis > effectiveMax)
+                            item.value = getDateString(effectiveMax)
                         else
                             item.value = getDateString(millis)
 
@@ -1119,8 +1129,6 @@ class FormInputAdapter(
                 datePickerDialog.showOnlyOkButton()
                 item.errorText = null
                 binding.tilEditTextDate.error = null
-                val effectiveMin = item.min
-                val effectiveMax = item.max
                 when {
                     effectiveMin != null && effectiveMax != null && effectiveMin > effectiveMax -> {
                         datePickerDialog.datePicker.minDate = effectiveMax
