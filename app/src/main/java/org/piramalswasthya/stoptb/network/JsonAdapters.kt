@@ -455,6 +455,8 @@ data class PatientRequest(
 )
 
 data class DiagnosticOrderPushRequest(
+    @com.squareup.moshi.Json(name = "beneficiaryId")
+    @com.google.gson.annotations.SerializedName("beneficiaryId")
     val benRegID: Long,
     val visitCode: Int,
     val providerServiceMapID: Int,
@@ -462,6 +464,12 @@ data class DiagnosticOrderPushRequest(
     val orderEvent: String = "STOP_TB_REFERRAL",
     val reasonForRefusal: String? = null,
     val patient: PatientRequest
+)
+
+data class DiagnosticManualResultRequest(
+    val beneficiaryId: Long,
+    val orderType: String,
+    val resultSummary: String
 )
 
 data class DiagnosticBeneficiaryStatusData(

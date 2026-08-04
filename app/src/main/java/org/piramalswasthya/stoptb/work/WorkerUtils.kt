@@ -198,22 +198,10 @@ object WorkerUtils {
     }
 
     fun triggerTrueNatDiagnosticResultPollWorker(context: Context, useMockApi: Boolean = false) {
-        val delaySec = if (useMockApi) 5L else 5L
-        val workRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>()
-            .setInitialDelay(delaySec, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            DiagnosticResultPollWorker.name + "_TRUENAT", ExistingWorkPolicy.REPLACE, workRequest
-        )
+        triggerDiagnosticResultPollWorker(context)
     }
 
     fun triggerRifDiagnosticResultPollWorker(context: Context, useMockApi: Boolean = false) {
-        val delaySec = if (useMockApi) 5L else 5L
-        val workRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>()
-            .setInitialDelay(delaySec, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            DiagnosticResultPollWorker.name + "_RIF", ExistingWorkPolicy.KEEP, workRequest
-        )
+        triggerDiagnosticResultPollWorker(context)
     }
 }

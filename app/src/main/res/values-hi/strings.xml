@@ -148,9 +148,9 @@
     <string name="eligible_couple_registration">पात्र दंपत्ति पंजीकरण</string>
     <string name="eligible_couple_tracking_list">पात्र दंपत्ति ट्रैकिंग सूची</string>
     <string name="tb_screening_list">टीबी स्क्रीनिंग सूची</string>
-    <string name="tb_suspected_list">संदेहास्पद टीबी मामले</string>
+    <string name="tb_suspected_list">संभावित टीबी मामले</string>
     <string name="tb_screening_form">टीबी स्क्रीनिंग फॉर्म</string>
-    <string name="tb_suspected_form">संदिग्ध टीबी मामला</string>
+    <string name="tb_suspected_form">संभावित टीबी मामला</string>
     <string name="delivery_outcome_list">प्रसव परिणाम सूची</string>
     <string name="communicable_diseases">संचारी (संक्रामक) रोग</string>
     <string name="dashboard">डैशबोर्ड</string>
@@ -594,7 +594,7 @@
     <string name="home_card_ncd_priority_subtitle">उच्च प्राथमिकता NCD फॉलो-अप ट्रैक करें</string>
     <string name="home_card_ncd_non_priority_subtitle">कम जोखिम वाले स्क्रीन किए गए लाभार्थियों को प्रबंधित करें</string>
     <string name="home_card_tb_screening_subtitle">टीबी स्क्रीनिंग शुरू करें और समीक्षा करें</string>
-    <string name="home_card_tb_suspected_short_subtitle">संदिग्ध टीबी मामलों पर फॉलो-अप करें</string>
+    <string name="home_card_tb_suspected_short_subtitle">संभावित टीबी मामलों पर फॉलो-अप करें</string>
     <string name="home_card_tb_confirmed_short_subtitle">पुष्ट टीबी रोगियों को ट्रैक करें</string>
     <string name="view_details">विवरण देखें</string>
     <string name="dashboard_tb_screening_subtitle">पहुंच और स्क्रीनिंग की मात्रा ट्रैक करें</string>
