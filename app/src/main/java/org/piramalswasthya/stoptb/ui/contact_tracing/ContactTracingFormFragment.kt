@@ -6,6 +6,9 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -55,6 +58,13 @@ class ContactTracingFormFragment : Fragment() {
         val viewHistory = arguments?.getBoolean(ARG_VIEW_HISTORY) ?: false
 
         binding?.apply {
+            ViewCompat.setOnApplyWindowInsetsListener(llCtContent) { view, insets ->
+                val bottomInset = insets.getInsets(
+                    WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime()
+                ).bottom
+                view.updatePadding(bottom = bottomInset)
+                insets
+            }
 
             rvCtForm.layoutManager = LinearLayoutManager(requireContext())
             (rvCtForm.itemAnimator as? androidx.recyclerview.widget.SimpleItemAnimator)
