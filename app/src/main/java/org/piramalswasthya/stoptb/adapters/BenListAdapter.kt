@@ -166,28 +166,34 @@ class BenListAdapter(
                         6 -> {
                             val status = tbDiag?.xrayOrderStatus
                             val referred = tbDiag?.isReferredForDigitalChestXray
+                            val isXrayDevIntegrated = pref?.getXrayIntegrated() == true
                             when {
                                 status.equals("REFUSED", ignoreCase = true) || referred == false -> {
                                     ButtonConfig("TEST REFUSED", android.R.color.darker_gray, "NONE", "XRAY_CHEST")
                                 }
-                                status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PROCESSING", ignoreCase = true) || status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) -> {
-                                    ButtonConfig("FETCHING RESULT...", android.R.color.darker_gray, "POLL", "XRAY_CHEST")
-                                }
                                 status.equals("COMPLETED", ignoreCase = true) -> {
                                     ButtonConfig("VIEW RESULT", android.R.color.holo_green_dark, "VIEW", "XRAY_CHEST")
                                 }
-                                status.equals("FAILED", ignoreCase = true) -> {
-                                    if (tbDiag?.xrayOrderId.isNullOrBlank()) {
-                                        ButtonConfig("RETRY REFERRAL", android.R.color.holo_red_dark, "REFER", "XRAY_CHEST")
+                                 isXrayDevIntegrated -> {
+                                    val isHubConnected = pref?.isCampHubConnected() == true
+                                    if (isHubConnected) {
+                                        when {
+                                            status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PENDING", ignoreCase = true) -> {
+                                                ButtonConfig("Pending", android.R.color.darker_gray, "NONE", "XRAY_CHEST")
+                                            }
+                                            status.equals("FAILED", ignoreCase = true) || status.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
+                                                ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
+                                            }
+                                            else -> {
+                                                ButtonConfig("TRACK", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
+                                            }
+                                        }
                                     } else {
-                                        ButtonConfig("RETRY RESULT RETRIEVAL", android.R.color.holo_red_dark, "RETRY_POLL", "XRAY_CHEST")
+                                        ButtonConfig("TRACK", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
                                     }
                                 }
-                                (referred == true && !status.equals("FAILED", ignoreCase = true)) || status.equals("PENDING", ignoreCase = true) || status.equals("CREATED", ignoreCase = true) || status.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) -> {
-                                    ButtonConfig("MARK X-RAY AS COMPLETED", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
-                                }
                                 else -> {
-                                    ButtonConfig("REFER FOR X-RAY", android.R.color.holo_blue_dark, "REFER", "XRAY_CHEST")
+                                    ButtonConfig("TRACK", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
                                 }
                             }
                         }
@@ -196,6 +202,9 @@ class BenListAdapter(
                             val sputumCollected = tbDiag?.isSputumCollected
                             val naatRes = tbDiag?.naatResult
                             val rifStatus = tbDiag?.rifOrderStatus
+                            val isHubConnected = pref?.isCampHubConnected() == true
+                            val isTruenatDevIntegrated = pref?.getTruenatIntegrated() == true
+                            val isTruenatManual = !isTruenatDevIntegrated || !isHubConnected
                             
                             binding.btnVitalScreenSecondary.visibility = View.GONE
                             
@@ -203,74 +212,101 @@ class BenListAdapter(
                                 status.equals("REFUSED", ignoreCase = true) || sputumCollected == false -> {
                                     ButtonConfig("TEST REFUSED", android.R.color.darker_gray, "NONE", "SPUTUM_TRUENAT")
                                 }
-                                status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PROCESSING", ignoreCase = true) || status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) -> {
-                                    ButtonConfig("FETCHING RESULT...", android.R.color.darker_gray, "POLL", "SPUTUM_TRUENAT")
-                                }
                                 status.equals("COMPLETED", ignoreCase = true) -> {
-                                    if (naatRes.equals("MTB not detected", ignoreCase = true)) {
-                                        ButtonConfig("VIEW MTB RESULT", android.R.color.holo_green_dark, "VIEW", "SPUTUM_TRUENAT")
-                                    } else if (naatRes.equals("MTB detected", ignoreCase = true)) {
-                                        // MTB Detected flow: handle RIF status machine
-                                        val conf = ButtonConfig("VIEW MTB RESULT", android.R.color.holo_green_dark, "VIEW", "SPUTUM_TRUENAT")
+                                    val isMtbDetected = !naatRes.isNullOrBlank() && {
+                                        val clean = naatRes.trim().lowercase()
+                                        (clean.contains("positive") || clean.contains("detected")) && !clean.contains("not") && !clean.contains("negative")
+                                    }()
+                                    val conf = ButtonConfig(if (isMtbDetected) "VIEW MTB RESULT" else "VIEW RESULT", android.R.color.holo_green_dark, "VIEW", "SPUTUM_TRUENAT")
+                                    if (isMtbDetected) {
                                         binding.btnVitalScreenSecondary.visibility = View.VISIBLE
                                         
-                                        when {
-                                            rifStatus == null || rifStatus.equals("PENDING", ignoreCase = true) || rifStatus.equals("CREATED", ignoreCase = true) || rifStatus.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) -> {
-                                                binding.btnVitalScreenSecondary.text = "MARK RIF COMPLETE"
-                                                binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_orange_dark))
-                                                binding.btnVitalScreenSecondary.isEnabled = isNurse
-                                                binding.btnVitalScreenSecondary.alpha = if (isNurse) 1.0f else 0.5f
-                                                binding.btnVitalScreenSecondary.setOnClickListener {
-                                                    clickListener?.onClickOrderAction(item, "COMPLETE_RIF", "MDR_RIF")
+                                        if (!isTruenatManual) {
+                                            when {
+                                                rifStatus == null || rifStatus.equals("PENDING", ignoreCase = true) || rifStatus.equals("CREATED", ignoreCase = true) || rifStatus.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) -> {
+                                                    binding.btnVitalScreenSecondary.text = "TRACK"
+                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_orange_dark))
+                                                    binding.btnVitalScreenSecondary.isEnabled = isNurse
+                                                    binding.btnVitalScreenSecondary.alpha = if (isNurse) 1.0f else 0.5f
+                                                    binding.btnVitalScreenSecondary.setOnClickListener {
+                                                        clickListener?.onClickOrderAction(item, "COMPLETE_RIF", "MDR_RIF")
+                                                    }
+                                                }
+                                                rifStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || rifStatus.equals("IN_PROGRESS", ignoreCase = true) -> {
+                                                    binding.btnVitalScreenSecondary.text = "Pending"
+                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.darker_gray))
+                                                    binding.btnVitalScreenSecondary.isEnabled = false
+                                                    binding.btnVitalScreenSecondary.alpha = 0.5f
+                                                }
+                                                rifStatus.equals("FAILED", ignoreCase = true) || rifStatus.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
+                                                    binding.btnVitalScreenSecondary.text = "Pending"
+                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_orange_dark))
+                                                    binding.btnVitalScreenSecondary.isEnabled = isNurse
+                                                    binding.btnVitalScreenSecondary.alpha = if (isNurse) 1.0f else 0.5f
+                                                    binding.btnVitalScreenSecondary.setOnClickListener {
+                                                        clickListener?.onClickOrderAction(item, "COMPLETE_RIF", "MDR_RIF")
+                                                    }
+                                                }
+                                                rifStatus.equals("COMPLETED", ignoreCase = true) -> {
+                                                    binding.btnVitalScreenSecondary.text = "VIEW RIF RESULT"
+                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_green_dark))
+                                                    binding.btnVitalScreenSecondary.isEnabled = true
+                                                    binding.btnVitalScreenSecondary.alpha = 1.0f
+                                                    binding.btnVitalScreenSecondary.setOnClickListener {
+                                                        clickListener?.onClickOrderAction(item, "VIEW_RIF", "MDR_RIF")
+                                                    }
+                                                }
+                                                else -> {
+                                                    binding.btnVitalScreenSecondary.visibility = View.GONE
                                                 }
                                             }
-                                            rifStatus.equals("IN_PROGRESS", ignoreCase = true) || rifStatus.equals("PROCESSING", ignoreCase = true) || rifStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) -> {
-                                                binding.btnVitalScreenSecondary.text = "FETCHING RIF RESULT..."
-                                                binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.darker_gray))
-                                                binding.btnVitalScreenSecondary.isEnabled = false
-                                                binding.btnVitalScreenSecondary.alpha = 0.5f
-                                            }
-                                            rifStatus.equals("COMPLETED", ignoreCase = true) -> {
-                                                binding.btnVitalScreenSecondary.text = "VIEW RIF RESULT"
-                                                binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_green_dark))
-                                                binding.btnVitalScreenSecondary.isEnabled = true
-                                                binding.btnVitalScreenSecondary.alpha = 1.0f
-                                                binding.btnVitalScreenSecondary.setOnClickListener {
-                                                    clickListener?.onClickOrderAction(item, "VIEW_RIF", "MDR_RIF")
+                                        } else {
+                                            when {
+                                                rifStatus == null || rifStatus.equals("PENDING", ignoreCase = true) || rifStatus.equals("CREATED", ignoreCase = true) || rifStatus.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) -> {
+                                                    binding.btnVitalScreenSecondary.text = "Pending"
+                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_orange_dark))
+                                                    binding.btnVitalScreenSecondary.isEnabled = isNurse
+                                                    binding.btnVitalScreenSecondary.alpha = if (isNurse) 1.0f else 0.5f
+                                                    binding.btnVitalScreenSecondary.setOnClickListener {
+                                                        clickListener?.onClickOrderAction(item, "COMPLETE_RIF", "MDR_RIF")
+                                                    }
                                                 }
-                                            }
-                                            rifStatus.equals("FAILED", ignoreCase = true) -> {
-                                                binding.btnVitalScreenSecondary.text = "RETRY RIF RESULT"
-                                                binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_red_dark))
-                                                binding.btnVitalScreenSecondary.isEnabled = true
-                                                binding.btnVitalScreenSecondary.alpha = 1.0f
-                                                binding.btnVitalScreenSecondary.setOnClickListener {
-                                                    clickListener?.onClickOrderAction(item, "RETRY_RIF_POLL", "MDR_RIF")
+                                                rifStatus.equals("COMPLETED", ignoreCase = true) -> {
+                                                    binding.btnVitalScreenSecondary.text = "VIEW RIF RESULT"
+                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_green_dark))
+                                                    binding.btnVitalScreenSecondary.isEnabled = true
+                                                    binding.btnVitalScreenSecondary.alpha = 1.0f
+                                                    binding.btnVitalScreenSecondary.setOnClickListener {
+                                                        clickListener?.onClickOrderAction(item, "VIEW_RIF", "MDR_RIF")
+                                                    }
                                                 }
-                                            }
-                                            else -> {
-                                                binding.btnVitalScreenSecondary.visibility = View.GONE
+                                                else -> {
+                                                    binding.btnVitalScreenSecondary.visibility = View.GONE
+                                                }
                                             }
                                         }
-                                        conf
-                                    } else if (naatRes.equals("Invalid", ignoreCase = true)) {
-                                        ButtonConfig("REPEAT TEST", android.R.color.holo_red_dark, "VIEW", "SPUTUM_TRUENAT")
-                                    } else {
-                                        ButtonConfig("VIEW MTB RESULT", android.R.color.holo_green_dark, "VIEW", "SPUTUM_TRUENAT")
                                     }
+                                    conf
                                 }
-                                status.equals("FAILED", ignoreCase = true) -> {
-                                    if (tbDiag?.trueNatOrderId.isNullOrBlank()) {
-                                        ButtonConfig("RETRY REFERRAL", android.R.color.holo_red_dark, "REFER", "SPUTUM_TRUENAT")
+                                 !isTruenatManual -> {
+                                    if (isHubConnected) {
+                                        when {
+                                            status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PENDING", ignoreCase = true) -> {
+                                                ButtonConfig("Pending", android.R.color.darker_gray, "NONE", "SPUTUM_TRUENAT")
+                                            }
+                                            status.equals("FAILED", ignoreCase = true) || status.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
+                                                ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
+                                            }
+                                            else -> {
+                                                ButtonConfig("TRACK", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
+                                            }
+                                        }
                                     } else {
-                                        ButtonConfig("RETRY RESULT RETRIEVAL", android.R.color.holo_red_dark, "RETRY_POLL", "SPUTUM_TRUENAT")
+                                        ButtonConfig("TRACK", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
                                     }
-                                }
-                                (sputumCollected == true && !status.equals("FAILED", ignoreCase = true)) || status.equals("PENDING", ignoreCase = true) || status.equals("CREATED", ignoreCase = true) || status.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) -> {
-                                    ButtonConfig("MARK TRUENAT COMPLETED", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
                                 }
                                 else -> {
-                                    ButtonConfig("REFER FOR SPUTUM", android.R.color.holo_blue_dark, "REFER", "SPUTUM_TRUENAT")
+                                    ButtonConfig("TRACK", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
                                 }
                             }
                         }
@@ -320,12 +356,21 @@ class BenListAdapter(
                         6 -> {
                             val status = tbDiag?.xrayOrderStatus
                             val referred = tbDiag?.isReferredForDigitalChestXray
+                            val isXrayDone = tbDiag?.isChestXRayDone
                             when {
-                                referred == false -> {
-                                    val reasonStr = formatDenialReason(tbDiag.reasonForDenialChestXray, tbDiag.reasonForDenialChestXrayOther)
-                                    "Referral Status: Declined\nReason:\n$reasonStr"
+                                referred == false || status.equals("REFUSED", ignoreCase = true) || isXrayDone == false -> {
+                                    val reasonStr = if (referred == false) {
+                                        formatDenialReason(tbDiag?.reasonForDenialChestXray, tbDiag?.reasonForDenialChestXrayOther)
+                                    } else {
+                                        formatDenialReason(tbDiag?.reasonNotConductedChestXray, tbDiag?.reasonNotConductedChestXrayOther)
+                                    }
+                                    if (reasonStr.isNotBlank()) {
+                                        "Referral Status: Declined / Not Conducted\nReason for Refusal:\n$reasonStr"
+                                    } else {
+                                        "Referral Status: Declined / Not Conducted"
+                                    }
                                 }
-                                 referred == true -> {
+                                referred == true -> {
                                     when {
                                         status.equals("PENDING", ignoreCase = true) || status.equals("CREATED", ignoreCase = true) || status.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) -> {
                                             "Referral Status: Referred\nOrder Status: Awaiting Test Completion"
@@ -334,7 +379,14 @@ class BenListAdapter(
                                             "Referral Status: Referred\nOrder Status: Awaiting Provider Result\nFetching Digital Chest X-ray Result..."
                                         }
                                         status.equals("COMPLETED", ignoreCase = true) -> {
-                                            "Referral Status: Completed\nResult Status: Available"
+                                            val rawRes = tbDiag?.chestXRayResult
+                                            val formattedRes = when {
+                                                rawRes.isNullOrBlank() -> "Available"
+                                                rawRes.equals("Positive", ignoreCase = true) || rawRes.equals("TB Presumptive", ignoreCase = true) -> "TB Presumptive"
+                                                rawRes.equals("Negative", ignoreCase = true) || rawRes.equals("Normal", ignoreCase = true) -> "Normal"
+                                                else -> rawRes
+                                            }
+                                            "Referral Status: Completed\nChest X-ray Result: $formattedRes"
                                         }
                                         status.equals("FAILED", ignoreCase = true) -> {
                                             if (tbDiag?.xrayOrderId.isNullOrBlank()) {
@@ -357,10 +409,19 @@ class BenListAdapter(
                             val naatRes = tbDiag?.naatResult
                             val rifStatus = tbDiag?.rifOrderStatus
                             val rifRes = tbDiag?.trueNatRifResult
+                            val isNaatConducted = tbDiag?.isNaatConducted
                             when {
-                                sputumCollected == false -> {
-                                    val reasonStr = formatDenialReason(tbDiag.reasonForDenialSputum, tbDiag.reasonForDenialSputumOther)
-                                    "Referral Status: Declined\nReason:\n$reasonStr"
+                                sputumCollected == false || status.equals("REFUSED", ignoreCase = true) || isNaatConducted == false -> {
+                                    val reasonStr = if (sputumCollected == false) {
+                                        formatDenialReason(tbDiag?.reasonForDenialSputum, tbDiag?.reasonForDenialSputumOther)
+                                    } else {
+                                        formatDenialReason(tbDiag?.reasonNotConductedNaat, tbDiag?.reasonNotConductedNaatOther)
+                                    }
+                                    if (reasonStr.isNotBlank()) {
+                                        "Status: Declined / Not Conducted\nReason for Refusal:\n$reasonStr"
+                                    } else {
+                                        "Status: Declined / Not Conducted"
+                                    }
                                 }
                                 sputumCollected == true -> {
                                     when {
@@ -371,26 +432,39 @@ class BenListAdapter(
                                             "Status: Fetching TrueNat Result...\nMTB Order Status: Awaiting Provider Result"
                                         }
                                         status.equals("COMPLETED", ignoreCase = true) -> {
-                                            if (naatRes.equals("MTB detected", ignoreCase = true)) {
+                                            val formattedMtb = when {
+                                                naatRes.isNullOrBlank() -> "Available"
+                                                naatRes.equals("TB Positive", ignoreCase = true) || naatRes.equals("MTB detected", ignoreCase = true) -> "MTB Detected"
+                                                naatRes.equals("TB Negative", ignoreCase = true) || naatRes.equals("MTB not detected", ignoreCase = true) -> "MTB Not Detected"
+                                                else -> naatRes
+                                            }
+                                            val isMtbDetected = naatRes.equals("MTB detected", ignoreCase = true) || naatRes.equals("TB Positive", ignoreCase = true)
+                                            if (isMtbDetected) {
+                                                val formattedRif = when {
+                                                    rifRes.isNullOrBlank() -> null
+                                                    rifRes.equals("DR TB", ignoreCase = true) || rifRes.equals("Rif Resistance Detected", ignoreCase = true) -> "RIF Resistance Detected"
+                                                    rifRes.equals("Non DR TB", ignoreCase = true) || rifRes.equals("Rif Resistance Not Detected", ignoreCase = true) -> "RIF Resistance Not Detected"
+                                                    else -> rifRes
+                                                }
                                                 when {
                                                     rifStatus == null || rifStatus.equals("PENDING", ignoreCase = true) || rifStatus.equals("CREATED", ignoreCase = true) -> {
-                                                        "Status: MTB Result Available\nMTB: Detected\nRIF Order: Created (Awaiting Completion)"
+                                                        "Status: Result Available\nMTB: $formattedMtb\nRIF Order: Created (Awaiting Completion)"
                                                     }
                                                     rifStatus.equals("IN_PROGRESS", ignoreCase = true) || rifStatus.equals("PROCESSING", ignoreCase = true) || rifStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) -> {
-                                                        "Status: Fetching RIF Result...\nMTB: Detected\nRIF Order: Awaiting Provider Result"
+                                                        "Status: Fetching RIF Result...\nMTB: $formattedMtb\nRIF Order: Awaiting Provider Result"
                                                     }
                                                     rifStatus.equals("COMPLETED", ignoreCase = true) -> {
-                                                        "Status: Result Available\nMTB: Detected\nRIF: ${rifRes ?: "Available"}"
+                                                        "Status: Result Available\nMTB: $formattedMtb\nRIF: ${formattedRif ?: "Available"}"
                                                     }
                                                     rifStatus.equals("FAILED", ignoreCase = true) -> {
-                                                        "Status: Result Available\nMTB: Detected\nRIF: Sync Failed (Retry Required)"
+                                                        "Status: Result Available\nMTB: $formattedMtb\nRIF: Sync Failed (Retry Required)"
                                                     }
                                                     else -> {
-                                                        "Status: MTB Result Available\nMTB: Detected"
+                                                        "Status: Result Available\nMTB: $formattedMtb"
                                                     }
                                                 }
                                             } else {
-                                                "Status: Result Available\nMTB: ${naatRes ?: "Available"}"
+                                                "Status: Result Available\nMTB: $formattedMtb"
                                             }
                                         }
                                         status.equals("FAILED", ignoreCase = true) -> {

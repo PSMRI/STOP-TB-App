@@ -40,9 +40,10 @@ import javax.inject.Inject
 class TBRepo @Inject constructor(
     private val tbDao: TBDao,
     private val benDao: BenDao,
-    private val preferenceDao: PreferenceDao,
+    val preferenceDao: PreferenceDao,
     private val userRepo: UserRepo,
-    private val tmcNetworkApiService: AmritApiService
+    private val tmcNetworkApiService: AmritApiService,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
 ) {
     enum class MockMtbScenario { DETECTED, NOT_DETECTED, INVALID }
     enum class MockRifScenario { DETECTED, NOT_DETECTED, INDETERMINATE }
@@ -1315,6 +1316,104 @@ class TBRepo @Inject constructor(
         }
     }
 
+    suspend fun submitManualResult(
+        benId: Long,
+        orderType: String,
+        resultSummary: String
+    ): org.piramalswasthya.stoptb.helpers.NetworkResponse<String> {
+        return withContext(Dispatchers.IO) {
+            val user = preferenceDao.getLoggedInUser()
+                ?: return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("No user logged in!!")
+            val ben = benDao.getBen(benId)
+                ?: return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Beneficiary not found")
+            val targetBenId = ben.beneficiaryId
+
+            val apiOrderType = if (orderType.equals("SPUTUM_TRUENAT", ignoreCase = true)) "MTB" else orderType
+
+            val localResult = when (resultSummary) {
+                "TB Positive" -> "MTB detected"
+                "TB Negative" -> "MTB not detected"
+                "DR TB" -> "Rif Resistance Detected"
+                "Non DR TB" -> "Rif Resistance Not Detected"
+                else -> resultSummary
+            }
+
+            if (useMockApi) {
+                val existing = tbDao.getTbDiagnosticsByBenId(benId)
+                val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
+                    if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
+                        it.copy(
+                            xrayOrderStatus = "COMPLETED",
+                            isChestXRayDone = true,
+                            chestXRayResult = localResult,
+                            syncState = SyncState.SYNCED
+                        )
+                    } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
+                        it.copy(
+                            rifOrderStatus = "COMPLETED",
+                            trueNatRifResult = localResult,
+                            syncState = SyncState.SYNCED
+                        )
+                    } else {
+                        it.copy(
+                            trueNatOrderStatus = "COMPLETED",
+                            isSputumCollected = true,
+                            isNaatConducted = true,
+                            naatResult = localResult,
+                            syncState = SyncState.SYNCED
+                        )
+                    }
+                }
+                tbDao.saveTbDiagnostics(cache)
+                return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success("Mock success")
+            }
+
+            try {
+                val request = org.piramalswasthya.stoptb.network.DiagnosticManualResultRequest(
+                    beneficiaryId = targetBenId,
+                    orderType = apiOrderType,
+                    resultSummary = resultSummary
+                )
+                val response = tmcNetworkApiService.submitManualResult(request)
+                val statusCode = response.code()
+                if (statusCode == 200) {
+                    val existing = tbDao.getTbDiagnosticsByBenId(benId)
+                    val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
+                        if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
+                            it.copy(
+                                xrayOrderStatus = "COMPLETED",
+                                isChestXRayDone = true,
+                                chestXRayResult = localResult,
+                                syncState = SyncState.SYNCED
+                            )
+                        } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
+                            it.copy(
+                                rifOrderStatus = "COMPLETED",
+                                trueNatRifResult = localResult,
+                                syncState = SyncState.SYNCED
+                            )
+                        } else {
+                            it.copy(
+                                trueNatOrderStatus = "COMPLETED",
+                                isSputumCollected = true,
+                                isNaatConducted = true,
+                                naatResult = localResult,
+                                syncState = SyncState.SYNCED
+                            )
+                        }
+                    }
+                    tbDao.saveTbDiagnostics(cache)
+                    return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success("Result submitted successfully")
+                } else {
+                    return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("HTTP Error $statusCode")
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "submitManualResult failed")
+                return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Unknown error")
+            }
+        }
+    }
+
     suspend fun createProdigiOrder(
         benId: Long, 
         testType: String, 
@@ -1372,7 +1471,7 @@ class TBRepo @Inject constructor(
                 val sexMapped = when {
                     ben.gender?.name.equals("MALE", ignoreCase = true) -> "Male"
                     ben.gender?.name.equals("FEMALE", ignoreCase = true) -> "Female"
-                    else -> "Others"
+                    else -> "Other"
                 }
                 val patientReq = PatientRequest(
                     firstName = ben.firstName ?: "",
@@ -1380,7 +1479,7 @@ class TBRepo @Inject constructor(
                     dateOfBirth = dobString,
                     sex = sexMapped
                 )
-                val apiOrderType = if (testType.equals("SPUTUM_TRUENAT", ignoreCase = true)) "MTB_PLUS" else testType
+                val apiOrderType = if (testType.equals("SPUTUM_TRUENAT", ignoreCase = true)) "MTB" else testType
                 val request = DiagnosticOrderPushRequest(
                     benRegID = ben.beneficiaryId,
                     visitCode = computedVisitCode,
@@ -1391,6 +1490,109 @@ class TBRepo @Inject constructor(
                     patient = patientReq
                 )
                 val response = tmcNetworkApiService.pushDiagnosticOrder(request)
+                val statusCode = response.code()
+                if (statusCode == 200) {
+                    val responseString = response.body()?.string()
+                    if (responseString != null) {
+                        val jsonObj = JSONObject(responseString)
+                        val resStatusCode = jsonObj.optInt("statusCode")
+                        if (resStatusCode == 200) {
+                            val dataObj = jsonObj.optJSONObject("data")
+                            val orderId = dataObj?.optString("providerOrderId") ?: dataObj?.optString("externalOrderId")
+                            val status = dataObj?.optString("status") ?: "PENDING"
+                            
+                            val existing = tbDao.getTbDiagnosticsByBenId(benId)
+                            val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
+                                if (testType.equals("XRAY_CHEST", ignoreCase = true)) {
+                                    it.copy(
+                                        xrayOrderId = orderId,
+                                        xrayOrderStatus = if (status.equals("COMPLETED", ignoreCase = true)) "COMPLETED" else if (status.equals("FAILED", ignoreCase = true)) "FAILED" else if (it.xrayOrderStatus == "AWAITING_PROVIDER_RESULT") "AWAITING_PROVIDER_RESULT" else status,
+                                        syncState = SyncState.SYNCED
+                                    )
+                                } else if (testType.equals("MDR_RIF", ignoreCase = true)) {
+                                    it.copy(
+                                        rifOrderId = orderId,
+                                        rifOrderStatus = if (status.equals("COMPLETED", ignoreCase = true)) "COMPLETED" else if (status.equals("FAILED", ignoreCase = true)) "FAILED" else if (it.rifOrderStatus == "AWAITING_PROVIDER_RESULT") "AWAITING_PROVIDER_RESULT" else status,
+                                        trueNatRifResult = null,
+                                        syncState = SyncState.SYNCED
+                                    )
+                                } else {
+                                    it.copy(
+                                        trueNatOrderId = orderId,
+                                        trueNatOrderStatus = if (status.equals("COMPLETED", ignoreCase = true)) "COMPLETED" else if (status.equals("FAILED", ignoreCase = true)) "FAILED" else if (it.trueNatOrderStatus == "AWAITING_PROVIDER_RESULT") "AWAITING_PROVIDER_RESULT" else status,
+                                        naatResult = null,
+                                        trueNatRifResult = null,
+                                        syncState = SyncState.SYNCED
+                                    )
+                                }
+                            }
+                            tbDao.saveTbDiagnostics(cache)
+                            return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(orderId ?: "")
+                        } else {
+                            val errorMsg = jsonObj.optString("errorMessage") ?: "Failed to push order"
+                            saveFailedOrderStatus(benId, testType)
+                            return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(errorMsg)
+                        }
+                    }
+                }
+                saveFailedOrderStatus(benId, testType)
+                org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("HTTP Error $statusCode")
+            } catch (e: Exception) {
+                Timber.e(e, "createProdigiOrder failed")
+                saveFailedOrderStatus(benId, testType)
+                org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Unknown error")
+            }
+        }
+    }
+
+    suspend fun retryProdigiOrder(
+        benId: Long,
+        testType: String
+    ): org.piramalswasthya.stoptb.helpers.NetworkResponse<String> {
+        return withContext(Dispatchers.IO) {
+            val ben = benDao.getBen(benId)
+                ?: return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Beneficiary not found")
+            val targetBenId = ben.beneficiaryId
+            if (targetBenId <= 0) {
+                return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Beneficiary ID not valid")
+            }
+            if (useMockApi) {
+                try {
+                    val orderId = "MOCK-RETRY-" + (kotlin.math.abs(java.util.UUID.randomUUID().mostSignificantBits) % 900000 + 100000)
+                    val existing = tbDao.getTbDiagnosticsByBenId(benId)
+                    val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
+                        if (testType.equals("XRAY_CHEST", ignoreCase = true)) {
+                            it.copy(
+                                xrayOrderId = orderId,
+                                xrayOrderStatus = "PENDING",
+                                syncState = SyncState.SYNCED
+                            )
+                        } else if (testType.equals("MDR_RIF", ignoreCase = true)) {
+                            it.copy(
+                                rifOrderId = orderId,
+                                rifOrderStatus = "PENDING",
+                                trueNatRifResult = null,
+                                syncState = SyncState.SYNCED
+                            )
+                        } else {
+                            it.copy(
+                                trueNatOrderId = orderId,
+                                trueNatOrderStatus = "PENDING",
+                                naatResult = null,
+                                trueNatRifResult = null,
+                                syncState = SyncState.SYNCED
+                            )
+                        }
+                    }
+                    tbDao.saveTbDiagnostics(cache)
+                    return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(orderId)
+                } catch (e: Exception) {
+                    return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Mock retry failed")
+                }
+            }
+            try {
+                val apiOrderType = if (testType.equals("SPUTUM_TRUENAT", ignoreCase = true)) "MTB" else testType
+                val response = tmcNetworkApiService.retryOrder(benId = targetBenId, orderType = apiOrderType)
                 val statusCode = response.code()
                 if (statusCode == 200) {
                     val responseString = response.body()?.string()
@@ -1430,18 +1632,15 @@ class TBRepo @Inject constructor(
                             tbDao.saveTbDiagnostics(cache)
                             return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(orderId ?: "")
                         } else {
-                            val errorMsg = jsonObj.optString("errorMessage") ?: "Failed to push order"
-                            saveFailedOrderStatus(benId, testType)
+                            val errorMsg = jsonObj.optString("errorMessage") ?: "Failed to retry order"
                             return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(errorMsg)
                         }
                     }
                 }
-                saveFailedOrderStatus(benId, testType)
-                org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("HTTP Error $statusCode")
+                return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("HTTP Error $statusCode")
             } catch (e: Exception) {
-                Timber.e(e, "createProdigiOrder failed")
-                saveFailedOrderStatus(benId, testType)
-                org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Unknown error")
+                Timber.e(e, "retryProdigiOrder failed")
+                return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Unknown error")
             }
         }
     }
@@ -1502,7 +1701,7 @@ class TBRepo @Inject constructor(
                 }
             }
             try {
-                val apiOrderType = if (orderType.equals("SPUTUM_TRUENAT", ignoreCase = true)) "MTB_PLUS" else orderType
+                val apiOrderType = if (orderType.equals("SPUTUM_TRUENAT", ignoreCase = true)) "MTB" else orderType
                 val response = tmcNetworkApiService.markTestCompleted(benRegID = ben.beneficiaryId, orderType = apiOrderType)
                 val statusCode = response.code()
                 if (statusCode == 200) {
@@ -1573,85 +1772,71 @@ class TBRepo @Inject constructor(
             }
             if (useMockApi) {
                 try {
-                    val createdTime = orderCreatedTimestamps["${benId}_${orderType}"] ?: (System.currentTimeMillis() - 25_000L)
-                    val elapsedMs = System.currentTimeMillis() - createdTime
-                    if (elapsedMs < 20_000L) {
-                        val status = "PROCESSING"
+                    val status = "COMPLETED"
+                    if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
+                        val isPositiveResult = (benId % 2 == 0L)
                         val existing = tbDao.getTbDiagnosticsByBenId(benId)
-                        existing?.let {
-                            val cache = if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
-                                it.copy(xrayOrderStatus = status, syncState = SyncState.SYNCED)
-                            } else {
-                                it.copy(trueNatOrderStatus = status, syncState = SyncState.SYNCED)
-                            }
-                            tbDao.saveTbDiagnostics(cache)
+                        val cache = (existing ?: TBDiagnosticsCache(benId = benId)).copy(
+                            xrayOrderStatus = status,
+                            isChestXRayDone = true,
+                            chestXRayResult = if (isPositiveResult) "TB Presumptive" else "Normal",
+                            syncState = SyncState.SYNCED
+                        )
+                        tbDao.saveTbDiagnostics(cache)
+                        return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(status)
+                    } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
+                        val rifResult = when (mockRifScenario) {
+                            MockRifScenario.DETECTED -> "Rif Resistance Detected"
+                            MockRifScenario.NOT_DETECTED -> "Rif Resistance Not Detected"
+                            MockRifScenario.INDETERMINATE -> "Indeterminate"
                         }
+                        val existing = tbDao.getTbDiagnosticsByBenId(benId)
+                        val cache = (existing ?: TBDiagnosticsCache(benId = benId)).copy(
+                            trueNatRifResult = rifResult,
+                            syncState = SyncState.SYNCED
+                        )
+                        tbDao.saveTbDiagnostics(cache)
                         return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(status)
                     } else {
-                        val status = "COMPLETED"
-                        if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
-                            val isPositiveResult = (benId % 2 == 0L)
-                            val existing = tbDao.getTbDiagnosticsByBenId(benId)
-                            val cache = (existing ?: TBDiagnosticsCache(benId = benId)).copy(
-                                xrayOrderStatus = status,
-                                isChestXRayDone = true,
-                                chestXRayResult = if (isPositiveResult) "Positive" else "Negative",
-                                syncState = SyncState.SYNCED
-                            )
-                            tbDao.saveTbDiagnostics(cache)
-                            return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(status)
-                        } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
-                            val rifResult = when (mockRifScenario) {
-                                MockRifScenario.DETECTED -> "Rif Resistance Detected"
-                                MockRifScenario.NOT_DETECTED -> "Rif Resistance Not Detected"
-                                MockRifScenario.INDETERMINATE -> "Indeterminate"
-                            }
-                            val existing = tbDao.getTbDiagnosticsByBenId(benId)
-                            val cache = (existing ?: TBDiagnosticsCache(benId = benId)).copy(
-                                trueNatRifResult = rifResult,
-                                syncState = SyncState.SYNCED
-                            )
-                            tbDao.saveTbDiagnostics(cache)
-                            return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(status)
-                        } else {
-                            val mtbResult = when (mockMtbScenario) {
-                                MockMtbScenario.DETECTED -> "MTB detected"
-                                MockMtbScenario.NOT_DETECTED -> "MTB not detected"
-                                MockMtbScenario.INVALID -> "Invalid"
-                            }
-                            val rifResult = when (mockRifScenario) {
-                                MockRifScenario.DETECTED -> "Rif Resistance Detected"
-                                MockRifScenario.NOT_DETECTED -> "Rif Resistance Not Detected"
-                                MockRifScenario.INDETERMINATE -> "Indeterminate"
-                            }
-                            val isMtbDetected = mtbResult == "MTB detected"
-                            if (isMtbDetected) {
-                                try {
-                                    createProdigiOrder(benId, "MDR_RIF")
-                                } catch (e: Exception) {
-                                    Timber.e(e, "Auto createProdigiOrder for MDR_RIF failed in mock mode")
-                                }
-                            }
-                            val existing = tbDao.getTbDiagnosticsByBenId(benId)
-                            val cache = (existing ?: TBDiagnosticsCache(benId = benId)).copy(
-                                trueNatOrderStatus = status,
-                                isNaatConducted = true,
-                                naatResult = mtbResult,
-                                trueNatRifResult = if (isMtbDetected) rifResult else existing?.trueNatRifResult,
-                                isTBConfirmed = if (isMtbDetected) true else existing?.isTBConfirmed ?: false,
-                                isConfirmed = if (isMtbDetected) true else existing?.isConfirmed ?: false,
-                                syncState = SyncState.SYNCED
-                            )
-                            tbDao.saveTbDiagnostics(cache)
-                            return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(status)
+                        val mtbResult = when (mockMtbScenario) {
+                            MockMtbScenario.DETECTED -> "MTB detected"
+                            MockMtbScenario.NOT_DETECTED -> "MTB not detected"
+                            MockMtbScenario.INVALID -> "Invalid"
                         }
+                        val rifResult = when (mockRifScenario) {
+                            MockRifScenario.DETECTED -> "Rif Resistance Detected"
+                            MockRifScenario.NOT_DETECTED -> "Rif Resistance Not Detected"
+                            MockRifScenario.INDETERMINATE -> "Indeterminate"
+                        }
+                        val isMtbDetected = mtbResult == "MTB detected"
+                        if (isMtbDetected) {
+                            try {
+                                createProdigiOrder(benId, "MDR_RIF")
+                            } catch (e: Exception) {
+                                Timber.e(e, "Auto createProdigiOrder for MDR_RIF failed in mock mode")
+                            }
+                        }
+                        val existing = tbDao.getTbDiagnosticsByBenId(benId)
+                        val cache = (existing ?: TBDiagnosticsCache(benId = benId)).copy(
+                            trueNatOrderStatus = status,
+                            isNaatConducted = true,
+                            naatResult = mtbResult,
+                            trueNatRifResult = if (isMtbDetected) rifResult else existing?.trueNatRifResult,
+                            isTBConfirmed = if (isMtbDetected) true else existing?.isTBConfirmed ?: false,
+                            isConfirmed = if (isMtbDetected) true else existing?.isConfirmed ?: false,
+                            rifOrderStatus = if (isMtbDetected) "PENDING" else existing?.rifOrderStatus,
+                            rifOrderId = if (isMtbDetected) "MOCK-RIF-001" else existing?.rifOrderId,
+                            syncState = SyncState.SYNCED
+                        )
+                        tbDao.saveTbDiagnostics(cache)
+                        return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(status)
                     }
                 } catch (e: Exception) {
                     return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Mock fetch result failed")
                 }
             }
             try {
-                val apiOrderType = if (orderType.equals("SPUTUM_TRUENAT", ignoreCase = true)) "MTB_PLUS" else orderType
+                val apiOrderType = if (orderType.equals("SPUTUM_TRUENAT", ignoreCase = true)) "MTB" else orderType
                 val response = tmcNetworkApiService.fetchOrderResult(benId = ben.beneficiaryId, orderType = apiOrderType)
                 val statusCode = response.code()
                 if (statusCode == 200) {
@@ -1663,41 +1848,124 @@ class TBRepo @Inject constructor(
                             val dataObj = jsonObj.optJSONObject("data")
                             val rawStatus = dataObj?.optString("status")
                             val status = if (rawStatus.isNullOrBlank()) "IN_PROGRESS" else rawStatus
+                            timber.log.Timber.d("STOP-TB polling debug: fetchOrderResult benId=$benId status=$status rawStatus=$rawStatus")
                             
                             val existing = tbDao.getTbDiagnosticsByBenId(benId)
                             val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
                                 if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
                                     val hasTbPresence = dataObj?.has("tbPresence") == true && !dataObj.isNull("tbPresence")
                                     val tbPresence = if (hasTbPresence) dataObj?.optBoolean("tbPresence") else null
-                                    val chestResult = if (tbPresence == true) "Positive" else "Negative"
+                                    val serverResultSummary = dataObj?.optString("resultSummary")
+                                    val chestResult = if (!serverResultSummary.isNullOrBlank()) {
+                                        serverResultSummary
+                                    } else {
+                                        if (tbPresence == true) "TB Presumptive" else "Normal"
+                                    }
 
                                     val isCompleted = status.equals("COMPLETED", ignoreCase = true)
-                                    it.copy(
-                                        xrayOrderStatus = status,
-                                        isReferredForDigitalChestXray = true,
-                                        isChestXRayDone = if (isCompleted) true else it.isChestXRayDone,
-                                        chestXRayResult = if (isCompleted) chestResult else it.chestXRayResult,
-                                        syncState = SyncState.SYNCED
-                                    )
+                                    val xrayPos = isCompleted && isChestXrayPositive(chestResult)
+
+                                    if (xrayPos && isTruenatIntegrated()) {
+                                        val hasTruenat = !it.trueNatOrderId.isNullOrBlank() && !it.trueNatOrderStatus.equals("FAILED", ignoreCase = true)
+                                        if (!hasTruenat) {
+                                            try {
+                                                val response = createProdigiOrder(benId, "SPUTUM_TRUENAT")
+                                                if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+                                                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context, useMockApi)
+                                                    it.copy(
+                                                        xrayOrderStatus = "COMPLETED",
+                                                        isChestXRayDone = true,
+                                                        chestXRayResult = chestResult,
+                                                        trueNatOrderStatus = "AWAITING_PROVIDER_RESULT",
+                                                        isSputumCollected = true,
+                                                        isNaatConducted = true,
+                                                        syncState = SyncState.SYNCED
+                                                    )
+                                                } else {
+                                                    it.copy(
+                                                        xrayOrderStatus = "COMPLETED",
+                                                        isChestXRayDone = true,
+                                                        chestXRayResult = chestResult,
+                                                        syncState = SyncState.SYNCED
+                                                    )
+                                                }
+                                            } catch (e: Exception) {
+                                                Timber.e(e, "Auto createProdigiOrder for SPUTUM_TRUENAT failed on +ve X-Ray")
+                                                it.copy(
+                                                    xrayOrderStatus = "COMPLETED",
+                                                    isChestXRayDone = true,
+                                                    chestXRayResult = chestResult,
+                                                    syncState = SyncState.SYNCED
+                                                )
+                                            }
+                                        } else {
+                                            it.copy(
+                                                xrayOrderStatus = "COMPLETED",
+                                                isChestXRayDone = true,
+                                                chestXRayResult = chestResult,
+                                                syncState = SyncState.SYNCED
+                                            )
+                                        }
+                                    } else {
+                                        it.copy(
+                                            xrayOrderStatus = if (status.equals("COMPLETED", ignoreCase = true)) "COMPLETED" else if (status.equals("FAILED", ignoreCase = true) || status.equals("POLLING_TIMEOUT", ignoreCase = true) || status.equals("EXPIRED", ignoreCase = true)) "FAILED" else "AWAITING_PROVIDER_RESULT",
+                                            isReferredForDigitalChestXray = true,
+                                            isChestXRayDone = if (isCompleted) true else it.isChestXRayDone,
+                                            chestXRayResult = if (isCompleted) chestResult else it.chestXRayResult,
+                                            syncState = SyncState.SYNCED
+                                        )
+                                    }
                                 } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
                                     val isCompleted = status.equals("COMPLETED", ignoreCase = true)
-                                    val rifResult = when {
-                                        dataObj == null || !dataObj.has("drugResistancePresence") || dataObj.isNull("drugResistancePresence") -> "Indeterminate"
-                                        dataObj.optBoolean("drugResistancePresence") -> "Rif Resistance Detected"
-                                        else -> "Rif Resistance Not Detected"
+                                    val serverRifResultSummary = dataObj?.optString("resultSummary")
+                                    val rifResult = if (!serverRifResultSummary.isNullOrBlank()) {
+                                        serverRifResultSummary
+                                    } else {
+                                        when {
+                                            dataObj == null || !dataObj.has("drugResistancePresence") || dataObj.isNull("drugResistancePresence") -> "Indeterminate"
+                                            dataObj.optBoolean("drugResistancePresence") -> "Rif Resistance Detected"
+                                            else -> "Rif Resistance Not Detected"
+                                        }
                                     }
+                                    val isRifIndeterminate = isCompleted && rifResult.equals("Indeterminate", ignoreCase = true)
+                                    var computedRifStatus = if (isCompleted) "COMPLETED" else if (status.equals("FAILED", ignoreCase = true) || status.equals("POLLING_TIMEOUT", ignoreCase = true) || status.equals("EXPIRED", ignoreCase = true)) "FAILED" else "AWAITING_PROVIDER_RESULT"
+                                    var computedRifOrderId = it.rifOrderId
+
+                                    if (isRifIndeterminate) {
+                                        try {
+                                            val rifResponse = createProdigiOrder(benId, "MDR_RIF")
+                                            if (rifResponse is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+                                                computedRifStatus = "AWAITING_PROVIDER_RESULT"
+                                                computedRifOrderId = rifResponse.data
+                                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context, useMockApi)
+                                            }
+                                        } catch (e: Exception) {
+                                            Timber.e(e, "Failed to auto re-push RIF order on indeterminate result")
+                                        }
+                                    }
+
                                     it.copy(
-                                        rifOrderStatus = status,
+                                        rifOrderStatus = computedRifStatus,
+                                        rifOrderId = computedRifOrderId ?: it.rifOrderId,
                                         trueNatRifResult = if (isCompleted) rifResult else it.trueNatRifResult,
                                         syncState = SyncState.SYNCED
                                     )
                                 } else {
-                                    val mtbResult = when {
-                                        dataObj == null || !dataObj.has("tbPresence") || dataObj.isNull("tbPresence") -> "Invalid"
-                                        dataObj.optBoolean("tbPresence") -> "MTB detected"
-                                        else -> "MTB not detected"
+                                    val serverMtbResultSummary = dataObj?.optString("resultSummary")
+                                    val mtbResult = if (!serverMtbResultSummary.isNullOrBlank()) {
+                                        val clean = serverMtbResultSummary.trim().lowercase()
+                                        when {
+                                            clean.contains("positive") || clean.contains("detected") -> "MTB detected"
+                                            clean.contains("negative") || clean.contains("not detected") -> "MTB not detected"
+                                            else -> "Invalid"
+                                        }
+                                    } else {
+                                        when {
+                                            dataObj == null || !dataObj.has("tbPresence") || dataObj.isNull("tbPresence") -> "Invalid"
+                                            dataObj.optBoolean("tbPresence") -> "MTB detected"
+                                            else -> "MTB not detected"
+                                        }
                                     }
-
                                     val isCompleted = status.equals("COMPLETED", ignoreCase = true)
                                     val isMtbDetected = isCompleted && mtbResult == "MTB detected"
 
@@ -1709,8 +1977,9 @@ class TBRepo @Inject constructor(
                                         if (useMockApi) {
                                             try {
                                                 createProdigiOrder(benId, "MDR_RIF")
-                                                computedRifStatus = "PENDING"
+                                                computedRifStatus = "AWAITING_PROVIDER_RESULT"
                                                 computedRifOrderId = "MOCK-RIF-001"
+                                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context, useMockApi)
                                             } catch (e: Exception) {
                                                 Timber.e(e, "Auto createProdigiOrder for MDR_RIF failed in mock mode")
                                             }
@@ -1725,12 +1994,14 @@ class TBRepo @Inject constructor(
                                                 val regId = ben.beneficiaryId
                                                 if (awaitingTestCompletion.contains(regId)) {
                                                     serverHasOrder = true
-                                                    computedRifStatus = "PENDING"
+                                                    computedRifStatus = "AWAITING_PROVIDER_RESULT"
                                                     computedRifOrderId = "EXISTING-RIF-${regId}"
+                                                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context, useMockApi)
                                                 } else if (awaitingProviderResult.contains(regId)) {
                                                     serverHasOrder = true
                                                     computedRifStatus = "AWAITING_PROVIDER_RESULT"
                                                     computedRifOrderId = "EXISTING-RIF-${regId}"
+                                                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context, useMockApi)
                                                 } else if (completedList.contains(regId)) {
                                                     serverHasOrder = true
                                                     computedRifStatus = "COMPLETED"
@@ -1738,26 +2009,50 @@ class TBRepo @Inject constructor(
                                                 }
                                             }
                                             if (!serverHasOrder) {
-                                                try {
-                                                    val newOrderId = createProdigiOrder(benId, "MDR_RIF")
-                                                    if (newOrderId is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
-                                                        computedRifStatus = "PENDING"
-                                                        computedRifOrderId = newOrderId.data
+                                                val maxRifRetries = 1
+                                                var rifAttempt = 0
+                                                var rifSuccess = false
+                                                while (rifAttempt <= maxRifRetries && !rifSuccess) {
+                                                    try {
+                                                        val newOrderId = createProdigiOrder(benId, "MDR_RIF")
+                                                        if (newOrderId is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+                                                            computedRifStatus = "AWAITING_PROVIDER_RESULT"
+                                                            computedRifOrderId = newOrderId.data
+                                                            rifSuccess = true
+                                                            org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context, useMockApi)
+                                                        } else {
+                                                            rifAttempt++
+                                                            if (rifAttempt <= maxRifRetries) {
+                                                                kotlinx.coroutines.delay(5000L)
+                                                            }
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        Timber.e(e, "Auto createProdigiOrder for MDR_RIF failed, attempt=${rifAttempt}")
+                                                        rifAttempt++
+                                                        if (rifAttempt <= maxRifRetries) {
+                                                            kotlinx.coroutines.delay(5000L)
+                                                        }
                                                     }
-                                                } catch (e: Exception) {
-                                                    Timber.e(e, "Auto createProdigiOrder for MDR_RIF failed for benId=%s", benId)
+                                                }
+                                                if (!rifSuccess) {
+                                                    computedRifStatus = "FAILED"
                                                 }
                                             }
                                         }
                                     }
 
+                                    var computedTrueNatStatus = if (status.equals("COMPLETED", ignoreCase = true)) "COMPLETED" else if (status.equals("FAILED", ignoreCase = true) || status.equals("POLLING_TIMEOUT", ignoreCase = true) || status.equals("EXPIRED", ignoreCase = true)) "FAILED" else "AWAITING_PROVIDER_RESULT"
+                                    var computedTrueNatOrderId = it.trueNatOrderId
+
                                     it.copy(
-                                        trueNatOrderStatus = status,
+                                        trueNatOrderStatus = computedTrueNatStatus,
+                                        trueNatOrderId = computedTrueNatOrderId ?: it.trueNatOrderId,
                                         isNaatConducted = if (isCompleted) true else it.isNaatConducted,
-                                        naatResult = if (isCompleted) mtbResult else it.naatResult,
+                                        naatResult = if (isCompleted) (serverMtbResultSummary ?: mtbResult) else it.naatResult,
                                         isTBConfirmed = if (isMtbDetected) true else it.isTBConfirmed,
                                         isConfirmed = if (isMtbDetected) true else it.isConfirmed,
                                         rifOrderStatus = computedRifStatus,
+                                        rifOrderId = computedRifOrderId ?: it.rifOrderId,
                                         syncState = SyncState.SYNCED
                                     )
                                 }
@@ -1789,7 +2084,7 @@ class TBRepo @Inject constructor(
             val villageId = locationRecord.village.id
             val providerServiceMapId = user.serviceMapId
 
-            val apiOrderType = if (orderType.equals("SPUTUM_TRUENAT", ignoreCase = true)) "MTB_PLUS" else orderType
+            val apiOrderType = if (orderType.equals("SPUTUM_TRUENAT", ignoreCase = true)) "MTB" else orderType
 
             try {
                 val response = tmcNetworkApiService.getBeneficiariesByStatus(
@@ -1840,7 +2135,7 @@ class TBRepo @Inject constructor(
                             }
                             dataObj?.optJSONArray("refused")?.let { arr ->
                                 for (i in 0 until arr.length()) {
-                                    refusedList.add(arr.getLong(i))
+                            refusedList.add(arr.getLong(i))
                                 }
                             }
 
@@ -1857,6 +2152,7 @@ class TBRepo @Inject constructor(
                                             currentStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) ||
                                             currentStatus.equals("PROCESSING", ignoreCase = true) ||
                                             currentStatus.equals("COMPLETED", ignoreCase = true)
+                                    Timber.d("STOP-TB polling debug: awaitingTestCompletion regId=$regId benId=${b.beneficiaryId} currentStatus=$currentStatus isInProgressOrDone=$isInProgressOrDone")
                                     if (!isInProgressOrDone) {
                                         val cache = (existing ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
                                             if (isXray) {
@@ -1890,6 +2186,7 @@ class TBRepo @Inject constructor(
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
                                     val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
                                     val isDone = currentStatus.equals("COMPLETED", ignoreCase = true)
+                                    Timber.d("STOP-TB polling debug: awaitingProviderResult regId=$regId benId=${b.beneficiaryId} currentStatus=$currentStatus isDone=$isDone")
                                     if (!isDone) {
                                         val cache = (existing ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
                                             if (isXray) {
@@ -1958,9 +2255,41 @@ class TBRepo @Inject constructor(
                                 }
                             }
 
-                            // 4. Polling Timed Out / Failed
-                            val timedOutOrFailed = (pollingTimedOutList + failedList).distinct()
-                            for (regId in timedOutOrFailed) {
+                            // 4. Polling Timed Out
+                            for (regId in pollingTimedOutList) {
+                                val ben = benDao.getBenByRegId(regId) ?: benDao.getBen(regId)
+                                ben?.let { b ->
+                                    val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
+                                    val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
+                                    val isDone = currentStatus.equals("COMPLETED", ignoreCase = true)
+                                    if (!isDone) {
+                                        val cache = (existing ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
+                                            if (isXray) {
+                                                it.copy(
+                                                    xrayOrderStatus = "POLLING_TIMEOUT",
+                                                    isReferredForDigitalChestXray = true,
+                                                    syncState = SyncState.SYNCED
+                                                )
+                                            } else if (isRif) {
+                                                it.copy(
+                                                    rifOrderStatus = "POLLING_TIMEOUT",
+                                                    syncState = SyncState.SYNCED
+                                                )
+                                            } else {
+                                                it.copy(
+                                                    trueNatOrderStatus = "POLLING_TIMEOUT",
+                                                    isSputumCollected = true,
+                                                    syncState = SyncState.SYNCED
+                                                )
+                                            }
+                                        }
+                                        tbDao.saveTbDiagnostics(cache)
+                                    }
+                                }
+                            }
+
+                            // 5. Failed
+                            for (regId in failedList) {
                                 val ben = benDao.getBenByRegId(regId) ?: benDao.getBen(regId)
                                 ben?.let { b ->
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
@@ -2046,5 +2375,68 @@ class TBRepo @Inject constructor(
                 org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Unknown error")
             }
         }
+    }
+
+    suspend fun getVendorHealth(orderType: String): org.piramalswasthya.stoptb.helpers.NetworkResponse<String> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = tmcNetworkApiService.getVendorHealth(orderType)
+                val statusCode = response.code()
+                if (response.isSuccessful) {
+                    val responseStr = response.body()?.string()
+                    if (!responseStr.isNullOrBlank()) {
+                        val json = org.json.JSONObject(responseStr as String)
+                        if (json.optBoolean("success")) {
+                            val data = json.optJSONObject("data")
+                            val isConnected = data?.optBoolean("isConnected") ?: false
+                            val isDeviceIntegrated = data?.optBoolean("isDeviceIntegrated") ?: false
+                            return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(
+                                "isConnected: $isConnected, isDeviceIntegrated: $isDeviceIntegrated"
+                            )
+                        } else {
+                            val errorMsg = json.optString("message", "Health check failed")
+                            return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(errorMsg)
+                        }
+                    }
+                }
+                org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("HTTP Error $statusCode")
+            } catch (e: Exception) {
+                Timber.e(e, "getVendorHealth failed for $orderType")
+                org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Unknown error")
+            }
+        }
+    }
+
+    suspend fun checkDeviceIntegration(orderType: String): Boolean {
+        val health = getVendorHealth(orderType)
+        if (health is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+            val dataStr = health.data
+            return dataStr?.contains("isDeviceIntegrated: true") == true
+        }
+        return false
+    }
+
+    suspend fun refreshDeviceIntegrationConfig() {
+        val xrayVal = checkDeviceIntegration("XRAY_CHEST")
+        val truenatVal = checkDeviceIntegration("MTB")
+        preferenceDao.setXrayIntegrated(xrayVal)
+        preferenceDao.setTruenatIntegrated(truenatVal)
+    }
+
+    fun isXrayIntegrated(): Boolean {
+        return preferenceDao.getXrayIntegrated()
+    }
+
+    fun isTruenatIntegrated(): Boolean {
+        return preferenceDao.getTruenatIntegrated()
+    }
+
+    private fun isChestXrayPositive(value: String?): Boolean {
+        if (value.isNullOrBlank()) return false
+        val clean = value.trim().lowercase()
+        if (clean.contains("negative") || clean.contains("invalid") || clean.contains("not detected") || clean.contains("waiting")) {
+            return false
+        }
+        return clean.contains("positive") || clean.contains("presumptive") || clean.contains("detected") || clean.contains("tb") || clean.contains("abnormal")
     }
 }

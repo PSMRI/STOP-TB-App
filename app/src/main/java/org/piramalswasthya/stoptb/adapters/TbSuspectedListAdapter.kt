@@ -81,10 +81,10 @@ class TbSuspectedListAdapter(
                 }
             }
 
-            binding.btnFormTb.text = if (isFullFormSubmitted) binding.root.resources.getString(R.string.view) else binding.root.resources.getString(R.string.track)
+            binding.btnFormTb.text = binding.root.resources.getString(R.string.view)
             binding.btnFormTb.setBackgroundColor(
                 binding.root.resources.getColor(
-                    if (isFullFormSubmitted) android.R.color.holo_green_dark else android.R.color.holo_red_dark
+                    android.R.color.holo_green_dark
                 )
             )
             binding.clickListener = clickListener

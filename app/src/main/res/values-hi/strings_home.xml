@@ -80,7 +80,7 @@
     <string name="icon_title_video_tutorial">वीडियो ट्यूटोरियल</string>
     <string name="icon_title_ncd_tb_screening">टीबी स्क्रीनिंग</string>
     <string name="icon_title_ncd_tb">क्षय रोग</string>
-    <string name="icon_title_ncd_tb_suspected">संदेहास्पद टीबी मामले</string>
+    <string name="icon_title_ncd_tb_suspected">संभावित टीबी मामले</string>
     <string name="icon_title_hrp_pregnant">उच्च जोखिम\ गर्भवती महिलाएं</string>
     <string name="icon_title_hrp_non_pregnant">उच्च जोखिम\ गैर-गर्भवती महिलाएं</string>
     <string name="icon_title_hrp_pregnant_assess">गर्भवती महिलाओं में उच्च जोखिम का आकलन</string>
