@@ -59,9 +59,12 @@ interface SyncDao {
                 "    INNER JOIN beneficiary b ON b.beneficiaryId = tbsn.benId AND b.loc_village_id = :selectedVillage " +
 
                 "    UNION ALL " +
-                "    SELECT 12 as id, 'TB Suspected' as name, tbsp.syncState as syncState " +
-                "    FROM TB_SUSPECTED tbsp " +
-                "    INNER JOIN beneficiary b ON b.beneficiaryId = tbsp.benId AND b.loc_village_id = :selectedVillage " +
+                "    SELECT 12 as id, 'TB Suspected' as name, suspected.syncState as syncState " +
+                "    FROM ( " +
+                "        SELECT DISTINCT tbsp.benId, tbsp.syncState " +
+                "        FROM TB_SUSPECTED tbsp " +
+                "        INNER JOIN beneficiary b ON b.beneficiaryId = tbsp.benId AND b.loc_village_id = :selectedVillage " +
+                "    ) suspected " +
 
                 "    UNION ALL " +
                 "    SELECT 20 as id, 'Anthropometric' as name, b2.syncState as syncState " +
