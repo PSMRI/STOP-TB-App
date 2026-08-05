@@ -902,7 +902,7 @@ class TBSuspectedQuickDataset(
                             val showRif = if (referralMode) {
                                 isRifCompleted && isMtbDetected()
                             } else {
-                                !diagnosticsCache?.rifOrderStatus.isNullOrBlank() && !diagnosticsCache?.rifOrderStatus.equals("FAILED", ignoreCase = true) && isMtbDetected()
+                                isMtbDetected()
                             }
                             if (showRif) {
                                 add(rifConducted)
@@ -1160,7 +1160,7 @@ class TBSuspectedQuickDataset(
         val showRif = if (referralMode) {
             diagnosticsCache?.rifOrderStatus.equals("COMPLETED", ignoreCase = true) && isMtbDetected()
         } else {
-            !diagnosticsCache?.rifOrderStatus.isNullOrBlank() && !diagnosticsCache?.rifOrderStatus.equals("FAILED", ignoreCase = true) && isMtbDetected()
+            isMtbDetected()
         }
         rifConducted.isEnabled = showRif && !lockRif
         rifConducted.required = showRif && !lockRif

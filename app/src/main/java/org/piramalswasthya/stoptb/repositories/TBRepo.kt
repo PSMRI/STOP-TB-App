@@ -1868,7 +1868,10 @@ class TBRepo @Inject constructor(
                                     val xrayPos = isCompleted && isChestXrayPositive(chestResult)
 
                                      if (xrayPos && isTruenatIntegrated()) {
-                                        val hasTruenat = !it.trueNatOrderStatus.isNullOrBlank() && !it.trueNatOrderStatus.equals("FAILED", ignoreCase = true)
+                                        val hasTruenat = !it.trueNatOrderId.isNullOrBlank() ||
+                                                it.trueNatOrderStatus.equals("COMPLETED", ignoreCase = true) ||
+                                                it.trueNatOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) ||
+                                                it.trueNatOrderStatus.equals("REFUSED", ignoreCase = true)
                                         if (!hasTruenat) {
                                             try {
                                                 val response = createProdigiOrder(benId, "SPUTUM_TRUENAT")
@@ -1977,7 +1980,10 @@ class TBRepo @Inject constructor(
 
                                     var computedRifStatus: String? = it.rifOrderStatus
                                     var computedRifOrderId: String? = it.rifOrderId
-                                    val hasExistingRifOrder = !it.rifOrderStatus.isNullOrBlank() && !it.rifOrderStatus.equals("FAILED", ignoreCase = true)
+                                    val hasExistingRifOrder = !it.rifOrderId.isNullOrBlank() ||
+                                             it.rifOrderStatus.equals("COMPLETED", ignoreCase = true) ||
+                                             it.rifOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) ||
+                                             it.rifOrderStatus.equals("REFUSED", ignoreCase = true)
                                     
                                     if (isMtbDetected && !hasExistingRifOrder) {
                                         if (useMockApi) {
