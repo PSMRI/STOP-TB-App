@@ -105,7 +105,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 39, exportSchema = false
+    version = 42, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -1358,6 +1358,111 @@ abstract class InAppDb : RoomDatabase() {
                 )
             }
         }
+        private val MIGRATION_39_40 = object : Migration(39, 40) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val columns = listOf(
+                    "fam_totalHhMembers INTEGER",
+                    "fam_isRegisteredAtCampSite TEXT",
+                    "fam_isRegisteredAtCampSiteId INTEGER"
+                )
+                columns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "HOUSEHOLD", columnName)) {
+                        database.execSQL("ALTER TABLE HOUSEHOLD ADD COLUMN $columnDefinition")
+                    }
+                }
+            }
+        }
+
+        private val MIGRATION_40_41 = object : Migration(40,41){
+            override fun migrate(db: SupportSQLiteDatabase) {
+                addLocationRecordExtraColumns(db, "BENEFICIARY")
+                addLocationRecordExtraColumns(db, "HOUSEHOLD")
+            }
+        }
+
+        private val MIGRATION_41_42 = object : Migration(41, 42) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val columns = listOf(
+                    "xrayOrderId TEXT",
+                    "xrayOrderStatus TEXT",
+                    "trueNatOrderId TEXT",
+                    "trueNatOrderStatus TEXT",
+                    "trueNatRifResult TEXT"
+                )
+                columns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "TB_DIAGNOSTICS", columnName)) {
+                        database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN $columnDefinition")
+                    }
+                }
+
+                var rifOrderIdHasDefault = false
+                var rifOrderStatusHasDefault = false
+                database.query("PRAGMA table_info(`TB_DIAGNOSTICS`)").use { cursor ->
+                    val nameIndex = cursor.getColumnIndex("name")
+                    val dfltIndex = cursor.getColumnIndex("dflt_value")
+                    while (cursor.moveToNext()) {
+                        when (cursor.getString(nameIndex)) {
+                            "rifOrderId" -> rifOrderIdHasDefault = cursor.getString(dfltIndex) != null
+                            "rifOrderStatus" -> rifOrderStatusHasDefault = cursor.getString(dfltIndex) != null
+                        }
+                    }
+                }
+
+                if (!rifOrderIdHasDefault && !rifOrderStatusHasDefault) {
+                    return
+                }
+
+                var originalSql = ""
+                database.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='TB_DIAGNOSTICS'").use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        originalSql = cursor.getString(0)
+                    }
+                }
+                if (originalSql.isEmpty()) return
+
+                var newSql = originalSql.replace("CREATE TABLE `TB_DIAGNOSTICS`", "CREATE TABLE `TB_DIAGNOSTICS_new`")
+                newSql = newSql.replace("CREATE TABLE TB_DIAGNOSTICS", "CREATE TABLE TB_DIAGNOSTICS_new")
+                newSql = newSql.replace("`rifOrderId` TEXT DEFAULT NULL", "`rifOrderId` TEXT")
+                newSql = newSql.replace("rifOrderId TEXT DEFAULT NULL", "rifOrderId TEXT")
+                newSql = newSql.replace("`rifOrderStatus` TEXT DEFAULT NULL", "`rifOrderStatus` TEXT")
+                newSql = newSql.replace("rifOrderStatus TEXT DEFAULT NULL", "rifOrderStatus TEXT")
+
+                database.execSQL(newSql)
+
+                val columnsList = ArrayList<String>()
+                database.query("PRAGMA table_info(`TB_DIAGNOSTICS`)").use { cursor ->
+                    val nameIndex = cursor.getColumnIndex("name")
+                    while (cursor.moveToNext()) {
+                        columnsList.add(cursor.getString(nameIndex))
+                    }
+                }
+                val columnsCsv = columnsList.joinToString(", ") { "`$it`" }
+
+                database.execSQL("INSERT INTO `TB_DIAGNOSTICS_new` ($columnsCsv) SELECT $columnsCsv FROM `TB_DIAGNOSTICS`")
+
+                val indexSqls = ArrayList<String>()
+                database.query(
+                    "SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='TB_DIAGNOSTICS' AND sql IS NOT NULL"
+                ).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        indexSqls.add(cursor.getString(0))
+                    }
+                }
+
+                database.execSQL("DROP TABLE `TB_DIAGNOSTICS`")
+                database.execSQL("ALTER TABLE `TB_DIAGNOSTICS_new` RENAME TO `TB_DIAGNOSTICS`")
+
+                for (indexSql in indexSqls) {
+                    try {
+                        database.execSQL(indexSql)
+                    } catch (e: Exception) {
+                        // in case the index already got created, ignore
+                    }
+                }
+            }
+        }
 
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
@@ -1617,6 +1722,9 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_36_37)
                         .addMigrations(MIGRATION_37_38)
                         .addMigrations(MIGRATION_38_39)
+                        .addMigrations(MIGRATION_39_40)
+                        .addMigrations(MIGRATION_40_41)
+                        .addMigrations(MIGRATION_41_42)
                         .fallbackToDestructiveMigration()
                         .build()
 
