@@ -72,6 +72,7 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                     Timber.d("Full tb fetching took $timeTaken seconds $result1")
 
                     if (result1.all { it }) {
+                        syncDiagnosticOrderStatuses()
                         return@withContext Result.success()
                     }
                     return@withContext Result.failure(workDataOf("worker_name" to "PullTBFromAmritWorker", "error" to "Pull operation returned incomplete results"))
@@ -192,6 +193,23 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
             }
             true
+        }
+    }
+    private suspend fun syncDiagnosticOrderStatuses() {
+        withContext(Dispatchers.IO) {
+            try {
+                // 1. Fetch statuses for all orders first (populates all local cache entries)
+                tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST", fetchResult = false)
+                tbRepo.fetchBeneficiariesByStatus("SPUTUM_TRUENAT", fetchResult = false)
+                tbRepo.fetchBeneficiariesByStatus("MDR_RIF", fetchResult = false)
+
+                // 2. Fetch results for completed orders (safely references populated caches to avoid duplicate pushes)
+                tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST", fetchResult = true)
+                tbRepo.fetchBeneficiariesByStatus("SPUTUM_TRUENAT", fetchResult = true)
+                tbRepo.fetchBeneficiariesByStatus("MDR_RIF", fetchResult = true)
+            } catch (e: Exception) {
+                Timber.e(e, "syncDiagnosticOrderStatuses failed")
+            }
         }
     }
 

@@ -285,47 +285,47 @@ class TBSuspectedQuickViewModel @Inject constructor(
                             if (r.equals("Other", ignoreCase = true) && !o.isNullOrBlank()) "Other: $o" else r
                         }()
 
-                        if (isMtbManual) {
-                            val isMtbAlreadyCompleted = oldTrueNatStatus.equals("COMPLETED", ignoreCase = true)
-                            if (isMtbAlreadyCompleted) {
-                                // ── RIF Manual Submission Flow ──────────────────
-                                val rifConductedVal = dataset.rifConducted.value
-                                if (rifConductedVal == dataset.yesValue) {
-                                    val isRifDetected = dataset.trueNatRifResult.value == dataset.trueNatRifResult.entries?.getOrNull(0)
-                                    val isRifNotDetected = dataset.trueNatRifResult.value == dataset.trueNatRifResult.entries?.getOrNull(1)
-                                    val rifResultString = when {
-                                        isRifDetected -> "DR TB"
-                                        isRifNotDetected -> "Non DR TB"
+                        val isMtbAlreadyCompleted = oldTrueNatStatus.equals("COMPLETED", ignoreCase = true)
+                        if (isMtbAlreadyCompleted) {
+                            // ── RIF Manual Submission Flow ──────────────────
+                            val rifConductedVal = dataset.rifConducted.value
+                            if (rifConductedVal == dataset.yesValue) {
+                                val isRifDetected = dataset.trueNatRifResult.value == dataset.trueNatRifResult.entries?.getOrNull(0)
+                                val isRifNotDetected = dataset.trueNatRifResult.value == dataset.trueNatRifResult.entries?.getOrNull(1)
+                                val rifResultString = when {
+                                    isRifDetected -> "DR TB"
+                                    isRifNotDetected -> "Non DR TB"
+                                    else -> "Indeterminate"
+                                }
+                                val rifRes = tbRepo.submitManualResult(benId, "MDR_RIF", rifResultString)
+                                if (rifRes is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+                                    tbDiagnostics.rifOrderStatus = "COMPLETED"
+                                    tbDiagnostics.trueNatRifResult = when {
+                                        isRifDetected -> "Rif Resistance Detected"
+                                        isRifNotDetected -> "Rif Resistance Not Detected"
                                         else -> "Indeterminate"
                                     }
-                                    val rifRes = tbRepo.submitManualResult(benId, "MDR_RIF", rifResultString)
-                                    if (rifRes is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
-                                        tbDiagnostics.rifOrderStatus = "COMPLETED"
-                                        tbDiagnostics.trueNatRifResult = when {
-                                            isRifDetected -> "Rif Resistance Detected"
-                                            isRifNotDetected -> "Rif Resistance Not Detected"
-                                            else -> "Indeterminate"
-                                        }
-                                    } else {
-                                        apiSuccess = false
-                                        apiError = (rifRes as? org.piramalswasthya.stoptb.helpers.NetworkResponse.Error)?.message ?: "Submit RIF Manual Result Failed"
-                                    }
-                                } else if (rifConductedVal == dataset.noValue) {
-                                    val rifRefusalReason = {
-                                        val r = dataset.reasonNotConductedRif.value
-                                        val o = dataset.reasonNotConductedRifOther.value
-                                        val selReason = dataset.getEnglishValueInArray(R.array.tb_reason_not_conducted_naat, r) ?: r
-                                        if (selReason.equals("Other", ignoreCase = true) && !o.isNullOrBlank()) "Other: $o" else selReason
-                                    }()
-                                    val rifRes = tbRepo.createProdigiOrder(benId, "MDR_RIF", reasonForRefusal = rifRefusalReason)
-                                    if (rifRes is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
-                                        tbDiagnostics.rifOrderStatus = "REFUSED"
-                                    } else {
-                                        apiSuccess = false
-                                        apiError = (rifRes as? org.piramalswasthya.stoptb.helpers.NetworkResponse.Error)?.message ?: "Push RIF Order Failed"
-                                    }
+                                } else {
+                                    apiSuccess = false
+                                    apiError = (rifRes as? org.piramalswasthya.stoptb.helpers.NetworkResponse.Error)?.message ?: "Submit RIF Manual Result Failed"
                                 }
-                            } else {
+                            } else if (rifConductedVal == dataset.noValue) {
+                                val rifRefusalReason = {
+                                    val r = dataset.reasonNotConductedRif.value
+                                    val o = dataset.reasonNotConductedRifOther.value
+                                    val selReason = dataset.getEnglishValueInArray(R.array.tb_reason_not_conducted_naat, r) ?: r
+                                    if (selReason.equals("Other", ignoreCase = true) && !o.isNullOrBlank()) "Other: $o" else selReason
+                                }()
+                                val rifRes = tbRepo.createProdigiOrder(benId, "MDR_RIF", reasonForRefusal = rifRefusalReason)
+                                if (rifRes is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+                                    tbDiagnostics.rifOrderStatus = "REFUSED"
+                                } else {
+                                    apiSuccess = false
+                                    apiError = (rifRes as? org.piramalswasthya.stoptb.helpers.NetworkResponse.Error)?.message ?: "Push RIF Order Failed"
+                                }
+                            }
+                        } else {
+                            if (isMtbManual) {
                                 // ── MTB Manual Submission Flow ──────────────────
                                 if (dataset.trueNatConducted.value == dataset.yesValue) {
                                     val isMtbDetected = dataset.isMtbDetected()
@@ -361,39 +361,6 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                     } else {
                                         apiSuccess = false
                                         apiError = (res as? org.piramalswasthya.stoptb.helpers.NetworkResponse.Error)?.message ?: "Push Order Failed"
-                                    }
-                                }
-                            }
-                        } else {
-                            // Integrated, initial track / RIF completion
-                            val isRifAlreadyCompleted = oldRifStatus.equals("COMPLETED", ignoreCase = true) || !tbDiagnostics.trueNatRifResult.isNullOrBlank()
-                            val isRifManual = !isRifAlreadyCompleted && (oldRifStatus.equals("POLLING_TIMEOUT", ignoreCase = true) || oldRifStatus.equals("FAILED", ignoreCase = true) || !isHubConnected)
-                            if (isRifManual) {
-                                val rifConductedVal = dataset.rifConducted.value
-                                if (rifConductedVal == dataset.yesValue) {
-                                    val isRifDetected = dataset.trueNatRifResult.value == dataset.trueNatRifResult.entries?.firstOrNull()
-                                    val rifResultString = if (isRifDetected) "DR TB" else "Non DR TB"
-                                    val rifRes = tbRepo.submitManualResult(benId, "MDR_RIF", rifResultString)
-                                    if (rifRes is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
-                                        tbDiagnostics.rifOrderStatus = "COMPLETED"
-                                        tbDiagnostics.trueNatRifResult = if (isRifDetected) "Rif Resistance Detected" else "Rif Resistance Not Detected"
-                                    } else {
-                                        apiSuccess = false
-                                        apiError = (rifRes as? org.piramalswasthya.stoptb.helpers.NetworkResponse.Error)?.message ?: "Submit RIF Manual Result Failed"
-                                    }
-                                } else if (rifConductedVal == dataset.noValue) {
-                                    val rifRefusalReason = {
-                                        val r = dataset.reasonNotConductedRif.value
-                                        val o = dataset.reasonNotConductedRifOther.value
-                                        val selReason = dataset.getEnglishValueInArray(R.array.tb_reason_not_conducted_naat, r) ?: r
-                                        if (selReason.equals("Other", ignoreCase = true) && !o.isNullOrBlank()) "Other: $o" else selReason
-                                    }()
-                                    val rifRes = tbRepo.createProdigiOrder(benId, "MDR_RIF", reasonForRefusal = rifRefusalReason)
-                                    if (rifRes is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
-                                        tbDiagnostics.rifOrderStatus = "REFUSED"
-                                    } else {
-                                        apiSuccess = false
-                                        apiError = (rifRes as? org.piramalswasthya.stoptb.helpers.NetworkResponse.Error)?.message ?: "Push RIF Order Failed"
                                     }
                                 }
                             }
