@@ -9,6 +9,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.RvItemBenBinding
 import org.piramalswasthya.stoptb.helpers.getDateFromLong
@@ -18,8 +19,9 @@ import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.Gender
-import timber.log.Timber
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
+import org.piramalswasthya.stoptb.ui.setSyncStateForBen
+import timber.log.Timber
 
 data class ButtonConfig(
     val text: String,
@@ -80,6 +82,12 @@ class BenListAdapter(
             tbScreeningBenIds: List<Long> = emptyList(),
             generalOpdBenIds: List<Long> = emptyList(),
             anthropometryBenIds: List<Long> = emptyList(),
+            unsyncedVitalBenIds: List<Long> = emptyList(),
+            unsyncedTbScreeningBenIds: List<Long> = emptyList(),
+            unsyncedGeneralOpdBenIds: List<Long> = emptyList(),
+            syncingVitalBenIds: List<Long> = emptyList(),
+            syncingTbScreeningBenIds: List<Long> = emptyList(),
+            syncingGeneralOpdBenIds: List<Long> = emptyList(),
             tbSuspectedBenIds: List<Long> = emptyList(),
             contactFollowUpDoneBenIds: List<Long> = emptyList(),
             tptFollowUpDoneBenIds: List<Long> = emptyList(),
@@ -116,6 +124,12 @@ class BenListAdapter(
             val hasTbScreening = tbScreeningBenIds.contains(item.benId)
             val hasGeneralOpd = generalOpdBenIds.contains(item.benId)
             val hasAnthropometry = anthropometryBenIds.contains(item.benId)
+            val hasUnsyncedVital = unsyncedVitalBenIds.contains(item.benId)
+            val hasUnsyncedTbScreening = unsyncedTbScreeningBenIds.contains(item.benId)
+            val hasUnsyncedGeneralOpd = unsyncedGeneralOpdBenIds.contains(item.benId)
+            val hasSyncingVital = syncingVitalBenIds.contains(item.benId)
+            val hasSyncingTbScreening = syncingTbScreeningBenIds.contains(item.benId)
+            val hasSyncingGeneralOpd = syncingGeneralOpdBenIds.contains(item.benId)
             val hasDiagnosis = tbSuspectedBenIds.contains(item.benId)
             val hasContactFollowUpDone = contactFollowUpDoneBenIds.contains(item.benId)
             val hasTptFollowUpDone = tptFollowUpDoneBenIds.contains(item.benId)
@@ -600,6 +614,30 @@ class BenListAdapter(
                 binding.father = false; binding.husband = false; binding.spouse = false
             }
 
+            val relevantUnsynced = if (isRegistrar) {
+                hasUnsyncedTbScreening
+            } else if (isNurse || isCounsellingOfficer) {
+                hasUnsyncedVital || hasUnsyncedTbScreening || hasUnsyncedGeneralOpd
+            } else {
+                false
+            }
+            val relevantSyncing = if (isRegistrar) {
+                hasSyncingTbScreening
+            } else if (isNurse || isCounsellingOfficer) {
+                hasSyncingVital || hasSyncingTbScreening || hasSyncingGeneralOpd
+            } else {
+                false
+            }
+            val effectiveSyncState = if (showSyncIcon && !item.isDeath && !item.isDeactivate) {
+                when {
+                    relevantUnsynced -> SyncState.UNSYNCED
+                    relevantSyncing -> SyncState.SYNCING
+                    else -> item.syncState
+                }
+            } else {
+                null
+            }
+
             // Death/Deactivate background
             when {
                 item.isDeath -> {
@@ -619,8 +657,8 @@ class BenListAdapter(
                     binding.contentLayout.setBackgroundColor(ContextCompat.getColor(binding.contentLayout.context, R.color.md_theme_light_primary))
                 }
             }
-
             binding.executePendingBindings()
+            binding.ivSyncState.setSyncStateForBen(effectiveSyncState)
         }
     }
 
@@ -632,6 +670,12 @@ class BenListAdapter(
     private val tbScreeningIds    = mutableListOf<Long>()
     private val generalOpdIds     = mutableListOf<Long>()
     private val anthropometryIds  = mutableListOf<Long>()
+    private val unsyncedVitalIds = mutableListOf<Long>()
+    private val unsyncedTbScreeningIds = mutableListOf<Long>()
+    private val unsyncedGeneralOpdIds = mutableListOf<Long>()
+    private val syncingVitalIds = mutableListOf<Long>()
+    private val syncingTbScreeningIds = mutableListOf<Long>()
+    private val syncingGeneralOpdIds = mutableListOf<Long>()
     private val diagnosisIds      = mutableListOf<Long>()
     private val contactFollowUpDoneIds = mutableListOf<Long>()
     private val tptFollowUpDoneIds     = mutableListOf<Long>()
@@ -656,6 +700,12 @@ class BenListAdapter(
             tbScreeningIds,
             generalOpdIds,
             anthropometryIds,
+            unsyncedVitalIds,
+            unsyncedTbScreeningIds,
+            unsyncedGeneralOpdIds,
+            syncingVitalIds,
+            syncingTbScreeningIds,
+            syncingGeneralOpdIds,
             diagnosisIds,
             contactFollowUpDoneIds,
             tptFollowUpDoneIds,
@@ -693,6 +743,12 @@ class BenListAdapter(
     fun submitTbScreeningBenIds(list: List<Long>) = applyIdList(tbScreeningIds, list)
     fun submitGeneralOpdBenIds(list: List<Long>)  = applyIdList(generalOpdIds, list)
     fun submitAnthropometryBenIds(list: List<Long>) = applyIdList(anthropometryIds, list)
+    fun submitUnsyncedVitalBenIds(list: List<Long>) = applyIdList(unsyncedVitalIds, list)
+    fun submitUnsyncedTbScreeningBenIds(list: List<Long>) = applyIdList(unsyncedTbScreeningIds, list)
+    fun submitUnsyncedGeneralOpdBenIds(list: List<Long>) = applyIdList(unsyncedGeneralOpdIds, list)
+    fun submitSyncingVitalBenIds(list: List<Long>) = applyIdList(syncingVitalIds, list)
+    fun submitSyncingTbScreeningBenIds(list: List<Long>) = applyIdList(syncingTbScreeningIds, list)
+    fun submitSyncingGeneralOpdBenIds(list: List<Long>) = applyIdList(syncingGeneralOpdIds, list)
     fun submitDiagnosisBenIds(list: List<Long>)   = applyIdList(diagnosisIds, list)
     fun submitContactFollowUpDoneBenIds(list: List<Long>) = applyIdList(contactFollowUpDoneIds, list)
     fun submitTptFollowUpDoneBenIds(list: List<Long>)      = applyIdList(tptFollowUpDoneIds, list)

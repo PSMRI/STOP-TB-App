@@ -217,6 +217,7 @@ interface BenDao {
     """)
     fun getAnthropometryFilledBenIds(selectedVillage: Int): Flow<List<Long>>
 
+
     @Query("""
         SELECT * FROM BEN_BASIC_CACHE
         WHERE villageId = :selectedVillage

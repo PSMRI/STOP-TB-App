@@ -30,6 +30,12 @@ class BenPagingAdapter(
     private val tbScreeningBenIds = mutableListOf<Long>()
     private val generalOpdBenIds = mutableListOf<Long>()
     private val anthropometryBenIds = mutableListOf<Long>()
+    private val unsyncedVitalBenIds = mutableListOf<Long>()
+    private val unsyncedTbScreeningBenIds = mutableListOf<Long>()
+    private val unsyncedGeneralOpdBenIds = mutableListOf<Long>()
+    private val syncingVitalBenIds = mutableListOf<Long>()
+    private val syncingTbScreeningBenIds = mutableListOf<Long>()
+    private val syncingGeneralOpdBenIds = mutableListOf<Long>()
     private val diagnosisIds = mutableListOf<Long>()
     private val contactFollowUpDoneIds = mutableListOf<Long>()
     private val tptFollowUpDoneIds = mutableListOf<Long>()
@@ -59,6 +65,12 @@ class BenPagingAdapter(
             tbScreeningBenIds,
             generalOpdBenIds,
             anthropometryBenIds,
+            unsyncedVitalBenIds,
+            unsyncedTbScreeningBenIds,
+            unsyncedGeneralOpdBenIds,
+            syncingVitalBenIds,
+            syncingTbScreeningBenIds,
+            syncingGeneralOpdBenIds,
             diagnosisIds,
             contactFollowUpDoneIds,
             tptFollowUpDoneIds,
@@ -116,6 +128,13 @@ class BenPagingAdapter(
         notifyChangedIds(oldIds, anthropometryBenIds.toSet())
     }
 
+    fun submitUnsyncedVitalBenIds(list: List<Long>) = submitStatusIds(unsyncedVitalBenIds, list)
+    fun submitUnsyncedTbScreeningBenIds(list: List<Long>) = submitStatusIds(unsyncedTbScreeningBenIds, list)
+    fun submitUnsyncedGeneralOpdBenIds(list: List<Long>) = submitStatusIds(unsyncedGeneralOpdBenIds, list)
+    fun submitSyncingVitalBenIds(list: List<Long>) = submitStatusIds(syncingVitalBenIds, list)
+    fun submitSyncingTbScreeningBenIds(list: List<Long>) = submitStatusIds(syncingTbScreeningBenIds, list)
+    fun submitSyncingGeneralOpdBenIds(list: List<Long>) = submitStatusIds(syncingGeneralOpdBenIds, list)
+
     fun submitDiagnosisBenIds(list: List<Long>) {
         val oldIds = diagnosisIds.toSet()
         diagnosisIds.clear()
@@ -154,6 +173,13 @@ class BenPagingAdapter(
                 }
             }
         }
+    }
+
+    private fun submitStatusIds(target: MutableList<Long>, list: List<Long>) {
+        val oldIds = target.toSet()
+        target.clear()
+        target.addAll(list)
+        notifyChangedIds(oldIds, target.toSet())
     }
 
     fun submitChildCounts(map: Map<Long, Int>) {

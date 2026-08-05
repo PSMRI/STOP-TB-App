@@ -462,6 +462,16 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 benAdapter.submitBenIds(benIds)
             }
         }
+        lifecycleScope.launch {
+            viewModel.unsyncedVitalBenIds.collectLatest { benIds ->
+                benAdapter.submitUnsyncedVitalBenIds(benIds)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.syncingVitalBenIds.collectLatest { benIds ->
+                benAdapter.submitSyncingVitalBenIds(benIds)
+            }
+        }
 
         lifecycleScope.launch {
             viewModel.tbScreeningBenIds.collectLatest { benIds ->
@@ -469,10 +479,30 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 benAdapter.submitTbScreeningBenIds(benIds)
             }
         }
+        lifecycleScope.launch {
+            viewModel.unsyncedTbScreeningBenIds.collectLatest { benIds ->
+                benAdapter.submitUnsyncedTbScreeningBenIds(benIds)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.syncingTbScreeningBenIds.collectLatest { benIds ->
+                benAdapter.submitSyncingTbScreeningBenIds(benIds)
+            }
+        }
 
         lifecycleScope.launch {
             viewModel.generalOpdBenIds.collectLatest { benIds ->
                 benAdapter.submitGeneralOpdBenIds(benIds)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.unsyncedGeneralOpdBenIds.collectLatest { benIds ->
+                benAdapter.submitUnsyncedGeneralOpdBenIds(benIds)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.syncingGeneralOpdBenIds.collectLatest { benIds ->
+                benAdapter.submitSyncingGeneralOpdBenIds(benIds)
             }
         }
 
