@@ -105,7 +105,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 39, exportSchema = false
+    version = 41, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -1358,6 +1358,28 @@ abstract class InAppDb : RoomDatabase() {
                 )
             }
         }
+        private val MIGRATION_39_40 = object : Migration(39, 40) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val columns = listOf(
+                    "fam_totalHhMembers INTEGER",
+                    "fam_isRegisteredAtCampSite TEXT",
+                    "fam_isRegisteredAtCampSiteId INTEGER"
+                )
+                columns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "HOUSEHOLD", columnName)) {
+                        database.execSQL("ALTER TABLE HOUSEHOLD ADD COLUMN $columnDefinition")
+                    }
+                }
+            }
+        }
+
+        private val MIGRATION_40_41 = object : Migration(40,41){
+            override fun migrate(db: SupportSQLiteDatabase) {
+                addLocationRecordExtraColumns(db, "BENEFICIARY")
+                addLocationRecordExtraColumns(db, "HOUSEHOLD")
+            }
+        }
 
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
@@ -1617,6 +1639,8 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_36_37)
                         .addMigrations(MIGRATION_37_38)
                         .addMigrations(MIGRATION_38_39)
+                        .addMigrations(MIGRATION_39_40)
+                        .addMigrations(MIGRATION_40_41)
                         .fallbackToDestructiveMigration()
                         .build()
 

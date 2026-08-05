@@ -20,7 +20,7 @@ import java.net.SocketTimeoutException
 // initialization, and structured error handling.
 //
 // Subclasses only need to implement doSyncWork() and provide workerName
-// and preferenceDao (via Hilt DI with `override val`).
+// and preferenceDao (via Hilt DI with override val).
 abstract class BasePushWorker(
     appContext: Context,
     params: WorkerParameters
@@ -31,9 +31,11 @@ abstract class BasePushWorker(
         private const val NOTIFICATION_ID = 1001
         const val KEY_ERROR = "error"
         const val KEY_WORKER_NAME = "worker_name"
+
+        private const val MAX_ERROR_MESSAGE_LENGTH = 15000
     }
 
-    // Subclass provides via Hilt DI constructor with `override val preferenceDao`
+    // Subclass provides via Hilt DI constructor with override val preferenceDao
     protected abstract val preferenceDao: PreferenceDao
     abstract val workerName: String
 
@@ -58,7 +60,7 @@ abstract class BasePushWorker(
             Timber.e(e, "[$workerName] Sync failed")
             Result.failure(workDataOf(
                 KEY_WORKER_NAME to workerName,
-                KEY_ERROR to (e.message ?: "Unknown error")
+                KEY_ERROR to (e.message ?: "Unknown error").take(MAX_ERROR_MESSAGE_LENGTH)
             ))
         }
     }
