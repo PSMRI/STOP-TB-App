@@ -514,6 +514,8 @@ class TBRepo @Inject constructor(
                 trueNatOrderId = item.optStringOrNull("trueNatOrderId") ?: existing?.trueNatOrderId,
                 trueNatOrderStatus = item.optStringOrNull("trueNatOrderStatus") ?: existing?.trueNatOrderStatus,
                 trueNatRifResult = item.optStringOrNull("trueNatRifResult") ?: existing?.trueNatRifResult,
+                rifOrderId = item.optStringOrNull("rifOrderId") ?: existing?.rifOrderId,
+                rifOrderStatus = item.optStringOrNull("rifOrderStatus") ?: existing?.rifOrderStatus,
                 serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
                 syncState = SyncState.SYNCED
             )
@@ -1766,9 +1768,9 @@ class TBRepo @Inject constructor(
         return withContext(Dispatchers.IO) {
             val ben = benDao.getBen(benId)
                 ?: return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Beneficiary not found")
-            val benRegId = ben.benRegId
-            if (benRegId <= 0) {
-                return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Beneficiary registration ID not sync'ed yet")
+            val targetBenId = ben.beneficiaryId
+            if (targetBenId <= 0) {
+                return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Beneficiary ID not valid")
             }
             if (useMockApi) {
                 try {
@@ -1865,8 +1867,8 @@ class TBRepo @Inject constructor(
                                     val isCompleted = status.equals("COMPLETED", ignoreCase = true)
                                     val xrayPos = isCompleted && isChestXrayPositive(chestResult)
 
-                                    if (xrayPos && isTruenatIntegrated()) {
-                                        val hasTruenat = !it.trueNatOrderId.isNullOrBlank() && !it.trueNatOrderStatus.equals("FAILED", ignoreCase = true)
+                                     if (xrayPos && isTruenatIntegrated()) {
+                                        val hasTruenat = !it.trueNatOrderStatus.isNullOrBlank() && !it.trueNatOrderStatus.equals("FAILED", ignoreCase = true)
                                         if (!hasTruenat) {
                                             try {
                                                 val response = createProdigiOrder(benId, "SPUTUM_TRUENAT")
@@ -1874,6 +1876,7 @@ class TBRepo @Inject constructor(
                                                     org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context, useMockApi)
                                                     it.copy(
                                                         xrayOrderStatus = "COMPLETED",
+                                                        isReferredForDigitalChestXray = true,
                                                         isChestXRayDone = true,
                                                         chestXRayResult = chestResult,
                                                         trueNatOrderStatus = "AWAITING_PROVIDER_RESULT",
@@ -1884,6 +1887,7 @@ class TBRepo @Inject constructor(
                                                 } else {
                                                     it.copy(
                                                         xrayOrderStatus = "COMPLETED",
+                                                        isReferredForDigitalChestXray = true,
                                                         isChestXRayDone = true,
                                                         chestXRayResult = chestResult,
                                                         syncState = SyncState.SYNCED
@@ -1893,6 +1897,7 @@ class TBRepo @Inject constructor(
                                                 Timber.e(e, "Auto createProdigiOrder for SPUTUM_TRUENAT failed on +ve X-Ray")
                                                 it.copy(
                                                     xrayOrderStatus = "COMPLETED",
+                                                    isReferredForDigitalChestXray = true,
                                                     isChestXRayDone = true,
                                                     chestXRayResult = chestResult,
                                                     syncState = SyncState.SYNCED
@@ -1901,6 +1906,7 @@ class TBRepo @Inject constructor(
                                         } else {
                                             it.copy(
                                                 xrayOrderStatus = "COMPLETED",
+                                                isReferredForDigitalChestXray = true,
                                                 isChestXRayDone = true,
                                                 chestXRayResult = chestResult,
                                                 syncState = SyncState.SYNCED
@@ -1931,7 +1937,7 @@ class TBRepo @Inject constructor(
                                     var computedRifStatus = if (isCompleted) "COMPLETED" else if (status.equals("FAILED", ignoreCase = true) || status.equals("POLLING_TIMEOUT", ignoreCase = true) || status.equals("EXPIRED", ignoreCase = true)) "FAILED" else "AWAITING_PROVIDER_RESULT"
                                     var computedRifOrderId = it.rifOrderId
 
-                                    if (isRifIndeterminate) {
+                                     if (isRifIndeterminate) {
                                         try {
                                             val rifResponse = createProdigiOrder(benId, "MDR_RIF")
                                             if (rifResponse is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
@@ -1971,7 +1977,7 @@ class TBRepo @Inject constructor(
 
                                     var computedRifStatus: String? = it.rifOrderStatus
                                     var computedRifOrderId: String? = it.rifOrderId
-                                    val hasExistingRifOrder = !it.rifOrderId.isNullOrBlank() && !it.rifOrderStatus.equals("FAILED", ignoreCase = true)
+                                    val hasExistingRifOrder = !it.rifOrderStatus.isNullOrBlank() && !it.rifOrderStatus.equals("FAILED", ignoreCase = true)
                                     
                                     if (isMtbDetected && !hasExistingRifOrder) {
                                         if (useMockApi) {
@@ -2047,6 +2053,7 @@ class TBRepo @Inject constructor(
                                     it.copy(
                                         trueNatOrderStatus = computedTrueNatStatus,
                                         trueNatOrderId = computedTrueNatOrderId ?: it.trueNatOrderId,
+                                        isSputumCollected = true,
                                         isNaatConducted = if (isCompleted) true else it.isNaatConducted,
                                         naatResult = if (isCompleted) (serverMtbResultSummary ?: mtbResult) else it.naatResult,
                                         isTBConfirmed = if (isMtbDetected) true else it.isTBConfirmed,
@@ -2074,7 +2081,7 @@ class TBRepo @Inject constructor(
         }
     }
 
-    suspend fun fetchBeneficiariesByStatus(orderType: String): org.piramalswasthya.stoptb.helpers.NetworkResponse<DiagnosticBeneficiaryStatusData> {
+    suspend fun fetchBeneficiariesByStatus(orderType: String, fetchResult: Boolean = true): org.piramalswasthya.stoptb.helpers.NetworkResponse<DiagnosticBeneficiaryStatusData> {
         return withContext(Dispatchers.IO) {
             val user = preferenceDao.getLoggedInUser()
                 ?: return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("No user logged in")
@@ -2225,9 +2232,10 @@ class TBRepo @Inject constructor(
                                         else -> !currentStatus.equals("COMPLETED", ignoreCase = true) || existing?.naatResult.isNullOrBlank()
                                     }
 
-                                    if (needsResultFetch) {
+                                    if (needsResultFetch && fetchResult) {
                                         fetchOrderResult(b.beneficiaryId, orderType)
-                                    } else {
+                                    }
+                                    if (!fetchResult || !needsResultFetch) {
                                         val cache = (existing ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
                                             if (isXray) {
                                                 it.copy(

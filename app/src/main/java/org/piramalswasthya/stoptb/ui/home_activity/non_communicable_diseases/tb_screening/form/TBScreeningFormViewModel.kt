@@ -212,7 +212,9 @@ class TBScreeningFormViewModel @Inject constructor(
             if (refersXray) {
                 try {
                     val current = tbRepo.getTBDiagnosticsById(benId)
-                    val hasOrder = !current?.xrayOrderId.isNullOrBlank() && !current?.xrayOrderStatus.equals("FAILED", ignoreCase = true)
+                    val hasOrder = !current?.xrayOrderStatus.isNullOrBlank() &&
+                            !current?.xrayOrderStatus.equals("FAILED", ignoreCase = true) &&
+                            !current?.xrayOrderStatus.equals("POLLING_TIMEOUT", ignoreCase = true)
                     if (!hasOrder) {
                         val response = tbRepo.createProdigiOrder(benId, "XRAY_CHEST")
                         if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
@@ -240,7 +242,9 @@ class TBScreeningFormViewModel @Inject constructor(
             if (refersTruenat) {
                 try {
                     val current = tbRepo.getTBDiagnosticsById(benId)
-                    val hasOrder = !current?.trueNatOrderId.isNullOrBlank() && !current?.trueNatOrderStatus.equals("FAILED", ignoreCase = true)
+                    val hasOrder = !current?.trueNatOrderStatus.isNullOrBlank() &&
+                            !current?.trueNatOrderStatus.equals("FAILED", ignoreCase = true) &&
+                            !current?.trueNatOrderStatus.equals("POLLING_TIMEOUT", ignoreCase = true)
                     if (!hasOrder) {
                         val response = tbRepo.createProdigiOrder(benId, "SPUTUM_TRUENAT")
                         if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
