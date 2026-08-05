@@ -181,9 +181,12 @@ class BenListAdapter(
                                             status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PENDING", ignoreCase = true) -> {
                                                 ButtonConfig("Pending", android.R.color.darker_gray, "NONE", "XRAY_CHEST")
                                             }
-                                            status.equals("FAILED", ignoreCase = true) || status.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
-                                                ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
-                                            }
+                                             status.equals("FAILED", ignoreCase = true) -> {
+                                                 ButtonConfig("Retry Referral", android.R.color.holo_red_dark, "RETRY_PUSH", "XRAY_CHEST")
+                                             }
+                                             status.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
+                                                 ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
+                                             }
                                             else -> {
                                                 ButtonConfig("TRACK", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
                                             }
@@ -232,20 +235,29 @@ class BenListAdapter(
                                                         clickListener?.onClickOrderAction(item, "COMPLETE_RIF", "MDR_RIF")
                                                     }
                                                 }
+                                                 rifStatus.equals("FAILED", ignoreCase = true) -> {
+                                                     binding.btnVitalScreenSecondary.text = "Retry Referral"
+                                                     binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_red_dark))
+                                                     binding.btnVitalScreenSecondary.isEnabled = isNurse
+                                                     binding.btnVitalScreenSecondary.alpha = if (isNurse) 1.0f else 0.5f
+                                                     binding.btnVitalScreenSecondary.setOnClickListener {
+                                                         clickListener?.onClickOrderAction(item, "RETRY_PUSH", "MDR_RIF")
+                                                     }
+                                                 }
+                                                 rifStatus.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
+                                                     binding.btnVitalScreenSecondary.text = "Pending"
+                                                     binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_orange_dark))
+                                                     binding.btnVitalScreenSecondary.isEnabled = isNurse
+                                                     binding.btnVitalScreenSecondary.alpha = if (isNurse) 1.0f else 0.5f
+                                                     binding.btnVitalScreenSecondary.setOnClickListener {
+                                                         clickListener?.onClickOrderAction(item, "COMPLETE_RIF", "MDR_RIF")
+                                                     }
+                                                 }
                                                 rifStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || rifStatus.equals("IN_PROGRESS", ignoreCase = true) -> {
                                                     binding.btnVitalScreenSecondary.text = "Pending"
                                                     binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.darker_gray))
                                                     binding.btnVitalScreenSecondary.isEnabled = false
                                                     binding.btnVitalScreenSecondary.alpha = 0.5f
-                                                }
-                                                rifStatus.equals("FAILED", ignoreCase = true) || rifStatus.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
-                                                    binding.btnVitalScreenSecondary.text = "Pending"
-                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_orange_dark))
-                                                    binding.btnVitalScreenSecondary.isEnabled = isNurse
-                                                    binding.btnVitalScreenSecondary.alpha = if (isNurse) 1.0f else 0.5f
-                                                    binding.btnVitalScreenSecondary.setOnClickListener {
-                                                        clickListener?.onClickOrderAction(item, "COMPLETE_RIF", "MDR_RIF")
-                                                    }
                                                 }
                                                 rifStatus.equals("COMPLETED", ignoreCase = true) -> {
                                                     binding.btnVitalScreenSecondary.text = "VIEW RIF RESULT"
@@ -294,9 +306,12 @@ class BenListAdapter(
                                             status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PENDING", ignoreCase = true) -> {
                                                 ButtonConfig("Pending", android.R.color.darker_gray, "NONE", "SPUTUM_TRUENAT")
                                             }
-                                            status.equals("FAILED", ignoreCase = true) || status.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
-                                                ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
-                                            }
+                                             status.equals("FAILED", ignoreCase = true) -> {
+                                                 ButtonConfig("Retry Referral", android.R.color.holo_red_dark, "RETRY_PUSH", "SPUTUM_TRUENAT")
+                                             }
+                                             status.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
+                                                 ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
+                                             }
                                             else -> {
                                                 ButtonConfig("TRACK", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
                                             }
