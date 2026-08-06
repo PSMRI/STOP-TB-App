@@ -8,11 +8,14 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.RvItemTbScreeningListBinding
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.model.BenWithTbScreeningDomain
 
 class TbScreeningListAdapter(
-    private val clickListener: ClickListener? = null
+    private val clickListener: ClickListener? = null,
+    private val pref: PreferenceDao? = null
 ) :
     ListAdapter<BenWithTbScreeningDomain, TbScreeningListAdapter.BenViewHolder>
         (BenDiffUtilCallBack) {
@@ -41,6 +44,7 @@ class TbScreeningListAdapter(
 
         fun bind(
             item: BenWithTbScreeningDomain,
+            pref : PreferenceDao?,
             clickListener: ClickListener?,
         ) {
             binding.benWithTb = item
@@ -77,6 +81,8 @@ class TbScreeningListAdapter(
             }
 
             val isScreened = item.tb != null
+            val isCounsellor = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
+            binding.btnFormTb.visibility = if (isCounsellor && !isScreened) View.GONE else View.VISIBLE
             binding.btnFormTb.text = binding.root.context.getString(
                 if (isScreened) R.string.view_screen else R.string.screening
             )
@@ -101,7 +107,7 @@ class TbScreeningListAdapter(
         BenViewHolder.from(parent)
 
     override fun onBindViewHolder(holder: BenViewHolder, position: Int) {
-        holder.bind(getItem(position), clickListener)
+        holder.bind(getItem(position),pref, clickListener)
     }
 
 

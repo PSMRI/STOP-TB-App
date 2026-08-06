@@ -162,6 +162,8 @@ class BenListAdapter(
                 if (showResultButton) {
                     val tbDiag = tbDiagnosticsList.find { it.benId == item.benId }
                     val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
+                    val isCounsellingOfficer = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
+                    val canActOnReferral = isNurse || isCounsellingOfficer
                     val config = when (source) {
                         6 -> {
                             val status = tbDiag?.xrayOrderStatus
@@ -226,8 +228,8 @@ class BenListAdapter(
                                                 rifStatus == null || rifStatus.equals("PENDING", ignoreCase = true) || rifStatus.equals("CREATED", ignoreCase = true) || rifStatus.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) -> {
                                                     binding.btnVitalScreenSecondary.text = "TRACK"
                                                     binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_orange_dark))
-                                                    binding.btnVitalScreenSecondary.isEnabled = isNurse
-                                                    binding.btnVitalScreenSecondary.alpha = if (isNurse) 1.0f else 0.5f
+                                                    binding.btnVitalScreenSecondary.isEnabled = canActOnReferral
+                                                    binding.btnVitalScreenSecondary.alpha = if (canActOnReferral) 1.0f else 0.5f
                                                     binding.btnVitalScreenSecondary.setOnClickListener {
                                                         clickListener?.onClickOrderAction(item, "COMPLETE_RIF", "MDR_RIF")
                                                     }
@@ -241,8 +243,8 @@ class BenListAdapter(
                                                 rifStatus.equals("FAILED", ignoreCase = true) || rifStatus.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
                                                     binding.btnVitalScreenSecondary.text = "Pending"
                                                     binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_orange_dark))
-                                                    binding.btnVitalScreenSecondary.isEnabled = isNurse
-                                                    binding.btnVitalScreenSecondary.alpha = if (isNurse) 1.0f else 0.5f
+                                                    binding.btnVitalScreenSecondary.isEnabled = canActOnReferral
+                                                    binding.btnVitalScreenSecondary.alpha = if (canActOnReferral) 1.0f else 0.5f
                                                     binding.btnVitalScreenSecondary.setOnClickListener {
                                                         clickListener?.onClickOrderAction(item, "COMPLETE_RIF", "MDR_RIF")
                                                     }
@@ -265,8 +267,8 @@ class BenListAdapter(
                                                 rifStatus == null || rifStatus.equals("PENDING", ignoreCase = true) || rifStatus.equals("CREATED", ignoreCase = true) || rifStatus.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) -> {
                                                     binding.btnVitalScreenSecondary.text = "Pending"
                                                     binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_orange_dark))
-                                                    binding.btnVitalScreenSecondary.isEnabled = isNurse
-                                                    binding.btnVitalScreenSecondary.alpha = if (isNurse) 1.0f else 0.5f
+                                                    binding.btnVitalScreenSecondary.isEnabled = canActOnReferral
+                                                    binding.btnVitalScreenSecondary.alpha = if (canActOnReferral) 1.0f else 0.5f
                                                     binding.btnVitalScreenSecondary.setOnClickListener {
                                                         clickListener?.onClickOrderAction(item, "COMPLETE_RIF", "MDR_RIF")
                                                     }
@@ -333,7 +335,7 @@ class BenListAdapter(
                     if (config.action == "POLL" || config.action == "NO_RESULT" || config.action == "NONE") {
                         binding.btnVitalScreen.isEnabled = false
                         binding.btnVitalScreen.alpha = 0.5f
-                    } else if (!isNurse && !isViewAction) {
+                    } else if (!canActOnReferral && !isViewAction) {
                         binding.btnVitalScreen.isEnabled = false
                         binding.btnVitalScreen.alpha = 0.5f
                     } else {
@@ -738,7 +740,8 @@ class BenListAdapter(
             showResultButton = showResultButton,
             showAnthropometryButton = showAnthropometryButton,
             tbDiagnosticsList = tbDiagnosticsList,
-            source = source
+            source = source,
+            showExamineButton = showExamineButton
         )
     }
 

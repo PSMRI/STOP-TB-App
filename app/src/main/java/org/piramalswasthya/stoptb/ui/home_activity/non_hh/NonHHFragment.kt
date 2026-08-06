@@ -27,6 +27,7 @@ import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import androidx.core.os.bundleOf
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import javax.inject.Inject
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
@@ -77,9 +78,9 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
-        binding.btnNextPage.text = "Add Beneficiary"
-        binding.btnNextPage.visibility = View.VISIBLE
+        val roleName = prefDao.getLoggedInUser()?.role
+        binding.btnNextPage.text = getString(R.string.btn_Add_beneficiary_nonHH)
+        binding.btnNextPage.visibility = if(roleName.isCounsellingOfficerRole()) View.GONE else View.VISIBLE
         binding.ibFilter.visibility = View.GONE
         binding.ibDownload.visibility = View.GONE
         binding.llQuickRefresh.visibility = View.GONE
@@ -99,9 +100,6 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         binding.ibSearch.setOnClickListener {
             sttContract.launch(Unit)
         }
-
-        val roleName = prefDao.getLoggedInUser()?.role
-        val isNurse = roleName.isNurseRole()
 
         benAdapter = BenListAdapter(
             clickListener = BenListAdapter.BenClickListener(
@@ -140,7 +138,8 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             role = roleName?.let { if (it.isNurseRole()) 2 else 0 } ?: 0,
             pref = prefDao,
             context = requireActivity(),
-            showActionButtons = false
+            showActionButtons = false,
+            showExamineButton = !roleName.isCounsellingOfficerRole()
         )
 
         benAdapter.submitBenIds(viewModel.vitalBenIds.value)

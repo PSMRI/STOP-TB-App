@@ -419,7 +419,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             showActionButtons = false,
             showResultButton = showResultButton,
             showAnthropometryButton = false,
-            showExamineButton = !isReadOnlyReferralList,
+            showExamineButton = !isReadOnlyReferralList && !isCounsellor ,
             source = args.source
         )
 
