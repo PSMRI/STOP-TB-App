@@ -251,7 +251,13 @@ interface AmritApiService {
 
     @POST("flw-api/diagnostic/order/result")
     suspend fun fetchOrderResult(
-        @Query("benId") benId: Long,
+        @Query("beneficiaryId") benId: Long,
+        @Query("orderType") orderType: String
+    ): Response<ResponseBody>
+
+    @POST("flw-api/diagnostic/order/retry")
+    suspend fun retryOrder(
+        @Query("beneficiaryId") benId: Long,
         @Query("orderType") orderType: String
     ): Response<ResponseBody>
 
@@ -260,5 +266,15 @@ interface AmritApiService {
         @Query("orderType") orderType: String,
         @Query("villageId") villageId: Int,
         @Query("providerServiceMapId") providerServiceMapId: Int
+    ): Response<ResponseBody>
+
+    @POST("flw-api/diagnostic/order/manualResult")
+    suspend fun submitManualResult(
+        @Body request: DiagnosticManualResultRequest
+    ): Response<ResponseBody>
+
+    @GET("flw-api/diagnostic/vendor/health")
+    suspend fun getVendorHealth(
+        @Query("orderType") orderType: String
     ): Response<ResponseBody>
 }

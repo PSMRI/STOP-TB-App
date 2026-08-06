@@ -35,6 +35,15 @@ class SuspectedTBDataset(
         isEnabled = false
     )
 
+    private val sputumSampleSubmittedAtScreeningCamp = FormElement(
+        id = 20,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.sputum_sample_submitted_at_screening_camp),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = false,
+        isEnabled = false
+    )
+
     private val sputumCollected = FormElement(
         id = 2,
         inputType = InputType.RADIO,
@@ -141,6 +150,11 @@ class SuspectedTBDataset(
         isQuickPrefillLockActive = saved?.visitLabel.isNullOrBlank() && saved != null
         ben?.let {
             dateOfVisit.min = it.regDate
+        }
+        val submitted = screening?.sputumSampleSubmittedAt
+        sputumSampleSubmittedAtScreeningCamp.value = when {
+            submitted.equals("TB Screening Camp", ignoreCase = true) || submitted.equals("Yes", ignoreCase = true) -> yesValue
+            else -> noValue
         }
 
         if (saved == null) {
@@ -321,6 +335,7 @@ class SuspectedTBDataset(
 
     private fun buildFormList(): List<FormElement> = listOf(
         dateOfVisit,
+        sputumSampleSubmittedAtScreeningCamp,
     ).toMutableList().apply {
 
         if (isDigitalChestXRayReferralEnabled()) {

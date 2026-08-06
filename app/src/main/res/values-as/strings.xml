@@ -98,9 +98,9 @@
     <string name="eligible_couple_registration">যোগ্য জনপৰা পৰাৰ পঞ্জীকৰণ</string>
     <string name="eligible_couple_tracking_list">যোগ্য জনপৰা পৰাৰ ট্ৰেকিং তালিকা</string>
     <string name="tb_screening_list">TB স্ক্ৰীনিং তালিকা</string>
-    <string name="tb_suspected_list">TB সন্দেহভাৱিত তালিকা</string>
+    <string name="tb_suspected_list">TB সম্ভাব্য তালিকা</string>
     <string name="tb_screening_form">TB স্ক্ৰীনিং ফৰ্ম</string>
-    <string name="tb_suspected_form">TB সন্দেহভাৱিত ফৰ্ম</string>
+    <string name="tb_suspected_form">TB সম্ভাব্য ফৰ্ম</string>
     <string name="delivery_outcome_list">প্ৰসৱ সম্পূৰ্ণ হোৱাৰ ফল তালিকা</string>
     <string name="communicable_diseases">সংক্রামণ পৰামৰ্শযোগ্য পৰাৰ তালিকা</string>
     <string name="dashboard">ডেশবৰ্ড</string>
@@ -454,7 +454,7 @@
     <string name="home_card_ncd_priority_subtitle">উচ্চ অগ্ৰাধিকাৰ NCD ফলো-আপ অনুসৰণ কৰক</string>
     <string name="home_card_ncd_non_priority_subtitle">কম ঝুঁকিৰ স্ক্ৰীণ কৰা হিতাধিকাৰী পৰিচালনা কৰক</string>
     <string name="home_card_tb_screening_subtitle">টিবি স্ক্ৰিনিং আৰম্ভ আৰু পৰ্যালোচনা কৰক</string>
-    <string name="home_card_tb_suspected_short_subtitle">সন্দেহজনক টিবি কেছসমূহৰ অনুসৰণ কৰক</string>
+    <string name="home_card_tb_suspected_short_subtitle">সম্ভাব্য টিবি কেছসমূহৰ অনুসৰণ কৰক</string>
     <string name="home_card_tb_confirmed_short_subtitle">নিশ্চিত টিবি ৰোগীক অনুসৰণ কৰক</string>
     <string name="view_details">বিৱৰণ চাওক</string>
     <string name="dashboard_tb_screening_subtitle">আউটৰিচ আৰু স্ক্ৰিনিংৰ পৰিমাণ অনুসৰণ কৰক</string>

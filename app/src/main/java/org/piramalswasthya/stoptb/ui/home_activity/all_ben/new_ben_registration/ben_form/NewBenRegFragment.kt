@@ -591,7 +591,7 @@ class NewBenRegFragment : Fragment() {
         super.onStart()
         val isNonHH = viewModel.isNonHHArg || (viewModel.benIdFromArgs != 0L && viewModel.showLinkHouseholdButton)
         val title = when {
-            isNonHH                     -> "New Non-Household Registration"
+            isNonHH                     -> getString(R.string.title_new_non_hh_reg)
             viewModel.relToHeadId == 18 -> getString(R.string.title_new_ben_reg_hof)
             viewModel.relToHeadId > 0   -> getString(R.string.title_new_ben_reg_non_hof)
             else                        -> getString(R.string.frag_new_ben_reg_type_title)

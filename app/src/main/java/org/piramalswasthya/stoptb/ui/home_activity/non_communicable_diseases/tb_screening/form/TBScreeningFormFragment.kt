@@ -144,7 +144,13 @@ class TBScreeningFormFragment : Fragment() {
 
         viewModel.state.observe(viewLifecycleOwner) {
             when (it) {
+                TBScreeningFormViewModel.State.SAVING -> {
+                    binding.btnSubmit.isEnabled = false
+                    binding.pbForm.visibility = View.VISIBLE
+                }
+
                 TBScreeningFormViewModel.State.SAVE_SUCCESS -> {
+                    binding.pbForm.visibility = View.GONE
                     WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
                     val alertMessage = viewModel.getSubmitAlertMessage()
                     if (alertMessage.isNullOrBlank()) {
@@ -156,6 +162,8 @@ class TBScreeningFormFragment : Fragment() {
                 }
 
                 TBScreeningFormViewModel.State.SAVE_FAILED -> {
+                    binding.btnSubmit.isEnabled = true
+                    binding.pbForm.visibility = View.GONE
                     Toast.makeText(
                         requireContext(),
                         resources.getString(R.string.something_went_wrong_try_again),
@@ -169,7 +177,10 @@ class TBScreeningFormFragment : Fragment() {
     }
 
     private fun submitTBScreeningForm() {
+        if (!binding.btnSubmit.isEnabled) return
         if (validateCurrentPage()) {
+            binding.btnSubmit.isEnabled = false
+            binding.pbForm.visibility = View.VISIBLE
             viewModel.saveForm()
         }
     }

@@ -158,4 +158,11 @@
         <item>नहीं</item>
     </string-array>
 
+    <!-- NON HOUSEHOLD CURRENT LIVING INFO -->
+    <string name="title_current_living_info">वर्तमान निवास की जानकारी</string>
+    <string name="sub_title_current_living_info">कृपया लाभार्थी के वर्तमान निवास स्थान का विवरण प्रदान करें।</string>
+    <string name="hint_place_of_current_living">वर्तमान निवास का स्थान *</string>
+    <string name="hint_other_place">अन्य स्थान *</string>
+    <string name="hint_institution_name">संस्था का नाम *</string>
+
 </resources>

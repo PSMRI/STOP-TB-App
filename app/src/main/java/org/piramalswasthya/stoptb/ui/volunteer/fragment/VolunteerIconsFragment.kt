@@ -13,6 +13,7 @@ import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.IconGridAdapter
 import org.piramalswasthya.stoptb.configuration.IconDataset
 import org.piramalswasthya.stoptb.databinding.FragmentVolunteerHomeBinding
+import org.piramalswasthya.stoptb.utils.navigateSafe
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -48,7 +49,7 @@ class VolunteerIconsFragment : Fragment() {
         binding.rvIconGrid.layoutManager = rvLayoutManager
         val iconAdapter = IconGridAdapter(
             IconGridAdapter.GridIconClickListener {
-                findNavController().navigate(it)
+                findNavController().navigateSafe(it)
             },
             viewLifecycleOwner.lifecycleScope
         )

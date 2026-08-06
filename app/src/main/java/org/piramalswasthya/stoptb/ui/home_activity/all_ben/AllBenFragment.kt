@@ -260,38 +260,34 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                             )
                         }
                         "COMPLETE" -> {
-                            val title = if (orderType == "XRAY_CHEST") "Confirm X-ray Completion" else "Confirm TrueNat Completion"
-                            val msg = if (orderType == "XRAY_CHEST") {
-                                "Please confirm that the beneficiary has completed the Digital Chest X-ray. The application will now start retrieving the diagnostic result."
-                            } else {
-                                "Please confirm that the beneficiary has completed the TrueNat test. The application will now start retrieving the diagnostic result."
-                            }
-                            androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                                .setTitle(title)
-                                .setMessage(msg)
-                                .setPositiveButton("CONFIRM") { d, _ ->
-                                    d.dismiss()
-                                    viewModel.markOrderTestCompleted(item.benId, orderType)
-                                }
-                                .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
-                                .show()
+                            findNavController().navigate(
+                                AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                    benId = item.benId,
+                                    viewOnly = false,
+                                    referralType = if (orderType == "XRAY_CHEST") 6 else 7
+                                )
+                            )
                         }
                         "COMPLETE_RIF" -> {
-                            androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                                .setTitle("Confirm RIF Test Completion?")
-                                .setMessage("Please confirm that the beneficiary has completed the TrueNat Rif Resistance test.")
-                                .setPositiveButton("CONFIRM") { d, _ ->
-                                    d.dismiss()
-                                    viewModel.markOrderTestCompleted(item.benId, "MDR_RIF")
-                                }
-                                .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
-                                .show()
+                            findNavController().navigate(
+                                AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                    benId = item.benId,
+                                    viewOnly = false,
+                                    referralType = 7
+                                )
+                            )
                         }
-                        "POLL", "RETRY_POLL" -> {
+                        "POLL" -> {
                             viewModel.pollOrderResult(item.benId, orderType)
                         }
+                        "RETRY_POLL" -> {
+                            viewModel.retryResultFetch(item.benId, orderType, requireContext())
+                        }
+                        "RETRY_PUSH" -> {
+                            viewModel.retryTest(item.benId, orderType, requireContext())
+                        }
                         "RETRY_RIF_POLL" -> {
-                            viewModel.pollOrderResult(item.benId, "MDR_RIF")
+                            viewModel.retryResultFetch(item.benId, "MDR_RIF", requireContext())
                         }
                         "REPEAT_TEST" -> {
                             lifecycleScope.launch {
@@ -605,6 +601,13 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 intent.putExtra("benRegId", it)
                 requireActivity().startActivity(intent)
                 viewModel.resetBenRegId()
+            }
+        }
+
+        lifecycleScope.launch {
+            while (viewLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                benAdapter.notifyDataSetChanged()
+                kotlinx.coroutines.delay(1000L)
             }
         }
     }
