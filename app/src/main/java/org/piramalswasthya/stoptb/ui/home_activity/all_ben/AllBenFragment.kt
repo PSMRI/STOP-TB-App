@@ -283,6 +283,9 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         "RETRY_POLL" -> {
                             viewModel.retryResultFetch(item.benId, orderType, requireContext())
                         }
+                        "RETRY_PUSH" -> {
+                            viewModel.retryTest(item.benId, orderType, requireContext())
+                        }
                         "RETRY_RIF_POLL" -> {
                             viewModel.retryResultFetch(item.benId, "MDR_RIF", requireContext())
                         }

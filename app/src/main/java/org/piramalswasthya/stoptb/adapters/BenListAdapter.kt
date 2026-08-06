@@ -183,9 +183,12 @@ class BenListAdapter(
                                             status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PENDING", ignoreCase = true) -> {
                                                 ButtonConfig("Pending", android.R.color.darker_gray, "NONE", "XRAY_CHEST")
                                             }
-                                            status.equals("FAILED", ignoreCase = true) || status.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
-                                                ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
-                                            }
+                                             status.equals("FAILED", ignoreCase = true) -> {
+                                                 ButtonConfig("Retry Referral", android.R.color.holo_red_dark, "RETRY_PUSH", "XRAY_CHEST")
+                                             }
+                                             status.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
+                                                 ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
+                                             }
                                             else -> {
                                                 ButtonConfig("TRACK", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
                                             }
@@ -228,8 +231,8 @@ class BenListAdapter(
                                                 rifStatus == null || rifStatus.equals("PENDING", ignoreCase = true) || rifStatus.equals("CREATED", ignoreCase = true) || rifStatus.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) -> {
                                                     binding.btnVitalScreenSecondary.text = "TRACK"
                                                     binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_orange_dark))
-                                                    binding.btnVitalScreenSecondary.isEnabled = canActOnReferral
-                                                    binding.btnVitalScreenSecondary.alpha = if (canActOnReferral) 1.0f else 0.5f
+                                                    binding.btnVitalScreenSecondary.isEnabled = isNurse
+                                                    binding.btnVitalScreenSecondary.alpha = if (isNurse) 1.0f else 0.5f
                                                     binding.btnVitalScreenSecondary.setOnClickListener {
                                                         clickListener?.onClickOrderAction(item, "COMPLETE_RIF", "MDR_RIF")
                                                     }
