@@ -203,8 +203,10 @@ class NewHouseholdFragment : Fragment() {
                 if (recordExists) getString(R.string.view_household_information)
                 else getString(R.string.frag_nhhr_title)
             )
-            val isNurse = prefDao.getLoggedInUser()?.role.isNurseRole()
-            binding.fabEdit.visibility = if (recordExists && !isNurse) View.VISIBLE else View.GONE
+            val role = prefDao.getLoggedInUser()?.role
+            val isNurse = role.isNurseRole()
+            val isCounsellor = role.isCounsellingOfficerRole()
+            binding.fabEdit.visibility = if (recordExists && !isNurse && !isCounsellor ) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (!recordExists) View.VISIBLE else View.GONE
             binding.btnCancel.visibility = if (!recordExists) View.VISIBLE else View.GONE
             binding.btnRefreshLocation.isEnabled = !recordExists
