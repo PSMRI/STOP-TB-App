@@ -143,8 +143,14 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         )
 
         benAdapter.submitBenIds(viewModel.vitalBenIds.value)
+        benAdapter.submitUnsyncedVitalBenIds(viewModel.unsyncedVitalBenIds.value)
+        benAdapter.submitSyncingVitalBenIds(viewModel.syncingVitalBenIds.value)
         benAdapter.submitTbScreeningBenIds(viewModel.tbScreeningBenIds.value)
+        benAdapter.submitUnsyncedTbScreeningBenIds(viewModel.unsyncedTbScreeningBenIds.value)
+        benAdapter.submitSyncingTbScreeningBenIds(viewModel.syncingTbScreeningBenIds.value)
         benAdapter.submitGeneralOpdBenIds(viewModel.generalOpdBenIds.value)
+        benAdapter.submitUnsyncedGeneralOpdBenIds(viewModel.unsyncedGeneralOpdBenIds.value)
+        benAdapter.submitSyncingGeneralOpdBenIds(viewModel.syncingGeneralOpdBenIds.value)
         benAdapter.submitAnthropometryBenIds(viewModel.anthropometryBenIds.value)
         benAdapter.submitDiagnosisBenIds(viewModel.diagnosisBenIds.value)
 
@@ -172,8 +178,14 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.vitalBenIds.collect { benAdapter.submitBenIds(it) } }
+                launch { viewModel.unsyncedVitalBenIds.collect { benAdapter.submitUnsyncedVitalBenIds(it) } }
+                launch { viewModel.syncingVitalBenIds.collect { benAdapter.submitSyncingVitalBenIds(it) } }
                 launch { viewModel.tbScreeningBenIds.collect { benAdapter.submitTbScreeningBenIds(it) } }
+                launch { viewModel.unsyncedTbScreeningBenIds.collect { benAdapter.submitUnsyncedTbScreeningBenIds(it) } }
+                launch { viewModel.syncingTbScreeningBenIds.collect { benAdapter.submitSyncingTbScreeningBenIds(it) } }
                 launch { viewModel.generalOpdBenIds.collect { benAdapter.submitGeneralOpdBenIds(it) } }
+                launch { viewModel.unsyncedGeneralOpdBenIds.collect { benAdapter.submitUnsyncedGeneralOpdBenIds(it) } }
+                launch { viewModel.syncingGeneralOpdBenIds.collect { benAdapter.submitSyncingGeneralOpdBenIds(it) } }
                 launch { viewModel.anthropometryBenIds.collect { benAdapter.submitAnthropometryBenIds(it) } }
                 launch { viewModel.diagnosisBenIds.collect { benAdapter.submitDiagnosisBenIds(it) } }
             }

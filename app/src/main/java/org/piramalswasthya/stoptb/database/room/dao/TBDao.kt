@@ -30,8 +30,14 @@ interface TBDao {
     @Query("SELECT benId FROM TB_SCREENING")
     fun getAllTbScreeningBenIds(): Flow<List<Long>>
 
+    @Query("SELECT benId FROM TB_SCREENING WHERE syncState = :syncState")
+    fun getTbScreeningBenIdsBySyncState(syncState: SyncState): Flow<List<Long>>
+
     @Query("SELECT benId FROM GENERAL_OPD")
     fun getAllGeneralOpdBenIds(): Flow<List<Long>>
+
+    @Query("SELECT benId FROM GENERAL_OPD WHERE syncState = :syncState")
+    fun getGeneralOpdBenIdsBySyncState(syncState: SyncState): Flow<List<Long>>
 
     @Query("SELECT benId FROM TB_SUSPECTED")
     fun getAllTbSuspectedBenIds(): Flow<List<Long>>

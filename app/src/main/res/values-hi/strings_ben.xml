@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="child_age_less_than_parent_error">बच्चे की आयु माता-पिता की आयु के बराबर या उससे अधिक नहीं हो सकती</string>
     <string name="nbr_village">गाँव / बस्ती</string>
     <string name="nbr_occupation">व्यवसाय</string>
     <string name="nbr_occupation_default">अज्ञात</string>

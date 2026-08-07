@@ -83,8 +83,12 @@ class TBRepo @Inject constructor(
     }
 
     val tbScreeningBenIds: Flow<List<Long>> = tbDao.getAllTbScreeningBenIds()
+    val unsyncedTbScreeningBenIds: Flow<List<Long>> = tbDao.getTbScreeningBenIdsBySyncState(SyncState.UNSYNCED)
+    val syncingTbScreeningBenIds: Flow<List<Long>> = tbDao.getTbScreeningBenIdsBySyncState(SyncState.SYNCING)
 
     val generalOpdBenIds: Flow<List<Long>> = tbDao.getAllGeneralOpdBenIds()
+    val unsyncedGeneralOpdBenIds: Flow<List<Long>> = tbDao.getGeneralOpdBenIdsBySyncState(SyncState.UNSYNCED)
+    val syncingGeneralOpdBenIds: Flow<List<Long>> = tbDao.getGeneralOpdBenIdsBySyncState(SyncState.SYNCING)
 
     val tbSuspectedBenIds: Flow<List<Long>> = tbDao.getAllTbSuspectedBenIds()
 

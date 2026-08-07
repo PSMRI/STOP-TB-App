@@ -220,7 +220,7 @@ class NewBenRegViewModel @Inject constructor(
             // For Son (8) / Daughter (9): pre-fill Father's Name and Mother's Name
             // Logic matches FLW2.9: use HoF as primary parent; spouse record (relPos 5/6) as the other parent;
             // fallback to HoF's stored genDetails.spouseName if no spouse is registered yet.
-            val (prefillFatherName, prefillMotherName) = if (relToHeadId == 8 || relToHeadId == 9) {
+            val (prefillFatherName, prefillMotherName, minimumChildDob) = if (relToHeadId == 8 || relToHeadId == 9) {
                 val members = benRepo.getBenListFromHousehold(hhId)
                 // HoF = Self (familyHeadRelationPosition = 19: index 18 in array + 1 for 1-indexed storage)
                 // Note: household.benId is not set in NikshayMitra, so we cannot use it for lookup.
@@ -233,6 +233,12 @@ class NewBenRegViewModel @Inject constructor(
                     it.beneficiaryId != hofBen?.beneficiaryId
                 }
 
+                val youngestParentDob = listOfNotNull(
+                    hofBen?.dob?.takeIf { it > 0L },
+                    hofSpouse?.dob?.takeIf { it > 0L }
+                ).maxOrNull()
+                val minimumChildDob = youngestParentDob?.plus(24 * 60 * 60 * 1000L)
+
                 if (hofBen != null) {
                     val hofFullName = listOfNotNull(hofBen.firstName?.trim(), hofBen.lastName?.trim())
                         .filter { it.isNotBlank() }.joinToString(" ").takeIf { it.isNotBlank() }
@@ -243,16 +249,16 @@ class NewBenRegViewModel @Inject constructor(
 
                     if (hofBen.genderId == 1) {
                         // HoF is male → he is the father; his spouse is the mother
-                        Pair(hofFullName, spouseFullName)
+                        Triple(hofFullName, spouseFullName, minimumChildDob)
                     } else {
                         // HoF is female → she is the mother; her spouse is the father
-                        Pair(spouseFullName, hofFullName)
+                        Triple(spouseFullName, hofFullName, minimumChildDob)
                     }
                 } else {
-                    Pair(null, null)
+                    Triple(null, null, minimumChildDob)
                 }
             } else {
-                Pair(null, null)
+                Triple(null, null, null)
             }
 
             val prefillBen = getHouseholdPrefillBen(
@@ -276,7 +282,8 @@ class NewBenRegViewModel @Inject constructor(
                 user.subCentre,
                 relToHeadId = effectiveRelToHeadId,
                 spouseRegistrationRelToHeadId = relToHeadId,
-                isNonHH = isNonHHArg
+                isNonHH = isNonHHArg,
+                minimumChildDob = minimumChildDob
             )
         }
         // Restore/Inherit Location details

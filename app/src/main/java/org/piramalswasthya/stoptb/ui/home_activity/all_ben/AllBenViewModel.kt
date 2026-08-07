@@ -81,8 +81,14 @@ class AllBenViewModel @Inject constructor(
 
     val childCounts: Flow<Map<Long, Int>> = recordsRepo.childCountsByBen
     val vitalBenIds: Flow<List<Long>> = vitalRepo.vitalBenIds
+    val unsyncedVitalBenIds: Flow<List<Long>> = vitalRepo.unsyncedVitalBenIds
+    val syncingVitalBenIds: Flow<List<Long>> = vitalRepo.syncingVitalBenIds
     val tbScreeningBenIds: Flow<List<Long>> = tbRepo.tbScreeningBenIds
+    val unsyncedTbScreeningBenIds: Flow<List<Long>> = tbRepo.unsyncedTbScreeningBenIds
+    val syncingTbScreeningBenIds: Flow<List<Long>> = tbRepo.syncingTbScreeningBenIds
     val generalOpdBenIds: Flow<List<Long>> = tbRepo.generalOpdBenIds
+    val unsyncedGeneralOpdBenIds: Flow<List<Long>> = tbRepo.unsyncedGeneralOpdBenIds
+    val syncingGeneralOpdBenIds: Flow<List<Long>> = tbRepo.syncingGeneralOpdBenIds
     val anthropometryFilledBenIds: Flow<List<Long>> = recordsRepo.anthropometryFilledBenIds
     val contactFollowUpDoneBenIds: Flow<List<Long>> = contactTracingRepo.observeContactFollowUpDoneBenIds()
     val tptFollowUpDoneBenIds: Flow<List<Long>> = contactTracingRepo.observeTptFollowUpTargetReachedBenIds()

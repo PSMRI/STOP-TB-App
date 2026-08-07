@@ -35,6 +35,8 @@ class VitalRepo @Inject constructor(
     }
 
     val vitalBenIds: Flow<List<Long>> = vitalDao.getAllVitalBenIds()
+    val unsyncedVitalBenIds: Flow<List<Long>> = vitalDao.getVitalBenIdsBySyncState(SyncState.UNSYNCED)
+    val syncingVitalBenIds: Flow<List<Long>> = vitalDao.getVitalBenIdsBySyncState(SyncState.SYNCING)
 
     suspend fun saveVitals(vitalCache: VitalCache) {
         withContext(Dispatchers.IO) {
