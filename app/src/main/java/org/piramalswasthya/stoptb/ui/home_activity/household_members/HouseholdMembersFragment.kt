@@ -13,6 +13,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
+import androidx.navigation.fragment.navArgs
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -33,6 +34,8 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    private val args: HouseholdMembersFragmentArgs by navArgs()
 
     private var _binding: FragmentHouseholdMembersBinding? = null
     private val binding: FragmentHouseholdMembersBinding get() = _binding!!
@@ -63,6 +66,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         buildAddBenDialog()
+        val role = prefDao.getLoggedInUser()?.role
 
         val benAdapter = BenListAdapter(
             clickListener = BenListAdapter.BenClickListener(
@@ -109,7 +113,8 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
             showRegistrationDate = true,
             showSyncIcon = true,
             pref = prefDao,
-            context = requireActivity()
+            context = requireActivity(),
+            showExamineButton = !role.isCounsellingOfficerRole() || args.fromContactTracing
         )
         binding.rvAny.adapter = benAdapter
 
@@ -195,8 +200,8 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
         }
 
         // Nurse role: invisible (takes space but not visible/clickable)
+        // Nurse role: invisible (takes space but not visible/clickable)
         // Nurse & Counselling officer role: invisible (takes space but not visible/clickable)
-        val role = prefDao.getLoggedInUser()?.role
         val isNurse = role.isNurseRole()
         val isCounsellingOfficer = role.isCounsellingOfficerRole()
         binding.fabAddMember.visibility = if (isNurse || isCounsellingOfficer) View.INVISIBLE else View.VISIBLE

@@ -16,12 +16,18 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.TbScreeningListAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchRvButtonBinding
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class TBScreeningListFragment : Fragment() {
+
+    @Inject
+    lateinit var pref: PreferenceDao
     private var _binding: FragmentDisplaySearchRvButtonBinding? = null
     private val binding: FragmentDisplaySearchRvButtonBinding
         get() = _binding!!
@@ -47,16 +53,19 @@ class TBScreeningListFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         binding.btnNextPage.visibility = View.GONE
+        val isCounsellor = pref.getLoggedInUser()?.role.isCounsellingOfficerRole()
         val benAdapter = TbScreeningListAdapter(
             TbScreeningListAdapter.ClickListener { hhId, benId, viewOnly ->
+                val forcedViewOnly = viewOnly || isCounsellor
                 findNavController().navigate(
                     TBScreeningListFragmentDirections.actionTBScreeningListFragmentToTBScreeningFormFragment(
                         benId = benId,
-                        viewOnly = viewOnly,
-                        syncImmediately = !viewOnly
+                        viewOnly = forcedViewOnly,
+                        syncImmediately = !forcedViewOnly
                     )
                 )
-            }
+            },
+            pref = pref
         )
         binding.rvAny.adapter = benAdapter
 

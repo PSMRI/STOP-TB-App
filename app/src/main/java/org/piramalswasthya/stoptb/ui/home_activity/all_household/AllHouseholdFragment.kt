@@ -24,6 +24,7 @@ import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertNewBenBinding
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchRvButtonBinding
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.model.Gender
@@ -91,11 +92,13 @@ class AllHouseholdFragment : Fragment() {
 
         binding.tvEmptyContent.text = getString(R.string.no_records_found_hh)
 
+        val role = prefDao.getLoggedInUser()?.role
         val isNurse = prefDao.getLoggedInUser()?.role.isNurseRole()
+        val isCounsellorOfficer = role.isCounsellingOfficerRole()
 
-        // Nurse role: hide New Household Registration button
+        // For Nurse & Counsellor role: hide New Household Registration button
         binding.btnNextPage.text = getString(R.string.btn_text_frag_home_nhhr)
-        binding.btnNextPage.visibility = if (isNurse) View.GONE else View.VISIBLE
+        binding.btnNextPage.visibility = if (isNurse || isCounsellorOfficer) View.GONE else View.VISIBLE
 
         val householdAdapter = HouseHoldListAdapter(
             diseaseType = "",
@@ -111,8 +114,8 @@ class AllHouseholdFragment : Fragment() {
                 softDeleteHh = {}
             )
         )
-        // Nurse: hide Add Member button on household cards
-        householdAdapter.setAddMemberVisible(!isNurse)
+        // For Nurse && Counsellor: hide Add Member button on household cards
+        householdAdapter.setAddMemberVisible(!isNurse && !isCounsellorOfficer)
         binding.rvAny.adapter = householdAdapter
 
         viewLifecycleOwner.lifecycleScope.launch {
