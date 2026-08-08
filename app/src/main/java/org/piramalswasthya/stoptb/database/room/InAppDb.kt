@@ -763,10 +763,11 @@ abstract class InAppDb : RoomDatabase() {
                             indexSqls.add(cursor.getString(0))
                         }
                     }
-                    
+
+                    database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
                     database.execSQL("DROP TABLE `BENEFICIARY`")
                     database.execSQL("ALTER TABLE `BENEFICIARY_new` RENAME TO `BENEFICIARY`")
-                    
+
                     for (indexSql in indexSqls) {
                         try {
                             database.execSQL(indexSql)
@@ -872,6 +873,7 @@ abstract class InAppDb : RoomDatabase() {
                         }
                     }
 
+                    database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
                     database.execSQL("DROP TABLE `HOUSEHOLD`")
                     database.execSQL("ALTER TABLE `HOUSEHOLD_new` RENAME TO `HOUSEHOLD`")
 
@@ -883,6 +885,7 @@ abstract class InAppDb : RoomDatabase() {
                         }
                     }
                 }
+                recreateBenBasicCacheView(database)
             }
         }
 
@@ -979,6 +982,7 @@ abstract class InAppDb : RoomDatabase() {
                     }
                 }
 
+                database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
                 database.execSQL("DROP TABLE `BENEFICIARY`")
                 database.execSQL("ALTER TABLE `BENEFICIARY_new` RENAME TO `BENEFICIARY`")
 
@@ -989,6 +993,7 @@ abstract class InAppDb : RoomDatabase() {
                         // in case the index already got created, ignore
                     }
                 }
+                recreateBenBasicCacheView(database)
             }
         }
 
