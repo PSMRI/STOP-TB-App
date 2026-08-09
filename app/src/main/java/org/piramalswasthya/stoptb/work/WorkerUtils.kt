@@ -41,7 +41,18 @@ object WorkerUtils {
             .setConstraints(networkOnlyConstraint)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
 
+    private fun hasLoggedInUser(context: Context): Boolean {
+        val prefs = PreferenceManager.getInstance(context)
+        val userKey = context.getString(R.string.PREF_user_entry)
+        return !prefs.getString(userKey, null).isNullOrBlank()
+    }
+
     fun triggerAmritPushWorker(context: Context): List<java.util.UUID> {
+        if (!hasLoggedInUser(context)) {
+            Timber.w("Push worker skipped: no logged-in user is stored yet")
+            return emptyList()
+        }
+
         // Block all data push until camp mode is active AND hub is connected
         val prefs = PreferenceManager.getInstance(context)
         val campKey = context.getString(R.string.PREF_camp_mode_enabled)
@@ -80,6 +91,11 @@ object WorkerUtils {
     }
 
     fun triggerAmritPullWorker(context: Context): List<java.util.UUID> {
+        if (!hasLoggedInUser(context)) {
+            Timber.w("Pull worker skipped: no logged-in user is stored yet")
+            return emptyList()
+        }
+
         val workManager = WorkManager.getInstance(context)
 
         // StopTB pull chain:
