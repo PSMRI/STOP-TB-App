@@ -138,8 +138,8 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
             val btn = rowView.findViewById<MaterialButton>(R.id.btn_form_action)
             val notFilled = rowView.findViewById<TextView>(R.id.tv_not_filled)
 
-            if ((isRegistrar && formIndex == FORM_ANTHROPOMETRY) ||
-                (isNurse && formIndex != FORM_TB_SCREENING)
+            if ((isNurse && formIndex == FORM_GENERAL_EXAM) ||
+                (isNurse && formIndex == FORM_GENERAL_OPD)
             ) {
                 viewLifecycleOwner.lifecycleScope.launch {
                     combine(

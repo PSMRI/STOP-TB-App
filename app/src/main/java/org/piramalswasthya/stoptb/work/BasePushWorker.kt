@@ -50,6 +50,10 @@ abstract class BasePushWorker(
                 KEY_ERROR to "Max retries ($MAX_RETRY_COUNT) exceeded"
             ))
         }
+        if (preferenceDao.getLoggedInUser() == null) {
+            Timber.w("[$workerName] Worker deferred: logged-in user is not available yet")
+            return Result.retry()
+        }
         initTokens()
         return try {
             doSyncWork()

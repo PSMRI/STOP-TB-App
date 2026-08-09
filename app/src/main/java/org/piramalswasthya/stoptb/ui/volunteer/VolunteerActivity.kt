@@ -514,11 +514,6 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     }
 
     private fun refreshCampHubOfflineBanner() {
-        if (!pref.isCampModeEnabled()) {
-            binding.tvCampHubOffline.visibility = View.GONE
-            return
-        }
-
         val isConnected = pref.isCampHubConnected()
         binding.tvCampHubOffline.visibility = View.VISIBLE
         binding.tvCampHubOffline.text =
@@ -535,8 +530,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     }
 
     private fun refreshCampHubDrawerItem() {
-        binding.navView.menu.findItem(R.id.menu_connect_camp_hub)?.isVisible =
-            pref.isCampModeEnabled()
+        binding.navView.menu.findItem(R.id.menu_connect_camp_hub)?.isVisible = true
     }
 
     private fun openCampHubConnect() {

@@ -15,16 +15,20 @@ class CampModeUrlInterceptor @Inject constructor(
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
 
-        if (!preferenceDao.isCampModeEnabled() || !preferenceDao.isCampHubConnected()) {
-            return chain.proceed(originalRequest)
+        val storedCampHubUrl = preferenceDao.getStoredCampHubUrl()
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+
+        if (storedCampHubUrl == null) {
+            throw IOException("Camp hub URL not configured")
         }
 
-        val campHubUrl = preferenceDao.getCampHubUrl()
+        val campHubUrl = storedCampHubUrl
             .trim()
             .trimEnd('/')
             .plus("/")
             .toHttpUrlOrNull()
-            ?: return chain.proceed(originalRequest)
+            ?: throw IOException("Invalid camp hub URL: $storedCampHubUrl")
 
         val campUrl = originalRequest.url.newBuilder()
             .scheme(campHubUrl.scheme)

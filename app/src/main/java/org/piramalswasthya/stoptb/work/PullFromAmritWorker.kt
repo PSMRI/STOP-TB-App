@@ -49,6 +49,11 @@ class PullFromAmritWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         setForeground(getForegroundInfo())
 
+        if (preferenceDao.getLoggedInUser() == null) {
+            Timber.w("[$name] Worker deferred: logged-in user is not available yet")
+            return Result.retry()
+        }
+
         return try {
             withContext(Dispatchers.IO) {
                 val startTime = System.currentTimeMillis()
