@@ -98,7 +98,8 @@ class BenListAdapter(
             showAnthropometryButton: Boolean = false,
             showExamineButton: Boolean = true,
             tbDiagnosticsList: List<TBDiagnosticsCache> = emptyList(),
-            source: Int = 0
+            source: Int = 0,
+            retryingBenIds: List<Long> = emptyList()
         ) {
 
             binding.btnAbha.visibility = View.VISIBLE
@@ -182,7 +183,7 @@ class BenListAdapter(
                         6 -> {
                             val status = tbDiag?.xrayOrderStatus
                             val referred = tbDiag?.isReferredForDigitalChestXray
-                            val isXrayDevIntegrated = pref?.getXrayIntegrated() == true
+
                             when {
                                 status.equals("REFUSED", ignoreCase = true) || referred == false -> {
                                     ButtonConfig("TEST REFUSED", android.R.color.darker_gray, "NONE", "XRAY_CHEST")
@@ -190,26 +191,14 @@ class BenListAdapter(
                                 status.equals("COMPLETED", ignoreCase = true) -> {
                                     ButtonConfig("VIEW RESULT", android.R.color.holo_green_dark, "VIEW", "XRAY_CHEST")
                                 }
-                                 isXrayDevIntegrated -> {
-                                    val isHubConnected = pref?.isCampHubConnected() == true
-                                    if (isHubConnected) {
-                                        when {
-                                            status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PENDING", ignoreCase = true) -> {
-                                                ButtonConfig("Pending", android.R.color.darker_gray, "NONE", "XRAY_CHEST")
-                                            }
-                                             status.equals("FAILED", ignoreCase = true) -> {
-                                                 ButtonConfig("Retry Referral", android.R.color.holo_red_dark, "RETRY_PUSH", "XRAY_CHEST")
-                                             }
-                                             status.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
-                                                 ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
-                                             }
-                                            else -> {
-                                                ButtonConfig("TRACK", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
-                                            }
-                                        }
-                                    } else {
-                                        ButtonConfig("TRACK", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
-                                    }
+                                status.equals("FAILED", ignoreCase = true) -> {
+                                    ButtonConfig("Retry Referral", android.R.color.holo_red_dark, "RETRY_PUSH", "XRAY_CHEST")
+                                }
+                                status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PENDING", ignoreCase = true) -> {
+                                    ButtonConfig("Pending", android.R.color.darker_gray, "NONE", "XRAY_CHEST")
+                                }
+                                status.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
+                                    ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
                                 }
                                 else -> {
                                     ButtonConfig("TRACK", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
@@ -307,22 +296,11 @@ class BenListAdapter(
                                     }
                                     conf
                                 }
-                                 !isTruenatManual -> {
-                                    if (isHubConnected) {
-                                        when {
-                                            status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PENDING", ignoreCase = true) -> {
-                                                ButtonConfig("Pending", android.R.color.darker_gray, "NONE", "SPUTUM_TRUENAT")
-                                            }
-                                            status.equals("FAILED", ignoreCase = true) || status.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
-                                                ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
-                                            }
-                                            else -> {
-                                                ButtonConfig("TRACK", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
-                                            }
-                                        }
-                                    } else {
-                                        ButtonConfig("TRACK", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
-                                    }
+                                status.equals("FAILED", ignoreCase = true) || status.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
+                                    ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
+                                }
+                                status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PENDING", ignoreCase = true) -> {
+                                    ButtonConfig("Pending", android.R.color.darker_gray, "NONE", "SPUTUM_TRUENAT")
                                 }
                                 else -> {
                                     ButtonConfig("TRACK", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
@@ -358,6 +336,21 @@ class BenListAdapter(
                     } else {
                         binding.btnVitalScreen.isEnabled = true
                         binding.btnVitalScreen.alpha = 1.0f
+                    }
+
+                    val isRetryPushInFlight = config.action == "RETRY_PUSH" && retryingBenIds.contains(item.benId)
+                    if (isRetryPushInFlight) {
+                        binding.btnVitalScreen.isEnabled = false
+                        binding.btnVitalScreen.alpha = 1.0f
+                        binding.btnVitalScreen.icon = androidx.swiperefreshlayout.widget.CircularProgressDrawable(binding.root.context).apply {
+                            setStyle(androidx.swiperefreshlayout.widget.CircularProgressDrawable.DEFAULT)
+                            setColorSchemeColors(android.graphics.Color.WHITE)
+                            start()
+                        }
+                        binding.btnVitalScreen.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
+                    } else {
+                        (binding.btnVitalScreen.icon as? androidx.swiperefreshlayout.widget.CircularProgressDrawable)?.stop()
+                        binding.btnVitalScreen.icon = null
                     }
 
                     fun formatDenialReason(reason: String?, other: String?): String {

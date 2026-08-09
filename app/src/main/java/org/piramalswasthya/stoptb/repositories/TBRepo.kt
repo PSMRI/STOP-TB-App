@@ -53,6 +53,7 @@ class TBRepo @Inject constructor(
     var mockRifScenario: MockRifScenario = MockRifScenario.DETECTED
 
     private val orderCreatedTimestamps = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private val ORDER_STATUS_GRACE_PERIOD_MS = 90_000L
 
     val allTbDiagnostics: Flow<List<TBDiagnosticsCache>> = tbDao.getAllTbDiagnostics()
 
@@ -1533,6 +1534,7 @@ class TBRepo @Inject constructor(
                                 }
                             }
                             tbDao.saveTbDiagnostics(cache)
+                            orderCreatedTimestamps["${benId}_${testType}"] = System.currentTimeMillis()
                             return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(orderId ?: "")
                         } else {
                             val errorMsg = jsonObj.optString("errorMessage") ?: "Failed to push order"
@@ -1636,6 +1638,7 @@ class TBRepo @Inject constructor(
                                 }
                             }
                             tbDao.saveTbDiagnostics(cache)
+                            orderCreatedTimestamps["${benId}_${testType}"] = System.currentTimeMillis()
                             return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(orderId ?: "")
                         } else {
                             val errorMsg = jsonObj.optString("errorMessage") ?: "Failed to retry order"
@@ -2313,7 +2316,10 @@ class TBRepo @Inject constructor(
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
                                     val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
                                     val isDone = currentStatus.equals("COMPLETED", ignoreCase = true)
-                                    if (!isDone) {
+                                    // Same staleness guard as the "Polling Timed Out" bucket above.
+                                    val justPushedAt = orderCreatedTimestamps["${b.beneficiaryId}_$orderType"]
+                                    val isRecentlyPushed = justPushedAt != null && System.currentTimeMillis() - justPushedAt < ORDER_STATUS_GRACE_PERIOD_MS
+                                    if (!isDone && !isRecentlyPushed) {
                                         val cache = (existing ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
                                             if (isXray) {
                                                 it.copy(
