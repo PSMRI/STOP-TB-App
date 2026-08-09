@@ -202,6 +202,10 @@ class AllBenViewModel @Inject constructor(
         _orderActionState.value = OrderActionResult.Idle
     }
 
+    /*retry referral loading spinner */
+    private val _retryingBenIds = MutableStateFlow<List<Long>>(emptyList())
+    val retryingBenIds: StateFlow<List<Long>> = _retryingBenIds.asStateFlow()
+
     fun initiateProdigiOrder(benId: Long, orderType: String) {
         viewModelScope.launch {
             _orderActionState.value = OrderActionResult.Loading
@@ -412,9 +416,29 @@ class AllBenViewModel @Inject constructor(
     }
 
     fun retryTest(benId: Long, orderType: String, context: Context) {
+        if (_retryingBenIds.value.contains(benId)) return
         viewModelScope.launch {
+            val existingBeforePush = tbRepo.getTBDiagnosticsById(benId)
+            val statusBeforePush = if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
+                existingBeforePush?.xrayOrderStatus
+            } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
+                existingBeforePush?.rifOrderStatus
+            } else {
+                existingBeforePush?.trueNatOrderStatus
+            }
+            if (statusBeforePush.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) ||
+                statusBeforePush.equals("IN_PROGRESS", ignoreCase = true) ||
+                statusBeforePush.equals("PENDING", ignoreCase = true)
+            ) {
+                return@launch
+            }
             _orderActionState.value = OrderActionResult.Loading
-            val response = tbRepo.createProdigiOrder(benId, orderType)
+            _retryingBenIds.value += benId
+            val response = try {
+                tbRepo.createProdigiOrder(benId, orderType)
+            } finally {
+                _retryingBenIds.value -= benId
+            }
             if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
                 val existing = tbRepo.getTBDiagnosticsById(benId)
                 existing?.let {

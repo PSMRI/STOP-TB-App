@@ -42,6 +42,7 @@ class BenPagingAdapter(
     private val tptEligibleIds = mutableListOf<Long>()
     private val childCountMap = mutableMapOf<Long, Int>()
     private val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
+    private val retryingBenIds = mutableListOf<Long>()
 
     override fun onCreateViewHolder(
         parent: ViewGroup, viewType: Int
@@ -81,7 +82,8 @@ class BenPagingAdapter(
             showAnthropometryButton = showAnthropometryButton,
             showExamineButton = showExamineButton,
             tbDiagnosticsList = tbDiagnosticsList,
-            source = source
+            source = source,
+            retryingBenIds = retryingBenIds
         )
     }
 
@@ -134,6 +136,7 @@ class BenPagingAdapter(
     fun submitSyncingVitalBenIds(list: List<Long>) = submitStatusIds(syncingVitalBenIds, list)
     fun submitSyncingTbScreeningBenIds(list: List<Long>) = submitStatusIds(syncingTbScreeningBenIds, list)
     fun submitSyncingGeneralOpdBenIds(list: List<Long>) = submitStatusIds(syncingGeneralOpdBenIds, list)
+    fun submitRetryingBenIds(list: List<Long>) = submitStatusIds(retryingBenIds, list)
 
     fun submitDiagnosisBenIds(list: List<Long>) {
         val oldIds = diagnosisIds.toSet()

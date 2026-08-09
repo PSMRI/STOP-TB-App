@@ -539,6 +539,12 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         }
 
         lifecycleScope.launch {
+            viewModel.retryingBenIds.collectLatest { benIds ->
+                benAdapter.submitRetryingBenIds(benIds)
+            }
+        }
+
+        lifecycleScope.launch {
             viewModel.orderActionState.collectLatest { state ->
                 when (state) {
                     is AllBenViewModel.OrderActionResult.Idle -> {}
@@ -557,7 +563,18 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         }
                     }
                     is AllBenViewModel.OrderActionResult.Error -> {
-                        Toast.makeText(requireContext(), state.error, Toast.LENGTH_LONG).show()
+                        val isNetworkError = state.error.contains("Unable to resolve host", ignoreCase = true) ||
+                                state.error.contains("failed to connect", ignoreCase = true) ||
+                                state.error.contains("timeout", ignoreCase = true) ||
+                                state.error.contains("timed out", ignoreCase = true) ||
+                                state.error.contains("Network is unreachable", ignoreCase = true) ||
+                                state.error.contains("No address associated with hostname", ignoreCase = true)
+                        val message = if (isNetworkError) {
+                            "Please connect to the camp hub to retry the referral."
+                        } else {
+                            state.error
+                        }
+                        Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
                         viewModel.resetOrderActionState()
                     }
                 }
