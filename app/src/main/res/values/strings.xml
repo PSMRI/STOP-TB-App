@@ -1366,5 +1366,6 @@
     <string name="patient_registered_successfully">Patient Registered Successfully</string>
     <string name="proceed_to_register_hof">Do you want to proceed with registration of Head of the Family?</string>
     <string name="refused">Refused</string>
+    <string name="form_submitted_successfully">Form submitted successfully</string>
 </resources>
 

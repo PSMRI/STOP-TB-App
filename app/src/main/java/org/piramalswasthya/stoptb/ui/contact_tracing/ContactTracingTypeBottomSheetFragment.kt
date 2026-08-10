@@ -47,15 +47,20 @@ class ContactTracingTypeBottomSheetFragment : BottomSheetDialogFragment() {
 
         binding.btnTypeCommunity.setOnClickListener {
             ContactTracingActivity.startForType(requireContext(), indexCaseBenId, "COMMUNITY")
-            dismiss()
+//            dismiss()
         }
 
         binding.btnTypeOccupational.setOnClickListener {
             ContactTracingActivity.startForType(requireContext(), indexCaseBenId, "OCCUPATIONAL")
-            dismiss()
+//            dismiss()
         }
 
         viewModel.status.observe(viewLifecycleOwner) { status -> updateStatusIcons(status) }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshStatus()
     }
 
     private fun updateStatusIcons(status: ContactTracingStatus) {

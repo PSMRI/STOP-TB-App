@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
@@ -180,6 +181,7 @@ class ContactTracingFormFragment : Fragment() {
 
             viewModel.formCompleted.observe(viewLifecycleOwner) { completed ->
                 if (completed == true) {
+                    Toast.makeText(requireContext(), R.string.form_submitted_successfully, Toast.LENGTH_SHORT).show()
                     (requireActivity() as? ContactTracingNavigator)?.onFormCompleted()
                 }
             }
@@ -225,6 +227,15 @@ class ContactTracingFormFragment : Fragment() {
     fun saveDraftAndGoBack() {
         viewModel.onBack()
     }
+
+    /** Read by ContactTracingActivity to restore the correct toolbar title when this
+     * fragment is revealed again by a back-stack pop. */
+    val screenFormType: FormType
+        get() = FormType.valueOf(
+            arguments?.getString(ARG_FORM_TYPE) ?: FormType.COMMUNITY_CONTACT_TRACING.name
+        )
+    val screenViewHistory: Boolean
+        get() = arguments?.getBoolean(ARG_VIEW_HISTORY) ?: false
 
     private fun handleOpenForm(targetFormUuid: String) {
         val navigator = requireActivity() as? ContactTracingNavigator ?: return

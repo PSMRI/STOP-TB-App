@@ -344,6 +344,7 @@ class ContactTracingFormViewModel @Inject constructor(
         questionsByUuid = questionsByUuid + (question.questionUuid to question)
         if (!reevaluate) {
             refreshErrorIfNeeded(question)
+            updateComputedNoOfContactsErrorIfNeeded(question)
             return
         }
         val current = _activeQuestions.value ?: return
@@ -354,9 +355,32 @@ class ContactTracingFormViewModel @Inject constructor(
         evaluateAllConditions(allSectionQuestions)
 
         allSectionQuestions.filter { it.visible }.forEach { q -> refreshErrorIfNeeded(q) }
+        updateComputedNoOfContactsErrorIfNeeded(question)
 
         _activeQuestions.value = allSectionQuestions.filter { it.visible }
     }
+
+    private fun updateComputedNoOfContactsErrorIfNeeded(question: CounsellingQuestionDto) {
+        val noOfContactsQ = questionsByUuid["CCT_NO_OF_CONTACTS"] ?: return
+        val relQ = questionsByUuid["CCT_RELATIONSHIP"]
+        val countFieldIds = relQ?.options.orEmpty()
+            .flatMap { it.conditions.orEmpty() }
+            .filter { it.actionType == ActionType.SHOW_QUESTION.value }
+            .mapNotNull { it.targetQuestionId }
+            .toSet()
+
+        if (question.questionUuid == "CCT_NO_OF_CONTACTS" || question.questionId in countFieldIds) {
+            val allQuestions = questionsByUuid.values.toList()
+            val newSum = allQuestions
+                .filter { it.questionId in countFieldIds }
+                .sumOf { it.value?.toString()?.toIntOrNull() ?: 0 }
+                .toString()
+
+            noOfContactsQ.value = newSum
+            refreshErrorIfNeeded(noOfContactsQ)
+        }
+    }
+
     private fun refreshErrorIfNeeded(q: CounsellingQuestionDto) {
         val newError = validateQuestion(q)
         if (q.errorMessage != newError && (q.errorMessage != null || newError == null)) {
@@ -410,22 +434,26 @@ class ContactTracingFormViewModel @Inject constructor(
         }
         isSubmitting = true
         viewModelScope.launch {
-            saveCurrentSection(current)
-            val finalStatus = if (currentFormType == FormType.TPT_FOLLOW_UP && currentSectionPhase == SectionPhase.POST_SUBMIT)
-                "COMPLETE" else "SUBMITTED"
-            repository.submitResponse(responseId, finalStatus)
-            persistedStatus = finalStatus
-            if (responseId > 0) {
-                val pushed = repository.submitResponseBulk(responseId, currentSectionPhase?.value)
-                if (!pushed) {
-                    ContactTracingSyncWorker.scheduleSync(context)
+            try {
+                saveCurrentSection(current)
+                val finalStatus = if (currentFormType == FormType.TPT_FOLLOW_UP && currentSectionPhase == SectionPhase.POST_SUBMIT)
+                    "COMPLETE" else "SUBMITTED"
+                repository.submitResponse(responseId, finalStatus)
+                persistedStatus = finalStatus
+                if (responseId > 0) {
+                    val pushed = repository.submitResponseBulk(responseId, currentSectionPhase?.value)
+                    if (!pushed) {
+                        ContactTracingSyncWorker.scheduleSync(context)
+                    }
                 }
-            }
-            val screeningStatusAnswer = questionsByUuid[QUESTION_UUID_CLINICAL_SCREENING_STATUS]?.value?.toString()
-            if (currentFormType == FormType.CONTACT_FOLLOW_UP && screeningStatusAnswer != null) {
-                handleClinicalScreeningStatusSubmit(pendingIndexCaseBenId, screeningStatusAnswer)
-            } else {
-                _formCompleted.value = true
+                val screeningStatusAnswer = questionsByUuid[QUESTION_UUID_CLINICAL_SCREENING_STATUS]?.value?.toString()
+                if (currentFormType == FormType.CONTACT_FOLLOW_UP && screeningStatusAnswer != null) {
+                    handleClinicalScreeningStatusSubmit(pendingIndexCaseBenId, screeningStatusAnswer)
+                } else {
+                    _formCompleted.value = true
+                }
+            } finally {
+                isSubmitting = false
             }
         }
     }
@@ -576,7 +604,8 @@ class ContactTracingFormViewModel @Inject constructor(
             val raw = rawQuestionsByUuid[q.questionUuid]
             q.visible = parseRef(raw?.enabledIfJson)?.let { matchesCondition(it) } ?: q.visibleByDefault
             parseRef(raw?.disabledIfJson)?.let { if (matchesCondition(it)) q.visible = false }
-            q.isMandatory = parseRef(raw?.mandatoryIfJson)?.let { matchesCondition(it) } ?: (q.originalIsMandatory ?: q.isMandatory)
+            q.isMandatory = (parseRef(raw?.mandatoryIfJson)?.let { matchesCondition(it) } ?: (q.originalIsMandatory ?: q.isMandatory))
+                    || matchesMandatoryIfValidation(q)
         }
 
         questions.forEach { q ->
@@ -589,6 +618,14 @@ class ContactTracingFormViewModel @Inject constructor(
                 conditionsByOptionId[opt.optionId]?.forEach { applyCondition(it) }
             }
         }
+    }
+
+    // Determines if the question's mandatory-if condition is satisfied.
+    private fun matchesMandatoryIfValidation(q: CounsellingQuestionDto): Boolean {
+        val mandatoryIf = q.validations?.firstOrNull { it.validationType == ActionType.MANDATORY_IF.value } ?: return false
+        val parts = mandatoryIf.validationParam.split("=")
+        if (parts.size != 2) return false
+        return questionsByUuid[parts[0]]?.value?.toString() == parts[1]
     }
 
     private fun parseRef(json: String?): ConditionRefDto? =
@@ -633,12 +670,9 @@ class ContactTracingFormViewModel @Inject constructor(
     }
 
     private fun getMandatoryError(q: CounsellingQuestionDto): String? {
-        if (q.isMandatory) return "This field is required"
-        val mandatoryIf = q.validations?.firstOrNull { it.validationType == "MANDATORY_IF" } ?: return null
-        val parts = mandatoryIf.validationParam.split("=")
-        if (parts.size != 2) return null
-        val refQuestion = questionsByUuid[parts[0]] ?: return null
-        return if (refQuestion.value?.toString() == parts[1]) mandatoryIf.errorMessage else null
+        val mandatoryIf = q.validations?.firstOrNull { it.validationType == ActionType.MANDATORY_IF.value }
+        if (mandatoryIf != null && matchesMandatoryIfValidation(q)) return mandatoryIf.errorMessage
+        return if (q.isMandatory) "This field is required" else null
     }
 
 
