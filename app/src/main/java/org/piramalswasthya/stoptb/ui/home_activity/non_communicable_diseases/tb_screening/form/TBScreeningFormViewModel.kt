@@ -15,6 +15,7 @@ import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.configuration.TBScreeningDataset
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.model.OrderStatus
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.getAgeGenderDisplayString
@@ -122,12 +123,16 @@ class TBScreeningFormViewModel @Inject constructor(
                     tbScreeningCache.longitude = capturedLongitude
                     tbScreeningCache.address = capturedAddress
                     tbScreeningCache.syncState = SyncState.UNSYNCED
-                    tbRepo.saveTBScreening(tbScreeningCache)
+//                    tbRepo.saveTBScreening(tbScreeningCache)
 
                     initializeDiagnosticsAndPush(tbScreeningCache)
 
                     if (syncImmediately) {
-                        tbRepo.pushUnSyncedTBScreeningRecords()
+                        try {
+                            tbRepo.pushUnSyncedTBScreeningRecords()
+                        } catch (e: Exception) {
+                            Timber.e(e, "Immediate sync failed, will sync in background")
+                        }
                     }
                     _state.postValue(State.SAVE_SUCCESS)
                 } catch (e: Exception) {
@@ -198,13 +203,13 @@ class TBScreeningFormViewModel @Inject constructor(
             var currentDiag = existingDiag ?: org.piramalswasthya.stoptb.model.TBDiagnosticsCache(benId = benId, syncState = SyncState.UNSYNCED)
             
             if (refersXray) {
-                if (currentDiag.xrayOrderStatus.isNullOrBlank() || currentDiag.xrayOrderStatus == "NONE") {
-                    currentDiag = currentDiag.copy(xrayOrderStatus = "PENDING", isReferredForDigitalChestXray = true)
+                if (currentDiag.xrayOrderStatus.isNullOrBlank() || currentDiag.xrayOrderStatus == OrderStatus.NONE.name) {
+                    currentDiag = currentDiag.copy(xrayOrderStatus = OrderStatus.PENDING.name, isReferredForDigitalChestXray = true)
                 }
             }
             if (refersTruenat) {
-                if (currentDiag.trueNatOrderStatus.isNullOrBlank() || currentDiag.trueNatOrderStatus == "NONE") {
-                    currentDiag = currentDiag.copy(trueNatOrderStatus = "PENDING")
+                if (currentDiag.trueNatOrderStatus.isNullOrBlank() || currentDiag.trueNatOrderStatus == OrderStatus.NONE.name) {
+                    currentDiag = currentDiag.copy(trueNatOrderStatus = OrderStatus.PENDING.name)
                 }
             }
             tbRepo.saveTBDiagnostics(currentDiag)
@@ -213,9 +218,9 @@ class TBScreeningFormViewModel @Inject constructor(
                 try {
                     val current = tbRepo.getTBDiagnosticsById(benId)
                     val hasOrder = !current?.xrayOrderId.isNullOrBlank() ||
-                            current?.xrayOrderStatus.equals("COMPLETED", ignoreCase = true) ||
-                            current?.xrayOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) ||
-                            current?.xrayOrderStatus.equals("REFUSED", ignoreCase = true)
+                            current?.xrayOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
+                            current?.xrayOrderStatus.equals(OrderStatus.AWAITING_PROVIDER_RESULT.name, ignoreCase = true) ||
+                            current?.xrayOrderStatus.equals(OrderStatus.REFUSED.name, ignoreCase = true)
                     if (!hasOrder) {
                         val response = tbRepo.createProdigiOrder(benId, "XRAY_CHEST")
                         if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
@@ -223,7 +228,7 @@ class TBScreeningFormViewModel @Inject constructor(
                             val fresh = tbRepo.getTBDiagnosticsById(benId)
                             fresh?.let {
                                 val updated = it.copy(
-                                    xrayOrderStatus = if (isIntegrated) "AWAITING_PROVIDER_RESULT" else "PENDING",
+                                    xrayOrderStatus = if (isIntegrated) OrderStatus.AWAITING_PROVIDER_RESULT.name else OrderStatus.PENDING.name,
                                     isChestXRayDone = isIntegrated,
                                     isReferredForDigitalChestXray = true,
                                     syncState = SyncState.SYNCED
@@ -244,9 +249,9 @@ class TBScreeningFormViewModel @Inject constructor(
                 try {
                     val current = tbRepo.getTBDiagnosticsById(benId)
                     val hasOrder = !current?.trueNatOrderId.isNullOrBlank() ||
-                            current?.trueNatOrderStatus.equals("COMPLETED", ignoreCase = true) ||
-                            current?.trueNatOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) ||
-                            current?.trueNatOrderStatus.equals("REFUSED", ignoreCase = true)
+                            current?.trueNatOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
+                            current?.trueNatOrderStatus.equals(OrderStatus.AWAITING_PROVIDER_RESULT.name, ignoreCase = true) ||
+                            current?.trueNatOrderStatus.equals(OrderStatus.REFUSED.name, ignoreCase = true)
                     if (!hasOrder) {
                         val response = tbRepo.createProdigiOrder(benId, "SPUTUM_TRUENAT")
                         if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
@@ -254,7 +259,7 @@ class TBScreeningFormViewModel @Inject constructor(
                             val fresh = tbRepo.getTBDiagnosticsById(benId)
                             fresh?.let {
                                 val updated = it.copy(
-                                    trueNatOrderStatus = if (isIntegrated) "AWAITING_PROVIDER_RESULT" else "PENDING",
+                                    trueNatOrderStatus = if (isIntegrated) OrderStatus.AWAITING_PROVIDER_RESULT.name else OrderStatus.PENDING.name,
                                     isSputumCollected = true,
                                     isNaatConducted = isIntegrated,
                                     syncState = SyncState.SYNCED
