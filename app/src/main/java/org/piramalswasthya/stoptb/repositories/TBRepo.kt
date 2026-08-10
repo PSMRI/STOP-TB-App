@@ -16,6 +16,7 @@ import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
+import org.piramalswasthya.stoptb.model.OrderStatus
 import org.piramalswasthya.stoptb.network.AmritApiService
 import org.piramalswasthya.stoptb.network.GeneralOpdRequestDTO
 import org.piramalswasthya.stoptb.network.GeneralOpdSaveRequest
@@ -2205,24 +2206,24 @@ class TBRepo @Inject constructor(
                                 ben?.let { b ->
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
                                     val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
-                                    val isDone = currentStatus.equals("COMPLETED", ignoreCase = true)
+                                    val isDone = currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
                                     Timber.d("STOP-TB polling debug: awaitingProviderResult regId=$regId benId=${b.beneficiaryId} currentStatus=$currentStatus isDone=$isDone")
                                     if (!isDone) {
                                         val cache = (existing ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
                                             if (isXray) {
                                                 it.copy(
-                                                    xrayOrderStatus = "AWAITING_PROVIDER_RESULT",
+                                                    xrayOrderStatus = OrderStatus.AWAITING_PROVIDER_RESULT.name,
                                                     isReferredForDigitalChestXray = true,
                                                     syncState = SyncState.SYNCED
                                                 )
                                             } else if (isRif) {
                                                 it.copy(
-                                                    rifOrderStatus = "AWAITING_PROVIDER_RESULT",
+                                                    rifOrderStatus = OrderStatus.AWAITING_PROVIDER_RESULT.name,
                                                     syncState = SyncState.SYNCED
                                                 )
                                             } else {
                                                 it.copy(
-                                                    trueNatOrderStatus = "AWAITING_PROVIDER_RESULT",
+                                                    trueNatOrderStatus = OrderStatus.AWAITING_PROVIDER_RESULT.name,
                                                     isSputumCollected = true,
                                                     syncState = SyncState.SYNCED
                                                 )
