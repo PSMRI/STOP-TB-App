@@ -24,7 +24,9 @@ import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertNewBenBinding
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchRvButtonBinding
-
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
+import org.piramalswasthya.stoptb.helpers.isNurseRole
+import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.HouseHoldBasicDomain
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
@@ -90,7 +92,9 @@ class AllHouseholdFragment : Fragment() {
 
         binding.tvEmptyContent.text = getString(R.string.no_records_found_hh)
 
-
+        // val role = prefDao.getLoggedInUser()?.role
+        // val isNurse = prefDao.getLoggedInUser()?.role.isNurseRole()
+        // val isCounsellorOfficer = role.isCounsellingOfficerRole()
 
         binding.btnNextPage.text = getString(R.string.btn_text_frag_home_nhhr)
         binding.btnNextPage.visibility = View.VISIBLE
