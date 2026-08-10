@@ -228,6 +228,15 @@ class ContactTracingFormFragment : Fragment() {
         viewModel.onBack()
     }
 
+    /** Read by ContactTracingActivity to restore the correct toolbar title when this
+     * fragment is revealed again by a back-stack pop. */
+    val screenFormType: FormType
+        get() = FormType.valueOf(
+            arguments?.getString(ARG_FORM_TYPE) ?: FormType.COMMUNITY_CONTACT_TRACING.name
+        )
+    val screenViewHistory: Boolean
+        get() = arguments?.getBoolean(ARG_VIEW_HISTORY) ?: false
+
     private fun handleOpenForm(targetFormUuid: String) {
         val navigator = requireActivity() as? ContactTracingNavigator ?: return
 

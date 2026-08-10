@@ -27,6 +27,9 @@ class ContactTracingActivity : AppCompatActivity(), ContactTracingNavigator {
 
         setupToolbar()
         setupBackPressHandling()
+        supportFragmentManager.addOnBackStackChangedListener {
+            updateTitleForCurrentFragment()
+        }
 
         val contactType = intent.getStringExtra(EXTRA_CONTACT_TYPE) ?: CONTACT_TYPE_COMMUNITY
         val formType = when (contactType) {
@@ -69,6 +72,12 @@ class ContactTracingActivity : AppCompatActivity(), ContactTracingNavigator {
         binding.toolbarContactTracing.setNavigationOnClickListener {
             onSupportNavigateUp()
         }
+    }
+
+    private fun updateTitleForCurrentFragment() {
+        val current = supportFragmentManager.findFragmentById(R.id.fragment_container)
+                as? ContactTracingFormFragment ?: return
+        updateTitle(current.screenViewHistory, current.screenFormType)
     }
 
     private fun updateTitle(viewHistory: Boolean,formType : FormType){
