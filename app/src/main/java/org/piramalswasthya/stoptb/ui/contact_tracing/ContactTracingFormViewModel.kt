@@ -576,7 +576,8 @@ class ContactTracingFormViewModel @Inject constructor(
             val raw = rawQuestionsByUuid[q.questionUuid]
             q.visible = parseRef(raw?.enabledIfJson)?.let { matchesCondition(it) } ?: q.visibleByDefault
             parseRef(raw?.disabledIfJson)?.let { if (matchesCondition(it)) q.visible = false }
-            q.isMandatory = parseRef(raw?.mandatoryIfJson)?.let { matchesCondition(it) } ?: (q.originalIsMandatory ?: q.isMandatory)
+            q.isMandatory = (parseRef(raw?.mandatoryIfJson)?.let { matchesCondition(it) } ?: (q.originalIsMandatory ?: q.isMandatory))
+                    || matchesMandatoryIfValidation(q)
         }
 
         questions.forEach { q ->
@@ -589,6 +590,14 @@ class ContactTracingFormViewModel @Inject constructor(
                 conditionsByOptionId[opt.optionId]?.forEach { applyCondition(it) }
             }
         }
+    }
+
+    // Determines if the question's mandatory-if condition is satisfied.
+    private fun matchesMandatoryIfValidation(q: CounsellingQuestionDto): Boolean {
+        val mandatoryIf = q.validations?.firstOrNull { it.validationType == ActionType.MANDATORY_IF.value } ?: return false
+        val parts = mandatoryIf.validationParam.split("=")
+        if (parts.size != 2) return false
+        return questionsByUuid[parts[0]]?.value?.toString() == parts[1]
     }
 
     private fun parseRef(json: String?): ConditionRefDto? =
@@ -633,12 +642,9 @@ class ContactTracingFormViewModel @Inject constructor(
     }
 
     private fun getMandatoryError(q: CounsellingQuestionDto): String? {
-        if (q.isMandatory) return "This field is required"
-        val mandatoryIf = q.validations?.firstOrNull { it.validationType == "MANDATORY_IF" } ?: return null
-        val parts = mandatoryIf.validationParam.split("=")
-        if (parts.size != 2) return null
-        val refQuestion = questionsByUuid[parts[0]] ?: return null
-        return if (refQuestion.value?.toString() == parts[1]) mandatoryIf.errorMessage else null
+        val mandatoryIf = q.validations?.firstOrNull { it.validationType == ActionType.MANDATORY_IF.value }
+        if (mandatoryIf != null && matchesMandatoryIfValidation(q)) return mandatoryIf.errorMessage
+        return if (q.isMandatory) "This field is required" else null
     }
 
 

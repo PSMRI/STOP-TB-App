@@ -1,8 +1,12 @@
 package org.piramalswasthya.stoptb.helpers
 
 import android.app.DatePickerDialog
+import android.graphics.Color
 import android.text.Editable
+import android.text.Spannable
+import android.text.SpannableString
 import android.text.TextWatcher
+import android.text.style.ForegroundColorSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.ArrayAdapter
@@ -40,9 +44,29 @@ object QuestionRenderer {
         til.hint = buildLabel(question, prefix)
     }
 
-    private fun buildLabel(question: CounsellingQuestionDto, prefix: String): String {
+    private fun buildLabel(
+        question: CounsellingQuestionDto,
+        prefix: String
+    ): SpannableString {
+
         val mandatory = if (question.isMandatory) "\u00A0*" else ""
-        return "$prefix${question.questionText}$mandatory"
+        val text = "$prefix${question.questionText}$mandatory"
+
+        val spannable = SpannableString(text)
+
+        if (question.isMandatory) {
+            val start = text.length - 1
+            val end = text.length
+
+            spannable.setSpan(
+                ForegroundColorSpan(Color.RED),
+                start,
+                end,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
+
+        return spannable
     }
 
     // ?? Text input
