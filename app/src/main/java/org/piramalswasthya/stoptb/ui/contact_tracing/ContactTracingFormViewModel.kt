@@ -344,6 +344,7 @@ class ContactTracingFormViewModel @Inject constructor(
         questionsByUuid = questionsByUuid + (question.questionUuid to question)
         if (!reevaluate) {
             refreshErrorIfNeeded(question)
+            updateComputedNoOfContactsErrorIfNeeded(question)
             return
         }
         val current = _activeQuestions.value ?: return
@@ -354,9 +355,32 @@ class ContactTracingFormViewModel @Inject constructor(
         evaluateAllConditions(allSectionQuestions)
 
         allSectionQuestions.filter { it.visible }.forEach { q -> refreshErrorIfNeeded(q) }
+        updateComputedNoOfContactsErrorIfNeeded(question)
 
         _activeQuestions.value = allSectionQuestions.filter { it.visible }
     }
+
+    private fun updateComputedNoOfContactsErrorIfNeeded(question: CounsellingQuestionDto) {
+        val noOfContactsQ = questionsByUuid["CCT_NO_OF_CONTACTS"] ?: return
+        val relQ = questionsByUuid["CCT_RELATIONSHIP"]
+        val countFieldIds = relQ?.options.orEmpty()
+            .flatMap { it.conditions.orEmpty() }
+            .filter { it.actionType == ActionType.SHOW_QUESTION.value }
+            .mapNotNull { it.targetQuestionId }
+            .toSet()
+
+        if (question.questionUuid == "CCT_NO_OF_CONTACTS" || question.questionId in countFieldIds) {
+            val allQuestions = questionsByUuid.values.toList()
+            val newSum = allQuestions
+                .filter { it.questionId in countFieldIds }
+                .sumOf { it.value?.toString()?.toIntOrNull() ?: 0 }
+                .toString()
+
+            noOfContactsQ.value = newSum
+            refreshErrorIfNeeded(noOfContactsQ)
+        }
+    }
+
     private fun refreshErrorIfNeeded(q: CounsellingQuestionDto) {
         val newError = validateQuestion(q)
         if (q.errorMessage != newError && (q.errorMessage != null || newError == null)) {
@@ -410,22 +434,26 @@ class ContactTracingFormViewModel @Inject constructor(
         }
         isSubmitting = true
         viewModelScope.launch {
-            saveCurrentSection(current)
-            val finalStatus = if (currentFormType == FormType.TPT_FOLLOW_UP && currentSectionPhase == SectionPhase.POST_SUBMIT)
-                "COMPLETE" else "SUBMITTED"
-            repository.submitResponse(responseId, finalStatus)
-            persistedStatus = finalStatus
-            if (responseId > 0) {
-                val pushed = repository.submitResponseBulk(responseId, currentSectionPhase?.value)
-                if (!pushed) {
-                    ContactTracingSyncWorker.scheduleSync(context)
+            try {
+                saveCurrentSection(current)
+                val finalStatus = if (currentFormType == FormType.TPT_FOLLOW_UP && currentSectionPhase == SectionPhase.POST_SUBMIT)
+                    "COMPLETE" else "SUBMITTED"
+                repository.submitResponse(responseId, finalStatus)
+                persistedStatus = finalStatus
+                if (responseId > 0) {
+                    val pushed = repository.submitResponseBulk(responseId, currentSectionPhase?.value)
+                    if (!pushed) {
+                        ContactTracingSyncWorker.scheduleSync(context)
+                    }
                 }
-            }
-            val screeningStatusAnswer = questionsByUuid[QUESTION_UUID_CLINICAL_SCREENING_STATUS]?.value?.toString()
-            if (currentFormType == FormType.CONTACT_FOLLOW_UP && screeningStatusAnswer != null) {
-                handleClinicalScreeningStatusSubmit(pendingIndexCaseBenId, screeningStatusAnswer)
-            } else {
-                _formCompleted.value = true
+                val screeningStatusAnswer = questionsByUuid[QUESTION_UUID_CLINICAL_SCREENING_STATUS]?.value?.toString()
+                if (currentFormType == FormType.CONTACT_FOLLOW_UP && screeningStatusAnswer != null) {
+                    handleClinicalScreeningStatusSubmit(pendingIndexCaseBenId, screeningStatusAnswer)
+                } else {
+                    _formCompleted.value = true
+                }
+            } finally {
+                isSubmitting = false
             }
         }
     }

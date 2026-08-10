@@ -143,10 +143,16 @@ object QuestionRenderer {
             .mapNotNull { it.targetQuestionId }
             .toSet()
 
-        question.value = allQuestions
+        val computedValue = allQuestions
             .filter { it.questionId in countFieldIds }
             .sumOf { it.value?.toString()?.toIntOrNull() ?: 0 }
             .toString()
+
+        question.value = computedValue
+
+        if ((computedValue.toIntOrNull() ?: 0) > 0 && question.errorMessage != null) {
+            question.errorMessage = null
+        }
 
         showTextView(binding, question, prefix, false, {})
     }

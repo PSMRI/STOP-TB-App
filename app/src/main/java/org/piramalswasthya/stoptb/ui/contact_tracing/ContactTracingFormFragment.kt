@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
@@ -180,6 +181,7 @@ class ContactTracingFormFragment : Fragment() {
 
             viewModel.formCompleted.observe(viewLifecycleOwner) { completed ->
                 if (completed == true) {
+                    Toast.makeText(requireContext(), R.string.form_submitted_successfully, Toast.LENGTH_SHORT).show()
                     (requireActivity() as? ContactTracingNavigator)?.onFormCompleted()
                 }
             }
