@@ -199,12 +199,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
             }
         }
 
-        // Nurse role: invisible (takes space but not visible/clickable)
-        // Nurse role: invisible (takes space but not visible/clickable)
-        // Nurse & Counselling officer role: invisible (takes space but not visible/clickable)
-        val isNurse = role.isNurseRole()
-        val isCounsellingOfficer = role.isCounsellingOfficerRole()
-        binding.fabAddMember.visibility = if (isNurse || isCounsellingOfficer) View.INVISIBLE else View.VISIBLE
+        binding.fabAddMember.visibility = View.VISIBLE
         binding.fabAddMember.setOnClickListener {
             addBenAlert?.show()
         }
