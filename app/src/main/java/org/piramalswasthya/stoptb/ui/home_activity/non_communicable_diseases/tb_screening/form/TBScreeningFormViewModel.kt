@@ -122,7 +122,7 @@ class TBScreeningFormViewModel @Inject constructor(
                     tbScreeningCache.longitude = capturedLongitude
                     tbScreeningCache.address = capturedAddress
                     tbScreeningCache.syncState = SyncState.UNSYNCED
-                    tbRepo.saveTBScreening(tbScreeningCache)
+//                    tbRepo.saveTBScreening(tbScreeningCache)
 
                     initializeDiagnosticsAndPush(tbScreeningCache)
 
