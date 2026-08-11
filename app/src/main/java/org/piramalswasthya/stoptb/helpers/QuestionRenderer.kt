@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.helpers
 
+import android.app.AlertDialog
 import android.app.DatePickerDialog
 import android.graphics.Color
 import android.text.Editable
@@ -29,6 +30,7 @@ import org.piramalswasthya.stoptb.databinding.ItemCtReadonlyBinding
 import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingOptionDto
 import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingQuestionDto
 import org.piramalswasthya.stoptb.ui.counselling_activity.ActionType
+import org.piramalswasthya.stoptb.ui.counselling_activity.QuestionType
 import org.piramalswasthya.stoptb.utils.Log
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -426,7 +428,8 @@ object QuestionRenderer {
         binding.tvError.visibility = View.GONE
     }
 
-    // Dropdown (single-select, from a popup list)
+    // Dropdown — single-select from a popup list, or multi-select from a checkbox dialog for DROPDOWN_MULTI.
+    // Shares the same layout/binding as single DROPDOWN; only the tap behaviour and stored value differ.
     fun showDropdown(
         binding: ItemCounsellingDropdownBinding,
         question: CounsellingQuestionDto,
@@ -440,28 +443,60 @@ object QuestionRenderer {
         binding.actDropdown.isEnabled = isEditable
 
         val options = question.options?.sortedBy { it.displayOrder } ?: emptyList()
-        val labels = options.map { it.optionLabel }
+        val isMultiSelect = question.questionType == QuestionType.DROPDOWN_MULTI.value
 
-        binding.actDropdown.setAdapter(
-            ArrayAdapter(binding.root.context, android.R.layout.simple_list_item_1, labels)
-        )
+        if (isMultiSelect) {
+            binding.actDropdown.setOnItemClickListener(null)
+            binding.actDropdown.setAdapter(null)
 
-        val selectedOption = options.firstOrNull { it.optionValue == question.value }
-        binding.actDropdown.setText(selectedOption?.optionLabel ?: "", false)
+            val currentValues = (question.value as? List<*>)
+                ?.filterIsInstance<String>()
+                ?: emptyList()
+            binding.actDropdown.setText(
+                options.filter { it.optionValue in currentValues }.joinToString(", ") { it.optionLabel },
+                false
+            )
 
-        binding.actDropdown.setOnItemClickListener { _, _, position, _ ->
-            if (!isEditable) return@setOnItemClickListener
-            val opt = options[position]
-            question.value = opt.optionValue
-            onValueChanged(question)
-        }
+            binding.actDropdown.setOnClickListener {
+                if (!isEditable) return@setOnClickListener
+                val latestValues = (question.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                val checkedItems = BooleanArray(options.size) { i -> options[i].optionValue in latestValues }
 
-        if (!question.errorMessage.isNullOrEmpty()) {
-            binding.tvError.text = question.errorMessage
-            binding.tvError.visibility = View.VISIBLE
+                AlertDialog.Builder(binding.root.context)
+                    .setTitle(buildLabel(question, prefix))
+                    .setMultiChoiceItems(options.map { it.optionLabel }.toTypedArray(), checkedItems) { _, which, checked ->
+                        checkedItems[which] = checked
+                    }
+                    .setPositiveButton(android.R.string.ok) { _, _ ->
+                        val selected = options.filterIndexed { i, _ -> checkedItems[i] }
+                        question.value = selected.map { it.optionValue }
+                        binding.actDropdown.setText(selected.joinToString(", ") { it.optionLabel }, false)
+                        onValueChanged(question)
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }
         } else {
-            binding.tvError.visibility = View.GONE
+            binding.actDropdown.setOnClickListener(null)
+
+            val labels = options.map { it.optionLabel }
+            binding.actDropdown.setAdapter(
+                ArrayAdapter(binding.root.context, android.R.layout.simple_list_item_1, labels)
+            )
+
+            val selectedOption = options.firstOrNull { it.optionValue == question.value }
+            binding.actDropdown.setText(selectedOption?.optionLabel ?: "", false)
+
+            binding.actDropdown.setOnItemClickListener { _, _, position, _ ->
+                if (!isEditable) return@setOnItemClickListener
+                val opt = options[position]
+                question.value = opt.optionValue
+                onValueChanged(question)
+            }
         }
+
+        // Hide tvError to avoid duplicating the TextInputLayout's error message.
+        binding.tvError.visibility = View.GONE
     }
 
     // Numeric-only input (age, hours, counts). New — no existing function covers this type.

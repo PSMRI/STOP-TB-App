@@ -95,12 +95,13 @@ class ExamineViewModel @Inject constructor(
             else      -> null  // all done
         }
     }
-    private val tptFollowUpStatus: Flow<String?> =
-        contactTracingRepo.observeResponseStatus(benId, FormType.TPT_FOLLOW_UP)
+    // Scope status to PRE_SUBMIT so newer POST_SUBMIT drafts don't mask the submitted PRE_SUBMIT row.
+    private val tptPreSubmitStatus: Flow<String?> =
+        contactTracingRepo.observePreSubmitResponseStatus(benId, FormType.TPT_FOLLOW_UP)
 
     /** Drives the "TPT Followup" row's visibility — true once PRE_SUBMIT has been submitted. */
     val isTptFollowUpPreSubmitDone: Flow<Boolean> =
-        tptFollowUpStatus.map { it == "SUBMITTED" || it == "COMPLETE" }
+        tptPreSubmitStatus.map { it == "SUBMITTED" || it == "COMPLETE" }
 
     private val contactFollowUpStatus: Flow<String?> =
         contactTracingRepo.observeResponseStatus(benId, FormType.CONTACT_FOLLOW_UP)
@@ -126,7 +127,7 @@ class ExamineViewModel @Inject constructor(
         combine(
             contactFollowUpStatus,
             contactFollowUpFormVersionId,
-            tptFollowUpStatus
+            tptPreSubmitStatus
         ) { cfuStatus, cfuVersionId, tptStatus ->
             val cfuSubmitted = cfuStatus == "SUBMITTED" || cfuStatus == "COMPLETE"
             if (!cfuSubmitted || cfuVersionId == null) {

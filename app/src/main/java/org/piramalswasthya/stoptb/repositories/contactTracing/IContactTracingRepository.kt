@@ -55,6 +55,9 @@ interface IContactTracingRepository {
     // Streams the beneficiary's current form status, used to decide Fill vs View for the Examine screen row.
     fun observeResponseStatus(beneficiaryId: Long, formType: FormType): Flow<String?>
 
+    // Streams PRE_SUBMIT status for the formType, keeping TPT Followup visibility unaffected by newer POST_SUBMIT drafts.
+    fun observePreSubmitResponseStatus(beneficiaryId: Long, formType: FormType): Flow<String?>
+
     // Streams the beneficiary's saved TPT Follow-up history entries, latest first.
     fun getTptHistory(beneficiaryId: Long, formVersionId: Int): Flow<List<CompleteFormResponse>>
 

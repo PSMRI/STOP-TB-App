@@ -33,7 +33,9 @@ import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import org.piramalswasthya.stoptb.ui.counselling_activity.QuestionType
 import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
 import org.piramalswasthya.stoptb.work.ContactTracingSyncWorker
+import org.piramalswasthya.stoptb.work.WorkerUtils
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
@@ -104,6 +106,10 @@ class ContactTracingFormViewModel @Inject constructor(
     val showContinueTpt: LiveData<Boolean> get() = _showContinueTpt
     private val _tptPreSubmitAlreadySubmitted = MutableLiveData(false)
     val tptPreSubmitAlreadySubmitted: LiveData<Boolean> get() = _tptPreSubmitAlreadySubmitted
+
+    // Tracks pending TPT Follow-Up resolution; disable submit while network calls determine whether this already-submitted CONTACT_FOLLOW_UP should continue to TPT_FOLLOW_UP.
+    private val _resolvingContinueTpt = MutableLiveData(false)
+    val resolvingContinueTpt: LiveData<Boolean> get() = _resolvingContinueTpt
 
     fun open(
         formType: FormType,
@@ -202,9 +208,14 @@ class ContactTracingFormViewModel @Inject constructor(
             loadSection(currentSectionIndex)
 
             if (formType == FormType.CONTACT_FOLLOW_UP && persistedStatus == "SUBMITTED") {
-                val (eligible, alreadySubmitted) = resolveContinueTptState(indexCaseBenId, responseId)
-                _showContinueTpt.value = eligible
-                _tptPreSubmitAlreadySubmitted.value = alreadySubmitted
+                _resolvingContinueTpt.value = true
+                try {
+                    val (eligible, alreadySubmitted) = resolveContinueTptState(indexCaseBenId, responseId)
+                    _showContinueTpt.value = eligible
+                    _tptPreSubmitAlreadySubmitted.value = alreadySubmitted
+                } finally {
+                    _resolvingContinueTpt.value = false
+                }
             }
         }
     }
@@ -315,6 +326,8 @@ class ContactTracingFormViewModel @Inject constructor(
             questionsByUuid = questionsByUuid + builtQuestions.associateBy { it.questionUuid }
             evaluateAllConditions(builtQuestions)
             ensureTptRegistrationDate(builtQuestions, sectionWithQuestions.section.sectionId)
+            ensureDateNotBeforeScreening(builtQuestions, sectionWithQuestions.section.sectionId)
+            ensureExpectedCompletionDate(builtQuestions, sectionWithQuestions.section.sectionId)
 
             _activeQuestions.value = builtQuestions.filter { it.visible }
             if (isHistoryMode) {
@@ -354,10 +367,26 @@ class ContactTracingFormViewModel @Inject constructor(
         val allSectionQuestions = fullSection.mapNotNull { questionsByUuid[it] }
         evaluateAllConditions(allSectionQuestions)
 
+        updateExpectedCompletionDateIfNeeded(question)
         allSectionQuestions.filter { it.visible }.forEach { q -> refreshErrorIfNeeded(q) }
         updateComputedNoOfContactsErrorIfNeeded(question)
 
         _activeQuestions.value = allSectionQuestions.filter { it.visible }
+    }
+
+    /** Recomputes Expected Completion Date when Regimen or TPT Start Date changes. */
+    private fun updateExpectedCompletionDateIfNeeded(question: CounsellingQuestionDto) {
+        if (question.questionUuid != QUESTION_UUID_REGIMEN_ADVISED &&
+            question.questionUuid != QUESTION_UUID_TPT_START_DATE) return
+
+        val regimen = RegimenAdvised.fromValue(questionsByUuid[QUESTION_UUID_REGIMEN_ADVISED]?.value?.toString()) ?: return
+        val startDateStr = questionsByUuid[QUESTION_UUID_TPT_START_DATE]?.value?.toString() ?: return
+        val completionQ = questionsByUuid[QUESTION_UUID_EXPECTED_COMPLETION_DATE] ?: return
+
+        val computed = computeExpectedCompletionDate(startDateStr, regimen) ?: return
+        completionQ.value = computed
+        questionsByUuid = questionsByUuid + (completionQ.questionUuid to completionQ)
+        refreshErrorIfNeeded(completionQ)
     }
 
     private fun updateComputedNoOfContactsErrorIfNeeded(question: CounsellingQuestionDto) {
@@ -485,6 +514,9 @@ class ContactTracingFormViewModel @Inject constructor(
         tbSuspected.isTBConfirmed = true
         tbSuspected.syncState = SyncState.UNSYNCED
         tbRepo.saveTBSuspected(tbSuspected)
+
+        // Auto-Sync TB rows on SAVE_SUCCESS
+        WorkerUtils.triggerAmritPushWorker(context)
     }
 
     fun onBack() {
@@ -579,7 +611,8 @@ class ContactTracingFormViewModel @Inject constructor(
         val answersByQuestionId = sectionResponse?.questionResponses?.groupBy { it.questionId } ?: emptyMap()
         questions.forEach { q ->
             val rows = answersByQuestionId[q.questionId] ?: return@forEach
-            val isMultiSelect =  q.questionType == QuestionType.CHECKBOX_MULTI.value
+            val isMultiSelect = q.questionType == QuestionType.CHECKBOX_MULTI.value ||
+                q.questionType == QuestionType.DROPDOWN_MULTI.value
             q.value = if (isMultiSelect) {
                 rows.mapNotNull { row -> q.options?.firstOrNull { it.optionId == row.optionId }?.optionValue }
             } else {
@@ -594,6 +627,55 @@ class ContactTracingFormViewModel @Inject constructor(
         val dateQuestion = questions.firstOrNull { it.questionUuid == QUESTION_UUID_TFU_REGISTRATION_DATE } ?: return
         if (dateQuestion.value != null) return
         dateQuestion.value = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).format(Date())
+        val id = ensureResponseCreated()
+        val status = persistedStatus?.takeIf { it != "DRAFT" } ?: "DRAFT"
+        repository.saveSectionAnswers(id, sectionId, buildAnswerRows(questions.filter { it.visible }), status)
+    }
+
+    /** Bounds TFU_START_DATE and TFU_VISIT_DATE to not precede the beneficiary's TB screening visit date. */
+    private suspend fun ensureDateNotBeforeScreening(questions: List<CounsellingQuestionDto>, sectionId: Int) {
+        if (currentFormType != FormType.TPT_FOLLOW_UP) return
+        val targetUuid = when (currentSectionPhase) {
+            SectionPhase.PRE_SUBMIT -> QUESTION_UUID_TPT_START_DATE
+            SectionPhase.POST_SUBMIT -> QUESTION_UUID_TPT_VISIT_DATE
+            else -> return
+        }
+        val dateQuestion = questions.firstOrNull { it.questionUuid == targetUuid } ?: return
+        if (dateQuestion.validations.orEmpty().any { it.validationType == "MIN_DATE" }) return
+
+        val visitDateMillis = tbRepo.getTBScreening(pendingIndexCaseBenId)?.visitDate ?: return
+        val isoScreeningDate = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).format(Date(visitDateMillis))
+
+        val existingMaxDate = dateQuestion.validations.orEmpty().firstOrNull { it.validationType == "MAX_DATE" }
+        if (existingMaxDate != null) {
+            val maxDateStr = if (existingMaxDate.validationParam.equals("TODAY", true)) {
+                SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).format(Date())
+            } else {
+                existingMaxDate.validationParam
+            }
+            if (isoScreeningDate > maxDateStr) return
+        }
+
+        val errorMsg = "${dateQuestion.questionText} cannot be before the Screening Date"
+        dateQuestion.validations = dateQuestion.validations.orEmpty() + listOf(
+            CounsellingValidationDto(null, "MIN_DATE", isoScreeningDate, errorMsg),
+            CounsellingValidationDto(null, "DATE_NOT_BEFORE", isoScreeningDate, errorMsg)
+        )
+        questionsByUuid = questionsByUuid + (dateQuestion.questionUuid to dateQuestion)
+    }
+
+    /** Computes and persists Expected Completion Date when Regimen and Start Date are already set. */
+    private suspend fun ensureExpectedCompletionDate(questions: List<CounsellingQuestionDto>, sectionId: Int) {
+        if (currentFormType != FormType.TPT_FOLLOW_UP || currentSectionPhase != SectionPhase.PRE_SUBMIT) return
+        val completionQ = questions.firstOrNull { it.questionUuid == QUESTION_UUID_EXPECTED_COMPLETION_DATE } ?: return
+        if (completionQ.value != null) return
+        val regimen = RegimenAdvised.fromValue(
+            questions.firstOrNull { it.questionUuid == QUESTION_UUID_REGIMEN_ADVISED }?.value?.toString()
+        ) ?: return
+        val startDateStr = questions.firstOrNull { it.questionUuid == QUESTION_UUID_TPT_START_DATE }?.value?.toString() ?: return
+        val computed = computeExpectedCompletionDate(startDateStr, regimen) ?: return
+
+        completionQ.value = computed
         val id = ensureResponseCreated()
         val status = persistedStatus?.takeIf { it != "DRAFT" } ?: "DRAFT"
         repository.saveSectionAnswers(id, sectionId, buildAnswerRows(questions.filter { it.visible }), status)
@@ -728,8 +810,15 @@ class ContactTracingFormViewModel @Inject constructor(
                 "DATE_NOT_BEFORE" -> {
                     val param = v.validationParam
                     val boundDateStr = when {
-                        param.equals("TODAY", true) -> null // enforced by the date picker itself
-                        param.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) -> null // fixed ISO date; enforced by the picker
+                        param.equals("TODAY", true) ->
+                            SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).format(Date())
+                        param.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) ->
+                            try {
+                                SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).parse(param)
+                                    ?.let { SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).format(it) }
+                            } catch (_: Exception) {
+                                null
+                            }
                         else -> questionsByUuid[param]?.value?.toString() // reference to another question's answer
                     }
                     if (boundDateStr != null) {
@@ -745,6 +834,21 @@ class ContactTracingFormViewModel @Inject constructor(
             }
         }
         return null
+    }
+}
+
+/** Calculates Expected Completion Date from TPT Start Date and regimen duration. */
+private fun computeExpectedCompletionDate(startDateStr: String, regimen: RegimenAdvised): String? {
+    return try {
+        val fmt = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
+        val parsedStartDate = fmt.parse(startDateStr) ?: return null
+        val cal = Calendar.getInstance().apply {
+            time = parsedStartDate
+            add(Calendar.MONTH, regimen.durationMonths)
+        }
+        fmt.format(cal.time)
+    } catch (_: Exception) {
+        null
     }
 }
 
@@ -770,7 +874,17 @@ private fun SectionQuestionWithDetails.toCounsellingQuestionDto(): CounsellingQu
                 validationParam = it.validationValue ?: "",
                 errorMessage = it.errorMessage
             )
-        },
+        } + if (q.questionUuid == QUESTION_UUID_EXPECTED_COMPLETION_DATE &&
+                validations.none { it.validationType == "DATE_NOT_BEFORE" && it.validationValue == QUESTION_UUID_TPT_START_DATE }) {
+            listOf(
+                CounsellingValidationDto(
+                    validationId = null,
+                    validationType = "DATE_NOT_BEFORE",
+                    validationParam = QUESTION_UUID_TPT_START_DATE,
+                    errorMessage = "Expected Completion Date cannot be before TPT Start Date"
+                )
+            )
+        } else emptyList(),
         options = options.sortedBy { it.option.optionOrder }.map { owc ->
             CounsellingOptionDto(
                 optionId = owc.option.optionId,

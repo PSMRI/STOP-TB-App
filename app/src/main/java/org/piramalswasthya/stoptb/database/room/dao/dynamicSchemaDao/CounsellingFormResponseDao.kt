@@ -105,6 +105,22 @@ interface CounsellingFormResponseDao {
         """
     )
     fun observeFormResponseStatus(beneficiaryId: Long, formType: String): Flow<String?>
+
+    // Phase-scoped status observer for TPT_FOLLOW_UP PRE_SUBMIT, avoiding newer POST_SUBMIT rows masking the submitted PRE_SUBMIT status.
+    @Query(
+        """
+        SELECT r.status FROM t_form_response r
+        JOIN t_section_response sr ON sr.formResponseId = r.responseId
+        JOIN t_form_section fs ON fs.sectionId = sr.sectionId
+        JOIN t_form_version v ON r.formVersionId = v.versionId
+        JOIN t_dynamic_form f ON v.formId = f.formId
+        WHERE r.beneficiaryId = :beneficiaryId AND f.formType = :formType AND r.isHistorySnapshot = 0
+          AND fs.sectionPhase = 'PRE_SUBMIT'
+        ORDER BY r.responseId DESC LIMIT 1
+        """
+    )
+    fun observePreSubmitResponseStatus(beneficiaryId: Long, formType: String): Flow<String?>
+
     @Transaction
     @Query(
         """

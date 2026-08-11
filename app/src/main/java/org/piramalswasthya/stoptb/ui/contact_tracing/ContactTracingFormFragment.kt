@@ -74,8 +74,8 @@ class ContactTracingFormFragment : Fragment() {
                 questions = emptyList(),
                 onValueChanged = { updatedQ ->
                     val nonKeystrokeTypes = setOf(
-                        "RADIO", "MCQ", "CHECKBOX_MULTI", "CHECKBOX", "DATE", "DROPDOWN", "NUMBER_PICKER",
-                        "READONLY_NUMBER", "READONLY_TEXT"
+                        "RADIO", "MCQ", "CHECKBOX_MULTI", "CHECKBOX", "DATE", "DROPDOWN", "DROPDOWN_MULTI",
+                        "NUMBER_PICKER", "READONLY_NUMBER", "READONLY_TEXT"
                     )
                     val isKeystrokeInput = updatedQ.questionType !in nonKeystrokeTypes
                     viewModel.onQuestionValueChanged(
@@ -100,6 +100,7 @@ class ContactTracingFormFragment : Fragment() {
 
                 val showContinueTpt = !editable && viewModel.showContinueTpt.value == true
                 val tptAlreadySubmitted = viewModel.tptPreSubmitAlreadySubmitted.value == true
+                val resolvingContinueTpt = viewModel.resolvingContinueTpt.value == true
 
 //                btnCtNext.visibility = if (editable || showContinueTpt ) View.VISIBLE else View.GONE
                 val hiddenSections = setOf("Contact & Exposure Details", "Occupation & Exposure Details")
@@ -110,6 +111,9 @@ class ContactTracingFormFragment : Fragment() {
                     isLastSection -> getString(R.string.btn_submit)
                     else -> getString(R.string.next)
                 }
+                // Disabled pending TPT Follow-Up routing determination; slow connections can lag isEditable and cause a tap to close the form before the redirect.
+                btnCtNext.isEnabled = !resolvingContinueTpt
+                pbCtNextResolving.visibility = if (resolvingContinueTpt) View.VISIBLE else View.GONE
                 btnCtNext.setOnClickListener {
                     when {
                         showContinueTpt -> viewModel.continueToTpt()
@@ -156,6 +160,10 @@ class ContactTracingFormFragment : Fragment() {
             }
 
             viewModel.tptPreSubmitAlreadySubmitted.observe(viewLifecycleOwner) {
+                updateNextButton()
+            }
+
+            viewModel.resolvingContinueTpt.observe(viewLifecycleOwner) {
                 updateNextButton()
             }
 

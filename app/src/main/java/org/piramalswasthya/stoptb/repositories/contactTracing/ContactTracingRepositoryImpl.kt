@@ -221,10 +221,13 @@ class ContactTracingRepositoryImpl @Inject constructor(
                     responseDao.insertQuestionResponses(questionResponsesToInsert)
                 }
 
+                // Only promote to SUBMITTED/COMPLETE when real answer data exists; otherwise preserve the response status.
+                val hasAnswers = questionResponsesToInsert.isNotEmpty()
                 val finalStatus = when {
                     apiResponse.status?.uppercase() == "REFUSED" -> "REFUSED"
                     hasPostSubmitAnswers || apiResponse.status?.uppercase() == "COMPLETE" || apiResponse.status?.uppercase() == "COMPLETED" -> "COMPLETE"
-                    else -> "SUBMITTED"
+                    hasAnswers -> "SUBMITTED"
+                    else -> "DRAFT"
                 }
 
                 responseDao.updateFormResponse(
@@ -348,6 +351,9 @@ class ContactTracingRepositoryImpl @Inject constructor(
 
     override fun observeResponseStatus(beneficiaryId: Long, formType: FormType): Flow<String?> =
         responseDao.observeFormResponseStatus(beneficiaryId, formType.name)
+
+    override fun observePreSubmitResponseStatus(beneficiaryId: Long, formType: FormType): Flow<String?> =
+        responseDao.observePreSubmitResponseStatus(beneficiaryId, formType.name)
 
     override fun getTptHistory(beneficiaryId: Long, formVersionId: Int): Flow<List<CompleteFormResponse>> =
         responseDao.getTptHistory(beneficiaryId, formVersionId)

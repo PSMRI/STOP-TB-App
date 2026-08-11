@@ -45,12 +45,29 @@
                 android:nestedScrollingEnabled="false" />
         </org.piramalswasthya.stoptb.helpers.FocusStableNestedScrollView>
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_ct_next"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_margin="16dp"
-            android:text="@string/next" />
+            android:layout_height="wrap_content">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_ct_next"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="16dp"
+                android:text="@string/next" />
+
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:id="@+id/pb_ct_next_resolving"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center_vertical|end"
+                android:layout_marginEnd="32dp"
+                android:indeterminate="true"
+                android:visibility="gone"
+                app:indicatorColor="@color/md_theme_light_onPrimary"
+                app:trackThickness="2dp" />
+
+        </FrameLayout>
 
     </LinearLayout>
 
