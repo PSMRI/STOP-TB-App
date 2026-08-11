@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.helpers
 import android.app.DatePickerDialog
 import android.graphics.Color
 import android.text.Editable
+import android.text.InputFilter
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.TextWatcher
@@ -75,16 +76,22 @@ object QuestionRenderer {
         question: CounsellingQuestionDto,
         prefix: String,
         isEditable: Boolean,
+        applyLatinFilter: Boolean = true,
         onValueChanged: (CounsellingQuestionDto) -> Unit
     ) {
         showLabel(binding.tilInput, question, prefix)
         binding.tilInput.error = question.errorMessage
         binding.etInput.isEnabled = isEditable
-        binding.etInput.filters = arrayOf(LatinInputFilter())
 
-        if (question.maxLength != null) {
+        val maxLength = question.maxLength
+        val filters = mutableListOf<InputFilter>()
+        if (applyLatinFilter) filters.add(LatinInputFilter())
+        if (maxLength != null) filters.add(InputFilter.LengthFilter(maxLength))
+        binding.etInput.filters = filters.toTypedArray()
+
+        if (maxLength != null) {
             binding.tilInput.isCounterEnabled = true
-            binding.tilInput.counterMaxLength = question.maxLength
+            binding.tilInput.counterMaxLength = maxLength
         } else {
             binding.tilInput.isCounterEnabled = false
         }
@@ -154,7 +161,7 @@ object QuestionRenderer {
             question.errorMessage = null
         }
 
-        showTextView(binding, question, prefix, false, {})
+        showTextView(binding, question, prefix, false, applyLatinFilter = false) {}
     }
 
     private fun scrollToView(v: View) {
@@ -331,7 +338,7 @@ object QuestionRenderer {
                 .mapNotNull { targetId -> allQuestions.firstOrNull { it.questionId == targetId } }
                 .forEach { target ->
                     val fieldBinding = ItemCounsellingTextBinding.inflate(LayoutInflater.from(context), container, false)
-                    showTextView(fieldBinding, target, "", isEditable, onValueChanged)
+                    showTextView(fieldBinding, target, "", isEditable, applyLatinFilter = false, onValueChanged = onValueChanged)
                     container.addView(fieldBinding.root, LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
                     ))

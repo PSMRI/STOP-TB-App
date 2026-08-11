@@ -31,7 +31,8 @@ import org.piramalswasthya.stoptb.ui.counselling_activity.QuestionType
 class CounsellingDynamicAdapter(
     private var questions: List<CounsellingQuestionDto>,
     private val onValueChanged: (CounsellingQuestionDto) -> Unit,
-    private var isEditable: Boolean = true
+    private var isEditable: Boolean = true,
+    private val isContactTracing: Boolean = false
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
 
@@ -181,9 +182,9 @@ class CounsellingDynamicAdapter(
             if (q.questionUuid == CT_NO_OF_CONTACTS_UUID) {
                 QuestionRenderer.showComputedNoOfContacts(binding, q, prefix, questions)
             } else if (q.questionUuid == TFU_REGISTRATION_DATE_UUID) {
-                QuestionRenderer.showTextView(binding, q, prefix, false, onValueChanged)
+                QuestionRenderer.showTextView(binding, q, prefix, false, applyLatinFilter = !isContactTracing, onValueChanged = onValueChanged)
             } else {
-                QuestionRenderer.showTextView(binding, q, prefix, isEditable) { updated ->
+                QuestionRenderer.showTextView(binding, q, prefix, isEditable, applyLatinFilter = !isContactTracing) { updated ->
                     onValueChanged(updated)
                     refreshNoOfContactsIfNeeded(updated)
                 }

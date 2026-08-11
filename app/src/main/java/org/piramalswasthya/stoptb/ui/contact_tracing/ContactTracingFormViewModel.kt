@@ -750,6 +750,8 @@ class ContactTracingFormViewModel @Inject constructor(
 
 private fun SectionQuestionWithDetails.toCounsellingQuestionDto(): CounsellingQuestionDto {
     val q = question
+    val maxLength = q.maxLength
+        ?: validations.find { it.validationType == "MAX_LENGTH" }?.validationValue?.toIntOrNull()
     return CounsellingQuestionDto(
         questionId = q.questionId,
         questionUuid = q.questionUuid ?: q.questionId.toString(),
@@ -757,7 +759,7 @@ private fun SectionQuestionWithDetails.toCounsellingQuestionDto(): CounsellingQu
         questionType = q.questionType,
         isMandatory = q.isRequired,
         displayOrder = q.questionOrder,
-        maxLength = q.maxLength,
+        maxLength = maxLength,
         defaultValue = null,
         containsPii = q.containsPii,
         visibleByDefault = q.visibleByDefault,

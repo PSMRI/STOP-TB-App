@@ -82,7 +82,8 @@ class ContactTracingFormFragment : Fragment() {
                         updatedQ,
                         reevaluate = !isKeystrokeInput
                     )
-                }
+                },
+                isContactTracing = true
             )
             rvCtForm.adapter = adapter
 
