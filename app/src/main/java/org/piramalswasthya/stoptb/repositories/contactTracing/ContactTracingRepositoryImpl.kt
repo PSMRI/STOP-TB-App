@@ -101,6 +101,14 @@ class ContactTracingRepositoryImpl @Inject constructor(
                 Timber.d("fetchAndStoreContactResponse: Synced response with answers already exists locally. Skipping fetch to preserve data.")
                 return true
             }
+            if (hasLocalAnswers) {
+                Timber.d(
+                    "fetchAndStoreContactResponse: Local response with answers already exists " +
+                            "(status=${localResponse?.formResponse?.status}, syncStatus=${localResponse?.formResponse?.syncStatus}). " +
+                            "Skipping remote fetch/rebuild to avoid destroying locally submitted answers."
+                )
+                return true
+            }
 
             val jwt = preferenceDao.getJWTAmritToken() ?: return false
             val response = amritApiService.getBeneficiaryFormResponses(jwt, beneficiaryId, formType.name)
