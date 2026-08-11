@@ -310,6 +310,7 @@ class CounsellingRepo @Inject constructor(
                                     }
 
                                     QuestionType.CHECKBOX_MULTI,
+                                    QuestionType.DROPDOWN_MULTI,
                                     QuestionType.READONLY_NUMBER,
                                     QuestionType.READONLY_TEXT,
                                     QuestionType.NUMBER_PICKER,

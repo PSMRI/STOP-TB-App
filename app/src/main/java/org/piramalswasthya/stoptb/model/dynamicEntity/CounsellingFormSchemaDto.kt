@@ -54,7 +54,7 @@ data class CounsellingQuestionDto(
     @SerializedName("defaultValue") val defaultValue: String? = null,
     @SerializedName("containsPii") val containsPii: Boolean = false,
     @SerializedName("visibleByDefault") val visibleByDefault: Boolean = true,
-    @SerializedName("validations") val validations: List<CounsellingValidationDto>? = null,
+    @SerializedName("validations") var validations: List<CounsellingValidationDto>? = null,
     @SerializedName("options") val options: List<CounsellingOptionDto>? = null,
 
     // Runtime UI state — not from JSON
