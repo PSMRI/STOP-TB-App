@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.ui.counselling_activity
 enum class QuestionType(val value: String) {
     RADIO("RADIO"),
     DROPDOWN("DROPDOWN"),
+    DROPDOWN_MULTI("DROPDOWN_MULTI"),
     CHECKBOX("CHECKBOX"),
     CHECKBOX_MULTI("CHECKBOX_MULTI"),
     MCQ("MCQ"),

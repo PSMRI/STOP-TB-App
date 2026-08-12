@@ -1,8 +1,14 @@
 package org.piramalswasthya.stoptb.helpers
 
+import android.app.AlertDialog
 import android.app.DatePickerDialog
+import android.graphics.Color
 import android.text.Editable
+import android.text.InputFilter
+import android.text.Spannable
+import android.text.SpannableString
 import android.text.TextWatcher
+import android.text.style.ForegroundColorSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.ArrayAdapter
@@ -24,6 +30,7 @@ import org.piramalswasthya.stoptb.databinding.ItemCtReadonlyBinding
 import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingOptionDto
 import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingQuestionDto
 import org.piramalswasthya.stoptb.ui.counselling_activity.ActionType
+import org.piramalswasthya.stoptb.ui.counselling_activity.QuestionType
 import org.piramalswasthya.stoptb.utils.Log
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -40,9 +47,29 @@ object QuestionRenderer {
         til.hint = buildLabel(question, prefix)
     }
 
-    private fun buildLabel(question: CounsellingQuestionDto, prefix: String): String {
+    private fun buildLabel(
+        question: CounsellingQuestionDto,
+        prefix: String
+    ): SpannableString {
+
         val mandatory = if (question.isMandatory) "\u00A0*" else ""
-        return "$prefix${question.questionText}$mandatory"
+        val text = "$prefix${question.questionText}$mandatory"
+
+        val spannable = SpannableString(text)
+
+        if (question.isMandatory) {
+            val start = text.length - 1
+            val end = text.length
+
+            spannable.setSpan(
+                ForegroundColorSpan(Color.RED),
+                start,
+                end,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
+
+        return spannable
     }
 
     // ?? Text input
@@ -51,16 +78,22 @@ object QuestionRenderer {
         question: CounsellingQuestionDto,
         prefix: String,
         isEditable: Boolean,
+        applyLatinFilter: Boolean = true,
         onValueChanged: (CounsellingQuestionDto) -> Unit
     ) {
         showLabel(binding.tilInput, question, prefix)
         binding.tilInput.error = question.errorMessage
         binding.etInput.isEnabled = isEditable
-        binding.etInput.filters = arrayOf(LatinInputFilter())
 
-        if (question.maxLength != null) {
+        val maxLength = question.maxLength
+        val filters = mutableListOf<InputFilter>()
+        if (applyLatinFilter) filters.add(LatinInputFilter())
+        if (maxLength != null) filters.add(InputFilter.LengthFilter(maxLength))
+        binding.etInput.filters = filters.toTypedArray()
+
+        if (maxLength != null) {
             binding.tilInput.isCounterEnabled = true
-            binding.tilInput.counterMaxLength = question.maxLength
+            binding.tilInput.counterMaxLength = maxLength
         } else {
             binding.tilInput.isCounterEnabled = false
         }
@@ -119,12 +152,18 @@ object QuestionRenderer {
             .mapNotNull { it.targetQuestionId }
             .toSet()
 
-        question.value = allQuestions
+        val computedValue = allQuestions
             .filter { it.questionId in countFieldIds }
             .sumOf { it.value?.toString()?.toIntOrNull() ?: 0 }
             .toString()
 
-        showTextView(binding, question, prefix, false, {})
+        question.value = computedValue
+
+        if ((computedValue.toIntOrNull() ?: 0) > 0 && question.errorMessage != null) {
+            question.errorMessage = null
+        }
+
+        showTextView(binding, question, prefix, false, applyLatinFilter = false) {}
     }
 
     private fun scrollToView(v: View) {
@@ -301,7 +340,7 @@ object QuestionRenderer {
                 .mapNotNull { targetId -> allQuestions.firstOrNull { it.questionId == targetId } }
                 .forEach { target ->
                     val fieldBinding = ItemCounsellingTextBinding.inflate(LayoutInflater.from(context), container, false)
-                    showTextView(fieldBinding, target, "", isEditable, onValueChanged)
+                    showTextView(fieldBinding, target, "", isEditable, applyLatinFilter = false, onValueChanged = onValueChanged)
                     container.addView(fieldBinding.root, LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
                     ))
@@ -389,7 +428,8 @@ object QuestionRenderer {
         binding.tvError.visibility = View.GONE
     }
 
-    // Dropdown (single-select, from a popup list)
+    // Dropdown — single-select from a popup list, or multi-select from a checkbox dialog for DROPDOWN_MULTI.
+    // Shares the same layout/binding as single DROPDOWN; only the tap behaviour and stored value differ.
     fun showDropdown(
         binding: ItemCounsellingDropdownBinding,
         question: CounsellingQuestionDto,
@@ -403,28 +443,60 @@ object QuestionRenderer {
         binding.actDropdown.isEnabled = isEditable
 
         val options = question.options?.sortedBy { it.displayOrder } ?: emptyList()
-        val labels = options.map { it.optionLabel }
+        val isMultiSelect = question.questionType == QuestionType.DROPDOWN_MULTI.value
 
-        binding.actDropdown.setAdapter(
-            ArrayAdapter(binding.root.context, android.R.layout.simple_list_item_1, labels)
-        )
+        if (isMultiSelect) {
+            binding.actDropdown.setOnItemClickListener(null)
+            binding.actDropdown.setAdapter(null)
 
-        val selectedOption = options.firstOrNull { it.optionValue == question.value }
-        binding.actDropdown.setText(selectedOption?.optionLabel ?: "", false)
+            val currentValues = (question.value as? List<*>)
+                ?.filterIsInstance<String>()
+                ?: emptyList()
+            binding.actDropdown.setText(
+                options.filter { it.optionValue in currentValues }.joinToString(", ") { it.optionLabel },
+                false
+            )
 
-        binding.actDropdown.setOnItemClickListener { _, _, position, _ ->
-            if (!isEditable) return@setOnItemClickListener
-            val opt = options[position]
-            question.value = opt.optionValue
-            onValueChanged(question)
-        }
+            binding.actDropdown.setOnClickListener {
+                if (!isEditable) return@setOnClickListener
+                val latestValues = (question.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                val checkedItems = BooleanArray(options.size) { i -> options[i].optionValue in latestValues }
 
-        if (!question.errorMessage.isNullOrEmpty()) {
-            binding.tvError.text = question.errorMessage
-            binding.tvError.visibility = View.VISIBLE
+                AlertDialog.Builder(binding.root.context)
+                    .setTitle(buildLabel(question, prefix))
+                    .setMultiChoiceItems(options.map { it.optionLabel }.toTypedArray(), checkedItems) { _, which, checked ->
+                        checkedItems[which] = checked
+                    }
+                    .setPositiveButton(android.R.string.ok) { _, _ ->
+                        val selected = options.filterIndexed { i, _ -> checkedItems[i] }
+                        question.value = selected.map { it.optionValue }
+                        binding.actDropdown.setText(selected.joinToString(", ") { it.optionLabel }, false)
+                        onValueChanged(question)
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }
         } else {
-            binding.tvError.visibility = View.GONE
+            binding.actDropdown.setOnClickListener(null)
+
+            val labels = options.map { it.optionLabel }
+            binding.actDropdown.setAdapter(
+                ArrayAdapter(binding.root.context, android.R.layout.simple_list_item_1, labels)
+            )
+
+            val selectedOption = options.firstOrNull { it.optionValue == question.value }
+            binding.actDropdown.setText(selectedOption?.optionLabel ?: "", false)
+
+            binding.actDropdown.setOnItemClickListener { _, _, position, _ ->
+                if (!isEditable) return@setOnItemClickListener
+                val opt = options[position]
+                question.value = opt.optionValue
+                onValueChanged(question)
+            }
         }
+
+        // Hide tvError to avoid duplicating the TextInputLayout's error message.
+        binding.tvError.visibility = View.GONE
     }
 
     // Numeric-only input (age, hours, counts). New — no existing function covers this type.

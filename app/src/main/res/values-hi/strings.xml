@@ -975,6 +975,7 @@
     <string name="dialog_no">नहीं</string>
     <string name="patient_registered_successfully">रोगी का पंजीकरण सफलतापूर्वक हुआ।</string>
     <string name="proceed_to_register_hof">क्या आप परिवार के मुखिया के पंजीकरण के साथ आगे बढ़ना चाहते हैं?</string>
+    <string name="form_submitted_successfully">फॉर्म सफलतापूर्वक सबमिट किया गया</string>
 </resources>
 
 

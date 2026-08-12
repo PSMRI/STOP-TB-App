@@ -836,6 +836,7 @@
     <string name="patient_registered_successfully">ৰোগীৰ পঞ্জীয়ন সফলতাৰে কৰা হ’ল।</string>
     <string name="proceed_to_register_hof">আপুনি পৰিয়ালৰ প্ৰধানৰ পঞ্জীয়ন কৰিবলৈ আগবাঢ়িব বিচাৰেনে?</string>
     <string name="counselling_consent">পৰামৰ্শৰ বাবে সন্মতি</string>
+    <string name="form_submitted_successfully">ফৰ্ম সফলতাৰে দাখিল কৰা হৈছে</string>
 </resources>
 
 
