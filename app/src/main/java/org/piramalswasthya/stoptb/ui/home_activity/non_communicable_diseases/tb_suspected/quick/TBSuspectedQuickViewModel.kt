@@ -225,7 +225,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                     if (referralType == 6) {
                         val isXrayManual = !isXrayDevIntegrated || 
                                 oldXrayStatus.equals("POLLING_TIMEOUT", ignoreCase = true) || 
-                                oldXrayStatus.equals("FAILED", ignoreCase = true)
+                                oldXrayStatus.equals("MANUAL_ENTRY", ignoreCase = true)
 
                         val refusalReason = {
                             val r = tbDiagnostics.reasonNotConductedChestXray
@@ -277,12 +277,18 @@ class TBSuspectedQuickViewModel @Inject constructor(
                         val isHubConnected = preferenceDao.isCampHubConnected()
                         val isMtbManual = !isTruenatDevIntegrated || !isHubConnected ||
                                 oldTrueNatStatus.equals("POLLING_TIMEOUT", ignoreCase = true) || 
-                                oldTrueNatStatus.equals("FAILED", ignoreCase = true)
+                                oldTrueNatStatus.equals("MANUAL_ENTRY", ignoreCase = true)
 
                         val mtbRefusalReason = {
-                            val r = tbDiagnostics.reasonNotConductedNaat
-                            val o = tbDiagnostics.reasonNotConductedNaatOther
-                            if (r.equals("Other", ignoreCase = true) && !o.isNullOrBlank()) "Other: $o" else r
+                            if (tbDiagnostics.isSputumCollected == false) {
+                                val r = tbDiagnostics.reasonForDenialSputum
+                                val o = tbDiagnostics.reasonForDenialSputumOther
+                                if (r.equals("Other", ignoreCase = true) && !o.isNullOrBlank()) "Other: $o" else r
+                            } else {
+                                val r = tbDiagnostics.reasonNotConductedNaat
+                                val o = tbDiagnostics.reasonNotConductedNaatOther
+                                if (r.equals("Other", ignoreCase = true) && !o.isNullOrBlank()) "Other: $o" else r
+                            }
                         }()
 
                         val isMtbAlreadyCompleted = oldTrueNatStatus.equals("COMPLETED", ignoreCase = true)

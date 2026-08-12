@@ -197,11 +197,11 @@ class BenListAdapter(
                                 status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PENDING", ignoreCase = true) -> {
                                     ButtonConfig("Pending", android.R.color.darker_gray, "NONE", "XRAY_CHEST")
                                 }
-                                status.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
+                                status.equals("POLLING_TIMEOUT", ignoreCase = true) || status.equals("MANUAL_ENTRY", ignoreCase = true) -> {
                                     ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
                                 }
                                 else -> {
-                                    ButtonConfig("TRACK", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
+                                    ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
                                 }
                             }
                         }
@@ -231,22 +231,22 @@ class BenListAdapter(
                                         
                                         if (!isTruenatManual) {
                                             when {
-                                                rifStatus == null || rifStatus.equals("PENDING", ignoreCase = true) || rifStatus.equals("CREATED", ignoreCase = true) || rifStatus.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) -> {
-                                                    binding.btnVitalScreenSecondary.text = "TRACK"
-                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_orange_dark))
-                                                    binding.btnVitalScreenSecondary.isEnabled = isNurse
-                                                    binding.btnVitalScreenSecondary.alpha = if (isNurse) 1.0f else 0.5f
-                                                    binding.btnVitalScreenSecondary.setOnClickListener {
-                                                        clickListener?.onClickOrderAction(item, "COMPLETE_RIF", "MDR_RIF")
-                                                    }
-                                                }
-                                                rifStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || rifStatus.equals("IN_PROGRESS", ignoreCase = true) -> {
+                                                rifStatus == null || rifStatus.equals("PENDING", ignoreCase = true) || rifStatus.equals("CREATED", ignoreCase = true) || rifStatus.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) || rifStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || rifStatus.equals("IN_PROGRESS", ignoreCase = true) -> {
                                                     binding.btnVitalScreenSecondary.text = "Pending"
                                                     binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.darker_gray))
                                                     binding.btnVitalScreenSecondary.isEnabled = false
                                                     binding.btnVitalScreenSecondary.alpha = 0.5f
                                                 }
-                                                rifStatus.equals("FAILED", ignoreCase = true) || rifStatus.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
+                                                rifStatus.equals("FAILED", ignoreCase = true) -> {
+                                                    binding.btnVitalScreenSecondary.text = "Retry Referral"
+                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_red_dark))
+                                                    binding.btnVitalScreenSecondary.isEnabled = canActOnReferral && !retryingBenIds.contains(item.benId)
+                                                    binding.btnVitalScreenSecondary.alpha = if (canActOnReferral && !retryingBenIds.contains(item.benId)) 1.0f else 0.5f
+                                                    binding.btnVitalScreenSecondary.setOnClickListener {
+                                                        clickListener?.onClickOrderAction(item, "RETRY_PUSH", "MDR_RIF")
+                                                    }
+                                                }
+                                                rifStatus.equals("POLLING_TIMEOUT", ignoreCase = true) || rifStatus.equals("MANUAL_ENTRY", ignoreCase = true) -> {
                                                     binding.btnVitalScreenSecondary.text = "Pending"
                                                     binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_orange_dark))
                                                     binding.btnVitalScreenSecondary.isEnabled = canActOnReferral
@@ -270,7 +270,7 @@ class BenListAdapter(
                                             }
                                         } else {
                                             when {
-                                                rifStatus == null || rifStatus.equals("PENDING", ignoreCase = true) || rifStatus.equals("CREATED", ignoreCase = true) || rifStatus.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) -> {
+                                                rifStatus == null || rifStatus.equals("PENDING", ignoreCase = true) || rifStatus.equals("CREATED", ignoreCase = true) || rifStatus.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) || rifStatus.equals("MANUAL_ENTRY", ignoreCase = true) -> {
                                                     binding.btnVitalScreenSecondary.text = "Pending"
                                                     binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_orange_dark))
                                                     binding.btnVitalScreenSecondary.isEnabled = canActOnReferral
@@ -296,14 +296,17 @@ class BenListAdapter(
                                     }
                                     conf
                                 }
-                                status.equals("FAILED", ignoreCase = true) || status.equals("POLLING_TIMEOUT", ignoreCase = true) -> {
+                                status.equals("FAILED", ignoreCase = true) -> {
+                                    ButtonConfig("Retry Referral", android.R.color.holo_red_dark, "RETRY_PUSH", "SPUTUM_TRUENAT")
+                                }
+                                status.equals("POLLING_TIMEOUT", ignoreCase = true) || status.equals("MANUAL_ENTRY", ignoreCase = true) -> {
                                     ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
                                 }
                                 status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PENDING", ignoreCase = true) -> {
                                     ButtonConfig("Pending", android.R.color.darker_gray, "NONE", "SPUTUM_TRUENAT")
                                 }
                                 else -> {
-                                    ButtonConfig("TRACK", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
+                                     ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
                                 }
                             }
                         }
@@ -351,6 +354,23 @@ class BenListAdapter(
                     } else {
                         (binding.btnVitalScreen.icon as? androidx.swiperefreshlayout.widget.CircularProgressDrawable)?.stop()
                         binding.btnVitalScreen.icon = null
+                    }
+
+                    val isSecondaryRetryInFlight = binding.btnVitalScreenSecondary.visibility == View.VISIBLE &&
+                            binding.btnVitalScreenSecondary.text == "Retry Referral" &&
+                            retryingBenIds.contains(item.benId)
+                    if (isSecondaryRetryInFlight) {
+                        binding.btnVitalScreenSecondary.isEnabled = false
+                        binding.btnVitalScreenSecondary.alpha = 1.0f
+                        binding.btnVitalScreenSecondary.icon = androidx.swiperefreshlayout.widget.CircularProgressDrawable(binding.root.context).apply {
+                            setStyle(androidx.swiperefreshlayout.widget.CircularProgressDrawable.DEFAULT)
+                            setColorSchemeColors(android.graphics.Color.WHITE)
+                            start()
+                        }
+                        binding.btnVitalScreenSecondary.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
+                    } else {
+                        (binding.btnVitalScreenSecondary.icon as? androidx.swiperefreshlayout.widget.CircularProgressDrawable)?.stop()
+                        binding.btnVitalScreenSecondary.icon = null
                     }
 
                     fun formatDenialReason(reason: String?, other: String?): String {
@@ -480,11 +500,7 @@ class BenListAdapter(
                                             }
                                         }
                                         status.equals("FAILED", ignoreCase = true) -> {
-                                            if (tbDiag?.trueNatOrderId.isNullOrBlank()) {
-                                                "Status: TrueNat Order Push Failed (Retry Required)"
-                                            } else {
-                                                "Status: Referred for TrueNat\nMTB Result Status: Sync Failed (Retry Required)"
-                                            }
+                                            "Status: Referred for TrueNat"
                                         }
                                         else -> "Status: Referred for TrueNat"
                                     }

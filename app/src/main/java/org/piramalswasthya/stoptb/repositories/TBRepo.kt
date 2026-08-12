@@ -2128,6 +2128,7 @@ class TBRepo @Inject constructor(
                             val pollingTimedOutList = mutableListOf<Long>()
                             val failedList = mutableListOf<Long>()
                             val refusedList = mutableListOf<Long>()
+                            val awaitingManualEntryList = mutableListOf<Long>()
 
                             dataObj?.optJSONArray("awaitingTestCompletion")?.let { arr ->
                                 for (i in 0 until arr.length()) {
@@ -2157,6 +2158,11 @@ class TBRepo @Inject constructor(
                             dataObj?.optJSONArray("refused")?.let { arr ->
                                 for (i in 0 until arr.length()) {
                             refusedList.add(arr.getLong(i))
+                                }
+                            }
+                            dataObj?.optJSONArray("awaitingManualEntry")?.let { arr ->
+                                for (i in 0 until arr.length()) {
+                                    awaitingManualEntryList.add(arr.getLong(i))
                                 }
                             }
 
@@ -2378,6 +2384,39 @@ class TBRepo @Inject constructor(
                                     }
                                 }
                             }
+
+                            // 6. Awaiting Manual Entry
+                            for (regId in awaitingManualEntryList) {
+                                val ben = benDao.getBenByRegId(regId) ?: benDao.getBen(regId)
+                                ben?.let { b ->
+                                    val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
+                                     val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
+                                     val isDone = currentStatus.equals("COMPLETED", ignoreCase = true)
+                                     if (!isDone) {
+                                         val cache = (existing ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
+                                             if (isXray) {
+                                                 it.copy(
+                                                     xrayOrderStatus = "MANUAL_ENTRY",
+                                                     isReferredForDigitalChestXray = true,
+                                                     syncState = SyncState.SYNCED
+                                                 )
+                                             } else if (isRif) {
+                                                 it.copy(
+                                                     rifOrderStatus = "MANUAL_ENTRY",
+                                                     syncState = SyncState.SYNCED
+                                                 )
+                                             } else {
+                                                 it.copy(
+                                                     trueNatOrderStatus = "MANUAL_ENTRY",
+                                                     isSputumCollected = true,
+                                                     syncState = SyncState.SYNCED
+                                                 )
+                                             }
+                                         }
+                                         tbDao.saveTbDiagnostics(cache)
+                                     }
+                                }
+                            }
  
                             val resultData = DiagnosticBeneficiaryStatusData(
                                 awaitingTestCompletion = awaitingTestCompList,
@@ -2385,7 +2424,8 @@ class TBRepo @Inject constructor(
                                 completed = completedList,
                                 pollingTimedOut = pollingTimedOutList,
                                 failed = failedList,
-                                refused = refusedList
+                                refused = refusedList,
+                                awaitingManualEntry = awaitingManualEntryList
                             )
                             return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(resultData)
                         } else {

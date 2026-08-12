@@ -313,7 +313,10 @@ class TBSuspectedQuickDataset(
         }
 
         // ── Sputum Collection ──────────────────────────────────────────────
-        referredForSputumCollection.value = boolToYesNo(if (isTruenatDeviceIntegrated && referralType == 7) true else saved?.isSputumCollected)
+        val isMtbManualState = saved?.trueNatOrderStatus.equals("POLLING_TIMEOUT", ignoreCase = true) ||
+                saved?.trueNatOrderStatus.equals("FAILED", ignoreCase = true) ||
+                saved?.trueNatOrderStatus.equals("MANUAL_ENTRY", ignoreCase = true)
+        referredForSputumCollection.value = boolToYesNo(if (isTruenatDeviceIntegrated && referralType == 7 && !isMtbManualState) true else saved?.isSputumCollected)
         reasonForDenialSputum.value = englishPipeToIndexPipe(
             saved?.reasonForDenialSputum, R.array.tb_reason_for_denial_sputum
         )
@@ -558,10 +561,22 @@ class TBSuspectedQuickDataset(
                     if (sputumSampleSubmittedAt.value.isNullOrBlank()) {
                         sputumSampleSubmittedAt.value = sputumSampleSubmittedAt.entries?.firstOrNull()
                     }
+                    val addItems = mutableListOf<FormElement>(sputumSampleSubmittedAt)
+                    if (shouldShowTrueNatConducted()) {
+                        addItems.add(trueNatConducted)
+                        if (isYes(trueNatConducted)) {
+                            addItems.add(trueNatResult)
+                        } else if (!trueNatConducted.value.isNullOrBlank() && !isYes(trueNatConducted)) {
+                            addItems.add(reasonNotConductedNaat)
+                            if (isLastItemSelectedDropdown(reasonNotConductedNaat, R.array.tb_reason_not_conducted_naat)) {
+                                addItems.add(reasonNotConductedNaatOther)
+                            }
+                        }
+                    }
                     triggerDependants(
                         source = referredForSputumCollection,
                         removeItems = listOf(reasonForDenialSputum, reasonForDenialSputumOther),
-                        addItems = listOf(sputumSampleSubmittedAt)
+                        addItems = addItems
                     )
                 } else {
                     // No: show denial (default to Patient refused if blank), conditionally remove NAAT
@@ -963,6 +978,8 @@ class TBSuspectedQuickDataset(
     private fun syncFieldStates() {
         val isXrayDevIntegrated = preferenceDao.getXrayIntegrated()
         val isTruenatDevIntegrated = preferenceDao.getTruenatIntegrated()
+        val xrayStatus = diagnosticsCache?.xrayOrderStatus
+        val isXrayFailed = xrayStatus.equals("FAILED", ignoreCase = true)
 
         // Referral for X-Ray — not shown for pregnant women
         if (referralType == 6) {
@@ -996,8 +1013,8 @@ class TBSuspectedQuickDataset(
         }
 
         // Conducted
-        digitalChestXrayConducted.isEnabled = shouldShowDigitalChestXray() && !lockDigitalChestXray
-        digitalChestXrayConducted.required = shouldShowDigitalChestXray() && !lockDigitalChestXray
+        digitalChestXrayConducted.isEnabled = shouldShowDigitalChestXray() && !lockDigitalChestXray && !isXrayFailed
+        digitalChestXrayConducted.required = shouldShowDigitalChestXray() && !lockDigitalChestXray && !isXrayFailed
         if (!shouldShowDigitalChestXray()) resetField(digitalChestXrayConducted)
 
         // Not-conducted reason for X-Ray
@@ -1030,27 +1047,33 @@ class TBSuspectedQuickDataset(
         }
 
         // X-Ray result
-        val xrayStatus = diagnosticsCache?.xrayOrderStatus
         val isXrayCompleted = xrayStatus.equals("COMPLETED", ignoreCase = true) || !diagnosticsCache?.chestXRayResult.isNullOrBlank()
         val isXrayWaiting = isXrayDevIntegrated && preferenceDao.isCampHubConnected() && referralType == 6 &&
             !xrayStatus.equals("POLLING_TIMEOUT", ignoreCase = true) &&
             !xrayStatus.equals("FAILED", ignoreCase = true) &&
+            !xrayStatus.equals("MANUAL_ENTRY", ignoreCase = true) &&
             !isXrayCompleted
 
-        if (isXrayWaiting || isXrayCompleted) {
+        if (isXrayWaiting || isXrayCompleted || isXrayFailed) {
             digitalChestXrayResult.inputType = InputType.TEXT_VIEW
             digitalChestXrayResult.isEnabled = false
             digitalChestXrayResult.required = false
             if (isYes(digitalChestXrayConducted)) {
                 if (isXrayCompleted) {
                     digitalChestXrayResult.value = if (diagnosticsCache?.chestXRayResult.isNullOrBlank()) "Waiting for Result" else (getLocalValueInArray(R.array.tb_test_result, diagnosticsCache?.chestXRayResult) ?: diagnosticsCache?.chestXRayResult)
+                } else if (isXrayFailed) {
+                    digitalChestXrayResult.value = "Referral Failed"
                 } else {
                     if (digitalChestXrayResult.value.isNullOrBlank() || digitalChestXrayResult.value == "Waiting for Result") {
                         digitalChestXrayResult.value = "Waiting for Result"
                     }
                 }
             } else {
-                resetField(digitalChestXrayResult)
+                if (isXrayFailed) {
+                    digitalChestXrayResult.value = "Referral Failed"
+                } else {
+                    resetField(digitalChestXrayResult)
+                }
             }
         } else {
             digitalChestXrayResult.inputType = InputType.RADIO
@@ -1063,7 +1086,12 @@ class TBSuspectedQuickDataset(
 
         // Sputum section
         val sputumVisible = referralType == 7 || shouldShowSputumCollected()
-        if (isTruenatDevIntegrated && referralType == 7) {
+        val currentMtbStatus = diagnosticsCache?.trueNatOrderStatus
+        val isMtbManualState = currentMtbStatus.equals("POLLING_TIMEOUT", ignoreCase = true) ||
+                currentMtbStatus.equals("FAILED", ignoreCase = true) ||
+                currentMtbStatus.equals("MANUAL_ENTRY", ignoreCase = true)
+
+        if (isTruenatDevIntegrated && referralType == 7 && !isMtbManualState) {
             referredForSputumCollection.value = yesValue
             referredForSputumCollection.isEnabled = false
             referredForSputumCollection.required = false
@@ -1098,8 +1126,10 @@ class TBSuspectedQuickDataset(
         }
 
         // TrueNAT
-        trueNatConducted.isEnabled = shouldShowTrueNatConducted() && !lockTrueNat
-        trueNatConducted.required = shouldShowTrueNatConducted() && !lockTrueNat
+        val mtbStatus = diagnosticsCache?.trueNatOrderStatus
+        val isMtbFailed = mtbStatus.equals("FAILED", ignoreCase = true)
+        trueNatConducted.isEnabled = shouldShowTrueNatConducted() && !lockTrueNat && !isMtbFailed
+        trueNatConducted.required = shouldShowTrueNatConducted() && !lockTrueNat && !isMtbFailed
         if (!shouldShowTrueNatConducted()) resetField(trueNatConducted)
 
         val naatConductedNo = !trueNatConducted.value.isNullOrBlank() && !isYes(trueNatConducted)
@@ -1125,27 +1155,33 @@ class TBSuspectedQuickDataset(
             reasonNotConductedNaatOther.errorText = null
         }
 
-        val mtbStatus = diagnosticsCache?.trueNatOrderStatus
         val isMtbCompleted = mtbStatus.equals("COMPLETED", ignoreCase = true) || !diagnosticsCache?.naatResult.isNullOrBlank()
         val isMtbWaiting = isTruenatDevIntegrated && preferenceDao.isCampHubConnected() && referralType == 7 &&
             !mtbStatus.equals("POLLING_TIMEOUT", ignoreCase = true) &&
             !mtbStatus.equals("FAILED", ignoreCase = true) &&
+            !mtbStatus.equals("MANUAL_ENTRY", ignoreCase = true) &&
             !isMtbCompleted
 
-        if (isMtbWaiting || isMtbCompleted) {
+        if (isMtbWaiting || isMtbCompleted || isMtbFailed) {
             trueNatResult.inputType = InputType.TEXT_VIEW
             trueNatResult.isEnabled = false
             trueNatResult.required = false
             if (isYes(trueNatConducted)) {
                 if (isMtbCompleted) {
                     trueNatResult.value = if (diagnosticsCache?.naatResult.isNullOrBlank()) "Waiting for Result" else (getLocalValueInArray(R.array.tb_test_result, diagnosticsCache?.naatResult) ?: diagnosticsCache?.naatResult)
+                } else if (isMtbFailed) {
+                    trueNatResult.value = "Referral Failed"
                 } else {
                     if (trueNatResult.value.isNullOrBlank() || trueNatResult.value == "Waiting for Result") {
                         trueNatResult.value = "Waiting for Result"
                     }
                 }
             } else {
-                resetField(trueNatResult)
+                if (isMtbFailed) {
+                    trueNatResult.value = "Referral Failed"
+                } else {
+                    resetField(trueNatResult)
+                }
             }
         } else {
             trueNatResult.inputType = InputType.RADIO
@@ -1162,8 +1198,10 @@ class TBSuspectedQuickDataset(
         } else {
             isMtbDetected()
         }
-        rifConducted.isEnabled = showRif && !lockRif
-        rifConducted.required = showRif && !lockRif
+        val rifStatus = diagnosticsCache?.rifOrderStatus
+        val isRifFailed = rifStatus.equals("FAILED", ignoreCase = true)
+        rifConducted.isEnabled = showRif && !lockRif && !isRifFailed
+        rifConducted.required = showRif && !lockRif && !isRifFailed
         if (!showRif) {
             resetField(rifConducted)
         }
@@ -1181,14 +1219,14 @@ class TBSuspectedQuickDataset(
             reasonNotConductedRifOther.errorText = null
         }
 
-        val rifStatus = diagnosticsCache?.rifOrderStatus
         val isRifCompleted = rifStatus.equals("COMPLETED", ignoreCase = true) || !diagnosticsCache?.trueNatRifResult.isNullOrBlank()
         val isRifWaiting = isTruenatDevIntegrated && preferenceDao.isCampHubConnected() && referralType == 7 &&
             !rifStatus.equals("POLLING_TIMEOUT", ignoreCase = true) &&
             !rifStatus.equals("FAILED", ignoreCase = true) &&
+            !rifStatus.equals("MANUAL_ENTRY", ignoreCase = true) &&
             !isRifCompleted
 
-        if (isRifWaiting || isRifCompleted) {
+        if (isRifWaiting || isRifCompleted || isRifFailed) {
             trueNatRifResult.inputType = InputType.TEXT_VIEW
             trueNatRifResult.isEnabled = false
             trueNatRifResult.required = false
@@ -1196,13 +1234,19 @@ class TBSuspectedQuickDataset(
             if (showRifResult) {
                 if (isRifCompleted) {
                     trueNatRifResult.value = if (diagnosticsCache?.trueNatRifResult.isNullOrBlank()) "Waiting for Result" else (getLocalValueInArray(R.array.tb_truenat_rif_result, diagnosticsCache?.trueNatRifResult) ?: diagnosticsCache?.trueNatRifResult)
+                } else if (isRifFailed) {
+                    trueNatRifResult.value = "Referral Failed"
                 } else {
                     if (trueNatRifResult.value.isNullOrBlank() || trueNatRifResult.value == "Waiting for Result") {
                         trueNatRifResult.value = "Waiting for Result"
                     }
                 }
             } else {
-                resetField(trueNatRifResult)
+                if (isRifFailed) {
+                    trueNatRifResult.value = "Referral Failed"
+                } else {
+                    resetField(trueNatRifResult)
+                }
             }
         } else {
             trueNatRifResult.inputType = InputType.RADIO
@@ -1256,13 +1300,8 @@ class TBSuspectedQuickDataset(
 
     /** TrueNAT shown when xray positive, sputum referred, history of TB, anti-TB drugs, or pregnant */
     private fun shouldShowTrueNatConducted(): Boolean =
-        (referralMode || referralType == 0 || referralType == 7) && (
-            isPositive(digitalChestXrayResult.value) ||
-            isYes(referredForSputumCollection) ||
-            screeningCache?.takingAntiTBDrugs == true ||
-            screeningCache?.historyOfTb == true ||
-            isPregnant()
-        )
+        (referralMode || referralType == 0 || referralType == 7) &&
+        isYes(referredForSputumCollection)
 
     /** Liquid Culture shown when both history of TB AND taking anti-TB drugs */
     private fun shouldShowLiquidCultureConducted(): Boolean =
