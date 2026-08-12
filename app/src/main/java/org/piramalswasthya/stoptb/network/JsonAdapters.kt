@@ -478,7 +478,8 @@ data class DiagnosticBeneficiaryStatusData(
     val completed: List<Long>? = emptyList(),
     val pollingTimedOut: List<Long>? = emptyList(),
     val failed: List<Long>? = emptyList(),
-    val refused: List<Long>? = emptyList()
+    val refused: List<Long>? = emptyList(),
+    val awaitingManualEntry: List<Long>? = emptyList()
 )
 
 data class DiagnosticBeneficiariesStatusResponse(
