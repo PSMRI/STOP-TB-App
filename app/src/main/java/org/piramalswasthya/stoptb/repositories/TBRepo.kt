@@ -1957,6 +1957,26 @@ class TBRepo @Inject constructor(
                                 }
                             }
                             tbDao.saveTbDiagnostics(cache)
+
+                            try {
+                                val existingSuspected = tbDao.getTbSuspected(benId)
+                                if (existingSuspected != null) {
+                                    val updatedSuspected = existingSuspected.copy(
+                                        isChestXRayDone = cache.isChestXRayDone ?: existingSuspected.isChestXRayDone,
+                                        chestXRayResult = cache.chestXRayResult ?: existingSuspected.chestXRayResult,
+                                        isSputumCollected = cache.isSputumCollected ?: existingSuspected.isSputumCollected,
+                                        isNaatConducted = cache.isNaatConducted ?: existingSuspected.isNaatConducted,
+                                        naatResult = cache.naatResult ?: existingSuspected.naatResult,
+                                        isTBConfirmed = cache.isTBConfirmed ?: existingSuspected.isTBConfirmed,
+                                        isConfirmed = cache.isConfirmed || existingSuspected.isConfirmed,
+                                        mdrRifResult = cache.trueNatRifResult ?: existingSuspected.mdrRifResult,
+                                        syncState = SyncState.UNSYNCED
+                                    )
+                                    tbDao.saveTbSuspected(updatedSuspected)
+                                }
+                            } catch (e: Exception) {
+                                Timber.e(e, "Failed to sync diagnostic results into tb_suspected table")
+                            }
                             
                             return@withContext NetworkResponse.Success(status)
                         } else {

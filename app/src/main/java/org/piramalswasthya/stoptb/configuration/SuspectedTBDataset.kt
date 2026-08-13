@@ -187,6 +187,18 @@ class SuspectedTBDataset(
             }
         }
 
+        diagnostics?.let { diag ->
+            if (!diag.chestXRayResult.isNullOrBlank()) {
+                digitalChestXRayConducted.value = yesValue
+                digitalChestXRayResult.value = getLocalValueInArray(R.array.tb_test_result, diag.chestXRayResult) ?: diag.chestXRayResult
+            }
+            if (!diag.naatResult.isNullOrBlank()) {
+                sputumCollected.value = yesValue
+                naatConducted.value = yesValue
+                naatResult.value = getLocalValueInArray(R.array.tb_truenat_mtb_result, diag.naatResult) ?: diag.naatResult
+            }
+        }
+
         syncFieldStates()
         applyResultPlaceholders()
         setUpPage(buildFormList())
@@ -523,18 +535,20 @@ class SuspectedTBDataset(
 
     private fun prefillFromDiagnostics(diagnostics: TBDiagnosticsCache?) {
         diagnostics ?: return
-        sputumCollected.value = boolToYesNo(diagnostics.isSputumCollected)
+        val isSputumCollectedVal = diagnostics.isSputumCollected == true || !diagnostics.naatResult.isNullOrBlank()
+        sputumCollected.value = boolToYesNo(if (isSputumCollectedVal) true else diagnostics.isSputumCollected)
         sputumSubmittedAt.value = getLocalValueInArray(
             R.array.tb_diagnostics_sputum_submitted_at,
             diagnostics.sputumSubmittedAt
         )
-        digitalChestXRayConducted.value = boolToYesNo(diagnostics.isChestXRayDone)
-        digitalChestXRayResult.value = mapToPositiveNegative(diagnostics.chestXRayResult)
+        val isXrayDone = diagnostics.isChestXRayDone == true || !diagnostics.chestXRayResult.isNullOrBlank()
+        digitalChestXRayConducted.value = boolToYesNo(if (isXrayDone) true else diagnostics.isChestXRayDone)
+        digitalChestXRayResult.value = getLocalValueInArray(R.array.tb_test_result, diagnostics.chestXRayResult) ?: diagnostics.chestXRayResult
+        val isNaatDone = diagnostics.isNaatConducted == true || !diagnostics.naatResult.isNullOrBlank()
         naatConducted.value = boolToYesNo(
-            diagnostics.isNaatConducted ?: diagnostics.chestXRayResult.isPositiveTestResult()
-                .takeIf { it }
+            if (isNaatDone) true else (diagnostics.isNaatConducted ?: diagnostics.chestXRayResult.isPositiveTestResult().takeIf { it })
         )
-        naatResult.value = mapToPositiveNegative(diagnostics.naatResult)
+        naatResult.value = getLocalValueInArray(R.array.tb_truenat_mtb_result, diagnostics.naatResult) ?: diagnostics.naatResult
         liquidCultureConducted.value = boolToYesNo(
             diagnostics.isLiquidCultureConducted ?: diagnostics.recommendedForLiquidCultureTest
         )
@@ -544,7 +558,10 @@ class SuspectedTBDataset(
 
     private fun prefillMissingFromDiagnostics(diagnostics: TBDiagnosticsCache?) {
         diagnostics ?: return
-        if (sputumCollected.value.isNullOrBlank()) sputumCollected.value = boolToYesNo(diagnostics.isSputumCollected)
+        if (sputumCollected.value.isNullOrBlank()) {
+            val isSputumCollectedVal = diagnostics.isSputumCollected == true || !diagnostics.naatResult.isNullOrBlank()
+            sputumCollected.value = boolToYesNo(if (isSputumCollectedVal) true else diagnostics.isSputumCollected)
+        }
         if (sputumSubmittedAt.value.isNullOrBlank()) {
             sputumSubmittedAt.value = getLocalValueInArray(
                 R.array.tb_diagnostics_sputum_submitted_at,
@@ -552,19 +569,20 @@ class SuspectedTBDataset(
             )
         }
         if (digitalChestXRayConducted.value.isNullOrBlank()) {
-            digitalChestXRayConducted.value = boolToYesNo(diagnostics.isChestXRayDone)
+            val isXrayDone = diagnostics.isChestXRayDone == true || !diagnostics.chestXRayResult.isNullOrBlank()
+            digitalChestXRayConducted.value = boolToYesNo(if (isXrayDone) true else diagnostics.isChestXRayDone)
         }
         if (digitalChestXRayResult.value.isNullOrBlank()) {
-            digitalChestXRayResult.value = mapToPositiveNegative(diagnostics.chestXRayResult)
+            digitalChestXRayResult.value = getLocalValueInArray(R.array.tb_test_result, diagnostics.chestXRayResult) ?: diagnostics.chestXRayResult
         }
         if (naatConducted.value.isNullOrBlank()) {
+            val isNaatDone = diagnostics.isNaatConducted == true || !diagnostics.naatResult.isNullOrBlank()
             naatConducted.value = boolToYesNo(
-                diagnostics.isNaatConducted ?: diagnostics.chestXRayResult.isPositiveTestResult()
-                    .takeIf { it }
+                if (isNaatDone) true else (diagnostics.isNaatConducted ?: diagnostics.chestXRayResult.isPositiveTestResult().takeIf { it })
             )
         }
         if (naatResult.value.isNullOrBlank()) {
-            naatResult.value = mapToPositiveNegative(diagnostics.naatResult)
+            naatResult.value = getLocalValueInArray(R.array.tb_truenat_mtb_result, diagnostics.naatResult) ?: diagnostics.naatResult
         }
         if (liquidCultureConducted.value.isNullOrBlank()) {
             liquidCultureConducted.value = boolToYesNo(
@@ -603,19 +621,31 @@ class SuspectedTBDataset(
         else -> "Waiting for Result" // PENDING, CREATED, AWAITING_TEST_COMPLETION, AWAITING_PROVIDER_RESULT, POLLING_TIMEOUT, MANUAL_ENTRY
     }
 
-    // Runs after syncFieldStates() so its resetField() calls can't clobber the placeholder.
     private fun applyResultPlaceholders() {
-        if (digitalChestXRayResult.value.isNullOrBlank()) {
+        val chestResultStr = diagnosticsCache?.chestXRayResult
+        if (!chestResultStr.isNullOrBlank()) {
+            digitalChestXRayResult.inputType = InputType.TEXT_VIEW
+            digitalChestXRayResult.value = getLocalValueInArray(R.array.tb_test_result, chestResultStr) ?: chestResultStr
+        } else if (digitalChestXRayResult.value.isNullOrBlank()) {
             resultPlaceholder(diagnosticsCache?.xrayOrderStatus)?.let {
                 digitalChestXRayResult.inputType = InputType.TEXT_VIEW
                 digitalChestXRayResult.value = it
             }
+        } else {
+            digitalChestXRayResult.inputType = InputType.RADIO
         }
-        if (naatResult.value.isNullOrBlank()) {
+
+        val mtbResultStr = diagnosticsCache?.naatResult
+        if (!mtbResultStr.isNullOrBlank()) {
+            naatResult.inputType = InputType.TEXT_VIEW
+            naatResult.value = getLocalValueInArray(R.array.tb_truenat_mtb_result, mtbResultStr) ?: mtbResultStr
+        } else if (naatResult.value.isNullOrBlank()) {
             resultPlaceholder(diagnosticsCache?.trueNatOrderStatus)?.let {
                 naatResult.inputType = InputType.TEXT_VIEW
                 naatResult.value = it
             }
+        } else {
+            naatResult.inputType = InputType.RADIO
         }
     }
 

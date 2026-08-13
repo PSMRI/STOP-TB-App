@@ -300,23 +300,23 @@ class TBSuspectedQuickDataset(
         )
         reasonNotConductedChestXrayOther.value = saved?.reasonNotConductedChestXrayOther
         
-        if (isXrayDeviceIntegrated && referralType == 6 && isYes(digitalChestXrayConducted)) {
+        if (!saved?.chestXRayResult.isNullOrBlank()) {
             digitalChestXrayResult.inputType = InputType.TEXT_VIEW
-            digitalChestXrayResult.value = if (saved?.chestXRayResult.isNullOrBlank()) "Waiting for Result" else (getLocalValueInArray(R.array.tb_test_result, saved?.chestXRayResult) ?: saved?.chestXRayResult)
+            digitalChestXrayResult.value = getLocalValueInArray(R.array.tb_test_result, saved?.chestXRayResult) ?: saved?.chestXRayResult
+        } else if (isXrayDeviceIntegrated && referralType == 6 && isYes(digitalChestXrayConducted)) {
+            digitalChestXrayResult.inputType = InputType.TEXT_VIEW
+            digitalChestXrayResult.value = "Waiting for Result"
         } else {
             digitalChestXrayResult.inputType = InputType.RADIO
-            digitalChestXrayResult.value = when {
-                saved?.chestXRayResult.isNullOrBlank() -> null
-                isPositive(saved?.chestXRayResult) -> digitalChestXrayResult.entries?.getOrNull(0)
-                else -> digitalChestXrayResult.entries?.getOrNull(1)
-            }
+            digitalChestXrayResult.value = null
         }
 
         // ── Sputum Collection ──────────────────────────────────────────────
         val isMtbManualState = saved?.trueNatOrderStatus.equals("POLLING_TIMEOUT", ignoreCase = true) ||
                 saved?.trueNatOrderStatus.equals("FAILED", ignoreCase = true) ||
                 saved?.trueNatOrderStatus.equals("MANUAL_ENTRY", ignoreCase = true)
-        referredForSputumCollection.value = boolToYesNo(if (isTruenatDeviceIntegrated && referralType == 7 && !isMtbManualState) true else saved?.isSputumCollected)
+        val isSputumCollectedVal = saved?.isSputumCollected == true || !saved?.naatResult.isNullOrBlank()
+        referredForSputumCollection.value = boolToYesNo(if (isTruenatDeviceIntegrated && referralType == 7 && !isMtbManualState) true else isSputumCollectedVal)
         reasonForDenialSputum.value = englishPipeToIndexPipe(
             saved?.reasonForDenialSputum, R.array.tb_reason_for_denial_sputum
         )
@@ -326,36 +326,44 @@ class TBSuspectedQuickDataset(
         )
 
         // ── TrueNAT ───────────────────────────────────────────────────────
-        trueNatConducted.value = boolToYesNo(saved?.isNaatConducted)
+        val isTrueNatDone = saved?.isNaatConducted == true || !saved?.naatResult.isNullOrBlank()
+        trueNatConducted.value = boolToYesNo(if (isTrueNatDone) true else saved?.isNaatConducted)
         reasonNotConductedNaat.value = getLocalValueInArray(
             R.array.tb_reason_not_conducted_naat, saved?.reasonNotConductedNaat
         )
         reasonNotConductedNaatOther.value = saved?.reasonNotConductedNaatOther
 
-        if (isTruenatDeviceIntegrated && referralType == 7 && isYes(trueNatConducted)) {
+        if (!saved?.naatResult.isNullOrBlank()) {
             trueNatResult.inputType = InputType.TEXT_VIEW
-            trueNatResult.value = if (saved?.naatResult.isNullOrBlank()) "Waiting for Result" else getLocalValueInArray(R.array.tb_truenat_mtb_result, saved?.naatResult)
+            trueNatResult.value = getLocalValueInArray(R.array.tb_truenat_mtb_result, saved?.naatResult) ?: saved?.naatResult
+        } else if (isTruenatDeviceIntegrated && referralType == 7 && isYes(trueNatConducted)) {
+            trueNatResult.inputType = InputType.TEXT_VIEW
+            trueNatResult.value = "Waiting for Result"
         } else {
             trueNatResult.inputType = InputType.RADIO
-            trueNatResult.value = getLocalValueInArray(R.array.tb_truenat_mtb_result, saved?.naatResult)
+            trueNatResult.value = null
         }
 
         // ── RIF Conducted & Results ───────────────────────────────────────
         val isRifConductedVal = saved?.rifOrderStatus.equals("COMPLETED", ignoreCase = true) ||
                 saved?.rifOrderStatus.equals("IN_PROGRESS", ignoreCase = true) ||
-                saved?.rifOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true)
+                saved?.rifOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) ||
+                !saved?.trueNatRifResult.isNullOrBlank()
         rifConducted.value = boolToYesNo(if (isRifConductedVal) true else if (saved?.rifOrderStatus.equals("NOT_CONDUCTED", ignoreCase = true)) false else null)
         reasonNotConductedRif.value = getLocalValueInArray(
             R.array.tb_reason_not_conducted_naat, preferenceDao.getRifNotConductedReason(ben?.beneficiaryId ?: saved?.benId ?: 0L)
         )
         reasonNotConductedRifOther.value = saved?.reasonNotConductedChestXrayOther // Wait, this doesn't matter since we don't have separate table column, but let's load it if we need to.
 
-        if (isTruenatDeviceIntegrated && referralType == 7 && isYes(rifConducted)) {
+        if (!saved?.trueNatRifResult.isNullOrBlank()) {
             trueNatRifResult.inputType = InputType.TEXT_VIEW
-            trueNatRifResult.value = if (saved?.trueNatRifResult.isNullOrBlank()) "Waiting for Result" else getLocalValueInArray(R.array.tb_truenat_rif_result, saved?.trueNatRifResult)
+            trueNatRifResult.value = getLocalValueInArray(R.array.tb_truenat_rif_result, saved?.trueNatRifResult) ?: saved?.trueNatRifResult
+        } else if (isTruenatDeviceIntegrated && referralType == 7 && isYes(rifConducted)) {
+            trueNatRifResult.inputType = InputType.TEXT_VIEW
+            trueNatRifResult.value = "Waiting for Result"
         } else {
             trueNatRifResult.inputType = InputType.RADIO
-            trueNatRifResult.value = getLocalValueInArray(R.array.tb_truenat_rif_result, saved?.trueNatRifResult)
+            trueNatRifResult.value = null
         }
 
         // ── Liquid Culture ────────────────────────────────────────────────
@@ -1168,7 +1176,7 @@ class TBSuspectedQuickDataset(
             trueNatResult.required = false
             if (isYes(trueNatConducted)) {
                 if (isMtbCompleted) {
-                    trueNatResult.value = if (diagnosticsCache?.naatResult.isNullOrBlank()) "Waiting for Result" else (getLocalValueInArray(R.array.tb_test_result, diagnosticsCache?.naatResult) ?: diagnosticsCache?.naatResult)
+                    trueNatResult.value = if (diagnosticsCache?.naatResult.isNullOrBlank()) "Waiting for Result" else (getLocalValueInArray(R.array.tb_truenat_mtb_result, diagnosticsCache?.naatResult) ?: diagnosticsCache?.naatResult)
                 } else if (isMtbFailed) {
                     trueNatResult.value = "Referral Failed"
                 } else {
