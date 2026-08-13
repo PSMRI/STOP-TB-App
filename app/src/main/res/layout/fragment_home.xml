@@ -64,15 +64,20 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:ellipsize="end"
                     android:fontFamily="@font/roboto_medium"
+                    android:maxLines="2"
                     android:text="@string/quick_refresh_not_updated"
                     android:textColor="?attr/colorPrimary"
-                    android:textSize="13sp" />
+                    android:textSize="13sp"
+                    tools:text="" />
 
                 <TextView
                     android:id="@+id/btn_quick_refresh"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/padding_small"
+                    android:layout_marginEnd="8dp"
                     android:background="@drawable/bg_quick_refresh_button"
                     android:fontFamily="@font/roboto_bold"
                     android:gravity="center"
