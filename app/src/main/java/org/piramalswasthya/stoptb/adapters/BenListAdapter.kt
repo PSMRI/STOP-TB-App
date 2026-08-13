@@ -213,9 +213,9 @@ class BenListAdapter(
                             val isHubConnected = pref?.isCampHubConnected() == true
                             val isTruenatDevIntegrated = pref?.getTruenatIntegrated() == true
                             val isTruenatManual = !isTruenatDevIntegrated || !isHubConnected
-                            
+
                             binding.btnVitalScreenSecondary.visibility = View.GONE
-                            
+
                             when {
                                 status.equals("REFUSED", ignoreCase = true) || sputumCollected == false -> {
                                     ButtonConfig("TEST REFUSED", android.R.color.darker_gray, "NONE", "SPUTUM_TRUENAT")
@@ -228,7 +228,7 @@ class BenListAdapter(
                                     val conf = ButtonConfig(if (isMtbDetected) "VIEW MTB RESULT" else "VIEW RESULT", android.R.color.holo_green_dark, "VIEW", "SPUTUM_TRUENAT")
                                     if (isMtbDetected) {
                                         binding.btnVitalScreenSecondary.visibility = View.VISIBLE
-                                        
+
                                         if (!isTruenatManual) {
                                             when {
                                                 rifStatus == null || rifStatus.equals("PENDING", ignoreCase = true) || rifStatus.equals("CREATED", ignoreCase = true) || rifStatus.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) || rifStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || rifStatus.equals("IN_PROGRESS", ignoreCase = true) -> {
@@ -306,7 +306,7 @@ class BenListAdapter(
                                     ButtonConfig("Pending", android.R.color.darker_gray, "NONE", "SPUTUM_TRUENAT")
                                 }
                                 else -> {
-                                     ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
+                                    ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
                                 }
                             }
                         }
@@ -588,12 +588,12 @@ class BenListAdapter(
                     ContextCompat.getColor(binding.root.context, android.R.color.white)
                 )
             }
-            // Examine button — show filled count X/total
+            // Examine button ? show filled count X/total
             // Registrar: Anthropometry + TB Screening
             // Nurse: Diagnosis hidden, so total stays 4
             // Counselling Officer: TB Screening + Contact Follow Up are always required (total = 2);
             // TPT Follow Up becomes a 3rd required item (total = 3) only when this beneficiary's
-            // ClinicalScreeningStatus answer is TPT_ELIGIBLE (see IContactTracingRepository.observeTptEligibleBenIds) —
+            // ClinicalScreeningStatus answer is TPT_ELIGIBLE (see IContactTracingRepository.observeTptEligibleBenIds) ?
             // otherwise FULL_TREATMENT/NO_TREATMENT beneficiaries would incorrectly get stuck at x/3.
             // Others: all 5 forms
             val currentRole = pref?.getLoggedInUser()?.role
@@ -648,7 +648,7 @@ class BenListAdapter(
             binding.llBenDetails4.visibility = View.GONE
             binding.btnAddChildren.visibility = View.GONE
 
-            // Register Wife / Register Husband — Registrar only (hidden for Nurse & Counselling officer)
+            // Register Wife / Register Husband ? Registrar only (hidden for Nurse & Counselling officer)
             val isNurseRole = currentRole.isNurseRole()
             when {
                 !isNurseRole && !isCounsellingOfficer && !item.isNonHH && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded

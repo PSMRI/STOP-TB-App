@@ -264,11 +264,12 @@ interface BenDao {
                 )
             ))
             OR (:source = 7 AND isDeath = 0 AND (
-                reproductiveStatusId = 1
-                OR benId IN (
+                ((reproductiveStatusId = 1 OR benId IN (
                     SELECT v.benId FROM BEN_VITALS v
                     WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%'
-                )
+                )) AND benId IN (
+                    SELECT tbs.benId FROM TB_SCREENING tbs
+                ))
                 OR benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isNaatConducted IS NOT NULL
@@ -404,11 +405,12 @@ interface BenDao {
                 )
             ))
             OR (:source = 7 AND isDeath = 0 AND (
-                reproductiveStatusId = 1
-                OR benId IN (
+                ((reproductiveStatusId = 1 OR benId IN (
                     SELECT v.benId FROM BEN_VITALS v
                     WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%'
-                )
+                )) AND benId IN (
+                    SELECT tbs.benId FROM TB_SCREENING tbs
+                ))
                 OR benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isNaatConducted IS NOT NULL
@@ -544,11 +546,12 @@ interface BenDao {
                 )
             ))
             OR (:source = 7 AND isDeath = 0 AND (
-                reproductiveStatusId = 1
-                OR benId IN (
+                ((reproductiveStatusId = 1 OR benId IN (
                     SELECT v.benId FROM BEN_VITALS v
                     WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%'
-                )
+                )) AND benId IN (
+                    SELECT tbs.benId FROM TB_SCREENING tbs
+                ))
                 OR benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isNaatConducted IS NOT NULL

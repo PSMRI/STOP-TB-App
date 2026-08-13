@@ -554,9 +554,9 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         viewModel.resetOrderActionState()
                         if (state.message.contains("completed", ignoreCase = true) || state.orderType.equals("MDR_RIF", ignoreCase = true)) {
                             if (state.orderType.equals("MDR_RIF", ignoreCase = true)) {
-                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(requireContext(), viewModel.tbRepo.useMockApi)
+                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(requireContext())
                             } else if (state.orderType.equals("SPUTUM_TRUENAT", ignoreCase = true) || state.orderType.equals("MTB_PLUS", ignoreCase = true)) {
-                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext(), viewModel.tbRepo.useMockApi)
+                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext())
                             } else {
                                 org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(requireContext())
                             }
@@ -582,8 +582,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         }
 
         org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(requireContext())
-        org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext(), viewModel.tbRepo.useMockApi)
-        org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(requireContext(), viewModel.tbRepo.useMockApi)
+        org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext())
+        org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(requireContext())
 
         binding.ibSearch.visibility = View.VISIBLE
         binding.ibSearch.setOnClickListener { sttContract.launch(Unit) }

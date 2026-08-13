@@ -664,6 +664,11 @@ data class TBSuspectedDTO(
     var isDRTBConfirmed: Boolean? = null, var isConfirmed: Boolean = false,
     var otherReasonForSuspicion: String? = null,
     var latitude: Double? = null, var longitude: Double? = null, var address: String? = null,
+    var reasonForRefusalXray: String? = null,
+    var reasonForRefusalMTB: String? = null,
+    var reasonForRefusalMDRRIF: String? = null,
+    var reasonForRefusalSputum: String? = null,
+    var mdrRifResult: String? = null,
     var updateDate: String? = null,
 ) {
     fun toCache(): TBSuspectedCache = TBSuspectedCache(
@@ -688,6 +693,11 @@ data class TBSuspectedDTO(
         latitude = latitude,
         longitude = longitude,
         address = address,
+        reasonForRefusalXray = reasonForRefusalXray,
+        reasonForRefusalMTB = reasonForRefusalMTB,
+        reasonForRefusalMDRRIF = reasonForRefusalMDRRIF,
+        reasonForRefusalSputum = reasonForRefusalSputum,
+        mdrRifResult = mdrRifResult,
         serverUpdatedDate = getLongFromDateMultipleSupport(updateDate),
         syncState = SyncState.SYNCED
     )

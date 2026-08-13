@@ -373,11 +373,11 @@ class AllBenViewModel @Inject constructor(
         val existing = tbRepo.getTBDiagnosticsById(benId)
         val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
             if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
-                it.copy(xrayOrderStatus = status, syncState = SyncState.SYNCED)
+                it.copy(xrayOrderStatus = status, syncState = SyncState.UNSYNCED)
             } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
-                it.copy(rifOrderStatus = status, syncState = SyncState.SYNCED)
+                it.copy(rifOrderStatus = status, syncState = SyncState.UNSYNCED)
             } else {
-                it.copy(trueNatOrderStatus = status, syncState = SyncState.SYNCED)
+                it.copy(trueNatOrderStatus = status, syncState = SyncState.UNSYNCED)
             }
         }
         tbRepo.saveTBDiagnostics(cache)
@@ -391,20 +391,20 @@ class AllBenViewModel @Inject constructor(
                 val existing = tbRepo.getTBDiagnosticsById(benId)
                 existing?.let {
                     val cache = if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
-                        it.copy(xrayOrderStatus = "AWAITING_PROVIDER_RESULT", syncState = SyncState.SYNCED)
+                        it.copy(xrayOrderStatus = "AWAITING_PROVIDER_RESULT", syncState = SyncState.UNSYNCED)
                     } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
-                        it.copy(rifOrderStatus = "AWAITING_PROVIDER_RESULT", syncState = SyncState.SYNCED)
+                        it.copy(rifOrderStatus = "AWAITING_PROVIDER_RESULT", syncState = SyncState.UNSYNCED)
                     } else {
-                        it.copy(trueNatOrderStatus = "AWAITING_PROVIDER_RESULT", syncState = SyncState.SYNCED)
+                        it.copy(trueNatOrderStatus = "AWAITING_PROVIDER_RESULT", syncState = SyncState.UNSYNCED)
                     }
                     tbRepo.saveTBDiagnostics(cache)
                 }
                 if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
                     org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(context)
                 } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
-                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context, tbRepo.useMockApi)
+                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context)
                 } else {
-                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context, tbRepo.useMockApi)
+                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context)
                 }
                 _orderActionState.value = OrderActionResult.Success("Result fetch retried successfully.", orderType)
             } else {
@@ -446,13 +446,13 @@ class AllBenViewModel @Inject constructor(
                             xrayOrderStatus = "AWAITING_PROVIDER_RESULT",
                             isChestXRayDone = true,
                             chestXRayResult = null,
-                            syncState = SyncState.SYNCED
+                            syncState = SyncState.UNSYNCED
                         )
                     } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
                         it.copy(
                             rifOrderStatus = "AWAITING_PROVIDER_RESULT",
                             trueNatRifResult = null,
-                            syncState = SyncState.SYNCED
+                            syncState = SyncState.UNSYNCED
                         )
                     } else {
                         it.copy(
@@ -462,7 +462,7 @@ class AllBenViewModel @Inject constructor(
                             rifOrderId = null,
                             rifOrderStatus = null,
                             trueNatRifResult = null,
-                            syncState = SyncState.SYNCED
+                            syncState = SyncState.UNSYNCED
                         )
                     }
                     tbRepo.saveTBDiagnostics(cache)
@@ -471,9 +471,9 @@ class AllBenViewModel @Inject constructor(
                 if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
                     org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(context)
                 } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
-                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context, tbRepo.useMockApi)
+                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context)
                 } else {
-                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context, tbRepo.useMockApi)
+                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context)
                 }
                 
                 _orderActionState.value = OrderActionResult.Success("New order created and workflow restarted.", orderType)

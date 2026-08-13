@@ -237,6 +237,18 @@ class TBScreeningFormViewModel @Inject constructor(
                             if (isIntegrated) {
                                 org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(context)
                             }
+                        } else {
+                            val isIntegrated = tbRepo.isXrayIntegrated()
+                            if (isIntegrated) {
+                                val fresh = tbRepo.getTBDiagnosticsById(benId)
+                                fresh?.let {
+                                    val updated = it.copy(
+                                        xrayOrderStatus = OrderStatus.FAILED.name,
+                                        syncState = SyncState.UNSYNCED
+                                    )
+                                    tbRepo.saveTBDiagnostics(updated)
+                                }
+                            }
                         }
                     }
                 } catch (e: java.lang.Exception) {
@@ -266,7 +278,19 @@ class TBScreeningFormViewModel @Inject constructor(
                                 tbRepo.saveTBDiagnostics(updated)
                             }
                             if (isIntegrated) {
-                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context, tbRepo.useMockApi)
+                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context)
+                            }
+                        } else {
+                            val isIntegrated = tbRepo.isTruenatIntegrated()
+                            if (isIntegrated) {
+                                val fresh = tbRepo.getTBDiagnosticsById(benId)
+                                fresh?.let {
+                                    val updated = it.copy(
+                                        trueNatOrderStatus = OrderStatus.FAILED.name,
+                                        syncState = SyncState.UNSYNCED
+                                    )
+                                    tbRepo.saveTBDiagnostics(updated)
+                                }
                             }
                         }
                     }

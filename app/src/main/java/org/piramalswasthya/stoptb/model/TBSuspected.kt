@@ -56,6 +56,11 @@ data class TBSuspectedCache(
     var address: String? = null,
     var referred: Boolean? = null,
     var followUps: String? = null,
+    var reasonForRefusalXray: String? = null,
+    var reasonForRefusalMTB: String? = null,
+    var reasonForRefusalMDRRIF: String? = null, // spelling matches backend field name exactly
+    var reasonForRefusalSputum: String? = null,
+    var mdrRifResult: String? = null,
     var serverUpdatedDate: Long? = null,
     var syncState: SyncState = SyncState.UNSYNCED,
 ) : FormDataModel {
@@ -91,7 +96,11 @@ data class TBSuspectedCache(
             latitude = latitude,
             longitude = longitude,
             address = address,
-
+            reasonForRefusalXray = reasonForRefusalXray,
+            reasonForRefusalMTB = reasonForRefusalMTB,
+            reasonForRefusalMDRRIF = reasonForRefusalMDRRIF,
+            reasonForRefusalSputum = reasonForRefusalSputum,
+            mdrRifResult = mdrRifResult,
         )
     }
 }
