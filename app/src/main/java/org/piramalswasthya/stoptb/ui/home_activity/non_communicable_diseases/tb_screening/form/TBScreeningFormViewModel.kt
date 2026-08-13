@@ -253,17 +253,6 @@ class TBScreeningFormViewModel @Inject constructor(
                     }
                 } catch (e: java.lang.Exception) {
                     Timber.e(e, "Automatic X-Ray order push failed")
-                    val isIntegrated = tbRepo.isXrayIntegrated()
-                    if (isIntegrated) {
-                        val fresh = tbRepo.getTBDiagnosticsById(benId)
-                        fresh?.let {
-                            val updated = it.copy(
-                                xrayOrderStatus = OrderStatus.FAILED.name,
-                                syncState = SyncState.UNSYNCED
-                            )
-                            tbRepo.saveTBDiagnostics(updated)
-                        }
-                    }
                 }
             }
 
@@ -307,17 +296,6 @@ class TBScreeningFormViewModel @Inject constructor(
                     }
                 } catch (e: java.lang.Exception) {
                     Timber.e(e, "Automatic TrueNat order push failed")
-                    val isIntegrated = tbRepo.isTruenatIntegrated()
-                    if (isIntegrated) {
-                        val fresh = tbRepo.getTBDiagnosticsById(benId)
-                        fresh?.let {
-                            val updated = it.copy(
-                                trueNatOrderStatus = OrderStatus.FAILED.name,
-                                syncState = SyncState.UNSYNCED
-                            )
-                            tbRepo.saveTBDiagnostics(updated)
-                        }
-                    }
                 }
             }
         } catch (e: java.lang.Exception) {
