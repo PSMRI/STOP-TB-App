@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkQuery
@@ -24,6 +25,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class VolunteerHomeFragment : Fragment() {
@@ -43,16 +46,18 @@ class VolunteerHomeFragment : Fragment() {
      */
     private val campHubPrefListener =
         android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == pref.getCampHubConnectedKey() && !pref.isCampHubConnected()
-                && manualHomeRefreshRequested
-            ) {
+            if (key == pref.getCampHubConnectedKey()) {
                 activity?.runOnUiThread {
-                    manualHomeRefreshRequested = false
-                    WorkerUtils.finishManualCampRefresh()
-                    setQuickRefreshButtonEnabled(true)
-                    if (_binding != null) {
+                    if (_binding == null) return@runOnUiThread
+                    if (!pref.isCampHubConnected() && manualHomeRefreshRequested) {
+                        manualHomeRefreshRequested = false
+                        WorkerUtils.finishManualCampRefresh()
+                        setQuickRefreshButtonEnabled(true)
                         binding.tvQuickRefreshStatus.text =
                             getString(R.string.quick_refresh_camp_disconnected)
+                    } else if (pref.isCampHubConnected() && !manualHomeRefreshRequested) {
+                        updateQuickRefreshStatus()
+                        setQuickRefreshButtonEnabled(true)
                     }
                 }
             }
@@ -89,20 +94,41 @@ class VolunteerHomeFragment : Fragment() {
         binding.btnQuickRefresh.setOnClickListener {
             if (manualHomeRefreshRequested || !binding.btnQuickRefresh.isEnabled) return@setOnClickListener
             if (!pref.isCampModeEnabled() || !pref.isCampHubConnected()) {
-                binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_camp_disconnected)
+                val unreachableStatus = getString(
+                    R.string.quick_refresh_ip_not_reachable,
+                    pref.getCampHubUrl()
+                )
+                if (binding.tvQuickRefreshStatus.text.toString() != unreachableStatus) {
+                    binding.tvQuickRefreshStatus.text =
+                        getString(R.string.quick_refresh_camp_disconnected)
+                }
                 setQuickRefreshButtonEnabled(true)
                 return@setOnClickListener
             }
-            manualHomeRefreshRequested = true
             setQuickRefreshButtonEnabled(false)
-            binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_refreshing)
-            manualRefreshWorkIds.clear()
-            manualRefreshWorkIds.addAll(
-                WorkerUtils.startManualCampRefresh(
-                    requireContext().applicationContext,
-                    pref
-                )
-            )
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                val isReachable = pingCampHub()
+                launch(Dispatchers.Main) {
+                    if (!isReachable) {
+                        pref.setCampHubConnected(false)
+                        binding.tvQuickRefreshStatus.text = getString(
+                            R.string.quick_refresh_ip_not_reachable,
+                            pref.getCampHubUrl()
+                        )
+                        setQuickRefreshButtonEnabled(true)
+                        return@launch
+                    }
+                    manualHomeRefreshRequested = true
+                    binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_refreshing)
+                    manualRefreshWorkIds.clear()
+                    manualRefreshWorkIds.addAll(
+                        WorkerUtils.startManualCampRefresh(
+                            requireContext().applicationContext,
+                            pref
+                        )
+                    )
+                }
+            }
         }
 
         WorkManager.getInstance(requireContext().applicationContext)
@@ -191,6 +217,22 @@ class VolunteerHomeFragment : Fragment() {
         binding.btnQuickRefresh.alpha = if (enabled) 1f else 0.55f
     }
 
+    private fun pingCampHub(): Boolean {
+        return try {
+            val url = java.net.URL(pref.getCampHubUrl())
+            val conn = url.openConnection() as java.net.HttpURLConnection
+            conn.connectTimeout = 3000
+            conn.readTimeout = 3000
+            conn.requestMethod = "GET"
+            conn.connect()
+            val code = conn.responseCode
+            conn.disconnect()
+            code in 100..499
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun setUpViewPager() {
         binding.vp2Home.adapter = VolunteerPagerAdapter(this)
         TabLayoutMediator(binding.tlHomeViewpager, binding.vp2Home) { tab, position ->
@@ -205,6 +247,10 @@ class VolunteerHomeFragment : Fragment() {
     override fun onStart() {
         super.onStart()
         pref.addOnPreferenceChangeListener(campHubPrefListener)
+        if (pref.isCampHubConnected() && !manualHomeRefreshRequested) {
+            updateQuickRefreshStatus()
+            setQuickRefreshButtonEnabled(true)
+        }
         activity?.let {
             (it as VolunteerActivity).updateActionBar(
                 R.drawable.ic_home,

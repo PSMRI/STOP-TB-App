@@ -17,7 +17,6 @@ import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.OrderStatus
 import org.piramalswasthya.stoptb.model.TBScreeningCache
-import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.getAgeGenderDisplayString
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
@@ -222,7 +221,7 @@ class TBScreeningFormViewModel @Inject constructor(
                             current?.xrayOrderStatus.equals(OrderStatus.AWAITING_PROVIDER_RESULT.name, ignoreCase = true) ||
                             current?.xrayOrderStatus.equals(OrderStatus.REFUSED.name, ignoreCase = true)
                     if (!hasOrder) {
-                        val response = tbRepo.createProdigiOrder(benId, "XRAY_CHEST")
+                        val response = tbRepo.createOrder(benId, "XRAY_CHEST")
                         if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
                             val isIntegrated = tbRepo.isXrayIntegrated()
                             val fresh = tbRepo.getTBDiagnosticsById(benId)
@@ -276,7 +275,7 @@ class TBScreeningFormViewModel @Inject constructor(
                             current?.trueNatOrderStatus.equals(OrderStatus.AWAITING_PROVIDER_RESULT.name, ignoreCase = true) ||
                             current?.trueNatOrderStatus.equals(OrderStatus.REFUSED.name, ignoreCase = true)
                     if (!hasOrder) {
-                        val response = tbRepo.createProdigiOrder(benId, "SPUTUM_TRUENAT")
+                        val response = tbRepo.createOrder(benId, "SPUTUM_TRUENAT")
                         if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
                             val isIntegrated = tbRepo.isTruenatIntegrated()
                             val fresh = tbRepo.getTBDiagnosticsById(benId)
