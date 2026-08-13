@@ -1874,12 +1874,12 @@ class TBRepo @Inject constructor(
                                     if (isMtbDetected && !hasExistingRifOrder) {
                                         val statusResponse = fetchBeneficiariesByStatus("MDR_RIF")
                                         var serverHasOrder = false
-                                        if (statusResponse is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+                                        if (statusResponse is NetworkResponse.Success) {
                                             val statusData = statusResponse.data
                                             val awaitingTestCompletion = statusData?.awaitingTestCompletion ?: emptyList()
                                             val awaitingProviderResult = statusData?.awaitingProviderResult ?: emptyList()
                                             val completedList = statusData?.completed ?: emptyList()
-                                            val regId = ben.beneficiaryId
+                                            val regId = if (ben.benRegId > 0) ben.benRegId else ben.beneficiaryId
                                             if (awaitingTestCompletion.contains(regId)) {
                                                 serverHasOrder = true
                                                 computedRifStatus = "AWAITING_PROVIDER_RESULT"
