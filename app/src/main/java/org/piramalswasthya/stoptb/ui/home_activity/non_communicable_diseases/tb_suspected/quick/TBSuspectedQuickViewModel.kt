@@ -389,6 +389,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                         }
                         tbDiagnostics.syncState = SyncState.UNSYNCED
                         tbRepo.saveTBDiagnostics(tbDiagnostics)
+                        tbRepo.syncTBSuspectedFromDiagnostics(benId, tbDiagnostics)
 
                         val updatedDiag = tbRepo.getTBDiagnosticsById(benId)
                         val xrayAwaiting = updatedDiag?.xrayOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true)

@@ -290,7 +290,7 @@ class TBScreeningFormViewModel @Inject constructor(
                                 tbRepo.saveTBDiagnostics(updated)
                             }
                             if (isIntegrated) {
-                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context, tbRepo.useMockApi)
+                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context)
                             }
                         } else {
                             val isIntegrated = tbRepo.isTruenatIntegrated()

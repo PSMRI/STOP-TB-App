@@ -403,9 +403,9 @@ class AllBenViewModel @Inject constructor(
                 if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
                     org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(context)
                 } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
-                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context, tbRepo.useMockApi)
+                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context)
                 } else {
-                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context, tbRepo.useMockApi)
+                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context)
                 }
                 _orderActionState.value = OrderActionResult.Success("Result fetch retried successfully.", orderType)
             } else {
@@ -472,9 +472,9 @@ class AllBenViewModel @Inject constructor(
                 if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
                     org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(context)
                 } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
-                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context, tbRepo.useMockApi)
+                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context)
                 } else {
-                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context, tbRepo.useMockApi)
+                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context)
                 }
                 
                 _orderActionState.value = OrderActionResult.Success("New order created and workflow restarted.", orderType)

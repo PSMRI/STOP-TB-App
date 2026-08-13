@@ -213,11 +213,11 @@ object WorkerUtils {
         )
     }
 
-    fun triggerTrueNatDiagnosticResultPollWorker(context: Context, useMockApi: Boolean = false) {
+    fun triggerTrueNatDiagnosticResultPollWorker(context: Context) {
         triggerDiagnosticResultPollWorker(context)
     }
 
-    fun triggerRifDiagnosticResultPollWorker(context: Context, useMockApi: Boolean = false) {
+    fun triggerRifDiagnosticResultPollWorker(context: Context) {
         triggerDiagnosticResultPollWorker(context)
     }
 }
