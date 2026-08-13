@@ -10,5 +10,6 @@ enum class OrderStatus {
     NONE,
     CREATED,
     AWAITING_TEST_COMPLETION,
-    MANUAL_ENTRY
+    MANUAL_ENTRY,
+    EXPIRED
 }

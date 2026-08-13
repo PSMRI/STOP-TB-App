@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.repositories
 
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -11,7 +12,9 @@ import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.TBDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Konstants
+import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.GeneralOpdCache
+import org.piramalswasthya.stoptb.model.OrderPushedResponse
 import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
@@ -31,12 +34,14 @@ import org.piramalswasthya.stoptb.network.TBSuspectedRequestDTO
 import org.piramalswasthya.stoptb.network.PatientRequest
 import org.piramalswasthya.stoptb.network.DiagnosticOrderPushRequest
 import org.piramalswasthya.stoptb.network.DiagnosticBeneficiaryStatusData
-import okhttp3.ResponseBody
+import org.piramalswasthya.stoptb.network.DiagnosticManualResultRequest
+import org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker
 import timber.log.Timber
 import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Locale
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 
 class TBRepo @Inject constructor(
     private val tbDao: TBDao,
@@ -1328,12 +1333,12 @@ class TBRepo @Inject constructor(
         benId: Long,
         orderType: String,
         resultSummary: String
-    ): org.piramalswasthya.stoptb.helpers.NetworkResponse<String> {
+    ):NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
-            val user = preferenceDao.getLoggedInUser()
-                ?: return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("No user logged in!!")
+         /*   val user = preferenceDao.getLoggedInUser()
+                ?: return@withContext NetworkResponse.Error("No user logged in!!")*/
             val ben = benDao.getBen(benId)
-                ?: return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Beneficiary not found")
+                ?: return@withContext NetworkResponse.Error("Beneficiary not found")
             val targetBenId = ben.beneficiaryId
 
             val apiOrderType = if (orderType.equals("SPUTUM_TRUENAT", ignoreCase = true)) "MTB" else orderType
@@ -1346,25 +1351,26 @@ class TBRepo @Inject constructor(
                 else -> resultSummary
             }
 
+            Timber.d("STOP-TB manualResult debug for beneficiary=$benId: useMockApi=$useMockApi orderType=$orderType")
             if (useMockApi) {
                 val existing = tbDao.getTbDiagnosticsByBenId(benId)
                 val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
                     if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
                         it.copy(
-                            xrayOrderStatus = "COMPLETED",
+                            xrayOrderStatus = OrderStatus.COMPLETED.name,
                             isChestXRayDone = true,
                             chestXRayResult = localResult,
                             syncState = SyncState.SYNCED
                         )
                     } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
                         it.copy(
-                            rifOrderStatus = "COMPLETED",
+                            rifOrderStatus = OrderStatus.COMPLETED.name,
                             trueNatRifResult = localResult,
                             syncState = SyncState.SYNCED
                         )
                     } else {
                         it.copy(
-                            trueNatOrderStatus = "COMPLETED",
+                            trueNatOrderStatus = OrderStatus.COMPLETED.name,
                             isSputumCollected = true,
                             isNaatConducted = true,
                             naatResult = localResult,
@@ -1373,36 +1379,43 @@ class TBRepo @Inject constructor(
                     }
                 }
                 tbDao.saveTbDiagnostics(cache)
-                return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success("Mock success")
+                return@withContext NetworkResponse.Success("Mock success")
             }
 
             try {
-                val request = org.piramalswasthya.stoptb.network.DiagnosticManualResultRequest(
+                val request = DiagnosticManualResultRequest(
                     beneficiaryId = targetBenId,
                     orderType = apiOrderType,
                     resultSummary = resultSummary
                 )
                 val response = tmcNetworkApiService.submitManualResult(request)
                 val statusCode = response.code()
+                Timber.d("STOP-TB manualResult debug: benId=$benId orderType=$orderType apiOrderType=$apiOrderType httpCode=$statusCode isSuccessful=${response.isSuccessful} rawBody=${response.body()} errorBody=${response.errorBody()?.string()}")
                 if (statusCode == 200) {
+                    val responseBody = response.body()
+                    val fetchedOrderId = responseBody?.data?.externalOrderId.asValidOrderId()
                     val existing = tbDao.getTbDiagnosticsByBenId(benId)
+                    Timber.d("STOP-TB manualResult debug: rawExternalOrderId=${responseBody?.data?.externalOrderId} fetchedOrderId=$fetchedOrderId existingRowId=${existing?.id} existingXrayId=${existing?.xrayOrderId} existingRifId=${existing?.rifOrderId} existingTrueNatId=${existing?.trueNatOrderId}")
                     val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
                         if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
                             it.copy(
-                                xrayOrderStatus = "COMPLETED",
+                                xrayOrderId = fetchedOrderId ?: it.xrayOrderId,
+                                xrayOrderStatus = OrderStatus.COMPLETED.name,
                                 isChestXRayDone = true,
                                 chestXRayResult = localResult,
                                 syncState = SyncState.SYNCED
                             )
                         } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
                             it.copy(
-                                rifOrderStatus = "COMPLETED",
+                                rifOrderId = fetchedOrderId ?: it.rifOrderId,
+                                rifOrderStatus = OrderStatus.COMPLETED.name,
                                 trueNatRifResult = localResult,
                                 syncState = SyncState.SYNCED
                             )
                         } else {
                             it.copy(
-                                trueNatOrderStatus = "COMPLETED",
+                                trueNatOrderId = fetchedOrderId ?: it.trueNatOrderId,
+                                trueNatOrderStatus = OrderStatus.COMPLETED.name,
                                 isSputumCollected = true,
                                 isNaatConducted = true,
                                 naatResult = localResult,
@@ -1410,32 +1423,38 @@ class TBRepo @Inject constructor(
                             )
                         }
                     }
+                    Timber.d("STOP-TB manualResult debug: about to save cache id=${cache.id} benId=${cache.benId} xrayOrderId=${cache.xrayOrderId} rifOrderId=${cache.rifOrderId} trueNatOrderId=${cache.trueNatOrderId}")
                     tbDao.saveTbDiagnostics(cache)
-                    return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success("Result submitted successfully")
+                    val verify = tbDao.getTbDiagnosticsByBenId(benId)
+                    Timber.d("STOP-TB manualResult debug: post-save read-back id=${verify?.id} xrayOrderId=${verify?.xrayOrderId} rifOrderId=${verify?.rifOrderId} trueNatOrderId=${verify?.trueNatOrderId}")
+                    return@withContext NetworkResponse.Success("Result submitted successfully")
                 } else {
-                    return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("HTTP Error $statusCode")
+                    return@withContext NetworkResponse.Error("HTTP Error $statusCode")
                 }
             } catch (e: Exception) {
                 Timber.e(e, "submitManualResult failed")
-                return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Unknown error")
+                return@withContext NetworkResponse.Error(e.message ?: "Unknown error")
             }
         }
     }
 
-    suspend fun createProdigiOrder(
-        benId: Long, 
-        testType: String, 
+    private fun String?.asValidOrderId(): String? =
+        this?.trim()?.takeIf { it.isNotBlank() && !it.equals("N/A", ignoreCase = true) }
+
+    suspend fun createOrder(
+        benId: Long,
+        testType: String,
         customVisitCode: Int? = null,
         reasonForRefusal: String? = null
-    ): org.piramalswasthya.stoptb.helpers.NetworkResponse<String> {
+    ): NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
             val user = preferenceDao.getLoggedInUser()
-                ?: return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("No user logged in!!")
+                ?: return@withContext NetworkResponse.Error("No user logged in!!")
             val ben = benDao.getBen(benId)
-                ?: return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Beneficiary not found")
+                ?: return@withContext NetworkResponse.Error("Beneficiary not found")
             val targetBenId = ben.beneficiaryId
             if (targetBenId <= 0) {
-                return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Beneficiary ID not valid")
+                return@withContext NetworkResponse.Error("Beneficiary ID not valid")
             }
             val computedVisitCode = customVisitCode ?: (kotlin.math.abs(java.util.UUID.randomUUID().mostSignificantBits) % 900000 + 100000).toInt()
             if (useMockApi) {
@@ -1469,9 +1488,9 @@ class TBRepo @Inject constructor(
                         }
                     }
                     tbDao.saveTbDiagnostics(cache)
-                    return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(mockOrderId)
+                    return@withContext NetworkResponse.Success(mockOrderId)
                 } catch (e: Exception) {
-                    return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Mock push failed")
+                    return@withContext NetworkResponse.Error(e.message ?: "Mock push failed")
                 }
             }
             try {
@@ -1498,16 +1517,15 @@ class TBRepo @Inject constructor(
                     patient = patientReq
                 )
                 val response = tmcNetworkApiService.pushDiagnosticOrder(request)
+                val responseBody = response.body()
                 val statusCode = response.code()
                 if (statusCode == 200) {
-                    val responseString = response.body()?.string()
-                    if (responseString != null) {
-                        val jsonObj = JSONObject(responseString)
-                        val resStatusCode = jsonObj.optInt("statusCode")
-                        if (resStatusCode == 200) {
-                            val dataObj = jsonObj.optJSONObject("data")
-                            val orderId = dataObj?.optString("providerOrderId") ?: dataObj?.optString("externalOrderId")
-                            val status = dataObj?.optString("status") ?: "PENDING"
+                    if (responseBody!= null && response.isSuccessful) {
+                        val responseData = responseBody.data
+                        if (responseBody.statusCode == 200) {
+                            val orderId = responseData.providerOrderId.asValidOrderId()
+                                ?: responseData.externalOrderId.asValidOrderId()
+                            val status = responseData.status
                             
                             val existing = tbDao.getTbDiagnosticsByBenId(benId)
                             val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
@@ -1536,34 +1554,34 @@ class TBRepo @Inject constructor(
                             }
                             tbDao.saveTbDiagnostics(cache)
                             orderCreatedTimestamps["${benId}_${testType}"] = System.currentTimeMillis()
-                            return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(orderId ?: "")
+                            return@withContext NetworkResponse.Success(orderId ?: "")
                         } else {
-                            val errorMsg = jsonObj.optString("errorMessage") ?: "Failed to push order"
+                            val errorMsg =  response.body()?.errorMessage?: "Failed to push order"
                             saveFailedOrderStatus(benId, testType)
-                            return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(errorMsg)
+                            return@withContext NetworkResponse.Error(errorMsg)
                         }
                     }
                 }
                 saveFailedOrderStatus(benId, testType)
-                org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("HTTP Error $statusCode")
+                NetworkResponse.Error("HTTP Error $statusCode")
             } catch (e: Exception) {
                 Timber.e(e, "createProdigiOrder failed")
                 saveFailedOrderStatus(benId, testType)
-                org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Unknown error")
+                NetworkResponse.Error(e.message ?: "Unknown error")
             }
         }
     }
 
-    suspend fun retryProdigiOrder(
+    suspend fun retryPushOrder(
         benId: Long,
         testType: String
-    ): org.piramalswasthya.stoptb.helpers.NetworkResponse<String> {
+    ): NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
             val ben = benDao.getBen(benId)
-                ?: return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Beneficiary not found")
+                ?: return@withContext NetworkResponse.Error("Beneficiary not found")
             val targetBenId = ben.beneficiaryId
             if (targetBenId <= 0) {
-                return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Beneficiary ID not valid")
+                return@withContext NetworkResponse.Error("Beneficiary ID not valid")
             }
             if (useMockApi) {
                 try {
@@ -1594,9 +1612,9 @@ class TBRepo @Inject constructor(
                         }
                     }
                     tbDao.saveTbDiagnostics(cache)
-                    return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(orderId)
+                    return@withContext NetworkResponse.Success(orderId)
                 } catch (e: Exception) {
-                    return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Mock retry failed")
+                    return@withContext NetworkResponse.Error(e.message ?: "Mock retry failed")
                 }
             }
             try {
@@ -1604,33 +1622,32 @@ class TBRepo @Inject constructor(
                 val response = tmcNetworkApiService.retryOrder(benId = targetBenId, orderType = apiOrderType)
                 val statusCode = response.code()
                 if (statusCode == 200) {
-                    val responseString = response.body()?.string()
-                    if (responseString != null) {
-                        val jsonObj = JSONObject(responseString)
-                        val resStatusCode = jsonObj.optInt("statusCode")
+                    val responseBody = response.body()
+                    if (responseBody != null && response.isSuccessful) {
+                        val resStatusCode = responseBody.statusCode
                         if (resStatusCode == 200) {
-                            val dataObj = jsonObj.optJSONObject("data")
-                            val orderId = dataObj?.optString("providerOrderId") ?: dataObj?.optString("externalOrderId")
-                            val status = dataObj?.optString("status") ?: "PENDING"
-                            
+                            val responseData = responseBody.data
+                            val orderId = responseData.externalOrderId.asValidOrderId()
+                            val status = responseData.status?.takeIf { it.isNotBlank() } ?: "PENDING"
+
                             val existing = tbDao.getTbDiagnosticsByBenId(benId)
                             val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
                                 if (testType.equals("XRAY_CHEST", ignoreCase = true)) {
                                     it.copy(
-                                        xrayOrderId = orderId,
+                                        xrayOrderId = orderId ?: it.xrayOrderId,
                                         xrayOrderStatus = status,
                                         syncState = SyncState.SYNCED
                                     )
                                 } else if (testType.equals("MDR_RIF", ignoreCase = true)) {
                                     it.copy(
-                                        rifOrderId = orderId,
+                                        rifOrderId = orderId ?: it.rifOrderId,
                                         rifOrderStatus = status,
                                         trueNatRifResult = null,
                                         syncState = SyncState.SYNCED
                                     )
                                 } else {
                                     it.copy(
-                                        trueNatOrderId = orderId,
+                                        trueNatOrderId = orderId ?: it.trueNatOrderId,
                                         trueNatOrderStatus = status,
                                         naatResult = null,
                                         trueNatRifResult = null,
@@ -1640,17 +1657,17 @@ class TBRepo @Inject constructor(
                             }
                             tbDao.saveTbDiagnostics(cache)
                             orderCreatedTimestamps["${benId}_${testType}"] = System.currentTimeMillis()
-                            return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(orderId ?: "")
+                            return@withContext NetworkResponse.Success(orderId ?: "")
                         } else {
-                            val errorMsg = jsonObj.optString("errorMessage") ?: "Failed to retry order"
-                            return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(errorMsg)
+                            val errorMsg = responseBody.errorMessage ?: "Failed to retry order"
+                            return@withContext NetworkResponse.Error(errorMsg)
                         }
                     }
                 }
-                return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("HTTP Error $statusCode")
+                return@withContext NetworkResponse.Error("HTTP Error $statusCode")
             } catch (e: Exception) {
                 Timber.e(e, "retryProdigiOrder failed")
-                return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Unknown error")
+                return@withContext NetworkResponse.Error(e.message ?: "Unknown error")
             }
         }
     }
@@ -1671,10 +1688,10 @@ class TBRepo @Inject constructor(
         }
     }
 
-    suspend fun markTestCompleted(benId: Long, orderType: String): org.piramalswasthya.stoptb.helpers.NetworkResponse<String> {
+    suspend fun markTestCompleted(benId: Long, orderType: String): NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
             val ben = benDao.getBen(benId)
-                ?: return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Beneficiary not found")
+                ?: return@withContext NetworkResponse.Error("Beneficiary not found")
             if (useMockApi) {
                 try {
                     val status = "IN_PROGRESS"
@@ -1705,9 +1722,9 @@ class TBRepo @Inject constructor(
                     }
                     val pollKey = "${benId}_${orderType}"
                     pollCounts[pollKey] = 0
-                    return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(status)
+                    return@withContext NetworkResponse.Success(status)
                 } catch (e: Exception) {
-                    return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Mock test completed failed")
+                    return@withContext NetworkResponse.Error(e.message ?: "Mock test completed failed")
                 }
             }
             try {
@@ -1757,28 +1774,28 @@ class TBRepo @Inject constructor(
                                 fetchOrderResult(benId, orderType)
                             }
 
-                            return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(status)
+                            return@withContext NetworkResponse.Success(status)
                         } else {
                             val errorMsg = jsonObj.optString("errorMessage") ?: "Failed to mark test completed"
-                            return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(errorMsg)
+                            return@withContext NetworkResponse.Error(errorMsg)
                         }
                     }
                 }
-                org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("HTTP Error $statusCode")
+                NetworkResponse.Error("HTTP Error $statusCode")
             } catch (e: Exception) {
                 Timber.e(e, "markTestCompleted failed")
-                org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Unknown error")
+                NetworkResponse.Error(e.message ?: "Unknown error")
             }
         }
     }
 
-    suspend fun fetchOrderResult(benId: Long, orderType: String): org.piramalswasthya.stoptb.helpers.NetworkResponse<String> {
+    suspend fun fetchOrderResult(benId: Long, orderType: String): NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
             val ben = benDao.getBen(benId)
-                ?: return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Beneficiary not found")
+                ?: return@withContext NetworkResponse.Error("Beneficiary not found")
             val targetBenId = ben.beneficiaryId
             if (targetBenId <= 0) {
-                return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Beneficiary ID not valid")
+                return@withContext NetworkResponse.Error("Beneficiary ID not valid")
             }
             if (useMockApi) {
                 try {
@@ -1793,7 +1810,7 @@ class TBRepo @Inject constructor(
                             syncState = SyncState.SYNCED
                         )
                         tbDao.saveTbDiagnostics(cache)
-                        return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(status)
+                        return@withContext NetworkResponse.Success(status)
                     } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
                         val rifResult = when (mockRifScenario) {
                             MockRifScenario.DETECTED -> "Rif Resistance Detected"
@@ -1806,7 +1823,7 @@ class TBRepo @Inject constructor(
                             syncState = SyncState.SYNCED
                         )
                         tbDao.saveTbDiagnostics(cache)
-                        return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(status)
+                        return@withContext NetworkResponse.Success(status)
                     } else {
                         val mtbResult = when (mockMtbScenario) {
                             MockMtbScenario.DETECTED -> "MTB detected"
@@ -1821,7 +1838,7 @@ class TBRepo @Inject constructor(
                         val isMtbDetected = mtbResult == "MTB detected"
                         if (isMtbDetected) {
                             try {
-                                createProdigiOrder(benId, "MDR_RIF")
+                                createOrder(benId, "MDR_RIF")
                             } catch (e: Exception) {
                                 Timber.e(e, "Auto createProdigiOrder for MDR_RIF failed in mock mode")
                             }
@@ -1839,10 +1856,10 @@ class TBRepo @Inject constructor(
                             syncState = SyncState.SYNCED
                         )
                         tbDao.saveTbDiagnostics(cache)
-                        return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(status)
+                        return@withContext NetworkResponse.Success(status)
                     }
                 } catch (e: Exception) {
-                    return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Mock fetch result failed")
+                    return@withContext NetworkResponse.Error(e.message ?: "Mock fetch result failed")
                 }
             }
             try {
@@ -1850,54 +1867,55 @@ class TBRepo @Inject constructor(
                 val response = tmcNetworkApiService.fetchOrderResult(benId = ben.beneficiaryId, orderType = apiOrderType)
                 val statusCode = response.code()
                 if (statusCode == 200) {
-                    val responseString = response.body()?.string()
-                    if (responseString != null) {
-                        val jsonObj = JSONObject(responseString)
-                        val resStatusCode = jsonObj.optInt("statusCode")
+                    val responseBody = response.body()
+                    if (responseBody != null  && response.isSuccessful) {
+                        val resStatusCode = responseBody.statusCode
                         if (resStatusCode == 200) {
-                            val dataObj = jsonObj.optJSONObject("data")
-                            val rawStatus = dataObj?.optString("status")
+                            val responseData = responseBody.data
+                            val rawStatus = responseData.status
                             val status = if (rawStatus.isNullOrBlank()) "IN_PROGRESS" else rawStatus
-                            timber.log.Timber.d("STOP-TB polling debug: fetchOrderResult benId=$benId status=$status rawStatus=$rawStatus")
+                           Timber.d("STOP-TB polling debug: fetchOrderResult benId=$benId status=$status rawStatus=$rawStatus")
                             
+                            val fetchedOrderId = responseData.externalOrderId.asValidOrderId()
                             val existing = tbDao.getTbDiagnosticsByBenId(benId)
                             val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
                                 if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
-                                    val hasTbPresence = dataObj?.has("tbPresence") == true && !dataObj.isNull("tbPresence")
-                                    val tbPresence = if (hasTbPresence) dataObj?.optBoolean("tbPresence") else null
-                                    val serverResultSummary = dataObj?.optString("resultSummary")
+                                    val tbPresence = responseData.tbPresence
+                                    val serverResultSummary = responseData.resultSummary
                                     val chestResult = if (!serverResultSummary.isNullOrBlank()) {
                                         serverResultSummary
                                     } else {
                                         if (tbPresence == true) "TB Presumptive" else "Normal"
                                     }
 
-                                    val isCompleted = status.equals("COMPLETED", ignoreCase = true)
+                                    val isCompleted = status.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
                                     val xrayPos = isCompleted && isChestXrayPositive(chestResult)
 
                                      if (xrayPos && isTruenatIntegrated()) {
                                         val hasTruenat = !it.trueNatOrderId.isNullOrBlank() ||
-                                                it.trueNatOrderStatus.equals("COMPLETED", ignoreCase = true) ||
+                                                it.trueNatOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
                                                 it.trueNatOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) ||
                                                 it.trueNatOrderStatus.equals("REFUSED", ignoreCase = true)
                                         if (!hasTruenat) {
                                             try {
-                                                val response = createProdigiOrder(benId, "SPUTUM_TRUENAT")
-                                                if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
-                                                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context, useMockApi)
+                                                val response = createOrder(benId, "SPUTUM_TRUENAT")
+                                                if (response is NetworkResponse.Success) {
+                                                    triggerTrueNatDiagnosticResultPollWorker(context, useMockApi)
                                                     it.copy(
-                                                        xrayOrderStatus = "COMPLETED",
+                                                        xrayOrderId = fetchedOrderId ?: it.xrayOrderId,
+                                                        xrayOrderStatus = OrderStatus.COMPLETED.name,
                                                         isReferredForDigitalChestXray = true,
                                                         isChestXRayDone = true,
                                                         chestXRayResult = chestResult,
-                                                        trueNatOrderStatus = "AWAITING_PROVIDER_RESULT",
+                                                        trueNatOrderStatus = OrderStatus.AWAITING_PROVIDER_RESULT.name,
                                                         isSputumCollected = true,
                                                         isNaatConducted = true,
                                                         syncState = SyncState.SYNCED
                                                     )
                                                 } else {
                                                     it.copy(
-                                                        xrayOrderStatus = "COMPLETED",
+                                                        xrayOrderId = fetchedOrderId ?: it.xrayOrderId,
+                                                        xrayOrderStatus = OrderStatus.COMPLETED.name,
                                                         isReferredForDigitalChestXray = true,
                                                         isChestXRayDone = true,
                                                         chestXRayResult = chestResult,
@@ -1905,9 +1923,10 @@ class TBRepo @Inject constructor(
                                                     )
                                                 }
                                             } catch (e: Exception) {
-                                                Timber.e(e, "Auto createProdigiOrder for SPUTUM_TRUENAT failed on +ve X-Ray")
+                                                Timber.e(e, "Auto createOrder for SPUTUM_TRUENAT failed on +ve X-Ray")
                                                 it.copy(
-                                                    xrayOrderStatus = "COMPLETED",
+                                                    xrayOrderId = fetchedOrderId ?: it.xrayOrderId,
+                                                    xrayOrderStatus = OrderStatus.COMPLETED.name,
                                                     isReferredForDigitalChestXray = true,
                                                     isChestXRayDone = true,
                                                     chestXRayResult = chestResult,
@@ -1916,7 +1935,8 @@ class TBRepo @Inject constructor(
                                             }
                                         } else {
                                             it.copy(
-                                                xrayOrderStatus = "COMPLETED",
+                                                xrayOrderId = fetchedOrderId ?: it.xrayOrderId,
+                                                xrayOrderStatus = OrderStatus.COMPLETED.name,
                                                 isReferredForDigitalChestXray = true,
                                                 isChestXRayDone = true,
                                                 chestXRayResult = chestResult,
@@ -1925,7 +1945,19 @@ class TBRepo @Inject constructor(
                                         }
                                     } else {
                                         it.copy(
-                                            xrayOrderStatus = if (status.equals("COMPLETED", ignoreCase = true)) "COMPLETED" else if (status.equals("FAILED", ignoreCase = true) || status.equals("POLLING_TIMEOUT", ignoreCase = true) || status.equals("EXPIRED", ignoreCase = true)) "FAILED" else "AWAITING_PROVIDER_RESULT",
+                                            xrayOrderId = fetchedOrderId ?: it.xrayOrderId,
+                                            xrayOrderStatus = when {
+                                                status.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ->
+                                                    OrderStatus.COMPLETED.name
+
+                                                status.equals(OrderStatus.FAILED.name, ignoreCase = true) ||
+                                                        status.equals(OrderStatus.POLLING_TIMEOUT.name, ignoreCase = true) ||
+                                                        status.equals(OrderStatus.EXPIRED.name, ignoreCase = true) ->
+                                                    OrderStatus.FAILED.name
+
+                                                else ->
+                                                    OrderStatus.AWAITING_PROVIDER_RESULT.name
+                                            },
                                             isReferredForDigitalChestXray = true,
                                             isChestXRayDone = if (isCompleted) true else it.isChestXRayDone,
                                             chestXRayResult = if (isCompleted) chestResult else it.chestXRayResult,
@@ -1933,27 +1965,36 @@ class TBRepo @Inject constructor(
                                         )
                                     }
                                 } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
-                                    val isCompleted = status.equals("COMPLETED", ignoreCase = true)
-                                    val serverRifResultSummary = dataObj?.optString("resultSummary")
+                                    val isCompleted = status.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
+                                    val serverRifResultSummary = responseData.resultSummary
                                     val rifResult = if (!serverRifResultSummary.isNullOrBlank()) {
                                         serverRifResultSummary
                                     } else {
-                                        when {
-                                            dataObj == null || !dataObj.has("drugResistancePresence") || dataObj.isNull("drugResistancePresence") -> "Indeterminate"
-                                            dataObj.optBoolean("drugResistancePresence") -> "Rif Resistance Detected"
-                                            else -> "Rif Resistance Not Detected"
+                                        when (responseData.drugResistancePresence) {
+                                            null -> "Indeterminate"
+                                            true -> "Rif Resistance Detected"
+                                            false -> "Rif Resistance Not Detected"
                                         }
                                     }
                                     val isRifIndeterminate = isCompleted && rifResult.equals("Indeterminate", ignoreCase = true)
-                                    var computedRifStatus = if (isCompleted) "COMPLETED" else if (status.equals("FAILED", ignoreCase = true) || status.equals("POLLING_TIMEOUT", ignoreCase = true) || status.equals("EXPIRED", ignoreCase = true)) "FAILED" else "AWAITING_PROVIDER_RESULT"
-                                    var computedRifOrderId = it.rifOrderId
+                                    var computedRifStatus = when {
+                                        isCompleted -> OrderStatus.COMPLETED.name
+                                        status.equals(OrderStatus.FAILED.name, ignoreCase = true) ||
+                                                status.equals(OrderStatus.POLLING_TIMEOUT.name, ignoreCase = true) ||
+                                                status.equals(OrderStatus.EXPIRED.name, ignoreCase = true) ->
+                                            OrderStatus.FAILED.name
+
+                                        else ->
+                                            OrderStatus.AWAITING_PROVIDER_RESULT.name
+                                    }
+                                    var computedRifOrderId = fetchedOrderId ?: it.rifOrderId
 
                                      if (isRifIndeterminate) {
                                         try {
-                                            val rifResponse = createProdigiOrder(benId, "MDR_RIF")
-                                            if (rifResponse is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
-                                                computedRifStatus = "AWAITING_PROVIDER_RESULT"
-                                                computedRifOrderId = rifResponse.data
+                                            val rifResponse = createOrder(benId, "MDR_RIF")
+                                            if (rifResponse is NetworkResponse.Success) {
+                                                computedRifStatus = OrderStatus.AWAITING_PROVIDER_RESULT.name
+                                                computedRifOrderId = rifResponse.data.asValidOrderId()
                                                 org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context, useMockApi)
                                             }
                                         } catch (e: Exception) {
@@ -1968,7 +2009,7 @@ class TBRepo @Inject constructor(
                                         syncState = SyncState.SYNCED
                                     )
                                 } else {
-                                    val serverMtbResultSummary = dataObj?.optString("resultSummary")
+                                    val serverMtbResultSummary = responseData.resultSummary
                                     val mtbResult = if (!serverMtbResultSummary.isNullOrBlank()) {
                                         val clean = serverMtbResultSummary.trim().lowercase()
                                         when {
@@ -1977,36 +2018,36 @@ class TBRepo @Inject constructor(
                                             else -> "Invalid"
                                         }
                                     } else {
-                                        when {
-                                            dataObj == null || !dataObj.has("tbPresence") || dataObj.isNull("tbPresence") -> "Invalid"
-                                            dataObj.optBoolean("tbPresence") -> "MTB detected"
-                                            else -> "MTB not detected"
+                                        when (responseData.tbPresence) {
+                                            null -> "Invalid"
+                                            true -> "MTB detected"
+                                            false -> "MTB not detected"
                                         }
                                     }
-                                    val isCompleted = status.equals("COMPLETED", ignoreCase = true)
+                                    val isCompleted = status.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
                                     val isMtbDetected = isCompleted && mtbResult == "MTB detected"
 
                                     var computedRifStatus: String? = it.rifOrderStatus
                                     var computedRifOrderId: String? = it.rifOrderId
                                     val hasExistingRifOrder = !it.rifOrderId.isNullOrBlank() ||
-                                             it.rifOrderStatus.equals("COMPLETED", ignoreCase = true) ||
-                                             it.rifOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) ||
-                                             it.rifOrderStatus.equals("REFUSED", ignoreCase = true)
+                                             it.rifOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
+                                             it.rifOrderStatus.equals(OrderStatus.AWAITING_PROVIDER_RESULT.name, ignoreCase = true) ||
+                                             it.rifOrderStatus.equals(OrderStatus.REFUSED.name, ignoreCase = true)
                                     
                                     if (isMtbDetected && !hasExistingRifOrder) {
                                         if (useMockApi) {
                                             try {
-                                                createProdigiOrder(benId, "MDR_RIF")
-                                                computedRifStatus = "AWAITING_PROVIDER_RESULT"
+                                                createOrder(benId, "MDR_RIF")
+                                                computedRifStatus = OrderStatus.AWAITING_PROVIDER_RESULT.name
                                                 computedRifOrderId = "MOCK-RIF-001"
                                                 org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context, useMockApi)
                                             } catch (e: Exception) {
-                                                Timber.e(e, "Auto createProdigiOrder for MDR_RIF failed in mock mode")
+                                                Timber.e(e, "Auto createOrder for MDR_RIF failed in mock mode")
                                             }
                                         } else {
                                             val statusResponse = fetchBeneficiariesByStatus("MDR_RIF")
                                             var serverHasOrder = false
-                                            if (statusResponse is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+                                            if (statusResponse is NetworkResponse.Success) {
                                                 val statusData = statusResponse.data
                                                 val awaitingTestCompletion = statusData?.awaitingTestCompletion ?: emptyList()
                                                 val awaitingProviderResult = statusData?.awaitingProviderResult ?: emptyList()
@@ -2014,17 +2055,17 @@ class TBRepo @Inject constructor(
                                                 val regId = ben.beneficiaryId
                                                 if (awaitingTestCompletion.contains(regId)) {
                                                     serverHasOrder = true
-                                                    computedRifStatus = "AWAITING_PROVIDER_RESULT"
+                                                    computedRifStatus = OrderStatus.AWAITING_PROVIDER_RESULT.name
                                                     computedRifOrderId = "EXISTING-RIF-${regId}"
                                                     org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context, useMockApi)
                                                 } else if (awaitingProviderResult.contains(regId)) {
                                                     serverHasOrder = true
-                                                    computedRifStatus = "AWAITING_PROVIDER_RESULT"
+                                                    computedRifStatus = OrderStatus.AWAITING_PROVIDER_RESULT.name
                                                     computedRifOrderId = "EXISTING-RIF-${regId}"
                                                     org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context, useMockApi)
                                                 } else if (completedList.contains(regId)) {
                                                     serverHasOrder = true
-                                                    computedRifStatus = "COMPLETED"
+                                                    computedRifStatus = OrderStatus.COMPLETED.name
                                                     computedRifOrderId = "EXISTING-RIF-${regId}"
                                                 }
                                             }
@@ -2034,23 +2075,23 @@ class TBRepo @Inject constructor(
                                                 var rifSuccess = false
                                                 while (rifAttempt <= maxRifRetries && !rifSuccess) {
                                                     try {
-                                                        val newOrderId = createProdigiOrder(benId, "MDR_RIF")
-                                                        if (newOrderId is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
-                                                            computedRifStatus = "AWAITING_PROVIDER_RESULT"
+                                                        val newOrderId = createOrder(benId, "MDR_RIF")
+                                                        if (newOrderId is NetworkResponse.Success) {
+                                                            computedRifStatus = OrderStatus.AWAITING_PROVIDER_RESULT.name
                                                             computedRifOrderId = newOrderId.data
                                                             rifSuccess = true
                                                             org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context, useMockApi)
                                                         } else {
                                                             rifAttempt++
                                                             if (rifAttempt <= maxRifRetries) {
-                                                                kotlinx.coroutines.delay(5000L)
+                                                                delay(5000L.milliseconds)
                                                             }
                                                         }
                                                     } catch (e: Exception) {
-                                                        Timber.e(e, "Auto createProdigiOrder for MDR_RIF failed, attempt=${rifAttempt}")
+                                                        Timber.e(e, "Auto createOrder for MDR_RIF failed, attempt=${rifAttempt}")
                                                         rifAttempt++
                                                         if (rifAttempt <= maxRifRetries) {
-                                                            kotlinx.coroutines.delay(5000L)
+                                                            delay(5000L.milliseconds)
                                                         }
                                                     }
                                                 }
@@ -2061,8 +2102,19 @@ class TBRepo @Inject constructor(
                                         }
                                     }
 
-                                    var computedTrueNatStatus = if (status.equals("COMPLETED", ignoreCase = true)) "COMPLETED" else if (status.equals("FAILED", ignoreCase = true) || status.equals("POLLING_TIMEOUT", ignoreCase = true) || status.equals("EXPIRED", ignoreCase = true)) "FAILED" else "AWAITING_PROVIDER_RESULT"
-                                    var computedTrueNatOrderId = it.trueNatOrderId
+                                    var computedTrueNatStatus = when {
+                                        status.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ->
+                                            OrderStatus.COMPLETED.name
+
+                                        status.equals(OrderStatus.FAILED.name, ignoreCase = true) ||
+                                                status.equals(OrderStatus.POLLING_TIMEOUT.name, ignoreCase = true) ||
+                                                status.equals(OrderStatus.EXPIRED.name, ignoreCase = true) ->
+                                            OrderStatus.FAILED.name
+
+                                        else ->
+                                            OrderStatus.AWAITING_PROVIDER_RESULT.name
+                                    }
+                                    var computedTrueNatOrderId = fetchedOrderId ?: it.trueNatOrderId
 
                                     it.copy(
                                         trueNatOrderStatus = computedTrueNatStatus,
@@ -2080,27 +2132,27 @@ class TBRepo @Inject constructor(
                             }
                             tbDao.saveTbDiagnostics(cache)
                             
-                            return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(status)
+                            return@withContext NetworkResponse.Success(status)
                         } else {
-                            val errorMsg = jsonObj.optString("errorMessage") ?: "Failed to fetch result"
-                            return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(errorMsg)
+                            val errorMsg = responseBody.errorMessage ?: "Failed to fetch result"
+                            return@withContext NetworkResponse.Error(errorMsg)
                         }
                     }
                 }
-                org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("HTTP Error $statusCode")
+                NetworkResponse.Error("HTTP Error $statusCode")
             } catch (e: Exception) {
                 Timber.e(e, "fetchOrderResult failed")
-                org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Unknown error")
+                NetworkResponse.Error(e.message ?: "Unknown error")
             }
         }
     }
 
-    suspend fun fetchBeneficiariesByStatus(orderType: String, fetchResult: Boolean = true): org.piramalswasthya.stoptb.helpers.NetworkResponse<DiagnosticBeneficiaryStatusData> {
+    suspend fun fetchBeneficiariesByStatus(orderType: String, fetchResult: Boolean = true): NetworkResponse<DiagnosticBeneficiaryStatusData> {
         return withContext(Dispatchers.IO) {
             val user = preferenceDao.getLoggedInUser()
-                ?: return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("No user logged in")
+                ?: return@withContext NetworkResponse.Error("No user logged in")
             val locationRecord = preferenceDao.getLocationRecord()
-                ?: return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("No location record found")
+                ?: return@withContext NetworkResponse.Error("No location record found")
 
             val villageId = locationRecord.village.id
             val providerServiceMapId = user.serviceMapId
@@ -2176,7 +2228,7 @@ class TBRepo @Inject constructor(
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
                                     val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
                                     val isInProgressOrDone = currentStatus.equals("IN_PROGRESS", ignoreCase = true) ||
-                                            currentStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) ||
+                                            currentStatus.equals(OrderStatus.AWAITING_PROVIDER_RESULT.name, ignoreCase = true) ||
                                             currentStatus.equals("PROCESSING", ignoreCase = true) ||
                                             currentStatus.equals("COMPLETED", ignoreCase = true)
                                     Timber.d("STOP-TB polling debug: awaitingTestCompletion regId=$regId benId=${b.beneficiaryId} currentStatus=$currentStatus isInProgressOrDone=$isInProgressOrDone")
@@ -2184,18 +2236,18 @@ class TBRepo @Inject constructor(
                                         val cache = (existing ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
                                             if (isXray) {
                                                 it.copy(
-                                                    xrayOrderStatus = "AWAITING_TEST_COMPLETION",
+                                                    xrayOrderStatus = OrderStatus.AWAITING_TEST_COMPLETION.name,
                                                     isReferredForDigitalChestXray = true,
                                                     syncState = SyncState.SYNCED
                                                 )
                                             } else if (isRif) {
                                                 it.copy(
-                                                    rifOrderStatus = "AWAITING_TEST_COMPLETION",
+                                                    rifOrderStatus = OrderStatus.AWAITING_TEST_COMPLETION.name,
                                                     syncState = SyncState.SYNCED
                                                 )
                                             } else {
                                                 it.copy(
-                                                    trueNatOrderStatus = "AWAITING_TEST_COMPLETION",
+                                                    trueNatOrderStatus = OrderStatus.AWAITING_TEST_COMPLETION.name,
                                                     isSputumCollected = true,
                                                     syncState = SyncState.SYNCED
                                                 )
@@ -2247,9 +2299,9 @@ class TBRepo @Inject constructor(
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
                                     val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
                                     val needsResultFetch = when {
-                                        isXray -> !currentStatus.equals("COMPLETED", ignoreCase = true) || existing?.chestXRayResult.isNullOrBlank()
-                                        isRif -> !currentStatus.equals("COMPLETED", ignoreCase = true) || existing?.trueNatRifResult.isNullOrBlank()
-                                        else -> !currentStatus.equals("COMPLETED", ignoreCase = true) || existing?.naatResult.isNullOrBlank()
+                                        isXray -> !currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) || existing?.chestXRayResult.isNullOrBlank()
+                                        isRif -> !currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) || existing?.trueNatRifResult.isNullOrBlank()
+                                        else -> !currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) || existing?.naatResult.isNullOrBlank()
                                     }
 
                                     if (needsResultFetch && fetchResult) {
@@ -2259,19 +2311,19 @@ class TBRepo @Inject constructor(
                                         val cache = (existing ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
                                             if (isXray) {
                                                 it.copy(
-                                                    xrayOrderStatus = "COMPLETED",
+                                                    xrayOrderStatus = OrderStatus.COMPLETED.name,
                                                     isReferredForDigitalChestXray = true,
                                                     isChestXRayDone = true,
                                                     syncState = SyncState.SYNCED
                                                 )
                                             } else if (isRif) {
                                                 it.copy(
-                                                    rifOrderStatus = "COMPLETED",
+                                                    rifOrderStatus = OrderStatus.COMPLETED.name,
                                                     syncState = SyncState.SYNCED
                                                 )
                                             } else {
                                                 it.copy(
-                                                    trueNatOrderStatus = "COMPLETED",
+                                                    trueNatOrderStatus = OrderStatus.COMPLETED.name,
                                                     isSputumCollected = true,
                                                     isNaatConducted = true,
                                                     syncState = SyncState.SYNCED
@@ -2289,23 +2341,23 @@ class TBRepo @Inject constructor(
                                 ben?.let { b ->
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
                                     val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
-                                    val isDone = currentStatus.equals("COMPLETED", ignoreCase = true)
+                                    val isDone = currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
                                     if (!isDone) {
                                         val cache = (existing ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
                                             if (isXray) {
                                                 it.copy(
-                                                    xrayOrderStatus = "POLLING_TIMEOUT",
+                                                    xrayOrderStatus = OrderStatus.POLLING_TIMEOUT.name,
                                                     isReferredForDigitalChestXray = true,
                                                     syncState = SyncState.SYNCED
                                                 )
                                             } else if (isRif) {
                                                 it.copy(
-                                                    rifOrderStatus = "POLLING_TIMEOUT",
+                                                    rifOrderStatus = OrderStatus.POLLING_TIMEOUT.name,
                                                     syncState = SyncState.SYNCED
                                                 )
                                             } else {
                                                 it.copy(
-                                                    trueNatOrderStatus = "POLLING_TIMEOUT",
+                                                    trueNatOrderStatus = OrderStatus.POLLING_TIMEOUT.name,
                                                     isSputumCollected = true,
                                                     syncState = SyncState.SYNCED
                                                 )
@@ -2322,7 +2374,7 @@ class TBRepo @Inject constructor(
                                 ben?.let { b ->
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
                                     val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
-                                    val isDone = currentStatus.equals("COMPLETED", ignoreCase = true)
+                                    val isDone = currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
                                     // Same staleness guard as the "Polling Timed Out" bucket above.
                                     val justPushedAt = orderCreatedTimestamps["${b.beneficiaryId}_$orderType"]
                                     val isRecentlyPushed = justPushedAt != null && System.currentTimeMillis() - justPushedAt < ORDER_STATUS_GRACE_PERIOD_MS
@@ -2330,18 +2382,18 @@ class TBRepo @Inject constructor(
                                         val cache = (existing ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
                                             if (isXray) {
                                                 it.copy(
-                                                    xrayOrderStatus = "FAILED",
+                                                    xrayOrderStatus = OrderStatus.FAILED.name,
                                                     isReferredForDigitalChestXray = true,
                                                     syncState = SyncState.SYNCED
                                                 )
                                             } else if (isRif) {
                                                 it.copy(
-                                                    rifOrderStatus = "FAILED",
+                                                    rifOrderStatus = OrderStatus.FAILED.name,
                                                     syncState = SyncState.SYNCED
                                                 )
                                             } else {
                                                 it.copy(
-                                                    trueNatOrderStatus = "FAILED",
+                                                    trueNatOrderStatus = OrderStatus.FAILED.name,
                                                     isSputumCollected = true,
                                                     syncState = SyncState.SYNCED
                                                 )
@@ -2358,23 +2410,23 @@ class TBRepo @Inject constructor(
                                 ben?.let { b ->
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
                                     val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
-                                    val isRefused = currentStatus.equals("REFUSED", ignoreCase = true)
+                                    val isRefused = currentStatus.equals(OrderStatus.REFUSED.name, ignoreCase = true)
                                     if (!isRefused) {
                                         val cache = (existing ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
                                             if (isXray) {
                                                 it.copy(
-                                                    xrayOrderStatus = "REFUSED",
+                                                    xrayOrderStatus = OrderStatus.REFUSED.name,
                                                     isReferredForDigitalChestXray = false,
                                                     syncState = SyncState.SYNCED
                                                 )
                                             } else if (isRif) {
                                                 it.copy(
-                                                    rifOrderStatus = "REFUSED",
+                                                    rifOrderStatus = OrderStatus.REFUSED.name,
                                                     syncState = SyncState.SYNCED
                                                 )
                                             } else {
                                                 it.copy(
-                                                    trueNatOrderStatus = "REFUSED",
+                                                    trueNatOrderStatus = OrderStatus.REFUSED.name,
                                                     isSputumCollected = false,
                                                     syncState = SyncState.SYNCED
                                                 )
@@ -2391,23 +2443,23 @@ class TBRepo @Inject constructor(
                                 ben?.let { b ->
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
                                      val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
-                                     val isDone = currentStatus.equals("COMPLETED", ignoreCase = true)
+                                     val isDone = currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
                                      if (!isDone) {
                                          val cache = (existing ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
                                              if (isXray) {
                                                  it.copy(
-                                                     xrayOrderStatus = "MANUAL_ENTRY",
+                                                     xrayOrderStatus = OrderStatus.MANUAL_ENTRY.name,
                                                      isReferredForDigitalChestXray = true,
                                                      syncState = SyncState.SYNCED
                                                  )
                                              } else if (isRif) {
                                                  it.copy(
-                                                     rifOrderStatus = "MANUAL_ENTRY",
+                                                     rifOrderStatus = OrderStatus.MANUAL_ENTRY.name,
                                                      syncState = SyncState.SYNCED
                                                  )
                                              } else {
                                                  it.copy(
-                                                     trueNatOrderStatus = "MANUAL_ENTRY",
+                                                     trueNatOrderStatus = OrderStatus.MANUAL_ENTRY.name,
                                                      isSputumCollected = true,
                                                      syncState = SyncState.SYNCED
                                                  )
@@ -2427,22 +2479,22 @@ class TBRepo @Inject constructor(
                                 refused = refusedList,
                                 awaitingManualEntry = awaitingManualEntryList
                             )
-                            return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(resultData)
+                            return@withContext NetworkResponse.Success(resultData)
                         } else {
                             val errorMsg = jsonObj.optString("message") ?: "Failed to fetch beneficiary order statuses"
-                            return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(errorMsg)
+                            return@withContext NetworkResponse.Error(errorMsg)
                         }
                     }
                 }
-                org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("HTTP Error $statusCode")
+                NetworkResponse.Error("HTTP Error $statusCode")
             } catch (e: Exception) {
                 Timber.e(e, "fetchBeneficiariesByStatus failed for $orderType")
-                org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Unknown error")
+                NetworkResponse.Error(e.message ?: "Unknown error")
             }
         }
     }
 
-    suspend fun getVendorHealth(orderType: String): org.piramalswasthya.stoptb.helpers.NetworkResponse<String> {
+    suspend fun getVendorHealth(orderType: String): NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
             try {
                 val response = tmcNetworkApiService.getVendorHealth(orderType)

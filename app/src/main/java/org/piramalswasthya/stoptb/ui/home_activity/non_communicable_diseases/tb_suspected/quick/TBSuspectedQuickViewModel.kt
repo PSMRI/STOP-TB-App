@@ -19,7 +19,6 @@ import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.VitalCache
-import org.piramalswasthya.stoptb.model.getAgeGenderDisplayString
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
@@ -182,7 +181,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 try {
-                    tbRepo.createProdigiOrder(benId, orderType, customVisitCode)
+                    tbRepo.createOrder(benId, orderType, customVisitCode)
                 } catch (e: Exception) {
                     Timber.e(e, "repeatTest failed for benId=%s", benId)
                 }
@@ -242,12 +241,13 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                     tbDiagnostics.xrayOrderStatus = "COMPLETED"
                                     tbDiagnostics.chestXRayResult = resultString
                                     tbDiagnostics.isChestXRayDone = true
+                                    tbRepo.getTBDiagnosticsById(benId)?.xrayOrderId?.let { tbDiagnostics.xrayOrderId = it }
                                 } else {
                                     apiSuccess = false
                                     apiError = (res as? org.piramalswasthya.stoptb.helpers.NetworkResponse.Error)?.message ?: "Submit Manual Result Failed"
                                 }
                             } else {
-                                val res = tbRepo.createProdigiOrder(benId, "XRAY_CHEST", reasonForRefusal = refusalReason)
+                                val res = tbRepo.createOrder(benId, "XRAY_CHEST", reasonForRefusal = refusalReason)
                                 if (res is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
                                     tbDiagnostics.xrayOrderStatus = "REFUSED"
                                     tbDiagnostics.isChestXRayDone = false
@@ -263,7 +263,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 tbRepo.preferenceDao.setTrackSubmitTime(benId, "XRAY_CHEST", System.currentTimeMillis())
                                 tbRepo.preferenceDao.setDiagPollActualStartTime(benId, "XRAY_CHEST", 0L)
                             } else {
-                                val res = tbRepo.createProdigiOrder(benId, "XRAY_CHEST", reasonForRefusal = refusalReason)
+                                val res = tbRepo.createOrder(benId, "XRAY_CHEST", reasonForRefusal = refusalReason)
                                 if (res is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
                                     tbDiagnostics.xrayOrderStatus = "REFUSED"
                                     tbDiagnostics.isChestXRayDone = false
@@ -311,6 +311,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                         isRifNotDetected -> "Rif Resistance Not Detected"
                                         else -> "Indeterminate"
                                     }
+                                    tbRepo.getTBDiagnosticsById(benId)?.rifOrderId?.let { tbDiagnostics.rifOrderId = it }
                                 } else {
                                     apiSuccess = false
                                     apiError = (rifRes as? org.piramalswasthya.stoptb.helpers.NetworkResponse.Error)?.message ?: "Submit RIF Manual Result Failed"
@@ -322,7 +323,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                     val selReason = dataset.getEnglishValueInArray(R.array.tb_reason_not_conducted_naat, r) ?: r
                                     if (selReason.equals("Other", ignoreCase = true) && !o.isNullOrBlank()) "Other: $o" else selReason
                                 }()
-                                val rifRes = tbRepo.createProdigiOrder(benId, "MDR_RIF", reasonForRefusal = rifRefusalReason)
+                                val rifRes = tbRepo.createOrder(benId, "MDR_RIF", reasonForRefusal = rifRefusalReason)
                                 if (rifRes is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
                                     tbDiagnostics.rifOrderStatus = "REFUSED"
                                 } else {
@@ -341,9 +342,10 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                         tbDiagnostics.trueNatOrderStatus = "COMPLETED"
                                         tbDiagnostics.naatResult = if (isMtbDetected) "MTB detected" else "MTB not detected"
                                         tbDiagnostics.isNaatConducted = true
+                                        tbRepo.getTBDiagnosticsById(benId)?.trueNatOrderId?.let { tbDiagnostics.trueNatOrderId = it }
 
                                         if (isMtbDetected) {
-                                            val rifRes = tbRepo.createProdigiOrder(benId, "MDR_RIF")
+                                            val rifRes = tbRepo.createOrder(benId, "MDR_RIF")
                                             if (rifRes is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
                                                 val updatedDiag = tbRepo.getTBDiagnosticsById(benId)
                                                 if (updatedDiag != null) {
@@ -360,7 +362,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                         apiError = (res as? org.piramalswasthya.stoptb.helpers.NetworkResponse.Error)?.message ?: "Submit Manual Result Failed"
                                     }
                                 } else {
-                                    val res = tbRepo.createProdigiOrder(benId, "SPUTUM_TRUENAT", reasonForRefusal = mtbRefusalReason)
+                                    val res = tbRepo.createOrder(benId, "SPUTUM_TRUENAT", reasonForRefusal = mtbRefusalReason)
                                     if (res is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
                                         tbDiagnostics.trueNatOrderStatus = "REFUSED"
                                         tbDiagnostics.isNaatConducted = false

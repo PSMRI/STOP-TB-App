@@ -241,7 +241,7 @@ interface AmritApiService {
     @POST("flw-api/diagnostic/order/push")
     suspend fun pushDiagnosticOrder(
         @Body request: DiagnosticOrderPushRequest
-    ): Response<ResponseBody>
+    ): Response<OrderPushedResponse>
 
     @POST("flw-api/diagnostic/order/testCompleted")
     suspend fun markTestCompleted(
@@ -253,13 +253,13 @@ interface AmritApiService {
     suspend fun fetchOrderResult(
         @Query("beneficiaryId") benId: Long,
         @Query("orderType") orderType: String
-    ): Response<ResponseBody>
+    ): Response<OrderResultResponse>
 
     @POST("flw-api/diagnostic/order/retry")
     suspend fun retryOrder(
         @Query("beneficiaryId") benId: Long,
         @Query("orderType") orderType: String
-    ): Response<ResponseBody>
+    ): Response<OrderResultResponse>
 
     @GET("flw-api/diagnostic/order/getBeneficiariesByStatus")
     suspend fun getBeneficiariesByStatus(
@@ -271,7 +271,7 @@ interface AmritApiService {
     @POST("flw-api/diagnostic/order/manualResult")
     suspend fun submitManualResult(
         @Body request: DiagnosticManualResultRequest
-    ): Response<ResponseBody>
+    ): Response<OrderResultResponse>
 
     @GET("flw-api/diagnostic/vendor/health")
     suspend fun getVendorHealth(

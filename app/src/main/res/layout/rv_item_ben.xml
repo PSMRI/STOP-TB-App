@@ -512,6 +512,17 @@
                             android:orientation="vertical">
 
                             <TextView
+                                android:id="@+id/tv_order_ID"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginBottom="4dp"
+                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                android:textColor="?attr/colorOnPrimary"
+                                android:textStyle="bold"
+                                android:visibility="gone"
+                                tools:text="Order ID : " />
+
+                            <TextView
                                 android:id="@+id/tv_order_status"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
