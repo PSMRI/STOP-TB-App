@@ -38,7 +38,6 @@ import java.io.FileWriter
 import javax.inject.Inject
 
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.Dispatchers
 import org.piramalswasthya.stoptb.database.room.SyncState
 
 @HiltViewModel
@@ -209,7 +208,7 @@ class AllBenViewModel @Inject constructor(
     fun initiateProdigiOrder(benId: Long, orderType: String) {
         viewModelScope.launch {
             _orderActionState.value = OrderActionResult.Loading
-            when (val response = tbRepo.createProdigiOrder(benId, orderType)) {
+            when (val response = tbRepo.createOrder(benId, orderType)) {
                 is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success -> {
                     _orderActionState.value = OrderActionResult.Success("Order created successfully. Order ID: ${response.data}", orderType)
                 }
@@ -273,7 +272,7 @@ class AllBenViewModel @Inject constructor(
     fun repeatTest(benId: Long, orderType: String, customVisitCode: Int? = null) {
         viewModelScope.launch {
             _orderActionState.value = OrderActionResult.Loading
-            when (val response = tbRepo.createProdigiOrder(benId, orderType, customVisitCode)) {
+            when (val response = tbRepo.createOrder(benId, orderType, customVisitCode)) {
                 is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success -> {
                     _orderActionState.value = OrderActionResult.Success("Fresh repeat test order created. Status: ${response.data}", orderType)
                 }
@@ -295,7 +294,7 @@ class AllBenViewModel @Inject constructor(
         var success = false
         while (attempt <= maxRetries && !success) {
             updateDiagnosticsOrderStatus(benId, "XRAY_CHEST", "CREATING")
-            val response = tbRepo.createProdigiOrder(benId, "XRAY_CHEST")
+            val response = tbRepo.createOrder(benId, "XRAY_CHEST")
             if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
                 success = true
             } else {
@@ -316,7 +315,7 @@ class AllBenViewModel @Inject constructor(
         var success = false
         while (attempt <= maxRetries && !success) {
             updateDiagnosticsOrderStatus(benId, "SPUTUM_TRUENAT", "CREATING")
-            val response = tbRepo.createProdigiOrder(benId, "SPUTUM_TRUENAT")
+            val response = tbRepo.createOrder(benId, "SPUTUM_TRUENAT")
             if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
                 success = true
             } else {
@@ -337,7 +336,7 @@ class AllBenViewModel @Inject constructor(
         var success = false
         while (attempt <= maxRetries && !success) {
             updateDiagnosticsOrderStatus(benId, "MDR_RIF", "CREATING")
-            val response = tbRepo.createProdigiOrder(benId, "MDR_RIF")
+            val response = tbRepo.createOrder(benId, "MDR_RIF")
             if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
                 success = true
             } else {
@@ -387,7 +386,7 @@ class AllBenViewModel @Inject constructor(
     fun retryResultFetch(benId: Long, orderType: String, context: Context) {
         viewModelScope.launch {
             _orderActionState.value = OrderActionResult.Loading
-            val response = tbRepo.retryProdigiOrder(benId, orderType)
+            val response = tbRepo.retryPushOrder(benId, orderType)
             if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
                 val existing = tbRepo.getTBDiagnosticsById(benId)
                 existing?.let {
@@ -435,7 +434,7 @@ class AllBenViewModel @Inject constructor(
             _orderActionState.value = OrderActionResult.Loading
             _retryingBenIds.value += benId
             val response = try {
-                tbRepo.createProdigiOrder(benId, orderType)
+                tbRepo.createOrder(benId, orderType)
             } finally {
                 _retryingBenIds.value -= benId
             }

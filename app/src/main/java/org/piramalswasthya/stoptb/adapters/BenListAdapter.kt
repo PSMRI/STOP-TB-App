@@ -445,7 +445,7 @@ class BenListAdapter(
                             when {
                                 sputumCollected == false || status.equals("REFUSED", ignoreCase = true) || isNaatConducted == false -> {
                                     val reasonStr = if (sputumCollected == false) {
-                                        formatDenialReason(tbDiag?.reasonForDenialSputum, tbDiag?.reasonForDenialSputumOther)
+                                        formatDenialReason(tbDiag.reasonForDenialSputum, tbDiag.reasonForDenialSputumOther)
                                     } else {
                                         formatDenialReason(tbDiag?.reasonNotConductedNaat, tbDiag?.reasonNotConductedNaatOther)
                                     }
@@ -518,6 +518,30 @@ class BenListAdapter(
                         binding.tvOrderStatus.visibility = View.VISIBLE
                     } else {
                         binding.tvOrderStatus.visibility = View.GONE
+                    }
+                    val orderId = when (source) {
+                        6 -> tbDiag?.xrayOrderId?.takeIf { it.isNotBlank() && !it.equals("N/A", ignoreCase = true) }
+                        7 -> tbDiag?.trueNatOrderId?.takeIf { it.isNotBlank() && !it.equals("N/A", ignoreCase = true) }
+                        else -> null
+                    }
+                    val hasOrderBeenPlaced = when (source) {
+                        6 -> tbDiag?.isReferredForDigitalChestXray == true || !tbDiag?.xrayOrderStatus.isNullOrBlank()
+                        7 -> tbDiag?.isSputumCollected == true || !tbDiag?.trueNatOrderStatus.isNullOrBlank()
+                        else -> false
+                    }
+
+                    when {
+                        orderId != null -> {
+                            binding.tvOrderID.visibility = View.VISIBLE
+                            binding.tvOrderID.text = "Order ID : $orderId"
+                        }
+                        hasOrderBeenPlaced -> {
+                            binding.tvOrderID.visibility = View.VISIBLE
+                            binding.tvOrderID.text = "Order ID : Pending"
+                        }
+                        else -> {
+                            binding.tvOrderID.visibility = View.GONE
+                        }
                     }
 
                     binding.btnVitalScreen.setOnClickListener {
