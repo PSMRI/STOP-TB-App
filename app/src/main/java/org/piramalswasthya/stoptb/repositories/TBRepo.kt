@@ -1354,13 +1354,13 @@ class TBRepo @Inject constructor(
                             xrayOrderStatus = "COMPLETED",
                             isChestXRayDone = true,
                             chestXRayResult = localResult,
-                            syncState = SyncState.SYNCED
+                            syncState = SyncState.UNSYNCED
                         )
                     } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
                         it.copy(
                             rifOrderStatus = "COMPLETED",
                             trueNatRifResult = localResult,
-                            syncState = SyncState.SYNCED
+                            syncState = SyncState.UNSYNCED
                         )
                     } else {
                         it.copy(
@@ -1368,7 +1368,7 @@ class TBRepo @Inject constructor(
                             isSputumCollected = true,
                             isNaatConducted = true,
                             naatResult = localResult,
-                            syncState = SyncState.SYNCED
+                            syncState = SyncState.UNSYNCED
                         )
                     }
                 }
@@ -1392,13 +1392,13 @@ class TBRepo @Inject constructor(
                                 xrayOrderStatus = "COMPLETED",
                                 isChestXRayDone = true,
                                 chestXRayResult = localResult,
-                                syncState = SyncState.SYNCED
+                                syncState = SyncState.UNSYNCED
                             )
                         } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
                             it.copy(
                                 rifOrderStatus = "COMPLETED",
                                 trueNatRifResult = localResult,
-                                syncState = SyncState.SYNCED
+                                syncState = SyncState.UNSYNCED
                             )
                         } else {
                             it.copy(
@@ -1406,7 +1406,7 @@ class TBRepo @Inject constructor(
                                 isSputumCollected = true,
                                 isNaatConducted = true,
                                 naatResult = localResult,
-                                syncState = SyncState.SYNCED
+                                syncState = SyncState.UNSYNCED
                             )
                         }
                     }
@@ -1449,14 +1449,14 @@ class TBRepo @Inject constructor(
                             it.copy(
                                 xrayOrderId = mockOrderId,
                                 xrayOrderStatus = status,
-                                syncState = SyncState.SYNCED
+                                syncState = SyncState.UNSYNCED
                             )
                         } else if (testType.equals("MDR_RIF", ignoreCase = true)) {
                             it.copy(
                                 rifOrderId = mockOrderId,
                                 rifOrderStatus = status,
                                 trueNatRifResult = null,
-                                syncState = SyncState.SYNCED
+                                syncState = SyncState.UNSYNCED
                             )
                         } else {
                             it.copy(
@@ -1464,11 +1464,12 @@ class TBRepo @Inject constructor(
                                 trueNatOrderStatus = status,
                                 naatResult = null,
                                 trueNatRifResult = null,
-                                syncState = SyncState.SYNCED
+                                syncState = SyncState.UNSYNCED
                             )
                         }
                     }
                     tbDao.saveTbDiagnostics(cache)
+                    upsertTBSuspectedOnOrderCreated(benId, testType, reasonForRefusal)
                     return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(mockOrderId)
                 } catch (e: Exception) {
                     return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Mock push failed")
@@ -1515,14 +1516,14 @@ class TBRepo @Inject constructor(
                                     it.copy(
                                         xrayOrderId = orderId,
                                         xrayOrderStatus = if (status.equals("COMPLETED", ignoreCase = true)) "COMPLETED" else if (status.equals("FAILED", ignoreCase = true)) "FAILED" else if (it.xrayOrderStatus == "AWAITING_PROVIDER_RESULT") "AWAITING_PROVIDER_RESULT" else status,
-                                        syncState = SyncState.SYNCED
+                                        syncState = SyncState.UNSYNCED
                                     )
                                 } else if (testType.equals("MDR_RIF", ignoreCase = true)) {
                                     it.copy(
                                         rifOrderId = orderId,
                                         rifOrderStatus = if (status.equals("COMPLETED", ignoreCase = true)) "COMPLETED" else if (status.equals("FAILED", ignoreCase = true)) "FAILED" else if (it.rifOrderStatus == "AWAITING_PROVIDER_RESULT") "AWAITING_PROVIDER_RESULT" else status,
                                         trueNatRifResult = null,
-                                        syncState = SyncState.SYNCED
+                                        syncState = SyncState.UNSYNCED
                                     )
                                 } else {
                                     it.copy(
@@ -1530,12 +1531,13 @@ class TBRepo @Inject constructor(
                                         trueNatOrderStatus = if (status.equals("COMPLETED", ignoreCase = true)) "COMPLETED" else if (status.equals("FAILED", ignoreCase = true)) "FAILED" else if (it.trueNatOrderStatus == "AWAITING_PROVIDER_RESULT") "AWAITING_PROVIDER_RESULT" else status,
                                         naatResult = null,
                                         trueNatRifResult = null,
-                                        syncState = SyncState.SYNCED
+                                        syncState = SyncState.UNSYNCED
                                     )
                                 }
                             }
                             tbDao.saveTbDiagnostics(cache)
                             orderCreatedTimestamps["${benId}_${testType}"] = System.currentTimeMillis()
+                            upsertTBSuspectedOnOrderCreated(benId, testType, reasonForRefusal)
                             return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(orderId ?: "")
                         } else {
                             val errorMsg = jsonObj.optString("errorMessage") ?: "Failed to push order"
@@ -1574,14 +1576,14 @@ class TBRepo @Inject constructor(
                             it.copy(
                                 xrayOrderId = orderId,
                                 xrayOrderStatus = "PENDING",
-                                syncState = SyncState.SYNCED
+                                syncState = SyncState.UNSYNCED
                             )
                         } else if (testType.equals("MDR_RIF", ignoreCase = true)) {
                             it.copy(
                                 rifOrderId = orderId,
                                 rifOrderStatus = "PENDING",
                                 trueNatRifResult = null,
-                                syncState = SyncState.SYNCED
+                                syncState = SyncState.UNSYNCED
                             )
                         } else {
                             it.copy(
@@ -1589,11 +1591,12 @@ class TBRepo @Inject constructor(
                                 trueNatOrderStatus = "PENDING",
                                 naatResult = null,
                                 trueNatRifResult = null,
-                                syncState = SyncState.SYNCED
+                                syncState = SyncState.UNSYNCED
                             )
                         }
                     }
                     tbDao.saveTbDiagnostics(cache)
+                    upsertTBSuspectedOnOrderCreated(benId, testType, null)
                     return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(orderId)
                 } catch (e: Exception) {
                     return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error(e.message ?: "Mock retry failed")
@@ -1619,14 +1622,14 @@ class TBRepo @Inject constructor(
                                     it.copy(
                                         xrayOrderId = orderId,
                                         xrayOrderStatus = status,
-                                        syncState = SyncState.SYNCED
+                                        syncState = SyncState.UNSYNCED
                                     )
                                 } else if (testType.equals("MDR_RIF", ignoreCase = true)) {
                                     it.copy(
                                         rifOrderId = orderId,
                                         rifOrderStatus = status,
                                         trueNatRifResult = null,
-                                        syncState = SyncState.SYNCED
+                                        syncState = SyncState.UNSYNCED
                                     )
                                 } else {
                                     it.copy(
@@ -1634,12 +1637,13 @@ class TBRepo @Inject constructor(
                                         trueNatOrderStatus = status,
                                         naatResult = null,
                                         trueNatRifResult = null,
-                                        syncState = SyncState.SYNCED
+                                        syncState = SyncState.UNSYNCED
                                     )
                                 }
                             }
                             tbDao.saveTbDiagnostics(cache)
                             orderCreatedTimestamps["${benId}_${testType}"] = System.currentTimeMillis()
+                            upsertTBSuspectedOnOrderCreated(benId, testType, null)
                             return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(orderId ?: "")
                         } else {
                             val errorMsg = jsonObj.optString("errorMessage") ?: "Failed to retry order"
@@ -1655,14 +1659,44 @@ class TBRepo @Inject constructor(
         }
     }
 
+    // Ensures a TB_SUSPECTED row exists for this beneficiary whenever a diagnostic order is
+    // created, so they show up in the backend's tb_suspected table (previously only happened
+    // via the now-unreachable manual "Track" submit button in the presumptive form).
+    private suspend fun upsertTBSuspectedOnOrderCreated(benId: Long, testType: String, reasonForRefusal: String?) {
+        try {
+            val existing = tbDao.getTbSuspected(benId)
+            val cache = (existing ?: TBSuspectedCache(benId = benId, visitLabel = "Visit 1")).let {
+                when {
+                    testType.equals("XRAY_CHEST", ignoreCase = true) -> it.copy(
+                        hasSymptoms = true,
+                        isChestXRayDone = if (reasonForRefusal != null) false else it.isChestXRayDone,
+                        syncState = SyncState.UNSYNCED
+                    )
+                    testType.equals("MDR_RIF", ignoreCase = true) -> it.copy(
+                        hasSymptoms = true,
+                        syncState = SyncState.UNSYNCED
+                    )
+                    else -> it.copy(
+                        hasSymptoms = true,
+                        isSputumCollected = if (reasonForRefusal != null) false else it.isSputumCollected,
+                        syncState = SyncState.UNSYNCED
+                    )
+                }
+            }
+            saveTBSuspected(cache)
+        } catch (e: Exception) {
+            Timber.e(e, "upsertTBSuspectedOnOrderCreated failed for benId=$benId testType=$testType")
+        }
+    }
+
     private suspend fun saveFailedOrderStatus(benId: Long, testType: String) {
         try {
             val existing = tbDao.getTbDiagnosticsByBenId(benId)
             val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
                 if (testType.equals("XRAY_CHEST", ignoreCase = true)) {
-                    it.copy(xrayOrderStatus = "FAILED", syncState = SyncState.SYNCED)
+                    it.copy(xrayOrderStatus = "FAILED", syncState = SyncState.UNSYNCED)
                 } else {
-                    it.copy(trueNatOrderStatus = "FAILED", syncState = SyncState.SYNCED)
+                    it.copy(trueNatOrderStatus = "FAILED", syncState = SyncState.UNSYNCED)
                 }
             }
             tbDao.saveTbDiagnostics(cache)
@@ -1684,19 +1718,19 @@ class TBRepo @Inject constructor(
                             orderType.equals("XRAY_CHEST", ignoreCase = true) -> {
                                 it.copy(
                                     xrayOrderStatus = status,
-                                    syncState = SyncState.SYNCED
+                                    syncState = SyncState.UNSYNCED
                                 )
                             }
                             orderType.equals("MDR_RIF", ignoreCase = true) -> {
                                 it.copy(
                                     rifOrderStatus = status,
-                                    syncState = SyncState.SYNCED
+                                    syncState = SyncState.UNSYNCED
                                 )
                             }
                             else -> {
                                 it.copy(
                                     trueNatOrderStatus = status,
-                                    syncState = SyncState.SYNCED
+                                    syncState = SyncState.UNSYNCED
                                 )
                             }
                         }
@@ -1731,20 +1765,20 @@ class TBRepo @Inject constructor(
                                         it.copy(
                                             xrayOrderStatus = status,
                                             isReferredForDigitalChestXray = true,
-                                            syncState = SyncState.SYNCED
+                                            syncState = SyncState.UNSYNCED
                                         )
                                     }
                                     orderType.equals("MDR_RIF", ignoreCase = true) -> {
                                         it.copy(
                                             rifOrderStatus = status,
-                                            syncState = SyncState.SYNCED
+                                            syncState = SyncState.UNSYNCED
                                         )
                                     }
                                     else -> {
                                         it.copy(
                                             trueNatOrderStatus = status,
                                             isSputumCollected = true,
-                                            syncState = SyncState.SYNCED
+                                            syncState = SyncState.UNSYNCED
                                         )
                                     }
                                 }
@@ -1790,7 +1824,7 @@ class TBRepo @Inject constructor(
                             xrayOrderStatus = status,
                             isChestXRayDone = true,
                             chestXRayResult = if (isPositiveResult) "TB Presumptive" else "Normal",
-                            syncState = SyncState.SYNCED
+                            syncState = SyncState.UNSYNCED
                         )
                         tbDao.saveTbDiagnostics(cache)
                         return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(status)
@@ -1803,7 +1837,7 @@ class TBRepo @Inject constructor(
                         val existing = tbDao.getTbDiagnosticsByBenId(benId)
                         val cache = (existing ?: TBDiagnosticsCache(benId = benId)).copy(
                             trueNatRifResult = rifResult,
-                            syncState = SyncState.SYNCED
+                            syncState = SyncState.UNSYNCED
                         )
                         tbDao.saveTbDiagnostics(cache)
                         return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(status)
@@ -1836,7 +1870,7 @@ class TBRepo @Inject constructor(
                             isConfirmed = if (isMtbDetected) true else existing?.isConfirmed ?: false,
                             rifOrderStatus = if (isMtbDetected) "PENDING" else existing?.rifOrderStatus,
                             rifOrderId = if (isMtbDetected) "MOCK-RIF-001" else existing?.rifOrderId,
-                            syncState = SyncState.SYNCED
+                            syncState = SyncState.UNSYNCED
                         )
                         tbDao.saveTbDiagnostics(cache)
                         return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Success(status)
@@ -1893,7 +1927,7 @@ class TBRepo @Inject constructor(
                                                         trueNatOrderStatus = "AWAITING_PROVIDER_RESULT",
                                                         isSputumCollected = true,
                                                         isNaatConducted = true,
-                                                        syncState = SyncState.SYNCED
+                                                        syncState = SyncState.UNSYNCED
                                                     )
                                                 } else {
                                                     it.copy(
@@ -1901,7 +1935,7 @@ class TBRepo @Inject constructor(
                                                         isReferredForDigitalChestXray = true,
                                                         isChestXRayDone = true,
                                                         chestXRayResult = chestResult,
-                                                        syncState = SyncState.SYNCED
+                                                        syncState = SyncState.UNSYNCED
                                                     )
                                                 }
                                             } catch (e: Exception) {
@@ -1911,7 +1945,7 @@ class TBRepo @Inject constructor(
                                                     isReferredForDigitalChestXray = true,
                                                     isChestXRayDone = true,
                                                     chestXRayResult = chestResult,
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             }
                                         } else {
@@ -1920,7 +1954,7 @@ class TBRepo @Inject constructor(
                                                 isReferredForDigitalChestXray = true,
                                                 isChestXRayDone = true,
                                                 chestXRayResult = chestResult,
-                                                syncState = SyncState.SYNCED
+                                                syncState = SyncState.UNSYNCED
                                             )
                                         }
                                     } else {
@@ -1929,7 +1963,7 @@ class TBRepo @Inject constructor(
                                             isReferredForDigitalChestXray = true,
                                             isChestXRayDone = if (isCompleted) true else it.isChestXRayDone,
                                             chestXRayResult = if (isCompleted) chestResult else it.chestXRayResult,
-                                            syncState = SyncState.SYNCED
+                                            syncState = SyncState.UNSYNCED
                                         )
                                     }
                                 } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
@@ -1965,7 +1999,7 @@ class TBRepo @Inject constructor(
                                         rifOrderStatus = computedRifStatus,
                                         rifOrderId = computedRifOrderId ?: it.rifOrderId,
                                         trueNatRifResult = if (isCompleted) rifResult else it.trueNatRifResult,
-                                        syncState = SyncState.SYNCED
+                                        syncState = SyncState.UNSYNCED
                                     )
                                 } else {
                                     val serverMtbResultSummary = dataObj?.optString("resultSummary")
@@ -2074,7 +2108,7 @@ class TBRepo @Inject constructor(
                                         isConfirmed = if (isMtbDetected) true else it.isConfirmed,
                                         rifOrderStatus = computedRifStatus,
                                         rifOrderId = computedRifOrderId ?: it.rifOrderId,
-                                        syncState = SyncState.SYNCED
+                                        syncState = SyncState.UNSYNCED
                                     )
                                 }
                             }
@@ -2186,18 +2220,18 @@ class TBRepo @Inject constructor(
                                                 it.copy(
                                                     xrayOrderStatus = "AWAITING_TEST_COMPLETION",
                                                     isReferredForDigitalChestXray = true,
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             } else if (isRif) {
                                                 it.copy(
                                                     rifOrderStatus = "AWAITING_TEST_COMPLETION",
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             } else {
                                                 it.copy(
                                                     trueNatOrderStatus = "AWAITING_TEST_COMPLETION",
                                                     isSputumCollected = true,
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             }
                                         }
@@ -2220,18 +2254,18 @@ class TBRepo @Inject constructor(
                                                 it.copy(
                                                     xrayOrderStatus = OrderStatus.AWAITING_PROVIDER_RESULT.name,
                                                     isReferredForDigitalChestXray = true,
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             } else if (isRif) {
                                                 it.copy(
                                                     rifOrderStatus = OrderStatus.AWAITING_PROVIDER_RESULT.name,
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             } else {
                                                 it.copy(
                                                     trueNatOrderStatus = OrderStatus.AWAITING_PROVIDER_RESULT.name,
                                                     isSputumCollected = true,
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             }
                                         }
@@ -2262,19 +2296,19 @@ class TBRepo @Inject constructor(
                                                     xrayOrderStatus = "COMPLETED",
                                                     isReferredForDigitalChestXray = true,
                                                     isChestXRayDone = true,
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             } else if (isRif) {
                                                 it.copy(
                                                     rifOrderStatus = "COMPLETED",
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             } else {
                                                 it.copy(
                                                     trueNatOrderStatus = "COMPLETED",
                                                     isSputumCollected = true,
                                                     isNaatConducted = true,
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             }
                                         }
@@ -2296,18 +2330,18 @@ class TBRepo @Inject constructor(
                                                 it.copy(
                                                     xrayOrderStatus = "POLLING_TIMEOUT",
                                                     isReferredForDigitalChestXray = true,
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             } else if (isRif) {
                                                 it.copy(
                                                     rifOrderStatus = "POLLING_TIMEOUT",
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             } else {
                                                 it.copy(
                                                     trueNatOrderStatus = "POLLING_TIMEOUT",
                                                     isSputumCollected = true,
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             }
                                         }
@@ -2332,18 +2366,18 @@ class TBRepo @Inject constructor(
                                                 it.copy(
                                                     xrayOrderStatus = "FAILED",
                                                     isReferredForDigitalChestXray = true,
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             } else if (isRif) {
                                                 it.copy(
                                                     rifOrderStatus = "FAILED",
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             } else {
                                                 it.copy(
                                                     trueNatOrderStatus = "FAILED",
                                                     isSputumCollected = true,
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             }
                                         }
@@ -2365,18 +2399,18 @@ class TBRepo @Inject constructor(
                                                 it.copy(
                                                     xrayOrderStatus = "REFUSED",
                                                     isReferredForDigitalChestXray = false,
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             } else if (isRif) {
                                                 it.copy(
                                                     rifOrderStatus = "REFUSED",
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             } else {
                                                 it.copy(
                                                     trueNatOrderStatus = "REFUSED",
                                                     isSputumCollected = false,
-                                                    syncState = SyncState.SYNCED
+                                                    syncState = SyncState.UNSYNCED
                                                 )
                                             }
                                         }
@@ -2398,18 +2432,18 @@ class TBRepo @Inject constructor(
                                                  it.copy(
                                                      xrayOrderStatus = "MANUAL_ENTRY",
                                                      isReferredForDigitalChestXray = true,
-                                                     syncState = SyncState.SYNCED
+                                                     syncState = SyncState.UNSYNCED
                                                  )
                                              } else if (isRif) {
                                                  it.copy(
                                                      rifOrderStatus = "MANUAL_ENTRY",
-                                                     syncState = SyncState.SYNCED
+                                                     syncState = SyncState.UNSYNCED
                                                  )
                                              } else {
                                                  it.copy(
                                                      trueNatOrderStatus = "MANUAL_ENTRY",
                                                      isSputumCollected = true,
-                                                     syncState = SyncState.SYNCED
+                                                     syncState = SyncState.UNSYNCED
                                                  )
                                              }
                                          }

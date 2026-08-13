@@ -194,11 +194,11 @@ class TBSuspectedQuickViewModel @Inject constructor(
         val existing = tbRepo.getTBDiagnosticsById(benId)
         val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
             if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
-                it.copy(xrayOrderStatus = status, syncState = SyncState.SYNCED)
+                it.copy(xrayOrderStatus = status, syncState = SyncState.UNSYNCED)
             } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
-                it.copy(rifOrderStatus = status, syncState = SyncState.SYNCED)
+                it.copy(rifOrderStatus = status, syncState = SyncState.UNSYNCED)
             } else {
-                it.copy(trueNatOrderStatus = status, syncState = SyncState.SYNCED)
+                it.copy(trueNatOrderStatus = status, syncState = SyncState.UNSYNCED)
             }
         }
         tbRepo.saveTBDiagnostics(cache)
@@ -374,8 +374,19 @@ class TBSuspectedQuickViewModel @Inject constructor(
                     }
 
                     if (apiSuccess) {
-                        val existingId = tbRepo.getTBDiagnosticsById(benId)?.id ?: 0
-                        if (existingId > 0) tbDiagnostics = tbDiagnostics.copy(id = existingId)
+
+                        // xrayOrderId/trueNatOrderId/rifOrderId to Room internally; tbDiagnostics
+                        // here is the stale snapshot loaded at init{}, so merge those ids forward
+                        // instead of only carrying the id, or the final save below wipes them out.
+                        val freshDiag = tbRepo.getTBDiagnosticsById(benId)
+                        if (freshDiag != null) {
+                            tbDiagnostics = tbDiagnostics.copy(
+                                id = freshDiag.id,
+                                xrayOrderId = freshDiag.xrayOrderId ?: tbDiagnostics.xrayOrderId,
+                                trueNatOrderId = freshDiag.trueNatOrderId ?: tbDiagnostics.trueNatOrderId,
+                                rifOrderId = freshDiag.rifOrderId ?: tbDiagnostics.rifOrderId
+                            )
+                        }
                         tbDiagnostics.syncState = SyncState.UNSYNCED
                         tbRepo.saveTBDiagnostics(tbDiagnostics)
 

@@ -183,10 +183,16 @@ class BenListAdapter(
                         6 -> {
                             val status = tbDiag?.xrayOrderStatus
                             val referred = tbDiag?.isReferredForDigitalChestXray
+                            val isHubConnected = pref?.isCampHubConnected() == true
+                            val isXrayDevIntegrated = pref?.getXrayIntegrated() == true
+                            val isXrayManual = !isXrayDevIntegrated || !isHubConnected
 
                             when {
                                 status.equals("REFUSED", ignoreCase = true) || referred == false -> {
                                     ButtonConfig("TEST REFUSED", android.R.color.darker_gray, "NONE", "XRAY_CHEST")
+                                }
+                                !isXrayManual && tbDiag?.xrayOrderId.isNullOrBlank() -> {
+                                    ButtonConfig("Retry Referral", android.R.color.holo_red_dark, "RETRY_PUSH", "XRAY_CHEST")
                                 }
                                 status.equals("COMPLETED", ignoreCase = true) -> {
                                     ButtonConfig("VIEW RESULT", android.R.color.holo_green_dark, "VIEW", "XRAY_CHEST")
@@ -194,7 +200,7 @@ class BenListAdapter(
                                 status.equals("FAILED", ignoreCase = true) -> {
                                     ButtonConfig("Retry Referral", android.R.color.holo_red_dark, "RETRY_PUSH", "XRAY_CHEST")
                                 }
-                                status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PENDING", ignoreCase = true) -> {
+                                !isXrayManual && (status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PENDING", ignoreCase = true)) -> {
                                     ButtonConfig("Pending", android.R.color.darker_gray, "NONE", "XRAY_CHEST")
                                 }
                                 status.equals("POLLING_TIMEOUT", ignoreCase = true) || status.equals("MANUAL_ENTRY", ignoreCase = true) -> {
@@ -296,13 +302,16 @@ class BenListAdapter(
                                     }
                                     conf
                                 }
+                                !isTruenatManual && tbDiag?.trueNatOrderId.isNullOrBlank() -> {
+                                    ButtonConfig("Retry Referral", android.R.color.holo_red_dark, "RETRY_PUSH", "SPUTUM_TRUENAT")
+                                }
                                 status.equals("FAILED", ignoreCase = true) -> {
                                     ButtonConfig("Retry Referral", android.R.color.holo_red_dark, "RETRY_PUSH", "SPUTUM_TRUENAT")
                                 }
                                 status.equals("POLLING_TIMEOUT", ignoreCase = true) || status.equals("MANUAL_ENTRY", ignoreCase = true) -> {
                                     ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
                                 }
-                                status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PENDING", ignoreCase = true) -> {
+                                !isTruenatManual && (status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PENDING", ignoreCase = true)) -> {
                                     ButtonConfig("Pending", android.R.color.darker_gray, "NONE", "SPUTUM_TRUENAT")
                                 }
                                 else -> {

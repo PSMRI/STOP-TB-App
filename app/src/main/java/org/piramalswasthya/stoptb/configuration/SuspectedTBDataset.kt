@@ -7,6 +7,7 @@ import org.piramalswasthya.stoptb.model.AgeUnit
 import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.FormElement
 import org.piramalswasthya.stoptb.model.InputType
+import org.piramalswasthya.stoptb.model.OrderStatus
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
@@ -53,12 +54,15 @@ class SuspectedTBDataset(
         hasDependants = true
     )
 
+    // This form is always view-only, so show the single stored value as plain text
+    // instead of a 6-option disabled radio group (entries kept only for the
+    // getLocalValueInArray lookup used to localize the raw stored value).
     private val sputumSubmittedAt = FormElement(
         id = 3,
-        inputType = InputType.RADIO,
+        inputType = InputType.TEXT_VIEW,
         title = resources.getString(R.string.sputum_sample_submitted_at),
-        arrayId = R.array.tb_suspected_sample_submitted_at,
-        entries = resources.getStringArray(R.array.tb_suspected_sample_submitted_at),
+        arrayId = R.array.tb_diagnostics_sputum_submitted_at,
+        entries = resources.getStringArray(R.array.tb_diagnostics_sputum_submitted_at),
         required = false,
         hasDependants = true
     )
@@ -151,7 +155,10 @@ class SuspectedTBDataset(
         ben?.let {
             dateOfVisit.min = it.regDate
         }
-        val submitted = screening?.sputumSampleSubmittedAt
+        // TBScreeningCache.sputumSampleSubmittedAt is never populated (hardcoded to null in
+        // TBScreeningDataset) — the device-integration flow writes this onto TBDiagnosticsCache
+        // instead, so that's the real source; screening is kept only as a legacy fallback.
+        val submitted = diagnostics?.sputumSubmittedAt ?: screening?.sputumSampleSubmittedAt
         sputumSampleSubmittedAtScreeningCamp.value = when {
             submitted.equals("TB Screening Camp", ignoreCase = true) || submitted.equals("Yes", ignoreCase = true) -> yesValue
             else -> noValue
@@ -164,14 +171,14 @@ class SuspectedTBDataset(
             dateOfVisit.value = getDateFromLong(saved.visitDate)
             sputumCollected.value = boolToYesNo(saved.isSputumCollected)
             sputumSubmittedAt.value = getLocalValueInArray(
-                R.array.tb_suspected_sample_submitted_at,
+                R.array.tb_diagnostics_sputum_submitted_at,
                 saved.sputumSubmittedAt
             )
 //            sputumTestResult.value = getLocalValueInArray(R.array.tb_test_result, saved.sputumTestResult)
             digitalChestXRayConducted.value = boolToYesNo(saved.isChestXRayDone)
-            digitalChestXRayResult.value = getLocalValueInArray(R.array.tb_test_result, saved.chestXRayResult)
+            digitalChestXRayResult.value = mapToPositiveNegative(saved.chestXRayResult)
             naatConducted.value = boolToYesNo(saved.isNaatConducted)
-            naatResult.value = getLocalValueInArray(R.array.tb_test_result, saved.naatResult)
+            naatResult.value = mapToPositiveNegative(saved.naatResult)
             liquidCultureConducted.value = boolToYesNo(saved.isLiquidCultureConducted)
             liquidCultureResult.value = getLocalValueInArray(R.array.tb_test_result, saved.liquidCultureResult)
             nikshayId.value = saved.nikshayId
@@ -181,6 +188,7 @@ class SuspectedTBDataset(
         }
 
         syncFieldStates()
+        applyResultPlaceholders()
         setUpPage(buildFormList())
     }
 
@@ -289,7 +297,7 @@ class SuspectedTBDataset(
             form.hasSymptoms = true
             form.isSputumCollected = isYes(sputumCollected).takeIf { isSputumReferralEnabled() }
             form.sputumSubmittedAt =
-                getEnglishValueInArray(R.array.tb_suspected_sample_submitted_at, sputumSubmittedAt.value)
+                getEnglishValueInArray(R.array.tb_diagnostics_sputum_submitted_at, sputumSubmittedAt.value)
 //            form.sputumTestResult = getEnglishValueInArray(R.array.tb_test_result, sputumTestResult.value)
             form.isChestXRayDone = isYes(digitalChestXRayConducted).takeIf { isDigitalChestXRayReferralEnabled() }
             form.chestXRayResult = getEnglishValueInArray(R.array.tb_test_result, digitalChestXRayResult.value)
@@ -340,7 +348,7 @@ class SuspectedTBDataset(
 
         if (isDigitalChestXRayReferralEnabled()) {
             add(digitalChestXRayConducted)
-            if (isYes(digitalChestXRayConducted)) {
+            if (isYes(digitalChestXRayConducted) || hasActiveOrder(diagnosticsCache?.xrayOrderStatus)) {
                 add(digitalChestXRayResult)
             }
         }
@@ -354,7 +362,7 @@ class SuspectedTBDataset(
 
         if (isNaatReferralEnabled()) {
             add(naatConducted)
-            if (isYes(naatConducted)) {
+            if (isYes(naatConducted) || hasActiveOrder(diagnosticsCache?.trueNatOrderStatus)) {
                 add(naatResult)
             }
         }
@@ -517,16 +525,16 @@ class SuspectedTBDataset(
         diagnostics ?: return
         sputumCollected.value = boolToYesNo(diagnostics.isSputumCollected)
         sputumSubmittedAt.value = getLocalValueInArray(
-            R.array.tb_suspected_sample_submitted_at,
+            R.array.tb_diagnostics_sputum_submitted_at,
             diagnostics.sputumSubmittedAt
         )
         digitalChestXRayConducted.value = boolToYesNo(diagnostics.isChestXRayDone)
-        digitalChestXRayResult.value = getLocalValueInArray(R.array.tb_test_result, diagnostics.chestXRayResult)
+        digitalChestXRayResult.value = mapToPositiveNegative(diagnostics.chestXRayResult)
         naatConducted.value = boolToYesNo(
             diagnostics.isNaatConducted ?: diagnostics.chestXRayResult.isPositiveTestResult()
                 .takeIf { it }
         )
-        naatResult.value = getLocalValueInArray(R.array.tb_test_result, diagnostics.naatResult)
+        naatResult.value = mapToPositiveNegative(diagnostics.naatResult)
         liquidCultureConducted.value = boolToYesNo(
             diagnostics.isLiquidCultureConducted ?: diagnostics.recommendedForLiquidCultureTest
         )
@@ -539,7 +547,7 @@ class SuspectedTBDataset(
         if (sputumCollected.value.isNullOrBlank()) sputumCollected.value = boolToYesNo(diagnostics.isSputumCollected)
         if (sputumSubmittedAt.value.isNullOrBlank()) {
             sputumSubmittedAt.value = getLocalValueInArray(
-                R.array.tb_suspected_sample_submitted_at,
+                R.array.tb_diagnostics_sputum_submitted_at,
                 diagnostics.sputumSubmittedAt
             )
         }
@@ -547,7 +555,7 @@ class SuspectedTBDataset(
             digitalChestXRayConducted.value = boolToYesNo(diagnostics.isChestXRayDone)
         }
         if (digitalChestXRayResult.value.isNullOrBlank()) {
-            digitalChestXRayResult.value = getLocalValueInArray(R.array.tb_test_result, diagnostics.chestXRayResult)
+            digitalChestXRayResult.value = mapToPositiveNegative(diagnostics.chestXRayResult)
         }
         if (naatConducted.value.isNullOrBlank()) {
             naatConducted.value = boolToYesNo(
@@ -556,7 +564,7 @@ class SuspectedTBDataset(
             )
         }
         if (naatResult.value.isNullOrBlank()) {
-            naatResult.value = getLocalValueInArray(R.array.tb_test_result, diagnostics.naatResult)
+            naatResult.value = mapToPositiveNegative(diagnostics.naatResult)
         }
         if (liquidCultureConducted.value.isNullOrBlank()) {
             liquidCultureConducted.value = boolToYesNo(
@@ -569,6 +577,48 @@ class SuspectedTBDataset(
         if (nikshayId.value.isNullOrBlank()) nikshayId.value = diagnostics.nikshayId
     }
 
+    // Device-integration results (e.g. chestXRayResult="TB Presumptive"/"Normal",
+    // naatResult="MTB detected"/"MTB not detected"/"Invalid") don't literally match the
+    // Positive/Negative entries in tb_test_result, so an exact array lookup returns null.
+    // Try the exact lookup first (covers legacy manually-entered "Positive"/"Negative" values),
+    // then fall back to keyword classification for device-sourced result strings.
+    private fun mapToPositiveNegative(rawValue: String?): String? {
+        if (rawValue.isNullOrBlank()) return null
+        getLocalValueInArray(R.array.tb_test_result, rawValue)?.let { return it }
+        val clean = rawValue.trim().lowercase()
+        val isNegative = clean.contains("negative") || clean.contains("not detected") ||
+            clean.contains("normal") || clean.contains("invalid")
+        return positiveNegativeEntries.getOrNull(if (isNegative) 1 else 0)
+    }
+
+    private fun hasActiveOrder(status: String?): Boolean =
+        !status.isNullOrBlank() && !status.equals(OrderStatus.NONE.name, ignoreCase = true)
+
+    private fun resultPlaceholder(status: String?): String? = when {
+        status.isNullOrBlank() -> null
+        status.equals(OrderStatus.NONE.name, ignoreCase = true) -> null
+        status.equals(OrderStatus.COMPLETED.name, ignoreCase = true) -> null
+        status.equals(OrderStatus.REFUSED.name, ignoreCase = true) -> "Test Refused"
+        status.equals(OrderStatus.FAILED.name, ignoreCase = true) -> "Referral Failed"
+        else -> "Waiting for Result" // PENDING, CREATED, AWAITING_TEST_COMPLETION, AWAITING_PROVIDER_RESULT, POLLING_TIMEOUT, MANUAL_ENTRY
+    }
+
+    // Runs after syncFieldStates() so its resetField() calls can't clobber the placeholder.
+    private fun applyResultPlaceholders() {
+        if (digitalChestXRayResult.value.isNullOrBlank()) {
+            resultPlaceholder(diagnosticsCache?.xrayOrderStatus)?.let {
+                digitalChestXRayResult.inputType = InputType.TEXT_VIEW
+                digitalChestXRayResult.value = it
+            }
+        }
+        if (naatResult.value.isNullOrBlank()) {
+            resultPlaceholder(diagnosticsCache?.trueNatOrderStatus)?.let {
+                naatResult.inputType = InputType.TEXT_VIEW
+                naatResult.value = it
+            }
+        }
+    }
+
     private fun boolToYesNo(value: Boolean?): String =
         when (value) {
             true -> yesValue
@@ -578,8 +628,14 @@ class SuspectedTBDataset(
 
     private fun isYes(formElement: FormElement): Boolean = formElement.value == yesValue
 
-    private fun String?.isPositiveTestResult(): Boolean =
-        !isNullOrBlank() && equals(englishResources.getStringArray(R.array.tb_test_result).firstOrNull(), ignoreCase = true)
+    private fun String?.isPositiveTestResult(): Boolean {
+        if (isNullOrBlank()) return false
+        val clean = trim().lowercase()
+        if (clean.contains("negative") || clean.contains("not detected") || clean.contains("normal") || clean.contains("invalid")) {
+            return false
+        }
+        return clean.contains("positive") || clean.contains("presumptive") || clean.contains("detected") || clean.contains("abnormal")
+    }
 
     private fun updateNikshayVisibility() {
         val anchor = when {
