@@ -158,7 +158,7 @@ class SuspectedTBDataset(
         // TBScreeningCache.sputumSampleSubmittedAt is never populated (hardcoded to null in
         // TBScreeningDataset) — the device-integration flow writes this onto TBDiagnosticsCache
         // instead, so that's the real source; screening is kept only as a legacy fallback.
-        val submitted = diagnostics?.sputumSubmittedAt ?: screening?.sputumSampleSubmittedAt
+        val submitted = diagnostics?.sputumSubmittedAt ?: saved?.sputumSubmittedAt ?: screening?.sputumSampleSubmittedAt
         sputumSampleSubmittedAtScreeningCamp.value = when {
             submitted.equals("TB Screening Camp", ignoreCase = true) || submitted.equals("Yes", ignoreCase = true) -> yesValue
             else -> noValue
