@@ -8,6 +8,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import org.piramalswasthya.stoptb.BuildConfig
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -530,18 +531,22 @@ class BenListAdapter(
                         else -> false
                     }
 
-                    when {
-                        orderId != null -> {
-                            binding.tvOrderID.visibility = View.VISIBLE
-                            binding.tvOrderID.text = "Order ID : $orderId"
+                    if (BuildConfig.FLAVOR.contains("uat", ignoreCase = true)) {
+                        when {
+                            orderId != null -> {
+                                binding.tvOrderID.visibility = View.VISIBLE
+                                binding.tvOrderID.text = "Order ID : $orderId"
+                            }
+                            hasOrderBeenPlaced -> {
+                                binding.tvOrderID.visibility = View.VISIBLE
+                                binding.tvOrderID.text = "Order ID : Pending"
+                            }
+                            else -> {
+                                binding.tvOrderID.visibility = View.GONE
+                            }
                         }
-                        hasOrderBeenPlaced -> {
-                            binding.tvOrderID.visibility = View.VISIBLE
-                            binding.tvOrderID.text = "Order ID : Pending"
-                        }
-                        else -> {
-                            binding.tvOrderID.visibility = View.GONE
-                        }
+                    } else {
+                        binding.tvOrderID.visibility = View.GONE
                     }
 
                     binding.btnVitalScreen.setOnClickListener {
