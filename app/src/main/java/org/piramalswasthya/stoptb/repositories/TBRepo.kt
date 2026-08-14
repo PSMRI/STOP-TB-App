@@ -1045,7 +1045,16 @@ class TBRepo @Inject constructor(
 
             for (chunk in chunks) {
                 try {
-                    val chunkDtos = chunk.map { it.toDTO() }
+                    val chunkDtos = chunk.mapNotNull { suspected ->
+                        val benRegId = benDao.getBen(suspected.benId)?.benRegId?.takeIf { it > 0L }
+                        benRegId?.let { regId ->
+                            suspected.toDTO().copy(benId = regId)
+                        }
+                    }
+                    if (chunkDtos.isEmpty()) {
+                        failCount += chunk.size
+                        continue
+                    }
 
                     val response = tmcNetworkApiService.saveTBSuspectedData(
                         TBSuspectedRequestDTO(
@@ -1113,7 +1122,16 @@ class TBRepo @Inject constructor(
 
             for (chunk in chunks) {
                 try {
-                    val chunkDtos = chunk.map { it.toDTO() }
+                    val chunkDtos = chunk.mapNotNull { confirmed ->
+                        val benRegId = benDao.getBen(confirmed.benId)?.benRegId?.takeIf { it > 0L }
+                        benRegId?.let { regId ->
+                            confirmed.toDTO().copy(benId = regId)
+                        }
+                    }
+                    if (chunkDtos.isEmpty()) {
+                        failCount += chunk.size
+                        continue
+                    }
 
                     val response = tmcNetworkApiService.saveTBConfirmedData(
                         TBConfirmedRequestDTO(
@@ -1956,21 +1974,22 @@ class TBRepo @Inject constructor(
                                     )
                                 }
                             }
-                            tbDao.saveTbDiagnostics(cache)
+                            val syncedCache = cache.copy(syncState = SyncState.SYNCED)
+                            tbDao.saveTbDiagnostics(syncedCache)
 
                             try {
                                 val existingSuspected = tbDao.getTbSuspected(benId)
                                 if (existingSuspected != null) {
                                     val updatedSuspected = existingSuspected.copy(
-                                        isChestXRayDone = cache.isChestXRayDone ?: existingSuspected.isChestXRayDone,
-                                        chestXRayResult = cache.chestXRayResult ?: existingSuspected.chestXRayResult,
-                                        isSputumCollected = cache.isSputumCollected ?: existingSuspected.isSputumCollected,
-                                        isNaatConducted = cache.isNaatConducted ?: existingSuspected.isNaatConducted,
-                                        naatResult = cache.naatResult ?: existingSuspected.naatResult,
-                                        isTBConfirmed = cache.isTBConfirmed ?: existingSuspected.isTBConfirmed,
-                                        isConfirmed = cache.isConfirmed || existingSuspected.isConfirmed,
-                                        mdrRifResult = cache.trueNatRifResult ?: existingSuspected.mdrRifResult,
-                                        syncState = SyncState.UNSYNCED
+                                        isChestXRayDone = syncedCache.isChestXRayDone ?: existingSuspected.isChestXRayDone,
+                                        chestXRayResult = syncedCache.chestXRayResult ?: existingSuspected.chestXRayResult,
+                                        isSputumCollected = syncedCache.isSputumCollected ?: existingSuspected.isSputumCollected,
+                                        isNaatConducted = syncedCache.isNaatConducted ?: existingSuspected.isNaatConducted,
+                                        naatResult = syncedCache.naatResult ?: existingSuspected.naatResult,
+                                        isTBConfirmed = syncedCache.isTBConfirmed ?: existingSuspected.isTBConfirmed,
+                                        isConfirmed = syncedCache.isConfirmed || existingSuspected.isConfirmed,
+                                        mdrRifResult = syncedCache.trueNatRifResult ?: existingSuspected.mdrRifResult,
+                                        syncState = existingSuspected.syncState
                                     )
                                     tbDao.saveTbSuspected(updatedSuspected)
                                 }
@@ -2072,6 +2091,9 @@ class TBRepo @Inject constructor(
                                 val ben = benDao.getBenByRegId(regId) ?: benDao.getBen(regId)
                                 ben?.let { b ->
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
+                                    if (existing?.syncState != null && existing.syncState != SyncState.SYNCED) {
+                                        return@let
+                                    }
                                     val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
                                     val isInProgressOrDone = currentStatus.equals("IN_PROGRESS", ignoreCase = true) ||
                                             currentStatus.equals(OrderStatus.AWAITING_PROVIDER_RESULT.name, ignoreCase = true) ||
@@ -2084,18 +2106,18 @@ class TBRepo @Inject constructor(
                                                 it.copy(
                                                     xrayOrderStatus = OrderStatus.AWAITING_TEST_COMPLETION.name,
                                                     isReferredForDigitalChestXray = true,
-                                                    syncState = SyncState.UNSYNCED
+                                                    syncState = SyncState.SYNCED
                                                 )
                                             } else if (isRif) {
                                                 it.copy(
                                                     rifOrderStatus = OrderStatus.AWAITING_TEST_COMPLETION.name,
-                                                    syncState = SyncState.UNSYNCED
+                                                    syncState = SyncState.SYNCED
                                                 )
                                             } else {
                                                 it.copy(
                                                     trueNatOrderStatus = OrderStatus.AWAITING_TEST_COMPLETION.name,
                                                     isSputumCollected = true,
-                                                    syncState = SyncState.UNSYNCED
+                                                    syncState = SyncState.SYNCED
                                                 )
                                             }
                                         }
@@ -2109,6 +2131,9 @@ class TBRepo @Inject constructor(
                                 val ben = benDao.getBenByRegId(regId) ?: benDao.getBen(regId)
                                 ben?.let { b ->
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
+                                    if (existing?.syncState != null && existing.syncState != SyncState.SYNCED) {
+                                        return@let
+                                    }
                                     val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
                                     val isDone = currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
                                     Timber.d("STOP-TB polling debug: awaitingProviderResult regId=$regId benId=${b.beneficiaryId} currentStatus=$currentStatus isDone=$isDone")
@@ -2118,18 +2143,18 @@ class TBRepo @Inject constructor(
                                                 it.copy(
                                                     xrayOrderStatus = OrderStatus.AWAITING_PROVIDER_RESULT.name,
                                                     isReferredForDigitalChestXray = true,
-                                                    syncState = SyncState.UNSYNCED
+                                                    syncState = SyncState.SYNCED
                                                 )
                                             } else if (isRif) {
                                                 it.copy(
                                                     rifOrderStatus = OrderStatus.AWAITING_PROVIDER_RESULT.name,
-                                                    syncState = SyncState.UNSYNCED
+                                                    syncState = SyncState.SYNCED
                                                 )
                                             } else {
                                                 it.copy(
                                                     trueNatOrderStatus = OrderStatus.AWAITING_PROVIDER_RESULT.name,
                                                     isSputumCollected = true,
-                                                    syncState = SyncState.UNSYNCED
+                                                    syncState = SyncState.SYNCED
                                                 )
                                             }
                                         }
@@ -2143,6 +2168,9 @@ class TBRepo @Inject constructor(
                                 val ben = benDao.getBenByRegId(regId) ?: benDao.getBen(regId)
                                 ben?.let { b ->
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
+                                    if (existing?.syncState != null && existing.syncState != SyncState.SYNCED) {
+                                        return@let
+                                    }
                                     val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
                                     val needsResultFetch = when {
                                         isXray -> !currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) || existing?.chestXRayResult.isNullOrBlank()
@@ -2160,19 +2188,19 @@ class TBRepo @Inject constructor(
                                                     xrayOrderStatus = OrderStatus.COMPLETED.name,
                                                     isReferredForDigitalChestXray = true,
                                                     isChestXRayDone = true,
-                                                    syncState = SyncState.UNSYNCED
+                                                    syncState = SyncState.SYNCED
                                                 )
                                             } else if (isRif) {
                                                 it.copy(
                                                     rifOrderStatus = OrderStatus.COMPLETED.name,
-                                                    syncState = SyncState.UNSYNCED
+                                                    syncState = SyncState.SYNCED
                                                 )
                                             } else {
                                                 it.copy(
                                                     trueNatOrderStatus = OrderStatus.COMPLETED.name,
                                                     isSputumCollected = true,
                                                     isNaatConducted = true,
-                                                    syncState = SyncState.UNSYNCED
+                                                    syncState = SyncState.SYNCED
                                                 )
                                             }
                                         }
@@ -2186,6 +2214,9 @@ class TBRepo @Inject constructor(
                                 val ben = benDao.getBenByRegId(regId) ?: benDao.getBen(regId)
                                 ben?.let { b ->
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
+                                    if (existing?.syncState != null && existing.syncState != SyncState.SYNCED) {
+                                        return@let
+                                    }
                                     val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
                                     val isDone = currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
                                     if (!isDone) {
@@ -2194,18 +2225,18 @@ class TBRepo @Inject constructor(
                                                 it.copy(
                                                     xrayOrderStatus = OrderStatus.POLLING_TIMEOUT.name,
                                                     isReferredForDigitalChestXray = true,
-                                                    syncState = SyncState.UNSYNCED
+                                                    syncState = SyncState.SYNCED
                                                 )
                                             } else if (isRif) {
                                                 it.copy(
                                                     rifOrderStatus = OrderStatus.POLLING_TIMEOUT.name,
-                                                    syncState = SyncState.UNSYNCED
+                                                    syncState = SyncState.SYNCED
                                                 )
                                             } else {
                                                 it.copy(
                                                     trueNatOrderStatus = OrderStatus.POLLING_TIMEOUT.name,
                                                     isSputumCollected = true,
-                                                    syncState = SyncState.UNSYNCED
+                                                    syncState = SyncState.SYNCED
                                                 )
                                             }
                                         }
@@ -2219,6 +2250,9 @@ class TBRepo @Inject constructor(
                                 val ben = benDao.getBenByRegId(regId) ?: benDao.getBen(regId)
                                 ben?.let { b ->
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
+                                    if (existing?.syncState != null && existing.syncState != SyncState.SYNCED) {
+                                        return@let
+                                    }
                                     val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
                                     val isDone = currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
                                     // Same staleness guard as the "Polling Timed Out" bucket above.
@@ -2230,18 +2264,18 @@ class TBRepo @Inject constructor(
                                                 it.copy(
                                                     xrayOrderStatus = OrderStatus.FAILED.name,
                                                     isReferredForDigitalChestXray = true,
-                                                    syncState = SyncState.UNSYNCED
+                                                    syncState = SyncState.SYNCED
                                                 )
                                             } else if (isRif) {
                                                 it.copy(
                                                     rifOrderStatus = OrderStatus.FAILED.name,
-                                                    syncState = SyncState.UNSYNCED
+                                                    syncState = SyncState.SYNCED
                                                 )
                                             } else {
                                                 it.copy(
                                                     trueNatOrderStatus = OrderStatus.FAILED.name,
                                                     isSputumCollected = true,
-                                                    syncState = SyncState.UNSYNCED
+                                                    syncState = SyncState.SYNCED
                                                 )
                                             }
                                         }
@@ -2255,6 +2289,9 @@ class TBRepo @Inject constructor(
                                 val ben = benDao.getBenByRegId(regId) ?: benDao.getBen(regId)
                                 ben?.let { b ->
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
+                                    if (existing?.syncState != null && existing.syncState != SyncState.SYNCED) {
+                                        return@let
+                                    }
                                     val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
                                     val isRefused = currentStatus.equals(OrderStatus.REFUSED.name, ignoreCase = true)
                                     if (!isRefused) {
@@ -2263,7 +2300,7 @@ class TBRepo @Inject constructor(
                                                 it.copy(
                                                     xrayOrderStatus = OrderStatus.REFUSED.name,
                                                     isReferredForDigitalChestXray = false,
-                                                    syncState = SyncState.UNSYNCED
+                                                    syncState = SyncState.SYNCED
                                                 )
                                             } else if (isRif) {
                                                 it.copy(
@@ -2274,7 +2311,7 @@ class TBRepo @Inject constructor(
                                                 it.copy(
                                                     trueNatOrderStatus = OrderStatus.REFUSED.name,
                                                     isSputumCollected = false,
-                                                    syncState = SyncState.UNSYNCED
+                                                    syncState = SyncState.SYNCED
                                                 )
                                             }
                                         }
@@ -2288,6 +2325,9 @@ class TBRepo @Inject constructor(
                                 val ben = benDao.getBenByRegId(regId) ?: benDao.getBen(regId)
                                 ben?.let { b ->
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
+                                    if (existing?.syncState != null && existing.syncState != SyncState.SYNCED) {
+                                        return@let
+                                    }
                                      val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
                                      val isDone = currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
                                      if (!isDone) {
@@ -2296,18 +2336,18 @@ class TBRepo @Inject constructor(
                                                  it.copy(
                                                      xrayOrderStatus = OrderStatus.MANUAL_ENTRY.name,
                                                      isReferredForDigitalChestXray = true,
-                                                     syncState = SyncState.UNSYNCED
+                                                     syncState = SyncState.SYNCED
                                                  )
                                              } else if (isRif) {
                                                  it.copy(
                                                      rifOrderStatus = OrderStatus.MANUAL_ENTRY.name,
-                                                     syncState = SyncState.UNSYNCED
+                                                     syncState = SyncState.SYNCED
                                                  )
                                              } else {
                                                  it.copy(
                                                      trueNatOrderStatus = OrderStatus.MANUAL_ENTRY.name,
                                                      isSputumCollected = true,
-                                                     syncState = SyncState.UNSYNCED
+                                                     syncState = SyncState.SYNCED
                                                  )
                                              }
                                          }

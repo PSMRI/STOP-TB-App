@@ -230,7 +230,7 @@ class TBScreeningFormViewModel @Inject constructor(
                                     xrayOrderStatus = if (isIntegrated) OrderStatus.AWAITING_PROVIDER_RESULT.name else OrderStatus.PENDING.name,
                                     isChestXRayDone = isIntegrated,
                                     isReferredForDigitalChestXray = true,
-                                    syncState = SyncState.SYNCED
+                                    syncState = SyncState.UNSYNCED
                                 )
                                 tbRepo.saveTBDiagnostics(updated)
                             }
@@ -273,7 +273,7 @@ class TBScreeningFormViewModel @Inject constructor(
                                     trueNatOrderStatus = if (isIntegrated) OrderStatus.AWAITING_PROVIDER_RESULT.name else OrderStatus.PENDING.name,
                                     isSputumCollected = true,
                                     isNaatConducted = isIntegrated,
-                                    syncState = SyncState.SYNCED
+                                    syncState = SyncState.UNSYNCED
                                 )
                                 tbRepo.saveTBDiagnostics(updated)
                             }
