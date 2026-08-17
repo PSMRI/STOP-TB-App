@@ -73,7 +73,11 @@ interface CounsellingFormResponseDao {
     @Query("SELECT * FROM t_form_response")
     suspend fun getAllFormResponses(): List<CompleteFormResponse>
 
-    @Query("DELETE FROM t_form_response WHERE beneficiaryId = :beneficiaryId AND formVersionId = :formVersionId")
+    // isHistorySnapshot = 0 keeps this scoped to the live response only, so re-syncing the
+    // current response (e.g. the village-wide Contact/TPT prefetch in PullTBFromAmritWorker)
+    // never deletes previously stored TPT Follow-up History snapshot rows (see refreshTptHistory),
+    // which would otherwise make the History screen come back empty despite valid server data.
+    @Query("DELETE FROM t_form_response WHERE beneficiaryId = :beneficiaryId AND formVersionId = :formVersionId AND isHistorySnapshot = 0")
     suspend fun deleteFormResponseForBeneficiary(beneficiaryId: Long, formVersionId: Int)
 
     @Query("DELETE FROM t_question_response WHERE sectionResponseId = :sectionResponseId")
@@ -105,6 +109,20 @@ interface CounsellingFormResponseDao {
         """
     )
     fun observeFormResponseStatus(beneficiaryId: Long, formType: String): Flow<String?>
+
+    // The formVersionId the beneficiary's latest response is actually stored under — may differ
+    // from the form schema's current "active" version, so callers must use this (not the active
+    // version) when querying version-scoped data like getAnsweredOptionValueAnyPhase for that response.
+    @Query(
+        """
+        SELECT r.formVersionId FROM t_form_response r
+        JOIN t_form_version v ON r.formVersionId = v.versionId
+        JOIN t_dynamic_form f ON v.formId = f.formId
+        WHERE r.beneficiaryId = :beneficiaryId AND f.formType = :formType AND r.isHistorySnapshot = 0
+        ORDER BY r.responseId DESC LIMIT 1
+        """
+    )
+    fun observeFormResponseVersionId(beneficiaryId: Long, formType: String): Flow<Int?>
 
     // Phase-scoped status observer for TPT_FOLLOW_UP PRE_SUBMIT, avoiding newer POST_SUBMIT rows masking the submitted PRE_SUBMIT status.
     @Query(
@@ -281,11 +299,30 @@ interface CounsellingFormResponseDao {
         SELECT DISTINCT r.beneficiaryId FROM t_form_response r
         JOIN t_form_version v ON r.formVersionId = v.versionId
         JOIN t_dynamic_form f ON v.formId = f.formId
+        JOIN t_section_response sr ON sr.formResponseId = r.responseId
+        JOIN t_question_response qr ON qr.sectionResponseId = sr.sectionResponseId
         WHERE f.formType = :formType AND r.isHistorySnapshot = 0
           AND (r.status = 'SUBMITTED' OR r.status = 'COMPLETE' OR r.status = 'COMPLETED')
         """
     )
     fun getFormDoneBenIds(formType: String): Flow<List<Long>>
+
+    // Aggregate, all-beneficiaries variant of observePreSubmitResponseStatus — used to gate the
+    // Contact Follow Up "done" badge for TPT_ELIGIBLE beneficiaries on TPT_FOLLOW_UP PRE_SUBMIT
+    // actually being submitted, matching ExamineViewModel.isContactFollowUpDone's stricter check.
+    @Query(
+        """
+        SELECT DISTINCT r.beneficiaryId FROM t_form_response r
+        JOIN t_section_response sr ON sr.formResponseId = r.responseId
+        JOIN t_form_section fs ON fs.sectionId = sr.sectionId
+        JOIN t_form_version v ON r.formVersionId = v.versionId
+        JOIN t_dynamic_form f ON v.formId = f.formId
+        WHERE f.formType = :formType AND r.isHistorySnapshot = 0
+          AND fs.sectionPhase = 'PRE_SUBMIT'
+          AND (r.status = 'SUBMITTED' OR r.status = 'COMPLETE' OR r.status = 'COMPLETED')
+        """
+    )
+    fun getPreSubmitDoneBenIds(formType: String): Flow<List<Long>>
 
     // One-shot, single-beneficiary variant of getFormDoneBenIds — lets a caller check local
     // submission state directly (e.g. ContactTracingRepositoryImpl.getContactTracingStatus)

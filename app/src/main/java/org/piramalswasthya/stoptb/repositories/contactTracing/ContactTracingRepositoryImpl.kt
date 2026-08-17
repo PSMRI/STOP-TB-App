@@ -16,6 +16,7 @@ import org.piramalswasthya.stoptb.model.contactTracing.ContactTracingStatus
 import org.piramalswasthya.stoptb.model.dynamicEntity.CompleteFormDefinition
 import org.piramalswasthya.stoptb.model.dynamicEntity.CompleteFormResponse
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormResponseEntity
+import org.piramalswasthya.stoptb.model.dynamicEntity.FormSectionWithQuestions
 import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionResponseEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.SectionResponseEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.ServerCounsellingResponseDto
@@ -28,6 +29,7 @@ import org.piramalswasthya.stoptb.ui.contact_tracing.QUESTION_UUID_REGIMEN_ADVIS
 import org.piramalswasthya.stoptb.ui.contact_tracing.RegimenAdvised
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
+import org.piramalswasthya.stoptb.utils.Log
 import timber.log.Timber
 import java.time.OffsetDateTime
 import javax.inject.Inject
@@ -101,17 +103,16 @@ class ContactTracingRepositoryImpl @Inject constructor(
                 Timber.d("fetchAndStoreContactResponse: Synced response with answers already exists locally. Skipping fetch to preserve data.")
                 return true
             }
-            if (hasLocalAnswers) {
-                Timber.d(
-                    "fetchAndStoreContactResponse: Local response with answers already exists " +
-                            "(status=${localResponse?.formResponse?.status}, syncStatus=${localResponse?.formResponse?.syncStatus}). " +
-                            "Skipping remote fetch/rebuild to avoid destroying locally submitted answers."
-                )
-                return true
-            }
+            if (hasLocalAnswers) return true
 
             val jwt = preferenceDao.getJWTAmritToken() ?: return false
-            val response = amritApiService.getBeneficiaryFormResponses(jwt, beneficiaryId, formType.name)
+            val response = amritApiService.getBeneficiaryFormResponses(
+                jwtToken = jwt,
+                beneficiaryId = beneficiaryId,
+                formUuid = formType.name,
+                villageId = null,
+                providerServiceMapId = null
+            )
             if (!response.isSuccessful) return false
             val apiResponses = response.body()?.data
             if (apiResponses.isNullOrEmpty()) return false
@@ -120,12 +121,25 @@ class ContactTracingRepositoryImpl @Inject constructor(
                 val unsyncedLocal = responseDao.getUnsyncedResponseForBeneficiary(beneficiaryId, formVersionId)
                 if (unsyncedLocal != null) return@withTransaction
 
+                val activeSectionIds = activeVersion.sections.map { it.section.sectionId }.toSet()
+                val activeSectionUuids = activeVersion.sections.map { it.section.sectionUuid }.toSet()
+
+                val apiResponse = apiResponses.find { resp ->
+                    resp.sections.any { sec ->
+                        sec.sectionId in activeSectionIds || sec.sectionUuid in activeSectionUuids
+                    }
+                }
+
+                if (apiResponse == null) {
+                    Timber.d("fetchAndStoreContactResponse: No API response matching formType=$formType schema for benId=$beneficiaryId")
+                    responseDao.deleteFormResponseForBeneficiary(beneficiaryId, formVersionId)
+                    return@withTransaction
+                }
+
                 val existingCreatedAt = responseDao.getFormResponseForBeneficiary(beneficiaryId, formVersionId)
                     ?.formResponse?.createdAt
 
                 responseDao.deleteFormResponseForBeneficiary(beneficiaryId, formVersionId)
-
-                val apiResponse = apiResponses.first()
 
                 val serverDate: Long? = try {
                     apiResponse.submittedAt?.let { OffsetDateTime.parse(it).toInstant().toEpochMilli() }
@@ -154,6 +168,28 @@ class ContactTracingRepositoryImpl @Inject constructor(
                     }
                 }
 
+                val questionResponsesToInsert = mutableListOf<QuestionResponseEntity>()
+                var hasPostSubmitAnswers = false
+
+                // Pre-calculate answers to verify data presence before creating FormResponseEntity
+                val backendSectionResponseIdBySectionId = apiResponse.sections
+                    .associate { it.sectionId to it.sectionResponseId }
+
+                apiResponse.sections.forEach { apiSec ->
+                    val sectionId = apiSec.sectionId
+                    val sectionDef = activeVersion.sections.find { it.section.sectionId == sectionId }
+                    if (sectionDef != null) {
+                        if (sectionDef.section.sectionPhase == "POST_SUBMIT" && apiSec.answers.isNotEmpty()) {
+                            hasPostSubmitAnswers = true
+                        }
+                    }
+                }
+
+                if (apiResponse.sections.none { apiSec -> activeVersion.sections.any { it.section.sectionId == apiSec.sectionId } }) {
+                    Timber.d("fetchAndStoreContactResponse: API response has no sections matching active local version for benId=$beneficiaryId")
+                    return@withTransaction
+                }
+
                 val formResponse = FormResponseEntity(
                     beneficiaryId = beneficiaryId,
                     formVersionId = activeVersion.version.versionId,
@@ -165,8 +201,6 @@ class ContactTracingRepositoryImpl @Inject constructor(
                 )
                 val responseId = responseDao.insertFormResponse(formResponse)
 
-                val backendSectionResponseIdBySectionId = apiResponse.sections
-                    .associate { it.sectionId to it.sectionResponseId }
                 val sectionResponses = activeVersion.sections.map {
                     SectionResponseEntity(
                         formResponseId = responseId,
@@ -181,19 +215,12 @@ class ContactTracingRepositoryImpl @Inject constructor(
                     it.sectionResponse.sectionId to it.sectionResponse.sectionResponseId
                 }
 
-                val questionResponsesToInsert = mutableListOf<QuestionResponseEntity>()
-                var hasPostSubmitAnswers = false
-
                 apiResponse.sections.forEach { apiSec ->
                     val sectionId = apiSec.sectionId
                     val sectionDef = activeVersion.sections.find { it.section.sectionId == sectionId }
                     if (sectionDef != null) {
                         val sectionResponseId = sectionIdToResponseIdMap[sectionId]
                         if (sectionResponseId != null) {
-                            if (sectionDef.section.sectionPhase == "POST_SUBMIT" && apiSec.answers.isNotEmpty()) {
-                                hasPostSubmitAnswers = true
-                            }
-
                             apiSec.answers.forEach { apiAns ->
                                 val serverQId = apiAns.questionId
                                 val qDetails = questionsMap[serverQId]
@@ -229,8 +256,13 @@ class ContactTracingRepositoryImpl @Inject constructor(
                     responseDao.insertQuestionResponses(questionResponsesToInsert)
                 }
 
-                // Only promote to SUBMITTED/COMPLETE when real answer data exists; otherwise preserve the response status.
                 val hasAnswers = questionResponsesToInsert.isNotEmpty()
+                if (!hasAnswers && apiResponse.status?.uppercase() != "REFUSED") {
+                    Timber.d("fetchAndStoreContactResponse: 0 valid question answers found. Deleting empty form response shell for benId=$beneficiaryId")
+                    responseDao.deleteFormResponseForBeneficiary(beneficiaryId, formVersionId)
+                    return@withTransaction
+                }
+
                 val finalStatus = when {
                     apiResponse.status?.uppercase() == "REFUSED" -> "REFUSED"
                     hasPostSubmitAnswers || apiResponse.status?.uppercase() == "COMPLETE" || apiResponse.status?.uppercase() == "COMPLETED" -> "COMPLETE"
@@ -360,6 +392,9 @@ class ContactTracingRepositoryImpl @Inject constructor(
     override fun observeResponseStatus(beneficiaryId: Long, formType: FormType): Flow<String?> =
         responseDao.observeFormResponseStatus(beneficiaryId, formType.name)
 
+    override fun observeResponseFormVersionId(beneficiaryId: Long, formType: FormType): Flow<Int?> =
+        responseDao.observeFormResponseVersionId(beneficiaryId, formType.name)
+
     override fun observePreSubmitResponseStatus(beneficiaryId: Long, formType: FormType): Flow<String?> =
         responseDao.observePreSubmitResponseStatus(beneficiaryId, formType.name)
 
@@ -367,12 +402,17 @@ class ContactTracingRepositoryImpl @Inject constructor(
         responseDao.getTptHistory(beneficiaryId, formVersionId)
 
     override suspend fun fetchAndRefreshTptHistory(beneficiaryId: Long, formVersionId: Int): Boolean {
-        val jwt = preferenceDao.getJWTAmritToken()
-        val authHeader = jwt ?: ""
+        val authHeader = preferenceDao.getJWTAmritToken()?:""
+        val villageId = preferenceDao.getLocationRecord()?.village?.id
+        val providerServiceMapId = preferenceDao.getLoggedInUser()?.serviceMapId
 
         val apiRecords: List<ServerCounsellingResponseDto> = try {
             val apiResponse = amritApiService.getBeneficiaryFormResponses(
-                authHeader, beneficiaryId, FormType.TPT_FOLLOW_UP.name
+                jwtToken = authHeader,
+                beneficiaryId = beneficiaryId,
+                formUuid = FormType.TPT_FOLLOW_UP.name,
+                villageId = villageId,
+                providerServiceMapId = providerServiceMapId
             )
             if (!apiResponse.isSuccessful) {
                 Timber.e("fetchAndRefreshTptHistory: beneficiaryId=$beneficiaryId failed: status=${apiResponse.code()}")
@@ -416,12 +456,19 @@ class ContactTracingRepositoryImpl @Inject constructor(
             }
         }
 
-        val allUuids = apiRecords.flatMap { it.sections }.map { it.sectionUuid }.distinct()
-        val infoByUuid = metadataDao.getSectionInfoByUuids(allUuids).associateBy { it.sectionUuid }
+        val sectionByIdMap = activeVersion.sections.associateBy { it.section.sectionId }
+        val sectionByUuidMap = activeVersion.sections.mapNotNull { sec ->
+            sec.section.sectionUuid?.let { uuid -> uuid to sec }
+        }.toMap()
 
+        fun getLocalSection(sectionDto: ServerSectionResponseDto): FormSectionWithQuestions? {
+            return sectionByIdMap[sectionDto.sectionId]
+                ?: sectionDto.sectionUuid.let { sectionByUuidMap[it] }
+        }
 
         suspend fun insertSingleSectionResponse(formResponseId: Long, sectionDto: ServerSectionResponseDto) {
-            val sectionId = infoByUuid[sectionDto.sectionUuid]?.sectionId ?: return
+            val localSection = getLocalSection(sectionDto) ?: return
+            val sectionId = localSection.section.sectionId
             val sectionResponseId = responseDao.insertSectionResponse(
                 SectionResponseEntity(
                     formResponseId = formResponseId,
@@ -449,13 +496,12 @@ class ContactTracingRepositoryImpl @Inject constructor(
         }
 
         db.withTransaction {
-
             val postSubmitSectionDtos = apiRecords.flatMap { record ->
-                record.sections.filter { infoByUuid[it.sectionUuid]?.sectionPhase == SectionPhase.POST_SUBMIT.value }
-                    .map { record to it }
+                record.sections.filter { sectionDto ->
+                    getLocalSection(sectionDto)?.section?.sectionPhase == SectionPhase.POST_SUBMIT.value
+                }.map { record to it }
             }
             if (postSubmitSectionDtos.isNotEmpty()) {
-
                 val candidateIds = postSubmitSectionDtos.map { it.second.sectionResponseId }
                 val alreadyStored = responseDao.getExistingBackendSectionResponseIds(candidateIds).toSet()
 
@@ -482,14 +528,13 @@ class ContactTracingRepositoryImpl @Inject constructor(
                 }
             }
 
-
             val hasLivePreSubmit = responseDao.getLatestResponseForPhase(
                 beneficiaryId, formVersionId, SectionPhase.PRE_SUBMIT.value
             ) != null
             if (!hasLivePreSubmit) {
                 val preSubmitRecord = apiRecords.maxByOrNull { it.responseId }
-                val preSubmitSections = preSubmitRecord?.sections?.filter {
-                    infoByUuid[it.sectionUuid]?.sectionPhase == SectionPhase.PRE_SUBMIT.value
+                val preSubmitSections = preSubmitRecord?.sections?.filter { sectionDto ->
+                    getLocalSection(sectionDto)?.section?.sectionPhase == SectionPhase.PRE_SUBMIT.value
                 }
                 if (!preSubmitSections.isNullOrEmpty()) {
                     val liveResponseId = responseDao.insertFormResponse(
@@ -650,8 +695,15 @@ class ContactTracingRepositoryImpl @Inject constructor(
         return allSuccess
     }
 
+
     override fun observeContactFollowUpDoneBenIds(): Flow<List<Long>> =
-        responseDao.getFormDoneBenIds(FormType.CONTACT_FOLLOW_UP.name)
+        combine(
+            responseDao.getFormDoneBenIds(FormType.CONTACT_FOLLOW_UP.name),
+            observeTptEligibleBenIds(),
+            responseDao.getPreSubmitDoneBenIds(FormType.TPT_FOLLOW_UP.name)
+        ) { cfuDoneBenIds, tptEligibleBenIds, tptPreSubmitDoneBenIds ->
+            cfuDoneBenIds.filter { benId -> benId !in tptEligibleBenIds || benId in tptPreSubmitDoneBenIds }
+        }
 
     override fun observeTptFollowUpTargetReachedBenIds(): Flow<List<Long>> =
         combine(
@@ -674,6 +726,187 @@ class ContactTracingRepositoryImpl @Inject constructor(
                     .map { it.beneficiaryId }
                     .distinct()
             }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    override suspend fun fetchAndStoreVillageContactResponses(
+        villageId: Int,
+        formType: FormType,
+        formVersionId: Int
+    ): Boolean {
+        try {
+            val formDef = metadataDao.getFormDefinition(formType) ?: return false
+            val activeVersion = formDef.versions.find { it.version.versionId == formVersionId }
+                ?: return false
+
+            val providerServiceMapId = preferenceDao.getLoggedInUser()?.serviceMapId
+            val jwt = preferenceDao.getJWTAmritToken() ?: return false
+            val response = amritApiService.getBeneficiaryFormResponses(
+                jwtToken = jwt,
+                beneficiaryId = null,
+                formUuid = formType.name,
+                villageId = villageId,
+                providerServiceMapId = providerServiceMapId
+            )
+            if (!response.isSuccessful) return false
+            val apiResponses = response.body()?.data
+            if (apiResponses.isNullOrEmpty()) return true
+
+            val questionsMap = activeVersion.sections
+                .flatMap { it.questions }
+                .filter { it.question.serverQuestionId != null }
+                .associateBy { it.question.serverQuestionId!! }
+
+            val optionsMap = mutableMapOf<Pair<Int, Int>, Int>()
+            activeVersion.sections.forEach { sec ->
+                sec.questions.forEach { qDetails ->
+                    val serverQId = qDetails.question.serverQuestionId
+                    if (serverQId != null) {
+                        qDetails.options.forEach { optDetails ->
+                            val serverOptId = optDetails.option.serverOptionId
+                            if (serverOptId != null) {
+                                optionsMap[Pair(serverQId, serverOptId)] = optDetails.option.optionId
+                            }
+                        }
+                    }
+                }
+            }
+
+            val activeSectionIds = activeVersion.sections.map { it.section.sectionId }.toSet()
+            val activeSectionUuids = activeVersion.sections.map { it.section.sectionUuid }.toSet()
+
+            db.withTransaction {
+                apiResponses.forEach { apiResponse ->
+                    val beneficiaryId = apiResponse.beneficiaryId ?: return@forEach
+
+                    val matchesFormSchema = apiResponse.sections.any { sec ->
+                        sec.sectionId in activeSectionIds || sec.sectionUuid in activeSectionUuids
+                    }
+                    if (!matchesFormSchema) {
+                        return@forEach
+                    }
+
+                    val unsyncedLocal = responseDao.getUnsyncedResponseForBeneficiary(beneficiaryId, formVersionId)
+                    if (unsyncedLocal != null) return@forEach
+
+                    val existingCreatedAt = responseDao.getFormResponseForBeneficiary(beneficiaryId, formVersionId)
+                        ?.formResponse?.createdAt
+
+                    responseDao.deleteFormResponseForBeneficiary(beneficiaryId, formVersionId)
+
+                    val serverDate: Long? = try {
+                        apiResponse.submittedAt?.let { OffsetDateTime.parse(it).toInstant().toEpochMilli() }
+                    } catch (e: Exception) {
+                        Timber.w(e, "fetchAndStoreVillageContactResponses: failed to parse submittedAt=${apiResponse.submittedAt}")
+                        null
+                    }
+
+                    val questionResponsesToInsert = mutableListOf<QuestionResponseEntity>()
+                    var hasPostSubmitAnswers = false
+
+                    val backendSectionResponseIdBySectionId = apiResponse.sections
+                        .associate { it.sectionId to it.sectionResponseId }
+
+                    apiResponse.sections.forEach { apiSec ->
+                        val sectionId = apiSec.sectionId
+                        val sectionDef = activeVersion.sections.find { it.section.sectionId == sectionId }
+                        if (sectionDef != null) {
+                            if (sectionDef.section.sectionPhase == "POST_SUBMIT" && apiSec.answers.isNotEmpty()) {
+                                hasPostSubmitAnswers = true
+                            }
+                        }
+                    }
+
+                    val formResponse = FormResponseEntity(
+                        beneficiaryId = beneficiaryId,
+                        formVersionId = activeVersion.version.versionId,
+                        status = "SUBMITTED",
+                        lastVisitedSectionId = null,
+                        syncStatus = "SYNCED",
+                        syncedAt = System.currentTimeMillis(),
+                        createdAt = serverDate ?: existingCreatedAt ?: System.currentTimeMillis()
+                    )
+                    val responseId = responseDao.insertFormResponse(formResponse)
+
+                    val sectionResponses = activeVersion.sections.map {
+                        SectionResponseEntity(
+                            formResponseId = responseId,
+                            sectionId = it.section.sectionId,
+                            backendSectionResponseId = backendSectionResponseIdBySectionId[it.section.sectionId]
+                        )
+                    }
+                    responseDao.insertSectionResponses(sectionResponses)
+
+                    val insertedSections = responseDao.getFormResponseById(responseId)?.sectionResponses ?: emptyList()
+                    val sectionIdToResponseIdMap = insertedSections.associate {
+                        it.sectionResponse.sectionId to it.sectionResponse.sectionResponseId
+                    }
+
+                    apiResponse.sections.forEach { apiSec ->
+                        val sectionId = apiSec.sectionId
+                        val sectionDef = activeVersion.sections.find { it.section.sectionId == sectionId }
+                        if (sectionDef != null) {
+                            val sectionResponseId = sectionIdToResponseIdMap[sectionId]
+                            if (sectionResponseId != null) {
+                                apiSec.answers.forEach { apiAns ->
+                                    val serverQId = apiAns.questionId
+                                    val qDetails = questionsMap[serverQId]
+                                    if (qDetails != null) {
+                                        val qId = qDetails.question.questionId
+
+                                        val serverOptId = apiAns.optionId
+                                        val localOptId = if (serverOptId != null) {
+                                            optionsMap[Pair(serverQId, serverOptId)]
+                                        } else {
+                                            null
+                                        }
+
+                                        questionResponsesToInsert.add(
+                                            QuestionResponseEntity(
+                                                sectionResponseId = sectionResponseId,
+                                                questionId = qId,
+                                                optionId = localOptId,
+                                                answerText = apiAns.answerText
+                                            )
+                                        )
+                                    } else {
+                                        Timber.w("fetchAndStoreVillageContactResponses: No local question found for serverQuestionId=$serverQId")
+                                    }
+                                }
+                            }
+                        } else {
+                            Timber.w("fetchAndStoreVillageContactResponses: No local section found for serverSectionId=$sectionId")
+                        }
+                    }
+
+                    if (questionResponsesToInsert.isNotEmpty()) {
+                        responseDao.insertQuestionResponses(questionResponsesToInsert)
+                    }
+
+                    val hasAnswers = questionResponsesToInsert.isNotEmpty()
+                    if (!hasAnswers && apiResponse.status?.uppercase() != "REFUSED") {
+                        Timber.d("fetchAndStoreVillageContactResponses: 0 valid question answers found. Deleting empty form response shell for benId=$beneficiaryId")
+                        responseDao.deleteFormResponseForBeneficiary(beneficiaryId, formVersionId)
+                        return@forEach
+                    }
+
+                    val finalStatus = when {
+                        apiResponse.status?.uppercase() == "REFUSED" -> "REFUSED"
+                        hasPostSubmitAnswers || apiResponse.status?.uppercase() == "COMPLETE" || apiResponse.status?.uppercase() == "COMPLETED" -> "COMPLETE"
+                        hasAnswers -> "SUBMITTED"
+                        else -> "DRAFT"
+                    }
+
+                    responseDao.updateFormResponse(
+                        formResponse.copy(status = finalStatus)
+                    )
+                }
+            }
+            return true
+        } catch (e: Exception) {
+            Timber.e(e, "fetchAndStoreVillageContactResponses failed for villageId=$villageId, formType=$formType")
+            return false
+        }
+    }
 
     private companion object {
         private const val DEFAULT_OFFICER_ID = 501L
