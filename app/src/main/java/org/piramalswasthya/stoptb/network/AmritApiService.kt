@@ -203,8 +203,10 @@ interface AmritApiService {
     @GET("flw-api/dynamicForm/response/getByBeneficiary")
     suspend fun getBeneficiaryFormResponses(
         @Header("Authorization") jwtToken: String,
-        @Query("beneficiaryId") beneficiaryId: Long,
-        @Query("formUuid") formUuid: String
+        @Query("beneficiaryId") beneficiaryId: Long?,
+        @Query("formUuid") formUuid: String,
+        @Query("villageId") villageId: Int?,
+        @Query("providerServiceMapId") providerServiceMapId: Int?
     ): Response<ApiResponse<List<ServerCounsellingResponseDto>>>
 
     @GET("flw-api/dynamicForm/response/getCompletedBeneficiaries")
