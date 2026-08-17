@@ -179,7 +179,7 @@ interface CounsellingFormResponseDao {
           AND r.isHistorySnapshot = 0 AND fs.sectionPhase = :phase
         ORDER BY r.responseId DESC LIMIT 1
     """)
-    suspend fun getLatestResponseForPhase(beneficiaryId: Long, formVersionId: Int, phase: String): CompleteFormResponse?
+    suspend fun getLatestResponseForPhase(beneficiaryId: Long?, formVersionId: Int, phase: String): CompleteFormResponse?
 
     // Count of completed POST_SUBMIT follow-up forms for this beneficiary — computed fresh from
     // actual submitted rows (not a manually-incremented counter), matching TPT_FOLLOW_UP's

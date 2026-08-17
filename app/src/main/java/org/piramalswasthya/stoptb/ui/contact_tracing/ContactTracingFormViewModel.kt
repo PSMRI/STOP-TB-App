@@ -222,7 +222,7 @@ class ContactTracingFormViewModel @Inject constructor(
     private fun isEditableFor(status: String?, phase: SectionPhase?): Boolean = when (phase) {
         SectionPhase.PRE_SUBMIT -> status == null || status == "DRAFT"
         SectionPhase.POST_SUBMIT -> status == null || status == "DRAFT" || status == "SUBMITTED"
-        else -> status != "SUBMITTED"
+        else -> status != "SUBMITTED" && status != "COMPLETE" && status != "COMPLETED" && status != "REFUSED"
     }
 
     fun enterEditMode() {
@@ -609,15 +609,23 @@ class ContactTracingFormViewModel @Inject constructor(
             ?: emptyList()
         val sectionResponse = if (matches.isEmpty()) null else matches[visitIndex.coerceIn(0, matches.size - 1)]
         val answersByQuestionId = sectionResponse?.questionResponses?.groupBy { it.questionId } ?: emptyMap()
+        val allAnswersByQuestionId = existing?.sectionResponses
+            ?.flatMap { it.questionResponses }
+            ?.groupBy { it.questionId } ?: emptyMap()
+
         questions.forEach { q ->
-            val rows = answersByQuestionId[q.questionId] ?: return@forEach
+            val rows = answersByQuestionId[q.questionId] ?: allAnswersByQuestionId[q.questionId] ?: return@forEach
             val isMultiSelect = q.questionType == QuestionType.CHECKBOX_MULTI.value ||
                 q.questionType == QuestionType.DROPDOWN_MULTI.value
             q.value = if (isMultiSelect) {
-                rows.mapNotNull { row -> q.options?.firstOrNull { it.optionId == row.optionId }?.optionValue }
+                rows.mapNotNull { row ->
+                    q.options?.firstOrNull { it.optionId == row.optionId }?.optionValue
+                }
             } else {
                 val row = rows.first()
-                row.optionId?.let { oid -> q.options?.firstOrNull { it.optionId == oid }?.optionValue } ?: row.answerText
+                row.optionId?.let { oid ->
+                    q.options?.firstOrNull { it.optionId == oid }?.optionValue ?: row.answerText
+                } ?: row.answerText
             }
         }
     }
