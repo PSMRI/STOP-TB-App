@@ -471,8 +471,18 @@ class CounsellingRepositoryImpl @Inject constructor(
                 return true
             }
 
+            val beneficiary = db.benDao.getBen(beneficiaryId)
+            val villageId = beneficiary?.locationRecord?.village?.id
+            val providerServiceMapId = preferenceDao.getLoggedInUser()?.serviceMapId
+
             val jwt = preferenceDao.getJWTAmritToken() ?: return false
-            val response = amritApiService.getBeneficiaryFormResponses(jwt, beneficiaryId, formUuid)
+            val response = amritApiService.getBeneficiaryFormResponses(
+                jwtToken = jwt,
+                beneficiaryId = beneficiaryId,
+                formUuid = formUuid,
+                villageId = villageId,
+                providerServiceMapId = providerServiceMapId
+            )
             if (!response.isSuccessful) return false
             val apiResponses = response.body()?.data
             if (apiResponses.isNullOrEmpty()) return false

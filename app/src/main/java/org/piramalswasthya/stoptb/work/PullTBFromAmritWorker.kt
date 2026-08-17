@@ -17,6 +17,10 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.database.room.InAppDb
+import org.piramalswasthya.stoptb.repositories.contactTracing.IContactTracingRepository
+import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
+import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
@@ -32,6 +36,8 @@ class PullTBFromAmritWorker @AssistedInject constructor(
     private val vitalRepo: VitalRepo,
     private val counsellingRepository: ICounsellingRepository,
     private val preferenceDao: PreferenceDao,
+    private val db: InAppDb,
+    private val contactTracingRepo: IContactTracingRepository,
 ) : CoroutineWorker(appContext, params) {
 
     companion object {
@@ -64,7 +70,8 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                             async { getTbDiagnosticsDetails() },
                             async { getTbSuspectedDetails() },
                             async { getTbConfirmedDetails() },
-                            async { getCounsellingCompletedDetails() }
+                            async { getCounsellingCompletedDetails() },
+                            async { getContactAndTptFollowUpDetails() }
                         )
 
                     val endTime = System.currentTimeMillis()
@@ -191,6 +198,42 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                 counsellingRepository.fetchAndStoreCompletedBeneficiaries()
             } catch (e: Exception) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
+            }
+            true
+        }
+    }
+
+    private suspend fun getContactAndTptFollowUpDetails(): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val villageId = preferenceDao.getLocationRecord()?.village?.id ?: return@withContext true
+
+                val cfuDefinition = (contactTracingRepo.getFormSchema(FormType.CONTACT_FOLLOW_UP) as? NetworkResponse.Success)?.data
+                val cfuActiveVersion = cfuDefinition?.versions?.firstOrNull { it.version.isActive }
+                    ?: cfuDefinition?.versions?.maxByOrNull { it.version.versionNumber }
+                val cfuVersionId = cfuActiveVersion?.version?.versionId
+
+                val tptDefinition = (contactTracingRepo.getFormSchema(FormType.TPT_FOLLOW_UP) as? NetworkResponse.Success)?.data
+                val tptActiveVersion = tptDefinition?.versions?.firstOrNull { it.version.isActive }
+                    ?: tptDefinition?.versions?.maxByOrNull { it.version.versionNumber }
+                val tptVersionId = tptActiveVersion?.version?.versionId
+
+                if (cfuVersionId != null) {
+                    contactTracingRepo.fetchAndStoreVillageContactResponses(villageId, FormType.CONTACT_FOLLOW_UP, cfuVersionId)
+                }
+                // TPT_FOLLOW_UP keeps multiple response rows per beneficiary (one per follow-up
+                // visit, flagged isHistorySnapshot) for the History screen. The generic village-wide
+                // bulk store collapses each beneficiary down to a single row and isn't aware of that
+                // model, which corrupts/hides previously synced history. Reuse fetchAndRefreshTptHistory
+                // per beneficiary instead - the same call the History button itself makes - so this
+                // prefetch stays consistent with how TPT_FOLLOW_UP history is actually read.
+                if (tptVersionId != null) {
+                    db.benDao.getActiveBeneficiaryIds(villageId).forEach { beneficiaryId ->
+                        contactTracingRepo.fetchAndRefreshTptHistory(beneficiaryId, tptVersionId)
+                    }
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Error pre-fetching contact follow-up / TPT responses in PullTBFromAmritWorker")
             }
             true
         }
