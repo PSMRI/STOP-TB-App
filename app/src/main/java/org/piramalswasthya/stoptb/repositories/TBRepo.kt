@@ -1633,6 +1633,7 @@ class TBRepo @Inject constructor(
                 }
             }
             tbDao.saveTbDiagnostics(cache)
+            syncTBSuspectedFromDiagnostics(benId, cache)
         } catch (e: Exception) {
             Timber.e(e, "saveFailedOrderStatus failed")
         }
