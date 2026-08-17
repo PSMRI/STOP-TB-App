@@ -1046,9 +1046,9 @@ class TBRepo @Inject constructor(
             for (chunk in chunks) {
                 try {
                     val chunkDtos = chunk.mapNotNull { suspected ->
-                        val benRegId = benDao.getBen(suspected.benId)?.benRegId?.takeIf { it > 0L }
-                        benRegId?.let { regId ->
-                            suspected.toDTO().copy(benId = regId)
+                        val ben = benDao.getBen(suspected.benId)
+                        ben?.let {
+                            suspected.toDTO()
                         }
                     }
                     if (chunkDtos.isEmpty()) {
@@ -1123,9 +1123,9 @@ class TBRepo @Inject constructor(
             for (chunk in chunks) {
                 try {
                     val chunkDtos = chunk.mapNotNull { confirmed ->
-                        val benRegId = benDao.getBen(confirmed.benId)?.benRegId?.takeIf { it > 0L }
-                        benRegId?.let { regId ->
-                            confirmed.toDTO().copy(benId = regId)
+                        val ben = benDao.getBen(confirmed.benId)
+                        ben?.let {
+                            confirmed.toDTO()
                         }
                     }
                     if (chunkDtos.isEmpty()) {
