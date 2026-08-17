@@ -80,7 +80,7 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         super.onViewCreated(view, savedInstanceState)
         val roleName = prefDao.getLoggedInUser()?.role
         binding.btnNextPage.text = getString(R.string.btn_Add_beneficiary_nonHH)
-        binding.btnNextPage.visibility = if(roleName.isCounsellingOfficerRole()) View.GONE else View.VISIBLE
+        binding.btnNextPage.visibility = View.VISIBLE
         binding.ibFilter.visibility = View.GONE
         binding.ibDownload.visibility = View.GONE
         binding.llQuickRefresh.visibility = View.GONE

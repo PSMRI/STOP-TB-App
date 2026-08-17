@@ -128,8 +128,8 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
                 rowView.visibility = View.GONE
                 return@forEachIndexed
             }
-            // Counselling Officer: show ONLY TB Screening here (Followup is a separate row below).
-            if (isCounsellingOfficer && formIndex != FORM_TB_SCREENING) {
+            // Counselling Officer: show TB Screening and Anthropometry here.
+            if (isCounsellingOfficer && formIndex != FORM_TB_SCREENING && formIndex != FORM_ANTHROPOMETRY) {
                 rowView.visibility = View.GONE
                 return@forEachIndexed
             }
@@ -364,10 +364,6 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
                         navigateToForm(benId, formIndex, viewOnly = true)
                     }
                 } else {
-                    if(isCounsellingOfficer){
-                        btn.visibility = View.GONE
-                        notFilled.visibility = View.VISIBLE
-                    }else{
                         btn.visibility = View.VISIBLE
                         // Red — Fill
                         btn.text = getString(R.string.examine_btn_fill)
@@ -377,7 +373,6 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
                         btn.setOnClickListener {
                             navigateToForm(benId, formIndex, viewOnly = false)
                         }
-                    }
                 }
             }
         }
