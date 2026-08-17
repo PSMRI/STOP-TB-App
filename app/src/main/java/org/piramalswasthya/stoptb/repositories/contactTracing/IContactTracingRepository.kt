@@ -76,6 +76,9 @@ interface IContactTracingRepository {
     // Fetches TPT Follow-up history from the server and refreshes local storage to match, avoiding duplicates.
     suspend fun fetchAndRefreshTptHistory(beneficiaryId: Long, formVersionId: Int): Boolean
 
+    // Fetches TPT Follow-up history village-wide from the server and refreshes local storage for all beneficiaries in the village in one bulk request.
+    suspend fun fetchAndRefreshVillageTptHistory(villageId: Int, formVersionId: Int): Boolean
+
     // Finds the beneficiary's current response for a given form phase, or null if a new one should be started.
     suspend fun getExistingContactResponseForPhase(
         beneficiaryId: Long,

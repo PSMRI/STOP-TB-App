@@ -13,7 +13,6 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.RvItemTbScreeningListBinding
 import org.piramalswasthya.stoptb.helpers.getDateFromLong
 import org.piramalswasthya.stoptb.helpers.getPatientTypeByAge
-import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.BenWithTbScreeningDomain
 
@@ -87,8 +86,7 @@ class TbScreeningListAdapter(
             }
 
             val isScreened = item.tb != null
-            val isCounsellor = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
-            binding.btnFormTb.visibility = if (isCounsellor && !isScreened) View.GONE else View.VISIBLE
+            binding.btnFormTb.visibility =  View.VISIBLE
             binding.btnFormTb.text = binding.root.context.getString(
                 if (isScreened) R.string.view_screen else R.string.screening
             )

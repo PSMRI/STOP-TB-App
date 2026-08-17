@@ -218,19 +218,28 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                     ?: tptDefinition?.versions?.maxByOrNull { it.version.versionNumber }
                 val tptVersionId = tptActiveVersion?.version?.versionId
 
+                val cctDefinition = (contactTracingRepo.getFormSchema(FormType.COMMUNITY_CONTACT_TRACING) as? NetworkResponse.Success)?.data
+                val cctActiveVersion = cctDefinition?.versions?.firstOrNull { it.version.isActive }
+                    ?: cctDefinition?.versions?.maxByOrNull { it.version.versionNumber }
+                val cctVersionId = cctActiveVersion?.version?.versionId
+
+                val octDefinition = (contactTracingRepo.getFormSchema(FormType.OCCUPATION_CONTACT_TRACING) as? NetworkResponse.Success)?.data
+                val octActiveVersion = octDefinition?.versions?.firstOrNull { it.version.isActive }
+                    ?: octDefinition?.versions?.maxByOrNull { it.version.versionNumber }
+                val octVersionId = octActiveVersion?.version?.versionId
+
+                if (cctVersionId != null) {
+                    contactTracingRepo.fetchAndStoreVillageContactResponses(villageId, FormType.COMMUNITY_CONTACT_TRACING, cctVersionId)
+                }
+                if (octVersionId != null) {
+                    contactTracingRepo.fetchAndStoreVillageContactResponses(villageId, FormType.OCCUPATION_CONTACT_TRACING, octVersionId)
+                }
+
                 if (cfuVersionId != null) {
                     contactTracingRepo.fetchAndStoreVillageContactResponses(villageId, FormType.CONTACT_FOLLOW_UP, cfuVersionId)
                 }
-                // TPT_FOLLOW_UP keeps multiple response rows per beneficiary (one per follow-up
-                // visit, flagged isHistorySnapshot) for the History screen. The generic village-wide
-                // bulk store collapses each beneficiary down to a single row and isn't aware of that
-                // model, which corrupts/hides previously synced history. Reuse fetchAndRefreshTptHistory
-                // per beneficiary instead - the same call the History button itself makes - so this
-                // prefetch stays consistent with how TPT_FOLLOW_UP history is actually read.
                 if (tptVersionId != null) {
-                    db.benDao.getActiveBeneficiaryIds(villageId).forEach { beneficiaryId ->
-                        contactTracingRepo.fetchAndRefreshTptHistory(beneficiaryId, tptVersionId)
-                    }
+                    contactTracingRepo.fetchAndRefreshVillageTptHistory(villageId, tptVersionId)
                 }
             } catch (e: Exception) {
                 Timber.e(e, "Error pre-fetching contact follow-up / TPT responses in PullTBFromAmritWorker")

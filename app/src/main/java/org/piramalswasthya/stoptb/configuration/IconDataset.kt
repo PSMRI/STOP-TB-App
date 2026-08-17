@@ -40,7 +40,7 @@ class IconDataset @Inject constructor(
             )
         )
 
-        if (role.isRegistrationOfficerRole() || role.isCounsellingOfficerRole()) {
+        if (role.isRegistrationOfficerRole() || role.isCounsellingOfficerRole() || role.isNurseRole()) {
             iconList.add(
                 Icon(
                     R.drawable.ic__ben,
