@@ -22,7 +22,8 @@ class BenPagingAdapter(
     private val showResultButton: Boolean = false,
     private val showAnthropometryButton: Boolean = false,
     private val showExamineButton: Boolean = true,
-    private val source: Int = 0
+    private val source: Int = 0,
+    private val showContactTracingForms: Boolean = false
 ) :
     PagingDataAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenListAdapter.BenDiffUtilCallBack) {
 
@@ -83,7 +84,8 @@ class BenPagingAdapter(
             showExamineButton = showExamineButton,
             tbDiagnosticsList = tbDiagnosticsList,
             source = source,
-            retryingBenIds = retryingBenIds
+            retryingBenIds = retryingBenIds,
+            showContactTracingForms = showContactTracingForms
         )
     }
 

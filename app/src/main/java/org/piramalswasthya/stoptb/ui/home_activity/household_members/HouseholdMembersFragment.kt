@@ -25,7 +25,6 @@ import org.piramalswasthya.stoptb.databinding.FragmentHouseholdMembersBinding
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
-import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import javax.inject.Inject
 
@@ -114,7 +113,8 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
             showSyncIcon = true,
             pref = prefDao,
             context = requireActivity(),
-            showExamineButton = !role.isCounsellingOfficerRole() || args.fromContactTracing
+            showExamineButton = !role.isCounsellingOfficerRole() || args.fromContactTracing,
+            showContactTracingForms = args.fromContactTracing
         )
         binding.rvAny.adapter = benAdapter
 
@@ -217,7 +217,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
     private fun showExamineBottomSheet(benId: Long) {
         val existing = childFragmentManager.findFragmentByTag(ExamineBottomSheetFragment.TAG)
         if (existing != null) return
-        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false)
+        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false, showContactTracingForms = args.fromContactTracing)
             .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
     }
 
