@@ -466,6 +466,12 @@ class AllBenViewModel @Inject constructor(
                         )
                     }
                     tbRepo.saveTBDiagnostics(cache)
+                    tbRepo.syncTBSuspectedFromDiagnostics(benId, cache)
+                    try {
+                        tbRepo.pushUnSyncedRecordsTBSuspected()
+                    } catch (e: java.lang.Exception) {
+                        timber.log.Timber.e(e, "Failed to call pushUnSyncedRecordsTBSuspected in retryTest")
+                    }
                 }
 
                 if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
