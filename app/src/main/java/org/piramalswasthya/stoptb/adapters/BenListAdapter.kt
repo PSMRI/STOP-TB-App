@@ -265,6 +265,12 @@ class BenListAdapter(
                                                         clickListener?.onClickOrderAction(item, "VIEW_RIF", "MDR_RIF")
                                                     }
                                                 }
+                                                rifStatus.equals("REFUSED", ignoreCase = true) -> {
+                                                    binding.btnVitalScreenSecondary.text = "RIF REFUSED"
+                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.darker_gray))
+                                                    binding.btnVitalScreenSecondary.isEnabled = false
+                                                    binding.btnVitalScreenSecondary.alpha = 0.5f
+                                                }
                                                 else -> {
                                                     binding.btnVitalScreenSecondary.visibility = View.GONE
                                                 }
@@ -288,6 +294,12 @@ class BenListAdapter(
                                                     binding.btnVitalScreenSecondary.setOnClickListener {
                                                         clickListener?.onClickOrderAction(item, "VIEW_RIF", "MDR_RIF")
                                                     }
+                                                }
+                                                rifStatus.equals("REFUSED", ignoreCase = true) -> {
+                                                    binding.btnVitalScreenSecondary.text = "RIF REFUSED"
+                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.darker_gray))
+                                                    binding.btnVitalScreenSecondary.isEnabled = false
+                                                    binding.btnVitalScreenSecondary.alpha = 0.5f
                                                 }
                                                 else -> {
                                                     binding.btnVitalScreenSecondary.visibility = View.GONE
