@@ -402,7 +402,7 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     private fun showExamineBottomSheet(benId: Long) {
         val existing = childFragmentManager.findFragmentByTag(ExamineBottomSheetFragment.TAG)
         if (existing != null) return
-        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false)
+        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false, showContactTracingForms = false)
             .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
     }
 
