@@ -43,8 +43,8 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
         const val FORM_TB_SCREENING  = 2
         const val FORM_GENERAL_OPD   = 3
 
-        fun newInstance(benId: Long, autoFlow: Boolean = false) = ExamineBottomSheetFragment().apply {
-            arguments = bundleOf("benId" to benId, "autoFlow" to autoFlow)
+        fun newInstance(benId: Long, autoFlow: Boolean = false, showContactTracingForms: Boolean = false) = ExamineBottomSheetFragment().apply {
+            arguments = bundleOf("benId" to benId, "autoFlow" to autoFlow, "showContactTracingForms" to showContactTracingForms)
         }
     }
 
@@ -73,6 +73,9 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
 
     private val autoFlow: Boolean
         get() = arguments?.getBoolean("autoFlow", false) ?: false
+
+    private val showContactTracingForms: Boolean
+        get() = arguments?.getBoolean("showContactTracingForms", false) ?: false
 
     private val examineCallback: ExamineCallback?
         get() = parentFragment as? ExamineCallback
@@ -194,7 +197,7 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
         // submission status (isContactFollowUpDone), gated on TPT_FOLLOW_UP completion only when
         // the screening answer was Tpt Eligible — see ExamineViewModel.isContactFollowUpDone.
         val followupRow = view.findViewById<View>(R.id.row_followup)
-        if (isCounsellingOfficer) {
+        if (isCounsellingOfficer && showContactTracingForms) {
             followupRow.visibility = View.VISIBLE
             followupRow.findViewById<TextView>(R.id.tv_form_name).text = getString(R.string.contact_tracing_follow_up)
             followupRow.findViewById<TextView>(R.id.tv_not_filled).visibility = View.GONE
@@ -229,7 +232,7 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
 
         // TPT Followup — Counselling Officer only.
         val tptFollowupRow = view.findViewById<View>(R.id.row_tpt_followup)
-        if (isCounsellingOfficer) {
+        if (isCounsellingOfficer && showContactTracingForms) {
             viewLifecycleOwner.lifecycleScope.launch {
                 viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                     combine(

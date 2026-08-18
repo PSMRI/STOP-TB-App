@@ -22,7 +22,6 @@ import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.ui.setSyncStateForBen
-import timber.log.Timber
 
 data class ButtonConfig(
     val text: String,
@@ -45,7 +44,8 @@ class BenListAdapter(
     private val showActionButtons: Boolean = true,
     private val showResultButton: Boolean = false,
     private val showAnthropometryButton: Boolean = false,
-    private val showExamineButton: Boolean = true
+    private val showExamineButton: Boolean = true,
+    private val showContactTracingForms: Boolean = false
 ) : ListAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenDiffUtilCallBack) {
 
     object BenDiffUtilCallBack : DiffUtil.ItemCallback<BenBasicDomain>() {
@@ -100,7 +100,8 @@ class BenListAdapter(
             showExamineButton: Boolean = true,
             tbDiagnosticsList: List<TBDiagnosticsCache> = emptyList(),
             source: Int = 0,
-            retryingBenIds: List<Long> = emptyList()
+            retryingBenIds: List<Long> = emptyList(),
+            showContactTracingForms: Boolean = false
         ) {
 
             binding.btnAbha.visibility = View.VISIBLE
@@ -619,12 +620,20 @@ class BenListAdapter(
             val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
             val isCounsellingOfficerForExamine = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
             val (examineFilledCount, examineTotal) = if (isCounsellingOfficerForExamine) {
-                val requiredItems = if (isTptEligible) {
-                    listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone, hasTptFollowUpDone)
+                if (showContactTracingForms) {
+                    val requiredItems = if (isTptEligible) {
+                        listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone, hasTptFollowUpDone)
+                    } else {
+                        listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone)
+                    }
+                    Pair(requiredItems.count { it }, requiredItems.size)
                 } else {
-                    listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone)
+                    val filled = listOf(
+                        hasAnthropometry,
+                        hasTbScreening
+                    ).count { it }
+                    Pair(filled, 2)
                 }
-                Pair(requiredItems.count { it }, requiredItems.size)
             } else if (isRegistrar) {
                 val filled = listOf(
                     hasAnthropometry,
@@ -844,7 +853,8 @@ class BenListAdapter(
             showAnthropometryButton = showAnthropometryButton,
             tbDiagnosticsList = tbDiagnosticsList,
             source = source,
-            showExamineButton = showExamineButton
+            showExamineButton = showExamineButton,
+            showContactTracingForms = showContactTracingForms
         )
     }
 

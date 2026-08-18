@@ -653,7 +653,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         if (existing != null) return // already visible
         // Always show without autoFlow — user decides whether to continue or close.
         // autoFlow=true caused the form to re-open automatically when back was pressed.
-        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false)
+        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false, showContactTracingForms = false)
             .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
     }
 
