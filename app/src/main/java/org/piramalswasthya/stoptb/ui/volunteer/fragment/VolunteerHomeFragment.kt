@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.ui.volunteer.fragment
 
+import android.os.SystemClock
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -24,12 +25,19 @@ import org.piramalswasthya.stoptb.work.WorkerUtils
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class VolunteerHomeFragment : Fragment() {
+    companion object {
+        private const val manualRefreshReleaseTimeoutMs = 60_000L
+    }
+
     @Inject
     lateinit var pref: PreferenceDao
 
@@ -38,7 +46,10 @@ class VolunteerHomeFragment : Fragment() {
         get() = _binding!!
 
     private var manualHomeRefreshRequested = false
+    private var manualRefreshStartedAtMs = 0L
     private val manualRefreshWorkIds = mutableListOf<java.util.UUID>()
+    private var manualRefreshTimeoutJob: Job? = null
+    private var manualRefreshProgressJob: Job? = null
 
     /**
      * Resets the "Refreshing..." state immediately when the camp hub connection
@@ -50,11 +61,7 @@ class VolunteerHomeFragment : Fragment() {
                 activity?.runOnUiThread {
                     if (_binding == null) return@runOnUiThread
                     if (!pref.isCampHubConnected() && manualHomeRefreshRequested) {
-                        manualHomeRefreshRequested = false
-                        WorkerUtils.finishManualCampRefresh()
-                        setQuickRefreshButtonEnabled(true)
-                        binding.tvQuickRefreshStatus.text =
-                            getString(R.string.quick_refresh_camp_disconnected)
+                        finishManualRefresh(getString(R.string.quick_refresh_camp_disconnected))
                     } else if (pref.isCampHubConnected() && !manualHomeRefreshRequested) {
                         updateQuickRefreshStatus()
                         setQuickRefreshButtonEnabled(true)
@@ -106,6 +113,9 @@ class VolunteerHomeFragment : Fragment() {
                 return@setOnClickListener
             }
             setQuickRefreshButtonEnabled(false)
+            binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_refreshing)
+            manualRefreshStartedAtMs = SystemClock.elapsedRealtime()
+            startManualRefreshProgress()
             viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
                 val isReachable = pingCampHub()
                 launch(Dispatchers.Main) {
@@ -116,10 +126,11 @@ class VolunteerHomeFragment : Fragment() {
                             pref.getCampHubUrl()
                         )
                         setQuickRefreshButtonEnabled(true)
+                        manualRefreshProgressJob?.cancel()
+                        manualRefreshProgressJob = null
                         return@launch
                     }
                     manualHomeRefreshRequested = true
-                    binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_refreshing)
                     manualRefreshWorkIds.clear()
                     manualRefreshWorkIds.addAll(
                         WorkerUtils.startManualCampRefresh(
@@ -127,6 +138,7 @@ class VolunteerHomeFragment : Fragment() {
                             pref
                         )
                     )
+                    startManualRefreshTimeout()
                 }
             }
         }
@@ -144,26 +156,20 @@ class VolunteerHomeFragment : Fragment() {
                 // If camp hub disconnected while a refresh was running, abort immediately
                 // (the worker may stay BLOCKED forever waiting for connectivity).
                 if (!pref.isCampModeEnabled() || !pref.isCampHubConnected()) {
-                    manualHomeRefreshRequested = false
-                    WorkerUtils.finishManualCampRefresh()
-                    setQuickRefreshButtonEnabled(true)
-                    binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_camp_disconnected)
+                    finishManualRefresh(getString(R.string.quick_refresh_camp_disconnected))
                     return@observe
                 }
 
-                val activeInfos = workInfos.filter {
-                    it.state == WorkInfo.State.ENQUEUED ||
-                            it.state == WorkInfo.State.RUNNING ||
-                            it.state == WorkInfo.State.BLOCKED
-                }
-                val filteredInfos = workInfos
-                    .filter { manualRefreshWorkIds.contains(it.id) }
-                    .ifEmpty {
-                        // ExistingWorkPolicy.KEEP can reuse an already active sync instead of
-                        // enqueuing the fresh IDs returned for this click.
-                        activeInfos
+                val filteredInfos = workInfos.filter { manualRefreshWorkIds.contains(it.id) }
+                if (filteredInfos.isEmpty()) {
+                    val refreshTimedOut = manualRefreshStartedAtMs > 0L &&
+                            SystemClock.elapsedRealtime() - manualRefreshStartedAtMs >=
+                            manualRefreshReleaseTimeoutMs
+                    if (refreshTimedOut) {
+                        finishManualRefresh(getString(R.string.quick_refresh_failed))
                     }
-                if (filteredInfos.isEmpty()) return@observe
+                    return@observe
+                }
 
                 val isRunning = filteredInfos.any {
                     it.state == WorkInfo.State.ENQUEUED ||
@@ -182,16 +188,11 @@ class VolunteerHomeFragment : Fragment() {
                     }
 
                     isFailed -> {
-                        manualHomeRefreshRequested = false
-                        WorkerUtils.finishManualCampRefresh()
-                        setQuickRefreshButtonEnabled(true)
-                        binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_failed)
+                        finishManualRefresh(getString(R.string.quick_refresh_failed))
                     }
 
                     isFinished -> {
-                        manualHomeRefreshRequested = false
-                        WorkerUtils.finishManualCampRefresh()
-                        setQuickRefreshButtonEnabled(true)
+                        finishManualRefresh()
                         pref.lastQuickRefreshTimestamp = System.currentTimeMillis()
                         updateQuickRefreshStatus()
                     }
@@ -207,7 +208,7 @@ class VolunteerHomeFragment : Fragment() {
                 SimpleDateFormat("hh:mm a", Locale.ENGLISH).format(Date(lastUpdated))
             )
         } else {
-            getString(R.string.quick_refresh_not_updated)
+            ""
         }
     }
 
@@ -215,6 +216,47 @@ class VolunteerHomeFragment : Fragment() {
         binding.btnQuickRefresh.isEnabled = enabled
         binding.btnQuickRefresh.isClickable = enabled
         binding.btnQuickRefresh.alpha = if (enabled) 1f else 0.55f
+        (activity as? VolunteerActivity)?.setQuickRefreshProgressVisible(!enabled)
+    }
+
+    private fun finishManualRefresh(statusText: String? = null) {
+        manualRefreshTimeoutJob?.cancel()
+        manualRefreshTimeoutJob = null
+        manualRefreshProgressJob?.cancel()
+        manualRefreshProgressJob = null
+        manualHomeRefreshRequested = false
+        manualRefreshStartedAtMs = 0L
+        manualRefreshWorkIds.clear()
+        WorkerUtils.finishManualCampRefresh()
+        setQuickRefreshButtonEnabled(true)
+        statusText?.let { binding.tvQuickRefreshStatus.text = it }
+    }
+
+    private fun startManualRefreshTimeout() {
+        manualRefreshTimeoutJob?.cancel()
+        manualRefreshTimeoutJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(manualRefreshReleaseTimeoutMs)
+            if (!manualHomeRefreshRequested || _binding == null) return@launch
+            finishManualRefresh(getString(R.string.quick_refresh_failed))
+        }
+        startManualRefreshProgress()
+    }
+
+    private fun startManualRefreshProgress() {
+        manualRefreshProgressJob?.cancel()
+        (activity as? VolunteerActivity)?.updateQuickRefreshProgress(0)
+        val startedAt = manualRefreshStartedAtMs
+        manualRefreshProgressJob = viewLifecycleOwner.lifecycleScope.launch {
+            while (manualHomeRefreshRequested && _binding != null) {
+                val elapsed = SystemClock.elapsedRealtime() - startedAt
+                val percent = ((elapsed.toFloat() / manualRefreshReleaseTimeoutMs) * 100f)
+                    .coerceIn(0f, 100f)
+                    .roundToInt()
+                (activity as? VolunteerActivity)?.updateQuickRefreshProgress(percent)
+                if (percent >= 100) break
+                delay(100)
+            }
+        }
     }
 
     private fun pingCampHub(): Boolean {
@@ -247,7 +289,11 @@ class VolunteerHomeFragment : Fragment() {
     override fun onStart() {
         super.onStart()
         pref.addOnPreferenceChangeListener(campHubPrefListener)
-        if (pref.isCampHubConnected() && !manualHomeRefreshRequested) {
+        if (manualHomeRefreshRequested) {
+            binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_refreshing)
+            setQuickRefreshButtonEnabled(false)
+            startManualRefreshProgress()
+        } else if (pref.isCampHubConnected()) {
             updateQuickRefreshStatus()
             setQuickRefreshButtonEnabled(true)
         }
@@ -274,11 +320,16 @@ class VolunteerHomeFragment : Fragment() {
         pref.removeOnPreferenceChangeListener(campHubPrefListener)
         activity?.let {
             (it as VolunteerActivity).removeClickListenerToHomepageActionBarTitle()
+            it.setQuickRefreshProgressVisible(false)
         }
         super.onStop()
     }
 
     override fun onDestroyView() {
+        manualRefreshTimeoutJob?.cancel()
+        manualRefreshTimeoutJob = null
+        manualRefreshProgressJob?.cancel()
+        manualRefreshProgressJob = null
         super.onDestroyView()
         _binding = null
     }

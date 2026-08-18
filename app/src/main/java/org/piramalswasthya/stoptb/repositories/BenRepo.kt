@@ -5,6 +5,7 @@ import android.net.Uri
 import android.widget.Toast
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -905,6 +906,11 @@ class BenRepo @Inject constructor(
 
                 Timber.e("get_ben error : $e")
                 return@withContext -2
+
+            } catch (e: CancellationException) {
+
+                Timber.w("get_ben cancelled : $e")
+                throw e
 
             } catch (e: IllegalStateException) {
 

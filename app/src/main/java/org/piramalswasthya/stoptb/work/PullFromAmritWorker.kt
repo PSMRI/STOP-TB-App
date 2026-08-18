@@ -12,9 +12,11 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Konstants
@@ -69,13 +71,14 @@ class PullFromAmritWorker @AssistedInject constructor(
                     } while (numPages == -2)
                     if (numPages == 0)
                         return@withContext Result.success()
-                    val result1 =
+                    val result1 = supervisorScope {
                         awaitAll(
                             async { getBenForPage(numPages, 0, startPage) },
                             async { getBenForPage(numPages, 1, startPage) },
                             async { getBenForPage(numPages, 2, startPage) },
                             async { getBenForPage(numPages, 3, startPage) },
                         )
+                    }
                     val endTime = System.currentTimeMillis()
                     val timeTaken = TimeUnit.MILLISECONDS.toSeconds(endTime - startTime)
                     Timber.d("Full load took $timeTaken seconds for $numPages pages  $result1")
@@ -91,6 +94,9 @@ class PullFromAmritWorker @AssistedInject constructor(
 
             }
 
+        } catch (e: CancellationException) {
+            Timber.w("PullFromAmritFullLoadWorker cancelled: $e")
+            throw e
         } catch (e: java.lang.Exception) {
             Timber.e("Error occurred in PullFromAmritFullLoadWorker $e ${e.stackTrace}")
 
@@ -144,6 +150,9 @@ class PullFromAmritWorker @AssistedInject constructor(
                     }
 
                 }
+            } catch (e: CancellationException) {
+                Timber.w("Page pull cancelled for rem=$rem page=$page: $e")
+                throw e
             } catch (e: SQLiteConstraintException) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
             }
