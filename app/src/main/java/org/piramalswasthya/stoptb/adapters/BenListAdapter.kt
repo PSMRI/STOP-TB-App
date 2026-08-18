@@ -202,7 +202,7 @@ class BenListAdapter(
                                     ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
                                 }
                                 else -> {
-                                    ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "XRAY_CHEST")
+                                    ButtonConfig("Facing some issues in Referral", android.R.color.holo_red_dark, "RETRY_PUSH", "XRAY_CHEST")
                                 }
                             }
                         }
@@ -319,7 +319,7 @@ class BenListAdapter(
                                     ButtonConfig("Pending", android.R.color.darker_gray, "NONE", "SPUTUM_TRUENAT")
                                 }
                                 else -> {
-                                    ButtonConfig("Pending", android.R.color.holo_orange_dark, "COMPLETE", "SPUTUM_TRUENAT")
+                                    ButtonConfig("Facing some issues in Referral", android.R.color.holo_red_dark, "RETRY_PUSH", "SPUTUM_TRUENAT")
                                 }
                             }
                         }
