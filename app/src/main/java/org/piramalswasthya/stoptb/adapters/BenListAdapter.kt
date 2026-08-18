@@ -265,6 +265,12 @@ class BenListAdapter(
                                                         clickListener?.onClickOrderAction(item, "VIEW_RIF", "MDR_RIF")
                                                     }
                                                 }
+                                                rifStatus.equals("REFUSED", ignoreCase = true) -> {
+                                                    binding.btnVitalScreenSecondary.text = "RIF REFUSED"
+                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.darker_gray))
+                                                    binding.btnVitalScreenSecondary.isEnabled = false
+                                                    binding.btnVitalScreenSecondary.alpha = 0.5f
+                                                }
                                                 else -> {
                                                     binding.btnVitalScreenSecondary.visibility = View.GONE
                                                 }
@@ -288,6 +294,12 @@ class BenListAdapter(
                                                     binding.btnVitalScreenSecondary.setOnClickListener {
                                                         clickListener?.onClickOrderAction(item, "VIEW_RIF", "MDR_RIF")
                                                     }
+                                                }
+                                                rifStatus.equals("REFUSED", ignoreCase = true) -> {
+                                                    binding.btnVitalScreenSecondary.text = "RIF REFUSED"
+                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.darker_gray))
+                                                    binding.btnVitalScreenSecondary.isEnabled = false
+                                                    binding.btnVitalScreenSecondary.alpha = 0.5f
                                                 }
                                                 else -> {
                                                     binding.btnVitalScreenSecondary.visibility = View.GONE
@@ -596,10 +608,10 @@ class BenListAdapter(
             // Examine button ? show filled count X/total
             // Registrar: Anthropometry + TB Screening
             // Nurse: Diagnosis hidden, so total stays 4
-            // Counselling Officer: TB Screening + Contact Follow Up are always required (total = 2);
-            // TPT Follow Up becomes a 3rd required item (total = 3) only when this beneficiary's
+            // Counselling Officer: Anthropometry + TB Screening + Contact Follow Up are always required (total = 3);
+            // TPT Follow Up becomes a 4th required item (total = 4) only when this beneficiary's
             // ClinicalScreeningStatus answer is TPT_ELIGIBLE (see IContactTracingRepository.observeTptEligibleBenIds) ?
-            // otherwise FULL_TREATMENT/NO_TREATMENT beneficiaries would incorrectly get stuck at x/3.
+            // otherwise FULL_TREATMENT/NO_TREATMENT beneficiaries would incorrectly get stuck at x/4.
             // Others: all 5 forms
             val currentRole = pref?.getLoggedInUser()?.role
             val isCounsellingOfficer = currentRole.isCounsellingOfficerRole()
@@ -608,9 +620,9 @@ class BenListAdapter(
             val isCounsellingOfficerForExamine = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
             val (examineFilledCount, examineTotal) = if (isCounsellingOfficerForExamine) {
                 val requiredItems = if (isTptEligible) {
-                    listOf(hasTbScreening, hasContactFollowUpDone, hasTptFollowUpDone)
+                    listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone, hasTptFollowUpDone)
                 } else {
-                    listOf(hasTbScreening, hasContactFollowUpDone)
+                    listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone)
                 }
                 Pair(requiredItems.count { it }, requiredItems.size)
             } else if (isRegistrar) {

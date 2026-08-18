@@ -862,6 +862,9 @@ interface BenDao {
     @Query("SELECT * FROM BENEFICIARY WHERE benRegId = :benRegId LIMIT 1")
     suspend fun getBenByRegId(benRegId: Long): BenRegCache?
 
+    @Query("SELECT beneficiaryId FROM BENEFICIARY WHERE loc_village_id = :selectedVillage AND isDeactivate = 0 AND isDraft = 0")
+    suspend fun getActiveBeneficiaryIds(selectedVillage: Int): List<Long>
+
     @Query("SELECT EXISTS(SELECT 1 FROM BENEFICIARY WHERE beneficiaryId = :benId AND isDeath = 1)")
     suspend fun isBenDead(benId: Long): Boolean
 

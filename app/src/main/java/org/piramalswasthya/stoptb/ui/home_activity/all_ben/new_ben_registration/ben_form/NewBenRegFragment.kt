@@ -40,14 +40,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.firstOrNull
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
-import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.databinding.AlertConsentBinding
 import org.piramalswasthya.stoptb.databinding.FragmentNewBenRegBinding
 import org.piramalswasthya.stoptb.databinding.LayoutViewMediaBinding
 import org.piramalswasthya.stoptb.helpers.Konstants
-import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.model.LocationState
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel.State
@@ -199,12 +197,9 @@ class NewBenRegFragment : Fragment() {
         }
 
         // Death badge visibility
-        val currentRole = prefDao.getLoggedInUser()?.role
-        val isNurse = currentRole.isNurseRole()
-        val isCounsellingOfficer = currentRole.isCounsellingOfficerRole()
         viewModel.isDeath.observe(viewLifecycleOwner) { isDeath ->
             val recordExists = viewModel.recordExists.value ?: false
-            binding.fabEdit.visibility = if (isDeath || !recordExists || isNurse || isCounsellingOfficer) View.GONE else View.VISIBLE
+            binding.fabEdit.visibility = if (isDeath || !recordExists) View.GONE else View.VISIBLE
         }
 
         // Set up adapter
@@ -254,7 +249,7 @@ class NewBenRegFragment : Fragment() {
 
         // Record exists observer
         viewModel.recordExists.observe(viewLifecycleOwner) { recordExists ->
-            binding.fabEdit.visibility = if (recordExists && !isNurse) View.VISIBLE else View.GONE
+            binding.fabEdit.visibility = if (recordExists) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (recordExists) View.GONE else View.VISIBLE
             binding.btnLinkHousehold.visibility = if (!recordExists && viewModel.showLinkHouseholdButton) View.VISIBLE else View.GONE
             adapter.isEnabled = !recordExists

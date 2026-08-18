@@ -149,7 +149,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         val showResultButton = args.source == 6 || args.source == 7 || args.source == 8
         val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
         val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
-        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess) && !isReadOnlyReferralList
+        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess || isCounsellor) && !isReadOnlyReferralList
         val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
         binding.llQuickRefresh.visibility = View.GONE
 
@@ -422,7 +422,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             showActionButtons = false,
             showResultButton = showResultButton,
             showAnthropometryButton = false,
-            showExamineButton = !isReadOnlyReferralList && !isCounsellor ,
+            showExamineButton = !isReadOnlyReferralList,
             source = args.source
         )
 
