@@ -139,7 +139,7 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             pref = prefDao,
             context = requireActivity(),
             showActionButtons = false,
-            showExamineButton = !roleName.isCounsellingOfficerRole()
+            showExamineButton = true
         )
 
         benAdapter.submitBenIds(viewModel.vitalBenIds.value)
