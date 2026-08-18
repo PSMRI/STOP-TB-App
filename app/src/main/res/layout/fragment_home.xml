@@ -50,8 +50,7 @@
                 android:layout_marginTop="12dp"
                 android:layout_marginEnd="16dp"
                 android:background="@drawable/bg_dashboard_chip"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
+                android:orientation="vertical"
                 android:paddingStart="@dimen/padding_normal"
                 android:paddingTop="@dimen/padding_small"
                 android:paddingEnd="@dimen/padding_small"
@@ -59,34 +58,42 @@
                 android:visibility="gone"
                 tools:visibility="visible">
 
-                <TextView
-                    android:id="@+id/tv_quick_refresh_status"
-                    android:layout_width="0dp"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:ellipsize="end"
-                    android:fontFamily="@font/roboto_medium"
-                    android:maxLines="2"
-                    android:text="@string/quick_refresh_not_updated"
-                    android:textColor="?attr/colorPrimary"
-                    android:textSize="13sp"
-                    tools:text="" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/btn_quick_refresh"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/padding_small"
-                    android:layout_marginEnd="8dp"
-                    android:background="@drawable/bg_quick_refresh_button"
-                    android:fontFamily="@font/roboto_bold"
-                    android:gravity="center"
-                    android:minHeight="@dimen/_28sdp"
-                    android:minWidth="@dimen/_74sdp"
-                    android:paddingHorizontal="@dimen/padding_normal"
-                    android:text="@string/quick_refresh_action"
-                    android:textColor="@android:color/white"
-                    android:textSize="13sp" />
+                    <TextView
+                        android:id="@+id/tv_quick_refresh_status"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:fontFamily="@font/roboto_medium"
+                        android:maxLines="2"
+                        android:text=""
+                        android:textColor="?attr/colorPrimary"
+                        android:textSize="13sp"
+                        tools:text="" />
+
+                    <TextView
+                        android:id="@+id/btn_quick_refresh"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/padding_small"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/bg_quick_refresh_button"
+                        android:fontFamily="@font/roboto_bold"
+                        android:gravity="center"
+                        android:minHeight="@dimen/_28sdp"
+                        android:minWidth="@dimen/_74sdp"
+                        android:paddingHorizontal="@dimen/padding_normal"
+                        android:text="@string/quick_refresh_action"
+                        android:textColor="@android:color/white"
+                        android:textSize="13sp" />
+
+                </LinearLayout>
 
             </LinearLayout>
 

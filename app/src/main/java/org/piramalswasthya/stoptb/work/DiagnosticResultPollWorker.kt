@@ -1,6 +1,8 @@
 package org.piramalswasthya.stoptb.work
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -33,6 +35,10 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
         return try {
             withContext(Dispatchers.IO) {
                 Timber.d("DiagnosticResultPollWorker starting work")
+                if (!hasValidatedInternet()) {
+                    Timber.d("Skipping DiagnosticResultPollWorker: internet is unavailable")
+                    return@withContext Result.success()
+                }
                 if (tbRepo.isXrayIntegrated()) {
                     tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST")
                 }
@@ -91,5 +97,15 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
             Timber.e(e, "Error inside DiagnosticResultPollWorker")
             Result.failure()
         }
+    }
+
+    private fun hasValidatedInternet(): Boolean {
+        val connectivityManager =
+            appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: return false
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 }

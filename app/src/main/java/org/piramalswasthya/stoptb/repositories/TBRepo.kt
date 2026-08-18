@@ -1,5 +1,8 @@
 package org.piramalswasthya.stoptb.repositories
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -49,7 +52,7 @@ class TBRepo @Inject constructor(
     val preferenceDao: PreferenceDao,
     private val userRepo: UserRepo,
     private val tmcNetworkApiService: AmritApiService,
-    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context
 ) {
     private val orderCreatedTimestamps = java.util.concurrent.ConcurrentHashMap<String, Long>()
     private val ORDER_STATUS_GRACE_PERIOD_MS = 90_000L
@@ -2460,6 +2463,10 @@ class TBRepo @Inject constructor(
     suspend fun getVendorHealth(orderType: String): NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
             try {
+                if (!hasValidatedInternet()) {
+                    Timber.d("Skipping getVendorHealth for $orderType: internet is unavailable")
+                    return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Internet unavailable")
+                }
                 val response = tmcNetworkApiService.getVendorHealth(orderType)
                 val statusCode = response.code()
                 if (response.isSuccessful) {
@@ -2497,6 +2504,10 @@ class TBRepo @Inject constructor(
     }
 
     suspend fun refreshDeviceIntegrationConfig() {
+        if (!hasValidatedInternet()) {
+            Timber.d("Skipping refreshDeviceIntegrationConfig: internet is unavailable")
+            return
+        }
         val xrayVal = checkDeviceIntegration("XRAY_CHEST")
         val truenatVal = checkDeviceIntegration("MTB")
         preferenceDao.setXrayIntegrated(xrayVal)
@@ -2509,6 +2520,16 @@ class TBRepo @Inject constructor(
 
     fun isTruenatIntegrated(): Boolean {
         return preferenceDao.getTruenatIntegrated()
+    }
+
+    private fun hasValidatedInternet(): Boolean {
+        val connectivityManager =
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: return false
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
     private fun isChestXrayPositive(value: String?): Boolean {
