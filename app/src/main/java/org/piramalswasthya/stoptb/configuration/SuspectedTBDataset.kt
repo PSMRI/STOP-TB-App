@@ -483,8 +483,6 @@ class SuspectedTBDataset(
             isYes(naatConducted)
 
     private fun isMarkedConfirmed(): Boolean =
-//        sputumTestResult.value == positiveNegativeEntries.getOrNull(0) ||
-            digitalChestXRayResult.value == positiveNegativeEntries.getOrNull(0) ||
             naatResult.value == positiveNegativeEntries.getOrNull(0) ||
             liquidCultureResult.value == positiveNegativeEntries.getOrNull(0)
 

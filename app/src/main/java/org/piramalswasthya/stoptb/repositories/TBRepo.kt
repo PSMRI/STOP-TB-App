@@ -1710,8 +1710,8 @@ class TBRepo @Inject constructor(
                 reasonForRefusalMDRRIF = reasonForRefusalMDRRIF ?: existing?.reasonForRefusalMDRRIF,
                 mdrRifResult = mappedMdrRifResult,
                 isDRTBConfirmed = mappedIsDRTBConfirmed,
-                isTBConfirmed = diag.isTBConfirmed ?: existing?.isTBConfirmed,
-                isConfirmed = diag.isConfirmed || (existing?.isConfirmed ?: false),
+                isTBConfirmed = mappedSputumTestResult == "TB Positive",
+                isConfirmed = mappedSputumTestResult == "TB Positive",
                 sputumTestResult = mappedSputumTestResult
             )
 
@@ -2100,8 +2100,8 @@ class TBRepo @Inject constructor(
                                         isSputumCollected = true,
                                         isNaatConducted = if (isCompleted) true else it.isNaatConducted,
                                         naatResult = if (isCompleted) (serverMtbResultSummary ?: mtbResult) else it.naatResult,
-                                        isTBConfirmed = if (isMtbDetected) true else it.isTBConfirmed,
-                                        isConfirmed = if (isMtbDetected) true else it.isConfirmed,
+                                        isTBConfirmed = if (isCompleted) isMtbDetected else it.isTBConfirmed,
+                                        isConfirmed = if (isCompleted) isMtbDetected else it.isConfirmed,
                                         rifOrderStatus = computedRifStatus,
                                         rifOrderId = computedRifOrderId ?: it.rifOrderId,
                                         syncState = SyncState.UNSYNCED
