@@ -734,7 +734,7 @@ data class TBConfirmedRequestDTO(
     @SerializedName("tbConfirmedCases") val tbConfirmedList: List<TBConfirmedTreatmentDTO>
 )
 
-data class TBSuspectedRequestDTO(val userId: Int, val tbSuspectedList: List<TBSuspectedDTO>)
+data class TBSuspectedRequestDTO(val userId: Int, val fromStopTB: Boolean = true, val tbSuspectedList: List<TBSuspectedDTO>)
 
 data class TBDiagnosticsDTO(
     val id: Long,
