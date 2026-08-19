@@ -1715,12 +1715,19 @@ class TBRepo @Inject constructor(
                 sputumTestResult = mappedSputumTestResult
             )
 
-            if (existing != null && provisionalCache == existing) {
+            // hasSymptoms is deliberately always forced true above (this function only runs off
+            // the back of a diagnostic test, which implies symptomatic), but the server's getAll
+            // response sometimes omits the field entirely, which toCache() then defaults back to
+            // false on the next pull. Normalize it here so that server-side quirk alone can't
+            // masquerade as a real change and defeat the guard below on every poll.
+            val normalizedExisting = existing?.copy(hasSymptoms = true)
+            if (existing != null && provisionalCache == normalizedExisting) {
                 return
             }
 
             if (existing != null) {
                 val diffs = buildList {
+                    if (existing.hasSymptoms != provisionalCache.hasSymptoms) add("hasSymptoms: ${existing.hasSymptoms} -> ${provisionalCache.hasSymptoms}")
                     if (existing.isChestXRayDone != provisionalCache.isChestXRayDone) add("isChestXRayDone: ${existing.isChestXRayDone} -> ${provisionalCache.isChestXRayDone}")
                     if (existing.chestXRayResult != provisionalCache.chestXRayResult) add("chestXRayResult: ${existing.chestXRayResult} -> ${provisionalCache.chestXRayResult}")
                     if (existing.isSputumCollected != provisionalCache.isSputumCollected) add("isSputumCollected: ${existing.isSputumCollected} -> ${provisionalCache.isSputumCollected}")
