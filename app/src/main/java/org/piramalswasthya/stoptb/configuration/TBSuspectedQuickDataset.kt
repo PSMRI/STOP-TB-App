@@ -858,8 +858,7 @@ class TBSuspectedQuickDataset(
                     else null
             }
 
-            val isConfirmed = isPositive(form.chestXRayResult) ||
-                isPositive(form.naatResult) ||
+            val isConfirmed = isPositive(form.naatResult) ||
                 isPositive(form.liquidCultureResult)
             form.isTBConfirmed = isConfirmed
             form.isConfirmed = isConfirmed
