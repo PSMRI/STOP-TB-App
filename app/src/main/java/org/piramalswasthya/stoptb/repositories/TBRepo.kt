@@ -1646,8 +1646,8 @@ class TBRepo @Inject constructor(
                 !naatResLocal.isNullOrBlank() -> {
                     val clean = naatResLocal.trim().lowercase()
                     when {
-                        clean.contains("detected") || clean.contains("positive") -> "TB Positive"
                         clean.contains("not detected") || clean.contains("negative") -> "TB Negative"
+                        clean.contains("detected") || clean.contains("positive") -> "TB Positive"
                         else -> null
                     }
                 }
@@ -1692,7 +1692,11 @@ class TBRepo @Inject constructor(
                 else -> existing?.isDRTBConfirmed
             }
 
-            val cache = (existing ?: TBSuspectedCache(benId = benId, visitLabel = "Visit 1")).copy(
+            // Built from `existing` without touching syncState, so a structural comparison
+            // against `existing` tells us whether anything actually changed. Without this guard,
+            // every diagnostic poll (which runs every 60s while a device order is in progress)
+            // would unconditionally flip an already-synced record back to UNSYNCED.
+            val provisionalCache = (existing ?: TBSuspectedCache(benId = benId, visitLabel = "Visit 1")).copy(
                 hasSymptoms = true,
                 isChestXRayDone = mappedIsChestXRayDone,
                 chestXRayResult = mappedChestXRayResult,
@@ -1708,10 +1712,37 @@ class TBRepo @Inject constructor(
                 isDRTBConfirmed = mappedIsDRTBConfirmed,
                 isTBConfirmed = diag.isTBConfirmed ?: existing?.isTBConfirmed,
                 isConfirmed = diag.isConfirmed || (existing?.isConfirmed ?: false),
-                sputumTestResult = mappedSputumTestResult,
-                syncState = SyncState.UNSYNCED
+                sputumTestResult = mappedSputumTestResult
             )
-            saveTBSuspected(cache)
+
+            if (existing != null && provisionalCache == existing) {
+                return
+            }
+
+            if (existing != null) {
+                val diffs = buildList {
+                    if (existing.isChestXRayDone != provisionalCache.isChestXRayDone) add("isChestXRayDone: ${existing.isChestXRayDone} -> ${provisionalCache.isChestXRayDone}")
+                    if (existing.chestXRayResult != provisionalCache.chestXRayResult) add("chestXRayResult: ${existing.chestXRayResult} -> ${provisionalCache.chestXRayResult}")
+                    if (existing.isSputumCollected != provisionalCache.isSputumCollected) add("isSputumCollected: ${existing.isSputumCollected} -> ${provisionalCache.isSputumCollected}")
+                    if (existing.sputumSubmittedAt != provisionalCache.sputumSubmittedAt) add("sputumSubmittedAt: ${existing.sputumSubmittedAt} -> ${provisionalCache.sputumSubmittedAt}")
+                    if (existing.isNaatConducted != provisionalCache.isNaatConducted) add("isNaatConducted: ${existing.isNaatConducted} -> ${provisionalCache.isNaatConducted}")
+                    if (existing.naatResult != provisionalCache.naatResult) add("naatResult: ${existing.naatResult} -> ${provisionalCache.naatResult}")
+                    if (existing.reasonForRefusalXray != provisionalCache.reasonForRefusalXray) add("reasonForRefusalXray: ${existing.reasonForRefusalXray} -> ${provisionalCache.reasonForRefusalXray}")
+                    if (existing.reasonForRefusalSputum != provisionalCache.reasonForRefusalSputum) add("reasonForRefusalSputum: ${existing.reasonForRefusalSputum} -> ${provisionalCache.reasonForRefusalSputum}")
+                    if (existing.reasonForRefusalMTB != provisionalCache.reasonForRefusalMTB) add("reasonForRefusalMTB: ${existing.reasonForRefusalMTB} -> ${provisionalCache.reasonForRefusalMTB}")
+                    if (existing.reasonForRefusalMDRRIF != provisionalCache.reasonForRefusalMDRRIF) add("reasonForRefusalMDRRIF: ${existing.reasonForRefusalMDRRIF} -> ${provisionalCache.reasonForRefusalMDRRIF}")
+                    if (existing.mdrRifResult != provisionalCache.mdrRifResult) add("mdrRifResult: ${existing.mdrRifResult} -> ${provisionalCache.mdrRifResult}")
+                    if (existing.isDRTBConfirmed != provisionalCache.isDRTBConfirmed) add("isDRTBConfirmed: ${existing.isDRTBConfirmed} -> ${provisionalCache.isDRTBConfirmed}")
+                    if (existing.isTBConfirmed != provisionalCache.isTBConfirmed) add("isTBConfirmed: ${existing.isTBConfirmed} -> ${provisionalCache.isTBConfirmed}")
+                    if (existing.isConfirmed != provisionalCache.isConfirmed) add("isConfirmed: ${existing.isConfirmed} -> ${provisionalCache.isConfirmed}")
+                    if (existing.sputumTestResult != provisionalCache.sputumTestResult) add("sputumTestResult: ${existing.sputumTestResult} -> ${provisionalCache.sputumTestResult}")
+                }
+                Timber.w("TB_SUSPECTED_DIRTY: benId=$benId marking UNSYNCED (was ${existing.syncState}), diag.xrayOrderStatus=${diag.xrayOrderStatus} trueNatOrderStatus=${diag.trueNatOrderStatus} rifOrderStatus=${diag.rifOrderStatus}, changes=$diffs")
+            } else {
+                Timber.w("TB_SUSPECTED_DIRTY: benId=$benId creating new tb_suspected record from diagnostics")
+            }
+
+            saveTBSuspected(provisionalCache.copy(syncState = SyncState.UNSYNCED))
         } catch (e: Exception) {
             Timber.e(e, "syncTBSuspectedFromDiagnostics failed for benId=$benId")
         }

@@ -67,7 +67,7 @@ interface TBDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveTbDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache)
 
-    @Query("SELECT * FROM TB_SUSPECTED WHERE benId =:benId limit 1")
+    @Query("SELECT * FROM TB_SUSPECTED WHERE benId =:benId ORDER BY id DESC limit 1")
     suspend fun getTbSuspected(benId: Long): TBSuspectedCache?
 
     @Query("""
