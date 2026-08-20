@@ -19,14 +19,11 @@ class ContactTracingTypeViewModel @Inject constructor(
 
     private val indexCaseBenId: Long = savedStateHandle["indexCaseBenId"] ?: 0L
 
-    // Red-cross default (both false) until the fetch resolves — matches the PRD's
+    // Red-cross default (both false) until the fetch resolves
     // "keep red cross mark as default" for the not-yet-submitted/pending/loading/failed cases.
     private val _status = MutableLiveData(ContactTracingStatus())
     val status: LiveData<ContactTracingStatus> get() = _status
-
-    init {
-        // Every bottom-sheet open creates a fresh instance of this ViewModel, so this fetch
-        // naturally re-runs (no stale caching) whenever the sheet is reopened.
+    fun refreshStatus() {
         viewModelScope.launch {
             _status.value = repository.getContactTracingStatus(indexCaseBenId)
         }

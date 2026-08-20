@@ -37,8 +37,6 @@ import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentNewHouseholdBinding
 import org.piramalswasthya.stoptb.helpers.Konstants
-import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
-import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.model.LocationState
 import org.piramalswasthya.stoptb.ui.home_activity.new_household_registration.NewHouseholdViewModel.State
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
@@ -203,8 +201,7 @@ class NewHouseholdFragment : Fragment() {
                 if (recordExists) getString(R.string.view_household_information)
                 else getString(R.string.frag_nhhr_title)
             )
-            val isNurse = prefDao.getLoggedInUser()?.role.isNurseRole()
-            binding.fabEdit.visibility = if (recordExists && !isNurse) View.VISIBLE else View.GONE
+            binding.fabEdit.visibility = if (recordExists) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (!recordExists) View.VISIBLE else View.GONE
             binding.btnCancel.visibility = if (!recordExists) View.VISIBLE else View.GONE
             binding.btnRefreshLocation.isEnabled = !recordExists

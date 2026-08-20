@@ -27,6 +27,7 @@ import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import androidx.core.os.bundleOf
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import javax.inject.Inject
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
@@ -77,8 +78,8 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
-        binding.btnNextPage.text = "Add Beneficiary"
+        val roleName = prefDao.getLoggedInUser()?.role
+        binding.btnNextPage.text = getString(R.string.btn_Add_beneficiary_nonHH)
         binding.btnNextPage.visibility = View.VISIBLE
         binding.ibFilter.visibility = View.GONE
         binding.ibDownload.visibility = View.GONE
@@ -99,9 +100,6 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         binding.ibSearch.setOnClickListener {
             sttContract.launch(Unit)
         }
-
-        val roleName = prefDao.getLoggedInUser()?.role
-        val isNurse = roleName.isNurseRole()
 
         benAdapter = BenListAdapter(
             clickListener = BenListAdapter.BenClickListener(
@@ -140,12 +138,19 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             role = roleName?.let { if (it.isNurseRole()) 2 else 0 } ?: 0,
             pref = prefDao,
             context = requireActivity(),
-            showActionButtons = false
+            showActionButtons = false,
+            showExamineButton = true
         )
 
         benAdapter.submitBenIds(viewModel.vitalBenIds.value)
+        benAdapter.submitUnsyncedVitalBenIds(viewModel.unsyncedVitalBenIds.value)
+        benAdapter.submitSyncingVitalBenIds(viewModel.syncingVitalBenIds.value)
         benAdapter.submitTbScreeningBenIds(viewModel.tbScreeningBenIds.value)
+        benAdapter.submitUnsyncedTbScreeningBenIds(viewModel.unsyncedTbScreeningBenIds.value)
+        benAdapter.submitSyncingTbScreeningBenIds(viewModel.syncingTbScreeningBenIds.value)
         benAdapter.submitGeneralOpdBenIds(viewModel.generalOpdBenIds.value)
+        benAdapter.submitUnsyncedGeneralOpdBenIds(viewModel.unsyncedGeneralOpdBenIds.value)
+        benAdapter.submitSyncingGeneralOpdBenIds(viewModel.syncingGeneralOpdBenIds.value)
         benAdapter.submitAnthropometryBenIds(viewModel.anthropometryBenIds.value)
         benAdapter.submitDiagnosisBenIds(viewModel.diagnosisBenIds.value)
 
@@ -173,8 +178,14 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.vitalBenIds.collect { benAdapter.submitBenIds(it) } }
+                launch { viewModel.unsyncedVitalBenIds.collect { benAdapter.submitUnsyncedVitalBenIds(it) } }
+                launch { viewModel.syncingVitalBenIds.collect { benAdapter.submitSyncingVitalBenIds(it) } }
                 launch { viewModel.tbScreeningBenIds.collect { benAdapter.submitTbScreeningBenIds(it) } }
+                launch { viewModel.unsyncedTbScreeningBenIds.collect { benAdapter.submitUnsyncedTbScreeningBenIds(it) } }
+                launch { viewModel.syncingTbScreeningBenIds.collect { benAdapter.submitSyncingTbScreeningBenIds(it) } }
                 launch { viewModel.generalOpdBenIds.collect { benAdapter.submitGeneralOpdBenIds(it) } }
+                launch { viewModel.unsyncedGeneralOpdBenIds.collect { benAdapter.submitUnsyncedGeneralOpdBenIds(it) } }
+                launch { viewModel.syncingGeneralOpdBenIds.collect { benAdapter.submitSyncingGeneralOpdBenIds(it) } }
                 launch { viewModel.anthropometryBenIds.collect { benAdapter.submitAnthropometryBenIds(it) } }
                 launch { viewModel.diagnosisBenIds.collect { benAdapter.submitDiagnosisBenIds(it) } }
             }
@@ -391,7 +402,7 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     private fun showExamineBottomSheet(benId: Long) {
         val existing = childFragmentManager.findFragmentByTag(ExamineBottomSheetFragment.TAG)
         if (existing != null) return
-        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false)
+        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false, showContactTracingForms = false)
             .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
     }
 

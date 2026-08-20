@@ -148,9 +148,9 @@
     <string name="eligible_couple_registration">पात्र दंपत्ति पंजीकरण</string>
     <string name="eligible_couple_tracking_list">पात्र दंपत्ति ट्रैकिंग सूची</string>
     <string name="tb_screening_list">टीबी स्क्रीनिंग सूची</string>
-    <string name="tb_suspected_list">संदेहास्पद टीबी मामले</string>
+    <string name="tb_suspected_list">संभावित टीबी मामले</string>
     <string name="tb_screening_form">टीबी स्क्रीनिंग फॉर्म</string>
-    <string name="tb_suspected_form">संदिग्ध टीबी मामला</string>
+    <string name="tb_suspected_form">संभावित टीबी मामला</string>
     <string name="delivery_outcome_list">प्रसव परिणाम सूची</string>
     <string name="communicable_diseases">संचारी (संक्रामक) रोग</string>
     <string name="dashboard">डैशबोर्ड</string>
@@ -594,7 +594,7 @@
     <string name="home_card_ncd_priority_subtitle">उच्च प्राथमिकता NCD फॉलो-अप ट्रैक करें</string>
     <string name="home_card_ncd_non_priority_subtitle">कम जोखिम वाले स्क्रीन किए गए लाभार्थियों को प्रबंधित करें</string>
     <string name="home_card_tb_screening_subtitle">टीबी स्क्रीनिंग शुरू करें और समीक्षा करें</string>
-    <string name="home_card_tb_suspected_short_subtitle">संदिग्ध टीबी मामलों पर फॉलो-अप करें</string>
+    <string name="home_card_tb_suspected_short_subtitle">संभावित टीबी मामलों पर फॉलो-अप करें</string>
     <string name="home_card_tb_confirmed_short_subtitle">पुष्ट टीबी रोगियों को ट्रैक करें</string>
     <string name="view_details">विवरण देखें</string>
     <string name="dashboard_tb_screening_subtitle">पहुंच और स्क्रीनिंग की मात्रा ट्रैक करें</string>
@@ -845,6 +845,7 @@
     <string name="quick_refresh_failed">अपडेट विफल। फिर कोशिश करें</string>
     <string name="quick_refresh_action">रिफ्रेश</string>
     <string name="quick_refresh_camp_disconnected">कैंप हब जुड़ा नहीं है। पहले दोबारा कनेक्ट करें।</string>
+    <string name="quick_refresh_ip_not_reachable">आईपी एड्रेस रीचेबल नहीं है: %1$s</string>
 
     <!-- Examine flow -->
     <string name="btn_examine">जांचें</string>
@@ -975,6 +976,7 @@
     <string name="dialog_no">नहीं</string>
     <string name="patient_registered_successfully">रोगी का पंजीकरण सफलतापूर्वक हुआ।</string>
     <string name="proceed_to_register_hof">क्या आप परिवार के मुखिया के पंजीकरण के साथ आगे बढ़ना चाहते हैं?</string>
+    <string name="form_submitted_successfully">फॉर्म सफलतापूर्वक सबमिट किया गया</string>
     <string name="care_context_creation_title">केयर कॉन्टेक्स्ट निर्माण</string>
     <string name="care_context_creation_subtitle">प्रिस्क्रिप्शन सबमिट होने के बाद केयर कॉन्टेक्स्ट बनाने के लिए OTP सत्यापित करें।</string>
     <string name="care_context_abha_label">आभा नंबर</string>

@@ -79,6 +79,19 @@
                 android:visibility="visible"
                 tools:visibility="visible" />
 
+            <ProgressBar
+                android:id="@+id/pb_quick_refresh_top"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="3dp"
+                android:max="100"
+                android:progress="0"
+                android:progressTint="@color/md_theme_light_primary"
+                android:progressBackgroundTint="@color/md_theme_light_primaryContainer"
+                android:visibility="gone"
+                tools:progress="35"
+                tools:visibility="visible" />
+
         </com.google.android.material.appbar.AppBarLayout>
 
         <androidx.fragment.app.FragmentContainerView

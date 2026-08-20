@@ -544,6 +544,8 @@ data class PatientRequest(
 )
 
 data class DiagnosticOrderPushRequest(
+    @com.squareup.moshi.Json(name = "beneficiaryId")
+    @com.google.gson.annotations.SerializedName("beneficiaryId")
     val benRegID: Long,
     val visitCode: Int,
     val providerServiceMapID: Int,
@@ -553,13 +555,20 @@ data class DiagnosticOrderPushRequest(
     val patient: PatientRequest
 )
 
+data class DiagnosticManualResultRequest(
+    val beneficiaryId: Long,
+    val orderType: String,
+    val resultSummary: String
+)
+
 data class DiagnosticBeneficiaryStatusData(
     val awaitingTestCompletion: List<Long>? = emptyList(),
     val awaitingProviderResult: List<Long>? = emptyList(),
     val completed: List<Long>? = emptyList(),
     val pollingTimedOut: List<Long>? = emptyList(),
     val failed: List<Long>? = emptyList(),
-    val refused: List<Long>? = emptyList()
+    val refused: List<Long>? = emptyList(),
+    val awaitingManualEntry: List<Long>? = emptyList()
 )
 
 data class DiagnosticBeneficiariesStatusResponse(
@@ -744,6 +753,11 @@ data class TBSuspectedDTO(
     var isDRTBConfirmed: Boolean? = null, var isConfirmed: Boolean = false,
     var otherReasonForSuspicion: String? = null,
     var latitude: Double? = null, var longitude: Double? = null, var address: String? = null,
+    var reasonForRefusalXray: String? = null,
+    var reasonForRefusalMTB: String? = null,
+    var reasonForRefusalMDRRIF: String? = null,
+    var reasonForRefusalSputum: String? = null,
+    var mdrRifResult: String? = null,
     var updateDate: String? = null,
 ) {
     fun toCache(): TBSuspectedCache = TBSuspectedCache(
@@ -768,6 +782,11 @@ data class TBSuspectedDTO(
         latitude = latitude,
         longitude = longitude,
         address = address,
+        reasonForRefusalXray = reasonForRefusalXray,
+        reasonForRefusalMTB = reasonForRefusalMTB,
+        reasonForRefusalMDRRIF = reasonForRefusalMDRRIF,
+        reasonForRefusalSputum = reasonForRefusalSputum,
+        mdrRifResult = mdrRifResult,
         serverUpdatedDate = getLongFromDateMultipleSupport(updateDate),
         syncState = SyncState.SYNCED
     )
@@ -804,7 +823,7 @@ data class TBConfirmedRequestDTO(
     @SerializedName("tbConfirmedCases") val tbConfirmedList: List<TBConfirmedTreatmentDTO>
 )
 
-data class TBSuspectedRequestDTO(val userId: Int, val tbSuspectedList: List<TBSuspectedDTO>)
+data class TBSuspectedRequestDTO(val userId: Int, val fromStopTB: Boolean = true, val tbSuspectedList: List<TBSuspectedDTO>)
 
 data class TBDiagnosticsDTO(
     val id: Long,

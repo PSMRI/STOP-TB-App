@@ -297,12 +297,12 @@
     <string name="eligible_couple_registration">Eligible Couple Registration</string>
     <string name="eligible_couple_tracking_list">Eligible Couple Tracking List</string>
     <string name="tb_screening_list">TB Screening List</string>
-    <string name="tb_suspected_list">Suspected TB cases</string>
+    <string name="tb_suspected_list">Presumptive TB cases</string>
     <string name="tb_screening_form">TB Screening Form</string>
     <string name="tb_confirmed_list">TB Confirmed List</string>
     <string name="tb_confirmed_form">TB Confirmed Form</string>
 
-    <string name="tb_suspected_form">Suspected TB case</string>
+    <string name="tb_suspected_form">Presumptive TB case</string>
     <string name="delivery_outcome_list">Delivery Outcome List</string>
     <string name="communicable_diseases">Communicable Diseases</string>
     <string name="dashboard">Dashboard</string>
@@ -329,7 +329,7 @@
     <string name="home_card_ncd_priority_subtitle">Track high priority NCD follow-up cases</string>
     <string name="home_card_ncd_non_priority_subtitle">Manage lower risk screened beneficiaries</string>
     <string name="home_card_tb_screening_subtitle">Start and review TB screening activity</string>
-    <string name="home_card_tb_suspected_short_subtitle">Follow up suspected TB cases</string>
+    <string name="home_card_tb_suspected_short_subtitle">Follow up presumptive TB cases</string>
     <string name="home_card_tb_confirmed_short_subtitle">Track confirmed TB patients</string>
     <string name="view_details">View Details</string>
     <string name="referral_digital_chest_xray">Digital Chest X-ray</string>
@@ -1004,6 +1004,7 @@
     <string name="quick_refresh_failed">Refresh failed. Try again</string>
     <string name="quick_refresh_action">Refresh</string>
     <string name="quick_refresh_camp_disconnected">Camp Hub is not connected. Please reconnect first.</string>
+    <string name="quick_refresh_ip_not_reachable">IP address not reachable: %1$s</string>
 
     <string name="vital_screen">General Examination</string>
     <string name="vital_screen_placeholder">Vitals and Anthropometric for beneficiary ID: %1$d</string>
@@ -1265,6 +1266,7 @@
     <string name="tb_reason_for_denial_sputum">Reason for Denial of Sputum Collection</string>
     <string name="tb_reason_for_denial_sputum_other">Specify other reason for denial (Sputum)</string>
     <string name="tb_sputum_submitted_at">Sputum sample submitted at</string>
+    <string name="sputum_sample_submitted_at_screening_camp">Sputum Sample Submitted at TB Screening Camp</string>
     <string name="tb_reason_not_conducted_naat">Reason True NAT not conducted</string>
     <string name="tb_reason_not_conducted_naat_other">Specify other reason (True NAT not conducted)</string>
 
@@ -1378,5 +1380,6 @@
     <string name="patient_registered_successfully">Patient Registered Successfully</string>
     <string name="proceed_to_register_hof">Do you want to proceed with registration of Head of the Family?</string>
     <string name="refused">Refused</string>
+    <string name="form_submitted_successfully">Form submitted successfully</string>
 </resources>
 

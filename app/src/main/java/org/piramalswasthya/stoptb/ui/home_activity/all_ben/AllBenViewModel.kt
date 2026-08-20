@@ -37,6 +37,9 @@ import java.io.File
 import java.io.FileWriter
 import javax.inject.Inject
 
+import kotlinx.coroutines.delay
+import org.piramalswasthya.stoptb.database.room.SyncState
+
 @HiltViewModel
 class AllBenViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -55,6 +58,9 @@ class AllBenViewModel @Inject constructor(
 
     init {
         fetchBeneficiaryStatuses()
+        viewModelScope.launch {
+            tbRepo.refreshDeviceIntegrationConfig()
+        }
     }
 
     @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
@@ -74,8 +80,14 @@ class AllBenViewModel @Inject constructor(
 
     val childCounts: Flow<Map<Long, Int>> = recordsRepo.childCountsByBen
     val vitalBenIds: Flow<List<Long>> = vitalRepo.vitalBenIds
+    val unsyncedVitalBenIds: Flow<List<Long>> = vitalRepo.unsyncedVitalBenIds
+    val syncingVitalBenIds: Flow<List<Long>> = vitalRepo.syncingVitalBenIds
     val tbScreeningBenIds: Flow<List<Long>> = tbRepo.tbScreeningBenIds
+    val unsyncedTbScreeningBenIds: Flow<List<Long>> = tbRepo.unsyncedTbScreeningBenIds
+    val syncingTbScreeningBenIds: Flow<List<Long>> = tbRepo.syncingTbScreeningBenIds
     val generalOpdBenIds: Flow<List<Long>> = tbRepo.generalOpdBenIds
+    val unsyncedGeneralOpdBenIds: Flow<List<Long>> = tbRepo.unsyncedGeneralOpdBenIds
+    val syncingGeneralOpdBenIds: Flow<List<Long>> = tbRepo.syncingGeneralOpdBenIds
     val anthropometryFilledBenIds: Flow<List<Long>> = recordsRepo.anthropometryFilledBenIds
     val contactFollowUpDoneBenIds: Flow<List<Long>> = contactTracingRepo.observeContactFollowUpDoneBenIds()
     val tptFollowUpDoneBenIds: Flow<List<Long>> = contactTracingRepo.observeTptFollowUpTargetReachedBenIds()
@@ -189,10 +201,14 @@ class AllBenViewModel @Inject constructor(
         _orderActionState.value = OrderActionResult.Idle
     }
 
+    /*retry referral loading spinner */
+    private val _retryingBenIds = MutableStateFlow<List<Long>>(emptyList())
+    val retryingBenIds: StateFlow<List<Long>> = _retryingBenIds.asStateFlow()
+
     fun initiateProdigiOrder(benId: Long, orderType: String) {
         viewModelScope.launch {
             _orderActionState.value = OrderActionResult.Loading
-            when (val response = tbRepo.createProdigiOrder(benId, orderType)) {
+            when (val response = tbRepo.createOrder(benId, orderType)) {
                 is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success -> {
                     _orderActionState.value = OrderActionResult.Success("Order created successfully. Order ID: ${response.data}", orderType)
                 }
@@ -256,7 +272,7 @@ class AllBenViewModel @Inject constructor(
     fun repeatTest(benId: Long, orderType: String, customVisitCode: Int? = null) {
         viewModelScope.launch {
             _orderActionState.value = OrderActionResult.Loading
-            when (val response = tbRepo.createProdigiOrder(benId, orderType, customVisitCode)) {
+            when (val response = tbRepo.createOrder(benId, orderType, customVisitCode)) {
                 is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success -> {
                     _orderActionState.value = OrderActionResult.Success("Fresh repeat test order created. Status: ${response.data}", orderType)
                 }
@@ -264,6 +280,212 @@ class AllBenViewModel @Inject constructor(
                     _orderActionState.value = OrderActionResult.Error(response.message ?: "Failed to create repeat test order")
                 }
                 else -> {}
+            }
+        }
+    }
+
+    private val activePushingBenIds = java.util.concurrent.ConcurrentHashMap<Long, Boolean>()
+
+
+
+    suspend fun triggerXrayOrderPush(benId: Long) {
+        val maxRetries = 1
+        var attempt = 0
+        var success = false
+        while (attempt <= maxRetries && !success) {
+            updateDiagnosticsOrderStatus(benId, "XRAY_CHEST", "CREATING")
+            val response = tbRepo.createOrder(benId, "XRAY_CHEST")
+            if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+                success = true
+            } else {
+                attempt++
+                if (attempt <= maxRetries) {
+                    delay(5000L)
+                }
+            }
+        }
+        if (!success) {
+            updateDiagnosticsOrderStatus(benId, "XRAY_CHEST", "FAILED")
+        }
+    }
+
+    suspend fun triggerMtbOrderPush(benId: Long) {
+        val maxRetries = 1
+        var attempt = 0
+        var success = false
+        while (attempt <= maxRetries && !success) {
+            updateDiagnosticsOrderStatus(benId, "SPUTUM_TRUENAT", "CREATING")
+            val response = tbRepo.createOrder(benId, "SPUTUM_TRUENAT")
+            if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+                success = true
+            } else {
+                attempt++
+                if (attempt <= maxRetries) {
+                    delay(5000L)
+                }
+            }
+        }
+        if (!success) {
+            updateDiagnosticsOrderStatus(benId, "SPUTUM_TRUENAT", "FAILED")
+        }
+    }
+
+    suspend fun triggerRifOrderPush(benId: Long) {
+        val maxRetries = 1
+        var attempt = 0
+        var success = false
+        while (attempt <= maxRetries && !success) {
+            updateDiagnosticsOrderStatus(benId, "MDR_RIF", "CREATING")
+            val response = tbRepo.createOrder(benId, "MDR_RIF")
+            if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+                success = true
+            } else {
+                attempt++
+                if (attempt <= maxRetries) {
+                    delay(5000L)
+                }
+            }
+        }
+        if (!success) {
+            updateDiagnosticsOrderStatus(benId, "MDR_RIF", "FAILED")
+        }
+    }
+
+    fun retryXrayOrder(benId: Long) {
+        viewModelScope.launch {
+            triggerXrayOrderPush(benId)
+        }
+    }
+
+    fun retryMtbOrder(benId: Long) {
+        viewModelScope.launch {
+            triggerMtbOrderPush(benId)
+        }
+    }
+
+    fun retryRifOrder(benId: Long) {
+        viewModelScope.launch {
+            triggerRifOrderPush(benId)
+        }
+    }
+
+    private suspend fun updateDiagnosticsOrderStatus(benId: Long, orderType: String, status: String) {
+        val existing = tbRepo.getTBDiagnosticsById(benId)
+        val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
+            if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
+                it.copy(xrayOrderStatus = status, syncState = SyncState.UNSYNCED)
+            } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
+                it.copy(rifOrderStatus = status, syncState = SyncState.UNSYNCED)
+            } else {
+                it.copy(trueNatOrderStatus = status, syncState = SyncState.UNSYNCED)
+            }
+        }
+        tbRepo.saveTBDiagnostics(cache)
+    }
+
+    fun retryResultFetch(benId: Long, orderType: String, context: Context) {
+        viewModelScope.launch {
+            _orderActionState.value = OrderActionResult.Loading
+            val response = tbRepo.retryPushOrder(benId, orderType)
+            if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+                val existing = tbRepo.getTBDiagnosticsById(benId)
+                existing?.let {
+                    val cache = if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
+                        it.copy(xrayOrderStatus = "AWAITING_PROVIDER_RESULT", syncState = SyncState.UNSYNCED)
+                    } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
+                        it.copy(rifOrderStatus = "AWAITING_PROVIDER_RESULT", syncState = SyncState.UNSYNCED)
+                    } else {
+                        it.copy(trueNatOrderStatus = "AWAITING_PROVIDER_RESULT", syncState = SyncState.UNSYNCED)
+                    }
+                    tbRepo.saveTBDiagnostics(cache)
+                }
+                if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
+                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(context)
+                } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
+                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context)
+                } else {
+                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context)
+                }
+                _orderActionState.value = OrderActionResult.Success("Result fetch retried successfully.", orderType)
+            } else {
+                val errorMsg = (response as? org.piramalswasthya.stoptb.helpers.NetworkResponse.Error)?.message ?: "Failed to retry order"
+                _orderActionState.value = OrderActionResult.Error(errorMsg)
+            }
+        }
+    }
+
+    fun retryTest(benId: Long, orderType: String, context: Context) {
+        if (_retryingBenIds.value.contains(benId)) return
+        viewModelScope.launch {
+            val existingBeforePush = tbRepo.getTBDiagnosticsById(benId)
+            val statusBeforePush = if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
+                existingBeforePush?.xrayOrderStatus
+            } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
+                existingBeforePush?.rifOrderStatus
+            } else {
+                existingBeforePush?.trueNatOrderStatus
+            }
+            if (statusBeforePush.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) ||
+                statusBeforePush.equals("IN_PROGRESS", ignoreCase = true) ||
+                statusBeforePush.equals("PENDING", ignoreCase = true)
+            ) {
+                return@launch
+            }
+            _orderActionState.value = OrderActionResult.Loading
+            _retryingBenIds.value += benId
+            val response = try {
+                tbRepo.createOrder(benId, orderType)
+            } finally {
+                _retryingBenIds.value -= benId
+            }
+            if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+                val existing = tbRepo.getTBDiagnosticsById(benId)
+                existing?.let {
+                    val cache = if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
+                        it.copy(
+                            xrayOrderStatus = "AWAITING_PROVIDER_RESULT",
+                            isChestXRayDone = true,
+                            chestXRayResult = null,
+                            syncState = SyncState.UNSYNCED
+                        )
+                    } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
+                        it.copy(
+                            rifOrderStatus = "AWAITING_PROVIDER_RESULT",
+                            trueNatRifResult = null,
+                            syncState = SyncState.UNSYNCED
+                        )
+                    } else {
+                        it.copy(
+                            trueNatOrderStatus = "AWAITING_PROVIDER_RESULT",
+                            isNaatConducted = true,
+                            naatResult = null,
+                            rifOrderId = null,
+                            rifOrderStatus = null,
+                            trueNatRifResult = null,
+                            syncState = SyncState.UNSYNCED
+                        )
+                    }
+                    tbRepo.saveTBDiagnostics(cache)
+                    tbRepo.syncTBSuspectedFromDiagnostics(benId, cache)
+                    try {
+                        tbRepo.pushUnSyncedRecordsTBSuspected()
+                    } catch (e: java.lang.Exception) {
+                        timber.log.Timber.e(e, "Failed to call pushUnSyncedRecordsTBSuspected in retryTest")
+                    }
+                }
+
+                if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
+                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(context)
+                } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
+                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context)
+                } else {
+                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context)
+                }
+                
+                _orderActionState.value = OrderActionResult.Success("New order created and workflow restarted.", orderType)
+            } else {
+                val errorMsg = (response as? org.piramalswasthya.stoptb.helpers.NetworkResponse.Error)?.message ?: "Failed to create new order"
+                _orderActionState.value = OrderActionResult.Error(errorMsg)
             }
         }
     }

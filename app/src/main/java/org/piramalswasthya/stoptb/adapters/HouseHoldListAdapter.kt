@@ -21,7 +21,7 @@ class HouseHoldListAdapter(private val diseaseType: String, private var isDiseas
         HouseHoldDiffUtilCallBack
     ) {
 
-    /** Controls visibility of "Add Member" button — hidden for Nurse role */
+    /** Controls visibility of "Add Member" button — hidden for Nurse & Counsellor role*/
     private var showAddMember: Boolean = true
 
     fun setAddMemberVisible(visible: Boolean) {

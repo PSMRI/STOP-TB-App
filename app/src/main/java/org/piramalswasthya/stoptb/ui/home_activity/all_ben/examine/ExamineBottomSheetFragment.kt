@@ -43,8 +43,8 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
         const val FORM_TB_SCREENING  = 2
         const val FORM_GENERAL_OPD   = 3
 
-        fun newInstance(benId: Long, autoFlow: Boolean = false) = ExamineBottomSheetFragment().apply {
-            arguments = bundleOf("benId" to benId, "autoFlow" to autoFlow)
+        fun newInstance(benId: Long, autoFlow: Boolean = false, showContactTracingForms: Boolean = false) = ExamineBottomSheetFragment().apply {
+            arguments = bundleOf("benId" to benId, "autoFlow" to autoFlow, "showContactTracingForms" to showContactTracingForms)
         }
     }
 
@@ -73,6 +73,9 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
 
     private val autoFlow: Boolean
         get() = arguments?.getBoolean("autoFlow", false) ?: false
+
+    private val showContactTracingForms: Boolean
+        get() = arguments?.getBoolean("showContactTracingForms", false) ?: false
 
     private val examineCallback: ExamineCallback?
         get() = parentFragment as? ExamineCallback
@@ -128,8 +131,8 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
                 rowView.visibility = View.GONE
                 return@forEachIndexed
             }
-            // Counselling Officer: show ONLY TB Screening here (Followup is a separate row below).
-            if (isCounsellingOfficer && formIndex != FORM_TB_SCREENING) {
+            // Counselling Officer: show TB Screening and Anthropometry here.
+            if (isCounsellingOfficer && formIndex != FORM_TB_SCREENING && formIndex != FORM_ANTHROPOMETRY) {
                 rowView.visibility = View.GONE
                 return@forEachIndexed
             }
@@ -138,8 +141,8 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
             val btn = rowView.findViewById<MaterialButton>(R.id.btn_form_action)
             val notFilled = rowView.findViewById<TextView>(R.id.tv_not_filled)
 
-            if ((isRegistrar && formIndex == FORM_ANTHROPOMETRY) ||
-                (isNurse && formIndex != FORM_TB_SCREENING)
+            if ((isNurse && formIndex == FORM_GENERAL_EXAM) ||
+                (isNurse && formIndex == FORM_GENERAL_OPD)
             ) {
                 viewLifecycleOwner.lifecycleScope.launch {
                     combine(
@@ -194,7 +197,7 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
         // submission status (isContactFollowUpDone), gated on TPT_FOLLOW_UP completion only when
         // the screening answer was Tpt Eligible — see ExamineViewModel.isContactFollowUpDone.
         val followupRow = view.findViewById<View>(R.id.row_followup)
-        if (isCounsellingOfficer) {
+        if (isCounsellingOfficer && showContactTracingForms) {
             followupRow.visibility = View.VISIBLE
             followupRow.findViewById<TextView>(R.id.tv_form_name).text = getString(R.string.contact_tracing_follow_up)
             followupRow.findViewById<TextView>(R.id.tv_not_filled).visibility = View.GONE
@@ -229,7 +232,7 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
 
         // TPT Followup — Counselling Officer only.
         val tptFollowupRow = view.findViewById<View>(R.id.row_tpt_followup)
-        if (isCounsellingOfficer) {
+        if (isCounsellingOfficer && showContactTracingForms) {
             viewLifecycleOwner.lifecycleScope.launch {
                 viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                     combine(
@@ -364,10 +367,6 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
                         navigateToForm(benId, formIndex, viewOnly = true)
                     }
                 } else {
-                    if(isCounsellingOfficer){
-                        btn.visibility = View.GONE
-                        notFilled.visibility = View.VISIBLE
-                    }else{
                         btn.visibility = View.VISIBLE
                         // Red — Fill
                         btn.text = getString(R.string.examine_btn_fill)
@@ -377,7 +376,6 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
                         btn.setOnClickListener {
                             navigateToForm(benId, formIndex, viewOnly = false)
                         }
-                    }
                 }
             }
         }

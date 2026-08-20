@@ -217,8 +217,10 @@ interface AmritApiService {
     @GET("flw-api/dynamicForm/response/getByBeneficiary")
     suspend fun getBeneficiaryFormResponses(
         @Header("Authorization") jwtToken: String,
-        @Query("beneficiaryId") beneficiaryId: Long,
-        @Query("formUuid") formUuid: String
+        @Query("beneficiaryId") beneficiaryId: Long?,
+        @Query("formUuid") formUuid: String,
+        @Query("villageId") villageId: Int?,
+        @Query("providerServiceMapId") providerServiceMapId: Int?
     ): Response<ApiResponse<List<ServerCounsellingResponseDto>>>
 
     @GET("flw-api/dynamicForm/response/getCompletedBeneficiaries")
@@ -255,7 +257,7 @@ interface AmritApiService {
     @POST("flw-api/diagnostic/order/push")
     suspend fun pushDiagnosticOrder(
         @Body request: DiagnosticOrderPushRequest
-    ): Response<ResponseBody>
+    ): Response<OrderPushedResponse>
 
     @POST("flw-api/diagnostic/order/testCompleted")
     suspend fun markTestCompleted(
@@ -265,14 +267,30 @@ interface AmritApiService {
 
     @POST("flw-api/diagnostic/order/result")
     suspend fun fetchOrderResult(
-        @Query("benId") benId: Long,
+        @Query("beneficiaryId") benId: Long,
         @Query("orderType") orderType: String
-    ): Response<ResponseBody>
+    ): Response<OrderResultResponse>
+
+    @POST("flw-api/diagnostic/order/retry")
+    suspend fun retryOrder(
+        @Query("beneficiaryId") benId: Long,
+        @Query("orderType") orderType: String
+    ): Response<OrderResultResponse>
 
     @GET("flw-api/diagnostic/order/getBeneficiariesByStatus")
     suspend fun getBeneficiariesByStatus(
         @Query("orderType") orderType: String,
         @Query("villageId") villageId: Int,
         @Query("providerServiceMapId") providerServiceMapId: Int
+    ): Response<ResponseBody>
+
+    @POST("flw-api/diagnostic/order/manualResult")
+    suspend fun submitManualResult(
+        @Body request: DiagnosticManualResultRequest
+    ): Response<OrderResultResponse>
+
+    @GET("flw-api/diagnostic/vendor/health")
+    suspend fun getVendorHealth(
+        @Query("orderType") orderType: String
     ): Response<ResponseBody>
 }

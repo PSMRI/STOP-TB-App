@@ -135,10 +135,11 @@ class TBSuspectedQuickFragment : Fragment() {
                 }
 
                 TBSuspectedQuickViewModel.State.SAVE_FAILED -> {
+                    val msg = viewModel.errorMessage.value ?: getString(R.string.tb_suspected_quick_save_failed)
                     Toast.makeText(
                         requireContext(),
-                        getString(R.string.tb_suspected_quick_save_failed),
-                        Toast.LENGTH_SHORT
+                        msg,
+                        Toast.LENGTH_LONG
                     ).show()
                     viewModel.resetState()
                 }

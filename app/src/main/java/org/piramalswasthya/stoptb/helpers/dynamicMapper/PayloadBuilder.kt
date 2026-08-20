@@ -211,7 +211,8 @@ object PayloadBuilder {
                         )
                     }
 
-                    QuestionType.CHECKBOX_MULTI -> {
+                    QuestionType.CHECKBOX_MULTI,
+                    QuestionType.DROPDOWN_MULTI -> {
                         val optionValues = optionIds.mapNotNull { it?.let { id -> optionsMap[id] } }
                         BulkAnswerPayload(
                             questionUuid = questionUuid,

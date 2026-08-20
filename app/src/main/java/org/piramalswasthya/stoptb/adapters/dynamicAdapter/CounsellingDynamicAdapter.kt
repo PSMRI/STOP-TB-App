@@ -31,7 +31,8 @@ import org.piramalswasthya.stoptb.ui.counselling_activity.QuestionType
 class CounsellingDynamicAdapter(
     private var questions: List<CounsellingQuestionDto>,
     private val onValueChanged: (CounsellingQuestionDto) -> Unit,
-    private var isEditable: Boolean = true
+    private var isEditable: Boolean = true,
+    private val isContactTracing: Boolean = false
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
 
@@ -46,6 +47,7 @@ class CounsellingDynamicAdapter(
         private const val TYPE_READONLY = 7
         private const val TYPE_NUMBER_PICKER = 8
         private const val TYPE_CHECKBOX = 9
+        private const val TYPE_DROPDOWN_MULTI = 10
         private const val  CT_RELATIONSHIP_UUID  = "CCT_RELATIONSHIP"
         private const val  CT_NO_OF_CONTACTS_UUID  = "CCT_NO_OF_CONTACTS"
         private const val TFU_REGISTRATION_DATE_UUID = "TFU_REGISTRATION_DATE"
@@ -125,6 +127,7 @@ class CounsellingDynamicAdapter(
             QuestionType.CHECKBOX_MULTI-> TYPE_CHECKBOX_MULTI
             QuestionType.DATE -> TYPE_DATE
             QuestionType.DROPDOWN -> TYPE_DROPDOWN
+            QuestionType.DROPDOWN_MULTI -> TYPE_DROPDOWN_MULTI
             QuestionType.CHECKBOX -> TYPE_CHECKBOX
             QuestionType.NUMBER -> TYPE_NUMBER
             QuestionType.READONLY_NUMBER,
@@ -148,7 +151,7 @@ class CounsellingDynamicAdapter(
             TYPE_RADIO -> RadioViewHolder(ItemCounsellingRadioBinding.inflate(inflater, parent, false))
             TYPE_CHECKBOX_MULTI, TYPE_CHECKBOX -> McqViewHolder(ItemCounsellingMcqBinding.inflate(inflater, parent, false))
             TYPE_DATE -> DateViewHolder(ItemCounsellingDateBinding.inflate(inflater, parent, false))
-            TYPE_DROPDOWN -> DropdownViewHolder(ItemCounsellingDropdownBinding.inflate(inflater, parent, false))
+            TYPE_DROPDOWN, TYPE_DROPDOWN_MULTI -> DropdownViewHolder(ItemCounsellingDropdownBinding.inflate(inflater, parent, false))
             TYPE_NUMBER -> NumberViewHolder(ItemCtNumberBinding.inflate(inflater, parent, false))
             TYPE_READONLY -> ReadOnlyViewHolder(ItemCtReadonlyBinding.inflate(inflater, parent, false))
             TYPE_NUMBER_PICKER -> NumberPickerViewHolder(ItemCtNumberPickerBinding.inflate(inflater, parent, false))
@@ -181,9 +184,9 @@ class CounsellingDynamicAdapter(
             if (q.questionUuid == CT_NO_OF_CONTACTS_UUID) {
                 QuestionRenderer.showComputedNoOfContacts(binding, q, prefix, questions)
             } else if (q.questionUuid == TFU_REGISTRATION_DATE_UUID) {
-                QuestionRenderer.showTextView(binding, q, prefix, false, onValueChanged)
+                QuestionRenderer.showTextView(binding, q, prefix, false, applyLatinFilter = !isContactTracing, onValueChanged = onValueChanged)
             } else {
-                QuestionRenderer.showTextView(binding, q, prefix, isEditable) { updated ->
+                QuestionRenderer.showTextView(binding, q, prefix, isEditable, applyLatinFilter = !isContactTracing) { updated ->
                     onValueChanged(updated)
                     refreshNoOfContactsIfNeeded(updated)
                 }

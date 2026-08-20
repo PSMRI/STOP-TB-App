@@ -33,7 +33,9 @@ import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import org.piramalswasthya.stoptb.ui.counselling_activity.QuestionType
 import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
 import org.piramalswasthya.stoptb.work.ContactTracingSyncWorker
+import org.piramalswasthya.stoptb.work.WorkerUtils
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
@@ -104,6 +106,10 @@ class ContactTracingFormViewModel @Inject constructor(
     val showContinueTpt: LiveData<Boolean> get() = _showContinueTpt
     private val _tptPreSubmitAlreadySubmitted = MutableLiveData(false)
     val tptPreSubmitAlreadySubmitted: LiveData<Boolean> get() = _tptPreSubmitAlreadySubmitted
+
+    // Tracks pending TPT Follow-Up resolution; disable submit while network calls determine whether this already-submitted CONTACT_FOLLOW_UP should continue to TPT_FOLLOW_UP.
+    private val _resolvingContinueTpt = MutableLiveData(false)
+    val resolvingContinueTpt: LiveData<Boolean> get() = _resolvingContinueTpt
 
     fun open(
         formType: FormType,
@@ -202,16 +208,21 @@ class ContactTracingFormViewModel @Inject constructor(
             loadSection(currentSectionIndex)
 
             if (formType == FormType.CONTACT_FOLLOW_UP && persistedStatus == "SUBMITTED") {
-                val (eligible, alreadySubmitted) = resolveContinueTptState(indexCaseBenId, responseId)
-                _showContinueTpt.value = eligible
-                _tptPreSubmitAlreadySubmitted.value = alreadySubmitted
+                _resolvingContinueTpt.value = true
+                try {
+                    val (eligible, alreadySubmitted) = resolveContinueTptState(indexCaseBenId, responseId)
+                    _showContinueTpt.value = eligible
+                    _tptPreSubmitAlreadySubmitted.value = alreadySubmitted
+                } finally {
+                    _resolvingContinueTpt.value = false
+                }
             }
         }
     }
     private fun isEditableFor(status: String?, phase: SectionPhase?): Boolean = when (phase) {
         SectionPhase.PRE_SUBMIT -> status == null || status == "DRAFT"
         SectionPhase.POST_SUBMIT -> status == null || status == "DRAFT" || status == "SUBMITTED"
-        else -> status != "SUBMITTED"
+        else -> status != "SUBMITTED" && status != "COMPLETE" && status != "COMPLETED" && status != "REFUSED"
     }
 
     fun enterEditMode() {
@@ -315,6 +326,8 @@ class ContactTracingFormViewModel @Inject constructor(
             questionsByUuid = questionsByUuid + builtQuestions.associateBy { it.questionUuid }
             evaluateAllConditions(builtQuestions)
             ensureTptRegistrationDate(builtQuestions, sectionWithQuestions.section.sectionId)
+            ensureDateNotBeforeScreening(builtQuestions, sectionWithQuestions.section.sectionId)
+            ensureExpectedCompletionDate(builtQuestions, sectionWithQuestions.section.sectionId)
 
             _activeQuestions.value = builtQuestions.filter { it.visible }
             if (isHistoryMode) {
@@ -344,6 +357,7 @@ class ContactTracingFormViewModel @Inject constructor(
         questionsByUuid = questionsByUuid + (question.questionUuid to question)
         if (!reevaluate) {
             refreshErrorIfNeeded(question)
+            updateComputedNoOfContactsErrorIfNeeded(question)
             return
         }
         val current = _activeQuestions.value ?: return
@@ -353,10 +367,49 @@ class ContactTracingFormViewModel @Inject constructor(
         val allSectionQuestions = fullSection.mapNotNull { questionsByUuid[it] }
         evaluateAllConditions(allSectionQuestions)
 
+        updateExpectedCompletionDateIfNeeded(question)
         allSectionQuestions.filter { it.visible }.forEach { q -> refreshErrorIfNeeded(q) }
+        updateComputedNoOfContactsErrorIfNeeded(question)
 
         _activeQuestions.value = allSectionQuestions.filter { it.visible }
     }
+
+    /** Recomputes Expected Completion Date when Regimen or TPT Start Date changes. */
+    private fun updateExpectedCompletionDateIfNeeded(question: CounsellingQuestionDto) {
+        if (question.questionUuid != QUESTION_UUID_REGIMEN_ADVISED &&
+            question.questionUuid != QUESTION_UUID_TPT_START_DATE) return
+
+        val regimen = RegimenAdvised.fromValue(questionsByUuid[QUESTION_UUID_REGIMEN_ADVISED]?.value?.toString()) ?: return
+        val startDateStr = questionsByUuid[QUESTION_UUID_TPT_START_DATE]?.value?.toString() ?: return
+        val completionQ = questionsByUuid[QUESTION_UUID_EXPECTED_COMPLETION_DATE] ?: return
+
+        val computed = computeExpectedCompletionDate(startDateStr, regimen) ?: return
+        completionQ.value = computed
+        questionsByUuid = questionsByUuid + (completionQ.questionUuid to completionQ)
+        refreshErrorIfNeeded(completionQ)
+    }
+
+    private fun updateComputedNoOfContactsErrorIfNeeded(question: CounsellingQuestionDto) {
+        val noOfContactsQ = questionsByUuid["CCT_NO_OF_CONTACTS"] ?: return
+        val relQ = questionsByUuid["CCT_RELATIONSHIP"]
+        val countFieldIds = relQ?.options.orEmpty()
+            .flatMap { it.conditions.orEmpty() }
+            .filter { it.actionType == ActionType.SHOW_QUESTION.value }
+            .mapNotNull { it.targetQuestionId }
+            .toSet()
+
+        if (question.questionUuid == "CCT_NO_OF_CONTACTS" || question.questionId in countFieldIds) {
+            val allQuestions = questionsByUuid.values.toList()
+            val newSum = allQuestions
+                .filter { it.questionId in countFieldIds }
+                .sumOf { it.value?.toString()?.toIntOrNull() ?: 0 }
+                .toString()
+
+            noOfContactsQ.value = newSum
+            refreshErrorIfNeeded(noOfContactsQ)
+        }
+    }
+
     private fun refreshErrorIfNeeded(q: CounsellingQuestionDto) {
         val newError = validateQuestion(q)
         if (q.errorMessage != newError && (q.errorMessage != null || newError == null)) {
@@ -410,22 +463,26 @@ class ContactTracingFormViewModel @Inject constructor(
         }
         isSubmitting = true
         viewModelScope.launch {
-            saveCurrentSection(current)
-            val finalStatus = if (currentFormType == FormType.TPT_FOLLOW_UP && currentSectionPhase == SectionPhase.POST_SUBMIT)
-                "COMPLETE" else "SUBMITTED"
-            repository.submitResponse(responseId, finalStatus)
-            persistedStatus = finalStatus
-            if (responseId > 0) {
-                val pushed = repository.submitResponseBulk(responseId, currentSectionPhase?.value)
-                if (!pushed) {
-                    ContactTracingSyncWorker.scheduleSync(context)
+            try {
+                saveCurrentSection(current)
+                val finalStatus = if (currentFormType == FormType.TPT_FOLLOW_UP && currentSectionPhase == SectionPhase.POST_SUBMIT)
+                    "COMPLETE" else "SUBMITTED"
+                repository.submitResponse(responseId, finalStatus)
+                persistedStatus = finalStatus
+                if (responseId > 0) {
+                    val pushed = repository.submitResponseBulk(responseId, currentSectionPhase?.value)
+                    if (!pushed) {
+                        ContactTracingSyncWorker.scheduleSync(context)
+                    }
                 }
-            }
-            val screeningStatusAnswer = questionsByUuid[QUESTION_UUID_CLINICAL_SCREENING_STATUS]?.value?.toString()
-            if (currentFormType == FormType.CONTACT_FOLLOW_UP && screeningStatusAnswer != null) {
-                handleClinicalScreeningStatusSubmit(pendingIndexCaseBenId, screeningStatusAnswer)
-            } else {
-                _formCompleted.value = true
+                val screeningStatusAnswer = questionsByUuid[QUESTION_UUID_CLINICAL_SCREENING_STATUS]?.value?.toString()
+                if (currentFormType == FormType.CONTACT_FOLLOW_UP && screeningStatusAnswer != null) {
+                    handleClinicalScreeningStatusSubmit(pendingIndexCaseBenId, screeningStatusAnswer)
+                } else {
+                    _formCompleted.value = true
+                }
+            } finally {
+                isSubmitting = false
             }
         }
     }
@@ -457,6 +514,9 @@ class ContactTracingFormViewModel @Inject constructor(
         tbSuspected.isTBConfirmed = true
         tbSuspected.syncState = SyncState.UNSYNCED
         tbRepo.saveTBSuspected(tbSuspected)
+
+        // Auto-Sync TB rows on SAVE_SUCCESS
+        WorkerUtils.triggerAmritPushWorker(context)
     }
 
     fun onBack() {
@@ -549,14 +609,23 @@ class ContactTracingFormViewModel @Inject constructor(
             ?: emptyList()
         val sectionResponse = if (matches.isEmpty()) null else matches[visitIndex.coerceIn(0, matches.size - 1)]
         val answersByQuestionId = sectionResponse?.questionResponses?.groupBy { it.questionId } ?: emptyMap()
+        val allAnswersByQuestionId = existing?.sectionResponses
+            ?.flatMap { it.questionResponses }
+            ?.groupBy { it.questionId } ?: emptyMap()
+
         questions.forEach { q ->
-            val rows = answersByQuestionId[q.questionId] ?: return@forEach
-            val isMultiSelect =  q.questionType == QuestionType.CHECKBOX_MULTI.value
+            val rows = answersByQuestionId[q.questionId] ?: allAnswersByQuestionId[q.questionId] ?: return@forEach
+            val isMultiSelect = q.questionType == QuestionType.CHECKBOX_MULTI.value ||
+                q.questionType == QuestionType.DROPDOWN_MULTI.value
             q.value = if (isMultiSelect) {
-                rows.mapNotNull { row -> q.options?.firstOrNull { it.optionId == row.optionId }?.optionValue }
+                rows.mapNotNull { row ->
+                    q.options?.firstOrNull { it.optionId == row.optionId }?.optionValue
+                }
             } else {
                 val row = rows.first()
-                row.optionId?.let { oid -> q.options?.firstOrNull { it.optionId == oid }?.optionValue } ?: row.answerText
+                row.optionId?.let { oid ->
+                    q.options?.firstOrNull { it.optionId == oid }?.optionValue ?: row.answerText
+                } ?: row.answerText
             }
         }
     }
@@ -571,12 +640,62 @@ class ContactTracingFormViewModel @Inject constructor(
         repository.saveSectionAnswers(id, sectionId, buildAnswerRows(questions.filter { it.visible }), status)
     }
 
+    /** Bounds TFU_START_DATE and TFU_VISIT_DATE to not precede the beneficiary's TB screening visit date. */
+    private suspend fun ensureDateNotBeforeScreening(questions: List<CounsellingQuestionDto>, sectionId: Int) {
+        if (currentFormType != FormType.TPT_FOLLOW_UP) return
+        val targetUuid = when (currentSectionPhase) {
+            SectionPhase.PRE_SUBMIT -> QUESTION_UUID_TPT_START_DATE
+            SectionPhase.POST_SUBMIT -> QUESTION_UUID_TPT_VISIT_DATE
+            else -> return
+        }
+        val dateQuestion = questions.firstOrNull { it.questionUuid == targetUuid } ?: return
+        if (dateQuestion.validations.orEmpty().any { it.validationType == "MIN_DATE" }) return
+
+        val visitDateMillis = tbRepo.getTBScreening(pendingIndexCaseBenId)?.visitDate ?: return
+        val isoScreeningDate = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).format(Date(visitDateMillis))
+
+        val existingMaxDate = dateQuestion.validations.orEmpty().firstOrNull { it.validationType == "MAX_DATE" }
+        if (existingMaxDate != null) {
+            val maxDateStr = if (existingMaxDate.validationParam.equals("TODAY", true)) {
+                SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).format(Date())
+            } else {
+                existingMaxDate.validationParam
+            }
+            if (isoScreeningDate > maxDateStr) return
+        }
+
+        val errorMsg = "${dateQuestion.questionText} cannot be before the Screening Date"
+        dateQuestion.validations = dateQuestion.validations.orEmpty() + listOf(
+            CounsellingValidationDto(null, "MIN_DATE", isoScreeningDate, errorMsg),
+            CounsellingValidationDto(null, "DATE_NOT_BEFORE", isoScreeningDate, errorMsg)
+        )
+        questionsByUuid = questionsByUuid + (dateQuestion.questionUuid to dateQuestion)
+    }
+
+    /** Computes and persists Expected Completion Date when Regimen and Start Date are already set. */
+    private suspend fun ensureExpectedCompletionDate(questions: List<CounsellingQuestionDto>, sectionId: Int) {
+        if (currentFormType != FormType.TPT_FOLLOW_UP || currentSectionPhase != SectionPhase.PRE_SUBMIT) return
+        val completionQ = questions.firstOrNull { it.questionUuid == QUESTION_UUID_EXPECTED_COMPLETION_DATE } ?: return
+        if (completionQ.value != null) return
+        val regimen = RegimenAdvised.fromValue(
+            questions.firstOrNull { it.questionUuid == QUESTION_UUID_REGIMEN_ADVISED }?.value?.toString()
+        ) ?: return
+        val startDateStr = questions.firstOrNull { it.questionUuid == QUESTION_UUID_TPT_START_DATE }?.value?.toString() ?: return
+        val computed = computeExpectedCompletionDate(startDateStr, regimen) ?: return
+
+        completionQ.value = computed
+        val id = ensureResponseCreated()
+        val status = persistedStatus?.takeIf { it != "DRAFT" } ?: "DRAFT"
+        repository.saveSectionAnswers(id, sectionId, buildAnswerRows(questions.filter { it.visible }), status)
+    }
+
     private fun evaluateAllConditions(questions: List<CounsellingQuestionDto>) {
         questions.forEach { q ->
             val raw = rawQuestionsByUuid[q.questionUuid]
             q.visible = parseRef(raw?.enabledIfJson)?.let { matchesCondition(it) } ?: q.visibleByDefault
             parseRef(raw?.disabledIfJson)?.let { if (matchesCondition(it)) q.visible = false }
-            q.isMandatory = parseRef(raw?.mandatoryIfJson)?.let { matchesCondition(it) } ?: (q.originalIsMandatory ?: q.isMandatory)
+            q.isMandatory = (parseRef(raw?.mandatoryIfJson)?.let { matchesCondition(it) } ?: (q.originalIsMandatory ?: q.isMandatory))
+                    || matchesMandatoryIfValidation(q)
         }
 
         questions.forEach { q ->
@@ -589,6 +708,14 @@ class ContactTracingFormViewModel @Inject constructor(
                 conditionsByOptionId[opt.optionId]?.forEach { applyCondition(it) }
             }
         }
+    }
+
+    // Determines if the question's mandatory-if condition is satisfied.
+    private fun matchesMandatoryIfValidation(q: CounsellingQuestionDto): Boolean {
+        val mandatoryIf = q.validations?.firstOrNull { it.validationType == ActionType.MANDATORY_IF.value } ?: return false
+        val parts = mandatoryIf.validationParam.split("=")
+        if (parts.size != 2) return false
+        return questionsByUuid[parts[0]]?.value?.toString() == parts[1]
     }
 
     private fun parseRef(json: String?): ConditionRefDto? =
@@ -633,12 +760,9 @@ class ContactTracingFormViewModel @Inject constructor(
     }
 
     private fun getMandatoryError(q: CounsellingQuestionDto): String? {
-        if (q.isMandatory) return "This field is required"
-        val mandatoryIf = q.validations?.firstOrNull { it.validationType == "MANDATORY_IF" } ?: return null
-        val parts = mandatoryIf.validationParam.split("=")
-        if (parts.size != 2) return null
-        val refQuestion = questionsByUuid[parts[0]] ?: return null
-        return if (refQuestion.value?.toString() == parts[1]) mandatoryIf.errorMessage else null
+        val mandatoryIf = q.validations?.firstOrNull { it.validationType == ActionType.MANDATORY_IF.value }
+        if (mandatoryIf != null && matchesMandatoryIfValidation(q)) return mandatoryIf.errorMessage
+        return if (q.isMandatory) "This field is required" else null
     }
 
 
@@ -694,8 +818,15 @@ class ContactTracingFormViewModel @Inject constructor(
                 "DATE_NOT_BEFORE" -> {
                     val param = v.validationParam
                     val boundDateStr = when {
-                        param.equals("TODAY", true) -> null // enforced by the date picker itself
-                        param.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) -> null // fixed ISO date; enforced by the picker
+                        param.equals("TODAY", true) ->
+                            SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).format(Date())
+                        param.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) ->
+                            try {
+                                SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).parse(param)
+                                    ?.let { SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).format(it) }
+                            } catch (_: Exception) {
+                                null
+                            }
                         else -> questionsByUuid[param]?.value?.toString() // reference to another question's answer
                     }
                     if (boundDateStr != null) {
@@ -714,8 +845,25 @@ class ContactTracingFormViewModel @Inject constructor(
     }
 }
 
+/** Calculates Expected Completion Date from TPT Start Date and regimen duration. */
+private fun computeExpectedCompletionDate(startDateStr: String, regimen: RegimenAdvised): String? {
+    return try {
+        val fmt = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
+        val parsedStartDate = fmt.parse(startDateStr) ?: return null
+        val cal = Calendar.getInstance().apply {
+            time = parsedStartDate
+            add(Calendar.MONTH, regimen.durationMonths)
+        }
+        fmt.format(cal.time)
+    } catch (_: Exception) {
+        null
+    }
+}
+
 private fun SectionQuestionWithDetails.toCounsellingQuestionDto(): CounsellingQuestionDto {
     val q = question
+    val maxLength = q.maxLength
+        ?: validations.find { it.validationType == "MAX_LENGTH" }?.validationValue?.toIntOrNull()
     return CounsellingQuestionDto(
         questionId = q.questionId,
         questionUuid = q.questionUuid ?: q.questionId.toString(),
@@ -723,7 +871,7 @@ private fun SectionQuestionWithDetails.toCounsellingQuestionDto(): CounsellingQu
         questionType = q.questionType,
         isMandatory = q.isRequired,
         displayOrder = q.questionOrder,
-        maxLength = q.maxLength,
+        maxLength = maxLength,
         defaultValue = null,
         containsPii = q.containsPii,
         visibleByDefault = q.visibleByDefault,
@@ -734,7 +882,17 @@ private fun SectionQuestionWithDetails.toCounsellingQuestionDto(): CounsellingQu
                 validationParam = it.validationValue ?: "",
                 errorMessage = it.errorMessage
             )
-        },
+        } + if (q.questionUuid == QUESTION_UUID_EXPECTED_COMPLETION_DATE &&
+                validations.none { it.validationType == "DATE_NOT_BEFORE" && it.validationValue == QUESTION_UUID_TPT_START_DATE }) {
+            listOf(
+                CounsellingValidationDto(
+                    validationId = null,
+                    validationType = "DATE_NOT_BEFORE",
+                    validationParam = QUESTION_UUID_TPT_START_DATE,
+                    errorMessage = "Expected Completion Date cannot be before TPT Start Date"
+                )
+            )
+        } else emptyList(),
         options = options.sortedBy { it.option.optionOrder }.map { owc ->
             CounsellingOptionDto(
                 optionId = owc.option.optionId,

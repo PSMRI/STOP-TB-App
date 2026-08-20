@@ -95,12 +95,13 @@ class ExamineViewModel @Inject constructor(
             else      -> null  // all done
         }
     }
-    private val tptFollowUpStatus: Flow<String?> =
-        contactTracingRepo.observeResponseStatus(benId, FormType.TPT_FOLLOW_UP)
+    // Scope status to PRE_SUBMIT so newer POST_SUBMIT drafts don't mask the submitted PRE_SUBMIT row.
+    private val tptPreSubmitStatus: Flow<String?> =
+        contactTracingRepo.observePreSubmitResponseStatus(benId, FormType.TPT_FOLLOW_UP)
 
     /** Drives the "TPT Followup" row's visibility — true once PRE_SUBMIT has been submitted. */
     val isTptFollowUpPreSubmitDone: Flow<Boolean> =
-        tptFollowUpStatus.map { it == "SUBMITTED" || it == "COMPLETE" }
+        tptPreSubmitStatus.map { it == "SUBMITTED" || it == "COMPLETE" }
 
     private val contactFollowUpStatus: Flow<String?> =
         contactTracingRepo.observeResponseStatus(benId, FormType.CONTACT_FOLLOW_UP)
@@ -116,6 +117,9 @@ class ExamineViewModel @Inject constructor(
         emit(versionId)
     }
 
+    private val contactFollowUpResponseVersionId: Flow<Int?> =
+        contactTracingRepo.observeResponseFormVersionId(benId, FormType.CONTACT_FOLLOW_UP)
+
     /**
      * Drives the "Contact Followup" row's Fill/View state.
      * Full Treatment and No Treatment complete as soon as CONTACT_FOLLOW_UP itself is submitted.
@@ -126,17 +130,21 @@ class ExamineViewModel @Inject constructor(
         combine(
             contactFollowUpStatus,
             contactFollowUpFormVersionId,
-            tptFollowUpStatus
-        ) { cfuStatus, cfuVersionId, tptStatus ->
+            contactFollowUpResponseVersionId,
+            tptPreSubmitStatus
+        ) { cfuStatus, schemaVersionId, responseVersionId, tptStatus ->
             val cfuSubmitted = cfuStatus == "SUBMITTED" || cfuStatus == "COMPLETE"
-            if (!cfuSubmitted || cfuVersionId == null) {
+            if (!cfuSubmitted || schemaVersionId == null || responseVersionId == null) {
                 false
             } else {
-                val screeningStatus = contactTracingRepo.getClinicalScreeningStatus(benId, cfuVersionId)
-                if (screeningStatus == ClinicalScreeningStatus.TPT_ELIGIBLE) {
-                    tptStatus == "SUBMITTED" || tptStatus == "COMPLETE"
-                } else {
-                    true
+                // Query against the version the response is actually stored under, not the
+                // schema's active version — those can disagree (e.g. right after reinstall,
+                // before a version migration has synced), and querying the wrong version
+                // silently returns null, which must NOT be treated as "not TPT eligible".
+                when (contactTracingRepo.getClinicalScreeningStatus(benId, responseVersionId)) {
+                    ClinicalScreeningStatus.TPT_ELIGIBLE -> tptStatus == "SUBMITTED" || tptStatus == "COMPLETE"
+                    ClinicalScreeningStatus.FULL_TREATMENT, ClinicalScreeningStatus.NO_TREATMENT -> true
+                    null -> false
                 }
             }
         }

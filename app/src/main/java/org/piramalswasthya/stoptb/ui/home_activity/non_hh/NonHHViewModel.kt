@@ -34,9 +34,21 @@ class NonHHViewModel @Inject constructor(
     // ── Examine form fill status ──────────────────────────────────────────────
     val vitalBenIds: StateFlow<List<Long>> = vitalRepo.vitalBenIds
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val unsyncedVitalBenIds: StateFlow<List<Long>> = vitalRepo.unsyncedVitalBenIds
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val syncingVitalBenIds: StateFlow<List<Long>> = vitalRepo.syncingVitalBenIds
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val tbScreeningBenIds: StateFlow<List<Long>> = tbRepo.tbScreeningBenIds
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val unsyncedTbScreeningBenIds: StateFlow<List<Long>> = tbRepo.unsyncedTbScreeningBenIds
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val syncingTbScreeningBenIds: StateFlow<List<Long>> = tbRepo.syncingTbScreeningBenIds
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val generalOpdBenIds: StateFlow<List<Long>> = tbRepo.generalOpdBenIds
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val unsyncedGeneralOpdBenIds: StateFlow<List<Long>> = tbRepo.unsyncedGeneralOpdBenIds
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val syncingGeneralOpdBenIds: StateFlow<List<Long>> = tbRepo.syncingGeneralOpdBenIds
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val anthropometryBenIds: StateFlow<List<Long>> = recordsRepo.anthropometryFilledBenIds
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())

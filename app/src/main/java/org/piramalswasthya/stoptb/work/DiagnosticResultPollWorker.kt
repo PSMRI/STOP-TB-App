@@ -1,6 +1,8 @@
 package org.piramalswasthya.stoptb.work
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -33,6 +35,17 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
         return try {
             withContext(Dispatchers.IO) {
                 Timber.d("DiagnosticResultPollWorker starting work")
+                if (!hasValidatedInternet()) {
+                    Timber.d("Skipping DiagnosticResultPollWorker: internet is unavailable")
+                    return@withContext Result.success()
+                }
+                if (tbRepo.isXrayIntegrated()) {
+                    tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST")
+                }
+                if (tbRepo.isTruenatIntegrated()) {
+                    tbRepo.fetchBeneficiariesByStatus("SPUTUM_TRUENAT")
+                    tbRepo.fetchBeneficiariesByStatus("MDR_RIF")
+                }
                 val activeList = tbRepo.getDiagnosticsList()
                 var hasInProgress = false
                 val now = System.currentTimeMillis()
@@ -42,59 +55,29 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                     val trueNatInProgress = diag.trueNatOrderStatus.equals("IN_PROGRESS", ignoreCase = true) || diag.trueNatOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true)
                     val rifInProgress = diag.rifOrderStatus.equals("IN_PROGRESS", ignoreCase = true) || diag.rifOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true)
 
-                    if (xrayInProgress) {
-                        var actualStart = preferenceDao.getDiagPollActualStartTime(diag.benId, "XRAY_CHEST")
-                        if (actualStart <= 0L) {
-                            actualStart = now
-                            preferenceDao.setDiagPollActualStartTime(diag.benId, "XRAY_CHEST", now)
-                        }
-                        if (now - actualStart > 30 * 60 * 1000) { // 30 minutes
-                            Timber.d("Polling xray result timed out (30 mins) for benId=${diag.benId}")
-                            val updated = diag.copy(xrayOrderStatus = "FAILED", syncState = SyncState.SYNCED)
-                            tbRepo.saveTBDiagnostics(updated)
-                        } else {
-                            Timber.d("Polling xray result for benId=${diag.benId}")
-                            tbRepo.fetchOrderResult(diag.benId, "XRAY_CHEST")
-                            hasInProgress = true
-                        }
+                    if (xrayInProgress && tbRepo.isXrayIntegrated()) {
+                        Timber.d("Polling xray result for benId=${diag.benId}")
+                        tbRepo.fetchOrderResult(diag.benId, "XRAY_CHEST")
+                        preferenceDao.setLastCheckedTime(diag.benId, "XRAY_CHEST", now)
+                        hasInProgress = true
                     }
-                    if (trueNatInProgress) {
-                        var actualStart = preferenceDao.getDiagPollActualStartTime(diag.benId, "SPUTUM_TRUENAT")
-                        if (actualStart <= 0L) {
-                            actualStart = now
-                            preferenceDao.setDiagPollActualStartTime(diag.benId, "SPUTUM_TRUENAT", now)
-                        }
-                        if (now - actualStart > 30 * 60 * 1000) { // 30 minutes
-                            Timber.d("Polling truenat result timed out (30 mins) for benId=${diag.benId}")
-                            val updated = diag.copy(trueNatOrderStatus = "FAILED", syncState = SyncState.SYNCED)
-                            tbRepo.saveTBDiagnostics(updated)
-                        } else {
-                            Timber.d("Polling truenat result for benId=${diag.benId}")
-                            tbRepo.fetchOrderResult(diag.benId, "SPUTUM_TRUENAT")
-                            hasInProgress = true
-                        }
+                    if (trueNatInProgress && tbRepo.isTruenatIntegrated()) {
+                        Timber.d("Polling truenat result for benId=${diag.benId}")
+                        tbRepo.fetchOrderResult(diag.benId, "SPUTUM_TRUENAT")
+                        preferenceDao.setLastCheckedTime(diag.benId, "SPUTUM_TRUENAT", now)
+                        hasInProgress = true
                     }
-                    if (rifInProgress) {
-                        var actualStart = preferenceDao.getDiagPollActualStartTime(diag.benId, "MDR_RIF")
-                        if (actualStart <= 0L) {
-                            actualStart = now
-                            preferenceDao.setDiagPollActualStartTime(diag.benId, "MDR_RIF", now)
-                        }
-                        if (now - actualStart > 30 * 60 * 1000) { // 30 minutes
-                            Timber.d("Polling rif result timed out (30 mins) for benId=${diag.benId}")
-                            val updated = diag.copy(rifOrderStatus = "FAILED", syncState = SyncState.SYNCED)
-                            tbRepo.saveTBDiagnostics(updated)
-                        } else {
-                            Timber.d("Polling rif result for benId=${diag.benId}")
-                            tbRepo.fetchOrderResult(diag.benId, "MDR_RIF")
-                            hasInProgress = true
-                        }
+                    if (rifInProgress && tbRepo.isTruenatIntegrated()) {
+                        Timber.d("Polling rif result for benId=${diag.benId}")
+                        tbRepo.fetchOrderResult(diag.benId, "MDR_RIF")
+                        preferenceDao.setLastCheckedTime(diag.benId, "MDR_RIF", now)
+                        hasInProgress = true
                     }
                 }
 
-                // If any test is still in progress, schedule another poll in 40 seconds
+                // If any test is still in progress, schedule another poll in 60 seconds
                 if (hasInProgress) {
-                    val pollDelaySec = 40L
+                    val pollDelaySec = 60L
                     Timber.d("Scheduling next DiagnosticResultPollWorker run in ${pollDelaySec}s")
                     val pollRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>()
                         .setInitialDelay(pollDelaySec, TimeUnit.SECONDS)
@@ -114,5 +97,15 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
             Timber.e(e, "Error inside DiagnosticResultPollWorker")
             Result.failure()
         }
+    }
+
+    private fun hasValidatedInternet(): Boolean {
+        val connectivityManager =
+            appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: return false
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 }

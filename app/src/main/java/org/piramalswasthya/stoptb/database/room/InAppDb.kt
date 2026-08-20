@@ -105,7 +105,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 27, exportSchema = false
+    version = 43, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -763,10 +763,11 @@ abstract class InAppDb : RoomDatabase() {
                             indexSqls.add(cursor.getString(0))
                         }
                     }
-                    
+
+                    database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
                     database.execSQL("DROP TABLE `BENEFICIARY`")
                     database.execSQL("ALTER TABLE `BENEFICIARY_new` RENAME TO `BENEFICIARY`")
-                    
+
                     for (indexSql in indexSqls) {
                         try {
                             database.execSQL(indexSql)
@@ -833,6 +834,656 @@ abstract class InAppDb : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS `index_t_section_response_backendSectionResponseId` " +
                         "ON `t_section_response` (`backendSectionResponseId`)"
                 )
+            }
+        }
+
+        private val MIGRATION_27_28 = object : Migration(27, 28) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                var originalSql = ""
+                database.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='HOUSEHOLD'").use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        originalSql = cursor.getString(0)
+                    }
+                }
+
+                if (originalSql.isNotEmpty()) {
+                    var newSql = originalSql.replace("CREATE TABLE `HOUSEHOLD`", "CREATE TABLE `HOUSEHOLD_new`")
+                    newSql = newSql.replace("CREATE TABLE HOUSEHOLD", "CREATE TABLE HOUSEHOLD_new")
+                    newSql = newSql.replace("fam_totalHhMembers INTEGER DEFAULT NULL", "fam_totalHhMembers INTEGER")
+                    newSql = newSql.replace("fam_isRegisteredAtCampSite TEXT DEFAULT NULL", "fam_isRegisteredAtCampSite TEXT")
+                    newSql = newSql.replace("fam_isRegisteredAtCampSiteId INTEGER DEFAULT 0", "fam_isRegisteredAtCampSiteId INTEGER")
+
+                    database.execSQL(newSql)
+
+                    val columns = ArrayList<String>()
+                    database.query("PRAGMA table_info(`HOUSEHOLD`)").use { cursor ->
+                        val nameIndex = cursor.getColumnIndex("name")
+                        while (cursor.moveToNext()) {
+                            columns.add(cursor.getString(nameIndex))
+                        }
+                    }
+                    val columnsCsv = columns.joinToString(", ") { "`$it`" }
+
+                    database.execSQL("INSERT INTO `HOUSEHOLD_new` ($columnsCsv) SELECT $columnsCsv FROM `HOUSEHOLD`")
+
+                    val indexSqls = ArrayList<String>()
+                    database.query("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='HOUSEHOLD' AND sql IS NOT NULL").use { cursor ->
+                        while (cursor.moveToNext()) {
+                            indexSqls.add(cursor.getString(0))
+                        }
+                    }
+
+                    database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
+                    database.execSQL("DROP TABLE `HOUSEHOLD`")
+                    database.execSQL("ALTER TABLE `HOUSEHOLD_new` RENAME TO `HOUSEHOLD`")
+
+                    for (indexSql in indexSqls) {
+                        try {
+                            database.execSQL(indexSql)
+                        } catch (e: Exception) {
+                            // in case the index already got created, ignore
+                        }
+                    }
+                }
+                recreateBenBasicCacheView(database)
+            }
+        }
+
+        private val MIGRATION_28_29 = object : Migration(28, 29) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val householdFamilyColumns = listOf(
+                    "fam_address TEXT",
+                    "fam_pinCode TEXT"
+                )
+                householdFamilyColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "HOUSEHOLD", columnName)) {
+                        database.execSQL("ALTER TABLE HOUSEHOLD ADD COLUMN $columnDefinition")
+                    }
+                }
+            }
+        }
+
+        private val MIGRATION_29_30 = object : Migration(29, 30) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val existingColumns = ArrayList<String>()
+                database.query("PRAGMA table_info(`BENEFICIARY`)").use { cursor ->
+                    val nameIndex = cursor.getColumnIndex("name")
+                    while (cursor.moveToNext()) {
+                        existingColumns.add(cursor.getString(nameIndex))
+                    }
+                }
+
+                var householdIdNotNull = false
+                database.query("PRAGMA table_info(`BENEFICIARY`)").use { cursor ->
+                    val nameIndex = cursor.getColumnIndex("name")
+                    val notNullIndex = cursor.getColumnIndex("notnull")
+                    while (cursor.moveToNext()) {
+                        if (cursor.getString(nameIndex) == "householdId") {
+                            householdIdNotNull = cursor.getInt(notNullIndex) == 1
+                        }
+                    }
+                }
+
+                val missingNullableColumns = listOf(
+                    "placeOfCurrentLiving" to "INTEGER",
+                    "otherPlaceOfCurrentLiving" to "TEXT",
+                    "institutionName" to "TEXT"
+                ).filter { !existingColumns.contains(it.first) }
+
+                missingNullableColumns.forEach { (name, type) ->
+                    database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN $name $type")
+                    existingColumns.add(name)
+                }
+
+                val needsIsNonHH = !existingColumns.contains("isNonHH")
+                if (!needsIsNonHH && !householdIdNotNull) {
+                    return
+                }
+
+                var originalSql = ""
+                database.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='BENEFICIARY'").use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        originalSql = cursor.getString(0)
+                    }
+                }
+
+                if (originalSql.isEmpty()) return
+
+                var newSql = originalSql.replace("CREATE TABLE `BENEFICIARY`", "CREATE TABLE `BENEFICIARY_new`")
+                newSql = newSql.replace("CREATE TABLE BENEFICIARY", "CREATE TABLE BENEFICIARY_new")
+                newSql = newSql.replace("`householdId` INTEGER NOT NULL", "`householdId` INTEGER")
+                newSql = newSql.replace("householdId INTEGER NOT NULL", "householdId INTEGER")
+
+                if (needsIsNonHH) {
+                    // A new column def must be inserted before the trailing `PRIMARY KEY(...)`
+                    // table constraint — SQLite's grammar doesn't allow a column def after it.
+                    val primaryKeyIndex = newSql.indexOf(", PRIMARY KEY(")
+                    newSql = if (primaryKeyIndex >= 0) {
+                        newSql.substring(0, primaryKeyIndex) + ", `isNonHH` INTEGER NOT NULL" + newSql.substring(primaryKeyIndex)
+                    } else {
+                        val lastParen = newSql.lastIndexOf(')')
+                        newSql.substring(0, lastParen) + ", `isNonHH` INTEGER NOT NULL" + newSql.substring(lastParen)
+                    }
+                }
+
+                database.execSQL(newSql)
+
+                val columnsCsv = existingColumns.joinToString(", ") { "`$it`" }
+                val selectCsv = if (needsIsNonHH) "$columnsCsv, 0" else columnsCsv
+                val insertCsv = if (needsIsNonHH) "$columnsCsv, `isNonHH`" else columnsCsv
+
+                database.execSQL("INSERT INTO `BENEFICIARY_new` ($insertCsv) SELECT $selectCsv FROM `BENEFICIARY`")
+
+                val indexSqls = ArrayList<String>()
+                database.query("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='BENEFICIARY' AND sql IS NOT NULL").use { cursor ->
+                    while (cursor.moveToNext()) {
+                        indexSqls.add(cursor.getString(0))
+                    }
+                }
+
+                database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
+                database.execSQL("DROP TABLE `BENEFICIARY`")
+                database.execSQL("ALTER TABLE `BENEFICIARY_new` RENAME TO `BENEFICIARY`")
+
+                for (indexSql in indexSqls) {
+                    try {
+                        database.execSQL(indexSql)
+                    } catch (e: Exception) {
+                        // in case the index already got created, ignore
+                    }
+                }
+                recreateBenBasicCacheView(database)
+            }
+        }
+
+        private val MIGRATION_30_31 = object : Migration(30, 31) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val dynamicFormColumns = listOf(
+                    "definition TEXT",
+                    "triggerRuleJson TEXT",
+                    "globalRuleJson TEXT",
+                    "enabledIfJson TEXT"
+                )
+                dynamicFormColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "t_dynamic_form", columnName)) {
+                        database.execSQL("ALTER TABLE t_dynamic_form ADD COLUMN $columnDefinition")
+                    }
+                }
+            }
+        }
+
+        private val MIGRATION_31_32 = object : Migration(31, 32) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (columnExists(database, "t_form_section", "hasSubmitButton")) {
+                    return
+                }
+
+                var originalSql = ""
+                database.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='t_form_section'").use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        originalSql = cursor.getString(0)
+                    }
+                }
+                if (originalSql.isEmpty()) return
+
+                var newSql = originalSql.replace("CREATE TABLE `t_form_section`", "CREATE TABLE `t_form_section_new`")
+                newSql = newSql.replace("CREATE TABLE t_form_section", "CREATE TABLE t_form_section_new")
+
+                val primaryKeyIndex = newSql.indexOf(", PRIMARY KEY(")
+                newSql = if (primaryKeyIndex >= 0) {
+                    newSql.substring(0, primaryKeyIndex) + ", `hasSubmitButton` INTEGER NOT NULL" + newSql.substring(primaryKeyIndex)
+                } else {
+                    val lastParen = newSql.lastIndexOf(')')
+                    newSql.substring(0, lastParen) + ", `hasSubmitButton` INTEGER NOT NULL" + newSql.substring(lastParen)
+                }
+
+                database.execSQL(newSql)
+
+                val columns = ArrayList<String>()
+                database.query("PRAGMA table_info(`t_form_section`)").use { cursor ->
+                    val nameIndex = cursor.getColumnIndex("name")
+                    while (cursor.moveToNext()) {
+                        columns.add(cursor.getString(nameIndex))
+                    }
+                }
+                val columnsCsv = columns.joinToString(", ") { "`$it`" }
+
+                database.execSQL("INSERT INTO `t_form_section_new` ($columnsCsv, `hasSubmitButton`) SELECT $columnsCsv, 0 FROM `t_form_section`")
+
+                val indexSqls = ArrayList<String>()
+                database.query("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='t_form_section' AND sql IS NOT NULL").use { cursor ->
+                    while (cursor.moveToNext()) {
+                        indexSqls.add(cursor.getString(0))
+                    }
+                }
+
+                database.execSQL("DROP TABLE `t_form_section`")
+                database.execSQL("ALTER TABLE `t_form_section_new` RENAME TO `t_form_section`")
+
+                for (indexSql in indexSqls) {
+                    try {
+                        database.execSQL(indexSql)
+                    } catch (e: Exception) {
+                        // in case the index already got created, ignore
+                    }
+                }
+            }
+        }
+
+        private val MIGRATION_32_33 = object : Migration(32, 33) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val tbScreeningColumns = listOf(
+                    "referralRequired INTEGER",
+                    "referralFor TEXT",
+                    "latitude REAL",
+                    "longitude REAL",
+                    "familyContactScreeningRequired INTEGER"
+                )
+                tbScreeningColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "TB_SCREENING", columnName)) {
+                        database.execSQL("ALTER TABLE TB_SCREENING ADD COLUMN $columnDefinition")
+                    }
+                }
+
+                val tbSuspectedColumns = listOf(
+                    "isAICoughAssessmentDone INTEGER",
+                    "aiCoughAssessmentResult TEXT",
+                    "otherReasonForSuspicion TEXT",
+                    "latitude REAL",
+                    "longitude REAL",
+                    "address TEXT"
+                )
+                tbSuspectedColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "TB_SUSPECTED", columnName)) {
+                        database.execSQL("ALTER TABLE TB_SUSPECTED ADD COLUMN $columnDefinition")
+                    }
+                }
+            }
+        }
+
+        private val MIGRATION_33_34 = object : Migration(33, 34) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val nullableColumns = listOf(
+                    "maxLength INTEGER",
+                    "enabledIfJson TEXT",
+                    "disabledIfJson TEXT",
+                    "mandatoryIfJson TEXT",
+                    "autoPopulateLogic TEXT",
+                    "autoPopulateNote TEXT",
+                    "unit TEXT",
+                    "exampleValuesJson TEXT",
+                    "note TEXT",
+                    "displayFormat TEXT"
+                )
+                nullableColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "t_section_question", columnName)) {
+                        database.execSQL("ALTER TABLE t_section_question ADD COLUMN $columnDefinition")
+                    }
+                }
+
+                val notNullDefaults = listOf(
+                    Triple("allowMultiple", "INTEGER NOT NULL", "0"),
+                    Triple("containsPii", "INTEGER NOT NULL", "0"),
+                    Triple("visibleByDefault", "INTEGER NOT NULL", "1"),
+                    Triple("autoPopulated", "INTEGER NOT NULL", "0")
+                ).filter { (name, _, _) -> !columnExists(database, "t_section_question", name) }
+
+                if (notNullDefaults.isEmpty()) return
+
+                var originalSql = ""
+                database.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='t_section_question'").use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        originalSql = cursor.getString(0)
+                    }
+                }
+                if (originalSql.isEmpty()) return
+
+                var newSql = originalSql.replace("CREATE TABLE `t_section_question`", "CREATE TABLE `t_section_question_new`")
+                newSql = newSql.replace("CREATE TABLE t_section_question", "CREATE TABLE t_section_question_new")
+
+                val newColumnDefs = notNullDefaults.joinToString(", ") { (name, type, _) -> "`$name` $type" }
+                val primaryKeyIndex = newSql.indexOf(", PRIMARY KEY(")
+                newSql = if (primaryKeyIndex >= 0) {
+                    newSql.substring(0, primaryKeyIndex) + ", $newColumnDefs" + newSql.substring(primaryKeyIndex)
+                } else {
+                    val lastParen = newSql.lastIndexOf(')')
+                    newSql.substring(0, lastParen) + ", $newColumnDefs" + newSql.substring(lastParen)
+                }
+
+                database.execSQL(newSql)
+
+                val columns = ArrayList<String>()
+                database.query("PRAGMA table_info(`t_section_question`)").use { cursor ->
+                    val nameIndex = cursor.getColumnIndex("name")
+                    while (cursor.moveToNext()) {
+                        columns.add(cursor.getString(nameIndex))
+                    }
+                }
+                val columnsCsv = columns.joinToString(", ") { "`$it`" }
+                val newColumnsCsv = notNullDefaults.joinToString(", ") { "`${it.first}`" }
+                val newValuesCsv = notNullDefaults.joinToString(", ") { it.third }
+
+                database.execSQL(
+                    "INSERT INTO `t_section_question_new` ($columnsCsv, $newColumnsCsv) SELECT $columnsCsv, $newValuesCsv FROM `t_section_question`"
+                )
+
+                val indexSqls = ArrayList<String>()
+                database.query("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='t_section_question' AND sql IS NOT NULL").use { cursor ->
+                    while (cursor.moveToNext()) {
+                        indexSqls.add(cursor.getString(0))
+                    }
+                }
+
+                database.execSQL("DROP TABLE `t_section_question`")
+                database.execSQL("ALTER TABLE `t_section_question_new` RENAME TO `t_section_question`")
+
+                for (indexSql in indexSqls) {
+                    try {
+                        database.execSQL(indexSql)
+                    } catch (e: Exception) {
+                        // in case the index already got created, ignore
+                    }
+                }
+            }
+        }
+
+        private val MIGRATION_34_35 = object : Migration(34, 35) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (columnExists(database, "t_question_option", "isExclusive")) {
+                    return
+                }
+
+                var originalSql = ""
+                database.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='t_question_option'").use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        originalSql = cursor.getString(0)
+                    }
+                }
+                if (originalSql.isEmpty()) return
+
+                var newSql = originalSql.replace("CREATE TABLE `t_question_option`", "CREATE TABLE `t_question_option_new`")
+                newSql = newSql.replace("CREATE TABLE t_question_option", "CREATE TABLE t_question_option_new")
+
+                val primaryKeyIndex = newSql.indexOf(", PRIMARY KEY(")
+                newSql = if (primaryKeyIndex >= 0) {
+                    newSql.substring(0, primaryKeyIndex) + ", `isExclusive` INTEGER NOT NULL" + newSql.substring(primaryKeyIndex)
+                } else {
+                    val lastParen = newSql.lastIndexOf(')')
+                    newSql.substring(0, lastParen) + ", `isExclusive` INTEGER NOT NULL" + newSql.substring(lastParen)
+                }
+
+                database.execSQL(newSql)
+
+                val columns = ArrayList<String>()
+                database.query("PRAGMA table_info(`t_question_option`)").use { cursor ->
+                    val nameIndex = cursor.getColumnIndex("name")
+                    while (cursor.moveToNext()) {
+                        columns.add(cursor.getString(nameIndex))
+                    }
+                }
+                val columnsCsv = columns.joinToString(", ") { "`$it`" }
+
+                database.execSQL("INSERT INTO `t_question_option_new` ($columnsCsv, `isExclusive`) SELECT $columnsCsv, 0 FROM `t_question_option`")
+
+                val indexSqls = ArrayList<String>()
+                database.query("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='t_question_option' AND sql IS NOT NULL").use { cursor ->
+                    while (cursor.moveToNext()) {
+                        indexSqls.add(cursor.getString(0))
+                    }
+                }
+
+                database.execSQL("DROP TABLE `t_question_option`")
+                database.execSQL("ALTER TABLE `t_question_option_new` RENAME TO `t_question_option`")
+
+                for (indexSql in indexSqls) {
+                    try {
+                        database.execSQL(indexSql)
+                    } catch (e: Exception) {
+                        // in case the index already got created, ignore
+                    }
+                }
+            }
+        }
+
+        private val MIGRATION_35_36 = object : Migration(35, 36) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val columns = listOf(
+                    "targetFormUuid TEXT",
+                    "alertMessage TEXT",
+                    "targetList TEXT",
+                    "actionValue TEXT",
+                    "note TEXT",
+                    "reEnableCondition TEXT"
+                )
+                columns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "t_option_condition", columnName)) {
+                        database.execSQL("ALTER TABLE t_option_condition ADD COLUMN $columnDefinition")
+                    }
+                }
+            }
+        }
+
+        private val MIGRATION_36_37 = object : Migration(36, 37) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DROP INDEX IF EXISTS `index_t_form_response_beneficiaryId`")
+
+                var backendResponseIdHasDefault = false
+                var isHistorySnapshotHasDefault = false
+                database.query("PRAGMA table_info(`t_form_response`)").use { cursor ->
+                    val nameIndex = cursor.getColumnIndex("name")
+                    val dfltIndex = cursor.getColumnIndex("dflt_value")
+                    while (cursor.moveToNext()) {
+                        when (cursor.getString(nameIndex)) {
+                            "backendResponseId" -> backendResponseIdHasDefault = cursor.getString(dfltIndex) != null
+                            "isHistorySnapshot" -> isHistorySnapshotHasDefault = cursor.getString(dfltIndex) != null
+                        }
+                    }
+                }
+
+                if (!backendResponseIdHasDefault && !isHistorySnapshotHasDefault) {
+                    return
+                }
+
+                var originalSql = ""
+                database.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='t_form_response'").use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        originalSql = cursor.getString(0)
+                    }
+                }
+                if (originalSql.isEmpty()) return
+
+                var newSql = originalSql.replace("CREATE TABLE `t_form_response`", "CREATE TABLE `t_form_response_new`")
+                newSql = newSql.replace("CREATE TABLE t_form_response", "CREATE TABLE t_form_response_new")
+                newSql = newSql.replace("`backendResponseId` INTEGER DEFAULT NULL", "`backendResponseId` INTEGER")
+                newSql = newSql.replace("backendResponseId INTEGER DEFAULT NULL", "backendResponseId INTEGER")
+                newSql = newSql.replace("`isHistorySnapshot` INTEGER NOT NULL DEFAULT 0", "`isHistorySnapshot` INTEGER NOT NULL")
+                newSql = newSql.replace("isHistorySnapshot INTEGER NOT NULL DEFAULT 0", "isHistorySnapshot INTEGER NOT NULL")
+
+                database.execSQL(newSql)
+
+                val columns = ArrayList<String>()
+                database.query("PRAGMA table_info(`t_form_response`)").use { cursor ->
+                    val nameIndex = cursor.getColumnIndex("name")
+                    while (cursor.moveToNext()) {
+                        columns.add(cursor.getString(nameIndex))
+                    }
+                }
+                val columnsCsv = columns.joinToString(", ") { "`$it`" }
+
+                database.execSQL("INSERT INTO `t_form_response_new` ($columnsCsv) SELECT $columnsCsv FROM `t_form_response`")
+
+                val indexSqls = ArrayList<String>()
+                database.query(
+                    "SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='t_form_response' AND sql IS NOT NULL " +
+                        "AND name != 'index_t_form_response_beneficiaryId'"
+                ).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        indexSqls.add(cursor.getString(0))
+                    }
+                }
+
+                database.execSQL("DROP TABLE `t_form_response`")
+                database.execSQL("ALTER TABLE `t_form_response_new` RENAME TO `t_form_response`")
+
+                for (indexSql in indexSqls) {
+                    try {
+                        database.execSQL(indexSql)
+                    } catch (e: Exception) {
+                        // in case the index already got created, ignore
+                    }
+                }
+            }
+        }
+
+        private val MIGRATION_37_38 = object : Migration(37, 38) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                recreateBenBasicCacheView(database)
+            }
+        }
+
+        private val MIGRATION_38_39 = object : Migration(38, 39) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DROP VIEW IF EXISTS `COUNSELLING_FORM_RESPONSE`")
+                database.execSQL(
+                    "CREATE VIEW `COUNSELLING_FORM_RESPONSE` AS " + """
+        SELECT r.beneficiaryId AS beneficiaryId, r.status AS status,
+               r.sectionsFilled AS sectionsFilled, r.totalSections AS totalSections
+        FROM t_form_response r
+        JOIN t_form_version v ON r.formVersionId = v.versionId
+        JOIN t_dynamic_form f ON v.formId = f.formId
+        WHERE f.formType IN ('TB_COUNSELLING', 'TB_COUNSELLING_V2')
+        GROUP BY r.beneficiaryId
+    """.trim()
+                )
+            }
+        }
+        private val MIGRATION_39_40 = object : Migration(39, 40) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val columns = listOf(
+                    "fam_totalHhMembers INTEGER",
+                    "fam_isRegisteredAtCampSite TEXT",
+                    "fam_isRegisteredAtCampSiteId INTEGER"
+                )
+                columns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "HOUSEHOLD", columnName)) {
+                        database.execSQL("ALTER TABLE HOUSEHOLD ADD COLUMN $columnDefinition")
+                    }
+                }
+            }
+        }
+
+        private val MIGRATION_40_41 = object : Migration(40,41){
+            override fun migrate(db: SupportSQLiteDatabase) {
+                addLocationRecordExtraColumns(db, "BENEFICIARY")
+                addLocationRecordExtraColumns(db, "HOUSEHOLD")
+            }
+        }
+
+        private val MIGRATION_41_42 = object : Migration(41, 42) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val columns = listOf(
+                    "xrayOrderId TEXT",
+                    "xrayOrderStatus TEXT",
+                    "trueNatOrderId TEXT",
+                    "trueNatOrderStatus TEXT",
+                    "trueNatRifResult TEXT"
+                )
+                columns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "TB_DIAGNOSTICS", columnName)) {
+                        database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN $columnDefinition")
+                    }
+                }
+
+                var rifOrderIdHasDefault = false
+                var rifOrderStatusHasDefault = false
+                database.query("PRAGMA table_info(`TB_DIAGNOSTICS`)").use { cursor ->
+                    val nameIndex = cursor.getColumnIndex("name")
+                    val dfltIndex = cursor.getColumnIndex("dflt_value")
+                    while (cursor.moveToNext()) {
+                        when (cursor.getString(nameIndex)) {
+                            "rifOrderId" -> rifOrderIdHasDefault = cursor.getString(dfltIndex) != null
+                            "rifOrderStatus" -> rifOrderStatusHasDefault = cursor.getString(dfltIndex) != null
+                        }
+                    }
+                }
+
+                if (!rifOrderIdHasDefault && !rifOrderStatusHasDefault) {
+                    return
+                }
+
+                var originalSql = ""
+                database.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='TB_DIAGNOSTICS'").use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        originalSql = cursor.getString(0)
+                    }
+                }
+                if (originalSql.isEmpty()) return
+
+                var newSql = originalSql.replace("CREATE TABLE `TB_DIAGNOSTICS`", "CREATE TABLE `TB_DIAGNOSTICS_new`")
+                newSql = newSql.replace("CREATE TABLE TB_DIAGNOSTICS", "CREATE TABLE TB_DIAGNOSTICS_new")
+                newSql = newSql.replace("`rifOrderId` TEXT DEFAULT NULL", "`rifOrderId` TEXT")
+                newSql = newSql.replace("rifOrderId TEXT DEFAULT NULL", "rifOrderId TEXT")
+                newSql = newSql.replace("`rifOrderStatus` TEXT DEFAULT NULL", "`rifOrderStatus` TEXT")
+                newSql = newSql.replace("rifOrderStatus TEXT DEFAULT NULL", "rifOrderStatus TEXT")
+
+                database.execSQL(newSql)
+
+                val columnsList = ArrayList<String>()
+                database.query("PRAGMA table_info(`TB_DIAGNOSTICS`)").use { cursor ->
+                    val nameIndex = cursor.getColumnIndex("name")
+                    while (cursor.moveToNext()) {
+                        columnsList.add(cursor.getString(nameIndex))
+                    }
+                }
+                val columnsCsv = columnsList.joinToString(", ") { "`$it`" }
+
+                database.execSQL("INSERT INTO `TB_DIAGNOSTICS_new` ($columnsCsv) SELECT $columnsCsv FROM `TB_DIAGNOSTICS`")
+
+                val indexSqls = ArrayList<String>()
+                database.query(
+                    "SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='TB_DIAGNOSTICS' AND sql IS NOT NULL"
+                ).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        indexSqls.add(cursor.getString(0))
+                    }
+                }
+
+                database.execSQL("DROP TABLE `TB_DIAGNOSTICS`")
+                database.execSQL("ALTER TABLE `TB_DIAGNOSTICS_new` RENAME TO `TB_DIAGNOSTICS`")
+
+                for (indexSql in indexSqls) {
+                    try {
+                        database.execSQL(indexSql)
+                    } catch (e: Exception) {
+                        // in case the index already got created, ignore
+                    }
+                }
+            }
+        }
+
+        private val MIGRATION_42_43 = object : Migration(42, 43) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val columns = listOf(
+                    "reasonForRefusalXray TEXT",
+                    "reasonForRefusalMTB TEXT",
+                    "reasonForRefusalMDRRIF TEXT",
+                    "reasonForRefusalSputum TEXT",
+                    "mdrRifResult TEXT"
+                )
+                columns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "TB_SUSPECTED", columnName)) {
+                        database.execSQL("ALTER TABLE TB_SUSPECTED ADD COLUMN $columnDefinition")
+                    }
+                }
             }
         }
 
@@ -1082,6 +1733,22 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_24_25)
                         .addMigrations(MIGRATION_25_26)
                         .addMigrations(MIGRATION_26_27)
+                        .addMigrations(MIGRATION_27_28)
+                        .addMigrations(MIGRATION_28_29)
+                        .addMigrations(MIGRATION_29_30)
+                        .addMigrations(MIGRATION_30_31)
+                        .addMigrations(MIGRATION_31_32)
+                        .addMigrations(MIGRATION_32_33)
+                        .addMigrations(MIGRATION_33_34)
+                        .addMigrations(MIGRATION_34_35)
+                        .addMigrations(MIGRATION_35_36)
+                        .addMigrations(MIGRATION_36_37)
+                        .addMigrations(MIGRATION_37_38)
+                        .addMigrations(MIGRATION_38_39)
+                        .addMigrations(MIGRATION_39_40)
+                        .addMigrations(MIGRATION_40_41)
+                        .addMigrations(MIGRATION_41_42)
+                        .addMigrations(MIGRATION_42_43)
                         .fallbackToDestructiveMigration()
                         .build()
 

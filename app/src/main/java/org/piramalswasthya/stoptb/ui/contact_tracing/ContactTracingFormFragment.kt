@@ -6,6 +6,10 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.Toast
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -55,6 +59,13 @@ class ContactTracingFormFragment : Fragment() {
         val viewHistory = arguments?.getBoolean(ARG_VIEW_HISTORY) ?: false
 
         binding?.apply {
+            ViewCompat.setOnApplyWindowInsetsListener(llCtContent) { view, insets ->
+                val bottomInset = insets.getInsets(
+                    WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime()
+                ).bottom
+                view.updatePadding(bottom = bottomInset)
+                insets
+            }
 
             rvCtForm.layoutManager = LinearLayoutManager(requireContext())
             (rvCtForm.itemAnimator as? androidx.recyclerview.widget.SimpleItemAnimator)
@@ -63,15 +74,16 @@ class ContactTracingFormFragment : Fragment() {
                 questions = emptyList(),
                 onValueChanged = { updatedQ ->
                     val nonKeystrokeTypes = setOf(
-                        "RADIO", "MCQ", "CHECKBOX_MULTI", "CHECKBOX", "DATE", "DROPDOWN", "NUMBER_PICKER",
-                        "READONLY_NUMBER", "READONLY_TEXT"
+                        "RADIO", "MCQ", "CHECKBOX_MULTI", "CHECKBOX", "DATE", "DROPDOWN", "DROPDOWN_MULTI",
+                        "NUMBER_PICKER", "READONLY_NUMBER", "READONLY_TEXT"
                     )
                     val isKeystrokeInput = updatedQ.questionType !in nonKeystrokeTypes
                     viewModel.onQuestionValueChanged(
                         updatedQ,
                         reevaluate = !isKeystrokeInput
                     )
-                }
+                },
+                isContactTracing = true
             )
             rvCtForm.adapter = adapter
 
@@ -88,6 +100,7 @@ class ContactTracingFormFragment : Fragment() {
 
                 val showContinueTpt = !editable && viewModel.showContinueTpt.value == true
                 val tptAlreadySubmitted = viewModel.tptPreSubmitAlreadySubmitted.value == true
+                val resolvingContinueTpt = viewModel.resolvingContinueTpt.value == true
 
 //                btnCtNext.visibility = if (editable || showContinueTpt ) View.VISIBLE else View.GONE
                 val hiddenSections = setOf("Contact & Exposure Details", "Occupation & Exposure Details")
@@ -98,6 +111,9 @@ class ContactTracingFormFragment : Fragment() {
                     isLastSection -> getString(R.string.btn_submit)
                     else -> getString(R.string.next)
                 }
+                // Disabled pending TPT Follow-Up routing determination; slow connections can lag isEditable and cause a tap to close the form before the redirect.
+                btnCtNext.isEnabled = !resolvingContinueTpt
+                pbCtNextResolving.visibility = if (resolvingContinueTpt) View.VISIBLE else View.GONE
                 btnCtNext.setOnClickListener {
                     when {
                         showContinueTpt -> viewModel.continueToTpt()
@@ -147,6 +163,10 @@ class ContactTracingFormFragment : Fragment() {
                 updateNextButton()
             }
 
+            viewModel.resolvingContinueTpt.observe(viewLifecycleOwner) {
+                updateNextButton()
+            }
+
             viewModel.alertMessage.observe(viewLifecycleOwner) { message ->
                 if (!message.isNullOrBlank()) {
                     AlertDialog.Builder(requireContext())
@@ -170,6 +190,7 @@ class ContactTracingFormFragment : Fragment() {
 
             viewModel.formCompleted.observe(viewLifecycleOwner) { completed ->
                 if (completed == true) {
+                    Toast.makeText(requireContext(), R.string.form_submitted_successfully, Toast.LENGTH_SHORT).show()
                     (requireActivity() as? ContactTracingNavigator)?.onFormCompleted()
                 }
             }
@@ -215,6 +236,15 @@ class ContactTracingFormFragment : Fragment() {
     fun saveDraftAndGoBack() {
         viewModel.onBack()
     }
+
+    /** Read by ContactTracingActivity to restore the correct toolbar title when this
+     * fragment is revealed again by a back-stack pop. */
+    val screenFormType: FormType
+        get() = FormType.valueOf(
+            arguments?.getString(ARG_FORM_TYPE) ?: FormType.COMMUNITY_CONTACT_TRACING.name
+        )
+    val screenViewHistory: Boolean
+        get() = arguments?.getBoolean(ARG_VIEW_HISTORY) ?: false
 
     private fun handleOpenForm(targetFormUuid: String) {
         val navigator = requireActivity() as? ContactTracingNavigator ?: return

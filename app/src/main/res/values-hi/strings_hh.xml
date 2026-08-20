@@ -11,6 +11,7 @@
     <string name="rv_item_hh_ph_3">उपनाम : </string>
     <string name="hh_members_text">सदस्यों</string>
     <string name="btn_rv_item_hh_add_ben">लाभार्थी जोड़ें</string>
+    <string name="btn_Add_beneficiary_nonHH">सदस्य जोड़ें</string>
     <string name="str_duplicate_record">रिकार्ड हटा दिया गया</string>
 
     <string name="frag_nhhr_title">नया घरेलू पंजीकरण</string>
@@ -157,5 +158,12 @@
         <item>हाँ</item>
         <item>नहीं</item>
     </string-array>
+
+    <!-- NON HOUSEHOLD CURRENT LIVING INFO -->
+    <string name="title_current_living_info">वर्तमान निवास की जानकारी</string>
+    <string name="sub_title_current_living_info">कृपया लाभार्थी के वर्तमान निवास स्थान का विवरण प्रदान करें।</string>
+    <string name="hint_place_of_current_living">वर्तमान निवास का स्थान *</string>
+    <string name="hint_other_place">अन्य स्थान *</string>
+    <string name="hint_institution_name">संस्था का नाम *</string>
 
 </resources>

@@ -11,6 +11,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.Operation
+import androidx.work.WorkInfo
 import androidx.work.WorkContinuation
 import androidx.work.WorkManager
 import org.piramalswasthya.stoptb.R
@@ -41,7 +42,47 @@ object WorkerUtils {
             .setConstraints(networkOnlyConstraint)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
 
+    private inline fun <reified W : androidx.work.ListenableWorker> campSyncRequestBuilder() =
+        OneTimeWorkRequestBuilder<W>()
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+
+    private fun hasLoggedInUser(context: Context): Boolean {
+        val prefs = PreferenceManager.getInstance(context)
+        val userKey = context.getString(R.string.PREF_user_entry)
+        return !prefs.getString(userKey, null).isNullOrBlank()
+    }
+
+    private fun isCampHubSyncActive(context: Context): Boolean {
+        val prefs = PreferenceManager.getInstance(context)
+        val campEnabledKey = context.getString(R.string.PREF_camp_mode_enabled)
+        val hubConnectedKey = context.getString(R.string.PREF_camp_hub_connected)
+        return prefs.getBoolean(campEnabledKey, false) &&
+                prefs.getBoolean(hubConnectedKey, false)
+    }
+
+    private fun getActiveUniqueWorkInfos(
+        workManager: WorkManager,
+        uniqueWorkName: String
+    ): List<WorkInfo> {
+        return try {
+            workManager.getWorkInfosForUniqueWork(uniqueWorkName).get()
+                .filter {
+                    it.state == WorkInfo.State.ENQUEUED ||
+                            it.state == WorkInfo.State.RUNNING ||
+                            it.state == WorkInfo.State.BLOCKED
+                }
+        } catch (e: Exception) {
+            Timber.w(e, "Unable to query active work for $uniqueWorkName")
+            emptyList()
+        }
+    }
+
     fun triggerAmritPushWorker(context: Context): List<java.util.UUID> {
+        if (!hasLoggedInUser(context)) {
+            Timber.w("Push worker skipped: no logged-in user is stored yet")
+            return emptyList()
+        }
+
         // Block all data push until camp mode is active AND hub is connected
         val prefs = PreferenceManager.getInstance(context)
         val campKey = context.getString(R.string.PREF_camp_mode_enabled)
@@ -55,22 +96,42 @@ object WorkerUtils {
             return emptyList()
         }
 
+        val isCampHubSyncActive = isCampHubSyncActive(context)
         val workManager = WorkManager.getInstance(context)
+        val activePushInfos = getActiveUniqueWorkInfos(workManager, pushWorkerUniqueName)
+        if (activePushInfos.any { it.state == WorkInfo.State.RUNNING }) {
+            Timber.d("Push worker skipped: existing unique push chain is already running")
+            return activePushInfos.map { it.id }
+        }
+        if (activePushInfos.isNotEmpty() && isCampHubSyncActive) {
+            Timber.d("Replacing stale unique push chain for camp sync")
+            workManager.cancelUniqueWork(pushWorkerUniqueName)
+        }
 
         // StopTB push chain:
         // Registration → NCD Referrals + TB data + ABHA
-        val registration = syncRequestBuilder<PushToAmritWorker>()
-            .addTag("push_group1_registration").build()
+        val registration = if (isCampHubSyncActive) {
+            campSyncRequestBuilder<PushToAmritWorker>()
+        } else {
+            syncRequestBuilder<PushToAmritWorker>()
+        }.addTag("push_group1_registration").build()
 
         val afterRegistration = workManager.beginUniqueWork(
             pushWorkerUniqueName, ExistingWorkPolicy.KEEP, registration)
 
         val groupTB = listOf(
-            syncRequestBuilder<PushTBToAmritWorker>().addTag("push_group5_tb").build(),
+            (if (isCampHubSyncActive) {
+                campSyncRequestBuilder<PushTBToAmritWorker>()
+            } else {
+                syncRequestBuilder<PushTBToAmritWorker>()
+            }).addTag("push_group5_tb").build(),
         ) 
 
-        val groupAbha = syncRequestBuilder<PushMapAbhatoBenficiaryWorker>()
-            .addTag("push_group9_digital_health").build()
+        val groupAbha = if (isCampHubSyncActive) {
+            campSyncRequestBuilder<PushMapAbhatoBenficiaryWorker>()
+        } else {
+            syncRequestBuilder<PushMapAbhatoBenficiaryWorker>()
+        }.addTag("push_group9_digital_health").build()
 
         val chainTB = afterRegistration.then(groupTB)
         val chainAbha = afterRegistration.then(listOf(groupAbha))
@@ -80,18 +141,40 @@ object WorkerUtils {
     }
 
     fun triggerAmritPullWorker(context: Context): List<java.util.UUID> {
+        if (!hasLoggedInUser(context)) {
+            Timber.w("Pull worker skipped: no logged-in user is stored yet")
+            return emptyList()
+        }
+
+        val isCampHubSyncActive = isCampHubSyncActive(context)
         val workManager = WorkManager.getInstance(context)
+        val activePullInfos = getActiveUniqueWorkInfos(workManager, pullWorkerUniqueName)
+        if (activePullInfos.any { it.state == WorkInfo.State.RUNNING }) {
+            Timber.d("Pull worker skipped: existing unique pull chain is already running")
+            return activePullInfos.map { it.id }
+        }
+        if (activePullInfos.isNotEmpty() && isCampHubSyncActive) {
+            Timber.d("Replacing stale unique pull chain for camp sync")
+            workManager.cancelUniqueWork(pullWorkerUniqueName)
+        }
 
         // StopTB pull chain:
         // Beneficiaries → Referrals + TB data → Mark complete
-        val pullWorkRequest = syncRequestBuilder<PullFromAmritWorker>()
-            .addTag("pull_phase1_foundation").build()
+        val pullWorkRequest = if (isCampHubSyncActive) {
+            campSyncRequestBuilder<PullFromAmritWorker>()
+        } else {
+            syncRequestBuilder<PullFromAmritWorker>()
+        }.addTag("pull_phase1_foundation").build()
 
         val afterFoundation = workManager.beginUniqueWork(
             pullWorkerUniqueName, ExistingWorkPolicy.KEEP, pullWorkRequest)
 
         val groupTB = listOf(
-            syncRequestBuilder<PullTBFromAmritWorker>().addTag("pull_group5_tb").build(),
+            (if (isCampHubSyncActive) {
+                campSyncRequestBuilder<PullTBFromAmritWorker>()
+            } else {
+                syncRequestBuilder<PullTBFromAmritWorker>()
+            }).addTag("pull_group5_tb").build(),
         )
 
         val setSyncCompleteWorker = OneTimeWorkRequestBuilder<UpdatePrefForPullCompleteWorker>().build()
@@ -197,23 +280,11 @@ object WorkerUtils {
         )
     }
 
-    fun triggerTrueNatDiagnosticResultPollWorker(context: Context, useMockApi: Boolean = false) {
-        val delaySec = if (useMockApi) 5L else 5L
-        val workRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>()
-            .setInitialDelay(delaySec, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            DiagnosticResultPollWorker.name + "_TRUENAT", ExistingWorkPolicy.REPLACE, workRequest
-        )
+    fun triggerTrueNatDiagnosticResultPollWorker(context: Context) {
+        triggerDiagnosticResultPollWorker(context)
     }
 
-    fun triggerRifDiagnosticResultPollWorker(context: Context, useMockApi: Boolean = false) {
-        val delaySec = if (useMockApi) 5L else 5L
-        val workRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>()
-            .setInitialDelay(delaySec, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            DiagnosticResultPollWorker.name + "_RIF", ExistingWorkPolicy.KEEP, workRequest
-        )
+    fun triggerRifDiagnosticResultPollWorker(context: Context) {
+        triggerDiagnosticResultPollWorker(context)
     }
 }

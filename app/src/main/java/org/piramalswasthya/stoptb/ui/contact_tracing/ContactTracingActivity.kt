@@ -27,8 +27,9 @@ class ContactTracingActivity : AppCompatActivity(), ContactTracingNavigator {
 
         setupToolbar()
         setupBackPressHandling()
-
-        if (savedInstanceState != null) return
+        supportFragmentManager.addOnBackStackChangedListener {
+            updateTitleForCurrentFragment()
+        }
 
         val contactType = intent.getStringExtra(EXTRA_CONTACT_TYPE) ?: CONTACT_TYPE_COMMUNITY
         val formType = when (contactType) {
@@ -37,9 +38,14 @@ class ContactTracingActivity : AppCompatActivity(), ContactTracingNavigator {
             CONTACT_TYPE_TPT_FOLLOW_UP -> FormType.TPT_FOLLOW_UP
             else -> FormType.COMMUNITY_CONTACT_TRACING
         }
+        val viewHistory = intent.getBooleanExtra(EXTRA_VIEW_HISTORY, false)
+
+        // Restore screen title on activity recreation (e.g. orientation change) before early return
+        updateTitle(viewHistory,formType)
+        if (savedInstanceState != null) return
+
         val sectionPhase = intent.getStringExtra(EXTRA_SECTION_PHASE)
             ?.let { runCatching { SectionPhase.valueOf(it) }.getOrNull() }
-        val viewHistory = intent.getBooleanExtra(EXTRA_VIEW_HISTORY, false)
         openContactForm(formType, contactType, sectionPhase, viewHistory = viewHistory)
     }
 
@@ -68,13 +74,13 @@ class ContactTracingActivity : AppCompatActivity(), ContactTracingNavigator {
         }
     }
 
-    override fun openContactForm(
-        formType: FormType,
-        contactType: String,
-        sectionPhase: SectionPhase?,
-        addToBackStack: Boolean,
-        viewHistory: Boolean
-    ) {
+    private fun updateTitleForCurrentFragment() {
+        val current = supportFragmentManager.findFragmentById(R.id.fragment_container)
+                as? ContactTracingFormFragment ?: return
+        updateTitle(current.screenViewHistory, current.screenFormType)
+    }
+
+    private fun updateTitle(viewHistory: Boolean,formType : FormType){
         title = if (viewHistory) {
             getString(R.string.follow_up_history)
         } else when (formType) {
@@ -83,7 +89,16 @@ class ContactTracingActivity : AppCompatActivity(), ContactTracingNavigator {
             FormType.TPT_FOLLOW_UP -> getString(R.string.tpt_follow_up)
             else -> getString(R.string.community_contact_tracing)
         }
+    }
 
+    override fun openContactForm(
+        formType: FormType,
+        contactType: String,
+        sectionPhase: SectionPhase?,
+        addToBackStack: Boolean,
+        viewHistory: Boolean
+    ) {
+        updateTitle(viewHistory,formType)
         val transaction = supportFragmentManager.beginTransaction()
             .replace(
                 R.id.fragment_container,

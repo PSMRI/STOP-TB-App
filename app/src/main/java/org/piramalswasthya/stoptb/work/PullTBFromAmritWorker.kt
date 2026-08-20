@@ -17,6 +17,10 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.database.room.InAppDb
+import org.piramalswasthya.stoptb.repositories.contactTracing.IContactTracingRepository
+import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
+import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
@@ -32,6 +36,8 @@ class PullTBFromAmritWorker @AssistedInject constructor(
     private val vitalRepo: VitalRepo,
     private val counsellingRepository: ICounsellingRepository,
     private val preferenceDao: PreferenceDao,
+    private val db: InAppDb,
+    private val contactTracingRepo: IContactTracingRepository,
 ) : CoroutineWorker(appContext, params) {
 
     companion object {
@@ -64,7 +70,8 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                             async { getTbDiagnosticsDetails() },
                             async { getTbSuspectedDetails() },
                             async { getTbConfirmedDetails() },
-                            async { getCounsellingCompletedDetails() }
+                            async { getCounsellingCompletedDetails() },
+                            async { getContactAndTptFollowUpDetails() }
                         )
 
                     val endTime = System.currentTimeMillis()
@@ -72,6 +79,7 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                     Timber.d("Full tb fetching took $timeTaken seconds $result1")
 
                     if (result1.all { it }) {
+                        syncDiagnosticOrderStatuses()
                         return@withContext Result.success()
                     }
                     return@withContext Result.failure(workDataOf("worker_name" to "PullTBFromAmritWorker", "error" to "Pull operation returned incomplete results"))
@@ -192,6 +200,68 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
             }
             true
+        }
+    }
+
+    private suspend fun getContactAndTptFollowUpDetails(): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val villageId = preferenceDao.getLocationRecord()?.village?.id ?: return@withContext true
+
+                val cfuDefinition = (contactTracingRepo.getFormSchema(FormType.CONTACT_FOLLOW_UP) as? NetworkResponse.Success)?.data
+                val cfuActiveVersion = cfuDefinition?.versions?.firstOrNull { it.version.isActive }
+                    ?: cfuDefinition?.versions?.maxByOrNull { it.version.versionNumber }
+                val cfuVersionId = cfuActiveVersion?.version?.versionId
+
+                val tptDefinition = (contactTracingRepo.getFormSchema(FormType.TPT_FOLLOW_UP) as? NetworkResponse.Success)?.data
+                val tptActiveVersion = tptDefinition?.versions?.firstOrNull { it.version.isActive }
+                    ?: tptDefinition?.versions?.maxByOrNull { it.version.versionNumber }
+                val tptVersionId = tptActiveVersion?.version?.versionId
+
+                val cctDefinition = (contactTracingRepo.getFormSchema(FormType.COMMUNITY_CONTACT_TRACING) as? NetworkResponse.Success)?.data
+                val cctActiveVersion = cctDefinition?.versions?.firstOrNull { it.version.isActive }
+                    ?: cctDefinition?.versions?.maxByOrNull { it.version.versionNumber }
+                val cctVersionId = cctActiveVersion?.version?.versionId
+
+                val octDefinition = (contactTracingRepo.getFormSchema(FormType.OCCUPATION_CONTACT_TRACING) as? NetworkResponse.Success)?.data
+                val octActiveVersion = octDefinition?.versions?.firstOrNull { it.version.isActive }
+                    ?: octDefinition?.versions?.maxByOrNull { it.version.versionNumber }
+                val octVersionId = octActiveVersion?.version?.versionId
+
+                if (cctVersionId != null) {
+                    contactTracingRepo.fetchAndStoreVillageContactResponses(villageId, FormType.COMMUNITY_CONTACT_TRACING, cctVersionId)
+                }
+                if (octVersionId != null) {
+                    contactTracingRepo.fetchAndStoreVillageContactResponses(villageId, FormType.OCCUPATION_CONTACT_TRACING, octVersionId)
+                }
+
+                if (cfuVersionId != null) {
+                    contactTracingRepo.fetchAndStoreVillageContactResponses(villageId, FormType.CONTACT_FOLLOW_UP, cfuVersionId)
+                }
+                if (tptVersionId != null) {
+                    contactTracingRepo.fetchAndRefreshVillageTptHistory(villageId, tptVersionId)
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Error pre-fetching contact follow-up / TPT responses in PullTBFromAmritWorker")
+            }
+            true
+        }
+    }
+    private suspend fun syncDiagnosticOrderStatuses() {
+        withContext(Dispatchers.IO) {
+            try {
+                // 1. Fetch statuses for all orders first (populates all local cache entries)
+                tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST", fetchResult = false)
+                tbRepo.fetchBeneficiariesByStatus("SPUTUM_TRUENAT", fetchResult = false)
+                tbRepo.fetchBeneficiariesByStatus("MDR_RIF", fetchResult = false)
+
+                // 2. Fetch results for completed orders (safely references populated caches to avoid duplicate pushes)
+                tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST", fetchResult = true)
+                tbRepo.fetchBeneficiariesByStatus("SPUTUM_TRUENAT", fetchResult = true)
+                tbRepo.fetchBeneficiariesByStatus("MDR_RIF", fetchResult = true)
+            } catch (e: Exception) {
+                Timber.e(e, "syncDiagnosticOrderStatuses failed")
+            }
         }
     }
 

@@ -8,7 +8,6 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.model.LocationEntity
 import org.piramalswasthya.stoptb.helpers.Languages
-import org.piramalswasthya.stoptb.helpers.setToStartOfTheDay
 import org.piramalswasthya.stoptb.model.AgeUnit
 import org.piramalswasthya.stoptb.model.BenBasicCache.Companion.getAgeFromDob
 import org.piramalswasthya.stoptb.model.BenBasicCache.Companion.getYearsFromDate
@@ -38,6 +37,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     private var currentLocation: LocationRecord? = null
 
     private val preferenceDao = PreferenceDao(context)
+    private var youngestParentDob: Long? = null
 
 
 
@@ -456,7 +456,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         subCentreName: String? = null,
         relToHeadId: Int = -1,
         spouseRegistrationRelToHeadId: Int = -1,
-        isNonHH: Boolean = false
+        isNonHH: Boolean = false,
+        minimumChildDob: Long? = null
     ) {
         val list = mutableListOf(
             pic,
@@ -490,6 +491,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         )
 
         this.familyHeadPhoneNo = familyHeadPhoneNo?.toString()
+        this.youngestParentDob = minimumChildDob?.minus(24 * 60 * 60 * 1000L)
+        minimumChildDob?.let { childDobMin ->
+            agePopup.min = maxOf(agePopup.min ?: childDobMin, childDobMin)
+        }
 
         if (relToHeadId >= 0 && !isNonHH) {
             list.add(list.indexOf(gender) + 1, relationToHead)
@@ -773,11 +778,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             healthFacility.value = it.healthFacility?.name ?: ""
         }
 
-        // Household-level fields (address, pincode, village, residential area type,
-        // economic status) are captured once on the Household form itself.
-        // Always hide them here — for both the Head of Family and subsequent members —
-        // and rely on the background defaulting logic above to populate their values.
-        if (relToHeadId >= 0) {
+        if (isNonHH) {
+            list.remove(pinCode)
+            pinCode.required = false
+        } else if (relToHeadId >= 0 && relToHeadId != 18) {
             list.removeAll(
                 listOf( address,pinCode, villageHamlet, residentialAreaType, economicStatus)
             )
@@ -787,7 +791,6 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             residentialAreaType.required = false
             economicStatus.required = false
         }
-
 
         setUpPage(list)
 
@@ -937,6 +940,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             agePopup.id -> {
 
                 val age = try { getAgeFromDob(getLongFromDate(agePopup.value)) } catch (_: Exception) { 0 }
+                validateChildAgeAgainstParent()
 
                 // Refresh reason of death when age changes and beneficiary is already marked Death
                 if (beneficiaryStatus.value == BenStatus.Death.name) {
@@ -1264,6 +1268,22 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             otherReligion.id -> validateEmptyOnEditText(otherReligion)
             otherResidentialAreaType.id -> validateEmptyOnEditText(otherResidentialAreaType)
             else -> -1
+        }
+    }
+
+    private fun validateChildAgeAgainstParent() {
+        val parentDob = youngestParentDob ?: run {
+            agePopup.errorText = null
+            return
+        }
+        val selectedDob = agePopup.value?.let { runCatching { getLongFromDate(it) }.getOrNull() } ?: run {
+            agePopup.errorText = null
+            return
+        }
+        agePopup.errorText = if (selectedDob <= parentDob) {
+            resources.getString(R.string.child_age_less_than_parent_error)
+        } else {
+            null
         }
     }
 

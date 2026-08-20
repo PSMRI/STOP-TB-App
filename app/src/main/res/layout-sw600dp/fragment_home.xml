@@ -43,7 +43,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:fontFamily="@font/roboto_medium"
-                    android:text="@string/quick_refresh_not_updated"
+                    android:text=""
                     android:textColor="?attr/colorPrimary"
                     android:textSize="13sp" />
 

@@ -13,6 +13,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
+import androidx.navigation.fragment.navArgs
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -24,7 +25,6 @@ import org.piramalswasthya.stoptb.databinding.FragmentHouseholdMembersBinding
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
-import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import javax.inject.Inject
 
@@ -33,6 +33,8 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    private val args: HouseholdMembersFragmentArgs by navArgs()
 
     private var _binding: FragmentHouseholdMembersBinding? = null
     private val binding: FragmentHouseholdMembersBinding get() = _binding!!
@@ -63,6 +65,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         buildAddBenDialog()
+        val role = prefDao.getLoggedInUser()?.role
 
         val benAdapter = BenListAdapter(
             clickListener = BenListAdapter.BenClickListener(
@@ -109,7 +112,9 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
             showRegistrationDate = true,
             showSyncIcon = true,
             pref = prefDao,
-            context = requireActivity()
+            context = requireActivity(),
+            showExamineButton = !role.isCounsellingOfficerRole() || args.fromContactTracing,
+            showContactTracingForms = args.fromContactTracing
         )
         binding.rvAny.adapter = benAdapter
 
@@ -130,12 +135,42 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
         }
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.unsyncedVitalBenIds.collect { benAdapter.submitUnsyncedVitalBenIds(it) }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.syncingVitalBenIds.collect { benAdapter.submitSyncingVitalBenIds(it) }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.tbScreeningBenIds.collect { benAdapter.submitTbScreeningBenIds(it) }
             }
         }
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.unsyncedTbScreeningBenIds.collect { benAdapter.submitUnsyncedTbScreeningBenIds(it) }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.syncingTbScreeningBenIds.collect { benAdapter.submitSyncingTbScreeningBenIds(it) }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.generalOpdBenIds.collect { benAdapter.submitGeneralOpdBenIds(it) }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.unsyncedGeneralOpdBenIds.collect { benAdapter.submitUnsyncedGeneralOpdBenIds(it) }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.syncingGeneralOpdBenIds.collect { benAdapter.submitSyncingGeneralOpdBenIds(it) }
             }
         }
         viewLifecycleOwner.lifecycleScope.launch {
@@ -164,12 +199,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
             }
         }
 
-        // Nurse role: invisible (takes space but not visible/clickable)
-        // Nurse & Counselling officer role: invisible (takes space but not visible/clickable)
-        val role = prefDao.getLoggedInUser()?.role
-        val isNurse = role.isNurseRole()
-        val isCounsellingOfficer = role.isCounsellingOfficerRole()
-        binding.fabAddMember.visibility = if (isNurse || isCounsellingOfficer) View.INVISIBLE else View.VISIBLE
+        binding.fabAddMember.visibility = View.VISIBLE
         binding.fabAddMember.setOnClickListener {
             addBenAlert?.show()
         }
@@ -187,7 +217,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
     private fun showExamineBottomSheet(benId: Long) {
         val existing = childFragmentManager.findFragmentByTag(ExamineBottomSheetFragment.TAG)
         if (existing != null) return
-        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false)
+        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false, showContactTracingForms = args.fromContactTracing)
             .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
     }
 

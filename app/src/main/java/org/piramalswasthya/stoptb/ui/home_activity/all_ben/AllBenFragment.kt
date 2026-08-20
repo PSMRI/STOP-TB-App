@@ -149,7 +149,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         val showResultButton = args.source == 6 || args.source == 7 || args.source == 8
         val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
         val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
-        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess) && !isReadOnlyReferralList
+        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess || isCounsellor) && !isReadOnlyReferralList
         val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
         binding.llQuickRefresh.visibility = View.GONE
 
@@ -260,38 +260,34 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                             )
                         }
                         "COMPLETE" -> {
-                            val title = if (orderType == "XRAY_CHEST") "Confirm X-ray Completion" else "Confirm TrueNat Completion"
-                            val msg = if (orderType == "XRAY_CHEST") {
-                                "Please confirm that the beneficiary has completed the Digital Chest X-ray. The application will now start retrieving the diagnostic result."
-                            } else {
-                                "Please confirm that the beneficiary has completed the TrueNat test. The application will now start retrieving the diagnostic result."
-                            }
-                            androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                                .setTitle(title)
-                                .setMessage(msg)
-                                .setPositiveButton("CONFIRM") { d, _ ->
-                                    d.dismiss()
-                                    viewModel.markOrderTestCompleted(item.benId, orderType)
-                                }
-                                .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
-                                .show()
+                            findNavController().navigate(
+                                AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                    benId = item.benId,
+                                    viewOnly = false,
+                                    referralType = if (orderType == "XRAY_CHEST") 6 else 7
+                                )
+                            )
                         }
                         "COMPLETE_RIF" -> {
-                            androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                                .setTitle("Confirm RIF Test Completion?")
-                                .setMessage("Please confirm that the beneficiary has completed the TrueNat Rif Resistance test.")
-                                .setPositiveButton("CONFIRM") { d, _ ->
-                                    d.dismiss()
-                                    viewModel.markOrderTestCompleted(item.benId, "MDR_RIF")
-                                }
-                                .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
-                                .show()
+                            findNavController().navigate(
+                                AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                    benId = item.benId,
+                                    viewOnly = false,
+                                    referralType = 7
+                                )
+                            )
                         }
-                        "POLL", "RETRY_POLL" -> {
+                        "POLL" -> {
                             viewModel.pollOrderResult(item.benId, orderType)
                         }
+                        "RETRY_POLL" -> {
+                            viewModel.retryResultFetch(item.benId, orderType, requireContext())
+                        }
+                        "RETRY_PUSH" -> {
+                            viewModel.retryTest(item.benId, orderType, requireContext())
+                        }
                         "RETRY_RIF_POLL" -> {
-                            viewModel.pollOrderResult(item.benId, "MDR_RIF")
+                            viewModel.retryResultFetch(item.benId, "MDR_RIF", requireContext())
                         }
                         "REPEAT_TEST" -> {
                             lifecycleScope.launch {
@@ -462,6 +458,16 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 benAdapter.submitBenIds(benIds)
             }
         }
+        lifecycleScope.launch {
+            viewModel.unsyncedVitalBenIds.collectLatest { benIds ->
+                benAdapter.submitUnsyncedVitalBenIds(benIds)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.syncingVitalBenIds.collectLatest { benIds ->
+                benAdapter.submitSyncingVitalBenIds(benIds)
+            }
+        }
 
         lifecycleScope.launch {
             viewModel.tbScreeningBenIds.collectLatest { benIds ->
@@ -469,10 +475,30 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 benAdapter.submitTbScreeningBenIds(benIds)
             }
         }
+        lifecycleScope.launch {
+            viewModel.unsyncedTbScreeningBenIds.collectLatest { benIds ->
+                benAdapter.submitUnsyncedTbScreeningBenIds(benIds)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.syncingTbScreeningBenIds.collectLatest { benIds ->
+                benAdapter.submitSyncingTbScreeningBenIds(benIds)
+            }
+        }
 
         lifecycleScope.launch {
             viewModel.generalOpdBenIds.collectLatest { benIds ->
                 benAdapter.submitGeneralOpdBenIds(benIds)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.unsyncedGeneralOpdBenIds.collectLatest { benIds ->
+                benAdapter.submitUnsyncedGeneralOpdBenIds(benIds)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.syncingGeneralOpdBenIds.collectLatest { benIds ->
+                benAdapter.submitSyncingGeneralOpdBenIds(benIds)
             }
         }
 
@@ -513,6 +539,12 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         }
 
         lifecycleScope.launch {
+            viewModel.retryingBenIds.collectLatest { benIds ->
+                benAdapter.submitRetryingBenIds(benIds)
+            }
+        }
+
+        lifecycleScope.launch {
             viewModel.orderActionState.collectLatest { state ->
                 when (state) {
                     is AllBenViewModel.OrderActionResult.Idle -> {}
@@ -522,16 +554,27 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         viewModel.resetOrderActionState()
                         if (state.message.contains("completed", ignoreCase = true) || state.orderType.equals("MDR_RIF", ignoreCase = true)) {
                             if (state.orderType.equals("MDR_RIF", ignoreCase = true)) {
-                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(requireContext(), viewModel.tbRepo.useMockApi)
+                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(requireContext())
                             } else if (state.orderType.equals("SPUTUM_TRUENAT", ignoreCase = true) || state.orderType.equals("MTB_PLUS", ignoreCase = true)) {
-                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext(), viewModel.tbRepo.useMockApi)
+                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext())
                             } else {
                                 org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(requireContext())
                             }
                         }
                     }
                     is AllBenViewModel.OrderActionResult.Error -> {
-                        Toast.makeText(requireContext(), state.error, Toast.LENGTH_LONG).show()
+                        val isNetworkError = state.error.contains("Unable to resolve host", ignoreCase = true) ||
+                                state.error.contains("failed to connect", ignoreCase = true) ||
+                                state.error.contains("timeout", ignoreCase = true) ||
+                                state.error.contains("timed out", ignoreCase = true) ||
+                                state.error.contains("Network is unreachable", ignoreCase = true) ||
+                                state.error.contains("No address associated with hostname", ignoreCase = true)
+                        val message = if (isNetworkError) {
+                            "Please connect to the camp hub to retry the referral."
+                        } else {
+                            state.error
+                        }
+                        Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
                         viewModel.resetOrderActionState()
                     }
                 }
@@ -539,8 +582,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         }
 
         org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(requireContext())
-        org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext(), viewModel.tbRepo.useMockApi)
-        org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(requireContext(), viewModel.tbRepo.useMockApi)
+        org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext())
+        org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(requireContext())
 
         binding.ibSearch.visibility = View.VISIBLE
         binding.ibSearch.setOnClickListener { sttContract.launch(Unit) }
@@ -577,6 +620,13 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 viewModel.resetBenRegId()
             }
         }
+
+        lifecycleScope.launch {
+            while (viewLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                benAdapter.notifyDataSetChanged()
+                kotlinx.coroutines.delay(1000L)
+            }
+        }
     }
 
     private fun checkAndGenerateABHA(benId: Long) {
@@ -603,7 +653,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         if (existing != null) return // already visible
         // Always show without autoFlow — user decides whether to continue or close.
         // autoFlow=true caused the form to re-open automatically when back was pressed.
-        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false)
+        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false, showContactTracingForms = false)
             .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
     }
 

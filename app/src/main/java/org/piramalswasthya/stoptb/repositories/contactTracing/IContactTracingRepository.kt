@@ -40,6 +40,13 @@ interface IContactTracingRepository {
         formVersionId: Int
     ): Boolean
 
+    // Fetches previously submitted answers for all beneficiaries in the village for this form type and stores them locally.
+    suspend fun fetchAndStoreVillageContactResponses(
+        villageId: Int,
+        formType: FormType,
+        formVersionId: Int
+    ): Boolean
+
     suspend fun saveSectionAnswers(
         responseId: Long,
         sectionId: Int,
@@ -55,11 +62,22 @@ interface IContactTracingRepository {
     // Streams the beneficiary's current form status, used to decide Fill vs View for the Examine screen row.
     fun observeResponseStatus(beneficiaryId: Long, formType: FormType): Flow<String?>
 
+    // Streams the formVersionId the beneficiary's latest response is actually stored under — may
+    // differ from the form schema's current "active" version, so callers must use this (not the
+    // active version) when looking up version-scoped answers like getClinicalScreeningStatus.
+    fun observeResponseFormVersionId(beneficiaryId: Long, formType: FormType): Flow<Int?>
+
+    // Streams PRE_SUBMIT status for the formType, keeping TPT Followup visibility unaffected by newer POST_SUBMIT drafts.
+    fun observePreSubmitResponseStatus(beneficiaryId: Long, formType: FormType): Flow<String?>
+
     // Streams the beneficiary's saved TPT Follow-up history entries, latest first.
     fun getTptHistory(beneficiaryId: Long, formVersionId: Int): Flow<List<CompleteFormResponse>>
 
     // Fetches TPT Follow-up history from the server and refreshes local storage to match, avoiding duplicates.
     suspend fun fetchAndRefreshTptHistory(beneficiaryId: Long, formVersionId: Int): Boolean
+
+    // Fetches TPT Follow-up history village-wide from the server and refreshes local storage for all beneficiaries in the village in one bulk request.
+    suspend fun fetchAndRefreshVillageTptHistory(villageId: Int, formVersionId: Int): Boolean
 
     // Finds the beneficiary's current response for a given form phase, or null if a new one should be started.
     suspend fun getExistingContactResponseForPhase(
@@ -90,6 +108,9 @@ interface IContactTracingRepository {
     // Fetches Community and Occupational contact tracing completion status to drive the type bottom sheet's tick/cross indicators.
     suspend fun getContactTracingStatus(beneficiaryId: Long): ContactTracingStatus
 
+    // "Done" requires the follow-on TPT_FOLLOW_UP PRE_SUBMIT to also be submitted for
+    // TPT_ELIGIBLE beneficiaries — matches ExamineViewModel.isContactFollowUpDone so the list
+    // badge and the Examine screen's per-row Fill/View state never disagree.
     fun observeContactFollowUpDoneBenIds(): Flow<List<Long>>
 
     fun observeTptFollowUpTargetReachedBenIds(): Flow<List<Long>>
