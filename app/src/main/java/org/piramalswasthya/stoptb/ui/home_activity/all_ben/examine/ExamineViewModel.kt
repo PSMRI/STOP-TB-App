@@ -8,12 +8,20 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
+import org.piramalswasthya.stoptb.repositories.contactTracing.IContactTracingRepository
+import org.piramalswasthya.stoptb.ui.contact_tracing.ClinicalScreeningStatus
+import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -22,7 +30,8 @@ class ExamineViewModel @Inject constructor(
     private val recordsRepo: RecordsRepo,
     private val vitalRepo: VitalRepo,
     private val tbRepo: TBRepo,
-    private val benRepo: BenRepo
+    private val benRepo: BenRepo,
+    private val contactTracingRepo: IContactTracingRepository
 ) : ViewModel() {
 
     val benId: Long = savedStateHandle["benId"] ?: -1L
@@ -84,6 +93,109 @@ class ExamineViewModel @Inject constructor(
             !genOpd   -> 3  // FORM_GENERAL_OPD
             tbScreen && !diagnosis -> 4  // FORM_DIAGNOSIS — only after TB Screening
             else      -> null  // all done
+        }
+    }
+    // Scope status to PRE_SUBMIT so newer POST_SUBMIT drafts don't mask the submitted PRE_SUBMIT row.
+    private val tptPreSubmitStatus: Flow<String?> =
+        contactTracingRepo.observePreSubmitResponseStatus(benId, FormType.TPT_FOLLOW_UP)
+
+    /** Drives the "TPT Followup" row's visibility — true once PRE_SUBMIT has been submitted. */
+    val isTptFollowUpPreSubmitDone: Flow<Boolean> =
+        tptPreSubmitStatus.map { it == "SUBMITTED" || it == "COMPLETE" }
+
+    private val contactFollowUpStatus: Flow<String?> =
+        contactTracingRepo.observeResponseStatus(benId, FormType.CONTACT_FOLLOW_UP)
+
+    private val contactFollowUpFormVersionId: Flow<Int?> = flow {
+        val definition = (contactTracingRepo.getFormSchema(FormType.CONTACT_FOLLOW_UP) as? NetworkResponse.Success)?.data
+        val activeVersion = definition?.versions?.firstOrNull { it.version.isActive }
+            ?: definition?.versions?.maxByOrNull { it.version.versionNumber }
+        val versionId = activeVersion?.version?.versionId
+        if (versionId != null) {
+            contactTracingRepo.fetchAndStoreContactResponse(benId, FormType.CONTACT_FOLLOW_UP, versionId)
+        }
+        emit(versionId)
+    }
+
+    private val contactFollowUpResponseVersionId: Flow<Int?> =
+        contactTracingRepo.observeResponseFormVersionId(benId, FormType.CONTACT_FOLLOW_UP)
+
+    /**
+     * Drives the "Contact Followup" row's Fill/View state.
+     * Full Treatment and No Treatment complete as soon as CONTACT_FOLLOW_UP itself is submitted.
+     * Tpt Eligible additionally requires the follow-on TPT_FOLLOW_UP PRE_SUBMIT to be submitted,
+     * since selecting it only redirects to that next form rather than finishing the flow.
+     */
+    val isContactFollowUpDone: Flow<Boolean> =
+        combine(
+            contactFollowUpStatus,
+            contactFollowUpFormVersionId,
+            contactFollowUpResponseVersionId,
+            tptPreSubmitStatus
+        ) { cfuStatus, schemaVersionId, responseVersionId, tptStatus ->
+            val cfuSubmitted = cfuStatus == "SUBMITTED" || cfuStatus == "COMPLETE"
+            if (!cfuSubmitted || schemaVersionId == null || responseVersionId == null) {
+                false
+            } else {
+                // Query against the version the response is actually stored under, not the
+                // schema's active version — those can disagree (e.g. right after reinstall,
+                // before a version migration has synced), and querying the wrong version
+                // silently returns null, which must NOT be treated as "not TPT eligible".
+                when (contactTracingRepo.getClinicalScreeningStatus(benId, responseVersionId)) {
+                    ClinicalScreeningStatus.TPT_ELIGIBLE -> tptStatus == "SUBMITTED" || tptStatus == "COMPLETE"
+                    ClinicalScreeningStatus.FULL_TREATMENT, ClinicalScreeningStatus.NO_TREATMENT -> true
+                    null -> false
+                }
+            }
+        }
+
+    private val tptFormVersionId: Flow<Int?> = flow {
+        val definition = (contactTracingRepo.getFormSchema(FormType.TPT_FOLLOW_UP) as? NetworkResponse.Success)?.data
+        val activeVersion = definition?.versions?.firstOrNull { it.version.isActive }
+            ?: definition?.versions?.maxByOrNull { it.version.versionNumber }
+        val versionId = activeVersion?.version?.versionId
+        if (versionId != null) {
+            contactTracingRepo.fetchAndRefreshTptHistory(benId, versionId)
+        }
+        emit(versionId)
+    }
+    val requiredFollowUpCount: Flow<Int?> = tptFormVersionId.map { versionId ->
+        versionId?.let { contactTracingRepo.getRegimenAdvised(benId, it) }?.requiredFollowUpCount
+    }
+
+    val submittedFollowUpCount: Flow<Int> = tptFormVersionId.flatMapLatest { versionId ->
+        versionId?.let { contactTracingRepo.observeSubmittedFollowUpCount(benId, it) } ?: flowOf(0)
+    }
+
+    // Shows Fill for "TPT Followup" repeatedly until submittedFollowUpCount reaches requiredFollowUpCount, then hides it permanently in favor of History.
+    val isTptFollowUpFillAvailable: Flow<Boolean> =
+        combine(requiredFollowUpCount, submittedFollowUpCount) { required, submitted ->
+            required == null || submitted < required
+        }
+
+    private val _historyState = MutableLiveData<NetworkResponse<Unit>>(NetworkResponse.Idle())
+    val historyState: LiveData<NetworkResponse<Unit>> get() = _historyState
+
+    fun onHistoryClicked() {
+        if (_historyState.value is NetworkResponse.Loading) return
+        _historyState.value = NetworkResponse.Loading()
+        viewModelScope.launch {
+            _historyState.value = try {
+                val activeVersion = contactTracingRepo.getFormDefinition(FormType.TPT_FOLLOW_UP)
+                    ?.versions?.firstOrNull { it.version.isActive }
+                val formVersionId = activeVersion?.version?.versionId
+
+                if (formVersionId == null) {
+                    NetworkResponse.Error("Schema definition not found")
+                } else {
+                    // fetch history form list from room-db when offline
+                    contactTracingRepo.fetchAndRefreshTptHistory(benId, formVersionId)
+                    NetworkResponse.Success(Unit)
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "onHistoryClicked failed for benId=$benId")
+                NetworkResponse.Error("Failed to fetch TPT follow-up history. Please try again.")
+            }
         }
     }
 }

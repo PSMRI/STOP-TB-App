@@ -359,5 +359,20 @@
         app:layout_constraintStart_toStartOf="parent" />
 <!--    app:layout_constraintTop_toBottomOf="@+id/cv_login_item_container"-->
 
+    <TextView
+        android:id="@+id/tv_login_version"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="-8dp"
+        android:layout_marginBottom="16dp"
+        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+        android:textColor="@color/md_theme_light_onSurfaceVariant"
+        android:gravity="center"
+        app:layout_constraintTop_toBottomOf="@id/textView12"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        tools:text="" />
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 </ScrollView>

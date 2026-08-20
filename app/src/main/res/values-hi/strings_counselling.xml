@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="counselling_overview_title">परामर्श अवलोकन</string>
+    <string name="counselling_menu_title">परामर्श</string>
+    <string name="counselling_progress_title">परामर्श प्रगति</string>
+    <string name="counselling_completed_default">6 में से 0 पूर्ण</string>
+    <string name="counselling_completed_of_total">6 में से %1$d पूर्ण</string>
+    <string name="counselling_section_default">अनुभाग 1 / 6</string>
+    <string name="counselling_section_of_total">अनुभाग %1$d / 6</string>
+
+    <string name="counselling_step_a">A</string>
+    <string name="counselling_step_b">B</string>
+    <string name="counselling_step_c">C</string>
+    <string name="counselling_step_d">D</string>
+    <string name="counselling_step_e">E</string>
+    <string name="counselling_step_f">F</string>
+
+    <string name="counselling_section_a_name">रोग के बारे में जागरूकता</string>
+    <string name="counselling_section_b_name">क्या करें और क्या न करें</string>
+    <string name="counselling_section_c_name">सरकारी योजनाएँ</string>
+    <string name="counselling_section_d_name">उपचार व्यवस्था</string>
+    <string name="counselling_section_e_name">परामर्श पूर्णता</string>
+    <string name="counselling_section_f_name">टीयू में अनुवर्ती कार्यवाही</string>
+
+    <string-array name="counselling_section_names">
+        <item>रोग के बारे में जागरूकता</item>
+        <item>क्या करें और क्या न करें</item>
+        <item>सरकारी योजनाएँ</item>
+        <item>उपचार व्यवस्था</item>
+        <item>परामर्श पूर्णता</item>
+        <item>टीयू में अनुवर्ती कार्यवाही</item>
+    </string-array>
+
+    <string name="counselling_date_label">परामर्श की तिथि</string>
+    <string name="counselling_officer_label">परामर्श अधिकारी</string>
+    <string name="age_gender_label">आयु / लिंग</string>
+    <string name="diagnosis_label">निदान</string>
+
+    <string name="counselling_notes_label">अतिरिक्त टिप्पणियाँ (वैकल्पिक)</string>
+    <string name="counselling_notes_hint">यहाँ टिप्पणी दर्ज करें</string>
+
+    <string name="counselling_nikshay_id_format">निक्षय आईडी: %1$s</string>
+    <string name="counselled">परामर्शित</string>
+
+    <string name="counselling_load_error">रोगी का डेटा लोड नहीं हो सका।\nकृपया पुनः प्रयास करें।</string>
+    <string name="counselling_retry">पुनः प्रयास करें</string>
+
+    <string name="btn_next_text">अगला</string>
+    <string name="btn_back_text">वापस</string>
+    <string name="btn_finish">समाप्त</string>
+
+    <string name="counselling_start_button">परामर्श प्रारंभ करें</string>
+    <string name="counselling_follow_up_button">फॉलो अप</string>
+    <string name="counselling_data_load_error">हम डेटा प्राप्त करने में असमर्थ हैं।\nकृपया बाद में पुनः प्रयास करें।</string>
+
+</resources>

@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.piramalswasthya.stoptb.model.LocationState
+import org.piramalswasthya.stoptb.helpers.DigiPinHelper
 import org.piramalswasthya.stoptb.configuration.BenRegFormDataset
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -29,6 +31,8 @@ import org.piramalswasthya.stoptb.model.PreviewItem
 import org.piramalswasthya.stoptb.model.User
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import timber.log.Timber
+import kotlinx.coroutines.flow.Flow
+import org.piramalswasthya.stoptb.model.HouseholdBasicCache
 import javax.inject.Inject
 
 @HiltViewModel
@@ -40,6 +44,8 @@ class NewBenRegViewModel @Inject constructor(
 ) : ViewModel() {
 
     enum class State { IDLE, SAVING, SAVE_SUCCESS, SAVE_FAILED }
+
+
 
     sealed class ListUpdateState {
         object Idle    : ListUpdateState()
@@ -54,6 +60,14 @@ class NewBenRegViewModel @Inject constructor(
     private val genderFromArgs = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).gender
 
     // StopTB has no HoF / spouse / child concept — kept for nav-graph compat
+    val isNonHHArg = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).isNonHH
+    val placeOfCurrentLivingArg = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).placeOfCurrentLiving
+    val otherPlaceArg = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).otherPlace
+    val institutionNameArg = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).institutionName
+
+    val showLinkHouseholdButton: Boolean
+        get() = benIdFromArgs != 0L && this::ben.isInitialized && ben.isNonHH
+
     val isHoF = false
     private val selectedBenIdFromArgs = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).selectedBenId
     private val isAddSpouseFromArgs   = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).isAddSpouse
@@ -77,9 +91,21 @@ class NewBenRegViewModel @Inject constructor(
     fun setConsentAgreed()    { isConsentAgreed = true }
     fun getIsConsentAgreed()  = isConsentAgreed
 
-    // Geolocation
-    var capturedLatitude: Double = 0.0
-    var capturedLongitude: Double = 0.0
+    // True when registering without an associated household
+    val isStandalone: Boolean get() = hhId == 0L
+
+    // Location state — only used for standalone registrations
+    private val _locationState = MutableStateFlow<LocationState>(LocationState.Idle)
+    val locationState: StateFlow<LocationState> = _locationState.asStateFlow()
+
+    private val _isGpsUnavailable = MutableStateFlow(false)
+    val isGpsUnavailable: StateFlow<Boolean> = _isGpsUnavailable.asStateFlow()
+
+    private val _gpsUnavailableReason = MutableStateFlow<String?>(null)
+    val gpsUnavailableReason: StateFlow<String?> = _gpsUnavailableReason.asStateFlow()
+
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     // ─── Data ────────────────────────────────────────────────────────────
     private lateinit var user:           User
@@ -107,7 +133,12 @@ class NewBenRegViewModel @Inject constructor(
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            setUpPage()
+            try {
+                _isLoading.value = true
+                setUpPage()
+            } finally {
+                _isLoading.value = false
+            }
             dataset.listFlow.collectLatest { _formList.value = it }
         }
     }
@@ -155,7 +186,8 @@ class NewBenRegViewModel @Inject constructor(
                 subCentreName = user.subCentre,
                 // familyHeadRelationPosition is stored 1-indexed (getPosition = indexOf+1),
                 // but setUpPage uses it as 0-indexed with getOrNull(). Subtract 1 to align.
-                relToHeadId = (ben.familyHeadRelationPosition - 1).takeIf { it >= 0 } ?: relToHeadId
+                relToHeadId = (ben.familyHeadRelationPosition - 1).takeIf { it >= 0 } ?: relToHeadId,
+                isNonHH = ben.isNonHH
             )
         } else {
             val villageNames = user.villages.map { it.name }.toTypedArray()
@@ -188,7 +220,7 @@ class NewBenRegViewModel @Inject constructor(
             // For Son (8) / Daughter (9): pre-fill Father's Name and Mother's Name
             // Logic matches FLW2.9: use HoF as primary parent; spouse record (relPos 5/6) as the other parent;
             // fallback to HoF's stored genDetails.spouseName if no spouse is registered yet.
-            val (prefillFatherName, prefillMotherName) = if (relToHeadId == 8 || relToHeadId == 9) {
+            val (prefillFatherName, prefillMotherName, minimumChildDob) = if (relToHeadId == 8 || relToHeadId == 9) {
                 val members = benRepo.getBenListFromHousehold(hhId)
                 // HoF = Self (familyHeadRelationPosition = 19: index 18 in array + 1 for 1-indexed storage)
                 // Note: household.benId is not set in NikshayMitra, so we cannot use it for lookup.
@@ -201,6 +233,12 @@ class NewBenRegViewModel @Inject constructor(
                     it.beneficiaryId != hofBen?.beneficiaryId
                 }
 
+                val youngestParentDob = listOfNotNull(
+                    hofBen?.dob?.takeIf { it > 0L },
+                    hofSpouse?.dob?.takeIf { it > 0L }
+                ).maxOrNull()
+                val minimumChildDob = youngestParentDob?.plus(24 * 60 * 60 * 1000L)
+
                 if (hofBen != null) {
                     val hofFullName = listOfNotNull(hofBen.firstName?.trim(), hofBen.lastName?.trim())
                         .filter { it.isNotBlank() }.joinToString(" ").takeIf { it.isNotBlank() }
@@ -211,16 +249,16 @@ class NewBenRegViewModel @Inject constructor(
 
                     if (hofBen.genderId == 1) {
                         // HoF is male → he is the father; his spouse is the mother
-                        Pair(hofFullName, spouseFullName)
+                        Triple(hofFullName, spouseFullName, minimumChildDob)
                     } else {
                         // HoF is female → she is the mother; her spouse is the father
-                        Pair(spouseFullName, hofFullName)
+                        Triple(spouseFullName, hofFullName, minimumChildDob)
                     }
                 } else {
-                    Pair(null, null)
+                    Triple(null, null, minimumChildDob)
                 }
             } else {
-                Pair(null, null)
+                Triple(null, null, null)
             }
 
             val prefillBen = getHouseholdPrefillBen(
@@ -229,18 +267,80 @@ class NewBenRegViewModel @Inject constructor(
                 prefillMotherName,
                 selectedSpouseMemberName
             )
+            val hof = benRepo.getBenListFromHousehold(hhId)
+                .firstOrNull { it.familyHeadRelationPosition == 19 }
+
             val prefillLocation = prefillBen?.locationRecord ?: locationRecord
             dataset.setUpPage(
                 prefillBen,
                 household.family?.familyHeadPhoneNo,
+                familyHeadCommunityId = hof?.communityId ?: 0,
                 prefillLocation.village.name,
+                pinCodeValue = hof?.pinCode,
                 villageNames,
                 user.villages,
                 user.subCentre,
                 relToHeadId = effectiveRelToHeadId,
-                spouseRegistrationRelToHeadId = relToHeadId
+                spouseRegistrationRelToHeadId = relToHeadId,
+                isNonHH = isNonHHArg,
+                minimumChildDob = minimumChildDob
             )
         }
+        // Restore/Inherit Location details
+        if (!isStandalone) {
+            if (household.isGpsUnavailable) {
+                _isGpsUnavailable.value = true
+                _gpsUnavailableReason.value = household.gpsUnavailableReason
+            } else if (household.gpsLatitude != null && household.gpsLongitude != null && household.digipin != null) {
+                _locationState.value = LocationState.Captured(
+                    lat = household.gpsLatitude!!,
+                    lon = household.gpsLongitude!!,
+                    digipin = household.digipin!!,
+                    timestamp = household.gpsTimestamp.orEmpty()
+                )
+            }
+        } else if (benIdFromArgs != 0L) {
+            if (ben.isGpsUnavailable) {
+                _isGpsUnavailable.value = true
+                _gpsUnavailableReason.value = ben.gpsUnavailableReason
+            } else if (ben.gpsLatitude != null && ben.gpsLongitude != null && ben.digipin != null) {
+                _locationState.value = LocationState.Captured(
+                    lat = ben.gpsLatitude!!,
+                    lon = ben.gpsLongitude!!,
+                    digipin = ben.digipin!!,
+                    timestamp = ben.gpsTimestamp.orEmpty()
+                )
+            }
+        }
+    }
+
+    // ─── Location callbacks (standalone registrations only) ─────────────
+    fun setFetching() { _locationState.value = LocationState.Fetching }
+
+    fun onLocationResult(lat: Double, lon: Double) {
+        val digipin = DigiPinHelper.generate(lat, lon)
+        if (digipin == null) {
+            _locationState.value = LocationState.Failed.OutsideIndia
+            return
+        }
+        val ts = System.currentTimeMillis().toString()
+        _locationState.value = LocationState.Captured(lat, lon, digipin, ts)
+    }
+
+    fun onLocationFailed(reason: LocationState.Failed) { _locationState.value = reason }
+
+    fun onGpsUnavailableToggled(checked: Boolean) {
+        _isGpsUnavailable.value = checked
+        if (checked) _locationState.value = LocationState.Idle
+        else _gpsUnavailableReason.value = null
+    }
+
+    fun onGpsUnavailableReasonSelected(reason: String?) { _gpsUnavailableReason.value = reason }
+
+    fun isLocationValid(): Boolean = when {
+        locationState.value is LocationState.Captured -> true
+        isGpsUnavailable.value && !gpsUnavailableReason.value.isNullOrBlank() -> true
+        else -> false
     }
 
     // ─── Save ────────────────────────────────────────────────────────────
@@ -284,7 +384,10 @@ class NewBenRegViewModel @Inject constructor(
 
         val family = household.family
         val details = household.details
-        val address = listOfNotNull(
+
+        // Prefer the Household form's own address field; fall back to the
+        // old scattered fields only if it wasn't captured.
+        val fallbackAddress = listOfNotNull(
             family?.houseNo,
             family?.mohallaName,
             family?.wardName,
@@ -293,6 +396,9 @@ class NewBenRegViewModel @Inject constructor(
         ).mapNotNull { value ->
             value.trim().takeIf { it.isNotEmpty() && !it.equals("null", ignoreCase = true) }
         }.joinToString(", ")
+
+        val resolvedAddress = family?.address?.takeIf { it.isNotBlank() }
+            ?: fallbackAddress.ifBlank { null }
 
         return BenRegCache(
             ashaId = user.userId,
@@ -328,7 +434,8 @@ class NewBenRegViewModel @Inject constructor(
             motherName = prefillMotherName,
             genderId = genderFromArgs,
             contactNumber = family?.familyHeadPhoneNo,
-            address = address.ifBlank { null },
+            address = resolvedAddress,
+          //  pinCode = family?.pinCode?.trim()?.takeIf { it.isNotBlank() },
             economicStatus = family?.povertyLine,
             economicStatusId = family?.povertyLineId,
             residentialArea = details?.residentialArea,
@@ -356,7 +463,7 @@ class NewBenRegViewModel @Inject constructor(
                             placeOfDeath   = "",
                             placeOfDeathId = -1,
                             otherPlaceOfDeath = "",
-                            householdId    = if (hhId > 0L) hhId else 0L,
+                            householdId    = if (hhId > 0L) hhId else null,
                             isAdult        = false,
                             isKid          = false,
                             isDraft        = true,
@@ -368,17 +475,54 @@ class NewBenRegViewModel @Inject constructor(
                             locationRecord = if (hhId > 0L && household.householdId > 0L)
                                 household.locationRecord else locationRecord,
                             isConsent      = isOtpVerified,
+                            isNonHH        = isNonHHArg,
+                            placeOfCurrentLiving = if (isNonHHArg) placeOfCurrentLivingArg else null,
+                            otherPlaceOfCurrentLiving = if (isNonHHArg) otherPlaceArg else null,
+                            institutionName = if (isNonHHArg) institutionNameArg else null
                         )
                     }
 
                     dataset.mapValues(ben, 1)
 
-                    // Set captured geolocation
-                    ben.latitude = capturedLatitude
-                    ben.longitude = capturedLongitude
+                    // Set GPS location: inherit from household when registered under one,
+                    // otherwise persist the standalone-captured GPS state
+                    if (!isStandalone) {
+                        ben.gpsLatitude = household.gpsLatitude
+                        ben.gpsLongitude = household.gpsLongitude
+                        ben.digipin = household.digipin
+                        ben.gpsTimestamp = household.gpsTimestamp
+                        ben.isGpsUnavailable = household.isGpsUnavailable
+                        ben.gpsUnavailableReason = household.gpsUnavailableReason
+                    } else {
+                        val locState = locationState.value
+                        if (locState is LocationState.Captured) {
+                            ben.gpsLatitude = locState.lat
+                            ben.gpsLongitude = locState.lon
+                            ben.digipin = locState.digipin
+                            ben.gpsTimestamp = locState.timestamp
+                            ben.isGpsUnavailable = false
+                            ben.gpsUnavailableReason = null
+                        } else if (isGpsUnavailable.value) {
+                            ben.gpsLatitude = null
+                            ben.gpsLongitude = null
+                            ben.digipin = null
+                            ben.gpsTimestamp = null
+                            ben.isGpsUnavailable = true
+                            ben.gpsUnavailableReason = gpsUnavailableReason.value
+                        }
+                    }
 
                     ben.apply {
-                        if (hhId > 0L) householdId = hhId
+                        if (hhId > 0L) {
+                            householdId = hhId
+                            isNonHH = false
+                        } else {
+                            householdId = null
+                            isNonHH = isNonHHArg
+                            placeOfCurrentLiving = if (isNonHHArg) placeOfCurrentLivingArg else null
+                            otherPlaceOfCurrentLiving = if (isNonHHArg) otherPlaceArg else null
+                            institutionName = if (isNonHHArg) institutionNameArg else null
+                        }
                         serverUpdatedStatus = if (beneficiaryId < 0L) 1 else 2
                         processed           = if (beneficiaryId < 0L) "N" else "U"
                         syncState           = SyncState.UNSYNCED
@@ -394,6 +538,11 @@ class NewBenRegViewModel @Inject constructor(
                         }
                         updatedDate = System.currentTimeMillis()
                         updatedBy   = user.userName
+                    }
+
+                    val spouseLinkBenId = findExistingSpouseLinkForFamilyMember(ben)
+                    if (spouseLinkBenId != null) {
+                        ben.isSpouseAdded = true
                     }
 
                     benRepo.persistRecord(ben, updateIfExists = benIdFromArgs != 0L)
@@ -430,6 +579,10 @@ class NewBenRegViewModel @Inject constructor(
                             }
                         }
                     }
+                    spouseLinkBenId?.let { linkedBenId ->
+                        benRepo.updateBeneficiarySpouseAdded(hhId, linkedBenId, SyncState.UNSYNCED)
+                        updateLinkedSpouseNameIfBlank(linkedBenId, ben)
+                    }
 
                     _state.postValue(State.SAVE_SUCCESS)
 
@@ -457,6 +610,10 @@ class NewBenRegViewModel @Inject constructor(
     fun getBenName()    = if (this::ben.isInitialized) "${ben.firstName} ${ben.lastName ?: ""}" else ""
     fun isHoFMarried()  = false  // StopTB has no HoF concept
 
+    fun isDeathSelected(): Boolean {
+        return dataset.isDeathSelected()
+    }
+
     fun setImageUriToFormElement(dpUri: Uri) {
         dataset.setImageUriToFormElement(lastImageFormId, dpUri)
     }
@@ -477,6 +634,67 @@ class NewBenRegViewModel @Inject constructor(
 
     fun setRecordExist(b: Boolean) { _recordExists.value = b }
     fun enableEditMode() { dataset.enableEditMode() }
+
+    private suspend fun findExistingSpouseLinkForFamilyMember(newBen: BenRegCache): Long? {
+        if (isAddSpouseFromArgs == 1 || hhId <= 0L || benIdFromArgs != 0L) return null
+        if (relToHeadId != 4 && relToHeadId != 5) return null
+
+        val newFirstName = newBen.firstName.normalizeNameForMatch()
+        val newFullName = newBen.fullName().normalizeNameForMatch()
+        if (newFirstName.isBlank() && newFullName.isBlank()) return null
+
+        val expectedExistingGenderId = if (relToHeadId == 4) 1 else 2
+        val matches = benRepo.getBenListFromHousehold(hhId).filter { existing ->
+            existing.beneficiaryId != newBen.beneficiaryId &&
+                existing.genderId == expectedExistingGenderId &&
+                existing.isMarried &&
+                (relToHeadId == 4 || !existing.isSpouseAdded) &&
+                existing.genDetails?.spouseName.normalizeNameForMatch().let { spouseName ->
+                    spouseName.isNotBlank() &&
+                        (spouseName == newFirstName || spouseName == newFullName)
+                }
+        }
+
+        matches.singleOrNull()?.beneficiaryId?.let { return it }
+
+        return findHouseholdHeadSpouseFallback()
+    }
+
+    private fun String?.normalizeNameForMatch(): String =
+        this?.trim()
+            ?.replace(Regex("\\s+"), " ")
+            ?.uppercase()
+            .orEmpty()
+
+    private suspend fun findHouseholdHeadSpouseFallback(): Long? {
+        val expectedGenderId = if (relToHeadId == 4) 1 else 2
+        val householdHead = benRepo.getBenListFromHousehold(hhId).singleOrNull { existing ->
+            existing.familyHeadRelationPosition == 19 &&
+                existing.genderId == expectedGenderId &&
+                existing.isMarried &&
+                !existing.isSpouseAdded
+        }
+        return householdHead?.beneficiaryId
+    }
+
+    private suspend fun updateLinkedSpouseNameIfBlank(linkedBenId: Long, newBen: BenRegCache) {
+        val newSpouseName = newBen.fullName()?.takeIf { it.isNotBlank() } ?: return
+        benRepo.getBeneficiaryRecord(linkedBenId, hhId)?.let { linkedBen ->
+            if (linkedBen.genDetails?.spouseName.isNullOrBlank()) {
+                if (linkedBen.genDetails == null) {
+                    linkedBen.genDetails = BenRegGen(spouseName = newSpouseName)
+                } else {
+                    linkedBen.genDetails!!.spouseName = newSpouseName
+                }
+                linkedBen.syncState = SyncState.UNSYNCED
+                linkedBen.serverUpdatedStatus = 2
+                linkedBen.processed = "U"
+                linkedBen.updatedDate = System.currentTimeMillis()
+                linkedBen.updatedBy = user.userName
+                benRepo.persistRecord(linkedBen, updateIfExists = true)
+            }
+        }
+    }
 
     // ─── Preview ─────────────────────────────────────────────────────────
     suspend fun getFormPreviewData(): List<PreviewItem> = withContext(Dispatchers.Default) {
@@ -499,6 +717,23 @@ class NewBenRegViewModel @Inject constructor(
             out.add(PreviewItem(label = el.title ?: "", value = trimmed, isImage = false))
         }
         out
+    }
+
+    val hhList: Flow<List<HouseholdBasicCache>>
+        get() {
+            val location = preferenceDao.getLocationRecord()
+            val selectedVillage = location?.village?.id ?: 0
+            return benRepo.getHouseholds(selectedVillage)
+        }
+
+    fun linkBenToHousehold(hhId: Long, relationPos: Int, relationName: String) {
+        viewModelScope.launch {
+            benRepo.linkBenToHousehold(benIdFromArgs, hhId, relationPos, relationName)
+        }
+    }
+
+    suspend fun getBenFromId(benId: Long): BenRegCache? {
+        return benRepo.getBenFromId(benId)
     }
 
     override fun onCleared() {

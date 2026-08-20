@@ -44,6 +44,9 @@ class TBScreeningFormFragment : Fragment() {
 
     @Inject lateinit var preferenceDao: PreferenceDao
 
+    private val openedFromHousehold: Boolean
+        get() = arguments?.getBoolean("openedFromHousehold", false) == true
+
     private var _binding: FragmentNewFormBinding? = null
     private val binding: FragmentNewFormBinding
         get() = _binding!!
@@ -133,16 +136,23 @@ class TBScreeningFormFragment : Fragment() {
         legendSpan.setSpan(ForegroundColorSpan(starColor), line2Start, line2Start + 2, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         binding.tvFormFooter.text = legendSpan
 
-        captureGeolocation()
+        // Auto geolocation disabled for TB Screening form: location is not required to open/use this module.
+//        captureGeolocation()
         binding.btnSubmit.setOnClickListener {
             submitTBScreeningForm()
         }
 
         viewModel.state.observe(viewLifecycleOwner) {
             when (it) {
+                TBScreeningFormViewModel.State.SAVING -> {
+                    binding.btnSubmit.isEnabled = false
+                    binding.pbForm.visibility = View.VISIBLE
+                }
+
                 TBScreeningFormViewModel.State.SAVE_SUCCESS -> {
+                    binding.pbForm.visibility = View.GONE
                     WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
-                    val alertMessage = viewModel.getFamilyContactAlert()
+                    val alertMessage = viewModel.getSubmitAlertMessage()
                     if (alertMessage.isNullOrBlank()) {
                         handleSaveSuccessNavigation()
                     } else {
@@ -152,6 +162,8 @@ class TBScreeningFormFragment : Fragment() {
                 }
 
                 TBScreeningFormViewModel.State.SAVE_FAILED -> {
+                    binding.btnSubmit.isEnabled = true
+                    binding.pbForm.visibility = View.GONE
                     Toast.makeText(
                         requireContext(),
                         resources.getString(R.string.something_went_wrong_try_again),
@@ -165,7 +177,10 @@ class TBScreeningFormFragment : Fragment() {
     }
 
     private fun submitTBScreeningForm() {
+        if (!binding.btnSubmit.isEnabled) return
         if (validateCurrentPage()) {
+            binding.btnSubmit.isEnabled = false
+            binding.pbForm.visibility = View.VISIBLE
             viewModel.saveForm()
         }
     }
@@ -186,13 +201,7 @@ class TBScreeningFormFragment : Fragment() {
             requireContext(),
             resources.getString(R.string.tb_screening_submitted), Toast.LENGTH_SHORT
         ).show()
-        if (viewModel.autoFlow) {
-            // Examine flow — return to AllBenFragment so user picks the next form
-            val popped = findNavController().popBackStack(R.id.allBenFragment, false)
-            if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
-        } else {
-            findNavController().navigateUp()
-        }
+        findNavController().navigateUp()
     }
 
     private fun validateCurrentPage(): Boolean {

@@ -60,6 +60,13 @@ class RecordsRepo @Inject constructor(
             .map { it.asBasicDomainModel() }
 
     val allBenListCount get() = benDao.getAllBenCount(selectedVillage)
+    val nonHHListCount get() = benDao.getNonHHCount(selectedVillage)
+    val nonHHList get() = benDao.getNonHHBeneficiaries(selectedVillage)
+        .map { list -> list.map { it.asBasicDomainModel() } }
+
+    fun searchNonHH(query: String) = benDao.searchNonHHBeneficiaries(selectedVillage, query)
+        .map { list -> list.map { it.asBasicDomainModel() } }
+
     val allBenWithoutAbhaList get() = benDao.getAllBenWithoutAbha(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }
     val allBenWithAbhaList get() = benDao.getAllBenWithAbha(selectedVillage)

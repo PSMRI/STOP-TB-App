@@ -1,9 +1,10 @@
 package org.piramalswasthya.stoptb.configuration
-
 import android.content.res.Resources
 import dagger.hilt.android.scopes.ActivityRetainedScoped
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
+import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.model.Icon
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import org.piramalswasthya.stoptb.ui.home_activity.communicable_diseases.CdFragmentDirections
@@ -12,18 +13,16 @@ import org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.Ncd
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.ui.volunteer.fragment.VolunteerHomeFragmentDirections
 import javax.inject.Inject
-
 @ActivityRetainedScoped
 class IconDataset @Inject constructor(
     private val recordsRepo: RecordsRepo,
     private val preferenceDao: PreferenceDao
 ) {
-
     enum class Disease {
         MALARIA, KALA_AZAR, AES_JE, FILARIA, LEPROSY, DEWARMING
     }
-
     fun getVolunteerIconDataset(resources: Resources): List<Icon> {
+        val role = preferenceDao.getLoggedInUser()?.role
         val iconList = mutableListOf(
             Icon(
                 R.drawable.ic__hh,
@@ -38,47 +37,56 @@ class IconDataset @Inject constructor(
                 resources.getString(R.string.home_card_all_ben_subtitle),
                 recordsRepo.allBenListCount,
                 VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment()
-            ),
-
-            Icon(
-                R.drawable.ic__ncd,
-                resources.getString(R.string.tuberculosis),
-                resources.getString(R.string.home_card_tb_subtitle),
-                null,
-                VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToTbFragment()
-            ),
-//        Icon(
-//            R.drawable.ic__ncd,
-//            resources.getString(R.string.icon_title_ncd),
-//            resources.getString(R.string.home_card_ncd_subtitle),
-//            null,
-//            VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToNcdFragment()
-//        ),
-            Icon(
-                R.drawable.ic_ncd_noneligible,
-                resources.getString(R.string.ncd_refer_list),
-                resources.getString(R.string.home_card_referral_subtitle),
-                null,
-                VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToReferralIconsFragment()
             )
         )
 
-        // Registrar role: show only All Beneficiaries + All Household (no TB / Referrals)
-        val role = preferenceDao.getLoggedInUser()?.role
-        if (role.isRegistrationOfficerRole()) {
-            iconList.removeAll { icon ->
-                icon.title != resources.getString(R.string.icon_title_ben) &&
-                icon.title != resources.getString(R.string.icon_title_household)
-            }
+        if (role.isRegistrationOfficerRole() || role.isCounsellingOfficerRole() || role.isNurseRole()) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic__ben,
+                    "Non-Household",
+                    "Wanderers, homeless, hostelites & institutional residents",
+                    recordsRepo.nonHHListCount,
+                    VolunteerHomeFragmentDirections
+                        .actionVolunteerHomeFragmentToNonHHFragment()
+                )
+            )
         }
 
+        if (role.isNurseRole() || role.isCounsellingOfficerRole()) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic__ncd,
+                    resources.getString(R.string.tuberculosis),
+                    resources.getString(R.string.home_card_tb_subtitle),
+                    null,
+                    VolunteerHomeFragmentDirections
+                        .actionVolunteerHomeFragmentToTbFragment()
+                )
+            )
+
+            iconList.add(
+                Icon(
+                    R.drawable.ic_ncd_noneligible,
+                    resources.getString(R.string.ncd_refer_list),
+                    resources.getString(R.string.home_card_referral_subtitle),
+                    null,
+                    VolunteerHomeFragmentDirections
+                        .actionVolunteerHomeFragmentToReferralIconsFragment()
+                )
+            )
+        }
+        /*if (role.isCounsellingOfficerRole()) {
+            iconList.removeAll { icon ->
+                icon.title != resources.getString(R.string.tuberculosis)
+            }
+        }*/
         return iconList.apply {
             forEachIndexed { index, icon ->
                 icon.colorPrimary = index % 2 == 0
             }
         }
     }
-
     fun getNCDDataset(resources: Resources) = listOf(
         Icon(
             R.drawable.ic__ncd_eligibility,
@@ -112,7 +120,6 @@ class IconDataset @Inject constructor(
             icon.colorPrimary = index % 2 == 0
         }
     }
-
     fun getNCDDatasetForVolunteer(resources: Resources) = listOf(
         Icon(
             R.drawable.ic__ncd_eligibility,
@@ -140,35 +147,41 @@ class IconDataset @Inject constructor(
             icon.colorPrimary = index % 2 == 0
         }
     }
-
-    fun getCDDataset(resources: Resources) = listOf(
-        Icon(
-            R.drawable.ic__ncd_eligibility,
-            resources.getString(R.string.icon_title_ncd_tb_screening),
-            resources.getString(R.string.home_card_tb_screening_subtitle),
-            recordsRepo.tbScreeningListCount,
-            CdFragmentDirections.actionCdFragmentToTBScreeningListFragment()
-        ),
-        Icon(
-            R.drawable.ic__death,
-            resources.getString(R.string.icon_title_ncd_tb_suspected),
-            resources.getString(R.string.home_card_tb_suspected_short_subtitle),
-            recordsRepo.tbSuspectedListCount,
-            CdFragmentDirections.actionCdFragmentToTBSuspectedListFragment()
-        ),
-        Icon(
-            icon = R.drawable.ic__death,
-            title = resources.getString(R.string.icon_title_ncd_tb_confirmed),
-            subtitle = resources.getString(R.string.home_card_tb_confirmed_short_subtitle),
-            count = recordsRepo.tbConfirmedListCount,
-            navAction = CdFragmentDirections.actionCdFragmentToTBConfirmedListFragment()
+    fun getCDDataset(resources: Resources): List<Icon> {
+        val iconList = mutableListOf(
+            Icon(
+                R.drawable.ic__ncd_eligibility,
+                resources.getString(R.string.icon_title_ncd_tb_screening),
+                resources.getString(R.string.home_card_tb_screening_subtitle),
+                recordsRepo.tbScreeningListCount,
+                CdFragmentDirections.actionCdFragmentToTBScreeningListFragment()
+            ),
+            Icon(
+                R.drawable.ic__death,
+                resources.getString(R.string.icon_title_ncd_tb_suspected),
+                resources.getString(R.string.home_card_tb_suspected_short_subtitle),
+                recordsRepo.tbSuspectedListCount,
+                CdFragmentDirections.actionCdFragmentToTBSuspectedListFragment()
+            ),
+            Icon(
+                icon = R.drawable.ic__death,
+                title = resources.getString(R.string.icon_title_ncd_tb_confirmed),
+                subtitle = resources.getString(R.string.home_card_tb_confirmed_short_subtitle),
+                count = recordsRepo.tbConfirmedListCount,
+                navAction = CdFragmentDirections.actionCdFragmentToTBConfirmedListFragment()
+            )
         )
-    ).apply {
-        forEachIndexed { index, icon ->
-            icon.colorPrimary = index % 2 == 0
+        /*if (role.isCounsellingOfficerRole()) {
+            iconList.removeAll { icon ->
+                icon.title != resources.getString(R.string.icon_title_ncd_tb_confirmed)
+            }
+        }*/
+        return iconList.apply {
+            forEachIndexed { index, icon ->
+                icon.colorPrimary = index % 2 == 0
+            }
         }
     }
-
     fun getReferralDataset(resources: Resources) = listOf(
         Icon(
             R.drawable.ic__ncd_eligibility,

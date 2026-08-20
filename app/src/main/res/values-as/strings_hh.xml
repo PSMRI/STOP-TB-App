@@ -12,6 +12,7 @@
     <string name="rv_item_hh_ph_3">উপাধি/ উপনাম : </string>
     <string name="hh_members_text">সদস্যসকল : %1d</string>
     <string name="btn_rv_item_hh_add_ben">হিতাধিকাৰী যোগ কৰক</string>
+    <string name="btn_Add_beneficiary_nonHH">সদস্য যোগ কৰক</string>
 
     <string name="frag_nhhr_title">নতুন পাৰিবাৰিক নিবন্ধন</string>
 
@@ -147,4 +148,20 @@
     <string name="add_head_of_family">এডিডি পৰিয়ালৰ মুৰব্বী</string>
     <string name="hh_no_members">ঘৰুৱা খালী!</string>
     <string name="add_head_of_family_message">Would you like to add <b>%1s</b> as a Head-of-Family Beneficiary?</string>
+
+    <string name="nhhr_total_members_hh">গৃহত বসবাস কৰা সদস্যৰ মুঠ সংখ্যা</string>
+    <string name="nhhr_registered_camp_site">কেম্প ছাইটত পঞ্জীয়ন কৰা হৈছে</string>
+
+    <string-array name="nhhr_yes_no_array">
+        <item>হয়</item>
+        <item>নহয়</item>
+    </string-array>
+
+    <!-- NON HOUSEHOLD CURRENT LIVING INFO -->
+    <string name="title_current_living_info">Current Living Information</string>
+    <string name="sub_title_current_living_info">Please provide the beneficiary\'s current living place details.</string>
+    <string name="hint_place_of_current_living">Place of Current Living *</string>
+    <string name="hint_other_place">Other Place *</string>
+    <string name="hint_institution_name">Name of Institution *</string>
+
 </resources>

@@ -5,6 +5,7 @@ import android.net.Uri
 import android.widget.Toast
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -25,9 +26,15 @@ import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.helpers.isNurseRole
+import org.piramalswasthya.stoptb.database.room.InAppDb
+import org.piramalswasthya.stoptb.helpers.dynamicMapper.PayloadBuilder
 import org.piramalswasthya.stoptb.model.*
+import org.piramalswasthya.stoptb.model.getPlaceOfCurrentLivingIndex
+import org.piramalswasthya.stoptb.model.getPlaceOfCurrentLivingCode
 import org.piramalswasthya.stoptb.network.*
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel
+import org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository
+import org.piramalswasthya.stoptb.utils.Log
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
 import java.io.File
@@ -46,11 +53,14 @@ class BenRepo @Inject constructor(
     private val userRepo: UserRepo,
     private val tmcNetworkApiService: AmritApiService,
     private val formResponseJsonDao: FormResponseJsonDao,
+    private val db: InAppDb,
+    private val counsellingRepository: ICounsellingRepository
 ) {
 
     private val processNewBenMutex = Mutex()
 
     companion object {
+        private const val DEFAULT_OFFICER_ID = 501L
         private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
         private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.ENGLISH)
         fun getCurrentDate(millis: Long = System.currentTimeMillis()): String {
@@ -218,6 +228,118 @@ class BenRepo @Inject constructor(
         }
     }
 
+    suspend fun linkBenToHousehold(benId: Long, hhId: Long, relationPos: Int, relationName: String) {
+        withContext(Dispatchers.IO) {
+            val ben = benDao.getBen(benId)
+            if (ben != null) {
+                ben.householdId = hhId
+                ben.familyHeadRelationPosition = relationPos
+                ben.familyHeadRelation = relationName
+                ben.isNonHH = false
+                ben.syncState = SyncState.UNSYNCED
+                ben.processed = "U"
+                ben.serverUpdatedStatus = 2
+
+                // If linked as Wife (5) or Husband (6), back-link the spouse name of the Head of Family
+                if (relationPos == 5 || relationPos == 6) {
+                    val linkedFullName = listOfNotNull(ben.firstName?.trim(), ben.lastName?.trim())
+                        .filter { it.isNotBlank() }
+                        .joinToString(" ")
+                    if (linkedFullName.isNotBlank()) {
+                        // Find the HoF (relPosition = 19) in the same household
+                        benDao.getAllBenForHousehold(hhId).firstOrNull { it.familyHeadRelationPosition == 19 }?.let { hofBen ->
+                            // Update HoF's spouseName and set isSpouseAdded = true
+                            if (hofBen.genDetails == null) {
+                                hofBen.genDetails = BenRegGen(spouseName = linkedFullName)
+                            } else {
+                                hofBen.genDetails!!.spouseName = linkedFullName
+                            }
+                            hofBen.genDetails!!.maritalStatusId = 2
+                            hofBen.genDetails!!.maritalStatus = "Married"
+                            hofBen.isSpouseAdded = true
+                            hofBen.syncState = SyncState.UNSYNCED
+                            hofBen.processed = "U"
+                            hofBen.serverUpdatedStatus = 2
+                            benDao.updateBen(hofBen)
+
+                            // Also back-link the HoF's name as the spouseName of the linked member
+                            val hofFullName = listOfNotNull(hofBen.firstName?.trim(), hofBen.lastName?.trim())
+                                .filter { it.isNotBlank() }
+                                .joinToString(" ")
+                            if (hofFullName.isNotBlank()) {
+                                if (ben.genDetails == null) {
+                                    ben.genDetails = BenRegGen(spouseName = hofFullName)
+                                } else {
+                                    ben.genDetails!!.spouseName = hofFullName
+                                }
+                                ben.genDetails!!.maritalStatusId = 2
+                                ben.genDetails!!.maritalStatus = "Married"
+                                ben.isSpouseAdded = true
+                            }
+                        }
+                    }
+                }
+                // If linked as Son (9) or Daughter (10)
+                else if (relationPos == 9 || relationPos == 10) {
+                    benDao.getAllBenForHousehold(hhId).firstOrNull { it.familyHeadRelationPosition == 19 }?.let { hofBen ->
+                        val hofFullName = listOfNotNull(hofBen.firstName?.trim(), hofBen.lastName?.trim())
+                            .filter { it.isNotBlank() }
+                            .joinToString(" ")
+                        if (hofFullName.isNotBlank()) {
+                            if (hofBen.genderId == 1) { // Male HOF is Father
+                                ben.fatherName = hofFullName
+                                // If HOF is married, set motherName to HOF's Wife's name
+                                hofBen.genDetails?.spouseName?.takeIf { it.isNotBlank() && it != "Not Available" }?.let { mother ->
+                                    ben.motherName = mother
+                                }
+                            } else if (hofBen.genderId == 2) { // Female HOF is Mother
+                                ben.motherName = hofFullName
+                                // If HOF is married, set fatherName to HOF's Husband's name
+                                hofBen.genDetails?.spouseName?.takeIf { it.isNotBlank() && it != "Not Available" }?.let { father ->
+                                    ben.fatherName = father
+                                }
+                            }
+                        }
+                    }
+                }
+                // If linked as Mother (1) or Father (2)
+                else if (relationPos == 1 || relationPos == 2) {
+                    val linkedFullName = listOfNotNull(ben.firstName?.trim(), ben.lastName?.trim())
+                        .filter { it.isNotBlank() }
+                        .joinToString(" ")
+                    if (linkedFullName.isNotBlank()) {
+                        val householdMembers = benDao.getAllBenForHousehold(hhId)
+                        householdMembers.forEach { member ->
+                            // Update HOF (19) or Sibling (Son 9 / Daughter 10)
+                            if (member.familyHeadRelationPosition == 19 || member.familyHeadRelationPosition == 9 || member.familyHeadRelationPosition == 10) {
+                                var updated = false
+                                if (relationPos == 1) { // Linked member is Mother
+                                    member.motherName = linkedFullName
+                                    updated = true
+                                } else if (relationPos == 2) { // Linked member is Father
+                                    member.fatherName = linkedFullName
+                                    updated = true
+                                }
+                                if (updated) {
+                                    member.syncState = SyncState.UNSYNCED
+                                    member.processed = "U"
+                                    member.serverUpdatedStatus = 2
+                                    benDao.updateBen(member)
+                                }
+                            }
+                        }
+                    }
+                }
+                benDao.updateBen(ben)
+            }
+        }
+    }
+
+    fun getHouseholds(selectedVillage: Int): Flow<List<HouseholdBasicCache>> {
+        return householdDao.getAllHouseholdWithNumMembers(selectedVillage)
+    }
+
+
     suspend fun getBenFromRegId(benRegId: Long): BenRegCache? {
         return withContext(Dispatchers.IO) {
             benDao.getBenByRegId(benRegId)
@@ -341,8 +463,8 @@ class BenRepo @Inject constructor(
     private suspend fun createBenIdAtServerByBeneficiarySending(
         ben: BenRegCache, user: User, locationRecord: LocationRecord
     ): Boolean {
-
-        val sendingData = ben.asNetworkSendingModel(user, locationRecord, context)
+        val household = if (ben.householdId != null && ben.householdId!! > 0L) householdDao.getHousehold(ben.householdId!!) else null
+        val sendingData = ben.asNetworkSendingModel(user, locationRecord, context, household)
         Timber.d("Amrit push beneficiary registration: benId=${ben.beneficiaryId}, hhId=${ben.householdId}")
         try {
             val response = tmcNetworkApiService.getBenIdFromBeneficiarySending(sendingData)
@@ -370,12 +492,15 @@ class BenRepo @Inject constructor(
                         oldBenId = ben.beneficiaryId,
                         newBenId = newBenId
                     )
-                    householdDao.getHousehold(ben.householdId)
-                        ?.takeIf { it.benId == ben.beneficiaryId }?.let {
-                            it.benId = newBenId
-                            householdDao.update(it)
-                        }
+                    ben.householdId?.let { hhId ->
+                        householdDao.getHousehold(hhId)
+                            ?.takeIf { it.benId == ben.beneficiaryId }?.let {
+                                it.benId = newBenId
+                                householdDao.update(it)
+                            }
+                    }
                     ben.beneficiaryId = newBenId
+                    ben.benRegId = newBenRegId
                     return true
                 }
                 Timber.e("Amrit push beneficiary registration failed: statusCode=$responseStatusCode, error=$errorMessage, benId=${ben.beneficiaryId}")
@@ -407,6 +532,9 @@ class BenRepo @Inject constructor(
                 preferenceDao.getLoggedInUser()
                     ?: throw IllegalStateException("No user logged in!!")
 
+            benDao.resetSyncingToUnsynced()
+            benDao.requeueTempBeneficiariesForRegistration()
+
             val benList = benDao.getAllUnprocessedBen()
             Timber.d("YTR 419 $benList")
 
@@ -415,17 +543,26 @@ class BenRepo @Inject constructor(
             val kidNetworkPostList = mutableSetOf<BenRegKidNetwork>()
 
             benList.forEach {
-                createBenIdAtServerByBeneficiarySending(it, user, it.locationRecord)
+                val idGenerated = createBenIdAtServerByBeneficiarySending(it, user, it.locationRecord)
+                if (!idGenerated) {
+                    Timber.w("Amrit push beneficiary registration pending retry: benId=${it.beneficiaryId}, benRegId=${it.benRegId}, hhId=${it.householdId}")
+                }
                 Timber.d("YTR 429 $it")
             }
 
             val updateBenList = benDao.getAllBenForSyncWithServer()
             updateBenList.forEach {
+                if (it.beneficiaryId <= 0L || it.benRegId <= 0L) {
+                    benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.UNSYNCED)
+                    Timber.w("Skipping beneficiary final sync until real IDs are available: benId=${it.beneficiaryId}, benRegId=${it.benRegId}, hhId=${it.householdId}")
+                    return@forEach
+                }
                 benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.SYNCING)
-                benNetworkPostList.add(it.asNetworkPostModel(context, user))
-                householdNetworkPostList.add(
-                    householdDao.getHousehold(it.householdId)!!.asNetworkModel(user)
-                )
+                val household = it.householdId?.let { hhId -> if (hhId > 0L) householdDao.getHousehold(hhId) else null }
+                benNetworkPostList.add(it.asNetworkPostModel(context, user, household))
+                household?.let { hh ->
+                    householdNetworkPostList.add(hh.asNetworkModel(user))
+                }
                 try {
                     if (it.ageUnitId != 3 || it.age < 15) kidNetworkPostList.add(
                         it.asKidNetworkModel(user)
@@ -444,7 +581,8 @@ class BenRepo @Inject constructor(
             } else {
                 Timber.d("Beneficiary batch push succeeded: ${benNetworkPostList.size} ben records, ${householdNetworkPostList.size} household records")
             }
-            return@withContext true
+            val counsellingSyncDone = pushCounsellingData()
+            return@withContext uploadDone && counsellingSyncDone
         }
     }
 
@@ -458,14 +596,23 @@ class BenRepo @Inject constructor(
         val benIds = benNetworkPostSet.map { it.benId }
         val hhIds = householdNetworkPostSet.map { it.householdId }
         Timber.d("Amrit push syncDataToAmrit: sending ${benNetworkPostSet.size} ben(s) $benIds, ${householdNetworkPostSet.size} hh(s) $hhIds, ${kidNetworkPostSet.size} kid(s)")
+
         val rmnchData = SendingRMNCHData(
             houseHoldRegistrationData = householdNetworkPostSet.toList(),
             benficieryRegistrationData = benNetworkPostSet.toList(),
             cbacData = null,
-            birthDetails = kidNetworkPostSet.toList()
+            birthDetails = kidNetworkPostSet.toList(),
+            counsellingDetails = null
         )
         try {
+            val jsonPayload = Gson().toJson(rmnchData)
+            Timber.d("Amrit push syncDataToAmrit payload JSON: $jsonPayload")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to serialize rmnchData to JSON for logging")
+        }
+        try {
             val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
+            Log.d("Response final",response.toString())
             val statusCode = response.code()
             Timber.d("Amrit push syncDataToAmrit response: httpStatus=$statusCode")
 
@@ -489,6 +636,7 @@ class BenRepo @Inject constructor(
                             Timber.d("Amrit push syncDataToAmrit DB updated: benIds=${it.toList()}")
                         }
                         hhToUpdateList?.let { householdDao.householdSyncedWithServer(*it) }
+                        
                         return true
                     } else if (responseStatusCode == 5002 || responseStatusCode == 401) {
                         val user = preferenceDao.getLoggedInUser()
@@ -522,6 +670,10 @@ class BenRepo @Inject constructor(
         }
     }
 
+    private suspend fun pushCounsellingData(): Boolean {
+        return counsellingRepository.syncUnsyncedRecords()
+    }
+
 
     suspend fun deactivateHouseHold(
         benNetworkPostSet: List<BenRegCache>,
@@ -531,7 +683,8 @@ class BenRepo @Inject constructor(
         val user = preferenceDao.getLoggedInUser() ?: throw IllegalStateException("No user logged in!!")
         val benNetworkPostList: List<BenPost> =
             benNetworkPostSet.map {
-                it.asNetworkPostModel(context, user)
+                val household = it.householdId?.let { hhId -> if (hhId > 0L) householdDao.getHousehold(hhId) else null }
+                it.asNetworkPostModel(context, user, household)
             }
 
 
@@ -539,6 +692,12 @@ class BenRepo @Inject constructor(
             listOf(householdNetworkPostSet),
             benNetworkPostList
         )
+        try {
+            val jsonPayload = Gson().toJson(rmnchData)
+            Timber.d("deactivateHouseHold syncDataToAmrit payload JSON: $jsonPayload")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to serialize deactivateHouseHold payload to JSON")
+        }
         try {
             val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
             val statusCode = response.code()
@@ -590,7 +749,8 @@ class BenRepo @Inject constructor(
         val user = preferenceDao.getLoggedInUser() ?: throw IllegalStateException("No user logged in!!")
         val benNetworkPostList: List<BenPost> =
             benNetworkPostSet.map {
-                it.asNetworkPostModel(context, user)
+                val household = it.householdId?.let { hhId -> if (hhId > 0L) householdDao.getHousehold(hhId) else null }
+                it.asNetworkPostModel(context, user, household)
             }
 
 
@@ -598,6 +758,12 @@ class BenRepo @Inject constructor(
             //   listOf(householdNetworkPostSet),
             benficieryRegistrationData= benNetworkPostList
         )
+        try {
+            val jsonPayload = Gson().toJson(rmnchData)
+            Timber.d("deactivateBeneficiary syncDataToAmrit payload JSON: $jsonPayload")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to serialize deactivateBeneficiary payload to JSON")
+        }
         try {
             val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
             val statusCode = response.code()
@@ -667,6 +833,7 @@ class BenRepo @Inject constructor(
 
                 if (statusCode == 200) {
                     val responseString = response.body()?.string()
+                    Timber.d("PULL_HH_DEBUG: $responseString")
 
                     if (responseString != null) {
                         val jsonObj = JSONObject(responseString)
@@ -683,6 +850,8 @@ class BenRepo @Inject constructor(
                                 val pageSize = getResponseTotalPage(jsonObj)
 
                                 try {
+
+
                                     householdDao.upsert(
                                         *getHouseholdCacheFromServerResponse(
                                             responseString
@@ -695,7 +864,7 @@ class BenRepo @Inject constructor(
                                 val benCacheList =
                                     getBenCacheFromServerResponse(responseString)
 
-                                benDao.upsert(*benCacheList.toTypedArray())
+                                upsertServerBeneficiariesSafely(benCacheList)
 
                                 Timber.d("GeTBenDataList: $pageSize")
 
@@ -738,6 +907,11 @@ class BenRepo @Inject constructor(
                 Timber.e("get_ben error : $e")
                 return@withContext -2
 
+            } catch (e: CancellationException) {
+
+                Timber.w("get_ben cancelled : $e")
+                throw e
+
             } catch (e: IllegalStateException) {
 
                 Timber.e("get_ben error : $e")
@@ -745,6 +919,17 @@ class BenRepo @Inject constructor(
             }
 
             -1
+        }
+    }
+
+    private suspend fun upsertServerBeneficiariesSafely(benCacheList: List<BenRegCache>) {
+        benCacheList.forEach { serverBen ->
+            val existingBen = benDao.getBen(serverBen.beneficiaryId)
+            if (existingBen != null) {
+                benDao.updateBen(serverBen)
+            } else {
+                benDao.upsert(serverBen)
+            }
         }
     }
 
@@ -918,9 +1103,19 @@ class BenRepo @Inject constructor(
 //    }
 
     private fun getLongFromDate(date: String): Long {
+        return getLongFromDateOrNull(date) ?: 0L
+    }
+
+    private fun getLongFromDateOrNull(date: String?): Long? {
+        if (date.isNullOrBlank()) return null
+
         val patterns = listOf(
             "MMM dd, yyyy HH:mm:ss a",
             "MMM dd, yyyy h:mm:ss a",
+            "MMM d, yyyy HH:mm:ss a",
+            "MMM d, yyyy h:mm:ss a",
+            "yyyy-MM-dd",
+            "yyyy-MM-dd HH:mm:ss",
             "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
             "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
         )
@@ -929,7 +1124,7 @@ class BenRepo @Inject constructor(
                 SimpleDateFormat(pattern, Locale.ENGLISH).parse(date)?.time
             }.getOrNull()?.let { return it }
         }
-        return 0
+        return null
     }
 
     private fun getResponseDataArray(jsonObj: JSONObject): JSONArray {
@@ -953,6 +1148,12 @@ class BenRepo @Inject constructor(
     private fun JSONObject.optStringOrNull(name: String): String? {
         if (!has(name) || isNull(name)) return null
         return optString(name).takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+    }
+
+    private fun JSONObject.optDoubleOrNull(name: String): Double? {
+        if (!has(name) || isNull(name)) return null
+        val value = optDouble(name)
+        return if (value.isNaN()) null else value
     }
 
     var count = 0
@@ -1565,7 +1766,9 @@ class BenRepo @Inject constructor(
                           jsonObject.optJSONObject("beneficiaryDetails") ?: jsonObject
 
                     val demographicsObj =
-                        jsonObject.optJSONObject("i_bendemographics") ?: JSONObject()
+                        jsonObject.optJSONObject("i_bendemographics")
+                            ?: jsonObject.optJSONObject("benDemographics")
+                            ?: JSONObject()
 
                     val abhaHealthDetailsObj =
                         jsonObject.optJSONObject("abhaHealthDetails") ?: JSONObject()
@@ -1582,10 +1785,24 @@ class BenRepo @Inject constructor(
                     val lastNameFromFullName =
                         fullName.substringAfter(" ", "").takeIf { it.isNotBlank() }
 
-                    val dobMillis = (
-                            benDataObj.optStringOrNull("dob")
-                                ?: benDataObj.optStringOrNull("dOB")
-                            )?.let { getLongFromDate(it) } ?: 0L
+                    val benId =
+                        if (jsonObject.has("benficieryid")) jsonObject.getLong("benficieryid")
+                        else -1L
+
+                    if (benId == -1L) continue
+
+                    val existingBen = benDao.getBen(benId)
+
+                    val parsedDobMillis = getLongFromDateOrNull(
+                        benDataObj.optStringOrNull("dob")
+                            ?: benDataObj.optStringOrNull("dOB")
+                    )
+
+                    val dobMillis = when {
+                        parsedDobMillis != null -> parsedDobMillis
+                        existingBen?.dob?.takeIf { it > 0L } != null -> existingBen.dob
+                        else -> 0L
+                    }
 
                     val ageUnitText =
                         benDataObj.optStringOrNull("age_unit")
@@ -1619,12 +1836,6 @@ class BenRepo @Inject constructor(
                     val childDataObj =
                         jsonObject.optJSONObject("bornbirthDeatils") ?: JSONObject()
 
-                    val benId =
-                        if (jsonObject.has("benficieryid")) jsonObject.getLong("benficieryid")
-                        else -1L
-
-                    if (benId == -1L) continue
-
                     val nikshayIdValue = benDataObj.optStringOrNull("nikshayId")
                         ?: benDataObj.optStringOrNull("nikshayID")
                         ?: jsonObject.optStringOrNull("nikshayId")
@@ -1632,18 +1843,58 @@ class BenRepo @Inject constructor(
                         ?: stopTBDetailsObj.optStringOrNull("nikshayId")
                         ?: stopTBDetailsObj.optStringOrNull("nikshayID")
 
-                    val existingBen = benDao.getBen(benId)
+                    val benGpsLatitude = demographicsObj.optDoubleOrNull("latitude")
+                        ?: demographicsObj.optDoubleOrNull("gpsLatitude")
+                        ?: benDataObj.optDoubleOrNull("gpsLatitude")
+                        ?: jsonObject.optDoubleOrNull("gpsLatitude")
+
+                    val benGpsLongitude = demographicsObj.optDoubleOrNull("longitude")
+                        ?: demographicsObj.optDoubleOrNull("gpsLongitude")
+                        ?: benDataObj.optDoubleOrNull("gpsLongitude")
+                        ?: jsonObject.optDoubleOrNull("gpsLongitude")
+
+                    val benDigipin = demographicsObj.optStringOrNull("digipin")
+                        ?: benDataObj.optStringOrNull("digipin")
+                        ?: jsonObject.optStringOrNull("digipin")
+
+                    val benGpsTimestamp = demographicsObj.optStringOrNull("gpsTimestamp")
+                        ?: benDataObj.optStringOrNull("gpsTimestamp")
+                        ?: jsonObject.optStringOrNull("gpsTimestamp")
+
+                    val benIsGpsUnavailable = demographicsObj.optBoolean("isGpsUnavailable", false)
+                        || benDataObj.optBoolean("isGpsUnavailable", false)
+                        || jsonObject.optBoolean("isGpsUnavailable", false)
+
+                    val benGpsUnavailableReason = demographicsObj.optStringOrNull("gpsUnavailableReason")
+                        ?: benDataObj.optStringOrNull("gpsUnavailableReason")
+                        ?: jsonObject.optStringOrNull("gpsUnavailableReason")
 
                     try {
                         val serverBen =
                             BenRegCache(
                                 householdId = run {
                                     // Server sends key with typo ("houseoldId") or correct ("householdId") — check both
-                                    val fromTypo = if (jsonObject.has("houseoldId")) jsonObject.getLong("houseoldId").takeIf { it > 0L } else null
-                                    val fromCorrect = if (jsonObject.has("householdId")) jsonObject.getLong("householdId").takeIf { it > 0L } else null
-                                    // Prefer server value; fall back to existing local value (helps non-reinstall flow); last resort -1L
-                                    fromTypo ?: fromCorrect ?: existingBen?.householdId?.takeIf { it > 0L } ?: -1L
+                                    val fromTypo = if (jsonObject.has("houseoldId") && !jsonObject.isNull("houseoldId")) jsonObject.getLong("houseoldId").takeIf { it > 0L } else null
+                                    val fromCorrect = if (jsonObject.has("householdId") && !jsonObject.isNull("householdId")) jsonObject.getLong("householdId").takeIf { it > 0L } else null
+                                    // Prefer server value; fall back to existing local value (helps non-reinstall flow)
+                                    fromTypo ?: fromCorrect ?: existingBen?.householdId?.takeIf { it > 0L }
                                 },
+
+                                isNonHH = run {
+                                    val fromTypo = if (jsonObject.has("houseoldId") && !jsonObject.isNull("houseoldId")) jsonObject.getLong("houseoldId").takeIf { it > 0L } else null
+                                    val fromCorrect = if (jsonObject.has("householdId") && !jsonObject.isNull("householdId")) jsonObject.getLong("householdId").takeIf { it > 0L } else null
+                                    val hhIdVal = fromTypo ?: fromCorrect
+                                    hhIdVal == null
+                                },
+
+                                placeOfCurrentLiving = if (jsonObject.has("placeOfCurrentLiving") && !jsonObject.isNull("placeOfCurrentLiving")) {
+                                    val code = jsonObject.optString("placeOfCurrentLiving", "")
+                                    getPlaceOfCurrentLivingIndex(code.takeIf { it.isNotEmpty() })
+                                } else null,
+
+                                otherPlaceOfCurrentLiving = jsonObject.optStringOrNull("otherPlaceOfCurrentLiving"),
+
+                                institutionName = jsonObject.optStringOrNull("institutionName"),
 
                                 beneficiaryId = jsonObject.getLong("benficieryid"),
 
@@ -1677,6 +1928,13 @@ class BenRepo @Inject constructor(
 
                                 ashaId = jsonObject.optInt("ashaId", 0),
                                 benRegId = jsonObject.optLong("BenRegId", 0L),
+
+                                gpsLatitude = benGpsLatitude,
+                                gpsLongitude = benGpsLongitude,
+                                digipin = benDigipin,
+                                gpsTimestamp = benGpsTimestamp,
+                                isGpsUnavailable = benIsGpsUnavailable,
+                                gpsUnavailableReason = benGpsUnavailableReason,
 
                                 isNewAbha = if (abhaHealthDetailsObj.has("isNewAbha"))
                                     abhaHealthDetailsObj.getBoolean("isNewAbha") else false,
@@ -1714,6 +1972,11 @@ class BenRepo @Inject constructor(
                                     .ifEmpty { benDataObj.optString("address") }
                                     .ifEmpty { jsonObject.optString("addressLine1") }
                                     .ifEmpty { jsonObject.optString("address") },
+
+                                pinCode = demographicsObj.optString("pinCode")
+                                    .ifEmpty { benDataObj.optString("pinCode") }
+                                    .ifEmpty { jsonObject.optString("pinCode") }
+                                    .ifEmpty { null },
 
                                 genderId = benDataObj.optInt(
                                     "genderId",
@@ -1994,12 +2257,34 @@ class BenRepo @Inject constructor(
                                 noOfChildren = jsonObject.optInt("noOfchildren", 0),
                             )
 
+                        val nowMillis = System.currentTimeMillis()
+
                         if (existingBen == null) {
                             result.add(serverBen)
                         } else {
-                            val savedServerUpdatedDate = existingBen.serverUpdatedDate ?: 0L
+                            val rawSavedServerUpdatedDate = existingBen.serverUpdatedDate ?: 0L
+                            // Treat corrupted future-dated local values (e.g. from device clock issues) as invalid
+                            val savedServerUpdatedDate = if (rawSavedServerUpdatedDate > nowMillis + 86_400_000L) 0L else rawSavedServerUpdatedDate
                             val serverUpdatedDate = serverBen.serverUpdatedDate ?: 0L
-                            if (existingBen.syncState != SyncState.SYNCED || serverUpdatedDate <= savedServerUpdatedDate) {
+
+                            // Skip ONLY if the record is genuinely unsynced locally (has unpushed local edits).
+                            // Do NOT skip purely because serverUpdatedDate is older/equal — always re-check
+                            // actual field-level diffs as a fallback so the pull is never silently dropped.
+                            val hasNewerServerDate = serverUpdatedDate > savedServerUpdatedDate
+                            val hasFieldDiff = serverBen.lastName != existingBen.lastName ||
+                                    serverBen.firstName != existingBen.firstName ||
+                                    serverBen.isDeath != existingBen.isDeath ||
+                                    serverBen.contactNumber != existingBen.contactNumber
+
+                            if (existingBen.syncState == SyncState.UNSYNCED) {
+                                // Local has unpushed edits — don't overwrite with server data
+                                nikshayIdValue?.takeIf { it.isNotBlank() && it != existingBen.nikshayId }?.let {
+                                    benDao.updateNikshayId(benId, it)
+                                }
+                                continue
+                            }
+
+                            if (!hasNewerServerDate && !hasFieldDiff) {
                                 nikshayIdValue?.takeIf { it.isNotBlank() && it != existingBen.nikshayId }?.let {
                                     benDao.updateNikshayId(benId, it)
                                 }
@@ -2054,119 +2339,150 @@ class BenRepo @Inject constructor(
                     val houseDataObj = jsonObject.getJSONObject("householdDetails")
                     val benDataObj = jsonObject.getJSONObject("beneficiaryDetails")
 
-                    val hhExists =
-                        householdDao.getHousehold(hhId) != null || result.map { it.householdId }
-                            .contains(hhId)
+                    val existingHh = householdDao.getHousehold(hhId)
+                    val resultContains = result.map { it.householdId }.contains(hhId)
 
-                    if (hhExists) {
+                    if (resultContains) {
                         continue
                     }
                     Timber.d("HouseHoldList $result")
+
+                    val hhGpsLatitude = houseDataObj.optDoubleOrNull("latitude")
+                        ?: houseDataObj.optDoubleOrNull("gpsLatitude")
+                        ?: benDataObj.optDoubleOrNull("latitude")
+                        ?: benDataObj.optDoubleOrNull("gpsLatitude")
+                        ?: jsonObject.optDoubleOrNull("latitude")
+                        ?: jsonObject.optDoubleOrNull("gpsLatitude")
+
+                    val hhGpsLongitude = houseDataObj.optDoubleOrNull("longitude")
+                        ?: houseDataObj.optDoubleOrNull("gpsLongitude")
+                        ?: benDataObj.optDoubleOrNull("longitude")
+                        ?: benDataObj.optDoubleOrNull("gpsLongitude")
+                        ?: jsonObject.optDoubleOrNull("longitude")
+                        ?: jsonObject.optDoubleOrNull("gpsLongitude")
+
+                    val hhDigipin = houseDataObj.optStringOrNull("digipin")
+                        ?: benDataObj.optStringOrNull("digipin")
+                        ?: jsonObject.optStringOrNull("digipin")
+
+                    val hhGpsTimestamp = houseDataObj.optStringOrNull("gpsTimestamp")
+                        ?: benDataObj.optStringOrNull("gpsTimestamp")
+                        ?: jsonObject.optStringOrNull("gpsTimestamp")
+
+                    val hhIsGpsUnavailable = houseDataObj.optBoolean("isGpsUnavailable", false)
+                        || benDataObj.optBoolean("isGpsUnavailable", false)
+                        || jsonObject.optBoolean("isGpsUnavailable", false)
+
+                    val hhGpsUnavailableReason = houseDataObj.optStringOrNull("gpsUnavailableReason")
+                        ?: benDataObj.optStringOrNull("gpsUnavailableReason")
+                        ?: jsonObject.optStringOrNull("gpsUnavailableReason")
+
                     try {
-                        result.add(
-                            HouseholdCache(
-                                householdId = hhId,  // already resolved from both spellings above
-                                ashaId = jsonObject.getInt("ashaId"),
-                                benId = jsonObject.getLong("benficieryid"),
-                                family = HouseholdFamily(
-                                    familyHeadName = houseDataObj.getString("familyHeadName"),
-                                    familyName = if (houseDataObj.has("familyName")) houseDataObj.getString(
-                                        "familyName"
-                                    ) else null,
-                                    familyHeadPhoneNo = houseDataObj.getString("familyHeadPhoneNo")
-                                        .toLongOrNull() ?: 0L,
-                                    houseNo = if (houseDataObj.has("houseno")) houseDataObj.getString(
-                                        "houseno"
-                                    )
-                                        .let { if (it == "null") null else it } else null,
-                                    wardNo = if (houseDataObj.has("wardNo")) houseDataObj.getString(
-                                        "wardNo"
-                                    )
-                                        .let { if (it == "null") null else it } else null,
-                                    wardName = if (houseDataObj.has("wardName")) houseDataObj.getString(
-                                        "wardName"
-                                    )
-                                        .let { if (it == "null") null else it } else null,
-                                    mohallaName = if (houseDataObj.has("mohallaName")) houseDataObj.getString(
-                                        "mohallaName"
-                                    )
-                                        .let { if (it == "null") null else it } else null,
-//                                rationCardDetails = houseDataObj.getString("rationCardDetails"),
-                                    povertyLine = houseDataObj.getString("type_bpl_apl"),
-                                    povertyLineId = houseDataObj.getInt("bpl_aplId"),
+                        val serverHh = HouseholdCache(
+                            householdId = hhId,  // already resolved from both spellings above
+                            ashaId = jsonObject.optInt("ashaId"),
+                            benId = jsonObject.optLong("benficieryid").takeIf { it > 0L },
+                            family = HouseholdFamily(
+                                totalHhMembers = houseDataObj.optInt("totalHhMembers").takeIf { it > 0 },
+                                isRegisteredAtCampSite = houseDataObj.optStringOrNull("registeredAtCampSite"),
+                                isRegisteredAtCampSiteId = houseDataObj.optInt("registeredAtCampSiteId"),
+                                familyHeadName = houseDataObj.optStringOrNull("familyHeadName"),
+                                familyName = houseDataObj.optStringOrNull("familyName"),
+                                familyHeadPhoneNo = houseDataObj.optStringOrNull("familyHeadPhoneNo")
+                                    ?.toLongOrNull() ?: 0L,
+                                houseNo = houseDataObj.optStringOrNull("houseno"),
+                                wardNo = houseDataObj.optStringOrNull("wardNo"),
+                                wardName = houseDataObj.optStringOrNull("wardName"),
+                                mohallaName = houseDataObj.optStringOrNull("mohallaName"),
+//                                rationCardDetails = houseDataObj.optStringOrNull("rationCardDetails"),
+                                povertyLine = houseDataObj.optStringOrNull("type_bpl_apl"),
+                                povertyLineId = houseDataObj.optInt("bpl_aplId"),
+                                address = houseDataObj.optStringOrNull("address"),
+                             //   pinCode = houseDataObj.optInt("Pincode").takeIf { it > 0 }?.toString(),
+                            ),
+                            details = HouseholdDetails(
+                                residentialArea = houseDataObj.optStringOrNull("residentialArea"),
+                                residentialAreaId = houseDataObj.optInt("residentialAreaId"),
+                                otherResidentialArea = houseDataObj.optStringOrNull("other_residentialArea"),
+                                houseType = houseDataObj.optStringOrNull("houseType"),
+                                houseTypeId = houseDataObj.optInt("houseTypeId"),
+                                otherHouseType = houseDataObj.optStringOrNull("other_houseType"),
+                                isHouseOwned = houseDataObj.optStringOrNull("houseOwnerShip"),
+                                isHouseOwnedId = houseDataObj.optInt("houseOwnerShipId"),
+//                                isLandOwned = houseDataObj.optStringOrNull("landOwned") == "Yes",
+//                                isLandIrrigated = houseDataObj.has("landIrregated") && houseDataObj.optStringOrNull("landIrregated") == "Yes",
+//                                isLivestockOwned = houseDataObj.optStringOrNull("liveStockOwnerShip") == "Yes",
+//                                street = houseDataObj.optStringOrNull("street"),
+//                                colony = houseDataObj.optStringOrNull("colony"),
+//                                pincode = houseDataObj.optInt("pincode"),
+                            ),
+                            amenities = HouseholdAmenities(
+                                separateKitchen = houseDataObj.optStringOrNull("seperateKitchen"),
+                                separateKitchenId = houseDataObj.optInt("seperateKitchenId"),
+                                fuelUsed = houseDataObj.optStringOrNull("fuelUsed"),
+                                fuelUsedId = houseDataObj.optInt("fuelUsedId"),
+                                otherFuelUsed = houseDataObj.optStringOrNull("other_fuelUsed"),
+                                sourceOfDrinkingWater = houseDataObj.optStringOrNull("sourceofDrinkingWater"),
+                                sourceOfDrinkingWaterId = houseDataObj.optInt("sourceofDrinkingWaterId"),
+                                otherSourceOfDrinkingWater = houseDataObj.optStringOrNull("other_sourceofDrinkingWater"),
+                                availabilityOfElectricity = houseDataObj.optStringOrNull("avalabilityofElectricity"),
+                                availabilityOfElectricityId = houseDataObj.optInt("avalabilityofElectricityId"),
+                                otherAvailabilityOfElectricity = houseDataObj.optStringOrNull("other_avalabilityofElectricity"),
+                                availabilityOfToilet = houseDataObj.optStringOrNull("availabilityofToilet"),
+                                availabilityOfToiletId = houseDataObj.optInt("availabilityofToiletId"),
+                                otherAvailabilityOfToilet = houseDataObj.optStringOrNull("other_availabilityofToilet"),
+                            ),
+//                                motorizedVehicle = houseDataObj.optStringOrNull("motarizedVehicle"),
+//                                otherMotorizedVehicle = houseDataObj.optStringOrNull("other_motarizedVehicle"),
+                            registrationType = houseDataObj.optStringOrNull("registrationType"),
+                            locationRecord = LocationRecord(
+                                country = preferenceDao.getLocationRecord()?.country ?: LocationEntity(1, "India"),
+                                state = LocationEntity(
+                                    benDataObj.getInt("stateId"),
+                                    benDataObj.getString("stateName"),
                                 ),
-                                details = HouseholdDetails(
-                                    residentialArea = houseDataObj.getString("residentialArea")
-                                        .let { if (it == "null") null else it },
-                                    residentialAreaId = houseDataObj.getInt("residentialAreaId"),
-                                    otherResidentialArea = houseDataObj.getString("other_residentialArea"),
-                                    houseType = houseDataObj.getString("houseType"),
-                                    houseTypeId = houseDataObj.getInt("houseTypeId"),
-                                    otherHouseType = houseDataObj.getString("other_houseType"),
-                                    isHouseOwned = houseDataObj.getString("houseOwnerShip"),
-                                    isHouseOwnedId = houseDataObj.getInt("houseOwnerShipId"),
-//                                isLandOwned = houseDataObj.getString("landOwned") == "Yes",
-//                                isLandIrrigated = houseDataObj.has("landIrregated") && houseDataObj.getString("landIrregated") == "Yes",
-//                                isLivestockOwned = houseDataObj.getString("liveStockOwnerShip") == "Yes",
-//                                street = houseDataObj.getString("street"),
-//                                colony = houseDataObj.getString("colony"),
-//                                pincode = houseDataObj.getInt("pincode"),
+                                district = LocationEntity(
+                                    benDataObj.getInt("districtid"),
+                                    benDataObj.getString("districtname"),
                                 ),
-                                amenities = HouseholdAmenities(
-                                    separateKitchen = houseDataObj.getString("seperateKitchen"),
-                                    separateKitchenId = houseDataObj.getInt("seperateKitchenId"),
-                                    fuelUsed = houseDataObj.getString("fuelUsed"),
-                                    fuelUsedId = houseDataObj.getInt("fuelUsedId"),
-                                    otherFuelUsed = houseDataObj.getString("other_fuelUsed"),
-                                    sourceOfDrinkingWater = houseDataObj.getString("sourceofDrinkingWater"),
-                                    sourceOfDrinkingWaterId = houseDataObj.getInt("sourceofDrinkingWaterId"),
-                                    otherSourceOfDrinkingWater = houseDataObj.getString("other_sourceofDrinkingWater"),
-                                    availabilityOfElectricity = houseDataObj.getString("avalabilityofElectricity"),
-                                    availabilityOfElectricityId = houseDataObj.getInt("avalabilityofElectricityId"),
-                                    otherAvailabilityOfElectricity = houseDataObj.getString("other_avalabilityofElectricity"),
-                                    availabilityOfToilet = houseDataObj.getString("availabilityofToilet"),
-                                    availabilityOfToiletId = houseDataObj.getInt("availabilityofToiletId"),
-                                    otherAvailabilityOfToilet = houseDataObj.getString("other_availabilityofToilet"),
+                                block = LocationEntity(
+                                    benDataObj.getInt("blockId"),
+                                    benDataObj.getString("blockName"),
                                 ),
-//                                motorizedVehicle = houseDataObj.getString("motarizedVehicle"),
-//                                otherMotorizedVehicle = houseDataObj.getString("other_motarizedVehicle"),
-                                registrationType = if (houseDataObj.has("registrationType")) houseDataObj.getString(
-                                    "registrationType"
-                                ) else null,
-                                locationRecord = LocationRecord(
-                                    country = preferenceDao.getLocationRecord()?.country ?: LocationEntity(1, "India"),
-                                    state = LocationEntity(
-                                        benDataObj.getInt("stateId"),
-                                        benDataObj.getString("stateName"),
-                                    ),
-                                    district = LocationEntity(
-                                        benDataObj.getInt("districtid"),
-                                        benDataObj.getString("districtname"),
-                                    ),
-                                    block = LocationEntity(
-                                        benDataObj.getInt("blockId"),
-                                        benDataObj.getString("blockName"),
-                                    ),
-                                    village = LocationEntity(
-                                        benDataObj.getInt("villageId"),
-                                        benDataObj.getString("villageName"),
-                                    ),
+                                village = LocationEntity(
+                                    benDataObj.getInt("villageId"),
+                                    benDataObj.getString("villageName"),
                                 ),
-                                serverUpdatedStatus = houseDataObj.getInt("serverUpdatedStatus"),
-                                createdBy = houseDataObj.getString("createdBy"),
-                                createdTimeStamp = getLongFromDate(houseDataObj.getString("createdDate")),
+                            ),
+                            gpsLatitude = hhGpsLatitude,
+                            gpsLongitude = hhGpsLongitude,
+                            digipin = hhDigipin,
+                            gpsTimestamp = hhGpsTimestamp,
+                            isGpsUnavailable = hhIsGpsUnavailable,
+                            gpsUnavailableReason = hhGpsUnavailableReason,
+                            serverUpdatedStatus = houseDataObj.optInt("serverUpdatedStatus"),
+                            createdBy = houseDataObj.optStringOrNull("createdBy"),
+                            createdTimeStamp = houseDataObj.optStringOrNull("createdDate")?.let { getLongFromDate(it) },
 //                            updatedBy = houseDataObj.getString("other_houseType"),
 //                            updatedTimeStamp = houseDataObj.getString("other_houseType"),
-                                processed = "P",
-                                isDraft = false,
-                                isDeactivate =  if (houseDataObj.has("isDeactivate")) houseDataObj.getBoolean(
-                                    "isDeactivate"
-                                ) else false
-                            )
+                            processed = "P",
+                            isDraft = false,
+                            isDeactivate =  if (houseDataObj.has("isDeactivate")) houseDataObj.getBoolean(
+                                "isDeactivate"
+                            ) else false
                         )
+
+                        if (existingHh == null) {
+                            result.add(serverHh)
+                        } else {
+                            if (existingHh.processed == "P") {
+                                result.add(serverHh)
+                            }
+                        }
                     } catch (e: JSONException) {
                         Timber.e("Household skipped: ${jsonObject.getLong("houseoldId")} with error $e")
                     }
+
                 }
             }
         }
@@ -2333,6 +2649,29 @@ class BenRepo @Inject constructor(
     suspend fun getMinBenId(): Long {
         return withContext(Dispatchers.IO) {
             benDao.getMinBenId() ?: 0L
+        }
+    }
+
+    private fun getPlaceOfCurrentLivingIndex(code: String?): Int? {
+        return when (code?.uppercase()) {
+            "FOOTPATH" -> 1
+            "RAILWAY_PLATFORM" -> 2
+            "BUS_STATION" -> 3
+            "UNDER_TREE" -> 4
+            "TEMPLE" -> 5
+            "MOSQUE" -> 6
+            "CHURCH" -> 7
+            "OTHER_PRAYING_PLACE" -> 8
+            "EDUCATIONAL_INSTITUTION" -> 9
+            "EKALAVYA_SCHOOL" -> 10
+            "REHABILITATION_CENTRE" -> 11
+            "ORPHANAGE" -> 12
+            "OLD_AGE_HOME" -> 13
+            "PRIVATE_HOSTEL" -> 14
+            "GOVT_HOSTEL" -> 15
+            "NGO_HOSTEL" -> 16
+            "OTHER" -> 17
+            else -> null
         }
     }
 }

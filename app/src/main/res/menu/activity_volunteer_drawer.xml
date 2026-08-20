@@ -43,6 +43,11 @@
         android:id="@+id/menu_group_bottom"
         android:checkableBehavior="single">
         <item
+            android:id="@+id/syncDashboardFragment"
+            android:checkable="false"
+            android:icon="@drawable/ic_syncing"
+            android:title="@string/sync_dashboard" />
+        <item
             android:id="@+id/menu_delete_account"
             android:checkable="false"
             android:icon="@drawable/ic_delete_account"

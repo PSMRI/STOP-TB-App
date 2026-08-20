@@ -16,6 +16,7 @@
     <string name="notification_sync_channel_id">sakhi-sync0</string>
     <string name="btn_submit">জমা দিব</string>
     <string name="btn_skip">এৰি যাওক</string>
+    <string name="contact_tracing">সংস্পৰ্শ অনুসৰণ</string>
     <string name="long_to_string">%d</string>
     <string name="tv_reg_date_ph">নিবন্ধনৰ তাৰিখ</string>
     <string name="tv_ben_name_ph">উপকাৰীৰ নাম</string>
@@ -24,7 +25,7 @@
     <string name="tv_ben_surname">উপকাৰীৰ বৰ্গীকৰণ</string>
     <string name="tv_gender_ph">লিংগ</string>
     <string name="tv_father_name_ph">পিতৃৰ নাম</string>
-    <string name="tv_family_head_name_ph">পৰিৱাৰৰ প্ৰধানৰ নাম</string>
+    <string name="tv_family_head_name_ph">Head of Family</string>
     <string name="tv_ben_id_ph">উপকাৰী আইডি</string>
     <string name="tv_mob_no_ph">"ম\'বাইল নম্বৰ</string>
     <string name="tv_age_ph">বয়স</string>
@@ -32,6 +33,7 @@
     <string name="iv_sync_state_tv">সময়সৰণি স্থিতি</string>
     <string name="iv_death_indicator">মৃত্যু</string>
     <string name="add_file">ফাইল যোগ কৰক</string>
+    <string name="view_members">সদস্যসকলক চাওক</string>
 <string name="form_input_empty_error">"প্ৰয়োজনীয় ক্ষেত্ৰখন খালী হ’ব নোৱাৰে !</string>
     <string name="form_input_upper_case_error">শুধুমাত্র বড় অক্ষরে অক্ষর অনুমোদিত!</string>
     <string name="form_input_missing_entry_error">ঘরে %1d টি সংখ্যা থাকা আবশ্যক।</string>
@@ -78,6 +80,7 @@
     <string name="view">চাবলৈ</string>
     <string name="home">ঘৰ</string>
     <string name="sync_records">ৰেকৰ্ড সমকৰণ কৰক</string>
+    <string name="counselling_section_title_format">খণ্ড %1$s - %2$s</string>
     <string name="about">আমাৰ বিষয়ে</string>
     <string name="help">সাহায্য</string>
     <string name="logout">লগআউট</string>
@@ -95,9 +98,9 @@
     <string name="eligible_couple_registration">যোগ্য জনপৰা পৰাৰ পঞ্জীকৰণ</string>
     <string name="eligible_couple_tracking_list">যোগ্য জনপৰা পৰাৰ ট্ৰেকিং তালিকা</string>
     <string name="tb_screening_list">TB স্ক্ৰীনিং তালিকা</string>
-    <string name="tb_suspected_list">TB সন্দেহভাৱিত তালিকা</string>
+    <string name="tb_suspected_list">TB সম্ভাব্য তালিকা</string>
     <string name="tb_screening_form">TB স্ক্ৰীনিং ফৰ্ম</string>
-    <string name="tb_suspected_form">TB সন্দেহভাৱিত ফৰ্ম</string>
+    <string name="tb_suspected_form">TB সম্ভাব্য ফৰ্ম</string>
     <string name="delivery_outcome_list">প্ৰসৱ সম্পূৰ্ণ হোৱাৰ ফল তালিকা</string>
     <string name="communicable_diseases">সংক্রামণ পৰামৰ্শযোগ্য পৰাৰ তালিকা</string>
     <string name="dashboard">ডেশবৰ্ড</string>
@@ -115,6 +118,11 @@
         <item>এইচআরপি ট্র্যাক</item>
         <item>এইচআর গৈরগর্ভ মূল্যায়ন</item>
         <item>এইচআর গৈরগর্ভ ট্র্যাক</item>
+        <item>এনথ্ৰোপমেট্ৰিক</item>
+        <item>সাধাৰণ পৰীক্ষা</item>
+        <item>অ’ পি ডি</item>
+        <item>ৰোগ নিৰ্ণয়</item>
+        <item>পৰামৰ্শদান</item>
     </string-array>
 
     <string-array name="temp_array">
@@ -137,8 +145,8 @@
     <string name="high_risk_non_pregnant_women">উচ্চ ঝুঁকিপূৰ্ণ অগৰ্ভৱতী মহিলা</string>
     <string name="low_birth_weight_babies">কম ওজনৰ নবজাত শিশুসকল</string>
     <string name="relation_with_hof">গৃহমুৰব্বীৰ সৈতে সম্পৰ্ক</string>
-    <string name="add_family_member">পৰিয়ালৰ সদস্য যোগ কৰক</string>
-
+    <string name="add_family_member">পৰিয়াল সদস্য যোগ কৰক</string>
+    <string name="add_household_member">ঘৰৰ মুখ্য সদস্য যোগ কৰক</string>
     <string name="male">পুৰুষ</string>
     <string name="female">মহিলা</string>
     <string name="transgender">ৰূপান্তৰিত লিংগ</string>
@@ -446,7 +454,7 @@
     <string name="home_card_ncd_priority_subtitle">উচ্চ অগ্ৰাধিকাৰ NCD ফলো-আপ অনুসৰণ কৰক</string>
     <string name="home_card_ncd_non_priority_subtitle">কম ঝুঁকিৰ স্ক্ৰীণ কৰা হিতাধিকাৰী পৰিচালনা কৰক</string>
     <string name="home_card_tb_screening_subtitle">টিবি স্ক্ৰিনিং আৰম্ভ আৰু পৰ্যালোচনা কৰক</string>
-    <string name="home_card_tb_suspected_short_subtitle">সন্দেহজনক টিবি কেছসমূহৰ অনুসৰণ কৰক</string>
+    <string name="home_card_tb_suspected_short_subtitle">সম্ভাব্য টিবি কেছসমূহৰ অনুসৰণ কৰক</string>
     <string name="home_card_tb_confirmed_short_subtitle">নিশ্চিত টিবি ৰোগীক অনুসৰণ কৰক</string>
     <string name="view_details">বিৱৰণ চাওক</string>
     <string name="dashboard_tb_screening_subtitle">আউটৰিচ আৰু স্ক্ৰিনিংৰ পৰিমাণ অনুসৰণ কৰক</string>
@@ -463,6 +471,9 @@
     <string name="recommended_for_truenat_test">Truenat পৰীক্ষাৰ পৰামৰ্শ দিয়া হৈছে</string>
     <string name="recommended_for_liquid_culture_test">লিকুইড কালচাৰ পৰীক্ষাৰ পৰামৰ্শ দিয়া হৈছে</string>
     <string name="reason_for_denial_for_getting_tested">পৰীক্ষা কৰাবলৈ অস্বীকাৰ কৰাৰ কাৰণ</string>
+    <string name="risk_factors">ঝুঁকিৰ কাৰকসমূহ</string>
+    <string name="total_presumptive_tb">সন্দেহজনক টিবি কেছ</string>
+
     <string-array name="tb_reason_for_denial_testing">
         <item>ভয় আৰু উদ্বেগ</item>
         <item>ভুল ধাৰণা</item>
@@ -518,8 +529,9 @@
     <string name="weight_kgs">ওজন (কেজি)</string>
     <string name="height_cms">উচ্চতা (চে.মি.)</string>
     <string name="temperature_degree_fahrenheit">তাপমাত্ৰা (ডিগ্ৰী ফাৰেনহাইট)</string>
-    <string name="normal_temperature_range">সাধাৰণ সীমা: 97-99&#176;F</string>
-    <string name="temperature_100_or_more">&gt;= 100&#176;F</string>
+    <string name="temperature_hypothermia">&lt;97 - Hypothermia</string>
+    <string name="normal_temperature_range">97-99 - Normal</string>
+    <string name="temperature_100_or_more">&gt;99 - Fever</string>
     <string name="anthropometry_age_gender_format">%1$d %2$s | %3$s</string>
     <string name="age_unit_years">বছৰ</string>
     <string name="age_unit_months">মাহ</string>
@@ -696,7 +708,7 @@
 
     <!-- Examine flow -->
     <string name="btn_examine">পৰীক্ষা কৰক</string>
-    <string name="btn_examine_count">পৰীক্ষা কৰক %1$d/5</string>
+    <string name="btn_examine_count">পৰীক্ষা কৰক %1$d/4</string>
     <string name="examine_bottomsheet_title">পৰীক্ষণ ফৰ্ম</string>
     <string name="examine_btn_fill">পূৰণ কৰক</string>
     <string name="examine_btn_view">চাওক</string>
@@ -785,6 +797,46 @@
         <item>CHC</item>
         <item>PHC</item>
     </string-array>
+
+    <!-- Location Details Section -->
+    <string name="loc_section_title">অৱস্থানৰ বিৱৰণ</string>
+    <string name="loc_btn_refresh">পুনৰ সতেজ কৰক</string>
+    <string name="loc_status_fetching">অৱস্থান আনা হৈছে…</string>
+    <string name="loc_status_captured">অৱস্থান ধৰা পৰিছে</string>
+    <string name="loc_status_failed">অৱস্থান আনিব পৰা নগ\'ল</string>
+    <string name="loc_status_permission_denied">অক্ষাংশ আৰু দ্ৰাঘিমাংশ আনিবলৈ অনুগ্ৰহ কৰি অৱস্থানৰ অনুমতি দিয়ক।</string>
+    <string name="loc_status_gps_unavailable">GPS উপলব্ধ নহয়</string>
+    <string name="loc_status_gps_disabled">এই ডিভাইচত GPS অক্ষম</string>
+    <string name="loc_label_latitude">অক্ষাংশ</string>
+    <string name="loc_label_longitude">দ্ৰাঘিমাংশ</string>
+    <string name="loc_label_digipin">DIGIPIN</string>
+    <string name="loc_label_timestamp">টাইমষ্টাম্প</string>
+    <string name="loc_cb_gps_unavailable">GPS উপলব্ধ নহয়</string>
+    <string name="loc_label_reason">GPS অনুপলব্ধতাৰ কাৰণ</string>
+    <string name="loc_hint_reason">কাৰণ বাছক</string>
+    <string name="loc_err_reason_required">অনুগ্ৰহ কৰি এটা কাৰণ বাছক</string>
+    <string name="loc_err_location_required">অনুগ্ৰহ কৰি অৱস্থান ধৰক বা GPS অনুপলব্ধ চিহ্নিত কৰক</string>
+    <string name="loc_msg_no_signal">বৰ্তমান অৱস্থান নিৰ্ধাৰণ কৰিব পৰা নগ\'ল। অনুগ্ৰহ কৰি মুকলি ঠাইলৈ যাওক আৰু পুনৰ চেষ্টা কৰক।</string>
+    <string name="loc_msg_outside_india">অৱস্থান সমৰ্থিত ভাৰতীয় সীমাৰ বাহিৰত। GPS সংকেত পৰীক্ষা কৰক।</string>
+    <string name="loc_msg_enable_gps">অৱস্থানৰ অনুমতি প্ৰয়োজন। অনুগ্ৰহ কৰি ছেটিংছত অনুমতি দিয়ক।</string>
+    <string name="loc_dialog_open_settings">ছেটিংছ খোলক</string>
+    <string name="loc_permission_rationale">এই ঘৰেলু পঞ্জীয়নৰ বাবে GPS স্থানাংক ধৰিবলৈ অৱস্থানৰ অনুমতি প্ৰয়োজন।</string>
+    <string name="loc_timeout_msg">অৱস্থান সময় শেষ হ\'ল। মুকলি ঠাইলৈ যাওক আৰু পুনৰ সতেজ কৰক।</string>
+    <string-array name="loc_gps_unavailable_reasons">
+        <item>GPS সংকেত নাই</item>
+        <item>ঘৰৰ ভিতৰত</item>
+        <item>ভূগৰ্ভত</item>
+        <item>ডিভাইচ GPS অক্ষম</item>
+        <item>অন্যান্য</item>
+    </string-array>
+    <string name="dialog_cancel_title">আপুনি নিশ্চিত নে?</string>
+    <string name="dialog_cancel_message">আপুনি এই পঞ্জীয়ন বাতিল কৰি পিছলৈ যাব বিচাৰেনে?</string>
+    <string name="dialog_yes">হয়</string>
+    <string name="dialog_no">নহয়</string>
+    <string name="patient_registered_successfully">ৰোগীৰ পঞ্জীয়ন সফলতাৰে কৰা হ’ল।</string>
+    <string name="proceed_to_register_hof">আপুনি পৰিয়ালৰ প্ৰধানৰ পঞ্জীয়ন কৰিবলৈ আগবাঢ়িব বিচাৰেনে?</string>
+    <string name="counselling_consent">পৰামৰ্শৰ বাবে সন্মতি</string>
+    <string name="form_submitted_successfully">ফৰ্ম সফলতাৰে দাখিল কৰা হৈছে</string>
 </resources>
 
 

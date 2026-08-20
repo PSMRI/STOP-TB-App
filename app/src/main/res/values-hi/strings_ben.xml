@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="child_age_less_than_parent_error">बच्चे की आयु माता-पिता की आयु के बराबर या उससे अधिक नहीं हो सकती</string>
     <string name="nbr_village">गाँव / बस्ती</string>
     <string name="nbr_occupation">व्यवसाय</string>
     <string name="nbr_occupation_default">अज्ञात</string>
@@ -46,8 +47,9 @@
     <string name="nbr_dor">पंजीकरण की तारीख</string>
     <string name="nbr_nb_first_name">पहला नाम</string>
     <string name="nbr_nb_last_name">अंतिम नाम / उपनाम</string>
-    <string name="title_new_ben_reg_hof">मुखिया का पंजीकरण</string>
+    <string name="title_new_ben_reg_hof">परिवार मुखिया पंजीकरण</string>
     <string name="title_new_ben_reg_non_hof">परिवार सदस्य पंजीकरण</string>
+    <string name="title_new_non_hh_reg">नया गैर-पारिवारिक पंजीकरण</string>
     <string name="icon_title_abortion">गर्भपात सूची</string>
     <string name="icon_title_pmsma">ई-पीएमएसएमए सूची</string>
     <string name="mother_rch_id">मां की RCH आईडी</string>

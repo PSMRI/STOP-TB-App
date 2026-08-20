@@ -21,12 +21,12 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace 'org.piramalswasthya.stoptb'
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId "org.piramalswasthya.stoptb"
         minSdk 25
-        targetSdk 35
+        targetSdk 36
         versionCode buildVersionCode()
         versionName buildVersionName()
         resourceConfigurations += ['en', 'hi', 'as']
@@ -239,6 +239,9 @@ dependencies {
     //In App Update
     //implementation 'com.google.android.play:core:1.10.3'
     implementation 'com.google.android.play:app-update:2.1.0'
+
+    // Location services — FusedLocationProviderClient + LocationSettingsRequest
+    implementation 'com.google.android.gms:play-services-location:21.3.0'
 
     implementation "net.zetetic:sqlcipher-android:4.13.0"
     implementation "androidx.sqlite:sqlite:2.4.0"

@@ -1,0 +1,28 @@
+package org.piramalswasthya.stoptb.repositories.dynamicRepo
+
+import org.piramalswasthya.stoptb.model.dynamicEntity.*
+import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
+import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
+
+interface ICounsellingRepository {
+    suspend fun getFormDefinition(formType: FormType): CompleteFormDefinition?
+    suspend fun getSectionsByPhase(formType: FormType, phase: SectionPhase): List<FormSectionWithQuestions>
+//    suspend fun downloadLatestFormSchema(formType: String): Boolean
+    suspend fun downloadAndStoreAllForms(): Boolean
+    suspend fun getOrCreateDraft(beneficiaryId: Long, formVersionId: Int): CompleteFormResponse
+    suspend fun saveDraftSection(
+        responseId: Long,
+        sectionId: Int,
+        nextSectionId: Int?,
+        answers: List<QuestionResponseEntity>
+    )
+    suspend fun submitSectionE(responseId: Long, answers: List<QuestionResponseEntity>)
+    suspend fun submitSectionF(responseId: Long, answers: List<QuestionResponseEntity>)
+    suspend fun submitSectionGeneralInfo(responseId: Long, answers: List<QuestionResponseEntity>)
+    suspend fun submitSectionBulk(responseId: Long, sectionId: Int): Boolean
+    suspend fun syncUnsyncedRecords(): Boolean
+    suspend fun fetchAndStoreCounsellingResponse(beneficiaryId: Long, formUuid: String): Boolean
+    suspend fun fetchAndStoreCompletedBeneficiaries(): List<CompletedBeneficiaryStatus>?
+    suspend fun revertFormStatus(responseId: Long, status: String)
+    suspend fun getLocalPreSubmitFilledCounts(): Map<Long, Int>
+}
