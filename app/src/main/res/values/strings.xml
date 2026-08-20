@@ -66,7 +66,7 @@
     <string name="tv_father_name_ph">Father Name</string>
     <string name="tv_husband_name_ph">Husband Name</string>
     <string name="tv_spouse_name_ph">Spouse Name</string>
-    <string name="tv_family_head_name_ph">Family Head Name</string>
+    <string name="tv_family_head_name_ph">Head of Family</string>
     <string name="tv_ben_id_ph">Ben ID</string>
     <string name="tv_mob_no_ph">Mobile Number</string>
     <string name="tv_age_ph">Age</string>
@@ -211,7 +211,7 @@
     <string name="form_input_error_invalid_rch">Invalid RCH ID !</string>
     <string name="form_input_error_invalid_mcp">Invalid MCP Number !</string>
     <string name="form_input_error_invalid_aadhar">Invalid Aadhaar Number !</string>
-<string name="version_2_0_0">APK Version 2.0.0</string>
+    <string name="version_2_0_0">APK Version 2.0.0</string>
     <string name="full_name">Full Name</string>
     <string name="male">Male</string>
     <string name="female">Female</string>
@@ -259,9 +259,18 @@
     <string name="view_cbac">View CBAC</string>
     <string name="view">VIEW</string>
     <string name="add">ADD</string>
+    <string name="contact_tracing">Contact tracing</string>
+    <string name="contact_tracing_load_error">Could not load this form.</string>
+    <string name="community_contact_tracing">Community Contacts</string>
+    <string name="occupational_contact_tracing">Occupational Contacts</string>
+    <string name="contact_tracing_section_progress">Section %1$d of %2$d</string>
+    <string name="contact_tracing_number_picker_decrement">Decrease</string>
+    <string name="contact_tracing_number_picker_increment">Increase</string>
+    <string name="contact_tracing_type_bottomsheet_title">Start Contact Tracing</string>
     <string name="home">Home</string>
     <string name="asha_profile">Profile</string>
     <string name="sync_records">Sync Records</string>
+    <string name="counselling_section_title_format">Section %1$s - %2$s</string>
     <string name="about">About Us</string>
 
     <string name="help">Help</string>
@@ -288,12 +297,12 @@
     <string name="eligible_couple_registration">Eligible Couple Registration</string>
     <string name="eligible_couple_tracking_list">Eligible Couple Tracking List</string>
     <string name="tb_screening_list">TB Screening List</string>
-    <string name="tb_suspected_list">Suspected TB cases</string>
+    <string name="tb_suspected_list">Presumptive TB cases</string>
     <string name="tb_screening_form">TB Screening Form</string>
     <string name="tb_confirmed_list">TB Confirmed List</string>
     <string name="tb_confirmed_form">TB Confirmed Form</string>
 
-    <string name="tb_suspected_form">Suspected TB case</string>
+    <string name="tb_suspected_form">Presumptive TB case</string>
     <string name="delivery_outcome_list">Delivery Outcome List</string>
     <string name="communicable_diseases">Communicable Diseases</string>
     <string name="dashboard">Dashboard</string>
@@ -320,7 +329,7 @@
     <string name="home_card_ncd_priority_subtitle">Track high priority NCD follow-up cases</string>
     <string name="home_card_ncd_non_priority_subtitle">Manage lower risk screened beneficiaries</string>
     <string name="home_card_tb_screening_subtitle">Start and review TB screening activity</string>
-    <string name="home_card_tb_suspected_short_subtitle">Follow up suspected TB cases</string>
+    <string name="home_card_tb_suspected_short_subtitle">Follow up presumptive TB cases</string>
     <string name="home_card_tb_confirmed_short_subtitle">Track confirmed TB patients</string>
     <string name="view_details">View Details</string>
     <string name="referral_digital_chest_xray">Digital Chest X-ray</string>
@@ -371,7 +380,7 @@
 
     <string name="save_successful">Save Successful</string>
     <string name="otp_resent">OTP Resent</string>
-    <string name="something_wend_wong_contact_testing">Something wend wong! Contact testing!</string>
+    <string name="something_wend_wong_contact_testing">Something went wrong.</string>
     <string name="error_input">Error Input</string>
     <string name="exit_application">Exit Application</string>
     <string name="do_you_want_to_exit_application">Do you want to exit application</string>
@@ -385,7 +394,8 @@
     <string name="validate">Validate</string>
     <string name="child_immunization">Child Immunization</string>
     <string name="relation_with_hof">Relation with HOF</string>
-    <string name="add_family_member">Add HoF Member</string>
+    <string name="add_family_member">Add Family Member</string>
+    <string name="add_household_member">Add HoF Member</string>
     <string name="app_native_name">StopTB</string>
     <string name="non_pregnant_women_eligible_couple_section">Non-Pregnant Women (Eligible Couple) section</string>
     <string name="time_of_death">Time of Death</string>
@@ -460,6 +470,7 @@
         <item>General Examination</item>
         <item>OPD</item>
         <item>Diagnosis</item>
+        <item>Counselling</item>
     </string-array>
 
     <string-array name="place_array">
@@ -909,6 +920,7 @@
     <string name="check_if_the_person_has_any_of_these_symptoms">Check if the person has any of these Symptoms:</string>
     <string name="tb_asymptomatic_screening">Asymptomatic Screening</string>
     <string name="tb_is_beneficiary_asymptomatic">Is beneficiary asymptomatic</string>
+    <string name="risk_factors">Risk Factors</string>
     <string name="tb_rise_of_fever">Rise of fever in evening</string>
     <string name="tb_loss_of_appetite">Loss of Appetite</string>
     <string name="tb_age_more_than_60">Age more than 60 years</string>
@@ -920,6 +932,10 @@
     <string name="tb_referral_required">Referral Required</string>
     <string name="tb_referral_for">Referral For</string>
     <string name="tb_family_contact_screening_alert">Advise tracing and screening of all family members</string>
+    <string name="total_presumptive_tb">Presumptive TB Cases</string>
+    <string name="tb_presumptive_alert_title">A Presumptive TB case!</string>
+    <string name="tb_presumptive_alert_refer">Refer to X-ray and collect sputum for Truenat test</string>
+    <string name="tb_presumptive_alert_family">Advise screening of all family members</string>
     <string name="referred_for_digital_chest_xray">Referred for digital chest x-ray</string>
     <string name="referred_for_sputum_collection">Referred for Sputum Collection</string>
     <string name="recommended_for_truenat_test">Recommended for Truenat test</string>
@@ -988,6 +1004,7 @@
     <string name="quick_refresh_failed">Refresh failed. Try again</string>
     <string name="quick_refresh_action">Refresh</string>
     <string name="quick_refresh_camp_disconnected">Camp Hub is not connected. Please reconnect first.</string>
+    <string name="quick_refresh_ip_not_reachable">IP address not reachable: %1$s</string>
 
     <string name="vital_screen">General Examination</string>
     <string name="vital_screen_placeholder">Vitals and Anthropometric for beneficiary ID: %1$d</string>
@@ -1010,8 +1027,12 @@
     <string name="height_cms">Height (cms)</string>
     <string name="temperature_degree_fahrenheit">Temperature (Degree Fahrenheit)</string>
     <string name="anthropometry_screen">Anthropometry Screen</string>
-    <string name="normal_temperature_range">Normal range: 97-99&#176;F</string>
-    <string name="temperature_100_or_more">&gt;= 100&#176;F</string>
+    <string name="temperature_hypothermia">&lt;97 - Hypothermia</string>
+    <string name="normal_temperature_range">97-99 - Normal</string>
+    <string name="temperature_100_or_more">&gt;99 - Fever</string>
+    <string name="enter_weight_between_1_250_kg">Enter Weight between 1 and 250 kg</string>
+    <string name="enter_height_between_30_250_cm">Enter Height between 30 and 250 cm</string>
+    <string name="enter_temperature_between_90_110_f">Enter Temperature between 90 and 110 &#176;F</string>
     <string name="anthropometry_age_gender_format">%1$d %2$s | %3$s</string>
     <string name="age_unit_years">Years</string>
     <string name="age_unit_months">Months</string>
@@ -1038,9 +1059,9 @@
     <string name="clubbing">Clubbing</string>
     <string name="lymphadenopathy">Lymphadenopathy</string>
     <string name="oedema">Oedema</string>
-    <string name="key_population_risk_factors">Key Population / Risk Factors *</string>
+    <string name="key_population_risk_factors">Key Population / Risk Factors</string>
     <string name="select_key_population_risk_factors">Select Key Population / Risk Factors</string>
-    <string name="hiv_status">HIV Status *</string>
+    <string name="hiv_status">HIV Status</string>
     <string name="no_risk_factor_selected">No risk factor selected</string>
     <string name="risk_factor_required">Select Key Population / Risk Factors</string>
     <string name="hiv_status_required">Select HIV Status</string>
@@ -1208,12 +1229,17 @@
 
     <!-- Examine flow -->
     <string name="btn_examine">Examine</string>
-    <string name="btn_examine_count">Examine %1$d/5</string>
+    <string name="btn_examine_count">Examine %1$d/4</string>
     <string name="btn_examine_count_of">Examine %1$d/%2$d</string>
     <string name="examine_bottomsheet_title">Examination Forms</string>
+    <string name="examine_btn_loading">Loading...</string>
     <string name="examine_btn_fill">Fill</string>
     <string name="examine_btn_view">View</string>
+    <string name="examine_btn_history">History</string>
+    <string name="tpt_history_empty">No TPT follow-up history yet.</string>
+    <string name="tpt_history_section_label">%1$s (Follow-up %2$d of %3$d)</string>
     <string name="diagnosis_locked_msg">Please fill TB Screening form first</string>
+    <string name="tb_screening_locked_msg">Please fill TB Screening form first</string>
     <string name="tb_screening_legend_xray_sputum">* Refer for Digital Chest X-Ray or for Sputum Collection</string>
     <string name="tb_screening_legend_family_members">** Advise for screening of all family members</string>
 
@@ -1227,6 +1253,7 @@
     <string name="tb_reason_for_denial_sputum">Reason for Denial of Sputum Collection</string>
     <string name="tb_reason_for_denial_sputum_other">Specify other reason for denial (Sputum)</string>
     <string name="tb_sputum_submitted_at">Sputum sample submitted at</string>
+    <string name="sputum_sample_submitted_at_screening_camp">Sputum Sample Submitted at TB Screening Camp</string>
     <string name="tb_reason_not_conducted_naat">Reason True NAT not conducted</string>
     <string name="tb_reason_not_conducted_naat_other">Specify other reason (True NAT not conducted)</string>
 
@@ -1298,5 +1325,48 @@
         <item>CHC</item>
         <item>PHC</item>
     </string-array>
+    <string name="counselling_date_hint">Date</string>
+    <!-- Location Details Section -->
+    <string name="loc_section_title">Location Details</string>
+    <string name="loc_btn_refresh">Refresh</string>
+    <string name="loc_status_fetching">Fetching Location…</string>
+    <string name="loc_status_captured">Location Captured</string>
+    <string name="loc_status_failed">Unable to Fetch Location</string>
+    <string name="loc_status_permission_denied">Please grant location permission to fetch latitude and longitude.</string>
+    <string name="loc_status_gps_unavailable">GPS Unavailable</string>
+    <string name="loc_status_gps_disabled">GPS is disabled on this device</string>
+    <string name="loc_label_latitude">Latitude</string>
+    <string name="loc_label_longitude">Longitude</string>
+    <string name="loc_label_digipin">DIGIPIN</string>
+    <string name="loc_label_timestamp">Timestamp</string>
+    <string name="loc_cb_gps_unavailable">GPS Unavailable</string>
+    <string name="loc_label_reason">Reason for GPS Unavailability</string>
+    <string name="loc_hint_reason">Select reason</string>
+    <string name="loc_err_reason_required">Please select a reason</string>
+    <string name="loc_err_location_required">Please capture location or mark GPS Unavailable with a reason</string>
+    <string name="loc_msg_no_signal">Unable to determine current location. Please move to an open area and try again.</string>
+    <string name="loc_msg_outside_india">Location is outside supported India bounds. Please check your GPS signal.</string>
+    <string name="loc_msg_enable_gps">Location permission is required. Please grant it in Settings.</string>
+    <string name="loc_dialog_open_settings">Open Settings</string>
+    <string name="loc_permission_rationale">Location permission is needed to capture GPS coordinates for this household registration.</string>
+    <string name="loc_timeout_msg">Location timed out. Please move to an open area and tap Refresh.</string>
+    <string-array name="loc_gps_unavailable_reasons">
+        <item>No GPS Signal</item>
+        <item>Indoor Location</item>
+        <item>Underground</item>
+        <item>Device GPS Disabled</item>
+        <item>Other</item>
+    </string-array>
+    <string name="dialog_cancel_title">Are you Sure?</string>
+    <string name="dialog_cancel_message">Do you want to discard this registration and go back?</string>
+    <string name="dialog_yes">Yes</string>
+    <string name="not_filled" translatable="false">Not Filled</string>
+    <string name="counselling_consent">Counselling Consent</string>
+
+    <string name="dialog_no">No</string>
+    <string name="patient_registered_successfully">Patient Registered Successfully</string>
+    <string name="proceed_to_register_hof">Do you want to proceed with registration of Head of the Family?</string>
+    <string name="refused">Refused</string>
+    <string name="form_submitted_successfully">Form submitted successfully</string>
 </resources>
 

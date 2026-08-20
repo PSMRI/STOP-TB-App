@@ -81,6 +81,9 @@ class DashboardViewModel @Inject constructor(
     private val _tbScreening = MutableLiveData(TbGenderBreakdown())
     val tbScreening: LiveData<TbGenderBreakdown> get() = _tbScreening
 
+    private val _presumptiveTb = MutableLiveData(TbGenderBreakdown())
+    val presumptiveTb: LiveData<TbGenderBreakdown> get() = _presumptiveTb
+
     private val _pastHistoryTb = MutableLiveData(TbPositiveNegativeBreakdown())
     val pastHistoryTb: LiveData<TbPositiveNegativeBreakdown> get() = _pastHistoryTb
 
@@ -137,6 +140,9 @@ class DashboardViewModel @Inject constructor(
         loadDashboardData()
     }
 
+    private fun getAssignedVillageIds(): List<Int> =
+        villageList.map { it.id }.ifEmpty { listOf(-1) }
+
     private fun getTimeRange(): Pair<Long, Long> {
         val period = _selectedTimePeriod.value ?: "Today"
         val cal = Calendar.getInstance()
@@ -185,8 +191,10 @@ class DashboardViewModel @Inject constructor(
 
         val (startTime, endTime) = getTimeRange()
         val village = selectedVillageId
+        val assignedVillageIds = getAssignedVillageIds()
 
         _tbScreening.value = TbGenderBreakdown()
+        _presumptiveTb.value = TbGenderBreakdown()
         _pastHistoryTb.value = TbPositiveNegativeBreakdown()
         _antiTbDrugs.value = TbPositiveNegativeBreakdown()
         _tbSuspected.value = TbGenderBreakdown()
@@ -199,38 +207,37 @@ class DashboardViewModel @Inject constructor(
 
         // TB Screening breakdown
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbScreeningCount(village, startTime, endTime, "", 0,0).collect { total ->
+            tbDao.getDashboardTbScreeningCount(village, assignedVillageIds, startTime, endTime, "", 0,0).collect { total ->
                 val current = _tbScreening.value ?: TbGenderBreakdown()
                 _tbScreening.value = current.copy(total = total)
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbScreeningCount(village, startTime, endTime, "MALE", 0,0).collect { male ->
+            tbDao.getDashboardTbScreeningCount(village, assignedVillageIds, startTime, endTime, "MALE", 0,0).collect { male ->
                 val current = _tbScreening.value ?: TbGenderBreakdown()
                 _tbScreening.value = current.copy(male = male)
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbScreeningCount(village, startTime, endTime, "FEMALE", 0,0).collect { female ->
+            tbDao.getDashboardTbScreeningCount(village, assignedVillageIds, startTime, endTime, "FEMALE", 0,0).collect { female ->
                 val current = _tbScreening.value ?: TbGenderBreakdown()
                 _tbScreening.value = current.copy(female = female)
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbScreeningCount(village, startTime, endTime, "", 1,0).collect { children ->
+            tbDao.getDashboardTbScreeningCount(village, assignedVillageIds, startTime, endTime, "", 1,0).collect { children ->
                 val current = _tbScreening.value ?: TbGenderBreakdown()
                 _tbScreening.value = current.copy(children = children)
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbScreeningCount(village, startTime, endTime, "OTHERS", 0,0).collect { others ->
+            tbDao.getDashboardTbScreeningCount(village, assignedVillageIds, startTime, endTime, "OTHERS", 0,0).collect { others ->
                 val current = _tbScreening.value ?: TbGenderBreakdown()
                 _tbScreening.value = current.copy(others = others)
             }
         }
-
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbScreeningCount(village, startTime, endTime, "", 0,1).collect { seniorCitizen ->
+            tbDao.getDashboardTbScreeningCount(village, assignedVillageIds, startTime, endTime, "", 0,1).collect { seniorCitizen ->
                 val current = _tbScreening.value ?: TbGenderBreakdown()
                 _tbScreening.value = current.copy(seniorCitizen = seniorCitizen)
             }
@@ -241,6 +248,7 @@ class DashboardViewModel @Inject constructor(
             countQuery = { gender, isChild, positive ->
                 tbDao.getDashboardPastHistoryTbCount(
                     village,
+                    assignedVillageIds,
                     startTime,
                     endTime,
                     gender,
@@ -255,6 +263,7 @@ class DashboardViewModel @Inject constructor(
             countQuery = { gender, isChild, positive ->
                 tbDao.getDashboardAntiTbDrugsCount(
                     village,
+                    assignedVillageIds,
                     startTime,
                     endTime,
                     gender,
@@ -264,40 +273,73 @@ class DashboardViewModel @Inject constructor(
             }
         )
 
+
+        // Presumptive TB breakdown
+        collectJobs += viewModelScope.launch {
+            tbDao.getDashboardPresumptiveTbCount(village, assignedVillageIds, startTime, endTime, "", 0).collect { total ->
+                val current = _presumptiveTb.value ?: TbGenderBreakdown()
+                _presumptiveTb.value = current.copy(total = total)
+            }
+        }
+        collectJobs += viewModelScope.launch {
+            tbDao.getDashboardPresumptiveTbCount(village, assignedVillageIds, startTime, endTime, "MALE", 0).collect { male ->
+                val current = _presumptiveTb.value ?: TbGenderBreakdown()
+                _presumptiveTb.value = current.copy(male = male)
+            }
+        }
+        collectJobs += viewModelScope.launch {
+            tbDao.getDashboardPresumptiveTbCount(village, assignedVillageIds, startTime, endTime, "FEMALE", 0).collect { female ->
+                val current = _presumptiveTb.value ?: TbGenderBreakdown()
+                _presumptiveTb.value = current.copy(female = female)
+            }
+        }
+        collectJobs += viewModelScope.launch {
+            tbDao.getDashboardPresumptiveTbCount(village, assignedVillageIds, startTime, endTime, "", 1).collect { children ->
+                val current = _presumptiveTb.value ?: TbGenderBreakdown()
+                _presumptiveTb.value = current.copy(children = children)
+            }
+        }
+        collectJobs += viewModelScope.launch {
+            tbDao.getDashboardPresumptiveTbCount(village, assignedVillageIds, startTime, endTime, "OTHERS", 0).collect { others ->
+                val current = _presumptiveTb.value ?: TbGenderBreakdown()
+                _presumptiveTb.value = current.copy(others = others)
+            }
+        }
+
         // TB Suspected breakdown
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbSuspectedCount(village, startTime, endTime, "", 0,0).collect { total ->
+            tbDao.getDashboardTbSuspectedCount(village, assignedVillageIds, startTime, endTime, "", 0,0).collect { total ->
                 val current = _tbSuspected.value ?: TbGenderBreakdown()
                 _tbSuspected.value = current.copy(total = total)
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbSuspectedCount(village, startTime, endTime, "MALE", 0,0).collect { male ->
+            tbDao.getDashboardTbSuspectedCount(village, assignedVillageIds, startTime, endTime, "MALE", 0,0).collect { male ->
                 val current = _tbSuspected.value ?: TbGenderBreakdown()
                 _tbSuspected.value = current.copy(male = male)
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbSuspectedCount(village, startTime, endTime, "FEMALE", 0,0).collect { female ->
+            tbDao.getDashboardTbSuspectedCount(village, assignedVillageIds, startTime, endTime, "FEMALE", 0,0).collect { female ->
                 val current = _tbSuspected.value ?: TbGenderBreakdown()
                 _tbSuspected.value = current.copy(female = female)
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbSuspectedCount(village, startTime, endTime, "", 1,0).collect { children ->
+            tbDao.getDashboardTbSuspectedCount(village, assignedVillageIds, startTime, endTime, "", 1,0).collect { children ->
                 val current = _tbSuspected.value ?: TbGenderBreakdown()
                 _tbSuspected.value = current.copy(children = children)
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbSuspectedCount(village, startTime, endTime, "OTHERS", 0,0).collect { others ->
+            tbDao.getDashboardTbSuspectedCount(village, assignedVillageIds, startTime, endTime, "OTHERS", 0,0).collect { others ->
                 val current = _tbSuspected.value ?: TbGenderBreakdown()
                 _tbSuspected.value = current.copy(others = others)
             }
         }
 
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbSuspectedCount(village, startTime, endTime, "", 0,1).collect { seniorCitizen ->
+            tbDao.getDashboardTbSuspectedCount(village, assignedVillageIds, startTime, endTime, "", 0,1).collect { seniorCitizen ->
                 val current = _tbSuspected.value ?: TbGenderBreakdown()
                 _tbSuspected.value = current.copy(seniorCitizen = seniorCitizen)
             }
@@ -305,38 +347,38 @@ class DashboardViewModel @Inject constructor(
 
         // TB Confirmed breakdown
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbConfirmedCount(village, startTime, endTime, "", 0,0).collect { total ->
+            benDao.getDashboardFilteredTbConfirmedCount(village, assignedVillageIds, startTime, endTime, "", 0,0).collect { total ->
                 val current = _tbConfirmed.value ?: TbGenderBreakdown()
                 _tbConfirmed.value = current.copy(total = total)
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbConfirmedCount(village, startTime, endTime, "MALE", 0,0).collect { male ->
+            benDao.getDashboardFilteredTbConfirmedCount(village, assignedVillageIds, startTime, endTime, "MALE", 0,0).collect { male ->
                 val current = _tbConfirmed.value ?: TbGenderBreakdown()
                 _tbConfirmed.value = current.copy(male = male)
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbConfirmedCount(village, startTime, endTime, "FEMALE", 0,0).collect { female ->
+            benDao.getDashboardFilteredTbConfirmedCount(village, assignedVillageIds, startTime, endTime, "FEMALE", 0,0).collect { female ->
                 val current = _tbConfirmed.value ?: TbGenderBreakdown()
                 _tbConfirmed.value = current.copy(female = female)
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbConfirmedCount(village, startTime, endTime, "", 1,0).collect { children ->
+            benDao.getDashboardFilteredTbConfirmedCount(village, assignedVillageIds, startTime, endTime, "", 1,0).collect { children ->
                 val current = _tbConfirmed.value ?: TbGenderBreakdown()
                 _tbConfirmed.value = current.copy(children = children)
             }
         }
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbConfirmedCount(village, startTime, endTime, "OTHERS", 0,0).collect { others ->
+            benDao.getDashboardFilteredTbConfirmedCount(village, assignedVillageIds, startTime, endTime, "OTHERS", 0,0).collect { others ->
                 val current = _tbConfirmed.value ?: TbGenderBreakdown()
                 _tbConfirmed.value = current.copy(others = others)
             }
         }
 
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardTbConfirmedCount(village, startTime, endTime, "", 0,1).collect { seniorCitizen ->
+            benDao.getDashboardFilteredTbConfirmedCount(village, assignedVillageIds, startTime, endTime, "", 0,1).collect { seniorCitizen ->
                 val current = _tbConfirmed.value ?: TbGenderBreakdown()
                 _tbConfirmed.value = current.copy(seniorCitizen = seniorCitizen)
             }
@@ -346,69 +388,69 @@ class DashboardViewModel @Inject constructor(
 
         collectBreakdown(
             target = _digitalChestXray,
-            totalQuery = { tbDao.getDashboardDigitalChestXRayCount(village, startTime, endTime, "", 0,0) },
-            maleQuery = { tbDao.getDashboardDigitalChestXRayCount(village, startTime, endTime, "MALE", 0,0) },
-            femaleQuery = { tbDao.getDashboardDigitalChestXRayCount(village, startTime, endTime, "FEMALE", 0,0) },
-            childrenQuery = { tbDao.getDashboardDigitalChestXRayCount(village, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardDigitalChestXRayCount(village, startTime, endTime, "OTHERS", 0,0) },
-            seniorCitizenQuery = { tbDao.getDashboardDigitalChestXRayCount(village, startTime, endTime, "", 0,1) }
+            totalQuery = { tbDao.getDashboardDigitalChestXRayCount(village, assignedVillageIds, startTime, endTime, "", 0,0) },
+            maleQuery = { tbDao.getDashboardDigitalChestXRayCount(village, assignedVillageIds, startTime, endTime, "MALE", 0,0) },
+            femaleQuery = { tbDao.getDashboardDigitalChestXRayCount(village, assignedVillageIds, startTime, endTime, "FEMALE", 0,0) },
+            childrenQuery = { tbDao.getDashboardDigitalChestXRayCount(village, assignedVillageIds, startTime, endTime, "", 1,0) },
+            othersQuery = { tbDao.getDashboardDigitalChestXRayCount(village, assignedVillageIds, startTime, endTime, "OTHERS", 0,0) },
+            seniorCitizenQuery = { tbDao.getDashboardDigitalChestXRayCount(village, assignedVillageIds, startTime, endTime, "", 0,1) }
 
             )
 
         collectBreakdown(
             target = _sputumCollection,
-            totalQuery = { tbDao.getDashboardSputumCollectionCount(village, startTime, endTime, "", 0,0) },
-            maleQuery = { tbDao.getDashboardSputumCollectionCount(village, startTime, endTime, "MALE", 0,0) },
-            femaleQuery = { tbDao.getDashboardSputumCollectionCount(village, startTime, endTime, "FEMALE", 0,0) },
-            childrenQuery = { tbDao.getDashboardSputumCollectionCount(village, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardSputumCollectionCount(village, startTime, endTime, "OTHERS", 0,0) },
-            seniorCitizenQuery = { tbDao.getDashboardSputumCollectionCount(village, startTime, endTime, "", 0,1) }
+            totalQuery = { tbDao.getDashboardSputumCollectionCount(village, assignedVillageIds, startTime, endTime, "", 0,0) },
+            maleQuery = { tbDao.getDashboardSputumCollectionCount(village, assignedVillageIds, startTime, endTime, "MALE", 0,0) },
+            femaleQuery = { tbDao.getDashboardSputumCollectionCount(village, assignedVillageIds, startTime, endTime, "FEMALE", 0,0) },
+            childrenQuery = { tbDao.getDashboardSputumCollectionCount(village, assignedVillageIds, startTime, endTime, "", 1,0) },
+            othersQuery = { tbDao.getDashboardSputumCollectionCount(village, assignedVillageIds, startTime, endTime, "OTHERS", 0,0) },
+            seniorCitizenQuery = { tbDao.getDashboardSputumCollectionCount(village, assignedVillageIds, startTime, endTime, "", 0,1) }
 
             )
 
         collectBreakdown(
             target = _trueNat,
-            totalQuery = { tbDao.getDashboardTrueNatCount(village, startTime, endTime, "", 0,0) },
-            maleQuery = { tbDao.getDashboardTrueNatCount(village, startTime, endTime, "MALE", 0,0) },
-            femaleQuery = { tbDao.getDashboardTrueNatCount(village, startTime, endTime, "FEMALE", 0,0) },
-            childrenQuery = { tbDao.getDashboardTrueNatCount(village, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardTrueNatCount(village, startTime, endTime, "OTHERS", 0,0) },
-            seniorCitizenQuery = { tbDao.getDashboardTrueNatCount(village, startTime, endTime, "", 0,1) }
+            totalQuery = { tbDao.getDashboardTrueNatCount(village, assignedVillageIds, startTime, endTime, "", 0,0) },
+            maleQuery = { tbDao.getDashboardTrueNatCount(village, assignedVillageIds, startTime, endTime, "MALE", 0,0) },
+            femaleQuery = { tbDao.getDashboardTrueNatCount(village, assignedVillageIds, startTime, endTime, "FEMALE", 0,0) },
+            childrenQuery = { tbDao.getDashboardTrueNatCount(village, assignedVillageIds, startTime, endTime, "", 1,0) },
+            othersQuery = { tbDao.getDashboardTrueNatCount(village, assignedVillageIds, startTime, endTime, "OTHERS", 0,0) },
+            seniorCitizenQuery = { tbDao.getDashboardTrueNatCount(village, assignedVillageIds, startTime, endTime, "", 0,1) }
 
             )
 
         collectBreakdown(
             target = _liquidCulture,
-            totalQuery = { tbDao.getDashboardLiquidCultureCount(village, startTime, endTime, "", 0,0) },
-            maleQuery = { tbDao.getDashboardLiquidCultureCount(village, startTime, endTime, "MALE", 0,0) },
-            femaleQuery = { tbDao.getDashboardLiquidCultureCount(village, startTime, endTime, "FEMALE", 0,0) },
-            childrenQuery = { tbDao.getDashboardLiquidCultureCount(village, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardLiquidCultureCount(village, startTime, endTime, "OTHERS", 0,0) },
-            seniorCitizenQuery = { tbDao.getDashboardLiquidCultureCount(village, startTime, endTime, "", 0,1) },
+            totalQuery = { tbDao.getDashboardLiquidCultureCount(village, assignedVillageIds, startTime, endTime, "", 0,0) },
+            maleQuery = { tbDao.getDashboardLiquidCultureCount(village, assignedVillageIds, startTime, endTime, "MALE", 0,0) },
+            femaleQuery = { tbDao.getDashboardLiquidCultureCount(village, assignedVillageIds, startTime, endTime, "FEMALE", 0,0) },
+            childrenQuery = { tbDao.getDashboardLiquidCultureCount(village, assignedVillageIds, startTime, endTime, "", 1,0) },
+            othersQuery = { tbDao.getDashboardLiquidCultureCount(village, assignedVillageIds, startTime, endTime, "OTHERS", 0,0) },
+            seniorCitizenQuery = { tbDao.getDashboardLiquidCultureCount(village, assignedVillageIds, startTime, endTime, "", 0,1) },
 
             )
 
         collectBreakdown(
             target = _hwcReferral,
-            totalQuery = { tbDao.getDashboardHwcReferralCount(village, startTime, endTime, "", 0,0) },
-            maleQuery = { tbDao.getDashboardHwcReferralCount(village, startTime, endTime, "MALE", 0,0) },
-            femaleQuery = { tbDao.getDashboardHwcReferralCount(village, startTime, endTime, "FEMALE", 0,0) },
-            childrenQuery = { tbDao.getDashboardHwcReferralCount(village, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardHwcReferralCount(village, startTime, endTime, "OTHERS", 0,0) },
-            seniorCitizenQuery = { tbDao.getDashboardHwcReferralCount(village, startTime, endTime, "", 0,1) }
+            totalQuery = { tbDao.getDashboardHwcReferralCount(village, assignedVillageIds, startTime, endTime, "", 0,0) },
+            maleQuery = { tbDao.getDashboardHwcReferralCount(village, assignedVillageIds, startTime, endTime, "MALE", 0,0) },
+            femaleQuery = { tbDao.getDashboardHwcReferralCount(village, assignedVillageIds, startTime, endTime, "FEMALE", 0,0) },
+            childrenQuery = { tbDao.getDashboardHwcReferralCount(village, assignedVillageIds, startTime, endTime, "", 1,0) },
+            othersQuery = { tbDao.getDashboardHwcReferralCount(village, assignedVillageIds, startTime, endTime, "OTHERS", 0,0) },
+            seniorCitizenQuery = { tbDao.getDashboardHwcReferralCount(village, assignedVillageIds, startTime, endTime, "", 0,1) }
 
             )
 
         // NIKSHAY count
         collectJobs += viewModelScope.launch {
-            tbDao.getDashboardNikshayCount(village, startTime, endTime).collect {
+            tbDao.getDashboardNikshayCount(village, assignedVillageIds, startTime, endTime).collect {
                 _nikshayCount.value = it
             }
         }
 
         // ABHA count
         collectJobs += viewModelScope.launch {
-            benDao.getDashboardAbhaCount(village, startTime, endTime).collect {
+            benDao.getDashboardAbhaCount(village, assignedVillageIds, startTime, endTime).collect {
                 _abhaCount.value = it
             }
         }
@@ -420,44 +462,33 @@ class DashboardViewModel @Inject constructor(
         maleQuery: () -> Flow<Int>,
         femaleQuery: () -> Flow<Int>,
         childrenQuery: () -> Flow<Int>,
-
         othersQuery: () -> Flow<Int>,
         seniorCitizenQuery: () -> Flow<Int>,
     ) {
         collectJobs += viewModelScope.launch {
-            totalQuery().collect { total ->
-                val current = target.value ?: TbGenderBreakdown()
-                target.value = current.copy(total = total)
+            kotlinx.coroutines.flow.combine(
+                totalQuery(),
+                maleQuery(),
+                femaleQuery(),
+                childrenQuery(),
+                othersQuery(),
+            ) { values ->
+                TbGenderBreakdown(
+                    total = values[0],
+                    male = values[1],
+                    female = values[2],
+                    children = values[3],
+                    others = values[4],
+                )
+            }.collect { breakdown ->
+                target.value = breakdown
             }
         }
-        collectJobs += viewModelScope.launch {
-            maleQuery().collect { male ->
-                val current = target.value ?: TbGenderBreakdown()
-                target.value = current.copy(male = male)
-            }
-        }
-        collectJobs += viewModelScope.launch {
-            femaleQuery().collect { female ->
-                val current = target.value ?: TbGenderBreakdown()
-                target.value = current.copy(female = female)
-            }
-        }
-        collectJobs += viewModelScope.launch {
-            childrenQuery().collect { children ->
-                val current = target.value ?: TbGenderBreakdown()
-                target.value = current.copy(children = children)
-            }
-        }
+        // Senior citizen collected separately since combine only takes 5
         collectJobs += viewModelScope.launch {
             seniorCitizenQuery().collect { seniorCitizen ->
                 val current = target.value ?: TbGenderBreakdown()
                 target.value = current.copy(seniorCitizen = seniorCitizen)
-            }
-        }
-        collectJobs += viewModelScope.launch {
-            othersQuery().collect { others ->
-                val current = target.value ?: TbGenderBreakdown()
-                target.value = current.copy(others = others)
             }
         }
     }

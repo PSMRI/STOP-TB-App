@@ -99,7 +99,8 @@ class TBSuspectedFragment : Fragment() {
         viewModel.benAgeGender.observe(viewLifecycleOwner) {
             binding.tvAgeGender.text = it
         }
-        captureGeolocation()
+        // Auto geolocation disabled for TB Suspected form: location is not required to open/use this module.
+//        captureGeolocation()
         binding.btnSubmit.setOnClickListener {
             submitTBSuspectedForm()
         }

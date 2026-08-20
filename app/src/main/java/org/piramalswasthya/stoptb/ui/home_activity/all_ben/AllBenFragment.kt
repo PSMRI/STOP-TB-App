@@ -9,6 +9,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.Toast
 import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -148,7 +149,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         val showResultButton = args.source == 6 || args.source == 7 || args.source == 8
         val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
         val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
-        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess) && !isReadOnlyReferralList
+        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess || isCounsellor) && !isReadOnlyReferralList
         val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
         binding.llQuickRefresh.visibility = View.GONE
 
@@ -237,7 +238,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         )
                     }
                 },
-                { item, benId, hhId ->
+                clickedResult = { item, benId, hhId ->
                     if (!showResultButton) return@BenClickListener
                     findNavController().navigate(
                         AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
@@ -245,6 +246,144 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                             viewOnly = true
                         )
                     )
+                },
+                clickedOrderAction = { item, action, orderType ->
+                    if (!showResultButton) return@BenClickListener
+                    when (action) {
+                        "REFER" -> {
+                            findNavController().navigate(
+                                AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                    benId = item.benId,
+                                    viewOnly = false,
+                                    referralType = if (orderType == "XRAY_CHEST") 6 else 7
+                                )
+                            )
+                        }
+                        "COMPLETE" -> {
+                            findNavController().navigate(
+                                AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                    benId = item.benId,
+                                    viewOnly = false,
+                                    referralType = if (orderType == "XRAY_CHEST") 6 else 7
+                                )
+                            )
+                        }
+                        "COMPLETE_RIF" -> {
+                            findNavController().navigate(
+                                AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                    benId = item.benId,
+                                    viewOnly = false,
+                                    referralType = 7
+                                )
+                            )
+                        }
+                        "POLL" -> {
+                            viewModel.pollOrderResult(item.benId, orderType)
+                        }
+                        "RETRY_POLL" -> {
+                            viewModel.retryResultFetch(item.benId, orderType, requireContext())
+                        }
+                        "RETRY_PUSH" -> {
+                            viewModel.retryTest(item.benId, orderType, requireContext())
+                        }
+                        "RETRY_RIF_POLL" -> {
+                            viewModel.retryResultFetch(item.benId, "MDR_RIF", requireContext())
+                        }
+                        "REPEAT_TEST" -> {
+                            lifecycleScope.launch {
+                                val diag = viewModel.tbRepo.getTBDiagnosticsById(item.benId)
+                                val naatRes = diag?.naatResult
+                                val rifRes = diag?.trueNatRifResult
+
+                                val isInvalidMtb = naatRes.equals("Invalid", ignoreCase = true)
+                                val isIndeterminateRif = rifRes.equals("Indeterminate", ignoreCase = true)
+
+                                val title = when {
+                                    isInvalidMtb -> "Invalid Test Result"
+                                    isIndeterminateRif -> "Indeterminate Test Result"
+                                    else -> "Repeat Test"
+                                }
+
+                                val msg = when {
+                                    isInvalidMtb -> "The test results are invalid. Repeat the test."
+                                    isIndeterminateRif -> "The test results are indeterminate. Repeat the test."
+                                    else -> "Are you sure you want to repeat this test? A new test order will be created."
+                                }
+
+                                val targetOrder = when {
+                                    isIndeterminateRif -> "MDR_RIF"
+                                    else -> "MTB_PLUS"
+                                }
+
+                                androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                                    .setTitle(title)
+                                    .setMessage(msg)
+                                    .setPositiveButton("REPEAT TEST") { d, _ ->
+                                        d.dismiss()
+                                        viewModel.repeatTest(item.benId, targetOrder)
+                                    }
+                                    .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
+                                    .show()
+                            }
+                        }
+                        "VIEW" -> {
+                            lifecycleScope.launch {
+                                val diag = viewModel.tbRepo.getTBDiagnosticsById(item.benId)
+                                if (diag?.naatResult.equals("Invalid", ignoreCase = true)) {
+                                    androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                                        .setTitle("Invalid Test Result")
+                                        .setMessage("The test result is invalid. Please repeat the test.")
+                                        .setPositiveButton("REPEAT TEST") { d, _ ->
+                                            d.dismiss()
+                                            viewModel.repeatTest(item.benId, "MTB_PLUS")
+                                        }
+                                        .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
+                                        .show()
+                                } else {
+                                    findNavController().navigate(
+                                        AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                            benId = item.benId,
+                                            viewOnly = true,
+                                            referralType = if (orderType == "XRAY_CHEST") 6 else 7
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                        "VIEW_RIF" -> {
+                            lifecycleScope.launch {
+                                val diag = viewModel.tbRepo.getTBDiagnosticsById(item.benId)
+                                if (diag?.trueNatRifResult.equals("Indeterminate", ignoreCase = true)) {
+                                    androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                                        .setTitle("Indeterminate Test Result")
+                                        .setMessage("The test result is indeterminate. Please repeat the test.")
+                                        .setPositiveButton("REPEAT TEST") { d, _ ->
+                                            d.dismiss()
+                                            viewModel.repeatTest(item.benId, "MDR_RIF")
+                                        }
+                                        .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
+                                        .show()
+                                } else {
+                                    findNavController().navigate(
+                                        AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                            benId = item.benId,
+                                            viewOnly = true,
+                                            referralType = 7
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                        "ENTER_LC", "VIEW_LC" -> {
+                            findNavController().navigate(
+                                AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                    benId = item.benId,
+                                    viewOnly = false,
+                                    referralType = 8
+                                )
+                            )
+                        }
+                    }
                 },
                 { item, benId, hhId, viewOnly ->
                     if (isReadOnlyReferralList) return@BenClickListener
@@ -283,7 +422,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             showActionButtons = false,
             showResultButton = showResultButton,
             showAnthropometryButton = false,
-            showExamineButton = !isReadOnlyReferralList
+            showExamineButton = !isReadOnlyReferralList,
+            source = args.source
         )
 
         binding.rvAny.adapter = benAdapter
@@ -318,16 +458,47 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 benAdapter.submitBenIds(benIds)
             }
         }
+        lifecycleScope.launch {
+            viewModel.unsyncedVitalBenIds.collectLatest { benIds ->
+                benAdapter.submitUnsyncedVitalBenIds(benIds)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.syncingVitalBenIds.collectLatest { benIds ->
+                benAdapter.submitSyncingVitalBenIds(benIds)
+            }
+        }
 
         lifecycleScope.launch {
             viewModel.tbScreeningBenIds.collectLatest { benIds ->
+                Timber.e("TB Screening IDs: $benIds")
                 benAdapter.submitTbScreeningBenIds(benIds)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.unsyncedTbScreeningBenIds.collectLatest { benIds ->
+                benAdapter.submitUnsyncedTbScreeningBenIds(benIds)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.syncingTbScreeningBenIds.collectLatest { benIds ->
+                benAdapter.submitSyncingTbScreeningBenIds(benIds)
             }
         }
 
         lifecycleScope.launch {
             viewModel.generalOpdBenIds.collectLatest { benIds ->
                 benAdapter.submitGeneralOpdBenIds(benIds)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.unsyncedGeneralOpdBenIds.collectLatest { benIds ->
+                benAdapter.submitUnsyncedGeneralOpdBenIds(benIds)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.syncingGeneralOpdBenIds.collectLatest { benIds ->
+                benAdapter.submitSyncingGeneralOpdBenIds(benIds)
             }
         }
 
@@ -342,6 +513,77 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 benAdapter.submitDiagnosisBenIds(benIds)
             }
         }
+
+        lifecycleScope.launch {
+            viewModel.contactFollowUpDoneBenIds.collectLatest { benIds ->
+                benAdapter.submitContactFollowUpDoneBenIds(benIds)
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.tptFollowUpDoneBenIds.collectLatest { benIds ->
+                benAdapter.submitTptFollowUpDoneBenIds(benIds)
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.tptEligibleBenIds.collectLatest { benIds ->
+                benAdapter.submitTptEligibleBenIds(benIds)
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.allTbDiagnostics.collectLatest { diagnosticsList ->
+                benAdapter.submitTBDiagnostics(diagnosticsList)
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.retryingBenIds.collectLatest { benIds ->
+                benAdapter.submitRetryingBenIds(benIds)
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.orderActionState.collectLatest { state ->
+                when (state) {
+                    is AllBenViewModel.OrderActionResult.Idle -> {}
+                    is AllBenViewModel.OrderActionResult.Loading -> {}
+                    is AllBenViewModel.OrderActionResult.Success -> {
+                        Toast.makeText(requireContext(), state.message, Toast.LENGTH_LONG).show()
+                        viewModel.resetOrderActionState()
+                        if (state.message.contains("completed", ignoreCase = true) || state.orderType.equals("MDR_RIF", ignoreCase = true)) {
+                            if (state.orderType.equals("MDR_RIF", ignoreCase = true)) {
+                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(requireContext())
+                            } else if (state.orderType.equals("SPUTUM_TRUENAT", ignoreCase = true) || state.orderType.equals("MTB_PLUS", ignoreCase = true)) {
+                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext())
+                            } else {
+                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(requireContext())
+                            }
+                        }
+                    }
+                    is AllBenViewModel.OrderActionResult.Error -> {
+                        val isNetworkError = state.error.contains("Unable to resolve host", ignoreCase = true) ||
+                                state.error.contains("failed to connect", ignoreCase = true) ||
+                                state.error.contains("timeout", ignoreCase = true) ||
+                                state.error.contains("timed out", ignoreCase = true) ||
+                                state.error.contains("Network is unreachable", ignoreCase = true) ||
+                                state.error.contains("No address associated with hostname", ignoreCase = true)
+                        val message = if (isNetworkError) {
+                            "Please connect to the camp hub to retry the referral."
+                        } else {
+                            state.error
+                        }
+                        Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+                        viewModel.resetOrderActionState()
+                    }
+                }
+            }
+        }
+
+        org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(requireContext())
+        org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext())
+        org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(requireContext())
 
         binding.ibSearch.visibility = View.VISIBLE
         binding.ibSearch.setOnClickListener { sttContract.launch(Unit) }
@@ -378,6 +620,13 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 viewModel.resetBenRegId()
             }
         }
+
+        lifecycleScope.launch {
+            while (viewLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                benAdapter.notifyDataSetChanged()
+                kotlinx.coroutines.delay(1000L)
+            }
+        }
     }
 
     private fun checkAndGenerateABHA(benId: Long) {
@@ -404,7 +653,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         if (existing != null) return // already visible
         // Always show without autoFlow — user decides whether to continue or close.
         // autoFlow=true caused the form to re-open automatically when back was pressed.
-        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false)
+        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false, showContactTracingForms = false)
             .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
     }
 
@@ -454,7 +703,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     )
                 )
             }
-            ExamineBottomSheetFragment.FORM_DIAGNOSIS -> {
+            /*ExamineBottomSheetFragment.FORM_DIAGNOSIS -> {
                 findNavController().navigate(
                     AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
                         benId = benId,
@@ -462,6 +711,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     )
                 )
             }
+             */
         }
     }
 
@@ -480,6 +730,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     override fun onResume() {
         super.onResume()
         updateToolbarTitle()
+        viewModel.fetchBeneficiaryStatuses()
 
         // If TBSuspectedQuickFragment (Diagnosis) signalled that the examine flow
         // is fully complete, clear pendingExamineBenId so the BottomSheet does NOT

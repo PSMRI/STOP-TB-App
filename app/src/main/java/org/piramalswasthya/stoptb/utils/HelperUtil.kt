@@ -801,7 +801,7 @@ object HelperUtil {
 
     fun getAgeStrFromAgeUnit(ageUnitDTO: org.piramalswasthya.stoptb.model.AgeUnitDTO): String {
         return when {
-            ageUnitDTO.years > 0 -> "${ageUnitDTO.years} Yr ${ageUnitDTO.months} Mo"
+            ageUnitDTO.years > 0 -> "${ageUnitDTO.years} Yr ${ageUnitDTO.months} Mo ${ageUnitDTO.days} D"
             ageUnitDTO.months > 0 -> "${ageUnitDTO.months} Mo ${ageUnitDTO.days} D"
             else -> "${ageUnitDTO.days} D"
         }
@@ -827,5 +827,32 @@ object HelperUtil {
         ageUnitDTO.days = days
     }
 
+}
+
+fun String?.toGpsTimestampLong(): Long? {
+    if (this.isNullOrBlank()) return null
+    val parsedLong = this.toLongOrNull()
+    if (parsedLong != null) return parsedLong
+
+    val patterns = listOf(
+        "MMM dd, yyyy h:mm:ss a",
+        "MMM d, yyyy h:mm:ss a",
+        "MMM dd, yyyy HH:mm:ss a",
+        "MMM d, yyyy HH:mm:ss a",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+        "dd-MM-yyyy HH:mm:ss"
+    )
+    for (pattern in patterns) {
+        try {
+            val sdf = SimpleDateFormat(pattern, Locale.ENGLISH)
+            val date = sdf.parse(this)
+            if (date != null) {
+                return date.time
+            }
+        } catch (_: Exception) {
+        }
+    }
+    return null
 }
 // Standalone AgeUnitDTO for AgePicker

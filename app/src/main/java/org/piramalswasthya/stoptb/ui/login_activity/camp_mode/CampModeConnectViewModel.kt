@@ -34,7 +34,7 @@ class CampModeConnectViewModel @Inject constructor(
     val campHubStatus: LiveData<CampHubStatus>
         get() = _campHubStatus
 
-    fun getCampHubUrl(): String = pref.getCampHubUrl()
+    fun getCampHubUrl(): String = pref.getStoredCampHubUrl().orEmpty()
 
     fun connectToCampHub(url: String) {
         val normalizedUrl = normalizeCampHubUrl(url)
@@ -57,7 +57,7 @@ class CampModeConnectViewModel @Inject constructor(
     private fun normalizeCampHubUrl(url: String): String {
         val trimmedUrl = url.trim()
         val resolvedUrl = when {
-            trimmedUrl.isBlank() -> "http://192.168.137.1:8080"
+            trimmedUrl.isBlank() -> ""
             trimmedUrl.contains("://") -> trimmedUrl
             else -> "http://$trimmedUrl"
         }

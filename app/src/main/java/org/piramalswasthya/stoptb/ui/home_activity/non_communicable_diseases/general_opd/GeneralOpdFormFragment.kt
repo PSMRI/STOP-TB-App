@@ -35,6 +35,8 @@ class GeneralOpdFormFragment : Fragment() {
         get() = _binding!!
 
     private val viewModel: GeneralOpdFormViewModel by viewModels()
+    private val openedFromHousehold: Boolean
+        get() = arguments?.getBoolean("openedFromHousehold", false) == true
 
     private val isManagedFlow: Boolean
         get() = viewModel.autoFlow || viewModel.generalOpdFlow
@@ -145,10 +147,9 @@ class GeneralOpdFormFragment : Fragment() {
     }
 
     private fun navigateToDiagnostics() {
-        if (isManagedFlow) {
-            // Examine flow — return to AllBenFragment so user picks the next form
-            val popped = findNavController().popBackStack(R.id.allBenFragment, false)
-            if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
+        if (openedFromHousehold || isManagedFlow) {
+            findNavController().navigateUp()
+            return
         } else {
             findNavController().navigate(
                 R.id.TBSuspectedQuickFragment,

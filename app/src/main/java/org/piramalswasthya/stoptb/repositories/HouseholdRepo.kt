@@ -43,4 +43,9 @@ class HouseholdRepo @Inject constructor(
     suspend fun deleteHouseholdDraft() = withContext(Dispatchers.IO) {
         dao.deleteDraftHousehold()
     }
+
+    /** Returns the DIGIPIN stored against a household, or null if not yet captured. */
+    suspend fun getDigipinForHousehold(householdId: Long): String? = withContext(Dispatchers.IO) {
+        dao.getHousehold(householdId)?.digipin
+    }
 }

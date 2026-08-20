@@ -16,6 +16,7 @@ import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
+import org.piramalswasthya.stoptb.model.getAgeGenderDisplayString
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import timber.log.Timber
@@ -66,12 +67,16 @@ class TBConfirmedViewModel @Inject constructor(
     private  var tbSuspected: TBSuspectedCache? = null
     private var tbConfirmedTreatmentCache: TBConfirmedTreatmentCache? = null
 
+    private val _isTreatmentCompleted = MutableLiveData(false)
+    val isTreatmentCompleted: LiveData<Boolean>
+        get() = _isTreatmentCompleted
+
     init {
         viewModelScope.launch {
             val ben = benRepo.getBenFromId(benId)?.also { ben ->
                 _benName.value =
                     "${ben.firstName} ${if (ben.lastName == null) "" else ben.lastName}"
-                _benAgeGender.value = "${ben.age} ${ben.ageUnit?.name} | ${ben.gender?.name}"
+                _benAgeGender.value = ben.getAgeGenderDisplayString()
                 tbSuspected = TBSuspectedCache(
                     benId = ben.beneficiaryId
                 )
@@ -88,10 +93,11 @@ class TBConfirmedViewModel @Inject constructor(
             tbRepo.getTBConfirmed(benId)?.let {
                 tbConfirmedTreatmentCache = it
                 _recordExists.value = true
+                _isTreatmentCompleted.postValue(it.treatmentCompleted == true)
             }?: run{
                 tbConfirmedTreatmentCache = null
                 _recordExists.value = false
-
+                _isTreatmentCompleted.postValue(false)
 
         }
 
@@ -124,6 +130,20 @@ class TBConfirmedViewModel @Inject constructor(
                         return@withContext
                     }
 
+                    // Prevent duplicate follow-up for same date
+                    val newFollowUpDate = dataset.getFollowUpDateLong()
+                    if (newFollowUpDate > 0L) {
+                        val allExisting = tbRepo.getAllFollowUpsForBeneficiary(benId)
+                        val isDuplicate = allExisting.any {
+                            it.followUpDate != null &&
+                                    millisAtStartOfDay(it.followUpDate!!) == millisAtStartOfDay(newFollowUpDate)
+                        }
+                        if (isDuplicate) {
+                            _state.postValue(State.SAVE_FAILED)
+                            return@withContext
+                        }
+                    }
+
                         tbConfirmedTreatmentCache = TBConfirmedTreatmentCache(
                             benId = benId,
                         )
@@ -144,6 +164,9 @@ class TBConfirmedViewModel @Inject constructor(
                         }
                     }
                     tbRepo.saveTBConfirmed(tbConfirmedTreatmentCache!!)
+                    if (tbConfirmedTreatmentCache?.treatmentCompleted == true) {
+                        _isTreatmentCompleted.postValue(true)
+                    }
                     tbSuspected?.let {
                         it.isConfirmed = true
                         it.isTBConfirmed = true
@@ -174,6 +197,17 @@ class TBConfirmedViewModel @Inject constructor(
         return withContext(Dispatchers.Default) {
             dataset.validateAllFields()
         }
+    }
+
+    private fun millisAtStartOfDay(timeMs: Long): Long {
+        if (timeMs <= 0L) return 0L
+        val cal = java.util.Calendar.getInstance()
+        cal.timeInMillis = timeMs
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        cal.set(java.util.Calendar.MINUTE, 0)
+        cal.set(java.util.Calendar.SECOND, 0)
+        cal.set(java.util.Calendar.MILLISECOND, 0)
+        return cal.timeInMillis
     }
 
 }

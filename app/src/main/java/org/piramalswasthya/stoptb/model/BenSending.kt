@@ -5,6 +5,7 @@ import androidx.room.ColumnInfo
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import org.piramalswasthya.stoptb.helpers.ImageUtils
+import org.piramalswasthya.stoptb.utils.toGpsTimestampLong
 import org.piramalswasthya.stoptb.model.Gender.FEMALE
 import org.piramalswasthya.stoptb.model.Gender.MALE
 import org.piramalswasthya.stoptb.model.Gender.TRANSGENDER
@@ -315,6 +316,18 @@ data class BenDemographics(
     @Json(name = "longitude")
     var longitude: Double? = null,
 
+    @Json(name = "digipin")
+    var digipin: String? = null,
+
+    @Json(name = "gpsTimestamp")
+    var gpsTimestamp: Long? = null,
+
+    @Json(name = "isGpsUnavailable")
+    var isGpsUnavailable: Boolean? = null,
+
+    @Json(name = "gpsUnavailableReason")
+    var gpsUnavailableReason: String? = null,
+
     @Json(name = "createdBy")
     var createdBy: String? = null,
 
@@ -355,7 +368,8 @@ data class BenPhoneMaps(
 fun BenRegCache.asNetworkSendingModel(
     user: User,
     locationRecord: LocationRecord,
-    context: Context
+    context: Context,
+    household: HouseholdCache? = null
 ): BeneficiaryDataSending {
     val isKid = (ageUnit != null && (ageUnit != AgeUnit.YEARS || age < 15))
 
@@ -437,14 +451,19 @@ fun BenRegCache.asNetworkSendingModel(
             addressLine1 = address ?: "",
             addressLine2 = "",
             addressLine3 = "",
+            pinCode = pinCode,
             occupation = occupation ?: "unknown",
             economicStatus = economicStatus,
             economicStatusId = economicStatusId,
             residentialArea = residentialArea,
             residentialAreaId = residentialAreaId,
             otherResidentialArea = otherResidentialArea,
-            latitude = latitude,
-            longitude = longitude,
+            latitude = gpsLatitude ?: household?.gpsLatitude ?: latitude,
+            longitude = gpsLongitude ?: household?.gpsLongitude ?: longitude,
+            digipin = digipin ?: household?.digipin,
+            gpsTimestamp = (gpsTimestamp ?: household?.gpsTimestamp).toGpsTimestampLong(),
+            isGpsUnavailable = if (gpsLatitude != null || household?.gpsLatitude != null || gpsLongitude != null || household?.gpsLongitude != null) false else (isGpsUnavailable || (household?.isGpsUnavailable ?: false)),
+            gpsUnavailableReason = gpsUnavailableReason ?: household?.gpsUnavailableReason,
             createdBy = user.userName,
         ),
         benPhoneMaps = arrayOf(

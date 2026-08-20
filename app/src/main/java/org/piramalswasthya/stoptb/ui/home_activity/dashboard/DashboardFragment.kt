@@ -56,8 +56,8 @@ class DashboardFragment : Fragment() {
      */
     override fun onResume() {
         super.onResume()
-       // timePeriodAdapter?.let { binding.actvTimePeriod.setAdapter(it) }
-      //  villageAdapter?.let { binding.actvVillage.setAdapter(it) }
+        timePeriodAdapter?.let { binding.actvTimePeriod.setAdapter(it) }
+        villageAdapter?.let { binding.actvVillage.setAdapter(it) }
     }
 
     private fun setupFilters() {
@@ -151,6 +151,14 @@ class DashboardFragment : Fragment() {
             binding.tvTbScreeningChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
             binding.tvTbScreeningOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
 
+        }
+
+        viewModel.presumptiveTb.observe(viewLifecycleOwner) { data ->
+            binding.tvPresumptiveTbTotal.text = data.total.toString()
+            binding.tvPresumptiveTbMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
+            binding.tvPresumptiveTbFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
+            binding.tvPresumptiveTbChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
+            binding.tvPresumptiveTbOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
         }
 
         viewModel.pastHistoryTb.observe(viewLifecycleOwner) { data ->

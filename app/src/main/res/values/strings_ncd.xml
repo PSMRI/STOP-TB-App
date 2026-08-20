@@ -282,4 +282,14 @@
     <string name="cat_geriatric">GERIATRIC</string>
     <string name="cat_hrp">HRP</string>
     <string name="cat_maternal">MATERNAL</string>
+    <string-array name="tb_truenat_mtb_result">
+        <item>MTB not detected</item>
+        <item>MTB detected</item>
+        <item>Invalid</item>
+    </string-array>
+    <string-array name="tb_truenat_rif_result">
+        <item>Rif Resistance Detected</item>
+        <item>Rif Resistance Not Detected</item>
+        <item>Indeterminate</item>
+    </string-array>
 </resources>

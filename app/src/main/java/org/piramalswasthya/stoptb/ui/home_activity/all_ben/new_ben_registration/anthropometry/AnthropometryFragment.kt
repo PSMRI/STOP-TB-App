@@ -23,6 +23,7 @@ import org.piramalswasthya.stoptb.databinding.FragmentAnthropometryBinding
 import org.piramalswasthya.stoptb.model.AgeUnit
 import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.Gender
+import org.piramalswasthya.stoptb.model.getAgeGenderDisplayString
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -37,10 +38,11 @@ class AnthropometryFragment : Fragment() {
     private companion object {
         const val MIN_WEIGHT_KG = 1.0
         const val MAX_WEIGHT_KG = 250.0
-        const val MIN_HEIGHT_CM = 35.0
+        const val MIN_HEIGHT_CM = 30.0
         const val MAX_HEIGHT_CM = 250.0
-        const val MIN_TEMPERATURE_F = 95.0
+        const val MIN_TEMPERATURE_F = 90.0
         const val MAX_TEMPERATURE_F = 110.0
+        const val FEVER_TEMPERATURE_F = 99.0
     }
 
     private var _binding: FragmentAnthropometryBinding? = null
@@ -50,6 +52,9 @@ class AnthropometryFragment : Fragment() {
     private val viewModel: AnthropometryViewModel by viewModels()
     private var highTemperatureAlertShown = false
     private var isFormLocked = false
+    private var isUpdatingTemperatureSelection = false
+    private val openedFromHousehold: Boolean
+        get() = arguments?.getBoolean("openedFromHousehold", false) == true
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -77,7 +82,7 @@ class AnthropometryFragment : Fragment() {
             ben ?: return@observe
             // Lock form FIRST so that setText below does not trigger the HWC alert in view mode
             lockFormIfExistingData(ben)
-            binding.tvAgeGender.text = formatAgeGender(ben)
+            binding.tvAgeGender.text = ben.getAgeGenderDisplayString()
             binding.etWeight.setText(ben.weight?.formatOneDecimal().orEmpty())
             binding.etHeight.setText(ben.height?.formatOneDecimal().orEmpty())
             binding.etBmi.setText(ben.bmi?.formatOneDecimal().orEmpty())
@@ -85,16 +90,32 @@ class AnthropometryFragment : Fragment() {
             selectTemperatureRange(ben.temperature)
         }
 
-        binding.etWeight.doAfterTextChanged { updateBmi() }
-        binding.etHeight.doAfterTextChanged { updateBmi() }
+        binding.etWeight.doAfterTextChanged {
+            validateWeight(showBlankError = false)
+            updateBmi()
+        }
+        binding.etHeight.doAfterTextChanged {
+            validateHeight(showBlankError = false)
+            updateBmi()
+        }
         binding.etTemperature.doAfterTextChanged {
-            if (isHighTemperature()) showHighTemperatureAlert()
+            validateTemperature(showBlankError = false)
+            selectTemperatureRange(binding.etTemperature.text?.toString()?.toDoubleOrNull())
+            if (isHighTemperature()) {
+                showHighTemperatureAlert()
+            } else {
+                // Temperature no longer high — allow the alert to fire again
+                // the next time it crosses back above the threshold.
+                highTemperatureAlertShown = false
+            }
         }
 
         binding.rgTemperature.setOnCheckedChangeListener { _, checkedId ->
             // isFormLocked = true when loading existing data in view mode —
             // don't overwrite the actual saved temperature value in that case
+            if (isUpdatingTemperatureSelection) return@setOnCheckedChangeListener
             when (checkedId) {
+                R.id.rbTempHypothermia -> if (!isFormLocked) binding.etTemperature.setText("96.0")
                 R.id.rbTempNormal -> if (!isFormLocked) binding.etTemperature.setText("98.0")
                 R.id.rbTempHigh -> {
                     if (!isFormLocked) binding.etTemperature.setText("100.0")
@@ -104,7 +125,7 @@ class AnthropometryFragment : Fragment() {
         }
 
         binding.btnSubmit.setOnClickListener {
-//            if (!validateInput()) return@setOnClickListener
+            if (!validateInput()) return@setOnClickListener
             if (isHighTemperature()) showHighTemperatureAlert()
             viewModel.saveAnthropometry(
                 weightKg = binding.etWeight.text?.toString(),
@@ -120,23 +141,7 @@ class AnthropometryFragment : Fragment() {
                     binding.loadingOverlay.visibility = View.GONE
                     WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
                     Toast.makeText(requireContext(), R.string.save_successful, Toast.LENGTH_SHORT).show()
-                    when {
-                        viewModel.examineFlow -> {
-                            // Examine flow — return to AllBenFragment so user picks the next form
-                            val popped = findNavController().popBackStack(R.id.allBenFragment, false)
-                            if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
-                        }
-                        viewModel.autoFlow -> {
-                            val returnedToList = findNavController().popBackStack(R.id.allBenFragment, false)
-                            if (!returnedToList) {
-                                findNavController().navigate(
-                                    R.id.allBenFragment,
-                                    bundleOf("source" to 0)
-                                )
-                            }
-                        }
-                        else -> findNavController().popBackStack()
-                    }
+                    findNavController().navigateUp()
                     viewModel.resetState()
                 }
                 AnthropometryViewModel.State.SAVE_FAILED -> {
@@ -162,47 +167,59 @@ class AnthropometryFragment : Fragment() {
     }
 
     private fun validateInput(): Boolean {
-        var valid = true
-        binding.tilWeight.error = null
-        binding.tilHeight.error = null
-        binding.tilTemperature.error = null
+        return validateWeight(showBlankError = false) &&
+            validateHeight(showBlankError = false) &&
+            validateTemperature(showBlankError = false)
+    }
 
-        if (binding.etWeight.text.isNullOrBlank()) {
-            binding.tilWeight.error = getString(R.string.field_is_required, getString(R.string.weight_kgs))
-            valid = false
-        } else if (!isWithinRange(binding.etWeight.text?.toString(), MIN_WEIGHT_KG, MAX_WEIGHT_KG)) {
-            binding.tilWeight.error = getString(
-                R.string.enter_value_between,
-                getString(R.string.weight_kgs),
-                MIN_WEIGHT_KG.stripTrailingZero(),
-                MAX_WEIGHT_KG.stripTrailingZero()
-            )
-            valid = false
+    private fun validateWeight(showBlankError: Boolean): Boolean {
+        return validateOptionalRange(
+            value = binding.etWeight.text?.toString(),
+            min = MIN_WEIGHT_KG,
+            max = MAX_WEIGHT_KG,
+            errorMessage = getString(R.string.enter_weight_between_1_250_kg),
+            showBlankError = showBlankError,
+            onErrorChanged = { binding.tilWeight.error = it }
+        )
+    }
+
+    private fun validateHeight(showBlankError: Boolean): Boolean {
+        return validateOptionalRange(
+            value = binding.etHeight.text?.toString(),
+            min = MIN_HEIGHT_CM,
+            max = MAX_HEIGHT_CM,
+            errorMessage = getString(R.string.enter_height_between_30_250_cm),
+            showBlankError = showBlankError,
+            onErrorChanged = { binding.tilHeight.error = it }
+        )
+    }
+
+    private fun validateTemperature(showBlankError: Boolean): Boolean {
+        return validateOptionalRange(
+            value = binding.etTemperature.text?.toString(),
+            min = MIN_TEMPERATURE_F,
+            max = MAX_TEMPERATURE_F,
+            errorMessage = getString(R.string.enter_temperature_between_90_110_f),
+            showBlankError = showBlankError,
+            onErrorChanged = { binding.tilTemperature.error = it }
+        )
+    }
+
+    private fun validateOptionalRange(
+        value: String?,
+        min: Double,
+        max: Double,
+        errorMessage: String,
+        showBlankError: Boolean,
+        onErrorChanged: (String?) -> Unit
+    ): Boolean {
+        val trimmed = value?.trim().orEmpty()
+        if (trimmed.isBlank()) {
+            onErrorChanged(if (showBlankError) errorMessage else null)
+            return !showBlankError
         }
-        if (binding.etHeight.text.isNullOrBlank()) {
-            binding.tilHeight.error = getString(R.string.field_is_required, getString(R.string.height_cms))
-            valid = false
-        } else if (!isWithinRange(binding.etHeight.text?.toString(), MIN_HEIGHT_CM, MAX_HEIGHT_CM)) {
-            binding.tilHeight.error = getString(
-                R.string.enter_value_between,
-                getString(R.string.height_cms),
-                MIN_HEIGHT_CM.stripTrailingZero(),
-                MAX_HEIGHT_CM.stripTrailingZero()
-            )
-            valid = false
-        }
-        if (binding.etTemperature.text.isNullOrBlank()) {
-            binding.tilTemperature.error = getString(R.string.field_is_required, getString(R.string.temperature_degree_fahrenheit))
-            valid = false
-        } else if (!isWithinRange(binding.etTemperature.text?.toString(), MIN_TEMPERATURE_F, MAX_TEMPERATURE_F)) {
-            binding.tilTemperature.error = getString(
-                R.string.enter_value_between,
-                getString(R.string.temperature_degree_fahrenheit),
-                MIN_TEMPERATURE_F.stripTrailingZero(),
-                MAX_TEMPERATURE_F.stripTrailingZero()
-            )
-            valid = false
-        }
+        val valid = isWithinRange(trimmed, min, max)
+        onErrorChanged(if (valid) null else errorMessage)
         return valid
     }
 
@@ -211,24 +228,8 @@ class AnthropometryFragment : Fragment() {
         return number in min..max
     }
 
-    private fun formatAgeGender(ben: BenRegCache): String {
-        val ageUnit = when (ben.ageUnit) {
-            AgeUnit.DAYS -> getString(R.string.age_unit_days)
-            AgeUnit.MONTHS -> getString(R.string.age_unit_months)
-            AgeUnit.YEARS, null -> getString(R.string.age_unit_years)
-        }
-        val gender = when (ben.gender) {
-            Gender.MALE -> getString(R.string.gender_male)
-            Gender.FEMALE -> getString(R.string.gender_female)
-            Gender.TRANSGENDER -> getString(R.string.gender_transgender)
-            Gender.PREFER_NOT_TO_SAY -> getString(R.string.gender_prefer_not_to_say)
-            null -> ""
-        }
-        return getString(R.string.anthropometry_age_gender_format, ben.age, ageUnit, gender)
-    }
-
     private fun isHighTemperature(): Boolean =
-        (binding.etTemperature.text?.toString()?.toDoubleOrNull() ?: 0.0) >= 100.0
+        (binding.etTemperature.text?.toString()?.toDoubleOrNull() ?: 0.0) > FEVER_TEMPERATURE_F
 
     private fun showHighTemperatureAlert() {
         if (highTemperatureAlertShown) return
@@ -241,12 +242,14 @@ class AnthropometryFragment : Fragment() {
     }
 
     private fun selectTemperatureRange(temperature: Double?) {
-        val temp = temperature ?: return
-        if (temp >= 100.0) {
-            binding.rbTempHigh.isChecked = true
-        } else {
-            binding.rbTempNormal.isChecked = true
+        isUpdatingTemperatureSelection = true
+        when {
+            temperature == null -> binding.rgTemperature.clearCheck()
+            temperature < 97.0 -> binding.rbTempHypothermia.isChecked = true
+            temperature > FEVER_TEMPERATURE_F -> binding.rbTempHigh.isChecked = true
+            else -> binding.rbTempNormal.isChecked = true
         }
+        isUpdatingTemperatureSelection = false
     }
 
     private fun lockFormIfExistingData(ben: org.piramalswasthya.stoptb.model.BenRegCache) {
@@ -258,14 +261,17 @@ class AnthropometryFragment : Fragment() {
         binding.etWeight.isEnabled = false
         binding.etHeight.isEnabled = false
         binding.etTemperature.isEnabled = false
+        binding.rbTempHypothermia.isEnabled = false
         binding.rbTempNormal.isEnabled = false
         binding.rbTempHigh.isEnabled = false
         binding.btnSubmit.isEnabled = false
 
         val disabledGray = ContextCompat.getColor(requireContext(), R.color.read_only)
         val disabledGrayStateList = ColorStateList.valueOf(disabledGray)
+        binding.rbTempHypothermia.setTextColor(disabledGray)
         binding.rbTempNormal.setTextColor(disabledGray)
         binding.rbTempHigh.setTextColor(disabledGray)
+        binding.rbTempHypothermia.buttonTintList = disabledGrayStateList
         binding.rbTempNormal.buttonTintList = disabledGrayStateList
         binding.rbTempHigh.buttonTintList = disabledGrayStateList
         binding.btnSubmit.backgroundTintList = disabledGrayStateList

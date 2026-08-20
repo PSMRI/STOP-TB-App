@@ -8,7 +8,6 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.model.LocationEntity
 import org.piramalswasthya.stoptb.helpers.Languages
-import org.piramalswasthya.stoptb.helpers.setToStartOfTheDay
 import org.piramalswasthya.stoptb.model.AgeUnit
 import org.piramalswasthya.stoptb.model.BenBasicCache.Companion.getAgeFromDob
 import org.piramalswasthya.stoptb.model.BenBasicCache.Companion.getYearsFromDate
@@ -29,6 +28,7 @@ import org.piramalswasthya.stoptb.model.InputType.RADIO
 import org.piramalswasthya.stoptb.model.InputType.TEXT_VIEW
 import org.piramalswasthya.stoptb.model.LocationRecord
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel.Companion.isOtpVerified
+import org.piramalswasthya.stoptb.utils.Log
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -37,6 +37,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     private var currentLocation: LocationRecord? = null
 
     private val preferenceDao = PreferenceDao(context)
+    private var youngestParentDob: Long? = null
 
 
 
@@ -254,6 +255,14 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         arrayId = -1, required = true, etMaxLength = 2000,
         etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
     )
+    private val pinCode = FormElement(
+        id = 1058, inputType = EDIT_TEXT,
+        title = resources.getString(R.string.str_pincode),
+        arrayId = -1, required = true,
+        etInputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL,
+        etMaxLength = 6,
+        min = 100000, max = 999999
+    )
     private val state = FormElement(
         id = 1054, inputType = DROPDOWN,
         title = resources.getString(R.string.ben_reg_state),
@@ -439,18 +448,22 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     suspend fun setUpPage(
         ben: BenRegCache?,
         familyHeadPhoneNo: Long?,
+        familyHeadCommunityId: Int = 0,
         villageName: String? = null,
+        pinCodeValue: String? = null,
         villageNames: Array<String>? = null,
         villageEntityList: List<LocationEntity> = emptyList(),
         subCentreName: String? = null,
         relToHeadId: Int = -1,
-        spouseRegistrationRelToHeadId: Int = -1
+        spouseRegistrationRelToHeadId: Int = -1,
+        isNonHH: Boolean = false,
+        minimumChildDob: Long? = null
     ) {
         val list = mutableListOf(
             pic,
             dateOfReg,
-            personFrom,
-            typeOfCaseFinding,
+//            personFrom,
+//            typeOfCaseFinding,
             firstName,
             lastName,
             agePopup,
@@ -459,6 +472,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             contactNumber,
             mobileNoOfRelation,
             address,
+            pinCode,
 //            state,
 //            district,
 //            tu,
@@ -477,8 +491,12 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         )
 
         this.familyHeadPhoneNo = familyHeadPhoneNo?.toString()
+        this.youngestParentDob = minimumChildDob?.minus(24 * 60 * 60 * 1000L)
+        minimumChildDob?.let { childDobMin ->
+            agePopup.min = maxOf(agePopup.min ?: childDobMin, childDobMin)
+        }
 
-        if (relToHeadId >= 0) {
+        if (relToHeadId >= 0 && !isNonHH) {
             list.add(list.indexOf(gender) + 1, relationToHead)
             relationToHead.value = resources.getStringArray(R.array.nbr_relationship_to_head_src).getOrNull(relToHeadId)
             // Lock gender only when it was pre-selected from Add HoF Member dialog (not for HoF/Self)
@@ -492,13 +510,39 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         if (personFrom.value.isNullOrBlank()) personFrom.value = personFrom.entries?.firstOrNull()
         // PRD: default = "Active (Active Case Finding)" = index 1 in type_of_case_finding_array
         if (typeOfCaseFinding.value.isNullOrBlank()) typeOfCaseFinding.value = typeOfCaseFinding.entries?.getOrNull(1) ?: typeOfCaseFinding.entries?.firstOrNull()
-        contactNumber.value = familyHeadPhoneNo?.toString()
+        val normalizedFamilyHeadPhone = familyHeadPhoneNo
+            ?.takeIf { it > 0L && it != 9999999999L }
+        val hasFamilyHeadMobile = normalizedFamilyHeadPhone != null
+        isHeadOfFamilyRegistration = relToHeadId == 18
+        contactNumber.value = normalizedFamilyHeadPhone?.toString()
         contactNumber.isEnabled = true
-        mobileNotAvailable.value = null
-        if (mobileNoOfRelation.value.isNullOrBlank()) {
-            mobileNoOfRelation.value = mobileNoOfRelation.entries?.firstOrNull()
+        mobileNotAvailable.value = if (hasFamilyHeadMobile) null else "0"
+        mobileNotAvailable.isEnabled = true
+        contactNumber.required = hasFamilyHeadMobile
+        if (!hasFamilyHeadMobile) {
+            contactNumber.value = "9999999999"
+            list.remove(mobileNoOfRelation)
+            list.remove(otherMobileNoOfRelation)
         }
-        if (address.value.isNullOrBlank()) address.value = ""
+        if (mobileNoOfRelation.value.isNullOrBlank()) {
+            mobileNoOfRelation.value = if (isHeadOfFamilyRegistration) {
+                mobileNoOfRelation.entries?.firstOrNull()
+            } else if (hasFamilyHeadMobile) {
+                mobileNoOfRelation.entries?.getOrNull(4)
+            } else {
+                mobileNoOfRelation.entries?.firstOrNull()
+            }
+        }
+        if (address.value.isNullOrBlank()) {
+            address.value = villageName?.takeIf { it.isNotBlank() }
+                ?: ben?.locationRecord?.village?.name?.takeIf { it.isNotBlank() }
+                ?: ""
+        }
+        if (pinCode.value.isNullOrBlank()) {
+            pinCode.value = pinCodeValue?.trim()?.takeIf { it.isNotBlank() }
+                ?: ben?.pinCode?.trim()?.takeIf { it.isNotBlank() }
+                        ?: ""
+        }
         state.entries = arrayOf(ben?.locationRecord?.state?.name ?: "")
         district.entries = arrayOf(ben?.locationRecord?.district?.name ?: "")
         tu.entries = arrayOf(ben?.locationRecord?.tu?.name ?: "")
@@ -521,6 +565,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             applyDraftPrefill(prefill)
         }
 
+        if (relToHeadId >= 0 && familyHeadCommunityId > 0) {
+            community.value = community.getStringFromPosition(familyHeadCommunityId)
+        }
+
         ben?.takeIf { !it.isDraft }?.let { saved ->
             // Beneficiary Status (death)
             list.add(list.indexOf(lastName) + 1, beneficiaryStatus)
@@ -534,9 +582,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                 }
             }
             beneficiaryStatus.value = when (saved.isDeath) {
-                true -> BenStatus.Death.name
-                false -> BenStatus.Alive.name
-                null -> null
+                true -> beneficiaryStatus.entries?.getOrNull(1)
+                false -> beneficiaryStatus.entries?.getOrNull(0)
+                null -> beneficiaryStatus.entries?.getOrNull(0) // default to Alive
             }
             dateOfDeath.value    = saved.dateOfDeath
             timeOfDeath.value    = saved.timeOfDeath
@@ -546,7 +594,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
             pic.value        = saved.userImage
             dateOfReg.value  = getDateFromLong(saved.regDate)
-            dateOfReg.isEnabled = false          // edit mode — registration date not changeable
+            dateOfReg.isEnabled = true          // edit mode — registration date not changeable
             personFrom.value = saved.personFromId?.let { personFrom.getStringFromPosition(it) }
                 ?: saved.personFrom
                 ?: personFrom.entries?.firstOrNull()
@@ -595,9 +643,17 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             contactNumber.value = saved.contactNumber?.toString()
             if (contactNumber.value == "9999999999") {
                 mobileNotAvailable.value = "0"
-                contactNumber.isEnabled = false
+                contactNumber.required = false
+                contactNumber.isEnabled = true
+                mobileNotAvailable.isEnabled = true
+                list.remove(mobileNoOfRelation)
+                list.remove(otherMobileNoOfRelation)
+            } else {
+                contactNumber.required = true
+                mobileNotAvailable.isEnabled = true
             }
             address.value = saved.address ?: ""
+            pinCode.value = saved.pinCode ?: ""
             state.entries = arrayOf(saved.locationRecord.state.name)
             district.entries = arrayOf(saved.locationRecord.district.name)
             tu.entries = arrayOf(saved.locationRecord.tu?.name ?: "")
@@ -620,8 +676,16 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             occupationDrop.value = getLocalValueInArray(R.array.occupation_array, saved.occupation)
             setDefaultOccupationIfNeeded()
 
-            reproductiveStatus.value = saved.genDetails?.reproductiveStatus?.let {
-                normalizeReproductiveStatusForDisplay(it)
+
+            saved.genDetails?.reproductiveStatusId?.let { id ->
+
+                val value = when (id) {
+                    1 -> reproductiveStatus.entries?.getOrNull(0)
+                    2 -> reproductiveStatus.entries?.getOrNull(1)
+                    else -> null
+                }
+
+                reproductiveStatus.value = value
             }
         }
 
@@ -714,9 +778,25 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             healthFacility.value = it.healthFacility?.name ?: ""
         }
 
+        if (isNonHH) {
+            list.remove(pinCode)
+            pinCode.required = false
+        } else if (relToHeadId >= 0 && relToHeadId != 18) {
+            list.removeAll(
+                listOf( address,pinCode, villageHamlet, residentialAreaType, economicStatus)
+            )
+            address.required = false
+            pinCode.required = false
+            villageHamlet.required = false
+            residentialAreaType.required = false
+            economicStatus.required = false
+        }
 
         setUpPage(list)
+
+
     }
+
 
     private fun applyDraftPrefill(prefill: BenRegCache) {
         prefill.firstName?.takeIf { it.isNotBlank() }?.let { firstName.value = it }
@@ -726,6 +806,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         prefill.motherName?.takeIf { it.isNotBlank() }?.let { motherName.value = it }
         prefill.contactNumber?.let { contactNumber.value = it.toString() }
         prefill.address?.takeIf { it.isNotBlank() }?.let { address.value = it }
+        prefill.pinCode?.takeIf { it.isNotBlank() }?.let { pinCode.value = it }
         prefill.economicStatusId?.takeIf { it > 0 }?.let {
             economicStatus.value = economicStatus.getStringFromPosition(it)
         }
@@ -741,12 +822,13 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     }
 
     // Keep setFirstPageToRead as alias for backward compat with ViewModel
-    suspend fun setFirstPageToRead(ben: BenRegCache?, familyHeadPhoneNo: Long?, villageName: String? = null, villageNames: Array<String>? = null, villageEntityList: List<LocationEntity> = emptyList(), subCentreName: String? = null, relToHeadId: Int = -1) =
-        setUpPage(ben, familyHeadPhoneNo, villageName, villageNames, villageEntityList, subCentreName, relToHeadId)
+    suspend fun setFirstPageToRead(ben: BenRegCache?, familyHeadPhoneNo: Long?, familyHeadCommunityId: Int = 0, villageName: String? = null,  pinCodeValue: String? = null, villageNames: Array<String>? = null, villageEntityList: List<LocationEntity> = emptyList(), subCentreName: String? = null, relToHeadId: Int = -1,isNonHH: Boolean = false) =
+        setUpPage(ben, familyHeadPhoneNo, familyHeadCommunityId, villageName, pinCodeValue,villageNames, villageEntityList, subCentreName, relToHeadId,isNonHH = isNonHH)
 
 
     private var familyHeadPhoneNo: String? = null
     private var villageEntities: List<LocationEntity> = emptyList()
+    private var isHeadOfFamilyRegistration: Boolean = false
 
     fun hasThirdPage(): Boolean {
         return (getAgeFromDob(getLongFromDate(agePopup.value)) >= Konstants.minAgeForGenBen
@@ -766,19 +848,12 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         maritalStatus.required = shouldRequireMaritalStatus()
     }
 
-    private fun setDefaultMaritalStatusIfNeeded() {
-        if (maritalStatus.value.isNullOrBlank()) {
-            maritalStatus.value = maritalStatus.entries?.getOrNull(2)
-        }
-    }
-
     private fun addMaritalStatusIfApplicable(list: MutableList<FormElement>) {
         if (!shouldShowMaritalStatus()) {
             maritalStatus.value = null
             return
         }
         updateMaritalStatusRequirement()
-        setDefaultMaritalStatusIfNeeded()
         if (list.contains(maritalStatus)) return
 
         val villageIndex = list.indexOf(villageHamlet)
@@ -790,8 +865,12 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         val selectedGender = gender.value
         val selectedMaritalStatus = maritalStatus.value
         val marriedValue = maritalStatus.entries?.getOrNull(1)
+        val age = agePopup.value
+            ?.let { runCatching { getAgeFromDob(getLongFromDate(it)) }.getOrDefault(0) }
+            ?: 0
         return selectedGender == gender.entries?.getOrNull(1) &&
-                selectedMaritalStatus == marriedValue
+                selectedMaritalStatus == marriedValue &&
+                age in 15..49
     }
 
     private fun addReproductiveStatusIfApplicable(list: MutableList<FormElement>) {
@@ -859,7 +938,22 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             }
 
             agePopup.id -> {
+
                 val age = try { getAgeFromDob(getLongFromDate(agePopup.value)) } catch (_: Exception) { 0 }
+                validateChildAgeAgainstParent()
+
+                // Refresh reason of death when age changes and beneficiary is already marked Death
+                if (beneficiaryStatus.value == BenStatus.Death.name) {
+                    val showMaternal = shouldShowMaternalDeath(gender.value, agePopup.value)
+
+                    reasonOfDeath.entries = if (showMaternal) {
+                        resources.getStringArray(R.array.reason_of_death_array_with_maternal)
+                    } else {
+                        resources.getStringArray(R.array.reason_of_death_array)
+                    }
+
+                    reasonOfDeath.value = null
+                }
 
                 // Spouse sub-fields (depend on marital status)
                 val spouseFields = listOf(husbandName, wifeName, spouseName, ageAtMarriage, dateOfMarriage, reproductiveStatus)
@@ -890,11 +984,19 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                             addItems = emptyList()
                         )
                     } else {
-                        // Normal case: remove all marital fields and re-add maritalStatus after villageHamlet
+                        // Normal case: remove all marital fields and re-add maritalStatus after villageHamlet.
+                        // Guard against villageHamlet being absent from the list (e.g. hidden for
+                        // household-member registrations) — indexOf would return -1, and the
+                        // generic fallback in triggerDependants would insert at position 0 (top of form).
+                        // Fall back to appending at the end instead.
+                        val villageIndex = getIndexOfElement(villageHamlet)
+                        val safePosition = if (villageIndex >= 0) villageIndex + 1 else -2 // -2 = append at end
+
                         triggerDependants(
                             source = villageHamlet,
                             removeItems = listOf(maritalStatus) + spouseFields,
-                            addItems = listOf(maritalStatus)
+                            addItems = listOf(maritalStatus),
+                            position = safePosition
                         )
                     }
 
@@ -905,9 +1007,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                                            else           R.array.nbr_marital_status_male_array
 
                     if (!isMaritalLocked) {
-                        // Normal: restore previous selection or set default
+                        // Normal: restore previous selection, but do not default to Unknown.
                         maritalStatus.value = savedMarital
-                        setDefaultMaritalStatusIfNeeded()
                     }
                     // Locked: maritalStatus.value was not in removeItems → still "Married" ✓
 
@@ -921,8 +1022,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                             else -> null
                         }
                         val fieldsToAdd = mutableListOf<FormElement>()
-                        if (isFemale) fieldsToAdd.add(reproductiveStatus) // "Are you pregnant?" before spouse name
                         spouseField?.let { fieldsToAdd.add(it) }
+                        if (shouldShowReproductiveStatus()) fieldsToAdd.add(reproductiveStatus)
 
                         if (fieldsToAdd.isNotEmpty()) {
                             triggerDependants(
@@ -979,7 +1080,6 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                     1 -> R.array.nbr_marital_status_female_array
                     else -> R.array.nbr_marital_status_male_array
                 }
-                setDefaultMaritalStatusIfNeeded()
                 updateMaritalStatusRequirement()
 
                 triggerDependants(
@@ -1014,14 +1114,18 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                         wifeName.required = false
                         updateReproductiveOptionsBasedOnAgeGender(formId = maritalStatus.id)
                         if (gender.value == gender.entries!![1]) {
+                            val itemsToAdd = mutableListOf(husbandName)
+                            if (shouldShowReproductiveStatus()) {
+                                itemsToAdd.add(reproductiveStatus)
+                            }
                             triggerDependants(
                                 source = maritalStatus,
-                                addItems = listOf(reproductiveStatus, husbandName),
+                                addItems = itemsToAdd,
                                 removeItems = listOf(wifeName, husbandName, spouseName, ageAtMarriage, dateOfMarriage, reproductiveStatus)
                             )
                         } else {
                             triggerDependants(
-                                source = motherName,
+                                source = maritalStatus,
                                 addItems = when (gender.value) {
                                     gender.entries!![0] -> listOf(wifeName)
                                     else -> listOf(spouseName)
@@ -1063,6 +1167,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             }
 
             contactNumber.id -> {
+                if (isMobileNotAvailableChecked()) {
+                    contactNumber.errorText = null
+                    return -1
+                }
                 validateEmptyOnEditText(contactNumber)
                 validateMobileNumberOnEditText(contactNumber)
                 return -1
@@ -1072,20 +1180,47 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                 if (isChecked) {
                     // Keep checkbox value in index format so adapter can render it checked.
                     mobileNotAvailable.value = "0"
+                    contactNumber.required = false
                     contactNumber.value = "9999999999"
                     contactNumber.errorText = null
-                    contactNumber.isEnabled = false
+                    contactNumber.isEnabled = true
+                    triggerDependants(
+                        source = contactNumber,
+                        passedIndex = 1,
+                        triggerIndex = 0,
+                        target = listOf(mobileNoOfRelation),
+                        targetSideEffect = listOf(otherMobileNoOfRelation)
+                    )
                 } else {
                     mobileNotAvailable.value = null
+                    contactNumber.required = true
                     contactNumber.isEnabled = true
                     contactNumber.value = null
                     contactNumber.errorText = null
+                    if (mobileNoOfRelation.value.isNullOrBlank()) {
+                        mobileNoOfRelation.value = if (isHeadOfFamilyRegistration) {
+                            mobileNoOfRelation.entries?.firstOrNull()
+                        } else if (familyHeadPhoneNo != null) {
+                            mobileNoOfRelation.entries?.getOrNull(4)
+                        } else {
+                            mobileNoOfRelation.entries?.firstOrNull()
+                        }
+                    }
+                    triggerDependants(
+                        source = contactNumber,
+                        passedIndex = 0,
+                        triggerIndex = 0,
+                        target = listOf(mobileNoOfRelation)
+                    )
                 }
                 return 1
             }
             address.id -> {
                 validateEmptyOnEditText(address)
-                validateAllAlphabetsSpaceOnEditText(address)
+                return -1
+            }
+            pinCode.id -> {
+                validatePincodeOnEditText(pinCode)
                 return -1
             }
             state.id -> {
@@ -1136,6 +1271,22 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         }
     }
 
+    private fun validateChildAgeAgainstParent() {
+        val parentDob = youngestParentDob ?: run {
+            agePopup.errorText = null
+            return
+        }
+        val selectedDob = agePopup.value?.let { runCatching { getLongFromDate(it) }.getOrNull() } ?: run {
+            agePopup.errorText = null
+            return
+        }
+        agePopup.errorText = if (selectedDob <= parentDob) {
+            resources.getString(R.string.child_age_less_than_parent_error)
+        } else {
+            null
+        }
+    }
+
     // ─────────────────────────── MAP VALUES ───────────────────────────
 
     override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
@@ -1183,6 +1334,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             ben.typeOfCaseFinding = typeOfCaseFinding.getEnglishStringFromPosition(ben.typeOfCaseFindingId ?: 0)
             ben.mobileNumberAvailable = !isMobileNotAvailableChecked()
             ben.address = address.value
+            ben.pinCode = pinCode.value?.trim()?.takeIf { it.isNotEmpty() }
 
             val relPos = relationToHead.getPosition()
             if (relPos >= 0) {
@@ -1281,6 +1433,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                 val reproductiveMap = mapOf(
                     "Yes" to 1,
                     "No" to 2,
+                    "हाँ" to 1,
+                    "नहीं" to 2,
                     "Women Pregnant" to 1,
                     "Women Not Pregnant" to 2,
                     "Pregnant Woman" to 1,
@@ -1289,6 +1443,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                     "Permanently Sterilised" to 2,
                     "Not Applicable" to 2
                 )
+
                 gen.reproductiveStatusId = reproductiveMap[selectedValue] ?: 0
                 gen.reproductiveStatus   = selectedValue
             }
@@ -1307,6 +1462,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     }
 
     // ─────────────────────────── HELPERS ───────────────────────────
+
+    fun isDeathSelected(): Boolean {
+        return beneficiaryStatus.value == BenStatus.Death.name
+    }
 
     fun getIndexOfAgeAtMarriage()  = -1
     fun getIndexOfContactNumber()  = getIndexOfElement(contactNumber)

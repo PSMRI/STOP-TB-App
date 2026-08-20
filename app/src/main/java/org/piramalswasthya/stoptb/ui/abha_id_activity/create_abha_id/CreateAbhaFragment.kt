@@ -97,16 +97,19 @@ class CreateAbhaFragment : Fragment() {
     }
 
     private val exitAlert by lazy {
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(resources.getString(R.string.exit)).setCancelable(false)
-            .setMessage(resources.getString(R.string.do_you_want_to_go_back))
-            .setPositiveButton(resources.getString(R.string.yes)) { _, _ ->
+        MaterialAlertDialogBuilder(requireContext()).apply {
+            setTitle(getString(R.string.exit))
+            setMessage(getString(R.string.do_you_want_to_go_back))
+            setCancelable(false)
+
+            setPositiveButton(getString(R.string.yes)) { _, _ ->
                 activity?.finish()
             }
-            .setNegativeButton(resources.getString(R.string.no)) { d, _ ->
-                d.dismiss()
+
+            setNegativeButton(getString(R.string.no)) { dialog, _ ->
+                dialog.dismiss()
             }
-            .create()
+        }.create()
     }
 
     private val beneficiaryDisclaimer by lazy {

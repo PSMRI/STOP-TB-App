@@ -13,9 +13,17 @@ on:
         required: true
         default: '3'
 
+permissions:
+  contents: read
+
+concurrency:
+  group: distribute-uat-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-distribute:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout code
@@ -27,6 +35,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -55,6 +69,10 @@ jobs:
           echo "VERSION=${{ github.event.inputs.versionName }}" > version/version.properties
           echo "VERSIONCODE=${{ github.event.inputs.versionCode }}" >> version/version.properties
 
+      - name: Decode debug keystore
+        run: |
+          echo "${{ secrets.DEBUG_KEYSTORE_FILE }}" | base64 --decode > $GITHUB_WORKSPACE/app/debug-keystore.jks
+
       - name: Build UAT Debug APK
         env:
           ENCRYPTED_PASS_KEY: ${{ secrets.ENCRYPTED_PASS_KEY }}
@@ -65,7 +83,12 @@ jobs:
           ABHA_TOKEN_URL: ${{ secrets.ABHA_TOKEN_URL }}
           ABHA_AUTH_URL: ${{ secrets.ABHA_AUTH_URL }}
           CHAT_URL: ${{ secrets.CHAT_URL }}
-        run: ./gradlew assembleStoptbUatDebug --no-daemon
+        run: >
+          ./gradlew assembleStoptbUatDebug --no-daemon
+          -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/app/debug-keystore.jks
+          -Pandroid.injected.signing.store.password=${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
+          -Pandroid.injected.signing.key.alias=${{ secrets.DEBUG_KEY_ALIAS }}
+          -Pandroid.injected.signing.key.password=${{ secrets.DEBUG_KEY_PASSWORD }}
 
       - name: Upload APK as artifact
         uses: actions/upload-artifact@v4

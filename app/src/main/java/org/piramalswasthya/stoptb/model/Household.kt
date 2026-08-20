@@ -7,9 +7,13 @@ import androidx.room.PrimaryKey
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import org.piramalswasthya.stoptb.configuration.FormDataModel
+import org.piramalswasthya.stoptb.utils.toGpsTimestampLong
 
 
 data class HouseholdFamily(
+    var totalHhMembers: Int? = null,
+    var isRegisteredAtCampSite: String? = null,
+    var isRegisteredAtCampSiteId: Int = 0,
     var familyHeadName: String? = null,
     var familyName: String? = null,
     var familyHeadPhoneNo: Long? = null,
@@ -20,6 +24,9 @@ data class HouseholdFamily(
     var rationCardDetails: String? = null,
     var povertyLine: String? = null,
     var povertyLineId: Int = 0,
+    var address: String? = null,
+    var pinCode: String? = null,
+
 )
 
 data class HouseholdDetails(
@@ -67,7 +74,14 @@ data class HouseholdCache(
     @Embedded(prefix = "fam_") var family: HouseholdFamily? = null,
     @Embedded(prefix = "det_") var details: HouseholdDetails? = null,
     @Embedded(prefix = "amn_") var amenities: HouseholdAmenities? = null,
-    @Embedded(prefix = "loc_") val locationRecord: LocationRecord,
+    @Embedded(prefix = "loc_") var locationRecord: LocationRecord,
+    // GPS location captured at registration time
+    var gpsLatitude: Double? = null,
+    var gpsLongitude: Double? = null,
+    var digipin: String? = null,
+    var gpsTimestamp: String? = null,
+    @ColumnInfo(defaultValue = "0") var isGpsUnavailable: Boolean = false,
+    var gpsUnavailableReason: String? = null,
     //Spam
     var registrationType: String? = null,
     var serverUpdatedStatus: Int = 0,
@@ -83,6 +97,10 @@ data class HouseholdCache(
 
     fun asNetworkModel(user: User): HouseholdNetwork {
         return HouseholdNetwork(
+            totalHhMembers = family?.totalHhMembers,
+            registeredAtCampSite = family?.isRegisteredAtCampSite,
+            registeredAtCampSiteId = family?.isRegisteredAtCampSiteId ?: 0,
+
             Countyid = locationRecord.country.id,
             Processed = processed,
             providerServiceMapID = user.serviceMapId,
@@ -130,12 +148,21 @@ data class HouseholdCache(
             villageid = locationRecord.village.id,
             familyName = family?.familyName,
 
+            address = family?.address ?: "null",        // NEW
+            pincode = family?.pinCode?.toIntOrNull() ?: 0, // NEW — see note below
+
             wardNo = family?.wardNo,
             wardName = family?.wardName,
             mohallaName = family?.mohallaName,
             rationCardDetails = family?.rationCardDetails,
             districtname = locationRecord.district.name,
-            isDeactivate = isDeactivate
+            isDeactivate = isDeactivate,
+            latitude = gpsLatitude,
+            longitude = gpsLongitude,
+            digipin = digipin,
+            gpsTimestamp = gpsTimestamp.toGpsTimestampLong(),
+            isGpsUnavailable = isGpsUnavailable,
+            gpsUnavailableReason = gpsUnavailableReason
         )
 
     }
@@ -144,6 +171,10 @@ data class HouseholdCache(
 
 @JsonClass(generateAdapter = true)
 data class HouseholdNetwork(
+    @Json(name = "totalHhMembers") val totalHhMembers: Int? = null,
+    @Json(name = "registeredAtCampSite") val registeredAtCampSite: String? = null,
+    @Json(name = "registeredAtCampSiteId") val registeredAtCampSiteId: Int = 0,
+
     @Json(name = "houseoldId") val householdId: String,
     @Json(name = "ashaid") val ashaId: Int,
     @Json(name = "benficieryid") val benId: Long = 0,
@@ -156,6 +187,9 @@ data class HouseholdNetwork(
 
     val familyHeadPhoneNo: String,
     @Json(name = "houseno") val houseNo: String,
+
+    @Json(name = "address") val address: String? = null,   // NEW
+
 
     val wardNo: String? = null,
 
@@ -254,7 +288,14 @@ data class HouseholdNetwork(
     @Json(name = "blockid") val blockid: Int = 0,
 
     @Json(name = "villageid") val villageid: Int = 0,
-    @Json(name = "isDeactivate")var isDeactivate: Boolean =false
+    @Json(name = "isDeactivate")var isDeactivate: Boolean =false,
+
+    @Json(name = "latitude") val latitude: Double? = null,
+    @Json(name = "longitude") val longitude: Double? = null,
+    @Json(name = "digipin") val digipin: String? = null,
+    @Json(name = "gpsTimestamp") val gpsTimestamp: Long? = null,
+    @Json(name = "isGpsUnavailable") val isGpsUnavailable: Boolean? = null,
+    @Json(name = "gpsUnavailableReason") val gpsUnavailableReason: String? = null
 
     )
 
