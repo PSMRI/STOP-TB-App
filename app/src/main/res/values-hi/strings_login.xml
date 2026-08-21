@@ -3,9 +3,9 @@
     <!--    Login-->
     <string name="tv_text_welcome">स्वागत</string>
     <string name="tv_text_welcome_user">स्वागत, %s</string>
-    <string name="login_app_native_name">स्टॉप टीबी</string>
+        <string name="login_app_native_name">टीबी मुक्त जनजाति अभियान</string>
+    <string name="login_app_native_name_uat">टीबी मुक्त जनजाति अभियान-यूएटी</string>
     <string name="tv_text_sign_in">लॉग इन</string>
-    <string name="login_app_native_name_uat">स्टॉप टीबी-यूएटी</string>
     <string name="tv_text_select_language">कृपया अपनी भाषा का चयन कीजिए</string>
     <string name="text_english" translatable="false">English</string>
     <string name="text_hindi" translatable="false">हिंदी</string>
@@ -40,7 +40,7 @@
     <string name="session_expired_message">आपका सत्र समाप्त हो गया है। कृपया पुनः लॉग इन करें।</string>
     <string name="cd_assam_nhm_logo">असम NHM लोगो</string>
     <string name="cd_piramal">पीरामल लोगो</string>
-    <string name="pwr_by_text" translatable="false">द्वारा संचालित\n <b>स्टॉप टीबी</b></string>
+    <string name="pwr_by_text" translatable="false">द्वारा संचालित\n <b>टीबीएमजेए</b></string>
 
 
     <string name="camp_hub_url_hint">कैंप हब URL</string>
