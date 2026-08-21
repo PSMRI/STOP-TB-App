@@ -38,8 +38,8 @@
 
     <!--    HBNC-->
 
-    <string name="title_activity_home" translatable="false">STOP TB</string>
-    <string name="splash_stop_tb" translatable="false">Stop TB</string>
+    <string name="title_activity_home" translatable="false">TBMJA</string>
+    <string name="splash_stop_tb" translatable="false">TBMJA</string>
     <string name="splash_tagline" translatable="false">Screen early. Treat early.</string>
     <string name="nav_header_desc" translatable="false">Navigation header</string>
 
@@ -396,7 +396,7 @@
     <string name="relation_with_hof">Relation with HOF</string>
     <string name="add_family_member">Add Family Member</string>
     <string name="add_household_member">Add HoF Member</string>
-    <string name="app_native_name">StopTB</string>
+    <string name="app_native_name">TBMJA</string>
     <string name="non_pregnant_women_eligible_couple_section">Non-Pregnant Women (Eligible Couple) section</string>
     <string name="time_of_death">Time of Death</string>
     <string name="reason_for_death">Reason for Death</string>
