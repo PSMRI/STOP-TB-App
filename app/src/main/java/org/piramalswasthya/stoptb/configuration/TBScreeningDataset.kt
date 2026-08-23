@@ -174,7 +174,8 @@ class TBScreeningDataset(
         title = resources.getString(R.string.key_population_risk_factors),
         entries = emptyArray(),
         required = true,
-        showAsMultiSelectDialog = true
+        showAsMultiSelectDialog = true,
+        enableSearchInMultiSelect = true
     )
 
     private val hivStatus = FormElement(
@@ -237,14 +238,12 @@ class TBScreeningDataset(
         if (saved == null) {
             dateOfVisit.value = getDateFromLong(System.currentTimeMillis())
             val pregnancyIndex = riskFactorOptions.indexOfFirst { it.code == "PREGNANCY" }
-            val notApplicableIndex = riskFactorOptions.indexOfFirst { it.code == "NOT_APPLICABLE" }
 
             keyPopulationRiskFactors.value = when {
                 isPregnantBen && pregnancyIndex >= 0 -> pregnancyIndex.toString()
-                notApplicableIndex >= 0 -> notApplicableIndex.toString()
                 else -> null
             }
-            hivStatus.value = hivStatusOptions.first { it.code == "UNKNOWN" }.label
+            hivStatus.value = null
         } else {
             dateOfVisit.value        = getDateFromLong(saved.visitDate)
             isCoughing.value         = boolToYesNo(saved.coughMoreThan2Weeks)
@@ -273,7 +272,7 @@ class TBScreeningDataset(
                 it.id == saved.hivStatusId ||
                         saved.hivStatus.equals(it.code, true) ||
                         saved.hivStatus.equals(it.label, true)
-            }?.label ?: hivStatusOptions.first { it.code == "UNKNOWN" }.label
+            }?.label
         }
 
         setUpPage(buildFormList())
@@ -401,7 +400,6 @@ class TBScreeningDataset(
     fun getIndexOfAsymptomatic(): Int = listFlow.value.indexOf(isAsymptomatic)
 
     private fun buildFormList(): List<FormElement> = listOf(
-        dateOfVisit,
         isCoughing,
         bloodInSputum,
         isFever,
