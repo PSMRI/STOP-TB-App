@@ -147,10 +147,12 @@ interface TBDao {
     ): Flow<Int>
 
 
-    // Dashboard query - Presumptive TB: any starred verbal screening symptom = Yes
+    // Dashboard query - Presumptive TB: any starred verbal screening symptom = Yes OR Positive Chest X-ray
     @Query("""
-    SELECT COUNT(*) FROM TB_SCREENING ts
+    SELECT COUNT(DISTINCT ts.benId) FROM TB_SCREENING ts
     INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
+    LEFT JOIN TB_SUSPECTED tsu ON b.beneficiaryId = tsu.benId
+    LEFT JOIN TB_DIAGNOSTICS td ON b.beneficiaryId = td.benId
     WHERE (
         ts.coughMoreThan2Weeks = 1
         OR ts.bloodInSputum = 1
@@ -162,7 +164,17 @@ interface TBDao {
         OR ts.familySufferingFromTB = 1
         OR ts.contactWithTBPatient = 1
         OR ts.historyOfTBInLastFiveYrs = 1
+        OR ts.historyOfTb = 1
+        OR ts.takingAntiTBDrugs = 1
+        OR UPPER(IFNULL(tsu.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+        OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
     )
+    AND IFNULL(tsu.isConfirmed, 0) = 0
+    AND IFNULL(tsu.isTBConfirmed, 0) = 0
+    AND IFNULL(td.isTBConfirmed, 0) = 0
+    AND UPPER(IFNULL(td.naatResult, '')) != 'POSITIVE'
+    AND UPPER(IFNULL(td.liquidCultureResult, '')) != 'POSITIVE'
+    AND NOT EXISTS (SELECT 1 FROM TB_CONFIRMED_TREATMENT tc WHERE tc.benId = b.beneficiaryId)
     AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
     AND (:startTime = 0 OR ts.visitDate >= :startTime)
     AND (:endTime = 0 OR ts.visitDate <= :endTime)
@@ -186,7 +198,8 @@ interface TBDao {
         AND (:endTime = 0 OR ts.visitDate <= :endTime)
         AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-        AND ((:positive = 1 AND ts.historyOfTb = 1) OR (:positive = 0 AND ts.historyOfTb = 0))
+        AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
+        AND ts.historyOfTb = 1
     """)
     fun getDashboardPastHistoryTbCount(
         villageId: Int,
@@ -195,7 +208,7 @@ interface TBDao {
         endTime: Long,
         gender: String,
         isChild: Int,
-        positive: Int,
+        isSeniorCitizen: Int
     ): Flow<Int>
 
     @Query("""
@@ -206,7 +219,8 @@ interface TBDao {
         AND (:endTime = 0 OR ts.visitDate <= :endTime)
         AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-        AND ((:positive = 1 AND ts.takingAntiTBDrugs = 1) OR (:positive = 0 AND ts.takingAntiTBDrugs = 0))
+        AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
+        AND ts.takingAntiTBDrugs = 1
     """)
     fun getDashboardAntiTbDrugsCount(
         villageId: Int,
@@ -215,7 +229,7 @@ interface TBDao {
         endTime: Long,
         gender: String,
         isChild: Int,
-        positive: Int,
+        isSeniorCitizen: Int
     ): Flow<Int>
 
     // Dashboard queries - TB Suspected count by gender with time + village filter
@@ -283,7 +297,8 @@ interface TBDao {
         SELECT COUNT(*) FROM (
             SELECT b.beneficiaryId FROM TB_SUSPECTED ts
             INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-            WHERE ts.isChestXRayDone IS NOT NULL
+            LEFT JOIN TB_DIAGNOSTICS td ON td.benId = ts.benId
+            WHERE ts.isChestXRayDone = 1 AND (td.benId IS NULL OR td.xrayOrderStatus = 'COMPLETED')
             AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
             AND (:startTime = 0 OR ts.visitDate >= :startTime)
             AND (:endTime = 0 OR ts.visitDate <= :endTime)
@@ -293,7 +308,7 @@ interface TBDao {
             UNION
             SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
             INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
-            WHERE td.isChestXRayDone IS NOT NULL
+            WHERE td.isChestXRayDone = 1 AND td.xrayOrderStatus = 'COMPLETED'
             AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
             AND (:startTime = 0 OR td.visitDate >= :startTime)
             AND (:endTime = 0 OR td.visitDate <= :endTime)
@@ -308,7 +323,8 @@ interface TBDao {
         SELECT COUNT(*) FROM (
             SELECT b.beneficiaryId FROM TB_SUSPECTED ts
             INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-            WHERE ts.isSputumCollected IS NOT NULL
+            LEFT JOIN TB_DIAGNOSTICS td ON td.benId = ts.benId
+            WHERE ts.isSputumCollected = 1 AND (td.benId IS NULL OR td.trueNatOrderStatus IN ('COMPLETED', 'REFUSED'))
             AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
             AND (:startTime = 0 OR ts.visitDate >= :startTime)
             AND (:endTime = 0 OR ts.visitDate <= :endTime)
@@ -318,7 +334,7 @@ interface TBDao {
             UNION
             SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
             INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
-            WHERE td.isSputumCollected IS NOT NULL
+            WHERE td.isSputumCollected = 1 AND td.trueNatOrderStatus IN ('COMPLETED', 'REFUSED')
             AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
             AND (:startTime = 0 OR td.visitDate >= :startTime)
             AND (:endTime = 0 OR td.visitDate <= :endTime)
@@ -333,7 +349,8 @@ interface TBDao {
         SELECT COUNT(*) FROM (
             SELECT b.beneficiaryId FROM TB_SUSPECTED ts
             INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-            WHERE ts.isNaatConducted IS NOT NULL
+            LEFT JOIN TB_DIAGNOSTICS td ON td.benId = ts.benId
+            WHERE ts.isNaatConducted = 1 AND (td.benId IS NULL OR td.trueNatOrderStatus = 'COMPLETED')
             AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
             AND (:startTime = 0 OR ts.visitDate >= :startTime)
             AND (:endTime = 0 OR ts.visitDate <= :endTime)
@@ -343,7 +360,7 @@ interface TBDao {
             UNION
             SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
             INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
-            WHERE td.isNaatConducted IS NOT NULL
+            WHERE td.isNaatConducted = 1 AND td.trueNatOrderStatus = 'COMPLETED'
             AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
             AND (:startTime = 0 OR td.visitDate >= :startTime)
             AND (:endTime = 0 OR td.visitDate <= :endTime)
@@ -358,7 +375,7 @@ interface TBDao {
         SELECT COUNT(*) FROM (
             SELECT b.beneficiaryId FROM TB_SUSPECTED ts
             INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-            WHERE ts.isLiquidCultureConducted IS NOT NULL
+            WHERE ts.isLiquidCultureConducted = 1
             AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
             AND (:startTime = 0 OR ts.visitDate >= :startTime)
             AND (:endTime = 0 OR ts.visitDate <= :endTime)
@@ -368,7 +385,7 @@ interface TBDao {
             UNION
             SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
             INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
-            WHERE td.isLiquidCultureConducted IS NOT NULL
+            WHERE td.isLiquidCultureConducted = 1
             AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
             AND (:startTime = 0 OR td.visitDate >= :startTime)
             AND (:endTime = 0 OR td.visitDate <= :endTime)
