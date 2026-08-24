@@ -2503,9 +2503,11 @@ class TBRepo @Inject constructor(
     suspend fun getVendorHealth(orderType: String): NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
             try {
-                if (!hasValidatedInternet()) {
-                    Timber.d("Skipping getVendorHealth for $orderType: internet is unavailable")
-                    return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Internet unavailable")
+                if (!preferenceDao.isCampModeEnabled()) {
+                    return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Camp Mode is disabled")
+                }
+                if (!preferenceDao.isCampHubConnected()) {
+                    return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Camp Hub is disconnected")
                 }
                 val response = tmcNetworkApiService.getVendorHealth(orderType)
                 val statusCode = response.code()
@@ -2538,14 +2540,15 @@ class TBRepo @Inject constructor(
         val health = getVendorHealth(orderType)
         if (health is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
             val dataStr = health.data
-            return dataStr?.contains("isDeviceIntegrated: true") == true
+            return dataStr?.contains("isDeviceIntegrated: true") == true &&
+                    dataStr?.contains("isConnected: true") == true
         }
         return false
     }
 
     suspend fun refreshDeviceIntegrationConfig() {
-        if (!hasValidatedInternet()) {
-            Timber.d("Skipping refreshDeviceIntegrationConfig: internet is unavailable")
+        if (!preferenceDao.isCampModeEnabled() || !preferenceDao.isCampHubConnected()) {
+            Timber.d("Skipping refreshDeviceIntegrationConfig: Camp Mode is disabled or Camp Hub is disconnected")
             return
         }
         val xrayVal = checkDeviceIntegration("XRAY_CHEST")
@@ -2562,15 +2565,7 @@ class TBRepo @Inject constructor(
         return preferenceDao.getTruenatIntegrated()
     }
 
-    private fun hasValidatedInternet(): Boolean {
-        val connectivityManager =
-            context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-                ?: return false
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-    }
+
 
     private fun isChestXrayPositive(value: String?): Boolean {
         if (value.isNullOrBlank()) return false
