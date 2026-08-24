@@ -96,7 +96,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
     private fun setDefaultOccupationIfNeeded() {
         if (occupationDrop.value.isNullOrBlank()) {
-            occupationDrop.value = null
+            occupationDrop.value = occupationDrop.entries?.firstOrNull()
         }
     }
 
@@ -1413,8 +1413,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             }
 
             // Occupation
+            val defaultOccupation = englishResources.getStringArray(R.array.occupation_array).first()
             ben.occupation = getEnglishValueInArray(R.array.occupation_array, occupationDrop.value)
-                ?.ifEmpty { null }
+                ?.ifEmpty { defaultOccupation }
+                ?: defaultOccupation
 
             // Marital Status
             ben.genDetails?.maritalStatusId = maritalStatus.getPosition()
