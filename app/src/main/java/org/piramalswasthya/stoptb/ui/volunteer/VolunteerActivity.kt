@@ -108,6 +108,9 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
                 val reached = pingCampHub()
                 if (pref.isCampModeEnabled()) {           // double-check after IO
                     pref.setCampHubConnected(reached)
+                    if (reached) {
+                        org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(applicationContext)
+                    }
                     runOnUiThread { refreshCampHubOfflineBanner() }
                 }
             }
