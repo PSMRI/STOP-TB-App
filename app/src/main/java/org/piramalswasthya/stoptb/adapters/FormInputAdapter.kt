@@ -24,8 +24,12 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
+import android.widget.ArrayAdapter
 import android.widget.CheckBox
+import android.widget.CheckedTextView
+import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ListView
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.TextView
@@ -723,45 +727,156 @@ class FormInputAdapter(
                 val labels = item.entries ?: emptyArray()
                 val checkedItems = BooleanArray(labels.size) { index -> selectedIndexes.contains(index) }
 
-                lateinit var dialogRef: AlertDialog
-                val builder = AlertDialog.Builder(binding.root.context)
-                    .setTitle(item.title)
-                    .setMultiChoiceItems(labels, checkedItems) { dialog, which, isChecked ->
-                        val exclusiveIndices = item.exclusiveOptionIndices
-                        if (exclusiveIndices != null) {
-                            if (isChecked && exclusiveIndices.contains(which)) {
-                                // "Not Applicable" (or similar) checked -> uncheck everything else
-                                checkedItems.indices.forEach { idx ->
-                                    if (idx != which) checkedItems[idx] = false
-                                }
-                            } else if (isChecked && exclusiveIndices.isNotEmpty()) {
-                                // A normal option checked -> uncheck the exclusive option(s)
-                                exclusiveIndices.forEach { idx -> checkedItems[idx] = false }
-                            }
+                if (item.enableSearchInMultiSelect) {
+                    showSearchableMultiSelectDialog(
+                        item,
+                        labels,
+                        checkedItems,
+                        selectedIndexes,
+                        formValueListener
+                    )
+                } else {
+                    AlertDialog.Builder(binding.root.context)
+                        .setTitle(item.title)
+                        .setMultiChoiceItems(labels, checkedItems) { dialog, which, isChecked ->
+                            applyExclusiveSelection(item, checkedItems, which, isChecked)
                             val listView = (dialog as? AlertDialog)?.listView
                             checkedItems.indices.forEach { idx -> listView?.setItemChecked(idx, checkedItems[idx]) }
                         }
-                    }
-                    .setPositiveButton(android.R.string.ok) { _, _ ->
-                        selectedIndexes.clear()
-                        checkedItems.forEachIndexed { index, checked ->
-                            if (checked) selectedIndexes.add(index)
+                        .setPositiveButton(android.R.string.ok) { _, _ ->
+                            applyMultiSelectResult(item, checkedItems, selectedIndexes, formValueListener)
                         }
-                        item.value =
-                            if (selectedIndexes.isEmpty()) null
-                            else selectedIndexes.sorted().joinToString("|")
-                        item.errorText = null
-                        binding.tilMultiSelect.error = null
-                        binding.clRi.setBackgroundResource(0)
-                        binding.etMultiSelect.setText(selectedIndexes.toDisplayText(item))
-                        formValueListener?.onValueChanged(item, -1)
-                    }
-                    .setNegativeButton(android.R.string.cancel, null)
-                builder.show()
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show()
+                }
             }
             binding.etMultiSelect.setOnClickListener(showDialog)
             binding.tilMultiSelect.setEndIconOnClickListener(showDialog)
             binding.executePendingBindings()
+        }
+
+        private fun applyExclusiveSelection(
+            item: FormElement,
+            checkedItems: BooleanArray,
+            which: Int,
+            isChecked: Boolean
+        ) {
+            val exclusiveIndices = item.exclusiveOptionIndices ?: return
+            if (isChecked && exclusiveIndices.contains(which)) {
+                checkedItems.indices.forEach { idx ->
+                    checkedItems[idx] = idx == which
+                }
+            } else if (isChecked && exclusiveIndices.isNotEmpty()) {
+                exclusiveIndices.forEach { idx -> checkedItems[idx] = false }
+                checkedItems[which] = true
+            } else {
+                checkedItems[which] = false
+            }
+        }
+
+        private fun applyMultiSelectResult(
+            item: FormElement,
+            checkedItems: BooleanArray,
+            selectedIndexes: MutableSet<Int>,
+            formValueListener: FormValueListener?
+        ) {
+            selectedIndexes.clear()
+            checkedItems.forEachIndexed { index, checked ->
+                if (checked) selectedIndexes.add(index)
+            }
+            item.value =
+                if (selectedIndexes.isEmpty()) null
+                else selectedIndexes.sorted().joinToString("|")
+            item.errorText = null
+            binding.tilMultiSelect.error = null
+            binding.clRi.setBackgroundResource(0)
+            binding.etMultiSelect.setText(selectedIndexes.toDisplayText(item))
+            formValueListener?.onValueChanged(item, -1)
+        }
+
+        private fun showSearchableMultiSelectDialog(
+            item: FormElement,
+            labels: Array<String>,
+            checkedItems: BooleanArray,
+            selectedIndexes: MutableSet<Int>,
+            formValueListener: FormValueListener?
+        ) {
+            val context = binding.root.context
+            val density = context.resources.displayMetrics.density
+            val container = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding((20 * density).toInt(), (8 * density).toInt(), (20 * density).toInt(), 0)
+            }
+            val searchInput = EditText(context).apply {
+                hint = context.getString(R.string.household_search)
+                setSingleLine(true)
+            }
+            val listView = ListView(context).apply {
+                choiceMode = ListView.CHOICE_MODE_MULTIPLE
+            }
+            container.addView(
+                searchInput,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+            container.addView(
+                listView,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    (320 * density).toInt()
+                )
+            )
+
+            var filteredIndices = labels.indices.toList()
+
+            fun refreshFilteredList(query: String) {
+                filteredIndices = labels.indices.filter { labels[it].contains(query, ignoreCase = true) }
+                val adapter = object : ArrayAdapter<String>(
+                    context,
+                    android.R.layout.simple_list_item_multiple_choice,
+                    filteredIndices.map { labels[it] }
+                ) {
+                    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                        val view = super.getView(position, convertView, parent) as CheckedTextView
+                        val originalIndex = filteredIndices[position]
+                        view.isChecked = checkedItems[originalIndex]
+                        return view
+                    }
+                }
+                listView.adapter = adapter
+                filteredIndices.forEachIndexed { position, originalIndex ->
+                    listView.setItemChecked(position, checkedItems[originalIndex])
+                }
+            }
+
+            refreshFilteredList("")
+
+            listView.setOnItemClickListener { _, _, position, _ ->
+                val originalIndex = filteredIndices[position]
+                val newCheckedState = listView.isItemChecked(position)
+                checkedItems[originalIndex] = newCheckedState
+                applyExclusiveSelection(item, checkedItems, originalIndex, newCheckedState)
+                refreshFilteredList(searchInput.text?.toString().orEmpty())
+            }
+
+            searchInput.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+                override fun afterTextChanged(s: Editable?) {
+                    refreshFilteredList(s?.toString().orEmpty())
+                }
+            })
+
+            AlertDialog.Builder(context)
+                .setTitle(item.title)
+                .setView(container)
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    applyMultiSelectResult(item, checkedItems, selectedIndexes, formValueListener)
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
         }
 
         private fun Set<Int>.toDisplayText(item: FormElement): String =

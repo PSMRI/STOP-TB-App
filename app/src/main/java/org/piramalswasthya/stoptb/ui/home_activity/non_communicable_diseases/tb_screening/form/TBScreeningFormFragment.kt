@@ -103,7 +103,8 @@ class TBScreeningFormFragment : Fragment() {
                 lifecycleScope.launch {
                     viewModel.formList.collect {
                         if (it.isNotEmpty()) {
-                            adapter.notifyItemChanged(viewModel.getIndexOfDate())
+                            val dateIndex = viewModel.getIndexOfDate()
+                            if (dateIndex >= 0) adapter.notifyItemChanged(dateIndex)
                             // isAsymptomatic is auto-computed in-place (same object ref),
                             // DiffUtil won't detect the change — force-rebind it directly.
                             val asymptomaticIdx = viewModel.getIndexOfAsymptomatic()
@@ -121,9 +122,7 @@ class TBScreeningFormFragment : Fragment() {
         viewModel.benAgeGender.observe(viewLifecycleOwner) {
             binding.tvAgeGender.text = it
         }
-        // TB Screening: show title above questions and legend (with red * markers) just below title
-        binding.tvFormTitle.visibility = View.VISIBLE
-        binding.tvFormTitle.text = getString(R.string.check_if_the_person_has_any_of_these_symptoms)
+        // TB Screening: show legend first, then the symptoms title just above questions.
         binding.tvFormFooter.visibility = View.VISIBLE
         val line1 = getString(R.string.tb_screening_legend_xray_sputum) // "* Refer..."
         val line2 = getString(R.string.tb_screening_legend_family_members) // "** Advise..."
@@ -135,6 +134,8 @@ class TBScreeningFormFragment : Fragment() {
         val line2Start = line1.length + 1 // +1 for \n
         legendSpan.setSpan(ForegroundColorSpan(starColor), line2Start, line2Start + 2, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         binding.tvFormFooter.text = legendSpan
+        binding.tvFormTitle.visibility = View.VISIBLE
+        binding.tvFormTitle.text = getString(R.string.check_if_the_person_has_any_of_these_symptoms)
 
         // Auto geolocation disabled for TB Screening form: location is not required to open/use this module.
 //        captureGeolocation()
