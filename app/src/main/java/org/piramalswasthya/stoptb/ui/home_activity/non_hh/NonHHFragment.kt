@@ -24,6 +24,7 @@ import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchAndToggleRvButtonBinding
 import org.piramalswasthya.stoptb.helpers.isNurseRole
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import androidx.core.os.bundleOf
@@ -37,6 +38,9 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private var _binding: FragmentDisplaySearchAndToggleRvButtonBinding? = null
     private val binding get() = _binding!!
@@ -78,7 +82,10 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        val roleName = prefDao.getLoggedInUser()?.role
+        // Dead code — confirmed unused: the numeric `role` param this fed only reaches an
+        // unused DataBinding variable in rv_item_ben.xml/rv_item_ben_with_form.xml (no
+        // android:* attribute or binding expression reads it). Left commented, not deleted.
+//        val roleName = prefDao.getLoggedInUser()?.role
         binding.btnNextPage.text = getString(R.string.btn_Add_beneficiary_nonHH)
         binding.btnNextPage.visibility = View.VISIBLE
         binding.ibFilter.visibility = View.GONE
@@ -135,9 +142,10 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             showRegistrationDate = true,
             showSyncIcon = true,
             showCall = true,
-            role = roleName?.let { if (it.isNurseRole()) 2 else 0 } ?: 0,
+//            role = roleName?.let { if (it.isNurseRole()) 2 else 0 } ?: 0,
             pref = prefDao,
             context = requireActivity(),
+            roleManager = roleManager,
             showActionButtons = false,
             showExamineButton = true
         )

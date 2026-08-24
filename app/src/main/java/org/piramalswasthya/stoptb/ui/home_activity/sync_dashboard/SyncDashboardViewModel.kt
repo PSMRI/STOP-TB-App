@@ -24,13 +24,15 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.SyncLogExporter
 import org.piramalswasthya.stoptb.helpers.SyncLogManager
-import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
+//import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.FailedWorkerInfo
 import org.piramalswasthya.stoptb.model.SyncLogEntry
 import org.piramalswasthya.stoptb.model.SyncStatusCache
 import org.piramalswasthya.stoptb.utils.HelperUtil.getLocalizedResources
 import org.piramalswasthya.stoptb.work.BasePushWorker
 import org.piramalswasthya.stoptb.work.WorkerUtils
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -39,6 +41,7 @@ class SyncDashboardViewModel @Inject constructor(
     private val preferenceDao: PreferenceDao,
     private val syncLogManager: SyncLogManager,
     private val syncLogExporter: SyncLogExporter,
+    private val roleManager: RoleManager,
     application: Application
 ) : AndroidViewModel(application) {
 
@@ -99,8 +102,16 @@ class SyncDashboardViewModel @Inject constructor(
         return getLocalizedResources(context, Languages.ENGLISH).getStringArray(R.array.sync_records)
     }
 
-    fun isCounsellingOfficerRole():Boolean{
-        return preferenceDao.getLoggedInUser()?.role.isCounsellingOfficerRole()
+    // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole() below,
+    // left commented in place for reference (not deleted, per project convention).
+//    fun isCounsellingOfficerRole():Boolean{
+//        return preferenceDao.getLoggedInUser()?.role.isCounsellingOfficerRole()
+//    }
+    fun isCounsellingOfficerRole(): Boolean {
+        val result = roleManager.privilegesForActiveRole().syncShowCounsellingStatusRow
+        // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
+        Timber.d("RoleManager verify: SyncDashboardViewModel activeRole=${roleManager.activeRole.value}, syncShowCounsellingStatusRow=$result")
+        return result
     }
 
     // Tab 2: Log export

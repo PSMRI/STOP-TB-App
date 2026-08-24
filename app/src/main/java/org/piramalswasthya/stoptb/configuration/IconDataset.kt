@@ -3,26 +3,32 @@ import android.content.res.Resources
 import dagger.hilt.android.scopes.ActivityRetainedScoped
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
-import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
-import org.piramalswasthya.stoptb.helpers.isNurseRole
+//import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
+//import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.model.Icon
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import org.piramalswasthya.stoptb.ui.home_activity.communicable_diseases.CdFragmentDirections
 import org.piramalswasthya.stoptb.ui.home_activity.home.ReferralIconsFragmentDirections
 import org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.NcdFragmentDirections
-import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
+//import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
+import org.piramalswasthya.stoptb.helpers.RoleManager
+import org.piramalswasthya.stoptb.model.AppModule
 import org.piramalswasthya.stoptb.ui.volunteer.fragment.VolunteerHomeFragmentDirections
 import javax.inject.Inject
 @ActivityRetainedScoped
 class IconDataset @Inject constructor(
     private val recordsRepo: RecordsRepo,
-    private val preferenceDao: PreferenceDao
+    private val preferenceDao: PreferenceDao,
+    private val roleManager: RoleManager
 ) {
     enum class Disease {
         MALARIA, KALA_AZAR, AES_JE, FILARIA, LEPROSY, DEWARMING
     }
     fun getVolunteerIconDataset(resources: Resources): List<Icon> {
-        val role = preferenceDao.getLoggedInUser()?.role
+        // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole().homeModules
+        // below, left commented in place for reference (not deleted, per project convention).
+//        val role = preferenceDao.getLoggedInUser()?.role
+        val homeModules = roleManager.privilegesForActiveRole().homeModules
         val iconList = mutableListOf(
             Icon(
                 R.drawable.ic__hh,
@@ -40,7 +46,8 @@ class IconDataset @Inject constructor(
             )
         )
 
-        if (role.isRegistrationOfficerRole() || role.isCounsellingOfficerRole() || role.isNurseRole()) {
+//        if (role.isRegistrationOfficerRole() || role.isCounsellingOfficerRole() || role.isNurseRole()) {
+        if (AppModule.NON_HOUSEHOLD in homeModules) {
             iconList.add(
                 Icon(
                     R.drawable.ic__ben,
@@ -53,28 +60,33 @@ class IconDataset @Inject constructor(
             )
         }
 
-        if (role.isNurseRole() || role.isCounsellingOfficerRole()) {
-            iconList.add(
-                Icon(
-                    R.drawable.ic__ncd,
-                    resources.getString(R.string.tuberculosis),
-                    resources.getString(R.string.home_card_tb_subtitle),
-                    null,
-                    VolunteerHomeFragmentDirections
-                        .actionVolunteerHomeFragmentToTbFragment()
+//        if (role.isNurseRole() || role.isCounsellingOfficerRole()) {
+        if (AppModule.TUBERCULOSIS in homeModules || AppModule.REFERRAL in homeModules) {
+            if (AppModule.TUBERCULOSIS in homeModules) {
+                iconList.add(
+                    Icon(
+                        R.drawable.ic__ncd,
+                        resources.getString(R.string.tuberculosis),
+                        resources.getString(R.string.home_card_tb_subtitle),
+                        null,
+                        VolunteerHomeFragmentDirections
+                            .actionVolunteerHomeFragmentToTbFragment()
+                    )
                 )
-            )
+            }
 
-            iconList.add(
-                Icon(
-                    R.drawable.ic_ncd_noneligible,
-                    resources.getString(R.string.ncd_refer_list),
-                    resources.getString(R.string.home_card_referral_subtitle),
-                    null,
-                    VolunteerHomeFragmentDirections
-                        .actionVolunteerHomeFragmentToReferralIconsFragment()
+            if (AppModule.REFERRAL in homeModules) {
+                iconList.add(
+                    Icon(
+                        R.drawable.ic_ncd_noneligible,
+                        resources.getString(R.string.ncd_refer_list),
+                        resources.getString(R.string.home_card_referral_subtitle),
+                        null,
+                        VolunteerHomeFragmentDirections
+                            .actionVolunteerHomeFragmentToReferralIconsFragment()
+                    )
                 )
-            )
+            }
         }
         /*if (role.isCounsellingOfficerRole()) {
             iconList.removeAll { icon ->

@@ -43,6 +43,7 @@ import org.piramalswasthya.stoptb.helpers.AutoFlowBackNavigationHost
 import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.helpers.TapjackingProtectionHelper
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.sync.SyncBottomSheetFragment
@@ -125,6 +126,9 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
 
     @Inject
     lateinit var pref: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private var _binding: ActivityVolunteerBinding? = null
     private val binding: ActivityVolunteerBinding
@@ -220,6 +224,10 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     override fun onCreate(savedInstanceState: Bundle?) {
         TapjackingProtectionHelper.applyWindowSecurity(this)
         super.onCreate(savedInstanceState)
+        // Resolve assigned/active role for this cold start. No bottom-nav UI wired yet
+        // (pending design) — this only makes RoleManager.privilegesForActiveRole() correct
+        // for the call sites already migrated to it.
+        roleManager.initializeFromLoggedInUser()
         _binding = ActivityVolunteerBinding.inflate(layoutInflater)
         setContentView(binding.root)
         TapjackingProtectionHelper.enableTouchFiltering(this)

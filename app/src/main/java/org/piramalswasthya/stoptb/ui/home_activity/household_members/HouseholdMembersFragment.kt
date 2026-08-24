@@ -24,8 +24,10 @@ import org.piramalswasthya.stoptb.databinding.AlertNewBenBinding
 import org.piramalswasthya.stoptb.databinding.FragmentHouseholdMembersBinding
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import timber.log.Timber
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -33,6 +35,9 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private val args: HouseholdMembersFragmentArgs by navArgs()
 
@@ -65,7 +70,12 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         buildAddBenDialog()
-        val role = prefDao.getLoggedInUser()?.role
+        // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole() below,
+        // left commented in place for reference (not deleted, per project convention).
+//        val role = prefDao.getLoggedInUser()?.role
+        val privilege = roleManager.privilegesForActiveRole()
+        // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
+        Timber.d("RoleManager verify: HouseholdMembersFragment activeRole=${roleManager.activeRole.value}, showExamineButtonDefault=${privilege.showExamineButtonDefault}, fromContactTracing=${args.fromContactTracing}")
 
         val benAdapter = BenListAdapter(
             clickListener = BenListAdapter.BenClickListener(
@@ -113,7 +123,9 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
             showSyncIcon = true,
             pref = prefDao,
             context = requireActivity(),
-            showExamineButton = !role.isCounsellingOfficerRole() || args.fromContactTracing,
+            roleManager = roleManager,
+            // showExamineButton = !role.isCounsellingOfficerRole() || args.fromContactTracing,
+            showExamineButton = privilege.showExamineButtonDefault || args.fromContactTracing,
             showContactTracingForms = args.fromContactTracing
         )
         binding.rvAny.adapter = benAdapter

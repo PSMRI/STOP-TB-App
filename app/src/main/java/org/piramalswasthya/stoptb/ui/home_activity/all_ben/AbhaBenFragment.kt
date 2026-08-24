@@ -22,6 +22,7 @@ import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertFilterBinding
 import org.piramalswasthya.stoptb.databinding.FragmentAbhaBenBinding
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
@@ -35,6 +36,9 @@ class AbhaBenFragment : Fragment() {
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private var _binding: FragmentAbhaBenBinding? = null
 
@@ -195,7 +199,8 @@ class AbhaBenFragment : Fragment() {
             showAbha = true,
             showCall = true,
             pref = prefDao,
-            context = requireActivity()
+            context = requireActivity(),
+            roleManager = roleManager
 
         )
         binding.rvNewAbha.adapter = benNewAdapter
@@ -245,7 +250,8 @@ class AbhaBenFragment : Fragment() {
             showAbha = true,
             showCall = true,
             pref = prefDao,
-            context = requireActivity()
+            context = requireActivity(),
+            roleManager = roleManager
         )
         binding.rvExistingAbha.adapter = benOldAdapter
 

@@ -20,8 +20,10 @@ import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.work.WorkerUtils
+import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -40,6 +42,9 @@ class VolunteerHomeFragment : Fragment() {
 
     @Inject
     lateinit var pref: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private var _binding: FragmentHomeBinding? = null
     private val binding: FragmentHomeBinding
@@ -85,10 +90,15 @@ class VolunteerHomeFragment : Fragment() {
     }
 
     private fun setupNurseQuickRefresh() {
-        val role = pref.getLoggedInUser()?.role
-        val canUseQuickRefresh = role.isNurseRole() ||
-                role.isRegistrationOfficerRole() ||
-                role.isCounsellingOfficerRole()
+        // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole() below,
+        // left commented in place for reference (not deleted, per project convention).
+//        val role = pref.getLoggedInUser()?.role
+//        val canUseQuickRefresh = role.isNurseRole() ||
+//                role.isRegistrationOfficerRole() ||
+//                role.isCounsellingOfficerRole()
+        val canUseQuickRefresh = roleManager.privilegesForActiveRole().allowQuickRefresh
+        // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
+        Timber.d("RoleManager verify: VolunteerHomeFragment activeRole=${roleManager.activeRole.value}, allowQuickRefresh=$canUseQuickRefresh")
         if (!canUseQuickRefresh) {
             binding.llQuickRefresh.visibility = View.GONE
             return

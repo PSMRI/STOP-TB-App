@@ -18,10 +18,14 @@ import org.piramalswasthya.stoptb.helpers.getPatientTypeByAge
 import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
+import org.piramalswasthya.stoptb.helpers.RoleManager
+import org.piramalswasthya.stoptb.model.AppRole
 import org.piramalswasthya.stoptb.model.BenBasicDomain
+import org.piramalswasthya.stoptb.model.ExamineDenominatorRule
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.ui.setSyncStateForBen
+import timber.log.Timber
 
 data class ButtonConfig(
     val text: String,
@@ -41,6 +45,7 @@ class BenListAdapter(
     private val pref: PreferenceDao? = null,
     private val context: FragmentActivity,
     private val role: Int? = null,
+    private val roleManager: RoleManager? = null,
     private val showActionButtons: Boolean = true,
     private val showResultButton: Boolean = false,
     private val showAnthropometryButton: Boolean = false,
@@ -101,7 +106,8 @@ class BenListAdapter(
             tbDiagnosticsList: List<TBDiagnosticsCache> = emptyList(),
             source: Int = 0,
             retryingBenIds: List<Long> = emptyList(),
-            showContactTracingForms: Boolean = false
+            showContactTracingForms: Boolean = false,
+            roleManager: RoleManager? = null
         ) {
 
             binding.btnAbha.visibility = View.VISIBLE
@@ -178,9 +184,14 @@ class BenListAdapter(
             if (binding.btnVitalScreen.visibility == View.VISIBLE) {
                 if (showResultButton) {
                     val tbDiag = tbDiagnosticsList.find { it.benId == item.benId }
-                    val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
-                    val isCounsellingOfficer = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
-                    val canActOnReferral = isNurse || isCounsellingOfficer
+                    // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole()
+                    // below, left commented in place for reference (not deleted, per project convention).
+//                    val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
+//                    val isCounsellingOfficer = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
+//                    val canActOnReferral = isNurse || isCounsellingOfficer
+                    val canActOnReferral = roleManager?.privilegesForActiveRole()?.canActOnReferral == true
+                    // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
+                    Timber.d("RoleManager verify: BenListAdapter referral activeRole=${roleManager?.activeRole?.value}, canActOnReferral=$canActOnReferral")
                     val config = when (source) {
                         6 -> {
                             val status = tbDiag?.xrayOrderStatus
@@ -585,49 +596,97 @@ class BenListAdapter(
             // ClinicalScreeningStatus answer is TPT_ELIGIBLE (see IContactTracingRepository.observeTptEligibleBenIds) ?
             // otherwise FULL_TREATMENT/NO_TREATMENT beneficiaries would incorrectly get stuck at x/4.
             // Others: all 5 forms
-            val currentRole = pref?.getLoggedInUser()?.role
-            val isCounsellingOfficer = currentRole.isCounsellingOfficerRole()
-            val isRegistrar = pref?.getLoggedInUser()?.role.isRegistrationOfficerRole()
-            val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
-            val isCounsellingOfficerForExamine = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
-            val (examineFilledCount, examineTotal) = if (isCounsellingOfficerForExamine) {
-                if (showContactTracingForms) {
-                    val requiredItems = if (isTptEligible) {
-                        listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone, hasTptFollowUpDone)
+            // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole() below,
+            // left commented in place for reference (not deleted, per project convention).
+//            val currentRole = pref?.getLoggedInUser()?.role
+//            val isCounsellingOfficer = currentRole.isCounsellingOfficerRole()
+//            val isRegistrar = pref?.getLoggedInUser()?.role.isRegistrationOfficerRole()
+//            val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
+//            val isCounsellingOfficerForExamine = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
+//            val (examineFilledCount, examineTotal) = if (isCounsellingOfficerForExamine) {
+//                if (showContactTracingForms) {
+//                    val requiredItems = if (isTptEligible) {
+//                        listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone, hasTptFollowUpDone)
+//                    } else {
+//                        listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone)
+//                    }
+//                    Pair(requiredItems.count { it }, requiredItems.size)
+//                } else {
+//                    val filled = listOf(
+//                        hasAnthropometry,
+//                        hasTbScreening
+//                    ).count { it }
+//                    Pair(filled, 2)
+//                }
+//            } else if (isRegistrar) {
+//                val filled = listOf(
+//                    hasAnthropometry,
+//                    hasTbScreening
+//                ).count { it }
+//                Pair(filled, 2)
+//            } else if (isNurse || isCounsellingOfficer) {
+//                val filled = listOf(
+//                    hasAnthropometry,
+//                    isMatched,
+//                    hasTbScreening,
+//                    hasGeneralOpd
+//                ).count { it }
+//                Pair(filled, 4)
+//            } else {
+//                val filled = listOf(
+//                    hasAnthropometry,
+//                    isMatched,
+//                    hasTbScreening,
+//                    hasGeneralOpd
+//                ).count { it }
+//                Pair(filled, 4)
+//            }
+
+            // `isRegistrar`/`isNurse`/`isCounsellingOfficer` are kept as names (now backed by
+            // roleManager.activeRole) because they're also reused further below for
+            // relevantUnsynced/relevantSyncing — not just for the denominator here.
+            val activeRole = roleManager?.activeRole?.value
+            val isRegistrar = activeRole == AppRole.REGISTRAR
+            val isNurse = activeRole == AppRole.NURSE
+            val isCounsellingOfficer = activeRole == AppRole.COUNSELING
+            val examineDenominatorRule = roleManager?.privilegesForActiveRole()?.examineDenominatorRule
+                ?: ExamineDenominatorRule.GENERIC_FOUR
+            val (examineFilledCount, examineTotal) = when (examineDenominatorRule) {
+                ExamineDenominatorRule.COUNSELLING_DYNAMIC -> {
+                    if (showContactTracingForms) {
+                        val requiredItems = if (isTptEligible) {
+                            listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone, hasTptFollowUpDone)
+                        } else {
+                            listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone)
+                        }
+                        Pair(requiredItems.count { it }, requiredItems.size)
                     } else {
-                        listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone)
+                        val filled = listOf(
+                            hasAnthropometry,
+                            hasTbScreening
+                        ).count { it }
+                        Pair(filled, 2)
                     }
-                    Pair(requiredItems.count { it }, requiredItems.size)
-                } else {
+                }
+                ExamineDenominatorRule.REGISTRAR_TWO -> {
                     val filled = listOf(
                         hasAnthropometry,
                         hasTbScreening
                     ).count { it }
                     Pair(filled, 2)
                 }
-            } else if (isRegistrar) {
-                val filled = listOf(
-                    hasAnthropometry,
-                    hasTbScreening
-                ).count { it }
-                Pair(filled, 2)
-            } else if (isNurse || isCounsellingOfficer) {
-                val filled = listOf(
-                    hasAnthropometry,
-                    isMatched,
-                    hasTbScreening,
-                    hasGeneralOpd
-                ).count { it }
-                Pair(filled, 4)
-            } else {
-                val filled = listOf(
-                    hasAnthropometry,
-                    isMatched,
-                    hasTbScreening,
-                    hasGeneralOpd
-                ).count { it }
-                Pair(filled, 4)
+                ExamineDenominatorRule.GENERIC_FOUR -> {
+                    val filled = listOf(
+                        hasAnthropometry,
+                        isMatched,
+                        hasTbScreening,
+                        hasGeneralOpd
+                    ).count { it }
+                    Pair(filled, 4)
+                }
             }
+            // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
+            Timber.d("RoleManager verify: BenListAdapter examine activeRole=$activeRole, denominatorRule=$examineDenominatorRule, filled=$examineFilledCount/$examineTotal")
 
             binding.btnExamine.text = "Examine ($examineFilledCount/$examineTotal)"
             val isExamineFilled = examineFilledCount > 0
@@ -646,9 +705,16 @@ class BenListAdapter(
             binding.btnAddChildren.visibility = View.GONE
 
             // Register Wife / Register Husband ? Registrar only (hidden for Nurse & Counselling officer)
-            val isNurseRole = currentRole.isNurseRole()
+            // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole() below,
+            // left commented in place for reference (not deleted, per project convention).
+//            val isNurseRole = currentRole.isNurseRole()
+            val showRegisterSpouseButtons = roleManager?.privilegesForActiveRole()?.showRegisterSpouseButtons == true
+            // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
+            Timber.d("RoleManager verify: BenListAdapter spouseButtons activeRole=$activeRole, showRegisterSpouseButtons=$showRegisterSpouseButtons")
             when {
-                !isNurseRole && !isCounsellingOfficer && !item.isNonHH && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
+//                !isNurseRole && !isCounsellingOfficer && !item.isNonHH && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
+//                        && !item.isDeath && !item.isDeactivate -> {
+                showRegisterSpouseButtons && !item.isNonHH && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
                         && !item.isDeath && !item.isDeactivate -> {
                     binding.llAddSpouseBtn.visibility = View.VISIBLE
                     binding.btnAddSpouse.visibility = View.VISIBLE
@@ -657,7 +723,9 @@ class BenListAdapter(
                         clickListener?.onClickedWifeBen(item)
                     }
                 }
-                (!isNurseRole && !isCounsellingOfficer) && !item.isNonHH && item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
+//                (!isNurseRole && !isCounsellingOfficer) && !item.isNonHH && item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
+//                        && !item.isDeath && !item.isDeactivate -> {
+                showRegisterSpouseButtons && !item.isNonHH && item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
                         && !item.isDeath && !item.isDeactivate -> {
                     binding.llAddSpouseBtn.visibility = View.VISIBLE
                     binding.btnAddSpouse.visibility = View.VISIBLE
@@ -825,7 +893,8 @@ class BenListAdapter(
             tbDiagnosticsList = tbDiagnosticsList,
             source = source,
             showExamineButton = showExamineButton,
-            showContactTracingForms = showContactTracingForms
+            showContactTracingForms = showContactTracingForms,
+            roleManager = roleManager
         )
     }
 

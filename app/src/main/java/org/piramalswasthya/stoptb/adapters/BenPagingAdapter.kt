@@ -4,6 +4,7 @@ import android.view.ViewGroup
 import androidx.fragment.app.FragmentActivity
 import androidx.paging.PagingDataAdapter
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 
@@ -17,6 +18,7 @@ class BenPagingAdapter(
     private val role: Int? = 0,
     private val pref: PreferenceDao? = null,
     var context: FragmentActivity,
+    private val roleManager: RoleManager? = null,
     private val isSoftDeleteEnabled: Boolean = false,
     private val showActionButtons: Boolean = false,
     private val showResultButton: Boolean = false,
@@ -85,7 +87,8 @@ class BenPagingAdapter(
             tbDiagnosticsList = tbDiagnosticsList,
             source = source,
             retryingBenIds = retryingBenIds,
-            showContactTracingForms = showContactTracingForms
+            showContactTracingForms = showContactTracingForms,
+            roleManager = roleManager
         )
     }
 

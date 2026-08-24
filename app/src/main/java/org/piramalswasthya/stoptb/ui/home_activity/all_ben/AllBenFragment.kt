@@ -31,6 +31,8 @@ import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchAndToggleRvBu
 import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
+import org.piramalswasthya.stoptb.helpers.RoleManager
+import org.piramalswasthya.stoptb.model.AppRole
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
@@ -56,6 +58,9 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private var _binding: FragmentDisplaySearchAndToggleRvButtonBinding? = null
 
@@ -139,18 +144,28 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val roleName = prefDao.getLoggedInUser()?.role
-        val isRegistrar = roleName.isRegistrationOfficerRole()
-        val isNurse = roleName.isNurseRole()
-        val isCounsellor = roleName.isCounsellingOfficerRole()
-        val isKnownRestrictedRole = isRegistrar || isNurse || isCounsellor
-        val allowLegacyAccess = !isKnownRestrictedRole
+        // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole() below,
+        // left commented in place for reference (not deleted, per project convention).
+//        val roleName = prefDao.getLoggedInUser()?.role
+//        val isRegistrar = roleName.isRegistrationOfficerRole()
+//        val isNurse = roleName.isNurseRole()
+//        val isCounsellor = roleName.isCounsellingOfficerRole()
+//        val isKnownRestrictedRole = isRegistrar || isNurse || isCounsellor
+//        val allowLegacyAccess = !isKnownRestrictedRole
         val isReadOnlyReferralList = args.source in READ_ONLY_REFERRAL_SOURCES
         val showResultButton = args.source == 6 || args.source == 7 || args.source == 8
-        val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
-        val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
-        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess || isCounsellor) && !isReadOnlyReferralList
-        val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
+        val privilege = roleManager.privilegesForActiveRole()
+        // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
+        Timber.d("RoleManager verify: AllBenFragment activeRole=${roleManager.activeRole.value}, showAbhaButton=${privilege.showAbhaButton}, showCallButton=${privilege.showCallButton}")
+        // showAnthropometryButton/showBenActionButtons removed entirely: confirmed dead code —
+        // the adapter always receives showAnthropometryButton = false (line ~424) regardless of
+        // role, and showBenActionButtons was never referenced anywhere else in this file.
+//        val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
+//        val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
+//        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess || isCounsellor) && !isReadOnlyReferralList
+//        val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
+        val showAbhaButton = privilege.showAbhaButton && !isReadOnlyReferralList
+        val showCallButton = privilege.showCallButton && !isReadOnlyReferralList
         binding.llQuickRefresh.visibility = View.GONE
 
         // Add Ben button hidden — ben registration only via Household flow
@@ -229,11 +244,15 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     if (isReadOnlyReferralList) return@BenClickListener
                     viewLifecycleOwner.lifecycleScope.launch {
                         val benRegId = viewModel.getBenFromId(benId)
+                        // was: autoFlow = isNurse (legacy role-string check)
+                        val vitalAutoFlow = roleManager.activeRole.value == AppRole.NURSE
+                        // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
+                        Timber.d("RoleManager verify: AllBenFragment->VitalScreenFragment activeRole=${roleManager.activeRole.value}, autoFlow=$vitalAutoFlow")
                         findNavController().navigate(
                             AllBenFragmentDirections.actionAllBenFragmentToVitalScreenFragment(
                                 benId = benId,
                                 benRegId = benRegId,
-                                autoFlow = isNurse
+                                autoFlow = vitalAutoFlow
                             )
                         )
                     }
@@ -398,7 +417,11 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     )
                 },
                 { item, benId, hhId, viewOnly ->
-                    if (!showAnthropometryButton) return@BenClickListener
+                    // Dead code — the Anthropometry icon this guards is unreachable: the
+                    // adapter always passes showAnthropometryButton = false below, so this
+                    // listener never fires regardless of role. Kept as-is, not deleted.
+//                    if (!showAnthropometryButton) return@BenClickListener
+                    if (true) return@BenClickListener
                     findNavController().navigate(
                         R.id.anthropometryFragment,
                         bundleOf(
@@ -419,6 +442,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             showCall = showCallButton,
             pref = prefDao,
             context = requireActivity(),
+            roleManager = roleManager,
             showActionButtons = false,
             showResultButton = showResultButton,
             showAnthropometryButton = false,

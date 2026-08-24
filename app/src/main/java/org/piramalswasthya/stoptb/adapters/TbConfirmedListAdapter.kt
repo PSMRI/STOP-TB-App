@@ -14,11 +14,14 @@ import org.piramalswasthya.stoptb.databinding.RvItemTbConfirmedListBinding
 import org.piramalswasthya.stoptb.helpers.getDateFromLong
 import org.piramalswasthya.stoptb.helpers.getPatientTypeByAge
 import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.BenWithTbSuspectedDomain
+import timber.log.Timber
 
 class TbConfirmedListAdapter( private val clickListener: ClickListener? = null,
-private val pref: PreferenceDao? = null
+private val pref: PreferenceDao? = null,
+private val roleManager: RoleManager? = null
 ) :
 ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 (BenDiffUtilCallBack) {
@@ -55,7 +58,8 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             pref: PreferenceDao?,
             benIdList: List<Long>?,
             totalSectionsFallback: Int?,
-            localFilledCounts: Map<Long, Int>?
+            localFilledCounts: Map<Long, Int>?,
+            roleManager: RoleManager? = null
         ) {
             binding.btnFormTb.visibility = View.VISIBLE
 
@@ -74,13 +78,20 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
                     sectionsFilled == 0
             // Provides a single source of truth for determining whether a row should show “Counselled.”
             val isCounselledFinal = !isRefused && (isCounselledByProgress || item.isCounselled || isBenAlreadyCounselled)
-            val role = pref?.getLoggedInUser()?.role
+            // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole() below,
+            // left commented in place for reference (not deleted, per project convention).
+//            val role = pref?.getLoggedInUser()?.role
+            val showCounsellingUi = roleManager?.privilegesForActiveRole()?.showTbConfirmedCounsellingUi == true
+            // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
+            Timber.d("RoleManager verify: TbConfirmedListAdapter activeRole=${roleManager?.activeRole?.value}, showTbConfirmedCounsellingUi=$showCounsellingUi")
 
             binding.ivSyncState.visibility = if (item.tbConfirmedList == null) View.INVISIBLE else View.VISIBLE
 
             binding.counsellingSectionProgress.setProgress(sectionsFilled, totalSections)
-            binding.counsellingSectionProgress.visibility = if(role.isCounsellingOfficerRole()) View.VISIBLE else View.INVISIBLE
-            binding.btnContactTracing.visibility = if(role.isCounsellingOfficerRole()) View.VISIBLE else View.GONE
+//            binding.counsellingSectionProgress.visibility = if(role.isCounsellingOfficerRole()) View.VISIBLE else View.INVISIBLE
+//            binding.btnContactTracing.visibility = if(role.isCounsellingOfficerRole()) View.VISIBLE else View.GONE
+            binding.counsellingSectionProgress.visibility = if (showCounsellingUi) View.VISIBLE else View.INVISIBLE
+            binding.btnContactTracing.visibility = if (showCounsellingUi) View.VISIBLE else View.GONE
 
             if (isRefused) {
                 binding.btnCounselling.visibility = View.GONE
@@ -103,13 +114,18 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             }
 
 
-            if (role != null) {
-                checkIfCounsellingOfficerOrNot(role, (isRefused || isCounselledFinal))
-            } else {
-                binding.btnFormTb.visibility = View.GONE
-                binding.btnCounselling.visibility = View.GONE
-                binding.btnCounselled.visibility = View.GONE
-            }
+            // Legacy null-role fallback (hid the 3 buttons below when no logged-in user's role
+            // string was available) — superseded by roleManager, which never resolves to null
+            // (always at least VOLUNTEER), so this branch is unreachable under the new model.
+            // Left commented in place for reference (not deleted, per project convention).
+//            if (role != null) {
+//                checkIfCounsellingOfficerOrNot(role, (isRefused || isCounselledFinal))
+//            } else {
+//                binding.btnFormTb.visibility = View.GONE
+//                binding.btnCounselling.visibility = View.GONE
+//                binding.btnCounselled.visibility = View.GONE
+//            }
+            checkIfCounsellingOfficerOrNot(showCounsellingUi, (isRefused || isCounselledFinal))
             if (item.ben.spouseName == "Not Available" && item.ben.fatherName == "Not Available") {
                 binding.father = true
                 binding.husband = false
@@ -187,6 +203,8 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             binding.head.visibility = if (isHeadOfFamily) View.VISIBLE else View.GONE
         }
 
+        // Legacy single-role-string version — no longer called (superseded by the
+        // roleManager-driven overload below), left in place for reference, not deleted.
         private fun checkIfCounsellingOfficerOrNot(
             role: String,
             isCounselled: Boolean
@@ -206,6 +224,23 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
                 if(isCounsellingOfficer) View.VISIBLE else View.GONE
         }
 
+        private fun checkIfCounsellingOfficerOrNot(
+            isCounsellingOfficer: Boolean,
+            isCounselled: Boolean
+        ) {
+            binding.btnFormTb.visibility =
+                if (isCounsellingOfficer) View.VISIBLE else View.GONE
+
+            binding.btnCounselling.visibility =
+                if (isCounsellingOfficer && !isCounselled) View.VISIBLE else View.GONE
+
+            binding.btnCounselled.visibility =
+                if (isCounsellingOfficer && isCounselled) View.VISIBLE else View.GONE
+
+            binding.ivViewMember.visibility =
+                if (isCounsellingOfficer) View.VISIBLE else View.GONE
+        }
+
     }
 
     override fun onCreateViewHolder(
@@ -217,7 +252,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
         holder: BenViewHolder,
         position: Int
     ) {
-        holder.bind(getItem(position), clickListener, pref, benIdList, totalSectionsFallback, localFilledCounts)
+        holder.bind(getItem(position), clickListener, pref, benIdList, totalSectionsFallback, localFilledCounts, roleManager)
     }
 
     /*override fun onCreateViewHolder(

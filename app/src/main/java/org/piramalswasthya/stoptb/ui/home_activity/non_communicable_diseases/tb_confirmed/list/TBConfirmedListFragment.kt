@@ -25,6 +25,7 @@ import org.piramalswasthya.stoptb.ui.counselling_activity.CounsellingViewModel
 import org.piramalswasthya.stoptb.model.BenWithTbSuspectedDomain
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import javax.inject.Inject
 import kotlin.getValue
 
@@ -34,6 +35,9 @@ class TBConfirmedListFragment : Fragment() {
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private var _binding: FragmentDisplaySearchRvButtonBinding? = null
     private val binding: FragmentDisplaySearchRvButtonBinding
@@ -100,7 +104,8 @@ class TBConfirmedListFragment : Fragment() {
                         .show(childFragmentManager, ContactTracingTypeBottomSheetFragment.TAG)
                 }
             ),
-            pref = prefDao
+            pref = prefDao,
+            roleManager = roleManager
         )
         binding.rvAny.adapter = benAdapter
 
