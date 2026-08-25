@@ -1,0 +1,156 @@
+name: StopTB UAT Signed Build
+run-name: STOP TB UAT Signed - ${{ inputs.versionName }} (${{ inputs.versionCode }}) [${{ inputs.branch }}]
+
+on:
+  workflow_dispatch:
+    inputs:
+      description:
+        description: 'Release notes / description for this build'
+        required: false
+        type: string
+        default: ''
+      branch:
+        description: 'Git branch to build from'
+        required: true
+        type: string
+        default: 'main'
+      versionName:
+        description: 'Build version (example: 1.0.3)'
+        required: true
+        type: string
+        default: '1.0.3'
+      versionCode:
+        description: 'Build number (example: 4)'
+        required: true
+        type: string
+        default: '4'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: distribute-uat-release-${{ inputs.branch }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-distribute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout selected branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Create local.properties
+        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - name: Create google-services.json (UAT)
+        run: |
+          mkdir -p app/src/stoptbUat
+          echo '${{ secrets.GOOGLE_SERVICES_JSON_UAT }}' > app/src/stoptbUat/google-services.json
+
+      - name: Create google-services.json (Prod)
+        run: |
+          mkdir -p app/src/stoptb
+          echo '${{ secrets.GOOGLE_SERVICES_JSON_PROD }}' > app/src/stoptb/google-services.json
+
+      - name: Accept SDK licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+
+      - name: Install NDK
+        run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;29.0.14033849"
+
+      - name: Set app version
+        run: |
+          echo "VERSION=${{ inputs.versionName }}" > version/version.properties
+          echo "VERSIONCODE=${{ inputs.versionCode }}" >> version/version.properties
+
+      - name: Create release keystore
+        run: |
+          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 --decode > stoptb_signing_key.jks
+          cat > keystore.properties <<'EOF'
+          storeFile=../stoptb_signing_key.jks
+          storePassword=${{ secrets.RELEASE_STORE_PASSWORD }}
+          keyAlias=${{ secrets.RELEASE_KEY_ALIAS }}
+          keyPassword=${{ secrets.RELEASE_KEY_PASSWORD }}
+          EOF
+
+      - name: Build UAT Release APK
+        env:
+          ENCRYPTED_PASS_KEY: ${{ secrets.ENCRYPTED_PASS_KEY }}
+          ABHA_CLIENT_SECRET: ${{ secrets.ABHA_CLIENT_SECRET }}
+          ABHA_CLIENT_ID: ${{ secrets.ABHA_CLIENT_ID }}
+          BASE_TMC_URL: ${{ secrets.BASE_TMC_URL }}
+          BASE_ABHA_URL: ${{ secrets.BASE_ABHA_URL }}
+          ABHA_TOKEN_URL: ${{ secrets.ABHA_TOKEN_URL }}
+          ABHA_AUTH_URL: ${{ secrets.ABHA_AUTH_URL }}
+          CHAT_URL: ${{ secrets.CHAT_URL }}
+        run: ./gradlew assembleStoptbUatRelease --no-daemon
+
+      - name: Verify APK is release-signed and not debuggable
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/stoptbUat/release/app-stoptbUat-universal-release.apk"
+          BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)"
+
+          if [ ! -f "$APK" ]; then
+            echo "APK not found: $APK"
+            ls -la app/build/outputs/apk/stoptbUat/release/ || true
+            exit 1
+          fi
+
+          echo "Using build-tools: $BUILD_TOOLS"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK"
+
+          CERTS="$("$BUILD_TOOLS/apksigner" verify --print-certs "$APK")"
+          if echo "$CERTS" | grep -qi "CN=Android Debug"; then
+            echo "ERROR: APK is signed with the Android debug certificate. Intune will reject this."
+            exit 1
+          fi
+
+          BADGING="$("$BUILD_TOOLS/aapt" dump badging "$APK")"
+          echo "$BADGING" | grep -E "package:|application-debuggable|sdkVersion|targetSdkVersion" || true
+          if echo "$BADGING" | grep -q "application-debuggable"; then
+            echo "ERROR: APK is marked debuggable. Intune will reject this as a debugging APK."
+            exit 1
+          fi
+
+          echo "Verified: release-signed, not debuggable, ready for Intune."
+
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-release-apk
+          path: app/build/outputs/apk/stoptbUat/release/*.apk
+
+      - name: Distribute to Firebase App Distribution (UAT)
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ secrets.FIREBASE_APP_ID_UAT }}
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          groups: testers
+          file: app/build/outputs/apk/stoptbUat/release/app-stoptbUat-universal-release.apk
+          releaseNotes: |
+            Environment: UAT (signed release)
+            Version: ${{ inputs.versionName }} (${{ inputs.versionCode }})
+            Branch: ${{ inputs.branch }}
+            Commit: ${{ github.sha }}
+            Description: ${{ inputs.description }}
