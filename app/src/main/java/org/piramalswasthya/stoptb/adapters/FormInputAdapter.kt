@@ -151,6 +151,8 @@ class FormInputAdapter(
                         item.value == "9999999999"
             Timber.d("binding triggered!!! $effectiveEnabled ${item.id}")
             if (!effectiveEnabled) {
+                binding.et.clearFocus()
+                binding.tilEditText.isEnabled = false
                 binding.et.isEnabled = false
                 binding.et.isClickable = false
                 binding.et.isFocusable = false
@@ -162,8 +164,15 @@ class FormInputAdapter(
                 binding.form = item
                 binding.et.setText(item.value)
                 binding.executePendingBindings()
+                binding.tilEditText.isEnabled = false
+                binding.et.isEnabled = false
+                binding.et.isClickable = false
+                binding.et.isFocusable = false
+                binding.et.isFocusableInTouchMode = false
+                binding.et.isCursorVisible = false
                 return
             } else {
+                binding.tilEditText.isEnabled = true
                 binding.et.isEnabled = true
                 binding.et.isClickable = true
                 binding.et.isFocusable = true
@@ -402,6 +411,14 @@ class FormInputAdapter(
             binding.actvRvDropdown.clearFocus()
             binding.actvRvDropdown.showSoftInputOnFocus = false
             binding.form = item
+
+            item.entries?.let { entries ->
+                binding.actvRvDropdown.setAdapter(
+                    android.widget.ArrayAdapter(binding.root.context, android.R.layout.simple_spinner_dropdown_item, entries)
+                )
+            }
+            binding.actvRvDropdown.setText(item.value, false)
+
             if (item.errorText == null) {
                 binding.tilRvDropdown.error = null
                 binding.tilRvDropdown.isErrorEnabled = false
@@ -419,26 +436,29 @@ class FormInputAdapter(
             binding.tilEditText.visibility = View.GONE
             binding.et.isFocusable = true
             binding.et.isClickable = true
-            hideKeyboardImmediately()
-
 
             binding.actvRvDropdown.setOnItemClickListener { _, _, index, _ ->
                 hideKeyboardWithRetry()
                 binding.actvRvDropdown.clearFocus()
                 binding.root.parent?.requestDisallowInterceptTouchEvent(false)
                 item.value = item.entries?.get(index)
+                item.errorText = null
+                binding.tilRvDropdown.error = null
+                binding.tilRvDropdown.isErrorEnabled = false
                 Timber.d("Item DD : $item")
-//                if (item.hasDependants || item.hasAlertError) {
                 formValueListener?.onValueChanged(item, index)
-//                }
                 binding.tilRvDropdown.isErrorEnabled = item.errorText != null
                 binding.tilRvDropdown.error = item.errorText
             }
 
-            binding.actvRvDropdown.setOnClickListener {
+            val openDropdown = View.OnClickListener {
                 binding.root.context.findFragmentActivity()?.currentFocus?.clearFocus()
                 hideKeyboardImmediately()
+                binding.actvRvDropdown.showDropDown()
             }
+
+            binding.actvRvDropdown.setOnClickListener(openDropdown)
+            binding.tilRvDropdown.setEndIconOnClickListener(openDropdown)
 
             item.errorText?.let { binding.tilRvDropdown.error = it }
             binding.executePendingBindings()
@@ -1557,6 +1577,9 @@ class FormInputAdapter(
                     it.errorText = emptyError
                     notifyItemChanged(index)
                     if (firstEmptyRequired == -1) firstEmptyRequired = index
+                } else if (it.errorText == emptyError) {
+                    it.errorText = null
+                    notifyItemChanged(index)
                 }
             }
         }

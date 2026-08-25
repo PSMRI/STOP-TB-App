@@ -329,4 +329,7 @@ data class HouseHoldBasicDomain(
     var isDeactivate: Boolean =false,
     var createdTimeStamp: Long? = null,
 
-    )
+    ) {
+    val isPlaceholderMobileNo: Boolean
+        get() = contactNumber == "9999999999"
+}
