@@ -35,10 +35,19 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
         return try {
             withContext(Dispatchers.IO) {
                 Timber.d("DiagnosticResultPollWorker starting work")
-                if (!hasValidatedInternet()) {
-                    Timber.d("Skipping DiagnosticResultPollWorker: internet is unavailable")
+                if (!preferenceDao.isCampModeEnabled() || !preferenceDao.isCampHubConnected()) {
+                    Timber.d("Skipping DiagnosticResultPollWorker: Camp Mode is disabled or Camp Hub is disconnected")
                     return@withContext Result.success()
                 }
+
+                // Refresh vendor integration config dynamically before polling
+                tbRepo.refreshDeviceIntegrationConfig()
+
+                if (!tbRepo.isXrayIntegrated() && !tbRepo.isTruenatIntegrated()) {
+                    Timber.d("Skipping DiagnosticResultPollWorker: No diagnostic devices are integrated (X-Ray and TrueNat are offline)")
+                    return@withContext Result.success()
+                }
+
                 if (tbRepo.isXrayIntegrated()) {
                     tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST")
                 }
@@ -99,13 +108,4 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
         }
     }
 
-    private fun hasValidatedInternet(): Boolean {
-        val connectivityManager =
-            appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-                ?: return false
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-    }
 }
