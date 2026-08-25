@@ -38,6 +38,29 @@ jobs:
     timeout-minutes: 45
 
     steps:
+      - name: Check required secrets
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          FIREBASE_APP_ID_UAT: ${{ secrets.FIREBASE_APP_ID_UAT }}
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_SERVICES_JSON_UAT: ${{ secrets.GOOGLE_SERVICES_JSON_UAT }}
+          GOOGLE_SERVICES_JSON_PROD: ${{ secrets.GOOGLE_SERVICES_JSON_PROD }}
+        run: |
+          missing=0
+          for name in RELEASE_KEYSTORE_BASE64 RELEASE_STORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD FIREBASE_APP_ID_UAT FIREBASE_SERVICE_ACCOUNT_JSON GOOGLE_SERVICES_JSON_UAT GOOGLE_SERVICES_JSON_PROD; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required secret: $name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Add the missing repository secrets, then re-run this workflow."
+            exit 1
+          fi
+
       - name: Checkout selected branch
         uses: actions/checkout@v4
         with:
@@ -85,13 +108,18 @@ jobs:
 
       - name: Create release keystore
         run: |
-          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 --decode > stoptb_signing_key.jks
-          cat > keystore.properties <<'EOF'
-          storeFile=../stoptb_signing_key.jks
+          KEYSTORE_PATH="$GITHUB_WORKSPACE/stoptb_signing_key.jks"
+          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 --decode > "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH"
+          cat > "$GITHUB_WORKSPACE/keystore.properties" <<'EOF'
+          storeFile=PLACEHOLDER_STORE_FILE
           storePassword=${{ secrets.RELEASE_STORE_PASSWORD }}
           keyAlias=${{ secrets.RELEASE_KEY_ALIAS }}
           keyPassword=${{ secrets.RELEASE_KEY_PASSWORD }}
           EOF
+          sed -i "s|storeFile=PLACEHOLDER_STORE_FILE|storeFile=$KEYSTORE_PATH|" "$GITHUB_WORKSPACE/keystore.properties"
+          test -f "$GITHUB_WORKSPACE/keystore.properties"
+          test -f "$GITHUB_WORKSPACE/version/version.properties"
 
       - name: Build UAT Release APK
         env:
@@ -106,17 +134,29 @@ jobs:
         run: ./gradlew assembleStoptbUatRelease --no-daemon
 
       - name: Verify APK is release-signed and not debuggable
+        id: apk
         run: |
           set -euo pipefail
-          APK="app/build/outputs/apk/stoptbUat/release/app-stoptbUat-universal-release.apk"
-          BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)"
+          RELEASE_DIR="app/build/outputs/apk/stoptbUat/release"
+          echo "Release APKs:"
+          ls -la "$RELEASE_DIR"
 
+          APK="$RELEASE_DIR/app-stoptbUat-universal-release.apk"
           if [ ! -f "$APK" ]; then
-            echo "APK not found: $APK"
-            ls -la app/build/outputs/apk/stoptbUat/release/ || true
+            APK="$(find "$RELEASE_DIR" -name '*universal*release*.apk' | head -n 1 || true)"
+          fi
+          if [ -z "$APK" ] || [ ! -f "$APK" ]; then
+            echo "Universal release APK not found in $RELEASE_DIR"
             exit 1
           fi
 
+          BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)"
+          if [ ! -x "$BUILD_TOOLS/apksigner" ] || [ ! -x "$BUILD_TOOLS/aapt" ]; then
+            echo "apksigner or aapt missing in $BUILD_TOOLS"
+            exit 1
+          fi
+
+          echo "Using APK: $APK"
           echo "Using build-tools: $BUILD_TOOLS"
           "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK"
 
@@ -133,6 +173,7 @@ jobs:
             exit 1
           fi
 
+          echo "apk_path=$APK" >> "$GITHUB_OUTPUT"
           echo "Verified: release-signed, not debuggable, ready for Intune."
 
       - name: Upload APK as artifact
@@ -147,7 +188,7 @@ jobs:
           appId: ${{ secrets.FIREBASE_APP_ID_UAT }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
           groups: testers
-          file: app/build/outputs/apk/stoptbUat/release/app-stoptbUat-universal-release.apk
+          file: ${{ steps.apk.outputs.apk_path }}
           releaseNotes: |
             Environment: UAT (signed release)
             Version: ${{ inputs.versionName }} (${{ inputs.versionCode }})
