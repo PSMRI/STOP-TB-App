@@ -287,7 +287,8 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:orientation="vertical"
-                            android:padding="@dimen/padding_small">
+                            android:padding="@dimen/padding_small"
+                            android:visibility="@{benWithTb.ben.isPlaceholderMobileNo ? View.GONE : View.VISIBLE}">
 
                             <TextView
                                 android:layout_width="wrap_content"

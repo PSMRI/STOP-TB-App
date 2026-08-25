@@ -297,6 +297,11 @@ class NewHouseholdFragment : Fragment() {
                 24 -> {      // <-- address.id
                     notifyDataSetChanged()
                 }
+
+                // Mobile number not available checkbox changed
+                1002 -> {    // <-- mobileNotAvailable.id
+                    notifyDataSetChanged()
+                }
             }
         }
     }
