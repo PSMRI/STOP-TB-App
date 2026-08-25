@@ -38,6 +38,10 @@
         <item name="materialButtonStyle">@style/Widget.Sakhi.Button</item>
         <item name="buttonStyle">@style/Widget.Sakhi.PlatformButton</item>
         <item name="android:buttonStyle">@style/Widget.Sakhi.PlatformButton</item>
+        <item name="buttonBarButtonStyle">@style/Widget.Sakhi.Button</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.Sakhi.Button</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.Sakhi.Button.Outlined</item>
+        <item name="buttonBarNeutralButtonStyle">@style/Widget.Sakhi.Button.Outlined</item>
         <item name="materialCardViewStyle">@style/Widget.Sakhi.MaterialCardView</item>
         <item name="navigationViewStyle">@style/Widget.Sakhi.NavigationView</item>
         <item name="toolbarStyle">@style/Theme.Custom.Toolbar</item>
@@ -62,6 +66,8 @@
         <item name="iconTint">@color/background_selector</item>
         <item name="android:textColor">@color/background_selector</item>
         <item name="android:textStyle">bold</item>
+        <item name="fontFamily">@font/roboto_bold</item>
+        <item name="android:fontFamily">@font/roboto_bold</item>
         <item name="textAppearance">@style/TextAppearance.Sakhi.Button</item>
         <item name="android:textAppearance">@style/TextAppearance.Sakhi.Button</item>
     </style>

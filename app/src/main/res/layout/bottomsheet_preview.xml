@@ -54,6 +54,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/submit"
+            android:textStyle="bold"
+            android:fontFamily="@font/roboto_bold"
             android:layout_marginEnd="@dimen/_40sdp"
             android:minWidth="@dimen/_100sdp"
             android:backgroundTint="?attr/colorPrimary"
@@ -65,6 +67,8 @@
             android:layout_height="wrap_content"
             android:minWidth="@dimen/_100sdp"
             android:text="@string/edit"
+            android:textStyle="bold"
+            android:fontFamily="@font/roboto_bold"
             android:backgroundTint="?attr/colorPrimary"
             android:textColor="@color/md_theme_light_onSecondary" />
     </LinearLayout>
