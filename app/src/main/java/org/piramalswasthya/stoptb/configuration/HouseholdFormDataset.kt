@@ -355,7 +355,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_type_of_house),
         arrayId = R.array.nhhr_type_of_house_array,
         entries = resources.getStringArray(R.array.nhhr_type_of_house_array),
-        required = false
+        required = true
     )
     private val houseOwnership = FormElement(
         id = 11,
@@ -411,7 +411,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_fuel_cooking),
         arrayId = R.array.nhhr_fuel_cooking_array,
         entries = resources.getStringArray(R.array.nhhr_fuel_cooking_array),
-        required = false,
+        required = true,
         hasDependants = true,
     )
 
@@ -431,7 +431,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_primary_water),
         arrayId = R.array.nhhr_primary_water_array,
         entries = resources.getStringArray(R.array.nhhr_primary_water_array),
-        required = false,
+        required = true,
         hasDependants = true,
     )
 
@@ -451,7 +451,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_avail_electricity),
         arrayId = R.array.nhhr_avail_electricity_array,
         entries = resources.getStringArray(R.array.nhhr_avail_electricity_array),
-        required = false,
+        required = true,
         hasDependants = true
     )
 
@@ -471,7 +471,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_avail_toilet),
         arrayId = R.array.nhhr_avail_toilet_array,
         entries = resources.getStringArray(R.array.nhhr_avail_toilet_array),
-        required = false,
+        required = true,
         hasDependants = true,
     )
 
