@@ -247,6 +247,9 @@ class FormInputAdapterWithBgIcon (
 
             binding.actvRvDropdown.setOnItemClickListener { _, _, index, _ ->
                 item.value = item.entries?.get(index)
+                item.errorText = null
+                binding.tilRvDropdown.error = null
+                binding.tilRvDropdown.isErrorEnabled = false
                 Timber.d("Item DD : $item")
                 formValueListener?.onValueChanged(item, index)
                 binding.tilRvDropdown.isErrorEnabled = item.errorText != null

@@ -166,6 +166,25 @@ abstract class InAppDb : RoomDatabase() {
             return false
         }
 
+        // SQLite's CREATE TABLE grammar forbids a column-def after any table-constraint
+        // (PRIMARY KEY/FOREIGN KEY/UNIQUE/CHECK/CONSTRAINT), so new column defs must be
+        // inserted before the first one. The stored sqlite_master SQL for a table can have
+        // arbitrary whitespace (including newlines) between the preceding comma and the
+        // constraint keyword depending on how the table was originally created, so a plain
+        // ", PRIMARY KEY(" substring search is not reliable — use a whitespace-tolerant regex.
+        private val TABLE_CONSTRAINT_REGEX =
+            Regex(",\\s*(PRIMARY KEY|FOREIGN KEY|UNIQUE|CHECK|CONSTRAINT)\\b", RegexOption.IGNORE_CASE)
+
+        fun insertColumnDefsBeforeTableConstraints(sql: String, columnDefs: String): String {
+            val match = TABLE_CONSTRAINT_REGEX.find(sql)
+            return if (match != null) {
+                sql.substring(0, match.range.first) + ", $columnDefs" + sql.substring(match.range.first)
+            } else {
+                val lastParen = sql.lastIndexOf(')')
+                sql.substring(0, lastParen) + ", $columnDefs" + sql.substring(lastParen)
+            }
+        }
+
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
@@ -956,15 +975,7 @@ abstract class InAppDb : RoomDatabase() {
                 newSql = newSql.replace("householdId INTEGER NOT NULL", "householdId INTEGER")
 
                 if (needsIsNonHH) {
-                    // A new column def must be inserted before the trailing `PRIMARY KEY(...)`
-                    // table constraint — SQLite's grammar doesn't allow a column def after it.
-                    val primaryKeyIndex = newSql.indexOf(", PRIMARY KEY(")
-                    newSql = if (primaryKeyIndex >= 0) {
-                        newSql.substring(0, primaryKeyIndex) + ", `isNonHH` INTEGER NOT NULL" + newSql.substring(primaryKeyIndex)
-                    } else {
-                        val lastParen = newSql.lastIndexOf(')')
-                        newSql.substring(0, lastParen) + ", `isNonHH` INTEGER NOT NULL" + newSql.substring(lastParen)
-                    }
+                    newSql = insertColumnDefsBeforeTableConstraints(newSql, "`isNonHH` INTEGER NOT NULL")
                 }
 
                 database.execSQL(newSql)
@@ -1031,13 +1042,7 @@ abstract class InAppDb : RoomDatabase() {
                 var newSql = originalSql.replace("CREATE TABLE `t_form_section`", "CREATE TABLE `t_form_section_new`")
                 newSql = newSql.replace("CREATE TABLE t_form_section", "CREATE TABLE t_form_section_new")
 
-                val primaryKeyIndex = newSql.indexOf(", PRIMARY KEY(")
-                newSql = if (primaryKeyIndex >= 0) {
-                    newSql.substring(0, primaryKeyIndex) + ", `hasSubmitButton` INTEGER NOT NULL" + newSql.substring(primaryKeyIndex)
-                } else {
-                    val lastParen = newSql.lastIndexOf(')')
-                    newSql.substring(0, lastParen) + ", `hasSubmitButton` INTEGER NOT NULL" + newSql.substring(lastParen)
-                }
+                newSql = insertColumnDefsBeforeTableConstraints(newSql, "`hasSubmitButton` INTEGER NOT NULL")
 
                 database.execSQL(newSql)
 
@@ -1147,13 +1152,7 @@ abstract class InAppDb : RoomDatabase() {
                 newSql = newSql.replace("CREATE TABLE t_section_question", "CREATE TABLE t_section_question_new")
 
                 val newColumnDefs = notNullDefaults.joinToString(", ") { (name, type, _) -> "`$name` $type" }
-                val primaryKeyIndex = newSql.indexOf(", PRIMARY KEY(")
-                newSql = if (primaryKeyIndex >= 0) {
-                    newSql.substring(0, primaryKeyIndex) + ", $newColumnDefs" + newSql.substring(primaryKeyIndex)
-                } else {
-                    val lastParen = newSql.lastIndexOf(')')
-                    newSql.substring(0, lastParen) + ", $newColumnDefs" + newSql.substring(lastParen)
-                }
+                newSql = insertColumnDefsBeforeTableConstraints(newSql, newColumnDefs)
 
                 database.execSQL(newSql)
 
@@ -1209,13 +1208,7 @@ abstract class InAppDb : RoomDatabase() {
                 var newSql = originalSql.replace("CREATE TABLE `t_question_option`", "CREATE TABLE `t_question_option_new`")
                 newSql = newSql.replace("CREATE TABLE t_question_option", "CREATE TABLE t_question_option_new")
 
-                val primaryKeyIndex = newSql.indexOf(", PRIMARY KEY(")
-                newSql = if (primaryKeyIndex >= 0) {
-                    newSql.substring(0, primaryKeyIndex) + ", `isExclusive` INTEGER NOT NULL" + newSql.substring(primaryKeyIndex)
-                } else {
-                    val lastParen = newSql.lastIndexOf(')')
-                    newSql.substring(0, lastParen) + ", `isExclusive` INTEGER NOT NULL" + newSql.substring(lastParen)
-                }
+                newSql = insertColumnDefsBeforeTableConstraints(newSql, "`isExclusive` INTEGER NOT NULL")
 
                 database.execSQL(newSql)
 

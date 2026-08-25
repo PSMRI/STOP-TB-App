@@ -96,23 +96,43 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         inputType = EDIT_TEXT,
         title = resources.getString(R.string.nhhr_last_name_hof),
         arrayId = -1,
-        required = false,
+        required = true,
         allCaps = true,
         hasSpeechToText = true,
         etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
     )
+    private val mobileNotAvailable = FormElement(
+        id = 1002,
+        inputType = org.piramalswasthya.stoptb.model.InputType.CHECKBOXES,
+        title = resources.getString(R.string.mobile_number_not_available),
+        arrayId = R.array.mobile_not_available_array,
+        entries = resources.getStringArray(R.array.mobile_not_available_array),
+        required = false, hasDependants = true
+    )
+
     private val mobileNoHeadOfFamily = FormElement(
         id = 2,
         inputType = EDIT_TEXT,
         title = resources.getString(R.string.nhhr_mob_no_hof),
         arrayId = -1,
-        required = false,
+        required = true,
         etInputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL,
         isMobileNumber = true,
         etMaxLength = 10,
         max = 9999999999,
         min = 6000000000
     )
+
+    private fun isMobileNotAvailableChecked(): Boolean {
+        val normalizedIndexes = getCheckboxIndexesFromValues(
+            mobileNotAvailable.arrayId,
+            mobileNotAvailable.value
+        )
+        return normalizedIndexes
+            ?.split("|")
+            ?.mapNotNull { it.trim().toIntOrNull() }
+            ?.contains(0) == true
+    }
     private val houseNo = FormElement(
         id = 3,
         inputType = EDIT_TEXT,
@@ -199,6 +219,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
                 registeredAtCampSite,
                 firstNameHeadOfFamily,
                 lastNameHeadOfFamily,
+                mobileNotAvailable,
                 mobileNoHeadOfFamily,
                 houseNo,
                 wardNo,
@@ -226,7 +247,10 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             registeredAtCampSite.value = registeredAtCampSite.getStringFromPosition(saved.isRegisteredAtCampSiteId)
             firstNameHeadOfFamily.value = saved.familyHeadName
             lastNameHeadOfFamily.value = saved.familyName
-            mobileNoHeadOfFamily.value = saved.familyHeadPhoneNo?.toString() ?: "9999999999"
+            val isPlaceholderPhone = saved.familyHeadPhoneNo == 9999999999L
+            mobileNoHeadOfFamily.value = saved.familyHeadPhoneNo?.toString()?.takeIf { !isPlaceholderPhone }
+            mobileNotAvailable.value = if (isPlaceholderPhone) "0" else null
+            mobileNotAvailable.isEnabled = false
             saved.familyHeadName?.takeIf { it.isNotEmpty() }?.let { firstNameHeadOfFamily.inputType = TEXT_VIEW }
             saved.familyName?.takeIf { it.isNotEmpty() }?.let { lastNameHeadOfFamily.inputType = TEXT_VIEW }
             saved.familyHeadPhoneNo.takeIf { it != null }?.let { mobileNoHeadOfFamily.inputType = TEXT_VIEW }
@@ -298,6 +322,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             listOf(
                 firstNameHeadOfFamily,
                 lastNameHeadOfFamily,
+                mobileNotAvailable,
                 mobileNoHeadOfFamily,
                 houseNo,
                 wardNo,
@@ -310,7 +335,9 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         family?.let { saved ->
             firstNameHeadOfFamily.value = saved.familyHeadName
             lastNameHeadOfFamily.value = saved.familyName
-            mobileNoHeadOfFamily.value = saved.familyHeadPhoneNo.toString()
+            val isPlaceholderPhone = saved.familyHeadPhoneNo == 9999999999L
+            mobileNoHeadOfFamily.value = saved.familyHeadPhoneNo?.toString()?.takeIf { !isPlaceholderPhone }
+            mobileNotAvailable.value = if (isPlaceholderPhone) "0" else null
             houseNo.value = saved.houseNo
             wardNo.value = saved.wardNo
             wardName.value = saved.wardName
@@ -541,8 +568,30 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
 
             }
             mobileNoHeadOfFamily.id -> {
+                if (isMobileNotAvailableChecked()) {
+                    mobileNoHeadOfFamily.errorText = null
+                    return -1
+                }
                 validateEmptyOnEditText(mobileNoHeadOfFamily)
                 validateMobileNumberOnEditText(mobileNoHeadOfFamily)
+            }
+
+            mobileNotAvailable.id -> {
+                val isChecked = index >= 0
+                if (isChecked) {
+                    mobileNotAvailable.value = "0"
+                    mobileNoHeadOfFamily.required = false
+                    mobileNoHeadOfFamily.value = null
+                    mobileNoHeadOfFamily.errorText = null
+                    mobileNoHeadOfFamily.isEnabled = false
+                } else {
+                    mobileNotAvailable.value = null
+                    mobileNoHeadOfFamily.required = true
+                    mobileNoHeadOfFamily.isEnabled = true
+                    mobileNoHeadOfFamily.value = null
+                    mobileNoHeadOfFamily.errorText = null
+                }
+                return 1
             }
 
             residentialArea.id -> triggerDependants(
@@ -727,5 +776,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         if (firstNameHeadOfFamily.inputType == TEXT_VIEW) firstNameHeadOfFamily.inputType = EDIT_TEXT
         if (lastNameHeadOfFamily.inputType == TEXT_VIEW) lastNameHeadOfFamily.inputType = EDIT_TEXT
         if (mobileNoHeadOfFamily.inputType == TEXT_VIEW) mobileNoHeadOfFamily.inputType = EDIT_TEXT
+        mobileNotAvailable.isEnabled = true
+        mobileNoHeadOfFamily.isEnabled = !isMobileNotAvailableChecked()
     }
 }
