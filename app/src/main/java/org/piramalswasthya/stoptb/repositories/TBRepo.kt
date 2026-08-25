@@ -2370,9 +2370,10 @@ class TBRepo @Inject constructor(
                                 val ben = benDao.getBenByRegId(regId) ?: benDao.getBen(regId)
                                 ben?.let { b ->
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
-                                    if (existing?.syncState != null && existing.syncState != SyncState.SYNCED) {
-                                        return@let
-                                    }
+                                    // Relies solely on the isRecentlyPushed grace-period check below (not a
+                                    // syncState==SYNCED check) - a diagnostics row can stay UNSYNCED indefinitely
+                                    // if its own push to Amrit never succeeds, which would otherwise block the
+                                    // server's confirmed "failed" status from ever landing locally.
                                     val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
                                     val isDone = currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
                                     // Same staleness guard as the "Polling Timed Out" bucket above.
