@@ -128,7 +128,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                         Timber.e(e, "Pre-fetching results failed for $orderType")
                     }
                 }
-                if (orderType == "SPUTUM_TRUENAT" && tbDiagnostics.naatResult.equals("MTB detected", ignoreCase = true)) {
+                if (orderType == "SPUTUM_TRUENAT" && (tbDiagnostics.naatResult.equals("MTB detected", ignoreCase = true) || tbDiagnostics.naatResult.equals("TB Positive", ignoreCase = true))) {
                     val hasLocalRifResult = !tbDiagnostics.trueNatRifResult.isNullOrBlank()
                     val isRifActive = tbDiagnostics.rifOrderStatus.equals("COMPLETED", ignoreCase = true) ||
                             tbDiagnostics.rifOrderStatus.equals("IN_PROGRESS", ignoreCase = true) ||

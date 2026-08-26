@@ -312,7 +312,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
                                 val targetOrder = when {
                                     isIndeterminateRif -> "MDR_RIF"
-                                    else -> "MTB_PLUS"
+                                    else -> "SPUTUM_TRUENAT"
                                 }
 
                                 androidx.appcompat.app.AlertDialog.Builder(requireContext())
@@ -335,7 +335,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                                         .setMessage("The test result is invalid. Please repeat the test.")
                                         .setPositiveButton("REPEAT TEST") { d, _ ->
                                             d.dismiss()
-                                            viewModel.repeatTest(item.benId, "MTB_PLUS")
+                                            viewModel.repeatTest(item.benId, "SPUTUM_TRUENAT")
                                         }
                                         .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
                                         .show()
@@ -555,7 +555,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         if (state.message.contains("completed", ignoreCase = true) || state.orderType.equals("MDR_RIF", ignoreCase = true)) {
                             if (state.orderType.equals("MDR_RIF", ignoreCase = true)) {
                                 org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(requireContext())
-                            } else if (state.orderType.equals("SPUTUM_TRUENAT", ignoreCase = true) || state.orderType.equals("MTB_PLUS", ignoreCase = true)) {
+                            } else if (state.orderType.equals("SPUTUM_TRUENAT", ignoreCase = true)) {
                                 org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext())
                             } else {
                                 org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(requireContext())

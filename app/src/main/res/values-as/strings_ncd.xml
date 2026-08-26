@@ -280,5 +280,9 @@
         <item>Rif Resistance Not Detected</item>
         <item>Indeterminate</item>
     </string-array>
+    <string-array name="tb_digital_xray_result">
+        <item>Normal</item>
+        <item>TB Presumptive</item>
+    </string-array>
 </resources>
 

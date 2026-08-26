@@ -244,11 +244,11 @@ interface BenDao {
                 UNION
                 SELECT ts.benId FROM TB_SUSPECTED ts
                 WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
-                  AND UPPER(IFNULL(ts.naatResult, '')) = 'NEGATIVE'
+                  AND UPPER(IFNULL(ts.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
                 UNION
                 SELECT td.benId FROM TB_DIAGNOSTICS td
                 WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
-                  AND UPPER(IFNULL(td.naatResult, '')) = 'NEGATIVE'
+                  AND UPPER(IFNULL(td.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
             ))
             OR (:source = 6 AND isDeath = 0 AND reproductiveStatusId != 1 AND benId NOT IN (SELECT v.benId FROM BEN_VITALS v WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%') AND (
                 benId IN (
@@ -385,11 +385,11 @@ interface BenDao {
                 UNION
                 SELECT ts.benId FROM TB_SUSPECTED ts
                 WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
-                  AND UPPER(IFNULL(ts.naatResult, '')) = 'NEGATIVE'
+                  AND UPPER(IFNULL(ts.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
                 UNION
                 SELECT td.benId FROM TB_DIAGNOSTICS td
                 WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
-                  AND UPPER(IFNULL(td.naatResult, '')) = 'NEGATIVE'
+                  AND UPPER(IFNULL(td.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
             ))
             OR (:source = 6 AND isDeath = 0 AND reproductiveStatusId != 1 AND benId NOT IN (SELECT v.benId FROM BEN_VITALS v WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%') AND (
                 benId IN (
@@ -526,11 +526,11 @@ interface BenDao {
                 UNION
                 SELECT ts.benId FROM TB_SUSPECTED ts
                 WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
-                  AND UPPER(IFNULL(ts.naatResult, '')) = 'NEGATIVE'
+                  AND UPPER(IFNULL(ts.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
                 UNION
                 SELECT td.benId FROM TB_DIAGNOSTICS td
                 WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
-                  AND UPPER(IFNULL(td.naatResult, '')) = 'NEGATIVE'
+                  AND UPPER(IFNULL(td.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
             ))
             OR (:source = 6 AND isDeath = 0 AND reproductiveStatusId != 1 AND benId NOT IN (SELECT v.benId FROM BEN_VITALS v WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%') AND (
                 benId IN (
@@ -960,11 +960,11 @@ interface BenDao {
             UNION
             SELECT ts.benId FROM TB_SUSPECTED ts
             WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
-              AND UPPER(IFNULL(ts.naatResult, '')) = 'NEGATIVE'
+              AND UPPER(IFNULL(ts.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
             UNION
             SELECT td.benId FROM TB_DIAGNOSTICS td
             WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
-              AND UPPER(IFNULL(td.naatResult, '')) = 'NEGATIVE'
+              AND UPPER(IFNULL(td.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
           )
     """)
     fun getHwcBenDataCount(selectedVillage: Int): Flow<Int>
@@ -1193,7 +1193,7 @@ interface BenDao {
             "        AND NOT EXISTS (\n" +
             "            SELECT 1 FROM TB_CONFIRMED_TREATMENT tc WHERE tc.benId = b.benId\n" +
             "        ) AND NOT (\n" +
-            "            UPPER(IFNULL(td.naatResult, '')) = 'POSITIVE'\n" +
+            "            UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')\n" +
             "            OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'\n" +
             "        ) GROUP BY b.benId")
     fun getTbScreeningList(villageId: Int): Flow<List<BenWithTbSuspectedCache>>
@@ -1210,9 +1210,9 @@ interface BenDao {
       AND b.isDeactivate = 0
       AND b.isDeath = 0 
       AND (
-            ts.isTbConfirmed = 1
-            OR td.isTbConfirmed = 1
-            OR UPPER(IFNULL(td.naatResult, '')) = 'POSITIVE'
+            ts.isConfirmed = 1
+            OR td.isConfirmed = 1
+            OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
             OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
           )
 """)
@@ -1233,15 +1233,15 @@ interface BenDao {
           AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
           AND (
                 (
-                    ts.isTbConfirmed = 1
+                    ts.isConfirmed = 1
                     AND (:startTime = 0 OR ts.visitDate >= :startTime)
                     AND (:endTime = 0 OR ts.visitDate <= :endTime)
                 )
                 OR
                 (
                     (
-                        td.isTbConfirmed = 1
-                        OR UPPER(IFNULL(td.naatResult, '')) = 'POSITIVE'
+                        td.isConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
                         OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
                     )
                     AND (:startTime = 0 OR td.visitDate >= :startTime)
