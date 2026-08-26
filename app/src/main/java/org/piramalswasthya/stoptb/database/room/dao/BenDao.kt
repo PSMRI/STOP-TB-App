@@ -1210,7 +1210,7 @@ interface BenDao {
       AND b.isDeactivate = 0
       AND b.isDeath = 0 
       AND (
-            ts.isConfirmed = 1
+            ts.isTbConfirmed = 1
             OR td.isConfirmed = 1
             OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
             OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
@@ -1233,14 +1233,14 @@ interface BenDao {
           AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
           AND (
                 (
-                    ts.isConfirmed = 1
+                    ts.isTbConfirmed = 1
                     AND (:startTime = 0 OR ts.visitDate >= :startTime)
                     AND (:endTime = 0 OR ts.visitDate <= :endTime)
                 )
                 OR
                 (
                     (
-                        td.isConfirmed = 1
+                        td.isTbConfirmed = 1
                         OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
                         OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
                     )
