@@ -162,54 +162,25 @@ class DashboardFragment : Fragment() {
         }
 
         viewModel.pastHistoryTb.observe(viewLifecycleOwner) { data ->
-            binding.tvPastHistoryTbTotal.text = data.total.total.toString()
-            binding.tvPastHistoryTbMale.text = getString(
-                R.string.dashboard_row_male_pos_neg,
-                data.male.positive,
-                data.male.negative
-            )
-            binding.tvPastHistoryTbFemale.text = getString(
-                R.string.dashboard_row_female_pos_neg,
-                data.female.positive,
-                data.female.negative
-            )
-            binding.tvPastHistoryTbChildren.text = getString(
-                R.string.dashboard_row_children_pos_neg,
-                data.children.positive,
-                data.children.negative
-            )
-            binding.tvPastHistoryTbOthers.text = getString(
-                R.string.dashboard_row_others_pos_neg,
-                data.others.positive,
-                data.others.negative
-            )
+            binding.tvPastHistoryTbTotal.text = data.total.toString()
+            binding.tvPastHistoryTbMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
+            binding.tvPastHistoryTbFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
+            binding.tvPastHistoryTbChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
+            binding.tvPastHistoryTbOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
+            binding.tvPastHistoryTbSeniorCitizen.text = requireContext().getBoldSecondValue(R.string.label_senior_citizen, data.seniorCitizen)
         }
 
         viewModel.antiTbDrugs.observe(viewLifecycleOwner) { data ->
-            binding.tvAntiTbDrugsTotal.text = data.total.total.toString()
-            binding.tvAntiTbDrugsMale.text = getString(
-                R.string.dashboard_row_male_pos_neg,
-                data.male.positive,
-                data.male.negative
-            )
-            binding.tvAntiTbDrugsFemale.text = getString(
-                R.string.dashboard_row_female_pos_neg,
-                data.female.positive,
-                data.female.negative
-            )
-            binding.tvAntiTbDrugsChildren.text = getString(
-                R.string.dashboard_row_children_pos_neg,
-                data.children.positive,
-                data.children.negative
-            )
-            binding.tvAntiTbDrugsOthers.text = getString(
-                R.string.dashboard_row_others_pos_neg,
-                data.others.positive,
-                data.others.negative
-            )
+            binding.tvAntiTbDrugsTotal.text = data.total.toString()
+            binding.tvAntiTbDrugsMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
+            binding.tvAntiTbDrugsFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
+            binding.tvAntiTbDrugsChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
+            binding.tvAntiTbDrugsOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
+            binding.tvAntiTbDrugsSeniorCitizen.text = requireContext().getBoldSecondValue(R.string.label_senior_citizen, data.seniorCitizen)
         }
 
-        // TB Suspected card
+        // TB Suspected card commented out
+        /*
         viewModel.tbSuspected.observe(viewLifecycleOwner) { data ->
             binding.tvTbSuspectedTotal.text = data.total.toString()
             binding.tvTbSuspectedMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
@@ -217,6 +188,7 @@ class DashboardFragment : Fragment() {
             binding.tvTbSuspectedChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
             binding.tvTbSuspectedOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
         }
+        */
 
         // TB Confirmed card
         viewModel.tbConfirmed.observe(viewLifecycleOwner) { data ->
