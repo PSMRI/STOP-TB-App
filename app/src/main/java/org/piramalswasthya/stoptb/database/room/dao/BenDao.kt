@@ -1211,7 +1211,7 @@ interface BenDao {
       AND b.isDeath = 0 
       AND (
             ts.isTbConfirmed = 1
-            OR td.isConfirmed = 1
+            OR td.isTbConfirmed = 1
             OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
             OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
           )
