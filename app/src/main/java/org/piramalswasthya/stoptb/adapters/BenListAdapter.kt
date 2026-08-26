@@ -212,10 +212,6 @@ class BenListAdapter(
                             val sputumCollected = tbDiag?.isSputumCollected
                             val naatRes = tbDiag?.naatResult
                             val rifStatus = tbDiag?.rifOrderStatus
-                            val isHubConnected = pref?.isCampHubConnected() == true
-                            val isTruenatDevIntegrated = pref?.getTruenatIntegrated() == true
-                            val isTruenatManual = !isTruenatDevIntegrated || !isHubConnected
-
                             binding.btnVitalScreenSecondary.visibility = View.GONE
 
                             when {
@@ -231,80 +227,55 @@ class BenListAdapter(
                                     if (isMtbDetected) {
                                         binding.btnVitalScreenSecondary.visibility = View.VISIBLE
 
-                                        if (!isTruenatManual) {
-                                            when {
-                                                rifStatus == null || rifStatus.equals("PENDING", ignoreCase = true) || rifStatus.equals("CREATED", ignoreCase = true) || rifStatus.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) || rifStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || rifStatus.equals("IN_PROGRESS", ignoreCase = true) -> {
-                                                    binding.btnVitalScreenSecondary.text = "Pending"
-                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.darker_gray))
-                                                    binding.btnVitalScreenSecondary.isEnabled = false
-                                                    binding.btnVitalScreenSecondary.alpha = 0.5f
-                                                }
-                                                rifStatus.equals("FAILED", ignoreCase = true) -> {
-                                                    binding.btnVitalScreenSecondary.text = "Retry Referral"
-                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_red_dark))
-                                                    binding.btnVitalScreenSecondary.isEnabled = canActOnReferral && !retryingBenIds.contains(item.benId)
-                                                    binding.btnVitalScreenSecondary.alpha = if (canActOnReferral && !retryingBenIds.contains(item.benId)) 1.0f else 0.5f
-                                                    binding.btnVitalScreenSecondary.setOnClickListener {
-                                                        clickListener?.onClickOrderAction(item, "RETRY_PUSH", "MDR_RIF")
-                                                    }
-                                                }
-                                                rifStatus.equals("POLLING_TIMEOUT", ignoreCase = true) || rifStatus.equals("MANUAL_ENTRY", ignoreCase = true) -> {
-                                                    binding.btnVitalScreenSecondary.text = "Pending"
-                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_orange_dark))
-                                                    binding.btnVitalScreenSecondary.isEnabled = canActOnReferral
-                                                    binding.btnVitalScreenSecondary.alpha = if (canActOnReferral) 1.0f else 0.5f
-                                                    binding.btnVitalScreenSecondary.setOnClickListener {
-                                                        clickListener?.onClickOrderAction(item, "COMPLETE_RIF", "MDR_RIF")
-                                                    }
-                                                }
-                                                rifStatus.equals("COMPLETED", ignoreCase = true) -> {
-                                                    binding.btnVitalScreenSecondary.text = "VIEW RIF RESULT"
-                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_green_dark))
-                                                    binding.btnVitalScreenSecondary.isEnabled = true
-                                                    binding.btnVitalScreenSecondary.alpha = 1.0f
-                                                    binding.btnVitalScreenSecondary.setOnClickListener {
-                                                        clickListener?.onClickOrderAction(item, "VIEW_RIF", "MDR_RIF")
-                                                    }
-                                                }
-                                                rifStatus.equals("REFUSED", ignoreCase = true) -> {
-                                                    binding.btnVitalScreenSecondary.text = "RIF REFUSED"
-                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.darker_gray))
-                                                    binding.btnVitalScreenSecondary.isEnabled = false
-                                                    binding.btnVitalScreenSecondary.alpha = 0.5f
-                                                }
-                                                else -> {
-                                                    binding.btnVitalScreenSecondary.visibility = View.GONE
+                                        when {
+                                            rifStatus.equals("PENDING", ignoreCase = true) ||
+                                                    rifStatus.equals("CREATED", ignoreCase = true) ||
+                                                    rifStatus.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) ||
+                                                    rifStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) ||
+                                                    rifStatus.equals("IN_PROGRESS", ignoreCase = true) ||
+                                                    rifStatus.equals("PROCESSING", ignoreCase = true) -> {
+                                                binding.btnVitalScreenSecondary.text = "Pending"
+                                                binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.darker_gray))
+                                                binding.btnVitalScreenSecondary.isEnabled = false
+                                                binding.btnVitalScreenSecondary.alpha = 0.5f
+                                                binding.btnVitalScreenSecondary.setOnClickListener(null)
+                                            }
+                                            rifStatus == null || rifStatus.equals("FAILED", ignoreCase = true) -> {
+                                                binding.btnVitalScreenSecondary.text = "Retry Referral"
+                                                binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_red_dark))
+                                                binding.btnVitalScreenSecondary.isEnabled = canActOnReferral && !retryingBenIds.contains(item.benId)
+                                                binding.btnVitalScreenSecondary.alpha = if (canActOnReferral && !retryingBenIds.contains(item.benId)) 1.0f else 0.5f
+                                                binding.btnVitalScreenSecondary.setOnClickListener {
+                                                    clickListener?.onClickOrderAction(item, "RETRY_PUSH", "MDR_RIF")
                                                 }
                                             }
-                                        } else {
-                                            when {
-                                                rifStatus == null || rifStatus.equals("PENDING", ignoreCase = true) || rifStatus.equals("CREATED", ignoreCase = true) || rifStatus.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) || rifStatus.equals("MANUAL_ENTRY", ignoreCase = true) -> {
-                                                    binding.btnVitalScreenSecondary.text = "Pending"
-                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_orange_dark))
-                                                    binding.btnVitalScreenSecondary.isEnabled = canActOnReferral
-                                                    binding.btnVitalScreenSecondary.alpha = if (canActOnReferral) 1.0f else 0.5f
-                                                    binding.btnVitalScreenSecondary.setOnClickListener {
-                                                        clickListener?.onClickOrderAction(item, "COMPLETE_RIF", "MDR_RIF")
-                                                    }
+                                            rifStatus.equals("POLLING_TIMEOUT", ignoreCase = true) || rifStatus.equals("MANUAL_ENTRY", ignoreCase = true) -> {
+                                                binding.btnVitalScreenSecondary.text = "Pending"
+                                                binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_orange_dark))
+                                                binding.btnVitalScreenSecondary.isEnabled = canActOnReferral
+                                                binding.btnVitalScreenSecondary.alpha = if (canActOnReferral) 1.0f else 0.5f
+                                                binding.btnVitalScreenSecondary.setOnClickListener {
+                                                    clickListener?.onClickOrderAction(item, "COMPLETE_RIF", "MDR_RIF")
                                                 }
-                                                rifStatus.equals("COMPLETED", ignoreCase = true) -> {
-                                                    binding.btnVitalScreenSecondary.text = "VIEW RIF RESULT"
-                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_green_dark))
-                                                    binding.btnVitalScreenSecondary.isEnabled = true
-                                                    binding.btnVitalScreenSecondary.alpha = 1.0f
-                                                    binding.btnVitalScreenSecondary.setOnClickListener {
-                                                        clickListener?.onClickOrderAction(item, "VIEW_RIF", "MDR_RIF")
-                                                    }
+                                            }
+                                            rifStatus.equals("COMPLETED", ignoreCase = true) -> {
+                                                binding.btnVitalScreenSecondary.text = "VIEW RIF RESULT"
+                                                binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_green_dark))
+                                                binding.btnVitalScreenSecondary.isEnabled = true
+                                                binding.btnVitalScreenSecondary.alpha = 1.0f
+                                                binding.btnVitalScreenSecondary.setOnClickListener {
+                                                    clickListener?.onClickOrderAction(item, "VIEW_RIF", "MDR_RIF")
                                                 }
-                                                rifStatus.equals("REFUSED", ignoreCase = true) -> {
-                                                    binding.btnVitalScreenSecondary.text = "RIF REFUSED"
-                                                    binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.darker_gray))
-                                                    binding.btnVitalScreenSecondary.isEnabled = false
-                                                    binding.btnVitalScreenSecondary.alpha = 0.5f
-                                                }
-                                                else -> {
-                                                    binding.btnVitalScreenSecondary.visibility = View.GONE
-                                                }
+                                            }
+                                            rifStatus.equals("REFUSED", ignoreCase = true) -> {
+                                                binding.btnVitalScreenSecondary.text = "RIF REFUSED"
+                                                binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.darker_gray))
+                                                binding.btnVitalScreenSecondary.isEnabled = false
+                                                binding.btnVitalScreenSecondary.alpha = 0.5f
+                                                binding.btnVitalScreenSecondary.setOnClickListener(null)
+                                            }
+                                            else -> {
+                                                binding.btnVitalScreenSecondary.visibility = View.GONE
                                             }
                                         }
                                     }

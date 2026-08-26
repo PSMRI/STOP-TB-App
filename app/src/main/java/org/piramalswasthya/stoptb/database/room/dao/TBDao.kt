@@ -163,6 +163,12 @@ interface TBDao {
         OR ts.contactWithTBPatient = 1
         OR ts.historyOfTBInLastFiveYrs = 1
     )
+    AND IFNULL(tsu.isConfirmed, 0) = 0
+    AND IFNULL(tsu.isTBConfirmed, 0) = 0
+    AND IFNULL(td.isTBConfirmed, 0) = 0
+    AND UPPER(IFNULL(td.naatResult, '')) NOT IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+    AND UPPER(IFNULL(td.liquidCultureResult, '')) != 'POSITIVE'
+    AND NOT EXISTS (SELECT 1 FROM TB_CONFIRMED_TREATMENT tc WHERE tc.benId = b.beneficiaryId)
     AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
     AND (:startTime = 0 OR ts.visitDate >= :startTime)
     AND (:endTime = 0 OR ts.visitDate <= :endTime)
