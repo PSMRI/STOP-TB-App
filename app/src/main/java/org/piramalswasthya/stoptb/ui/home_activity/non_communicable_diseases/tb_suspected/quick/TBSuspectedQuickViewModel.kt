@@ -242,6 +242,27 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                     tbDiagnostics.chestXRayResult = resultString
                                     tbDiagnostics.isChestXRayDone = true
                                     tbRepo.getTBDiagnosticsById(benId)?.xrayOrderId?.let { tbDiagnostics.xrayOrderId = it }
+
+                                    if (isXrayPositive) {
+                                        val currentDiag = tbRepo.getTBDiagnosticsById(benId)
+                                        val hasTruenat = !currentDiag?.trueNatOrderId.isNullOrBlank() ||
+                                                currentDiag?.trueNatOrderStatus.equals("COMPLETED", ignoreCase = true) ||
+                                                currentDiag?.trueNatOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) ||
+                                                currentDiag?.trueNatOrderStatus.equals("REFUSED", ignoreCase = true)
+                                        if (!hasTruenat) {
+                                            val truenatRes = tbRepo.createOrder(benId, "SPUTUM_TRUENAT")
+                                            if (truenatRes is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+                                                val updatedDiag = tbRepo.getTBDiagnosticsById(benId)
+                                                if (updatedDiag != null) {
+                                                    tbDiagnostics.trueNatOrderStatus = updatedDiag.trueNatOrderStatus
+                                                    tbDiagnostics.trueNatOrderId = updatedDiag.trueNatOrderId
+                                                }
+                                            } else {
+                                                apiSuccess = false
+                                                apiError = (truenatRes as? org.piramalswasthya.stoptb.helpers.NetworkResponse.Error)?.message ?: "Push SPUTUM_TRUENAT Order Failed"
+                                            }
+                                        }
+                                    }
                                 } else {
                                     apiSuccess = false
                                     apiError = (res as? org.piramalswasthya.stoptb.helpers.NetworkResponse.Error)?.message ?: "Submit Manual Result Failed"

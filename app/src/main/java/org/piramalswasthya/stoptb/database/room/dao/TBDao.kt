@@ -151,6 +151,8 @@ interface TBDao {
     @Query("""
     SELECT COUNT(*) FROM TB_SCREENING ts
     INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
+    LEFT JOIN TB_SUSPECTED tsu ON b.beneficiaryId = tsu.benId
+    LEFT JOIN TB_DIAGNOSTICS td ON b.beneficiaryId = td.benId
     WHERE (
         ts.coughMoreThan2Weeks = 1
         OR ts.bloodInSputum = 1
