@@ -285,5 +285,9 @@
         <item>रिफ प्रतिरोध नहीं पाया गया (Rif Resistance Not Detected)</item>
         <item>अनिर्णायक (Indeterminate)</item>
     </string-array>
+    <string-array name="tb_digital_xray_result">
+        <item>सामान्य (Normal)</item>
+        <item>टीबी प्रकल्पित (TB Presumptive)</item>
+    </string-array>
 </resources>
 
