@@ -31,18 +31,12 @@ android {
         versionName buildVersionName()
         resourceConfigurations += ['en', 'hi', 'as']
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-
-    }
-
-    splits {
-        abi {
-            enable true
-            reset()
-            include 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
-            universalApk true
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
         }
     }
 
+    // Single fat APK from assemble. Play still ABI-splits the AAB at delivery time.
     bundle {
         language {
             enableSplit = false
@@ -96,7 +90,7 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
     kapt {
-        correctErrorTypes true 
+        correctErrorTypes true
     }
 
     kotlinOptions {

@@ -1,5 +1,5 @@
 name: StopTB PROD Build
-run-name: STOP TB Android Build - PROD
+run-name: STOP TB Android Build - PROD ${{ inputs.versionName }} (${{ inputs.versionCode }}) [${{ inputs.publishTo }}]
 
 on:
   workflow_dispatch:
@@ -7,17 +7,27 @@ on:
       versionName:
         description: 'Version name (example: 1.0.3)'
         required: true
+        type: string
         default: '1.0.2'
       versionCode:
-        description: 'Version code (example: 4)'
+        description: 'Version code, must be a positive integer greater than the last Play Store upload (example: 4)'
         required: true
+        type: string
         default: '3'
+      publishTo:
+        description: 'Publish to one channel only. Mixing Play Internal (AAB splits) and Firebase (APK) on the same device causes INSTALL_FAILED_MISSING_SPLIT (-28). Uninstall before switching channels.'
+        required: true
+        type: choice
+        default: firebase-apk
+        options:
+          - firebase-apk
+          - play-internal-aab
 
 permissions:
   contents: read
 
 concurrency:
-  group: distribute-prod-${{ github.ref }}
+  group: distribute-prod-${{ github.ref }}-${{ inputs.publishTo }}
   cancel-in-progress: true
 
 jobs:
@@ -75,9 +85,23 @@ jobs:
         run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;29.0.14033849"
 
       - name: Set app version
+        env:
+          VERSION_NAME: ${{ inputs.versionName }}
+          VERSION_CODE: ${{ inputs.versionCode }}
         run: |
-          echo "VERSION=${{ github.event.inputs.versionName }}" > version/version.properties
-          echo "VERSIONCODE=${{ github.event.inputs.versionCode }}" >> version/version.properties
+          set -euo pipefail
+          if [ -z "${VERSION_CODE}" ] || ! [[ "${VERSION_CODE}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "versionCode must be a positive integer (got: '${VERSION_CODE}')."
+            echo "Re-run the workflow with a version code greater than 0, and higher than the last Play Store internal upload."
+            exit 1
+          fi
+          if [ -z "${VERSION_NAME}" ]; then
+            echo "versionName is required (got: '${VERSION_NAME}')."
+            exit 1
+          fi
+          printf 'VERSION=%s\nVERSIONCODE=%s\n' "${VERSION_NAME}" "${VERSION_CODE}" > version/version.properties
+          echo "Using app version:"
+          cat version/version.properties
 
       - name: Create release keystore
         run: |
@@ -89,32 +113,64 @@ jobs:
           keyPassword=${{ secrets.RELEASE_KEY_PASSWORD }}
           EOF
 
+      - name: Announce publish channel
+        run: |
+          echo "Publishing ${{ inputs.versionName }} (${{ inputs.versionCode }}) to ${{ inputs.publishTo }}"
+          echo "Do not install a Firebase APK over a Play Internal install (or the reverse)."
+          echo "That fails with INSTALL_FAILED_MISSING_SPLIT (-28). Uninstall first to switch channels."
+
       - name: Build PROD Release APK
+        if: ${{ inputs.publishTo == 'firebase-apk' }}
         run: ./gradlew assembleStoptbRelease --no-daemon
 
+      - name: Verify fat APK
+        if: ${{ inputs.publishTo == 'firebase-apk' }}
+        id: apk
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/stoptb/release/app-stoptb-release.apk"
+          if [ ! -f "$APK" ]; then
+            echo "Expected fat APK not found: $APK"
+            ls -la app/build/outputs/apk/stoptb/release || true
+            exit 1
+          fi
+          BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)"
+          BADGING="$("$BUILD_TOOLS/aapt" dump badging "$APK")"
+          echo "$BADGING" | grep -E "package:|native-code:|application-debuggable" || true
+          if echo "$BADGING" | grep -qE "^split[ =]"; then
+            echo "ERROR: APK is a config split, not a fat APK. This would cause INSTALL_FAILED_MISSING_SPLIT."
+            exit 1
+          fi
+          echo "apk_path=$APK" >> "$GITHUB_OUTPUT"
+
       - name: Upload APK as GitHub artifact
+        if: ${{ inputs.publishTo == 'firebase-apk' }}
         uses: actions/upload-artifact@v5
         with:
           name: prod-release-apk
-          path: app/build/outputs/apk/stoptb/release/*.apk
+          path: app/build/outputs/apk/stoptb/release/app-stoptb-release.apk
 
       - name: Distribute APK to Firebase App Distribution
+        if: ${{ inputs.publishTo == 'firebase-apk' }}
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
           appId: ${{ secrets.FIREBASE_APP_ID_PROD }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
           groups: testers
-          file: app/build/outputs/apk/stoptb/release/app-stoptb-universal-release.apk
+          file: ${{ steps.apk.outputs.apk_path }}
           releaseNotes: |
             Environment: PROD
+            Channel: Firebase APK
             Version: ${{ github.event.inputs.versionName }} (${{ github.event.inputs.versionCode }})
             Branch: ${{ github.ref_name }}
             Commit: ${{ github.sha }}
 
       - name: Build PROD Release AAB
+        if: ${{ inputs.publishTo == 'play-internal-aab' }}
         run: ./gradlew bundleStoptbRelease --no-daemon
 
       - name: Find and prepare AAB
+        if: ${{ inputs.publishTo == 'play-internal-aab' }}
         id: aab
         run: |
           set -euo pipefail
@@ -134,30 +190,31 @@ jobs:
           fi
 
       - name: Upload AAB as GitHub artifact
+        if: ${{ inputs.publishTo == 'play-internal-aab' }}
         uses: actions/upload-artifact@v5
         with:
           name: prod-release-aab
           path: app-stoptb-release.aab
 
       - name: Upload AAB to Google Play Internal Testing
-        if: steps.aab.outputs.mapping_file != ''
+        if: ${{ inputs.publishTo == 'play-internal-aab' && steps.aab.outputs.mapping_file != '' }}
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: org.piramalswasthya.stoptb
           releaseFiles: app-stoptb-release.aab
-          track: internal
+          tracks: internal
           status: completed
           mappingFile: ${{ steps.aab.outputs.mapping_file }}
           changesNotSentForReview: true
 
       - name: Upload AAB to Google Play Internal Testing
-        if: steps.aab.outputs.mapping_file == ''
+        if: ${{ inputs.publishTo == 'play-internal-aab' && steps.aab.outputs.mapping_file == '' }}
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: org.piramalswasthya.stoptb
           releaseFiles: app-stoptb-release.aab
-          track: internal
+          tracks: internal
           status: completed
           changesNotSentForReview: true

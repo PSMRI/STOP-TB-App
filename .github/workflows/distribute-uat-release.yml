@@ -157,12 +157,15 @@ jobs:
           echo "Release APKs:"
           ls -la "$RELEASE_DIR"
 
-          APK="$RELEASE_DIR/app-stoptbUat-universal-release.apk"
+          APK="$RELEASE_DIR/app-stoptbUat-release.apk"
           if [ ! -f "$APK" ]; then
-            APK="$(find "$RELEASE_DIR" -name '*universal*release*.apk' | head -n 1 || true)"
+            APK="$RELEASE_DIR/app-stoptbUat-universal-release.apk"
+          fi
+          if [ ! -f "$APK" ]; then
+            APK="$(find "$RELEASE_DIR" -name '*release*.apk' ! -name '*-armeabi-*' ! -name '*-arm64-*' ! -name '*-x86*' | head -n 1 || true)"
           fi
           if [ -z "$APK" ] || [ ! -f "$APK" ]; then
-            echo "Universal release APK not found in $RELEASE_DIR"
+            echo "Release APK not found in $RELEASE_DIR"
             exit 1
           fi
 
@@ -196,7 +199,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: uat-release-apk
-          path: app/build/outputs/apk/stoptbUat/release/*.apk
+          path: ${{ steps.apk.outputs.apk_path }}
 
       - name: Distribute to Firebase App Distribution (UAT)
         uses: wzieba/Firebase-Distribution-Github-Action@v1
