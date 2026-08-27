@@ -112,15 +112,28 @@ jobs:
           echo '${{ secrets.GOOGLE_SERVICES_JSON_PROD }}' > app/src/stoptb/google-services.json
 
       - name: Accept SDK licenses
-        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+        run: yes 2>/dev/null | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
 
       - name: Install NDK
         run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;29.0.14033849"
 
       - name: Set app version
+        env:
+          VERSION_NAME: ${{ inputs.versionName }}
+          VERSION_CODE: ${{ inputs.versionCode }}
         run: |
-          echo "VERSION=${{ inputs.versionName }}" > version/version.properties
-          echo "VERSIONCODE=${{ inputs.versionCode }}" >> version/version.properties
+          set -euo pipefail
+          if [ -z "${VERSION_CODE}" ] || ! [[ "${VERSION_CODE}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "versionCode must be a positive integer (got: '${VERSION_CODE}')."
+            exit 1
+          fi
+          if [ -z "${VERSION_NAME}" ]; then
+            echo "versionName is required (got: '${VERSION_NAME}')."
+            exit 1
+          fi
+          printf 'VERSION=%s\nVERSIONCODE=%s\n' "${VERSION_NAME}" "${VERSION_CODE}" > version/version.properties
+          echo "Using app version:"
+          cat version/version.properties
 
       - name: Create release keystore
         run: |

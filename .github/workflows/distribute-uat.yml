@@ -1,5 +1,5 @@
 name: StopTB UAT Build
-run-name: STOP TB Android Build - UAT
+run-name: STOP TB Android Build - UAT ${{ inputs.versionName }} (${{ inputs.versionCode }})
 
 on:
   workflow_dispatch:
@@ -7,11 +7,13 @@ on:
       versionName:
         description: 'Version name (example: 1.0.3)'
         required: true
-        default: '1.0.2'
+        type: string
+        default: '1.0.3'
       versionCode:
-        description: 'Version code (example: 4)'
+        description: 'Version code, must be a positive integer (example: 4)'
         required: true
-        default: '3'
+        type: string
+        default: '4'
 
 permissions:
   contents: read
@@ -59,19 +61,34 @@ jobs:
           echo '${{ secrets.GOOGLE_SERVICES_JSON_PROD }}' > app/src/stoptb/google-services.json
 
       - name: Accept SDK licenses
-        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+        run: yes 2>/dev/null | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
 
       - name: Install NDK
         run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;29.0.14033849"
 
       - name: Set app version
+        env:
+          VERSION_NAME: ${{ inputs.versionName }}
+          VERSION_CODE: ${{ inputs.versionCode }}
         run: |
-          echo "VERSION=${{ github.event.inputs.versionName }}" > version/version.properties
-          echo "VERSIONCODE=${{ github.event.inputs.versionCode }}" >> version/version.properties
+          set -euo pipefail
+          if [ -z "${VERSION_CODE}" ] || ! [[ "${VERSION_CODE}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "versionCode must be a positive integer (got: '${VERSION_CODE}')."
+            exit 1
+          fi
+          if [ -z "${VERSION_NAME}" ]; then
+            echo "versionName is required (got: '${VERSION_NAME}')."
+            exit 1
+          fi
+          printf 'VERSION=%s\nVERSIONCODE=%s\n' "${VERSION_NAME}" "${VERSION_CODE}" > version/version.properties
+          echo "Using app version:"
+          cat version/version.properties
 
       - name: Decode debug keystore
         run: |
-          echo "${{ secrets.DEBUG_KEYSTORE_FILE }}" | base64 --decode > $GITHUB_WORKSPACE/app/debug-keystore.jks
+          set -euo pipefail
+          echo "${{ secrets.DEBUG_KEYSTORE_FILE }}" | base64 --decode > "$GITHUB_WORKSPACE/app/debug-keystore.jks"
+          test -s "$GITHUB_WORKSPACE/app/debug-keystore.jks"
 
       - name: Build UAT Debug APK
         env:
@@ -84,17 +101,37 @@ jobs:
           ABHA_AUTH_URL: ${{ secrets.ABHA_AUTH_URL }}
           CHAT_URL: ${{ secrets.CHAT_URL }}
         run: >
-          ./gradlew assembleStoptbUatDebug --no-daemon
+          ./gradlew assembleStoptbUatDebug --no-daemon --stacktrace
           -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/app/debug-keystore.jks
           -Pandroid.injected.signing.store.password=${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
           -Pandroid.injected.signing.key.alias=${{ secrets.DEBUG_KEY_ALIAS }}
           -Pandroid.injected.signing.key.password=${{ secrets.DEBUG_KEY_PASSWORD }}
 
+      - name: Verify debug APK
+        id: apk
+        run: |
+          set -euo pipefail
+          DEBUG_DIR="app/build/outputs/apk/stoptbUat/debug"
+          ls -la "$DEBUG_DIR"
+          APK="$DEBUG_DIR/app-stoptbUat-debug.apk"
+          if [ ! -f "$APK" ]; then
+            APK="$DEBUG_DIR/app-stoptbUat-universal-debug.apk"
+          fi
+          if [ ! -f "$APK" ]; then
+            APK="$(find "$DEBUG_DIR" -name '*debug*.apk' ! -name '*-armeabi-*' ! -name '*-arm64-*' ! -name '*-x86*' | head -n 1 || true)"
+          fi
+          if [ -z "$APK" ] || [ ! -f "$APK" ]; then
+            echo "ERROR: UAT debug APK not found in $DEBUG_DIR"
+            exit 1
+          fi
+          echo "Using APK: $APK"
+          echo "apk_path=$APK" >> "$GITHUB_OUTPUT"
+
       - name: Upload APK as artifact
         uses: actions/upload-artifact@v5
         with:
           name: uat-debug-apk
-          path: app/build/outputs/apk/stoptbUat/debug/app-stoptbUat-debug.apk
+          path: ${{ steps.apk.outputs.apk_path }}
 
       - name: Distribute to Firebase App Distribution
         uses: wzieba/Firebase-Distribution-Github-Action@v1
@@ -102,7 +139,7 @@ jobs:
           appId: ${{ secrets.FIREBASE_APP_ID_UAT }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
           groups: testers
-          file: app/build/outputs/apk/stoptbUat/debug/app-stoptbUat-debug.apk
+          file: ${{ steps.apk.outputs.apk_path }}
           releaseNotes: |
             Environment: UAT
             Version: ${{ github.event.inputs.versionName }} (${{ github.event.inputs.versionCode }})
