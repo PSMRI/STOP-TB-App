@@ -33,6 +33,7 @@ import org.piramalswasthya.stoptb.repositories.BenRepo
 import timber.log.Timber
 import kotlinx.coroutines.flow.Flow
 import org.piramalswasthya.stoptb.model.HouseholdBasicCache
+import org.piramalswasthya.stoptb.model.InputType
 import javax.inject.Inject
 
 @HiltViewModel
@@ -701,11 +702,18 @@ class NewBenRegViewModel @Inject constructor(
         val elements = dataset.listFlow.first()
         val out = mutableListOf<PreviewItem>()
         for (el in elements) {
-            if (el.inputType.name == "IMAGE_VIEW") {
-                val uri = runCatching { el.value?.let { Uri.parse(it.toString()) } }.getOrNull()
-                out.add(PreviewItem(label = el.title ?: "", value = "", isImage = true, imageUri = uri))
-                continue
-            }
+            // Exclude HEADLINE elements
+            if (el.inputType == InputType.HEADLINE) continue
+
+            // Exclude Photo (IMAGE_VIEW)
+            if (el.inputType == InputType.IMAGE_VIEW || el.id == 1) continue
+
+            // Exclude unnecessary fields: date of registration (id 2), person from (id 1050), type of case finding (id 1051)
+            if (el.id == 2 || el.id == 1050 || el.id == 1051) continue
+
+            // Exclude optional fields
+            if (!el.required) continue
+
             val display = when {
                 el.value == null                                         -> "-"
                 el.value is String && el.value.toString().isBlank()     -> "-"
@@ -713,6 +721,9 @@ class NewBenRegViewModel @Inject constructor(
                     el.value.toString().split(",").map { it.trim() }.filter { it.isNotEmpty() }.joinToString(", ")
                 else -> el.value.toString()
             }
+
+            if (display == "-") continue
+
             val trimmed = if (display.length > 400) display.substring(0, 400) + "…" else display
             out.add(PreviewItem(label = el.title ?: "", value = trimmed, isImage = false))
         }

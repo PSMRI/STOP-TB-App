@@ -96,7 +96,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
     private fun setDefaultOccupationIfNeeded() {
         if (occupationDrop.value.isNullOrBlank()) {
-            occupationDrop.value = occupationDrop.entries?.firstOrNull()
+            occupationDrop.value = null
         }
     }
 
@@ -520,7 +520,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         mobileNotAvailable.isEnabled = true
         contactNumber.required = hasFamilyHeadMobile
         if (!hasFamilyHeadMobile) {
-            contactNumber.value = "9999999999"
+            contactNumber.value = null
+            contactNumber.isEnabled = false
             list.remove(mobileNoOfRelation)
             list.remove(otherMobileNoOfRelation)
         }
@@ -644,12 +645,14 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             if (contactNumber.value == "9999999999") {
                 mobileNotAvailable.value = "0"
                 contactNumber.required = false
-                contactNumber.isEnabled = true
+                contactNumber.value = null
+                contactNumber.isEnabled = false
                 mobileNotAvailable.isEnabled = true
                 list.remove(mobileNoOfRelation)
                 list.remove(otherMobileNoOfRelation)
             } else {
                 contactNumber.required = true
+                contactNumber.isEnabled = true
                 mobileNotAvailable.isEnabled = true
             }
             address.value = saved.address ?: ""
@@ -804,7 +807,16 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         prefill.genderId.takeIf { it > 0 }?.let { gender.value = gender.getStringFromPosition(it) }
         prefill.fatherName?.takeIf { it.isNotBlank() }?.let { fatherName.value = it }
         prefill.motherName?.takeIf { it.isNotBlank() }?.let { motherName.value = it }
-        prefill.contactNumber?.let { contactNumber.value = it.toString() }
+        prefill.contactNumber?.let {
+            if (it == 9999999999L) {
+                mobileNotAvailable.value = "0"
+                contactNumber.required = false
+                contactNumber.value = null
+                contactNumber.isEnabled = false
+            } else {
+                contactNumber.value = it.toString()
+            }
+        }
         prefill.address?.takeIf { it.isNotBlank() }?.let { address.value = it }
         prefill.pinCode?.takeIf { it.isNotBlank() }?.let { pinCode.value = it }
         prefill.economicStatusId?.takeIf { it > 0 }?.let {
@@ -1176,14 +1188,14 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                 return -1
             }
             mobileNotAvailable.id -> {
-                val isChecked = index >= 0 || isMobileNotAvailableChecked()
+                val isChecked = index >= 0
                 if (isChecked) {
                     // Keep checkbox value in index format so adapter can render it checked.
                     mobileNotAvailable.value = "0"
                     contactNumber.required = false
-                    contactNumber.value = "9999999999"
+                    contactNumber.value = null
                     contactNumber.errorText = null
-                    contactNumber.isEnabled = true
+                    contactNumber.isEnabled = false
                     triggerDependants(
                         source = contactNumber,
                         passedIndex = 1,
@@ -1351,6 +1363,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             ben.mobileNoOfRelation   = mobileNoOfRelation.getEnglishStringFromPosition(ben.mobileNoOfRelationId)
             ben.mobileOthers         = otherMobileNoOfRelation.value
             ben.contactNumber        = when {
+                isMobileNotAvailableChecked() -> 9999999999L
                 ben.mobileNoOfRelationId == 5 -> familyHeadPhoneNo?.toLongOrNull()
                 contactNumber.value.isNullOrEmpty() -> null
                 else -> contactNumber.value!!.toLong()
@@ -1413,10 +1426,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             }
 
             // Occupation
-            val defaultOccupation = englishResources.getStringArray(R.array.occupation_array).first()
             ben.occupation = getEnglishValueInArray(R.array.occupation_array, occupationDrop.value)
-                ?.ifEmpty { defaultOccupation }
-                ?: defaultOccupation
+                ?.ifEmpty { null }
 
             // Marital Status
             ben.genDetails?.maritalStatusId = maritalStatus.getPosition()

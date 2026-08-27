@@ -288,7 +288,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_columnWeight="1"
-                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
                 android:layout_marginBottom="16dp"
                 android:backgroundTint="#E3F3EE"
                 app:cardCornerRadius="22dp"
@@ -350,7 +350,7 @@
                         android:layout_marginTop="10dp"
                         android:textColor="#4E5D5F"
                         android:textSize="11sp"
-                        tools:text="Male: Positive 4 / Negative 6" />
+                        tools:text="Male: 4" />
 
                     <TextView
                         android:id="@+id/tvPastHistoryTbFemale"
@@ -359,7 +359,7 @@
                         android:layout_marginTop="2dp"
                         android:textColor="#4E5D5F"
                         android:textSize="11sp"
-                        tools:text="Female: Positive 2 / Negative 5" />
+                        tools:text="Female: 2" />
 
                     <TextView
                         android:id="@+id/tvPastHistoryTbChildren"
@@ -368,7 +368,7 @@
                         android:layout_marginTop="2dp"
                         android:textColor="#4E5D5F"
                         android:textSize="11sp"
-                        tools:text="Children (&lt;15 yrs): Positive 1 / Negative 2" />
+                        tools:text="Children(&lt;15y): 1" />
 
                     <TextView
                         android:id="@+id/tvPastHistoryTbOthers"
@@ -377,7 +377,16 @@
                         android:layout_marginTop="2dp"
                         android:textColor="#4E5D5F"
                         android:textSize="11sp"
-                        tools:text="Others: Positive 0 / Negative 1" />
+                        tools:text="Others: 0" />
+
+                    <TextView
+                        android:id="@+id/tvPastHistoryTbSeniorCitizen"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="#4E5D5F"
+                        android:textSize="11sp"
+                        tools:text="Age(&gt;=60): 0" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -385,7 +394,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_columnWeight="1"
-                android:layout_marginEnd="8dp"
+                android:layout_marginStart="8dp"
                 android:layout_marginBottom="16dp"
                 android:backgroundTint="#FDEBDE"
                 app:cardCornerRadius="22dp"
@@ -446,7 +455,7 @@
                         android:layout_marginTop="10dp"
                         android:textColor="#4E5D5F"
                         android:textSize="11sp"
-                        tools:text="Male: Positive 3 / Negative 7" />
+                        tools:text="Male: 3" />
 
                     <TextView
                         android:id="@+id/tvAntiTbDrugsFemale"
@@ -455,7 +464,7 @@
                         android:layout_marginTop="2dp"
                         android:textColor="#4E5D5F"
                         android:textSize="11sp"
-                        tools:text="Female: Positive 2 / Negative 4" />
+                        tools:text="Female: 2" />
 
                     <TextView
                         android:id="@+id/tvAntiTbDrugsChildren"
@@ -464,7 +473,7 @@
                         android:layout_marginTop="2dp"
                         android:textColor="#4E5D5F"
                         android:textSize="11sp"
-                        tools:text="Children (&lt;15 yrs): Positive 0 / Negative 3" />
+                        tools:text="Children(&lt;15y): 0" />
 
                     <TextView
                         android:id="@+id/tvAntiTbDrugsOthers"
@@ -473,7 +482,16 @@
                         android:layout_marginTop="2dp"
                         android:textColor="#4E5D5F"
                         android:textSize="11sp"
-                        tools:text="Others: Positive 0 / Negative 0" />
+                        tools:text="Others: 0" />
+
+                    <TextView
+                        android:id="@+id/tvAntiTbDrugsSeniorCitizen"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="#4E5D5F"
+                        android:textSize="11sp"
+                        tools:text="Age(&gt;=60): 0" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -481,7 +499,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_columnWeight="1"
-                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
                 android:layout_marginBottom="16dp"
                 android:backgroundTint="#FDEBDE"
                 app:cardCornerRadius="22dp"
@@ -586,7 +604,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_columnWeight="1"
-                android:layout_marginEnd="8dp"
+                android:layout_marginStart="8dp"
                 android:layout_marginBottom="16dp"
                 android:backgroundTint="#E3F3EE"
                 app:cardCornerRadius="22dp"
@@ -691,7 +709,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_columnWeight="1"
-                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
                 android:layout_marginBottom="16dp"
                 android:backgroundTint="#FDEBDE"
                 app:cardCornerRadius="22dp"
@@ -796,7 +814,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_columnWeight="1"
-                android:layout_marginEnd="8dp"
+                android:layout_marginStart="8dp"
                 android:layout_marginBottom="16dp"
                 android:backgroundTint="#E3F3EE"
                 app:cardCornerRadius="22dp"
@@ -901,7 +919,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_columnWeight="1"
-                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
                 android:layout_marginBottom="16dp"
                 android:backgroundTint="#FDEBDE"
                 app:cardCornerRadius="22dp"
@@ -1002,6 +1020,7 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!--
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -1098,12 +1117,13 @@
                         tools:text="Others: 1" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
+            -->
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_columnWeight="1"
-                android:layout_marginEnd="8dp"
+                android:layout_marginStart="8dp"
                 android:layout_marginBottom="16dp"
                 android:backgroundTint="#FDEBDE"
                 app:cardCornerRadius="22dp"
@@ -1200,7 +1220,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_columnWeight="1"
-                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
                 android:layout_marginBottom="16dp"
                 android:backgroundTint="#E3F3EE"
                 app:cardCornerRadius="22dp"
@@ -1263,6 +1283,7 @@
                 android:layout_height="wrap_content"
                 android:layout_columnWeight="1"
                 android:layout_marginStart="8dp"
+                android:layout_marginBottom="16dp"
                 android:backgroundTint="#E7F1FB"
                 app:cardCornerRadius="22dp"
                 app:cardElevation="0dp"
@@ -1272,7 +1293,7 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:minHeight="196dp"
+                    android:minHeight="220dp"
                     android:orientation="vertical"
                     android:padding="16dp">
 

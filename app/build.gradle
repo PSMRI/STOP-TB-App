@@ -81,12 +81,12 @@ android {
 
         stoptb {
             applicationId "org.piramalswasthya.stoptb"
-            resValue "string", "app_native_name", "StopTB"
+            resValue "string", "app_native_name", "TBMJA"
         }
 
         stoptbUat {
             applicationId "org.piramalswasthya.stoptb.uat"
-            resValue "string", "app_native_name", "StopTB-UAT"
+            resValue "string", "app_native_name", "TBMJA-UAT"
         }
 
     }
