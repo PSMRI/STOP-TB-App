@@ -1233,7 +1233,7 @@ interface BenDao {
           AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
           AND (
                 (
-                    ts.isTbConfirmed = 1
+                    ts.isConfirmed = 1
                     AND (:startTime = 0 OR ts.visitDate >= :startTime)
                     AND (:endTime = 0 OR ts.visitDate <= :endTime)
                 )
