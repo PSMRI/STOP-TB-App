@@ -23,7 +23,17 @@ concurrency:
 jobs:
   build-and-distribute:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
+
+    env:
+      ENCRYPTED_PASS_KEY: ${{ secrets.ENCRYPTED_PASS_KEY }}
+      ABHA_CLIENT_SECRET: ${{ secrets.ABHA_CLIENT_SECRET }}
+      ABHA_CLIENT_ID: ${{ secrets.ABHA_CLIENT_ID }}
+      BASE_TMC_URL: ${{ secrets.BASE_TMC_URL }}
+      BASE_ABHA_URL: ${{ secrets.BASE_ABHA_URL }}
+      ABHA_TOKEN_URL: ${{ secrets.ABHA_TOKEN_URL }}
+      ABHA_AUTH_URL: ${{ secrets.ABHA_AUTH_URL }}
+      CHAT_URL: ${{ secrets.CHAT_URL }}
 
     steps:
       - name: Checkout code
@@ -34,6 +44,7 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+          cache: gradle
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -79,24 +90,15 @@ jobs:
           EOF
 
       - name: Build PROD Release APK
-        env:
-          ENCRYPTED_PASS_KEY: ${{ secrets.ENCRYPTED_PASS_KEY }}
-          ABHA_CLIENT_SECRET: ${{ secrets.ABHA_CLIENT_SECRET }}
-          ABHA_CLIENT_ID: ${{ secrets.ABHA_CLIENT_ID }}
-          BASE_TMC_URL: ${{ secrets.BASE_TMC_URL }}
-          BASE_ABHA_URL: ${{ secrets.BASE_ABHA_URL }}
-          ABHA_TOKEN_URL: ${{ secrets.ABHA_TOKEN_URL }}
-          ABHA_AUTH_URL: ${{ secrets.ABHA_AUTH_URL }}
-          CHAT_URL: ${{ secrets.CHAT_URL }}
         run: ./gradlew assembleStoptbRelease --no-daemon
 
-      - name: Upload APK as artifact
+      - name: Upload APK as GitHub artifact
         uses: actions/upload-artifact@v5
         with:
           name: prod-release-apk
           path: app/build/outputs/apk/stoptb/release/*.apk
 
-      - name: Distribute to Firebase App Distribution
+      - name: Distribute APK to Firebase App Distribution
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
           appId: ${{ secrets.FIREBASE_APP_ID_PROD }}
@@ -108,4 +110,54 @@ jobs:
             Version: ${{ github.event.inputs.versionName }} (${{ github.event.inputs.versionCode }})
             Branch: ${{ github.ref_name }}
             Commit: ${{ github.sha }}
-            Message: ${{ github.event.head_commit.message }}
+
+      - name: Build PROD Release AAB
+        run: ./gradlew bundleStoptbRelease --no-daemon
+
+      - name: Find and prepare AAB
+        id: aab
+        run: |
+          set -euo pipefail
+          AAB_FILE="$(find app/build/outputs/bundle -type f -name '*.aab' | head -n 1 || true)"
+          if [ -z "$AAB_FILE" ] || [ ! -f "$AAB_FILE" ]; then
+            echo "ERROR: AAB file not found"
+            find app/build/outputs/bundle -type f || true
+            exit 1
+          fi
+          echo "AAB found at: $AAB_FILE"
+          cp "$AAB_FILE" app-stoptb-release.aab
+          echo "aab_path=app-stoptb-release.aab" >> "$GITHUB_OUTPUT"
+
+          MAPPING_FILE="app/build/outputs/mapping/stoptbRelease/mapping.txt"
+          if [ -f "$MAPPING_FILE" ]; then
+            echo "mapping_file=$MAPPING_FILE" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload AAB as GitHub artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: prod-release-aab
+          path: app-stoptb-release.aab
+
+      - name: Upload AAB to Google Play Internal Testing
+        if: steps.aab.outputs.mapping_file != ''
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: org.piramalswasthya.stoptb
+          releaseFiles: app-stoptb-release.aab
+          track: internal
+          status: completed
+          mappingFile: ${{ steps.aab.outputs.mapping_file }}
+          changesNotSentForReview: true
+
+      - name: Upload AAB to Google Play Internal Testing
+        if: steps.aab.outputs.mapping_file == ''
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: org.piramalswasthya.stoptb
+          releaseFiles: app-stoptb-release.aab
+          track: internal
+          status: completed
+          changesNotSentForReview: true
