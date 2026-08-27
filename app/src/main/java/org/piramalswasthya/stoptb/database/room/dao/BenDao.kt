@@ -1210,13 +1210,8 @@ interface BenDao {
       AND b.isDeactivate = 0
       AND b.isDeath = 0 
       AND (
-            ts.isConfirmed = 1
-            OR td.isConfirmed = 1
+            OR td.isTbConfirmed = 1
             OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
-            OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
-          )
-""")
-    fun getTbConfirmedList(
         villageId: Int
     ): Flow<List<BenWithTbSuspectedCache>>
 
@@ -1240,7 +1235,7 @@ interface BenDao {
                 OR
                 (
                     (
-                        td.isConfirmed = 1
+                        td.isTbConfirmed = 1
                         OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
                         OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
                     )
