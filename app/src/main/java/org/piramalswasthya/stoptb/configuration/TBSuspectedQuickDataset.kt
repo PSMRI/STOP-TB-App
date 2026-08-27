@@ -302,7 +302,7 @@ class TBSuspectedQuickDataset(
         
         if (!saved?.chestXRayResult.isNullOrBlank()) {
             digitalChestXrayResult.inputType = InputType.TEXT_VIEW
-            digitalChestXrayResult.value = getLocalValueInArray(R.array.tb_test_result, saved?.chestXRayResult) ?: saved?.chestXRayResult
+            digitalChestXrayResult.value = getLocalValueInArray(R.array.tb_digital_xray_result, saved?.chestXRayResult) ?: saved?.chestXRayResult
         } else if (isXrayDeviceIntegrated && referralType == 6 && isYes(digitalChestXrayConducted)) {
             digitalChestXrayResult.inputType = InputType.TEXT_VIEW
             digitalChestXrayResult.value = "Waiting for Result"
@@ -335,7 +335,7 @@ class TBSuspectedQuickDataset(
 
         if (!saved?.naatResult.isNullOrBlank()) {
             trueNatResult.inputType = InputType.TEXT_VIEW
-            trueNatResult.value = getLocalValueInArray(R.array.tb_truenat_mtb_result, saved?.naatResult) ?: saved?.naatResult
+            trueNatResult.value = getLocalValueInArray(R.array.tb_truenat_mtb_result, mapMtbResultForUi(saved?.naatResult)) ?: mapMtbResultForUi(saved?.naatResult)
         } else if (isTruenatDeviceIntegrated && referralType == 7 && isYes(trueNatConducted)) {
             trueNatResult.inputType = InputType.TEXT_VIEW
             trueNatResult.value = "Waiting for Result"
@@ -357,7 +357,7 @@ class TBSuspectedQuickDataset(
 
         if (!saved?.trueNatRifResult.isNullOrBlank()) {
             trueNatRifResult.inputType = InputType.TEXT_VIEW
-            trueNatRifResult.value = getLocalValueInArray(R.array.tb_truenat_rif_result, saved?.trueNatRifResult) ?: saved?.trueNatRifResult
+            trueNatRifResult.value = getLocalValueInArray(R.array.tb_truenat_rif_result, mapRifResultForUi(saved?.trueNatRifResult)) ?: mapRifResultForUi(saved?.trueNatRifResult)
         } else if (isTruenatDeviceIntegrated && referralType == 7 && isYes(rifConducted)) {
             trueNatRifResult.inputType = InputType.TEXT_VIEW
             trueNatRifResult.value = "Waiting for Result"
@@ -1067,7 +1067,7 @@ class TBSuspectedQuickDataset(
             digitalChestXrayResult.required = false
             if (isYes(digitalChestXrayConducted)) {
                 if (isXrayCompleted) {
-                    digitalChestXrayResult.value = if (diagnosticsCache?.chestXRayResult.isNullOrBlank()) "Waiting for Result" else (getLocalValueInArray(R.array.tb_test_result, diagnosticsCache?.chestXRayResult) ?: diagnosticsCache?.chestXRayResult)
+                    digitalChestXrayResult.value = if (diagnosticsCache?.chestXRayResult.isNullOrBlank()) "Waiting for Result" else (getLocalValueInArray(R.array.tb_digital_xray_result, diagnosticsCache?.chestXRayResult) ?: diagnosticsCache?.chestXRayResult)
                 } else if (isXrayFailed) {
                     digitalChestXrayResult.value = "Referral Failed"
                 } else {
@@ -1175,7 +1175,7 @@ class TBSuspectedQuickDataset(
             trueNatResult.required = false
             if (isYes(trueNatConducted)) {
                 if (isMtbCompleted) {
-                    trueNatResult.value = if (diagnosticsCache?.naatResult.isNullOrBlank()) "Waiting for Result" else (getLocalValueInArray(R.array.tb_truenat_mtb_result, diagnosticsCache?.naatResult) ?: diagnosticsCache?.naatResult)
+                    trueNatResult.value = if (diagnosticsCache?.naatResult.isNullOrBlank()) "Waiting for Result" else (getLocalValueInArray(R.array.tb_truenat_mtb_result, mapMtbResultForUi(diagnosticsCache?.naatResult)) ?: mapMtbResultForUi(diagnosticsCache?.naatResult))
                 } else if (isMtbFailed) {
                     trueNatResult.value = "Referral Failed"
                 } else {
@@ -1240,7 +1240,7 @@ class TBSuspectedQuickDataset(
             val showRifResult = showRif && isYes(rifConducted)
             if (showRifResult) {
                 if (isRifCompleted) {
-                    trueNatRifResult.value = if (diagnosticsCache?.trueNatRifResult.isNullOrBlank()) "Waiting for Result" else (getLocalValueInArray(R.array.tb_truenat_rif_result, diagnosticsCache?.trueNatRifResult) ?: diagnosticsCache?.trueNatRifResult)
+                    trueNatRifResult.value = if (diagnosticsCache?.trueNatRifResult.isNullOrBlank()) "Waiting for Result" else (getLocalValueInArray(R.array.tb_truenat_rif_result, mapRifResultForUi(diagnosticsCache?.trueNatRifResult)) ?: mapRifResultForUi(diagnosticsCache?.trueNatRifResult))
                 } else if (isRifFailed) {
                     trueNatRifResult.value = "Referral Failed"
                 } else {
@@ -1419,4 +1419,24 @@ class TBSuspectedQuickDataset(
 
         return pregnantFromBen || pregnantFromVital
     }
+
+    private fun mapMtbResultForUi(value: String?): String? {
+        if (value == null) return null
+        return when {
+            value.equals("TB Positive", ignoreCase = true) || value.equals("MTB detected", ignoreCase = true) -> "MTB detected"
+            value.equals("TB Negative", ignoreCase = true) || value.equals("MTB not detected", ignoreCase = true) -> "MTB not detected"
+            else -> value
+        }
+    }
+
+
+    private fun mapRifResultForUi(value: String?): String? {
+        if (value == null) return null
+        return when {
+            value.equals("DR TB", ignoreCase = true) || value.equals("Rif Resistance Detected", ignoreCase = true) -> "Rif Resistance Detected"
+            value.equals("Non DR TB", ignoreCase = true) || value.equals("Rif Resistance Not Detected", ignoreCase = true) -> "Rif Resistance Not Detected"
+            else -> value
+        }
+    }
+
 }

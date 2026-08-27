@@ -1860,17 +1860,12 @@ class TBRepo @Inject constructor(
                             val status = if (rawStatus.isNullOrBlank()) "IN_PROGRESS" else rawStatus
                            Timber.d("STOP-TB polling debug: fetchOrderResult benId=$benId status=$status rawStatus=$rawStatus")
                             
-                            val fetchedOrderId = responseData.externalOrderId.asValidOrderId()
+val fetchedOrderId = responseData.externalOrderId.asValidOrderId()
                             val existing = tbDao.getTbDiagnosticsByBenId(benId)
                             val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
                                 if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
-                                    val tbPresence = responseData.tbPresence
                                     val serverResultSummary = responseData.resultSummary
-                                    val chestResult = if (!serverResultSummary.isNullOrBlank()) {
-                                        if (isChestXrayPositive(serverResultSummary)) "TB Presumptive" else "Normal"
-                                    } else {
-                                        if (tbPresence == true) "TB Presumptive" else "Normal"
-                                    }
+                                    val chestResult = serverResultSummary ?: ""
 
                                     val isCompleted = status.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
                                     val xrayPos = isCompleted && isChestXrayPositive(chestResult)
@@ -1951,21 +1946,8 @@ class TBRepo @Inject constructor(
                                 } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
                                     val isCompleted = status.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
                                     val serverRifResultSummary = responseData.resultSummary
-                                    val rifResult = if (!serverRifResultSummary.isNullOrBlank()) {
-                                        val clean = serverRifResultSummary.trim().lowercase()
-                                        when {
-                                            clean.contains("not detected") || clean.contains("negative") || clean.contains("non dr") -> "Rif Resistance Not Detected"
-                                            clean.contains("detected") || clean.contains("positive") || clean.contains("dr") -> "Rif Resistance Detected"
-                                            else -> "Indeterminate"
-                                        }
-                                    } else {
-                                        when (responseData.drugResistancePresence) {
-                                            null -> "Indeterminate"
-                                            true -> "Rif Resistance Detected"
-                                            false -> "Rif Resistance Not Detected"
-                                        }
-                                    }
-                                    val isRifIndeterminate = isCompleted && rifResult.equals("Indeterminate", ignoreCase = true)
+                                     val rifResult = serverRifResultSummary ?: ""
+                                     val isRifIndeterminate = isCompleted && rifResult.equals("Indeterminate", ignoreCase = true)
                                     var computedRifStatus = when {
                                         isCompleted -> OrderStatus.COMPLETED.name
                                         status.equals(OrderStatus.FAILED.name, ignoreCase = true) ||
@@ -1999,22 +1981,9 @@ class TBRepo @Inject constructor(
                                     )
                                 } else {
                                     val serverMtbResultSummary = responseData.resultSummary
-                                    val mtbResult = if (!serverMtbResultSummary.isNullOrBlank()) {
-                                        val clean = serverMtbResultSummary.trim().lowercase()
-                                        when {
-                                            clean.contains("positive") || clean.contains("detected") -> "MTB detected"
-                                            clean.contains("negative") || clean.contains("not detected") -> "MTB not detected"
-                                            else -> "Invalid"
-                                        }
-                                    } else {
-                                        when (responseData.tbPresence) {
-                                            null -> "Invalid"
-                                            true -> "MTB detected"
-                                            false -> "MTB not detected"
-                                        }
-                                    }
-                                    val isCompleted = status.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
-                                    val isMtbDetected = isCompleted && mtbResult == "MTB detected"
+                                    val mtbResult = serverMtbResultSummary ?: ""
+                                     val isCompleted = status.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
+                                     val isMtbDetected = isCompleted && (mtbResult.equals("TB Positive", ignoreCase = true) || mtbResult.equals("MTB detected", ignoreCase = true))
 
                                     var computedRifStatus: String? = it.rifOrderStatus
                                     var computedRifOrderId: String? = it.rifOrderId
@@ -2570,10 +2539,6 @@ class TBRepo @Inject constructor(
 
     private fun isChestXrayPositive(value: String?): Boolean {
         if (value.isNullOrBlank()) return false
-        val clean = value.trim().lowercase()
-        if (clean.contains("negative") || clean.contains("invalid") || clean.contains("not detected") || clean.contains("waiting")) {
-            return false
-        }
-        return clean.contains("positive") || clean.contains("presumptive") || clean.contains("detected") || clean.contains("tb") || clean.contains("abnormal")
+        return value.trim().lowercase() == "tb presumptive"
     }
 }

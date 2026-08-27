@@ -195,7 +195,7 @@ class SuspectedTBDataset(
             if (!diag.naatResult.isNullOrBlank()) {
                 sputumCollected.value = yesValue
                 naatConducted.value = yesValue
-                naatResult.value = getLocalValueInArray(R.array.tb_truenat_mtb_result, diag.naatResult) ?: diag.naatResult
+                naatResult.value = getLocalValueInArray(R.array.tb_truenat_mtb_result, mapMtbResultForUi(diag.naatResult)) ?: mapMtbResultForUi(diag.naatResult)
             }
         }
 
@@ -546,7 +546,7 @@ class SuspectedTBDataset(
         naatConducted.value = boolToYesNo(
             if (isNaatDone) true else (diagnostics.isNaatConducted ?: diagnostics.chestXRayResult.isPositiveTestResult().takeIf { it })
         )
-        naatResult.value = getLocalValueInArray(R.array.tb_truenat_mtb_result, diagnostics.naatResult) ?: diagnostics.naatResult
+        naatResult.value = getLocalValueInArray(R.array.tb_truenat_mtb_result, mapMtbResultForUi(diagnostics.naatResult)) ?: mapMtbResultForUi(diagnostics.naatResult)
         liquidCultureConducted.value = boolToYesNo(
             diagnostics.isLiquidCultureConducted ?: diagnostics.recommendedForLiquidCultureTest
         )
@@ -580,7 +580,7 @@ class SuspectedTBDataset(
             )
         }
         if (naatResult.value.isNullOrBlank()) {
-            naatResult.value = getLocalValueInArray(R.array.tb_truenat_mtb_result, diagnostics.naatResult) ?: diagnostics.naatResult
+            naatResult.value = getLocalValueInArray(R.array.tb_truenat_mtb_result, mapMtbResultForUi(diagnostics.naatResult)) ?: mapMtbResultForUi(diagnostics.naatResult)
         }
         if (liquidCultureConducted.value.isNullOrBlank()) {
             liquidCultureConducted.value = boolToYesNo(
@@ -593,18 +593,12 @@ class SuspectedTBDataset(
         if (nikshayId.value.isNullOrBlank()) nikshayId.value = diagnostics.nikshayId
     }
 
-    // Device-integration results (e.g. chestXRayResult="TB Presumptive"/"Normal",
-    // naatResult="MTB detected"/"MTB not detected"/"Invalid") don't literally match the
-    // Positive/Negative entries in tb_test_result, so an exact array lookup returns null.
-    // Try the exact lookup first (covers legacy manually-entered "Positive"/"Negative" values),
-    // then fall back to keyword classification for device-sourced result strings.
     private fun mapToPositiveNegative(rawValue: String?): String? {
         if (rawValue.isNullOrBlank()) return null
         getLocalValueInArray(R.array.tb_test_result, rawValue)?.let { return it }
         val clean = rawValue.trim().lowercase()
-        val isNegative = clean.contains("negative") || clean.contains("not detected") ||
-            clean.contains("normal") || clean.contains("invalid")
-        return positiveNegativeEntries.getOrNull(if (isNegative) 1 else 0)
+        val isPositive = clean == "tb presumptive" || clean == "tb positive" || clean == "mtb detected" || clean == "positive"
+        return positiveNegativeEntries.getOrNull(if (isPositive) 0 else 1)
     }
 
     private fun hasActiveOrder(status: String?): Boolean =
@@ -636,7 +630,7 @@ class SuspectedTBDataset(
         val mtbResultStr = diagnosticsCache?.naatResult
         if (!mtbResultStr.isNullOrBlank()) {
             naatResult.inputType = InputType.TEXT_VIEW
-            naatResult.value = getLocalValueInArray(R.array.tb_truenat_mtb_result, mtbResultStr) ?: mtbResultStr
+            naatResult.value = getLocalValueInArray(R.array.tb_truenat_mtb_result, mapMtbResultForUi(mtbResultStr)) ?: mapMtbResultForUi(mtbResultStr)
         } else if (naatResult.value.isNullOrBlank()) {
             resultPlaceholder(diagnosticsCache?.trueNatOrderStatus)?.let {
                 naatResult.inputType = InputType.TEXT_VIEW
@@ -658,11 +652,7 @@ class SuspectedTBDataset(
 
     private fun String?.isPositiveTestResult(): Boolean {
         if (isNullOrBlank()) return false
-        val clean = trim().lowercase()
-        if (clean.contains("negative") || clean.contains("not detected") || clean.contains("normal") || clean.contains("invalid")) {
-            return false
-        }
-        return clean.contains("positive") || clean.contains("presumptive") || clean.contains("detected") || clean.contains("abnormal")
+        return trim().lowercase() == "tb presumptive"
     }
 
     private fun updateNikshayVisibility() {
@@ -680,6 +670,16 @@ class SuspectedTBDataset(
             triggerIndex = 1,
             target = nikshayId
         )
+    }
+
+
+    private fun mapMtbResultForUi(value: String?): String? {
+        if (value == null) return null
+        return when {
+            value.equals("TB Positive", ignoreCase = true) || value.equals("MTB detected", ignoreCase = true) -> "MTB detected"
+            value.equals("TB Negative", ignoreCase = true) || value.equals("MTB not detected", ignoreCase = true) -> "MTB not detected"
+            else -> value
+        }
     }
 
     companion object {
