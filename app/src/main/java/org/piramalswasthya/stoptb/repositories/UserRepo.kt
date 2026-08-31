@@ -282,7 +282,6 @@ class UserRepo @Inject constructor(
                 ?.optString("facilityName")
                 ?.takeIf { !it.isNullOrBlank() }
             val assignedRoleScreenNames = extractAssignedScreenNames(data)
-            // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
             Timber.d("RoleManager verify: raw previlegeObj present=${data.has("previlegeObj")}, parsed screenNames=$assignedRoleScreenNames")
             val refreshToken = data.getString("refreshToken")
             //  db.clearAllTables()

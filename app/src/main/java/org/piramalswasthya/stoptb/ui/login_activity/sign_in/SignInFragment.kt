@@ -45,7 +45,6 @@ import androidx.core.widget.doOnTextChanged
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.ui.login_activity.camp_mode.CampModeConnectFragment
 import org.piramalswasthya.stoptb.ui.login_activity.sign_in.SignInViewModel.CampHubStatus
-import org.piramalswasthya.stoptb.utils.RoleConstants
 import org.piramalswasthya.stoptb.helpers.RoleManager
 
 

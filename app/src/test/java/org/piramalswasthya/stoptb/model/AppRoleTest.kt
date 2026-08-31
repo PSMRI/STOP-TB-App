@@ -20,32 +20,15 @@ class AppRoleTest {
         assertThat(AppRole.fromScreenName("")).isNull()
     }
 
-    @Test
-    fun `isRecognizedLegacyRoleString matches the old RoleConstants allow-list`() {
-        assertThat(AppRole.isRecognizedLegacyRoleString("Registration Officer")).isTrue()
-        assertThat(AppRole.isRecognizedLegacyRoleString("Nurse")).isTrue()
-        assertThat(AppRole.isRecognizedLegacyRoleString("Counselling Officer")).isTrue()
-        assertThat(AppRole.isRecognizedLegacyRoleString("Counseling Officer")).isTrue()
-        assertThat(AppRole.isRecognizedLegacyRoleString("Volunteer")).isTrue()
-        assertThat(AppRole.isRecognizedLegacyRoleString("volenteer")).isTrue()
-        assertThat(AppRole.isRecognizedLegacyRoleString("Registrar")).isTrue()
-    }
-
-    @Test
-    fun `isRecognizedLegacyRoleString rejects disallowed or blank roles`() {
-        assertThat(AppRole.isRecognizedLegacyRoleString("Asha")).isFalse()
-        assertThat(AppRole.isRecognizedLegacyRoleString("ASHA Supervisor")).isFalse()
-        assertThat(AppRole.isRecognizedLegacyRoleString("ProviderAdmin")).isFalse()
-        assertThat(AppRole.isRecognizedLegacyRoleString(null)).isFalse()
-        assertThat(AppRole.isRecognizedLegacyRoleString("")).isFalse()
-        assertThat(AppRole.isRecognizedLegacyRoleString("   ")).isFalse()
-    }
+    // isRecognizedLegacyRoleString tests removed: the function itself is commented out in
+    // AppRole.kt (product decision — no more legacy-role-string fallback), so it's no longer
+    // callable. Left out rather than commented, since a commented-out test asserting on
+    // commented-out production code would just be dead weight either way.
 
     @Test
     fun `resolveAssignedRoles prioritizes screenNames, dedupes, preserves order`() {
         val roles = AppRole.resolveAssignedRoles(
-            screenNames = listOf("Nurse", "Registrar", "Nurse"),
-            legacyRoleName = null
+            screenNames = listOf("Nurse", "Registrar", "Nurse")
         )
         assertThat(roles).containsExactly(AppRole.NURSE, AppRole.REGISTRAR).inOrder()
     }
@@ -53,36 +36,18 @@ class AppRoleTest {
     @Test
     fun `resolveAssignedRoles ignores unrecognized screenNames`() {
         val roles = AppRole.resolveAssignedRoles(
-            screenNames = listOf("SomeFutureRole", "Nurse"),
-            legacyRoleName = null
+            screenNames = listOf("SomeFutureRole", "Nurse")
         )
         assertThat(roles).containsExactly(AppRole.NURSE)
     }
 
     @Test
-    fun `resolveAssignedRoles falls back to VOLUNTEER when legacy role was allowed but no screenName resolves`() {
-        val roles = AppRole.resolveAssignedRoles(
-            screenNames = emptyList(),
-            legacyRoleName = "Volunteer"
-        )
-        assertThat(roles).containsExactly(AppRole.VOLUNTEER)
-    }
-
-    @Test
-    fun `resolveAssignedRoles returns empty for a disallowed legacy role - preserves login denial`() {
-        val roles = AppRole.resolveAssignedRoles(
-            screenNames = emptyList(),
-            legacyRoleName = "Asha"
-        )
-        assertThat(roles).isEmpty()
-    }
-
-    @Test
-    fun `resolveAssignedRoles returns empty for null blank role data`() {
-        val roles = AppRole.resolveAssignedRoles(
-            screenNames = emptyList(),
-            legacyRoleName = null
-        )
-        assertThat(roles).isEmpty()
+    fun `resolveAssignedRoles returns empty when no screenNames resolve - no legacy fallback anymore`() {
+        // Previously this would have fallen back to VOLUNTEER for an allowed legacy role
+        // string like "Volunteer" or "Registrar" — that fallback was removed by product
+        // decision. Now ANY account with no mapped screenName is denied, full stop.
+        assertThat(AppRole.resolveAssignedRoles(screenNames = emptyList())).isEmpty()
+        assertThat(AppRole.resolveAssignedRoles(screenNames = listOf("Volunteer"))).isEmpty()
+        assertThat(AppRole.resolveAssignedRoles(screenNames = listOf("Asha"))).isEmpty()
     }
 }

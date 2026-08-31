@@ -1368,5 +1368,17 @@
     <string name="proceed_to_register_hof">Do you want to proceed with registration of Head of the Family?</string>
     <string name="refused">Refused</string>
     <string name="form_submitted_successfully">Form submitted successfully</string>
+
+    <!-- Role bottom navigation (multi-role tab switcher) -->
+    <string name="role_tab_registrar">Registration</string>
+    <string name="role_tab_nurse">Treatment</string>
+    <string name="role_tab_counseling">Counselling</string>
+
+    <!-- Multi-role Home screen — Counselling tab "Coming soon" placeholder cards -->
+    <string name="home_card_counselling_title">Counselling</string>
+    <string name="home_card_contact_tracing_title">Contact Tracing</string>
+    <string name="home_card_tb_treatment_followup_title">TB Treatment Follow-up</string>
+    <string name="home_card_tpt_title">TPT</string>
+    <string name="home_card_coming_soon_subtitle">Coming soon</string>
 </resources>
 

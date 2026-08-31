@@ -28,9 +28,6 @@ import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertFilterBinding
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchAndToggleRvButtonBinding
-import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
-import org.piramalswasthya.stoptb.helpers.isNurseRole
-import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.AppRole
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity

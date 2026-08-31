@@ -159,21 +159,23 @@ class AbhaBenFragment : Fragment() {
                 },
                 clickedWifeBen = {
                         _, _, _, _ ->
-
-                    if (prefDao.getLoggedInUser()?.role.equals("asha", true)) {
-                        /*
-                        * Currently No Implementation Required
-                        * */
-                    }
+                    // Dead code — live but no-op (comment-only body regardless of role),
+                    // confirmed during the multi-role migration. Left commented, not deleted.
+//                    if (prefDao.getLoggedInUser()?.role.equals("asha", true)) {
+//                        /*
+//                        * Currently No Implementation Required
+//                        * */
+//                    }
                 },
                 clickedHusbandBen = {
                         item, hhId, benId, relToHeadId ->
-
-                    if (prefDao.getLoggedInUser()?.role.equals("asha", true)) {
-                        /*
-                        *      * Currently No Implementation Required
-                        * */
-                    }
+                    // Dead code — live but no-op (comment-only body regardless of role),
+                    // confirmed during the multi-role migration. Left commented, not deleted.
+//                    if (prefDao.getLoggedInUser()?.role.equals("asha", true)) {
+//                        /*
+//                        *      * Currently No Implementation Required
+//                        * */
+//                    }
                 },
                 clickedChildben = {_, _, _, _ ->
 

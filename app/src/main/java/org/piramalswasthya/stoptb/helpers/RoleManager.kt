@@ -33,12 +33,11 @@ class RoleManager @Inject constructor(
     fun initializeFromLoggedInUser() {
         val user = preferenceDao.getLoggedInUser()
         _assignedRoles = AppRole.resolveAssignedRoles(
-            screenNames = user?.assignedRoleScreenNames.orEmpty(),
-            legacyRoleName = user?.role
+            screenNames = user?.assignedRoleScreenNames.orEmpty()
         )
         _activeRole.value = _assignedRoles.firstOrNull() ?: AppRole.VOLUNTEER
         // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-        Timber.d("RoleManager verify: initializeFromLoggedInUser -> assignedRoles=$_assignedRoles, activeRole=${_activeRole.value}")
+        Timber.d("RoleManager verify: initializeFromLoggedInUser -> legacyRole=${user?.role} (no longer consulted), assignedRoles=$_assignedRoles, activeRole=${_activeRole.value}")
     }
 
     fun setActiveRole(role: AppRole) {
@@ -50,11 +49,10 @@ class RoleManager @Inject constructor(
     fun hasAnyValidRole(): Boolean {
         val user = preferenceDao.getLoggedInUser()
         val resolved = AppRole.resolveAssignedRoles(
-            screenNames = user?.assignedRoleScreenNames.orEmpty(),
-            legacyRoleName = user?.role
+            screenNames = user?.assignedRoleScreenNames.orEmpty()
         )
         // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-        Timber.d("RoleManager verify: hasAnyValidRole -> legacyRole=${user?.role}, screenNames=${user?.assignedRoleScreenNames}, resolved=$resolved")
+        Timber.d("RoleManager verify: hasAnyValidRole -> legacyRole=${user?.role} (no longer consulted), screenNames=${user?.assignedRoleScreenNames}, resolved=$resolved")
         return resolved.isNotEmpty()
     }
 

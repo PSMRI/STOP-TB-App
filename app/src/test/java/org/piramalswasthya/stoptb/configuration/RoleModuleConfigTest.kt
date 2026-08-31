@@ -23,8 +23,9 @@ class RoleModuleConfigTest {
         assertThat(p.homeModules).containsExactly(
             AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.NON_HOUSEHOLD
         )
-        assertThat(p.schedulerShowNonHousehold).isTrue()
-        assertThat(p.schedulerShowTbCard).isFalse()
+        assertThat(p.multiRoleHomeModules).containsExactly(
+            AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.NON_HOUSEHOLD
+        )
         assertThat(p.canActOnReferral).isFalse()
         assertThat(p.examineDenominatorRule).isEqualTo(ExamineDenominatorRule.REGISTRAR_TWO)
         assertThat(p.syncBottomSheetRowFilter).isEqualTo(SyncRowFilter.REGISTRAR_ROWS_ONLY)
@@ -36,6 +37,11 @@ class RoleModuleConfigTest {
         assertThat(p.homeModules).containsExactly(
             AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.NON_HOUSEHOLD,
             AppModule.TUBERCULOSIS, AppModule.REFERRAL
+        )
+        // Multi-role "Treatment" tab is deliberately narrower than the single-role set above:
+        // Referral + Tuberculosis only, per the product spec.
+        assertThat(p.multiRoleHomeModules).containsExactly(
+            AppModule.REFERRAL, AppModule.TUBERCULOSIS
         )
         assertThat(p.examineRowSet).isEqualTo(ExamineRowSet.ALL_FOUR)
         assertThat(p.examineLockGeneralFormsBehindTbScreening).isTrue()
@@ -51,7 +57,12 @@ class RoleModuleConfigTest {
         assertThat(p.syncBottomSheetRowFilter).isEqualTo(SyncRowFilter.COUNSELLING_ROWS_ONLY)
         assertThat(p.examineShowContactTracingRows).isTrue()
         assertThat(p.showCallButton).isFalse()
-        assertThat(p.schedulerShowAllBenCard).isFalse()
+        // Multi-role "Counselling" tab is its own distinct set — none of the single-role
+        // homeModules carry over.
+        assertThat(p.multiRoleHomeModules).containsExactly(
+            AppModule.COUNSELLING, AppModule.CONTACT_TRACING,
+            AppModule.TB_TREATMENT_FOLLOWUP, AppModule.TPT
+        )
     }
 
     @Test

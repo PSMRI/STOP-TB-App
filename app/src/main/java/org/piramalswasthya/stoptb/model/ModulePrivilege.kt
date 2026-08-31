@@ -6,14 +6,14 @@ enum class ExamineDenominatorRule { REGISTRAR_TWO, COUNSELLING_DYNAMIC, GENERIC_
 
 data class ModulePrivilege(
 
-    //Controls which primary feature modules/icons are visible on the app's Main Home Dashboard Screen.
+    //Controls which primary feature modules/icons are visible on the app's Main Home Dashboard Screen
+    //for a SINGLE-role user — preserves the app's existing/legacy card set unchanged.
     val homeModules: Set<AppModule>,
 
-    //Toggle the visibility of summary statistics counter cards displayed in the Scheduler Dashboard (Task List).
-    val schedulerShowNonHousehold: Boolean,
-    val schedulerShowAllBenCard: Boolean,
-    val schedulerShowTbCard: Boolean,
-    val schedulerShowReferralsCard: Boolean,
+    //Controls which Home-screen cards are shown for this role's bottom-nav tab when the user has
+    //MULTIPLE assigned roles — a narrower, role-exclusive set per the product spec, independent of
+    //[homeModules]. Only consulted when RoleManager.assignedRoles.size > 1.
+    val multiRoleHomeModules: Set<AppModule>,
 
     //Determines if the Counselling synchronization progress indicator row is shown in the sync progress panel.
     val syncShowCounsellingStatusRow: Boolean,

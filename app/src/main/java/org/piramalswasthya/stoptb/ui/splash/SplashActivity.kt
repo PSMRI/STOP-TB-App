@@ -19,7 +19,6 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.ui.login_activity.LoginActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
-import org.piramalswasthya.stoptb.utils.RoleConstants
 
 class SplashActivity : AppCompatActivity() {
 

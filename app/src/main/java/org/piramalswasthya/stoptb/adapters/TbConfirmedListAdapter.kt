@@ -13,6 +13,8 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.RvItemTbConfirmedListBinding
 import org.piramalswasthya.stoptb.helpers.getDateFromLong
 import org.piramalswasthya.stoptb.helpers.getPatientTypeByAge
+// Still needed: the legacy String-based checkIfCounsellingOfficerOrNot() overload below
+// (uncalled at runtime, but still compiled) references isCounsellingOfficerRole().
 import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.Gender

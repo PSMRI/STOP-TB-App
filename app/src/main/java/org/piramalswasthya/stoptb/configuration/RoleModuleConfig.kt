@@ -18,10 +18,7 @@ object RoleModuleConfig {
     val privilegesByRole: Map<AppRole, ModulePrivilege> = mapOf(
         AppRole.REGISTRAR to ModulePrivilege(
             homeModules = setOf(AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.NON_HOUSEHOLD),
-            schedulerShowNonHousehold = true,
-            schedulerShowAllBenCard = true,
-            schedulerShowTbCard = false,
-            schedulerShowReferralsCard = false,
+            multiRoleHomeModules = setOf(AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.NON_HOUSEHOLD),
             syncShowCounsellingStatusRow = false,
             syncBottomSheetRowFilter = SyncRowFilter.REGISTRAR_ROWS_ONLY,
             examineRowSet = ExamineRowSet.ANTHROPOMETRY_AND_TB_SCREENING_ONLY,
@@ -42,10 +39,7 @@ object RoleModuleConfig {
                 AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.NON_HOUSEHOLD,
                 AppModule.TUBERCULOSIS, AppModule.REFERRAL
             ),
-            schedulerShowNonHousehold = false,
-            schedulerShowAllBenCard = true,
-            schedulerShowTbCard = true,
-            schedulerShowReferralsCard = true,
+            multiRoleHomeModules = setOf(AppModule.REFERRAL, AppModule.TUBERCULOSIS),
             syncShowCounsellingStatusRow = false,
             syncBottomSheetRowFilter = SyncRowFilter.ALL_EXCEPT_COUNSELLING,
             examineRowSet = ExamineRowSet.ALL_FOUR,
@@ -66,10 +60,10 @@ object RoleModuleConfig {
                 AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.NON_HOUSEHOLD,
                 AppModule.TUBERCULOSIS, AppModule.REFERRAL
             ),
-            schedulerShowNonHousehold = false,
-            schedulerShowAllBenCard = false,
-            schedulerShowTbCard = true,
-            schedulerShowReferralsCard = true,
+            multiRoleHomeModules = setOf(
+                AppModule.COUNSELLING, AppModule.CONTACT_TRACING,
+                AppModule.TB_TREATMENT_FOLLOWUP, AppModule.TPT
+            ),
             syncShowCounsellingStatusRow = true,
             syncBottomSheetRowFilter = SyncRowFilter.COUNSELLING_ROWS_ONLY,
             examineRowSet = ExamineRowSet.ANTHROPOMETRY_AND_TB_SCREENING_ONLY,
@@ -85,12 +79,16 @@ object RoleModuleConfig {
             showExamineButtonDefault = false,
             allowQuickRefresh = true
         ),
+        // AppRole.VOLUNTEER can no longer be assigned to a real logged-in user —
+        // AppRole.resolveAssignedRoles() has no legacy-role fallback anymore, so a user whose
+        // previlegeObj doesn't map to REGISTRAR/NURSE/COUNSELING is denied login outright
+        // rather than resolving to VOLUNTEER. This entry only exists as a defensive
+        // placeholder: RoleManager's activeRole StateFlow needs a non-null initial value
+        // before initializeFromLoggedInUser() runs, and RoleModuleConfig.privilegeFor()
+        // falls back to it if a role were ever missing from this map.
         AppRole.VOLUNTEER to ModulePrivilege(
             homeModules = setOf(AppModule.HOUSEHOLD, AppModule.BENEFICIARIES),
-            schedulerShowNonHousehold = false,
-            schedulerShowAllBenCard = true,
-            schedulerShowTbCard = false,
-            schedulerShowReferralsCard = false,
+            multiRoleHomeModules = setOf(AppModule.HOUSEHOLD, AppModule.BENEFICIARIES),
             syncShowCounsellingStatusRow = false,
             syncBottomSheetRowFilter = SyncRowFilter.ALL_EXCEPT_COUNSELLING,
             examineRowSet = ExamineRowSet.ALL_FOUR,

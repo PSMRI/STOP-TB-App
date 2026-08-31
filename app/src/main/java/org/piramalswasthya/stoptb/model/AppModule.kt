@@ -5,5 +5,12 @@ enum class AppModule {
     BENEFICIARIES,
     NON_HOUSEHOLD,
     TUBERCULOSIS,
-    REFERRAL
+    REFERRAL,
+
+    // Multi-role "Counselling" tab only — no landing screens exist yet, ship as
+    // "Coming soon" placeholder cards until real destinations are designed.
+    COUNSELLING,
+    CONTACT_TRACING,
+    TB_TREATMENT_FOLLOWUP,
+    TPT
 }

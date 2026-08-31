@@ -14,24 +14,24 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentSchedulerBinding
-//import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
-//import org.piramalswasthya.stoptb.helpers.isNurseRole
-//import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
-import org.piramalswasthya.stoptb.helpers.RoleManager
+import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
+import org.piramalswasthya.stoptb.helpers.isNurseRole
+import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.ui.setCountBadgeText
 import org.piramalswasthya.stoptb.ui.home_activity.home.SchedulerViewModel.State.LOADED
 import org.piramalswasthya.stoptb.ui.home_activity.home.SchedulerViewModel.State.LOADING
-import timber.log.Timber
 import javax.inject.Inject
 
+// NOTE: SchedulerFragment/HomeActivity is confirmed dead code — HomeActivity is never
+// launched from anywhere reachable in the app (the only reference is a commented-out line
+// in FBMessaging.kt). Left on the ORIGINAL legacy RoleUtils-based role check rather than
+// migrated to RoleManager: modeling behavior for an unreachable screen in the new
+// role/privilege system would only add confusion with no observable benefit.
 @AndroidEntryPoint
 class SchedulerFragment : Fragment() {
 
     @Inject
     lateinit var prefDao: PreferenceDao
-
-    @Inject
-    lateinit var roleManager: RoleManager
 
     private var _binding: FragmentSchedulerBinding? = null
     private val binding: FragmentSchedulerBinding
@@ -142,51 +142,35 @@ class SchedulerFragment : Fragment() {
     }
 
     private fun applyRoleVisibility() {
-        // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole() below,
-        // left commented in place for reference (not deleted, per project convention).
-//        val role = prefDao.getLoggedInUser()?.role
-//        binding.cvHousehold.visibility = View.VISIBLE
-//        binding.cvNonHH.visibility = if (role.isRegistrationOfficerRole()) View.VISIBLE else View.GONE
-//        when {
-//            role.isNullOrBlank() || (!role.isNurseRole() && !role.isCounsellingOfficerRole()) -> {
-//                binding.cvAllBen.visibility = View.VISIBLE
-//                binding.cvTb.visibility = View.GONE
-//                binding.cvNcd.visibility = View.GONE
-//                binding.cvReferrals.visibility = View.GONE
-//                binding.cvAbha.visibility = View.GONE
-//                binding.cvRch.visibility = View.GONE
-//            }
-//            role.isNurseRole() -> {
-//                binding.cvAllBen.visibility = View.VISIBLE
-//                binding.cvTb.visibility = View.VISIBLE
-//                binding.cvNcd.visibility = View.GONE
-//                binding.cvReferrals.visibility = View.VISIBLE
-//                binding.cvAbha.visibility = View.GONE
-//                binding.cvRch.visibility = View.GONE
-//            }
-//            role.isCounsellingOfficerRole() -> {
-//                binding.cvAllBen.visibility = View.GONE
-//                binding.cvTb.visibility = View.VISIBLE
-//                binding.cvNcd.visibility = View.GONE
-//                binding.cvReferrals.visibility = View.VISIBLE
-//                binding.cvAbha.visibility = View.GONE
-//                binding.cvRch.visibility = View.GONE
-//            }
-//        }
-
-        val privilege = roleManager.privilegesForActiveRole()
-        // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-        Timber.d("RoleManager verify: SchedulerFragment activeRole=${roleManager.activeRole.value}, nonHH=${privilege.schedulerShowNonHousehold}, allBen=${privilege.schedulerShowAllBenCard}, tb=${privilege.schedulerShowTbCard}, referrals=${privilege.schedulerShowReferralsCard}")
+        val role = prefDao.getLoggedInUser()?.role
         binding.cvHousehold.visibility = View.VISIBLE
-        binding.cvNonHH.visibility = if (privilege.schedulerShowNonHousehold) View.VISIBLE else View.GONE
-        binding.cvAllBen.visibility = if (privilege.schedulerShowAllBenCard) View.VISIBLE else View.GONE
-        binding.cvTb.visibility = if (privilege.schedulerShowTbCard) View.VISIBLE else View.GONE
-        binding.cvReferrals.visibility = if (privilege.schedulerShowReferralsCard) View.VISIBLE else View.GONE
-        // cvNcd/cvAbha/cvRch are unconditionally GONE in every role today — confirmed dead
-        // toggles, not modeled in ModulePrivilege, left exactly as-is.
-        binding.cvNcd.visibility = View.GONE
-        binding.cvAbha.visibility = View.GONE
-        binding.cvRch.visibility = View.GONE
+        binding.cvNonHH.visibility = if (role.isRegistrationOfficerRole()) View.VISIBLE else View.GONE
+        when {
+            role.isNullOrBlank() || (!role.isNurseRole() && !role.isCounsellingOfficerRole()) -> {
+                binding.cvAllBen.visibility = View.VISIBLE
+                binding.cvTb.visibility = View.GONE
+                binding.cvNcd.visibility = View.GONE
+                binding.cvReferrals.visibility = View.GONE
+                binding.cvAbha.visibility = View.GONE
+                binding.cvRch.visibility = View.GONE
+            }
+            role.isNurseRole() -> {
+                binding.cvAllBen.visibility = View.VISIBLE
+                binding.cvTb.visibility = View.VISIBLE
+                binding.cvNcd.visibility = View.GONE
+                binding.cvReferrals.visibility = View.VISIBLE
+                binding.cvAbha.visibility = View.GONE
+                binding.cvRch.visibility = View.GONE
+            }
+            role.isCounsellingOfficerRole() -> {
+                binding.cvAllBen.visibility = View.GONE
+                binding.cvTb.visibility = View.VISIBLE
+                binding.cvNcd.visibility = View.GONE
+                binding.cvReferrals.visibility = View.VISIBLE
+                binding.cvAbha.visibility = View.GONE
+                binding.cvRch.visibility = View.GONE
+            }
+        }
     }
 
     private fun setupHeader() {

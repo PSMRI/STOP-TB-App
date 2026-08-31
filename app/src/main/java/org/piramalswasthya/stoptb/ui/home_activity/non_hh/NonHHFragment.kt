@@ -23,12 +23,10 @@ import org.piramalswasthya.stoptb.adapters.BenListAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchAndToggleRvButtonBinding
-import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import androidx.core.os.bundleOf
-import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import javax.inject.Inject
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity

@@ -24,7 +24,24 @@ class IconDataset @Inject constructor(
     enum class Disease {
         MALARIA, KALA_AZAR, AES_JE, FILARIA, LEPROSY, DEWARMING
     }
+    /**
+     * Single-role users keep seeing today's existing/legacy card set unchanged
+     * ([getSingleRoleIconDataset]). Multi-role users get a narrower, role-exclusive card
+     * set per the active bottom-nav tab ([getMultiRoleIconDataset]) — the two are
+     * deliberately different (product decision), not two views of the same data.
+     */
     fun getVolunteerIconDataset(resources: Resources): List<Icon> {
+        val isMultiRole = roleManager.assignedRoles.size > 1
+        // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
+        timber.log.Timber.d("RoleManager verify: getVolunteerIconDataset assignedRoles=${roleManager.assignedRoles}, activeRole=${roleManager.activeRole.value}, isMultiRole=$isMultiRole")
+        return if (isMultiRole) {
+            getMultiRoleIconDataset(resources)
+        } else {
+            getSingleRoleIconDataset(resources)
+        }
+    }
+
+    private fun getSingleRoleIconDataset(resources: Resources): List<Icon> {
         // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole().homeModules
         // below, left commented in place for reference (not deleted, per project convention).
 //        val role = preferenceDao.getLoggedInUser()?.role
@@ -99,6 +116,124 @@ class IconDataset @Inject constructor(
             }
         }
     }
+
+    /**
+     * Multi-role bottom-nav tab card sets — exclusive per role, per the product spec:
+     * Registration = Household/Beneficiaries/Non-Household; Treatment = Referral/Tuberculosis
+     * only (no Household/Beneficiaries, unlike the single-role set above); Counselling = 4
+     * "Coming soon" placeholder cards (no landing screens exist yet for any of them).
+     */
+    private fun getMultiRoleIconDataset(resources: Resources): List<Icon> {
+        val modules = roleManager.privilegesForActiveRole().multiRoleHomeModules
+        val iconList = mutableListOf<Icon>()
+
+        if (AppModule.HOUSEHOLD in modules) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic__hh,
+                    resources.getString(R.string.icon_title_household),
+                    resources.getString(R.string.home_card_household_subtitle),
+                    recordsRepo.hhListCount,
+                    VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllHouseholdFragment()
+                )
+            )
+        }
+        if (AppModule.BENEFICIARIES in modules) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic__ben,
+                    resources.getString(R.string.icon_title_ben),
+                    resources.getString(R.string.home_card_all_ben_subtitle),
+                    recordsRepo.allBenListCount,
+                    VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment()
+                )
+            )
+        }
+        if (AppModule.NON_HOUSEHOLD in modules) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic__ben,
+                    "Non-Household",
+                    "Wanderers, homeless, hostelites & institutional residents",
+                    recordsRepo.nonHHListCount,
+                    VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToNonHHFragment()
+                )
+            )
+        }
+        if (AppModule.TUBERCULOSIS in modules) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic__ncd,
+                    resources.getString(R.string.tuberculosis),
+                    resources.getString(R.string.home_card_tb_subtitle),
+                    null,
+                    VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToTbFragment()
+                )
+            )
+        }
+        if (AppModule.REFERRAL in modules) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic_ncd_noneligible,
+                    resources.getString(R.string.ncd_refer_list),
+                    resources.getString(R.string.home_card_referral_subtitle),
+                    null,
+                    VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToReferralIconsFragment()
+                )
+            )
+        }
+        if (AppModule.COUNSELLING in modules) {
+            iconList.add(
+                Icon(
+                    icon = R.drawable.ic_role_counseling,
+                    title = resources.getString(R.string.home_card_counselling_title),
+                    subtitle = resources.getString(R.string.home_card_coming_soon_subtitle),
+                    count = null,
+                    navAction = null
+                )
+            )
+        }
+        if (AppModule.CONTACT_TRACING in modules) {
+            iconList.add(
+                Icon(
+                    icon = R.drawable.ic__ncd_priority,
+                    title = resources.getString(R.string.home_card_contact_tracing_title),
+                    subtitle = resources.getString(R.string.home_card_coming_soon_subtitle),
+                    count = null,
+                    navAction = null
+                )
+            )
+        }
+        if (AppModule.TB_TREATMENT_FOLLOWUP in modules) {
+            iconList.add(
+                Icon(
+                    icon = R.drawable.ic__ncd,
+                    title = resources.getString(R.string.home_card_tb_treatment_followup_title),
+                    subtitle = resources.getString(R.string.home_card_coming_soon_subtitle),
+                    count = null,
+                    navAction = null
+                )
+            )
+        }
+        if (AppModule.TPT in modules) {
+            iconList.add(
+                Icon(
+                    icon = R.drawable.ic__ncd_eligibility,
+                    title = resources.getString(R.string.home_card_tpt_title),
+                    subtitle = resources.getString(R.string.home_card_coming_soon_subtitle),
+                    count = null,
+                    navAction = null
+                )
+            )
+        }
+
+        return iconList.apply {
+            forEachIndexed { index, icon ->
+                icon.colorPrimary = index % 2 == 0
+            }
+        }
+    }
+
     fun getNCDDataset(resources: Resources) = listOf(
         Icon(
             R.drawable.ic__ncd_eligibility,
