@@ -10,10 +10,10 @@ on:
         type: string
         default: ''
       branch:
-        description: 'Git branch to build from'
+        description: 'Git branch to build from (example: release-2.1). Matching is case-insensitive.'
         required: true
         type: string
-        default: 'main'
+        default: 'release-2.1'
       versionName:
         description: 'Build version (example: 1.0.3)'
         required: true
@@ -61,13 +61,29 @@ jobs:
             exit 1
           fi
 
-      - name: Checkout selected branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.branch }}
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Checkout requested branch
+        run: |
+          set -euo pipefail
+          REQUESTED="${{ inputs.branch }}"
+          MATCH="$(git ls-remote --heads origin | awk '{print $2}' | sed 's|^refs/heads/||' | grep -ixF -- "$REQUESTED" | head -n 1 || true)"
+          if [ -z "$MATCH" ]; then
+            echo "Branch not found: '$REQUESTED'"
+            echo "Available branches:"
+            git ls-remote --heads origin | awk '{print $2}' | sed 's|^refs/heads/||'
+            exit 1
+          fi
+          if [ "$MATCH" != "$REQUESTED" ]; then
+            echo "Using existing branch '$MATCH' for requested '$REQUESTED'"
+          fi
+          git fetch --no-tags --depth=1 origin "$MATCH"
+          git checkout --force -B "$MATCH" FETCH_HEAD
+          echo "Checked out $MATCH @ $(git rev-parse --short HEAD)"
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -96,15 +112,28 @@ jobs:
           echo '${{ secrets.GOOGLE_SERVICES_JSON_PROD }}' > app/src/stoptb/google-services.json
 
       - name: Accept SDK licenses
-        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+        run: yes 2>/dev/null | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
 
       - name: Install NDK
         run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;29.0.14033849"
 
       - name: Set app version
+        env:
+          VERSION_NAME: ${{ inputs.versionName }}
+          VERSION_CODE: ${{ inputs.versionCode }}
         run: |
-          echo "VERSION=${{ inputs.versionName }}" > version/version.properties
-          echo "VERSIONCODE=${{ inputs.versionCode }}" >> version/version.properties
+          set -euo pipefail
+          if [ -z "${VERSION_CODE}" ] || ! [[ "${VERSION_CODE}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "versionCode must be a positive integer (got: '${VERSION_CODE}')."
+            exit 1
+          fi
+          if [ -z "${VERSION_NAME}" ]; then
+            echo "versionName is required (got: '${VERSION_NAME}')."
+            exit 1
+          fi
+          printf 'VERSION=%s\nVERSIONCODE=%s\n' "${VERSION_NAME}" "${VERSION_CODE}" > version/version.properties
+          echo "Using app version:"
+          cat version/version.properties
 
       - name: Create release keystore
         run: |
@@ -141,12 +170,15 @@ jobs:
           echo "Release APKs:"
           ls -la "$RELEASE_DIR"
 
-          APK="$RELEASE_DIR/app-stoptbUat-universal-release.apk"
+          APK="$RELEASE_DIR/app-stoptbUat-release.apk"
           if [ ! -f "$APK" ]; then
-            APK="$(find "$RELEASE_DIR" -name '*universal*release*.apk' | head -n 1 || true)"
+            APK="$RELEASE_DIR/app-stoptbUat-universal-release.apk"
+          fi
+          if [ ! -f "$APK" ]; then
+            APK="$(find "$RELEASE_DIR" -name '*release*.apk' ! -name '*-armeabi-*' ! -name '*-arm64-*' ! -name '*-x86*' | head -n 1 || true)"
           fi
           if [ -z "$APK" ] || [ ! -f "$APK" ]; then
-            echo "Universal release APK not found in $RELEASE_DIR"
+            echo "Release APK not found in $RELEASE_DIR"
             exit 1
           fi
 
@@ -177,10 +209,10 @@ jobs:
           echo "Verified: release-signed, not debuggable, ready for Intune."
 
       - name: Upload APK as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: uat-release-apk
-          path: app/build/outputs/apk/stoptbUat/release/*.apk
+          path: ${{ steps.apk.outputs.apk_path }}
 
       - name: Distribute to Firebase App Distribution (UAT)
         uses: wzieba/Firebase-Distribution-Github-Action@v1

@@ -23,6 +23,8 @@
             android:layout_marginTop="@dimen/margin_small"
             android:layout_marginEnd="16dp"
             android:text="@string/send_otp"
+            android:textStyle="bold"
+            android:fontFamily="@font/roboto_bold"
             android:backgroundTint="@color/background_selector"
             app:layout_constraintEnd_toEndOf="parent"
             android:textAllCaps="false"

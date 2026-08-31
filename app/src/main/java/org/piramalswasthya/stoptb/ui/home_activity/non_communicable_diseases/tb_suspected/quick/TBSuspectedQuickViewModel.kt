@@ -128,7 +128,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                         Timber.e(e, "Pre-fetching results failed for $orderType")
                     }
                 }
-                if (orderType == "SPUTUM_TRUENAT" && tbDiagnostics.naatResult.equals("MTB detected", ignoreCase = true)) {
+                if (orderType == "SPUTUM_TRUENAT" && (tbDiagnostics.naatResult.equals("MTB detected", ignoreCase = true) || tbDiagnostics.naatResult.equals("TB Positive", ignoreCase = true))) {
                     val hasLocalRifResult = !tbDiagnostics.trueNatRifResult.isNullOrBlank()
                     val isRifActive = tbDiagnostics.rifOrderStatus.equals("COMPLETED", ignoreCase = true) ||
                             tbDiagnostics.rifOrderStatus.equals("IN_PROGRESS", ignoreCase = true) ||
@@ -242,6 +242,27 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                     tbDiagnostics.chestXRayResult = resultString
                                     tbDiagnostics.isChestXRayDone = true
                                     tbRepo.getTBDiagnosticsById(benId)?.xrayOrderId?.let { tbDiagnostics.xrayOrderId = it }
+
+                                    if (isXrayPositive) {
+                                        val currentDiag = tbRepo.getTBDiagnosticsById(benId)
+                                        val hasTruenat = !currentDiag?.trueNatOrderId.isNullOrBlank() ||
+                                                currentDiag?.trueNatOrderStatus.equals("COMPLETED", ignoreCase = true) ||
+                                                currentDiag?.trueNatOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) ||
+                                                currentDiag?.trueNatOrderStatus.equals("REFUSED", ignoreCase = true)
+                                        if (!hasTruenat) {
+                                            val truenatRes = tbRepo.createOrder(benId, "SPUTUM_TRUENAT")
+                                            if (truenatRes is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+                                                val updatedDiag = tbRepo.getTBDiagnosticsById(benId)
+                                                if (updatedDiag != null) {
+                                                    tbDiagnostics.trueNatOrderStatus = updatedDiag.trueNatOrderStatus
+                                                    tbDiagnostics.trueNatOrderId = updatedDiag.trueNatOrderId
+                                                }
+                                            } else {
+                                                apiSuccess = false
+                                                apiError = (truenatRes as? org.piramalswasthya.stoptb.helpers.NetworkResponse.Error)?.message ?: "Push SPUTUM_TRUENAT Order Failed"
+                                            }
+                                        }
+                                    }
                                 } else {
                                     apiSuccess = false
                                     apiError = (res as? org.piramalswasthya.stoptb.helpers.NetworkResponse.Error)?.message ?: "Submit Manual Result Failed"
