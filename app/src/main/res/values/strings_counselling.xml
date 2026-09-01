@@ -55,4 +55,14 @@
 
     <string name="counselling_data_load_error">We\'re unable to fetch data.\nPlease try again later.</string>
 
+    <!-- Home cards for the four independent Counsellor modules (module separation) -->
+    <string name="icon_title_counselling_module">Counselling</string>
+    <string name="home_card_counselling_module_subtitle">Counsel TB confirmed patients</string>
+    <string name="icon_title_contact_tracing_module">Contact Tracing</string>
+    <string name="home_card_contact_tracing_module_subtitle">Trace community &amp; occupational contacts</string>
+    <string name="icon_title_tb_followup_module">TB Treatment Follow-up</string>
+    <string name="home_card_tb_followup_module_subtitle">Monthly treatment follow-up</string>
+    <string name="icon_title_tpt_module">TPT</string>
+    <string name="home_card_tpt_module_subtitle">TB Preventive Treatment follow-up</string>
+
 </resources>

@@ -323,6 +323,7 @@
     <string name="home_card_household_subtitle">Register and manage households</string>
     <string name="home_card_tb_subtitle">Track screening and support TB cases</string>
     <string name="home_card_ncd_subtitle">Manage non-communicable disease workflows</string>
+    <string name="home_card_non_hh_subtitle">Wanderers, homeless, hostelites &amp; institutional residents</string>
     <string name="home_card_referral_subtitle">Follow up on referred cases</string>
     <string name="home_card_rch_subtitle">Beneficiaries linked with RCH IDs</string>
     <string name="home_card_ncd_eligible_subtitle">Screen and manage eligible beneficiaries</string>

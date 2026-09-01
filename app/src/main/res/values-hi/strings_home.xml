@@ -20,6 +20,7 @@
 
     <string name="icon_title_household">सभी घरेलू सूची</string>
     <string name="icon_title_ben">सभी लाभार्थियों की सूची</string>
+    <string name="icon_title_non_hh">गैर-घरेलू</string>
     <string name="icon_title_ec">पात्र युगल सूची</string>
     <string name="icon_title_mc">माता की देखभाल</string>
     <string name="icon_title_cc">बच्चे की देखभाल</string>

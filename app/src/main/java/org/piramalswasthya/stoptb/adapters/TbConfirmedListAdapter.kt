@@ -17,11 +17,15 @@ import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.BenWithTbSuspectedDomain
 
-class TbConfirmedListAdapter( private val clickListener: ClickListener? = null,
-private val pref: PreferenceDao? = null
+class TbConfirmedListAdapter(
+    private val clickListener: ClickListener? = null,
+    private val pref: PreferenceDao? = null,
+    private val restrictToAction: Action? = null
 ) :
 ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 (BenDiffUtilCallBack) {
+
+    enum class Action { COUNSELLING, CONTACT_TRACING, FOLLOW_UP, VIEW_ONLY }
 
     private var benIdList: MutableList<Long>? = null
     private var totalSectionsFallback: Int? = null
@@ -55,7 +59,8 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             pref: PreferenceDao?,
             benIdList: List<Long>?,
             totalSectionsFallback: Int?,
-            localFilledCounts: Map<Long, Int>?
+            localFilledCounts: Map<Long, Int>?,
+            restrictToAction: Action?
         ) {
             binding.btnFormTb.visibility = View.VISIBLE
 
@@ -109,6 +114,25 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
                 binding.btnFormTb.visibility = View.GONE
                 binding.btnCounselling.visibility = View.GONE
                 binding.btnCounselled.visibility = View.GONE
+            }
+
+            if (restrictToAction != null) {
+                if (restrictToAction != Action.FOLLOW_UP) {
+                    binding.btnFormTb.visibility = View.GONE
+                    binding.ivViewMember.visibility = View.VISIBLE
+                } else {
+                    binding.ivViewMember.visibility = View.GONE
+                }
+
+                if (restrictToAction != Action.CONTACT_TRACING) {
+                    binding.btnContactTracing.visibility = View.GONE
+                }
+
+                if (restrictToAction != Action.COUNSELLING) {
+                    binding.btnCounselling.visibility = View.GONE
+                    binding.btnCounselled.visibility = View.GONE
+                    binding.counsellingSectionProgress.visibility = View.INVISIBLE
+                }
             }
             if (item.ben.spouseName == "Not Available" && item.ben.fatherName == "Not Available") {
                 binding.father = true
@@ -217,7 +241,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
         holder: BenViewHolder,
         position: Int
     ) {
-        holder.bind(getItem(position), clickListener, pref, benIdList, totalSectionsFallback, localFilledCounts)
+        holder.bind(getItem(position), clickListener, pref, benIdList, totalSectionsFallback, localFilledCounts, restrictToAction)
     }
 
     /*override fun onCreateViewHolder(
