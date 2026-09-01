@@ -52,6 +52,7 @@
 
     <string name="counselling_start_button">परामर्श प्रारंभ करें</string>
     <string name="counselling_follow_up_button">फॉलो अप</string>
+    <string name="counselling_in_progress">प्रगति पर है</string>
     <string name="counselling_data_load_error">हम डेटा प्राप्त करने में असमर्थ हैं।\nकृपया बाद में पुनः प्रयास करें।</string>
 
     <!-- Home cards for the four independent Counsellor modules (module separation) -->
