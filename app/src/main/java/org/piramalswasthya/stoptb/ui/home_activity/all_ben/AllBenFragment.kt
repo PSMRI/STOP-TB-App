@@ -161,13 +161,19 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 //        val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
 //        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess || isCounsellor) && !isReadOnlyReferralList
 //        val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
-        val showAbhaButton = privilege.showAbhaButton && !isReadOnlyReferralList
+        // Duplicate re-introduction of already-removed dead code from a bad merge
+        // (feat/separate-counselling-contact-tracing-tb-treatment-tpt-modules) — undefined
+        // isRegistrar/isNurse/allowLegacyAccess/isCounsellor, and showAnthropometryButton/
+        // showBenActionButtons were already confirmed dead earlier in this migration. Left
+        // commented in place for reference (not deleted, per project convention), but only the
+        // genuinely new bit (&& !args.showContactTracingForms) is merged into the live line below.
+//        val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
+//        val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
+//        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess || isCounsellor) &&
+//                !isReadOnlyReferralList && !args.showContactTracingForms
+//        val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
+        val showAbhaButton = privilege.showAbhaButton && !isReadOnlyReferralList && !args.showContactTracingForms
         val showCallButton = privilege.showCallButton && !isReadOnlyReferralList
-        val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
-        val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
-        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess || isCounsellor) &&
-                !isReadOnlyReferralList && !args.showContactTracingForms
-        val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
         binding.llQuickRefresh.visibility = View.GONE
 
         // Add Ben button hidden — ben registration only via Household flow

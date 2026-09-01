@@ -110,7 +110,7 @@ class TBConfirmedListFragment : Fragment() {
                 }
             ),
             pref = prefDao,
-            roleManager = roleManager
+            roleManager = roleManager,
             restrictToAction = restrictToAction
         )
         binding.rvAny.adapter = benAdapter

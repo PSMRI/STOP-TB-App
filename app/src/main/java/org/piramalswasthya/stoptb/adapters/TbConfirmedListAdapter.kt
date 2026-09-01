@@ -22,11 +22,11 @@ import org.piramalswasthya.stoptb.model.BenWithTbSuspectedDomain
 import timber.log.Timber
 
 
-class TbConfirmedListAdapter( private val clickListener: ClickListener? = null,
-private val pref: PreferenceDao? = null,
-private val roleManager: RoleManager? = null
-private val restrictToAction: Action? = null
-
+class TbConfirmedListAdapter(
+    private val clickListener: ClickListener? = null,
+    private val pref: PreferenceDao? = null,
+    private val roleManager: RoleManager? = null,
+    private val restrictToAction: Action? = null
 ) :
 ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 (BenDiffUtilCallBack) {
@@ -66,7 +66,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             benIdList: List<Long>?,
             totalSectionsFallback: Int?,
             localFilledCounts: Map<Long, Int>?,
-            roleManager: RoleManager? = null
+            roleManager: RoleManager? = null,
             restrictToAction: Action?
         ) {
             binding.btnFormTb.visibility = View.VISIBLE
@@ -134,13 +134,6 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 //                binding.btnCounselled.visibility = View.GONE
 //            }
             checkIfCounsellingOfficerOrNot(showCounsellingUi, (isRefused || isCounselledFinal))
-            if (role != null) {
-                checkIfCounsellingOfficerOrNot(role, (isRefused || isCounselledFinal))
-            } else {
-                binding.btnFormTb.visibility = View.GONE
-                binding.btnCounselling.visibility = View.GONE
-                binding.btnCounselled.visibility = View.GONE
-            }
 
             if (restrictToAction != null) {
                 if (restrictToAction != Action.FOLLOW_UP) {

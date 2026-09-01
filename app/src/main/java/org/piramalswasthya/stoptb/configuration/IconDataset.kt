@@ -13,6 +13,7 @@ import org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.Ncd
 //import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.AppModule
+import org.piramalswasthya.stoptb.model.AppRole
 import org.piramalswasthya.stoptb.ui.volunteer.fragment.VolunteerHomeFragmentDirections
 import javax.inject.Inject
 @ActivityRetainedScoped
@@ -111,7 +112,14 @@ class IconDataset @Inject constructor(
             }
         }*/
 
-        if (role.isCounsellingOfficerRole()) {
+        // The 4 blocks below came in from a separately-developed feature branch
+        // (feat/separate-counselling-contact-tracing-tb-treatment-tpt-modules) that predated
+        // the RoleManager migration — they originally read `role.isCounsellingOfficerRole()`,
+        // which no longer compiles since `role` was commented out earlier in this function.
+        // Fixed to use the active role directly (single-role path: activeRole IS the user's
+        // one role, so this is equivalent to "is this single-role user a Counsellor").
+        val isCounsellingActive = roleManager.activeRole.value == AppRole.COUNSELING
+        if (isCounsellingActive) {
             iconList.add(
                 Icon(
                     R.drawable.ic_counselling_module,
@@ -124,7 +132,7 @@ class IconDataset @Inject constructor(
                 )
             )
         }
-        if (role.isCounsellingOfficerRole()) {
+        if (isCounsellingActive) {
             iconList.add(
                 Icon(
                     R.drawable.ic_contact_tracing_module,
@@ -137,7 +145,7 @@ class IconDataset @Inject constructor(
                 )
             )
         }
-        if (role.isCounsellingOfficerRole()) {
+        if (isCounsellingActive) {
             iconList.add(
                 Icon(
                     R.drawable.ic_tb_treatment_follow_up_module,
@@ -150,7 +158,7 @@ class IconDataset @Inject constructor(
                 )
             )
         }
-        if (role.isCounsellingOfficerRole()) {
+        if (isCounsellingActive) {
             iconList.add(
                 Icon(
                     R.drawable.ic_tpt_module,
@@ -207,8 +215,8 @@ class IconDataset @Inject constructor(
             iconList.add(
                 Icon(
                     R.drawable.ic__ben,
-                    "Non-Household",
-                    "Wanderers, homeless, hostelites & institutional residents",
+                    resources.getString(R.string.icon_title_non_hh),
+                    resources.getString(R.string.home_card_non_hh_subtitle),
                     recordsRepo.nonHHListCount,
                     VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToNonHHFragment()
                 )
@@ -236,47 +244,60 @@ class IconDataset @Inject constructor(
                 )
             )
         }
+        // Real destinations (previously "Coming soon" placeholders) — landed via the
+        // separately-developed feat/separate-counselling-contact-tracing-tb-treatment-tpt-modules
+        // branch, same drawables/strings/navigation reused here as in getSingleRoleIconDataset()
+        // above, so the card looks identical whether reached via the single-role legacy path
+        // or a multi-role Counselling tab.
         if (AppModule.COUNSELLING in modules) {
             iconList.add(
                 Icon(
-                    icon = R.drawable.ic_role_counseling,
-                    title = resources.getString(R.string.home_card_counselling_title),
-                    subtitle = resources.getString(R.string.home_card_coming_soon_subtitle),
+                    icon = R.drawable.ic_counselling_module,
+                    title = resources.getString(R.string.icon_title_counselling_module),
+                    subtitle = resources.getString(R.string.home_card_counselling_module_subtitle),
                     count = null,
-                    navAction = null
+                    navAction = VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToTBConfirmedListFragment(
+                        restrictToAction = "COUNSELLING"
+                    )
                 )
             )
         }
         if (AppModule.CONTACT_TRACING in modules) {
             iconList.add(
                 Icon(
-                    icon = R.drawable.ic__ncd_priority,
-                    title = resources.getString(R.string.home_card_contact_tracing_title),
-                    subtitle = resources.getString(R.string.home_card_coming_soon_subtitle),
+                    icon = R.drawable.ic_contact_tracing_module,
+                    title = resources.getString(R.string.icon_title_contact_tracing_module),
+                    subtitle = resources.getString(R.string.home_card_contact_tracing_module_subtitle),
                     count = null,
-                    navAction = null
+                    navAction = VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToTBConfirmedListFragment(
+                        restrictToAction = "CONTACT_TRACING"
+                    )
                 )
             )
         }
         if (AppModule.TB_TREATMENT_FOLLOWUP in modules) {
             iconList.add(
                 Icon(
-                    icon = R.drawable.ic__ncd,
-                    title = resources.getString(R.string.home_card_tb_treatment_followup_title),
-                    subtitle = resources.getString(R.string.home_card_coming_soon_subtitle),
+                    icon = R.drawable.ic_tb_treatment_follow_up_module,
+                    title = resources.getString(R.string.icon_title_tb_followup_module),
+                    subtitle = resources.getString(R.string.home_card_tb_followup_module_subtitle),
                     count = null,
-                    navAction = null
+                    navAction = VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToTBConfirmedListFragment(
+                        restrictToAction = "FOLLOW_UP"
+                    )
                 )
             )
         }
         if (AppModule.TPT in modules) {
             iconList.add(
                 Icon(
-                    icon = R.drawable.ic__ncd_eligibility,
-                    title = resources.getString(R.string.home_card_tpt_title),
-                    subtitle = resources.getString(R.string.home_card_coming_soon_subtitle),
+                    icon = R.drawable.ic_tpt_module,
+                    title = resources.getString(R.string.icon_title_tpt_module),
+                    subtitle = resources.getString(R.string.home_card_tpt_module_subtitle),
                     count = null,
-                    navAction = null
+                    navAction = VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment(
+                        showContactTracingForms = true
+                    )
                 )
             )
         }

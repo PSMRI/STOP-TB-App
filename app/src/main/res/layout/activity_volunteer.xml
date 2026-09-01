@@ -114,11 +114,11 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 app:menu="@menu/bottom_nav_role"
-
                 app:layout_constraintBottom_toBottomOf="parent"
                 android:background="@color/sakhi_toolbar_surface"
                 app:itemTextColor="@android:color/white"
-                app:itemIconTint="@android:color/black" />
+                app:itemIconTint="@color/bottom_nav_icon_tint" />
+
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
