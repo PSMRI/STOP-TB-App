@@ -855,6 +855,7 @@
     <string name="examine_btn_fill">भरें</string>
     <string name="examine_btn_view">देखें</string>
     <string name="diagnosis_locked_msg">कृपया पहले टीबी स्क्रीनिंग फॉर्म भरें</string>
+    <string name="examine_btn_history">पिछला रिकॉर्ड</string>
     <string name="tb_screening_legend_xray_sputum">* डिजिटल छाती एक्स-रे या थूक संग्रह के लिए रेफर करें</string>
     <string name="tb_screening_legend_family_members">** सभी परिवार के सदस्यों की जांच की सलाह दें</string>
 
