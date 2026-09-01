@@ -157,7 +157,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
                 if (restrictToAction != Action.COUNSELLING) {
                     binding.btnCounselling.visibility = View.GONE
                     binding.btnCounselled.visibility = View.GONE
-                    binding.counsellingSectionProgress.visibility = View.INVISIBLE
+                    binding.counsellingSectionProgress.visibility = View.GONE
                 }
             }
             if (item.ben.spouseName == "Not Available" && item.ben.fatherName == "Not Available") {
