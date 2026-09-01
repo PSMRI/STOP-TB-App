@@ -67,6 +67,10 @@
             android:name="source"
             android:defaultValue="0"
             app:argType="integer" />
+        <argument
+            android:name="showContactTracingForms"
+            android:defaultValue="false"
+            app:argType="boolean" />
     </fragment>
 
     <fragment
@@ -185,6 +189,10 @@
             android:name="source"
             android:defaultValue="0"
             app:argType="integer" />
+        <argument
+            android:name="showContactTracingForms"
+            android:defaultValue="false"
+            app:argType="boolean" />
     </fragment>
 
     <fragment
@@ -532,6 +540,11 @@
         android:id="@+id/TBConfirmedListFragment"
         android:name="org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.tb_confirmed.list.TBConfirmedListFragment"
         android:label="@string/tb_confirmed_list">
+        <argument
+            android:name="restrictToAction"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
         <action
             android:id="@+id/action_TBConfirmedListFragment_to_TBConfirmedFormFragment"
             app:destination="@id/TBConfirmedFormFragment" />

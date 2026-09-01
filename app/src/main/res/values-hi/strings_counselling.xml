@@ -54,4 +54,14 @@
     <string name="counselling_follow_up_button">फॉलो अप</string>
     <string name="counselling_data_load_error">हम डेटा प्राप्त करने में असमर्थ हैं।\nकृपया बाद में पुनः प्रयास करें।</string>
 
+    <!-- Home cards for the four independent Counsellor modules (module separation) -->
+    <string name="icon_title_counselling_module">काउंसलिंग</string>
+    <string name="home_card_counselling_module_subtitle">टीबी से पुष्टि किए गए मरीजों की काउंसलिंग</string>
+    <string name="icon_title_contact_tracing_module">कॉन्टैक्ट ट्रेसिंग</string>
+    <string name="home_card_contact_tracing_module_subtitle">सामुदायिक और व्यावसायिक संपर्कों का पता लगाना</string>
+    <string name="icon_title_tb_followup_module">टीबी उपचार फॉलो-अप</string>
+    <string name="home_card_tb_followup_module_subtitle">मासिक उपचार फॉलो-अप</string>
+    <string name="icon_title_tpt_module">टीपीटी</string>
+    <string name="home_card_tpt_module_subtitle">टीबी निवारक उपचार फॉलो-अप</string>
+
 </resources>

@@ -588,6 +588,7 @@
     <string name="home_card_household_subtitle">परिवार पंजीकरण और प्रबंधन करें</string>
     <string name="home_card_tb_subtitle">टीबी स्क्रीनिंग और सहायता को ट्रैक करें</string>
     <string name="home_card_ncd_subtitle">एनसीडी कार्यप्रवाह प्रबंधित करें</string>
+    <string name="home_card_non_hh_subtitle">घुमंतू, बेघर, छात्रावास में रहने वाले और संस्थागत निवासी</string>
     <string name="home_card_referral_subtitle">रेफर किए गए मामलों पर फॉलो-अप करें</string>
     <string name="home_card_rch_subtitle">RCH ID से जुड़े लाभार्थी</string>
     <string name="home_card_ncd_eligible_subtitle">पात्र लाभार्थियों की स्क्रीनिंग और प्रबंधन करें</string>

@@ -149,7 +149,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         val showResultButton = args.source == 6 || args.source == 7 || args.source == 8
         val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
         val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
-        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess || isCounsellor) && !isReadOnlyReferralList
+        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess || isCounsellor) &&
+                !isReadOnlyReferralList && !args.showContactTracingForms
         val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
         binding.llQuickRefresh.visibility = View.GONE
 
@@ -423,7 +424,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             showResultButton = showResultButton,
             showAnthropometryButton = false,
             showExamineButton = !isReadOnlyReferralList,
-            source = args.source
+            source = args.source,
+            showContactTracingForms = args.showContactTracingForms
         )
 
         binding.rvAny.adapter = benAdapter
@@ -653,7 +655,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         if (existing != null) return // already visible
         // Always show without autoFlow — user decides whether to continue or close.
         // autoFlow=true caused the form to re-open automatically when back was pressed.
-        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false, showContactTracingForms = false)
+
+        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false, showContactTracingForms = args.showContactTracingForms)
             .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
     }
 
