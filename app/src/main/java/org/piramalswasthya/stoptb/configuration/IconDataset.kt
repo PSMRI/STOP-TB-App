@@ -68,8 +68,8 @@ class IconDataset @Inject constructor(
             iconList.add(
                 Icon(
                     R.drawable.ic__ben,
-                    "Non-Household",
-                    "Wanderers, homeless, hostelites & institutional residents",
+                    resources.getString(R.string.icon_title_non_hh),
+                    resources.getString(R.string.home_card_non_hh_subtitle),
                     recordsRepo.nonHHListCount,
                     VolunteerHomeFragmentDirections
                         .actionVolunteerHomeFragmentToNonHHFragment()
@@ -110,6 +110,60 @@ class IconDataset @Inject constructor(
                 icon.title != resources.getString(R.string.tuberculosis)
             }
         }*/
+
+        if (role.isCounsellingOfficerRole()) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic_counselling_module,
+                    resources.getString(R.string.icon_title_counselling_module),
+                    resources.getString(R.string.home_card_counselling_module_subtitle),
+                    null,
+                    VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToTBConfirmedListFragment(
+                        restrictToAction = "COUNSELLING"
+                    )
+                )
+            )
+        }
+        if (role.isCounsellingOfficerRole()) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic_contact_tracing_module,
+                    resources.getString(R.string.icon_title_contact_tracing_module),
+                    resources.getString(R.string.home_card_contact_tracing_module_subtitle),
+                    null,
+                    VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToTBConfirmedListFragment(
+                        restrictToAction = "CONTACT_TRACING"
+                    )
+                )
+            )
+        }
+        if (role.isCounsellingOfficerRole()) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic_tb_treatment_follow_up_module,
+                    resources.getString(R.string.icon_title_tb_followup_module),
+                    resources.getString(R.string.home_card_tb_followup_module_subtitle),
+                    null,
+                    VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToTBConfirmedListFragment(
+                        restrictToAction = "FOLLOW_UP"
+                    )
+                )
+            )
+        }
+        if (role.isCounsellingOfficerRole()) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic_tpt_module,
+                    resources.getString(R.string.icon_title_tpt_module),
+                    resources.getString(R.string.home_card_tpt_module_subtitle),
+                    null,
+                    VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment(
+                        showContactTracingForms = true
+                    )
+                )
+            )
+        }
+
         return iconList.apply {
             forEachIndexed { index, icon ->
                 icon.colorPrimary = index % 2 == 0
@@ -315,7 +369,9 @@ class IconDataset @Inject constructor(
                 title = resources.getString(R.string.icon_title_ncd_tb_confirmed),
                 subtitle = resources.getString(R.string.home_card_tb_confirmed_short_subtitle),
                 count = recordsRepo.tbConfirmedListCount,
-                navAction = CdFragmentDirections.actionCdFragmentToTBConfirmedListFragment()
+                navAction = CdFragmentDirections.actionCdFragmentToTBConfirmedListFragment(
+                    restrictToAction = "VIEW_ONLY"
+                )
             )
         )
         /*if (role.isCounsellingOfficerRole()) {

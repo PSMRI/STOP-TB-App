@@ -12,6 +12,7 @@ import android.widget.EditText
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import androidx.navigation.fragment.navArgs
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
@@ -38,6 +39,10 @@ class TBConfirmedListFragment : Fragment() {
 
     @Inject
     lateinit var roleManager: RoleManager
+    private val args: TBConfirmedListFragmentArgs by navArgs()
+
+    private val restrictToAction: TbConfirmedListAdapter.Action?
+        get() = args.restrictToAction?.let { TbConfirmedListAdapter.Action.valueOf(it) }
 
     private var _binding: FragmentDisplaySearchRvButtonBinding? = null
     private val binding: FragmentDisplaySearchRvButtonBinding
@@ -106,6 +111,7 @@ class TBConfirmedListFragment : Fragment() {
             ),
             pref = prefDao,
             roleManager = roleManager
+            restrictToAction = restrictToAction
         )
         binding.rvAny.adapter = benAdapter
 
@@ -163,10 +169,16 @@ class TBConfirmedListFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
+        val title = when (restrictToAction) {
+            TbConfirmedListAdapter.Action.COUNSELLING -> getString(R.string.counselling_menu_title)
+            TbConfirmedListAdapter.Action.CONTACT_TRACING -> getString(R.string.contact_tracing)
+            TbConfirmedListAdapter.Action.FOLLOW_UP -> getString(R.string.follow_up)
+            TbConfirmedListAdapter.Action.VIEW_ONLY, null -> getString(R.string.tb_confirmed_list)
+        }
         activity?.let {
             when (it) {
-                is HomeActivity -> it.updateActionBar(R.drawable.ic__ncd, getString(R.string.tb_confirmed_list))
-                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ncd, getString(R.string.tb_confirmed_list))
+                is HomeActivity -> it.updateActionBar(R.drawable.ic__ncd, title)
+                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ncd, title)
             }
         }
     }
