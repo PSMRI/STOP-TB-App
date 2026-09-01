@@ -20,6 +20,7 @@ import androidx.navigation.fragment.findNavController
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import dagger.hilt.android.AndroidEntryPoint
+import org.piramalswasthya.stoptb.BuildConfig
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentCampModeConnectBinding
@@ -76,7 +77,17 @@ class CampModeConnectFragment : Fragment() {
 
         applyStatusBarInsetsToHeader()
 
-        binding.etCampHubUrl.setText(viewModel.getCampHubUrl())
+        val defaultCampUrl = if (BuildConfig.FLAVOR.contains("uat", ignoreCase = true)) {
+            val url = viewModel.getCampHubUrl()
+            if (url.isBlank() || url.contains("192.168.137.1")) {
+                "https://uatstoptb.piramalswasthya.org/"
+            } else {
+                url
+            }
+        } else {
+            viewModel.getCampHubUrl()
+        }
+        binding.etCampHubUrl.setText(defaultCampUrl)
 
         // Scroll to bottom after keyboard fully animates open (~300ms)
         // so Connect button is visible above keyboard
