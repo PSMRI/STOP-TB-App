@@ -139,6 +139,9 @@ class FormInputAdapter(
 
     class EditTextInputViewHolder private constructor(private val binding: RvItemFormEditTextV2Binding) :
         ViewHolder(binding.root) {
+
+        private var currentWatcher: TextWatcher? = null   // ADD THIS
+
         companion object {
             fun from(parent: ViewGroup): ViewHolder {
                 val layoutInflater = LayoutInflater.from(parent.context)
@@ -146,9 +149,12 @@ class FormInputAdapter(
                 return EditTextInputViewHolder(binding)
             }
         }
-
         fun bind(item: FormElement, isEnabled: Boolean, formValueListener: FormValueListener?) {
             val effectiveEnabled = isEnabled && item.isEnabled
+
+            currentWatcher?.let { binding.et.removeTextChangedListener(it) }
+            currentWatcher = null
+
             val isReadOnlyUnavailableContact =
                 item.title.equals("Contact Number", ignoreCase = true) &&
                         !item.required &&
@@ -194,15 +200,13 @@ class FormInputAdapter(
                 binding.et.isFocusable = false
             }
 
-            if (item.allCaps) {
-                val editFilters = binding.et.filters
-                var newFilters = arrayOfNulls<InputFilter>(editFilters.size + 1)
-                editFilters.forEachIndexed { index, inputFilter ->
-                    newFilters[index] = editFilters[index]
-                }
-                newFilters[editFilters.size] = AllCaps()
-                binding.et.filters = newFilters
-            }
+            // ALWAYS rebuild from a clean baseline — don't append onto whatever filters
+            // the previously-bound field left behind on this recycled view.
+            val baseFilters = mutableListOf<InputFilter>()
+            if (item.etMaxLength > 0) baseFilters.add(InputFilter.LengthFilter(item.etMaxLength))
+            if (item.allCaps) baseFilters.add(AllCaps())
+            binding.et.filters = baseFilters.toTypedArray()
+
             binding.form = item
             if (item.errorText == null) binding.tilEditText.isErrorEnabled = false
             Timber.d("Bound EditText item ${item.title} with ${item.required}")
@@ -255,6 +259,8 @@ class FormInputAdapter(
                         binding.tilEditText.isErrorEnabled = item.errorText != null
                         binding.tilEditText.error = item.errorText
                     }
+
+
 //                    binding.tilEditText.error = null
 //                    else if(item.errorText!= null && binding.tilEditText.error==null)
 //                        binding.tilEditText.error = item.errorText
@@ -339,6 +345,10 @@ class FormInputAdapter(
 
                 }
             }
+
+            // ADD THIS — attach immediately and remember it, so it's not dependent on focus events.
+            currentWatcher = textWatcher
+            binding.et.addTextChangedListener(textWatcher)
             binding.et.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus){
                     binding.et.requestFocus()
