@@ -53,6 +53,7 @@
             android:id="@+id/btnSubmitPreview"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            style="@style/Widget.Material3.Button.OutlinedButton"
             android:text="@string/submit"
             android:textStyle="bold"
             android:fontFamily="@font/roboto_bold"
@@ -65,11 +66,14 @@
             android:id="@+id/btnEditPreview"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            style="@style/Widget.Material3.Button.OutlinedButton"
             android:minWidth="@dimen/_100sdp"
             android:text="@string/edit"
             android:textStyle="bold"
             android:fontFamily="@font/roboto_bold"
-            android:backgroundTint="?attr/colorPrimary"
-            android:textColor="@color/md_theme_light_onSecondary" />
+            android:backgroundTint="@color/md_theme_light_onSecondary"
+            android:textColor="?attr/colorPrimary"
+            app:icon="@drawable/ic_edit"
+            app:iconTint="?attr/colorPrimary" />
     </LinearLayout>
 </LinearLayout>
