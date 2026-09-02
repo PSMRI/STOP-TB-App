@@ -80,6 +80,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     // ── WiFi / NetworkCallback ────────────────────────────────────────────────
 
     private var isNetworkCallbackRegistered = false
+    private var campHubReconnectJob: Job? = null
 
     private val connectivityManager: ConnectivityManager by lazy {
         getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -94,6 +95,8 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
      */
     private val wifiNetworkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onLost(network: Network) {
+            campHubReconnectJob?.cancel()
+            campHubReconnectJob = null
             // WiFi dropped — if camp mode was active, mark disconnected at once
             if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
                 pref.setCampHubConnected(false)
@@ -102,18 +105,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         }
 
         override fun onAvailable(network: Network) {
-            // WiFi came back — only try to reconnect if we're not already connected
-            if (!pref.isCampModeEnabled() || pref.isCampHubConnected()) return
-            lifecycleScope.launch(Dispatchers.IO) {
-                val reached = pingCampHub()
-                if (pref.isCampModeEnabled()) {           // double-check after IO
-                    pref.setCampHubConnected(reached)
-                    if (reached) {
-                        org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(applicationContext)
-                    }
-                    runOnUiThread { refreshCampHubOfflineBanner() }
-                }
-            }
+            startCampHubReconnect()
         }
     }
 
@@ -465,6 +457,8 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     override fun onPause() {
         super.onPause()
         pref.removeOnPreferenceChangeListener(campHubPrefListener)
+        campHubReconnectJob?.cancel()
+        campHubReconnectJob = null
         campAutoPullJob?.cancel()
         campAutoPullJob = null
         if (isNetworkCallbackRegistered) {
@@ -499,6 +493,12 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             isNetworkCallbackRegistered = true
         }
 
+        // A WiFi restore while the activity was paused does not produce a callback,
+        // so retry the saved Camp Hub URL when the user returns to the app.
+        if (pref.isCampModeEnabled() && !pref.isCampHubConnected() && isWifiAvailable()) {
+            startCampHubReconnect()
+        }
+
         window.decorView.alpha = 1f
         refreshCampHubOfflineBanner()
         refreshCampHubDrawerItem()
@@ -512,6 +512,29 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             while (isActive) {
                 WorkerUtils.triggerCampQuickPullIfConnected(applicationContext, pref)
                 delay(WorkerUtils.campAutoPullIntervalMs)
+            }
+        }
+    }
+
+    private fun isWifiAvailable(): Boolean = connectivityManager.activeNetwork?.let {
+        connectivityManager.getNetworkCapabilities(it)
+            ?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+    } ?: false
+
+    private fun startCampHubReconnect() {
+        if (!pref.isCampModeEnabled() || pref.isCampHubConnected() ||
+            campHubReconnectJob?.isActive == true
+        ) return
+
+        campHubReconnectJob = lifecycleScope.launch(Dispatchers.IO) {
+            while (isActive && pref.isCampModeEnabled() && !pref.isCampHubConnected()) {
+                if (isWifiAvailable() && pingCampHub()) {
+                    pref.setCampHubConnected(true)
+                    WorkerUtils.triggerDiagnosticResultPollWorker(applicationContext)
+                    runOnUiThread { refreshCampHubOfflineBanner() }
+                    return@launch
+                }
+                delay(3_000L)
             }
         }
     }

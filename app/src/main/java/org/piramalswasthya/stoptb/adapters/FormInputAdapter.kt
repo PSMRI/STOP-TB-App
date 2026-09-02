@@ -35,6 +35,7 @@ import android.widget.RadioGroup
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.content.res.AppCompatResources
+import androidx.core.content.ContextCompat
 import androidx.core.view.children
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -833,6 +834,8 @@ class FormInputAdapter(
         ) {
             val context = binding.root.context
             val density = context.resources.displayMetrics.density
+            val maxListHeightPx = (context.resources.displayMetrics.heightPixels * 0.58f).toInt()
+            val rowHeightPx = (48 * density).toInt()
             val container = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding((20 * density).toInt(), (8 * density).toInt(), (20 * density).toInt(), 0)
@@ -855,7 +858,7 @@ class FormInputAdapter(
                 listView,
                 LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    (320 * density).toInt()
+                    0
                 )
             )
 
@@ -879,6 +882,10 @@ class FormInputAdapter(
                 filteredIndices.forEachIndexed { position, originalIndex ->
                     listView.setItemChecked(position, checkedItems[originalIndex])
                 }
+                // Keep the native button panel below the scrollable list on every screen size.
+                listView.layoutParams = listView.layoutParams.apply {
+                    height = minOf(filteredIndices.size * rowHeightPx, maxListHeightPx)
+                }
             }
 
             refreshFilteredList("")
@@ -899,7 +906,7 @@ class FormInputAdapter(
                 }
             })
 
-            AlertDialog.Builder(context)
+            val dialog = AlertDialog.Builder(context)
                 .setTitle(item.title)
                 .setView(container)
                 .setPositiveButton(android.R.string.ok) { _, _ ->
@@ -907,6 +914,29 @@ class FormInputAdapter(
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
+
+            dialog.window?.setLayout(
+                (context.resources.displayMetrics.widthPixels * 0.9f).toInt(),
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+
+            val buttonPadding = (16 * density).toInt()
+            val actionTextColor = ContextCompat.getColor(context, R.color.md_theme_light_primary)
+            listOf(AlertDialog.BUTTON_NEGATIVE, AlertDialog.BUTTON_POSITIVE).forEach { which ->
+                dialog.getButton(which).apply {
+                    // Match the original dialog's text-button actions and prevent overlap.
+                    background = null
+                    minWidth = 0
+                    minimumWidth = 0
+                    setTextColor(actionTextColor)
+                    setPadding(buttonPadding, 0, buttonPadding, 0)
+                }
+            }
+            (dialog.getButton(AlertDialog.BUTTON_NEGATIVE).layoutParams as? ViewGroup.MarginLayoutParams)
+                ?.let { params ->
+                    params.marginEnd = buttonPadding
+                    dialog.getButton(AlertDialog.BUTTON_NEGATIVE).layoutParams = params
+                }
         }
 
         private fun Set<Int>.toDisplayText(item: FormElement): String =

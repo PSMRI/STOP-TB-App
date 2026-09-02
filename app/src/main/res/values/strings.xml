@@ -298,7 +298,7 @@
     <string name="eligible_couple_tracking_list">Eligible Couple Tracking List</string>
     <string name="tb_screening_list">TB Screening List</string>
     <string name="tb_suspected_list">Presumptive TB cases</string>
-    <string name="tb_screening_form">TB Screening Form</string>
+    <string name="tb_screening_form">TB Symptoms Screening</string>
     <string name="tb_confirmed_list">TB Confirmed List</string>
     <string name="tb_confirmed_form">TB Confirmed Form</string>
 
@@ -1027,7 +1027,7 @@
     <string name="weight_kgs">Weight (Kgs)</string>
     <string name="height_cms">Height (cms)</string>
     <string name="temperature_degree_fahrenheit">Temperature (Degree Fahrenheit)</string>
-    <string name="anthropometry_screen">Anthropometry Screen</string>
+    <string name="anthropometry_screen">Anthropometry</string>
     <string name="temperature_hypothermia">&lt;97 - Hypothermia</string>
     <string name="normal_temperature_range">97-99 - Normal</string>
     <string name="temperature_100_or_more">&gt;99 - Fever</string>
