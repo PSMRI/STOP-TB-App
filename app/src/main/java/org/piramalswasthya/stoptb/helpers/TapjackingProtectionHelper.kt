@@ -17,10 +17,13 @@ object TapjackingProtectionHelper {
         if (BuildConfig.DEBUG) return
 
         // Prevent screenshot + some overlays
-        activity.window.setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE
-        )
+        if (!BuildConfig.FLAVOR.contains("uat", ignoreCase = true)) {
+            // Prevent screenshot + some overlays
+            activity.window.setFlags(
+                WindowManager.LayoutParams.FLAG_SECURE,
+                WindowManager.LayoutParams.FLAG_SECURE
+            )
+        }
     }
 
     /**
