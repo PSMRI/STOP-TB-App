@@ -855,6 +855,9 @@
     <string name="examine_btn_fill">भरें</string>
     <string name="examine_btn_view">देखें</string>
     <string name="diagnosis_locked_msg">कृपया पहले टीबी स्क्रीनिंग फॉर्म भरें</string>
+    <string name="tb_screening_locked_msg">कृपया पहले टीबी स्क्रीनिंग फॉर्म भरें</string>
+    <string name="examine_form_view_only_msg">आपके पास इस फॉर्म को केवल देखने की अनुमति है</string>
+    <string name="contact_tracing_load_error">यह फॉर्म लोड नहीं हो सका।</string>
     <string name="examine_btn_history">पिछला रिकॉर्ड</string>
     <string name="tb_screening_legend_xray_sputum">* डिजिटल छाती एक्स-रे या थूक संग्रह के लिए रेफर करें</string>
     <string name="tb_screening_legend_family_members">** सभी परिवार के सदस्यों की जांच की सलाह दें</string>
@@ -979,6 +982,11 @@
     <string name="patient_registered_successfully">रोगी का पंजीकरण सफलतापूर्वक हुआ।</string>
     <string name="proceed_to_register_hof">क्या आप परिवार के मुखिया के पंजीकरण के साथ आगे बढ़ना चाहते हैं?</string>
     <string name="form_submitted_successfully">फॉर्म सफलतापूर्वक सबमिट किया गया</string>
+
+    <!-- Role bottom navigation (multi-role tab switcher) -->
+    <string name="role_tab_registrar">पंजीकरण</string>
+    <string name="role_tab_nurse">उपचार</string>
+    <string name="role_tab_counseling">परामर्श</string>
 </resources>
 
 
