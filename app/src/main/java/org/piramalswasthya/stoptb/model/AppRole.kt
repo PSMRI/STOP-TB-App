@@ -16,11 +16,8 @@ enum class AppRole {
                 else -> null
             }
 
-        // Legacy login-allow-list fallback — removed by product decision. previlegeObj-derived
-        // screenNames are now the ONLY source of truth for role resolution; an account with no
-        // screenName mapping to a real AppRole is denied login outright, regardless of its old
-        // flat `role` string. Left commented in place for reference (not deleted, per project
-        // convention), not because it's still used.
+        // Legacy fallback, no longer used — screenNames are now the only source of truth for
+        // role resolution. Kept for reference.
 //        /**
 //         * Verbatim relocation of the normalized-match logic from the old
 //         * `RoleConstants.isAllowedStopTbRole` — preserved exactly so the Volunteer
@@ -47,11 +44,9 @@ enum class AppRole {
 //        }
 
         /**
-         * previlegeObj-derived screenNames are the ONLY source of truth for role resolution.
-         * An account whose screenNames don't map to any known AppRole has no usable role —
-         * there is no legacy-role-string fallback to VOLUNTEER anymore (product decision).
-         * Roles are ordered canonically (REGISTRAR, NURSE, COUNSELING, VOLUNTEER) so that
-         * multi-role accounts always default to the 0th index tab on launch.
+         * Maps backend screenNames to roles. An account with no recognized screenName has no
+         * usable role (no fallback). Result is ordered canonically (REGISTRAR, NURSE,
+         * COUNSELING) regardless of backend order, so the first tab is always deterministic.
          */
         fun resolveAssignedRoles(screenNames: List<String>): List<AppRole> {
             val resolved = screenNames.mapNotNull { fromScreenName(it) }.toSet()

@@ -57,15 +57,11 @@ class SyncBottomSheetFragment : BottomSheetDialogFragment() {
 
         val localNames = viewModel.getLocalNames(requireContext())
         val englishNames = viewModel.getEnglishNames(requireContext())
-        // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole() below,
-        // left commented in place for reference (not deleted, per project convention).
+        // Legacy, kept for reference:
 //        val isRegistrar = prefDao.getLoggedInUser()?.role.isRegistrationOfficerRole()
 //        val isCounsellingOfficer = prefDao.getLoggedInUser()?.role.isCounsellingOfficerRole()
-        // Union across ALL assigned roles, not just the active tab — sync-row visibility is
-        // a permission, not Home-card display, so it must not reset when switching tabs.
         val rowFilter = roleManager.privilegesUnion().syncBottomSheetRowFilter
-        // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-        Timber.d("RoleManager verify: SyncBottomSheetFragment assignedRoles=${roleManager.assignedRoles}, rowFilter=$rowFilter")
+        Timber.d("RoleManager: rowFilter=$rowFilter")
 
         lifecycleScope.launch {
             viewModel.syncStatus.collect {

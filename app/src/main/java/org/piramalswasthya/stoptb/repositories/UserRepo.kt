@@ -130,8 +130,7 @@ class UserRepo @Inject constructor(
         val user = response.data.toUser(password, subCentre).copy(
             assignedRoleScreenNames = assignedRoleScreenNames
         )
-        // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-        Timber.d("RoleManager verify: legacyRole=${user.role}, assignedRoleScreenNames=${user.assignedRoleScreenNames}")
+        Timber.d("RoleManager: assignedRoleScreenNames=${user.assignedRoleScreenNames}")
         preferenceDao.registerUser(user)
         // Auto-set location if user has exactly one village (common for ASHA workers)
         if (user.villages.size == 1) {
@@ -282,7 +281,7 @@ class UserRepo @Inject constructor(
                 ?.optString("facilityName")
                 ?.takeIf { !it.isNullOrBlank() }
             val assignedRoleScreenNames = extractAssignedScreenNames(data)
-            Timber.d("RoleManager verify: raw previlegeObj present=${data.has("previlegeObj")}, parsed screenNames=$assignedRoleScreenNames")
+            Timber.d("RoleManager: parsed screenNames=$assignedRoleScreenNames")
             val refreshToken = data.getString("refreshToken")
             //  db.clearAllTables()
             TokenInsertTmcInterceptor.setJwt(data.getString("jwtToken"))

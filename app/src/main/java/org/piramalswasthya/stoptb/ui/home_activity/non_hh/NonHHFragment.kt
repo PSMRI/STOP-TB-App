@@ -85,8 +85,6 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // unused DataBinding variable in rv_item_ben.xml/rv_item_ben_with_form.xml (no
         // android:* attribute or binding expression reads it). Left commented, not deleted.
 //        val roleName = prefDao.getLoggedInUser()?.role
-        // Gap 2: "Add beneficiary (non-HH)" is a create action — only visible with FULL
-        // non-household permission (Registrar).
         val canAddNonHH = roleManager.privilegesUnion().nonHouseholdPermission == Permission.FULL
         binding.btnNextPage.text = getString(R.string.btn_Add_beneficiary_nonHH)
         binding.btnNextPage.visibility = if (canAddNonHH) View.VISIBLE else View.GONE
@@ -450,8 +448,6 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     bundleOf(
                         "benId" to benId,
                         "autoFlow" to !viewOnly,
-                        // Gap 2 fix: same missing viewOnly forward as AllBenFragment's copy of
-                        // this callback — see its comment.
                         "viewOnly" to viewOnly
                     )
                 )

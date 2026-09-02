@@ -141,8 +141,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole() below,
-        // left commented in place for reference (not deleted, per project convention).
+        // Legacy, kept for reference:
 //        val roleName = prefDao.getLoggedInUser()?.role
 //        val isRegistrar = roleName.isRegistrationOfficerRole()
 //        val isNurse = roleName.isNurseRole()
@@ -151,24 +150,14 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 //        val allowLegacyAccess = !isKnownRestrictedRole
         val isReadOnlyReferralList = args.source in READ_ONLY_REFERRAL_SOURCES
         val showResultButton = args.source == 6 || args.source == 7 || args.source == 8
-        // Union across ALL assigned roles, not just the active tab — a permission, not
-        // Home-card display.
         val privilege = roleManager.privilegesUnion()
-        // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-        Timber.d("RoleManager verify: AllBenFragment assignedRoles=${roleManager.assignedRoles}, showAbhaButton=${privilege.showAbhaButton}, showCallButton=${privilege.showCallButton}")
-        // showAnthropometryButton/showBenActionButtons removed entirely: confirmed dead code —
-        // the adapter always receives showAnthropometryButton = false (line ~424) regardless of
-        // role, and showBenActionButtons was never referenced anywhere else in this file.
+        Timber.d("RoleManager: showAbhaButton=${privilege.showAbhaButton}, showCallButton=${privilege.showCallButton}")
+        // showAnthropometryButton/showBenActionButtons: confirmed dead code, not used anywhere.
 //        val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
 //        val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
 //        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess || isCounsellor) && !isReadOnlyReferralList
 //        val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
-        // Duplicate re-introduction of already-removed dead code from a bad merge
-        // (feat/separate-counselling-contact-tracing-tb-treatment-tpt-modules) — undefined
-        // isRegistrar/isNurse/allowLegacyAccess/isCounsellor, and showAnthropometryButton/
-        // showBenActionButtons were already confirmed dead earlier in this migration. Left
-        // commented in place for reference (not deleted, per project convention), but only the
-        // genuinely new bit (&& !args.showContactTracingForms) is merged into the live line below.
+        // Legacy, kept for reference:
 //        val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
 //        val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
 //        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess || isCounsellor) &&
@@ -254,12 +243,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     if (isReadOnlyReferralList) return@BenClickListener
                     viewLifecycleOwner.lifecycleScope.launch {
                         val benRegId = viewModel.getBenFromId(benId)
-                        // was: autoFlow = isNurse (legacy role-string check). Union-based
-                        // (assignedRoles, not activeRole) — this is a permission decision, not
-                        // Home-card display, so it must hold regardless of which tab is active.
                         val vitalAutoFlow = AppRole.NURSE in roleManager.assignedRoles
-                        // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-                        Timber.d("RoleManager verify: AllBenFragment->VitalScreenFragment assignedRoles=${roleManager.assignedRoles}, autoFlow=$vitalAutoFlow")
+                        Timber.d("RoleManager: VitalScreenFragment autoFlow=$vitalAutoFlow")
                         findNavController().navigate(
                             AllBenFragmentDirections.actionAllBenFragmentToVitalScreenFragment(
                                 benId = benId,
@@ -722,10 +707,6 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     bundleOf(
                         "benId" to benId,
                         "autoFlow" to !viewOnly,
-                        // Gap 2 fix: TBScreeningFormFragment already supports a real viewOnly
-                        // lock (see its own Fragment/ViewModel) but this call site was never
-                        // passing it — the sheet only forwarded autoFlow, silently dropping the
-                        // Gap-2 role-permission veto for this one form.
                         "viewOnly" to viewOnly
                     )
                 )

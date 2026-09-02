@@ -280,8 +280,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         )
         val itemIdToRole = roleToItemId.entries.associate { (role, id) -> id to role }
         val visibleRoles = roleManager.assignedRoles.filter { it in roleToItemId }
-        // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-        Timber.d("RoleManager verify: setUpRoleBottomNav assignedRoles=${roleManager.assignedRoles}, visibleTabs=$visibleRoles, activeRole=${roleManager.activeRole.value}")
+        Timber.d("RoleManager: bottomNav visibleTabs=$visibleRoles, activeRole=${roleManager.activeRole.value}")
 
         binding.bottomNavRole.menu.let { menu ->
             roleToItemId.forEach { (role, id) ->
@@ -303,16 +302,12 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         }
 
         binding.bottomNavRole.setOnItemSelectedListener { item ->
-            itemIdToRole[item.itemId]?.let {
-                roleManager.setActiveRole(it)
-                Timber.d("RoleManager verify: bottom nav tab tapped -> activeRole=${roleManager.activeRole.value}")
-            }
+            itemIdToRole[item.itemId]?.let { roleManager.setActiveRole(it) }
             true
         }
 
-        // Show only on the Home destination; hide on every other screen/module.
-        // addOnDestinationChangedListener fires immediately with the current destination,
-        // so this also sets the correct initial visibility state.
+        // Visible on Home only; addOnDestinationChangedListener fires immediately with the
+        // current destination, so this also sets the correct initial state.
         navController.addOnDestinationChangedListener { _, destination, _ ->
             binding.bottomNavRole.visibility =
                 if (destination.id == R.id.volunteerHomeFragment) View.VISIBLE else View.GONE

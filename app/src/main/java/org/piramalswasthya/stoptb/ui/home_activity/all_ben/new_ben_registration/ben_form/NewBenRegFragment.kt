@@ -204,9 +204,8 @@ class NewBenRegFragment : Fragment() {
         // Death badge visibility
         viewModel.isDeath.observe(viewLifecycleOwner) { isDeath ->
             val recordExists = viewModel.recordExists.value ?: false
-            // Gap 2: this observer fires independently of (and can run after) the recordExists
-            // observer below, so it needs the same role-permission gate — otherwise it silently
-            // re-shows the Edit FAB for a VIEW-only Nurse/Counsellor once isDeath loads.
+            // Can fire after the recordExists observer below — needs the same permission gate,
+            // or it silently re-shows the Edit FAB once isDeath loads.
             binding.fabEdit.visibility =
                 if (isDeath || !recordExists || !canEditRecord()) View.GONE else View.VISIBLE
         }
@@ -258,10 +257,7 @@ class NewBenRegFragment : Fragment() {
 
         // Record exists observer
         viewModel.recordExists.observe(viewLifecycleOwner) { recordExists ->
-            // Gap 2: the Edit FAB is the sole path from view-mode back into an editable form —
-            // hide it whenever the union of assigned roles only grants VIEW (not FULL) on
-            // whichever module this form represents (Beneficiary vs Non-Household, selected by
-            // the isNonHH nav arg), so a Nurse/Counsellor viewing an existing record stays locked.
+            // Edit FAB is the only way back into edit mode — hide it below full permission.
             binding.fabEdit.visibility = if (recordExists && canEditRecord()) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (recordExists) View.GONE else View.VISIBLE
             binding.btnLinkHousehold.visibility = if (!recordExists && viewModel.showLinkHouseholdButton) View.VISIBLE else View.GONE
@@ -318,10 +314,8 @@ class NewBenRegFragment : Fragment() {
         }
     }
 
-    // Gap 2: single source of truth for "can this role edit this record" — selects
-    // nonHouseholdPermission vs beneficiaryPermission per the isNonHH nav arg. Both fabEdit
-    // visibility observers must use this (not recompute it separately), since isDeath and
-    // recordExists are independent LiveData that can fire in either order.
+    // Both fabEdit observers must call this rather than recompute their own check — isDeath
+    // and recordExists are independent LiveData that can fire in either order.
     private fun canEditRecord(): Boolean {
         val union = roleManager.privilegesUnion()
         return if (viewModel.isNonHHArg) {

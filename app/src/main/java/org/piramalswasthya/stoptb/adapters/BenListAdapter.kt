@@ -181,16 +181,12 @@ class BenListAdapter(
             if (binding.btnVitalScreen.visibility == View.VISIBLE) {
                 if (showResultButton) {
                     val tbDiag = tbDiagnosticsList.find { it.benId == item.benId }
-                    // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole()
-                    // below, left commented in place for reference (not deleted, per project convention).
+                    // Legacy, kept for reference:
 //                    val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
 //                    val isCounsellingOfficer = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
 //                    val canActOnReferral = isNurse || isCounsellingOfficer
-                    // Union across ALL assigned roles, not just the active tab — a permission,
-                    // not Home-card display.
                     val canActOnReferral = roleManager?.privilegesUnion()?.canActOnReferral == true
-                    // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-                    Timber.d("RoleManager verify: BenListAdapter referral assignedRoles=${roleManager?.assignedRoles}, canActOnReferral=$canActOnReferral")
+                    Timber.d("RoleManager: canActOnReferral=$canActOnReferral")
                     val config = when (source) {
                         6 -> {
                             val status = tbDiag?.xrayOrderStatus
@@ -595,8 +591,7 @@ class BenListAdapter(
             // ClinicalScreeningStatus answer is TPT_ELIGIBLE (see IContactTracingRepository.observeTptEligibleBenIds) ?
             // otherwise FULL_TREATMENT/NO_TREATMENT beneficiaries would incorrectly get stuck at x/4.
             // Others: all 5 forms
-            // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole() below,
-            // left commented in place for reference (not deleted, per project convention).
+            // Legacy, kept for reference:
 //            val currentRole = pref?.getLoggedInUser()?.role
 //            val isCounsellingOfficer = currentRole.isCounsellingOfficerRole()
 //            val isRegistrar = pref?.getLoggedInUser()?.role.isRegistrationOfficerRole()
@@ -641,22 +636,13 @@ class BenListAdapter(
 //                Pair(filled, 4)
 //            }
 
-            // `isRegistrar`/`isNurse`/`isCounsellingOfficer` are kept as names (now backed by
-            // roleManager.assignedRoles — ALL assigned roles, not just the active tab) because
-            // they're also reused further below for relevantUnsynced/relevantSyncing — not just
-            // for the denominator here. Union-based: these are permission/behavior decisions,
-            // not Home-card display, so a Registrar+Nurse user keeps both roles' concerns
-            // regardless of which bottom-nav tab is active.
+            // Reused below for relevantUnsynced/relevantSyncing too, not just the denominator.
             val assignedRoles = roleManager?.assignedRoles.orEmpty()
             val isRegistrar = AppRole.REGISTRAR in assignedRoles
             val isNurse = AppRole.NURSE in assignedRoles
             val isCounsellingOfficer = AppRole.COUNSELING in assignedRoles
-            // Workflow-scoped, not purely role-scoped: examinePrivilegesFor() overrides this to
-            // Counselling's own COUNSELLING_DYNAMIC rule when showContactTracingForms is true
-            // (the TPT-module card), regardless of which other roles are also assigned — so a
-            // Registrar+Nurse+Counsellor user's TPT card denominates against the 4 TPT-relevant
-            // forms, while their All-Beneficiaries card denominates against all 4 general forms
-            // (via the plain role union) rather than collapsing to Counsellor's dynamic rule.
+            // examinePrivilegesFor() switches to Counselling's own denominator rule when this is
+            // the TPT-module card (showContactTracingForms), regardless of other assigned roles.
             val examineDenominatorRule = roleManager?.examinePrivilegesFor(showContactTracingForms)?.examineDenominatorRule
                 ?: ExamineDenominatorRule.GENERIC_FOUR
             val (examineFilledCount, examineTotal) = when (examineDenominatorRule) {
@@ -693,8 +679,7 @@ class BenListAdapter(
                     Pair(filled, 4)
                 }
             }
-            // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-            Timber.d("RoleManager verify: BenListAdapter examine assignedRoles=$assignedRoles, denominatorRule=$examineDenominatorRule, filled=$examineFilledCount/$examineTotal")
+            Timber.d("RoleManager: denominatorRule=$examineDenominatorRule, filled=$examineFilledCount/$examineTotal")
 
             binding.btnExamine.text = "Examine ($examineFilledCount/$examineTotal)"
             val isExamineFilled = examineFilledCount > 0
@@ -718,8 +703,7 @@ class BenListAdapter(
                 roleManager?.privilegesForActiveRole()?.showRegisterSpouseButtons == true &&
                 !showContactTracingForms &&
                 source !in 5..8
-            // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-            Timber.d("RoleManager verify: BenListAdapter spouseButtons assignedRoles=$assignedRoles, activeRole=${roleManager?.activeRole?.value}, showRegisterSpouseButtons=$showRegisterSpouseButtons")
+            Timber.d("RoleManager: showRegisterSpouseButtons=$showRegisterSpouseButtons")
             when {
 //                !isNurseRole && !isCounsellingOfficer && !item.isNonHH && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
 //                        && !item.isDeath && !item.isDeactivate -> {
@@ -923,12 +907,9 @@ class BenListAdapter(
     }
 
     fun submitTBDiagnostics(list: List<TBDiagnosticsCache>) {
-        // Selective diff, same pattern as applyIdList() below — a blanket notifyDataSetChanged()
-        // here forces every visible row to rebind (including tearing down and reattaching every
-        // DataBinding android:onClick listener) on every emission of this Flow, which can fire
-        // on any write to the diagnostics table, not just ones affecting an on-screen row. A tap
-        // whose down/up straddles that rebind gets silently cancelled by RecyclerView, which was
-        // the root cause of beneficiary cards/ABHA/Examine needing multiple taps to register.
+        // Diff instead of notifyDataSetChanged() — a blanket refresh here rebinds every visible
+        // row (including its click listeners) on every emission, which was the root cause of
+        // cards needing multiple taps to register.
         val oldByBenId = tbDiagnosticsList.associateBy { it.benId }
         val newByBenId = list.associateBy { it.benId }
         tbDiagnosticsList.clear()

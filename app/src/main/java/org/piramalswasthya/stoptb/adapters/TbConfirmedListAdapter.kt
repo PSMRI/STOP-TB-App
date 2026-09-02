@@ -13,8 +13,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.RvItemTbConfirmedListBinding
 import org.piramalswasthya.stoptb.helpers.getDateFromLong
 import org.piramalswasthya.stoptb.helpers.getPatientTypeByAge
-// Still needed: the legacy String-based checkIfCounsellingOfficerOrNot() overload below
-// (uncalled at runtime, but still compiled) references isCounsellingOfficerRole().
+// Used by the legacy checkIfCounsellingOfficerOrNot() overload below — don't remove as "unused".
 import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.Gender
@@ -86,14 +85,10 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
                     sectionsFilled == 0
             // Provides a single source of truth for determining whether a row should show “Counselled.”
             val isCounselledFinal = !isRefused && (isCounselledByProgress || item.isCounselled || isBenAlreadyCounselled)
-            // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole() below,
-            // left commented in place for reference (not deleted, per project convention).
+            // Legacy, kept for reference:
 //            val role = pref?.getLoggedInUser()?.role
-            // Union across ALL assigned roles, not just the active tab — a permission, not
-            // Home-card display.
             val showCounsellingUi = roleManager?.privilegesUnion()?.showTbConfirmedCounsellingUi == true
-            // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-            Timber.d("RoleManager verify: TbConfirmedListAdapter assignedRoles=${roleManager?.assignedRoles}, showTbConfirmedCounsellingUi=$showCounsellingUi")
+            Timber.d("RoleManager: showTbConfirmedCounsellingUi=$showCounsellingUi")
 
             binding.ivSyncState.visibility = if (item.tbConfirmedList == null) View.INVISIBLE else View.VISIBLE
 
@@ -124,10 +119,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             }
 
 
-            // Legacy null-role fallback (hid the 3 buttons below when no logged-in user's role
-            // string was available) — superseded by roleManager, which never resolves to null
-            // (always at least VOLUNTEER), so this branch is unreachable under the new model.
-            // Left commented in place for reference (not deleted, per project convention).
+            // Legacy, kept for reference:
 //            if (role != null) {
 //                checkIfCounsellingOfficerOrNot(role, (isRefused || isCounselledFinal))
 //            } else {
@@ -232,8 +224,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             binding.head.visibility = if (isHeadOfFamily) View.VISIBLE else View.GONE
         }
 
-        // Legacy single-role-string version — no longer called (superseded by the
-        // roleManager-driven overload below), left in place for reference, not deleted.
+        // Legacy, unused — kept for reference:
         private fun checkIfCounsellingOfficerOrNot(
             role: String,
             isCounselled: Boolean

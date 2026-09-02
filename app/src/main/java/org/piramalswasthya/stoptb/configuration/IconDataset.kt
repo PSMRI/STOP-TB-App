@@ -26,15 +26,12 @@ class IconDataset @Inject constructor(
         MALARIA, KALA_AZAR, AES_JE, FILARIA, LEPROSY, DEWARMING
     }
     /**
-     * Single-role users keep seeing today's existing/legacy card set unchanged
-     * ([getSingleRoleIconDataset]). Multi-role users get a narrower, role-exclusive card
-     * set per the active bottom-nav tab ([getMultiRoleIconDataset]) — the two are
-     * deliberately different (product decision), not two views of the same data.
+     * Single-role users see the original card set ([getSingleRoleIconDataset]). Multi-role
+     * users see a narrower, role-exclusive set per active tab ([getMultiRoleIconDataset]) —
+     * these are deliberately different card sets, not two views of the same data.
      */
     fun getVolunteerIconDataset(resources: Resources): List<Icon> {
         val isMultiRole = roleManager.assignedRoles.size > 1
-        // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-        timber.log.Timber.d("RoleManager verify: getVolunteerIconDataset assignedRoles=${roleManager.assignedRoles}, activeRole=${roleManager.activeRole.value}, isMultiRole=$isMultiRole")
         return if (isMultiRole) {
             getMultiRoleIconDataset(resources)
         } else {
@@ -43,8 +40,7 @@ class IconDataset @Inject constructor(
     }
 
     private fun getSingleRoleIconDataset(resources: Resources): List<Icon> {
-        // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole().homeModules
-        // below, left commented in place for reference (not deleted, per project convention).
+        // Legacy, kept for reference:
 //        val role = preferenceDao.getLoggedInUser()?.role
         val homeModules = roleManager.privilegesForActiveRole().homeModules
         val iconList = mutableListOf(
@@ -112,12 +108,8 @@ class IconDataset @Inject constructor(
             }
         }*/
 
-        // The 4 blocks below came in from a separately-developed feature branch
-        // (feat/separate-counselling-contact-tracing-tb-treatment-tpt-modules) that predated
-        // the RoleManager migration — they originally read `role.isCounsellingOfficerRole()`,
-        // which no longer compiles since `role` was commented out earlier in this function.
-        // Fixed to use the active role directly (single-role path: activeRole IS the user's
-        // one role, so this is equivalent to "is this single-role user a Counsellor").
+        // Single-role path: activeRole IS the user's one role, so this is just "is this user
+        // a Counsellor."
         val isCounsellingActive = roleManager.activeRole.value == AppRole.COUNSELING
         if (isCounsellingActive) {
             iconList.add(
@@ -180,12 +172,8 @@ class IconDataset @Inject constructor(
     }
 
     /**
-     * Multi-role bottom-nav tab card sets — exclusive per role, per the product spec:
-     * Registration = Household/Beneficiaries/Non-Household; Treatment = Referral/Tuberculosis;
-     * Counselling = the 4 counselling-family modules, plus Referral/Tuberculosis too UNLESS
-     * Nurse is also assigned (Nurse's own tab already covers those two — see
-     * RoleManager.multiRoleHomeModulesFor()'s doc for why this needs cross-role awareness that
-     * a plain per-role lookup can't provide).
+     * Multi-role bottom-nav tab card sets — each tab's own exclusive set (see
+     * RoleManager.multiRoleHomeModulesFor() for the Counselling-tab dedup rule).
      */
     private fun getMultiRoleIconDataset(resources: Resources): List<Icon> {
         val modules = roleManager.multiRoleHomeModulesFor(roleManager.activeRole.value)
@@ -246,11 +234,6 @@ class IconDataset @Inject constructor(
                 )
             )
         }
-        // Real destinations (previously "Coming soon" placeholders) — landed via the
-        // separately-developed feat/separate-counselling-contact-tracing-tb-treatment-tpt-modules
-        // branch, same drawables/strings/navigation reused here as in getSingleRoleIconDataset()
-        // above, so the card looks identical whether reached via the single-role legacy path
-        // or a multi-role Counselling tab.
         if (AppModule.COUNSELLING in modules) {
             iconList.add(
                 Icon(

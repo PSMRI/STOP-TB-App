@@ -99,12 +99,10 @@ class AllHouseholdFragment : Fragment() {
         // val isNurse = prefDao.getLoggedInUser()?.role.isNurseRole()
         // val isCounsellorOfficer = role.isCounsellingOfficerRole()
 
-        // Gap 2: "Add household" is a create action — only visible with FULL household
-        // permission (Registrar). Nurse/Counsellor are View-only per the acceptance criteria.
         val privilege = roleManager.privilegesUnion()
         val canAddHousehold = privilege.householdPermission == Permission.FULL
         val canAddBeneficiary = privilege.beneficiaryPermission == Permission.FULL
-        Timber.d("RoleManager verify: AllHouseholdFragment assignedRoles=${roleManager.assignedRoles}, householdPermission=${privilege.householdPermission}, beneficiaryPermission=${privilege.beneficiaryPermission}")
+        Timber.d("RoleManager: householdPermission=${privilege.householdPermission}, beneficiaryPermission=${privilege.beneficiaryPermission}")
 
         binding.btnNextPage.text = getString(R.string.btn_text_frag_home_nhhr)
         binding.btnNextPage.visibility = if (canAddHousehold) View.VISIBLE else View.GONE

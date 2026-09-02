@@ -206,9 +206,7 @@ class NewHouseholdFragment : Fragment() {
                 if (recordExists) getString(R.string.view_household_information)
                 else getString(R.string.frag_nhhr_title)
             )
-            // Gap 2: the Edit FAB is the sole path from view-mode back into an editable form —
-            // hide it whenever the union of assigned roles only grants VIEW (not FULL) on
-            // Household, so a Nurse/Counsellor viewing an existing household stays locked.
+            // Edit FAB is the only way back into edit mode — hide it below full permission.
             val canEditHousehold = roleManager.privilegesUnion().householdPermission == Permission.FULL
             binding.fabEdit.visibility = if (recordExists && canEditHousehold) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (!recordExists) View.VISIBLE else View.GONE

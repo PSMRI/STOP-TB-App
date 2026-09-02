@@ -87,17 +87,13 @@ class VolunteerHomeFragment : Fragment() {
     }
 
     private fun setupNurseQuickRefresh() {
-        // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole() below,
-        // left commented in place for reference (not deleted, per project convention).
+        // Legacy, kept for reference:
 //        val role = pref.getLoggedInUser()?.role
 //        val canUseQuickRefresh = role.isNurseRole() ||
 //                role.isRegistrationOfficerRole() ||
 //                role.isCounsellingOfficerRole()
-        // Union across ALL assigned roles, not just the active tab — a permission, not
-        // Home-card display.
         val canUseQuickRefresh = roleManager.privilegesUnion().allowQuickRefresh
-        // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-        Timber.d("RoleManager verify: VolunteerHomeFragment assignedRoles=${roleManager.assignedRoles}, allowQuickRefresh=$canUseQuickRefresh")
+        Timber.d("RoleManager: allowQuickRefresh=$canUseQuickRefresh")
         if (!canUseQuickRefresh) {
             binding.llQuickRefresh.visibility = View.GONE
             return

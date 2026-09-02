@@ -9,10 +9,8 @@ import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.model.SyncRowFilter
 
 /**
- * Single source of truth for role -> module/privilege mapping. Values are a direct
- * codification of the legacy per-screen role-string behavior (RoleConstants/RoleUtils
- * call sites) — see the truth table in the multi-role-user-access plan doc. Adding a
- * future role means adding one enum entry to [AppRole] plus one entry in this map.
+ * Single source of truth for role -> module/privilege mapping. Adding a role means adding
+ * one enum entry to [AppRole] plus one entry in this map — nothing else.
  */
 object RoleModuleConfig {
 
@@ -34,8 +32,7 @@ object RoleModuleConfig {
             showCallButton = true,
             showExamineButtonDefault = true,
             allowQuickRefresh = true,
-            // Registrar (acceptance criteria item 1): full CRUD on Household/Beneficiaries/
-            // Non-Household/Anthropometry/TB Screening.
+            // Registrar: full CRUD everywhere it has access.
             householdPermission = Permission.FULL,
             beneficiaryPermission = Permission.FULL,
             nonHouseholdPermission = Permission.FULL,
@@ -62,10 +59,8 @@ object RoleModuleConfig {
             showCallButton = true,
             showExamineButtonDefault = true,
             allowQuickRefresh = true,
-            // Nurse (acceptance criteria item 2): View-only on Household/Beneficiaries/
-            // Non-Household; full CRUD on Anthropometry/TB Screening (General Exam/OPD have no
-            // dedicated field — see the ModulePrivilege doc, they're always FULL when Nurse's
-            // presence makes them reachable at all).
+            // Nurse: View-only on Household/Beneficiaries/Non-Household, full CRUD on
+            // Anthropometry/TB Screening (General Exam/OPD have no field — see ModulePrivilege).
             householdPermission = Permission.VIEW,
             beneficiaryPermission = Permission.VIEW,
             nonHouseholdPermission = Permission.VIEW,
@@ -77,11 +72,9 @@ object RoleModuleConfig {
                 AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.NON_HOUSEHOLD,
                 AppModule.TUBERCULOSIS, AppModule.REFERRAL
             ),
-            // Includes REFERRAL/TUBERCULOSIS alongside the 4 counselling-family modules: the
-            // acceptance criteria's solo-Counsellor list (item 3) grants Referral CRUD + TB
-            // section View in addition to the counselling modules, and the Registrar+Counsellor
-            // union example (item 2) expects both reachable — they can only come from this tab,
-            // since Registrar's own set has neither.
+            // Includes Referral/Tuberculosis alongside the 4 counselling modules — needed so a
+            // Registrar+Counsellor account (no Nurse tab) can still reach them. RoleManager
+            // removes them again if Nurse is also assigned — see multiRoleHomeModulesFor().
             multiRoleHomeModules = setOf(
                 AppModule.COUNSELLING, AppModule.CONTACT_TRACING,
                 AppModule.TB_TREATMENT_FOLLOWUP, AppModule.TPT,
@@ -99,34 +92,22 @@ object RoleModuleConfig {
             showTbConfirmedCounsellingUi = true,
             showAbhaButton = true,
             showCallButton = false,
-            // Was false (legacy-preserved from the pre-Gap-2 app, where the only safe way to
-            // give Counsellor any visibility into Anthropometry/TB Screening was the special
-            // fromContactTracing=true path from TB Confirmed). Now that Gap 2 properly enforces
-            // View-only access inside the Examine sheet itself (examineRowSet restricts rows to
-            // Anthropometry/TB Screening; formPermissionFor() locks the submit buttons), hiding
-            // the button entirely on the plain Household Members / All Beneficiaries browsing
-            // path denied Counsellor their legitimate View access from anywhere except that one
-            // TB-Confirmed-linked route. HouseholdMembersFragment.kt is the only consumer of
-            // this field — verified before flipping it.
+            // Examine sheet's own row/permission checks already restrict Counsellor correctly,
+            // so the button itself doesn't need to be hidden by default too.
             showExamineButtonDefault = true,
             allowQuickRefresh = true,
-            // Counsellor (acceptance criteria item 3): View-only on Household/Beneficiaries/
-            // Non-Household/Anthropometry/TB Screening. Full CRUD on the 4 counselling-family
-            // modules is enforced separately (those screens aren't gated by this Permission
-            // model — see the Counselling-module recon note).
+            // Counsellor: View-only on Household/Beneficiaries/Non-Household/Anthropometry/TB
+            // Screening. Full CRUD on the counselling modules is enforced elsewhere, not by
+            // this Permission model — see the Counselling-module note in the docs.
             householdPermission = Permission.VIEW,
             beneficiaryPermission = Permission.VIEW,
             nonHouseholdPermission = Permission.VIEW,
             anthropometryPermission = Permission.VIEW,
             tbScreeningPermission = Permission.VIEW
         ),
-        // AppRole.VOLUNTEER can no longer be assigned to a real logged-in user —
-        // AppRole.resolveAssignedRoles() has no legacy-role fallback anymore, so a user whose
-        // previlegeObj doesn't map to REGISTRAR/NURSE/COUNSELING is denied login outright
-        // rather than resolving to VOLUNTEER. This entry only exists as a defensive
-        // placeholder: RoleManager's activeRole StateFlow needs a non-null initial value
-        // before initializeFromLoggedInUser() runs, and RoleModuleConfig.privilegeFor()
-        // falls back to it if a role were ever missing from this map.
+        // VOLUNTEER can't be assigned to a real user (login is denied instead) — this entry is
+        // a defensive placeholder only, for RoleManager's initial state and privilegeFor()'s
+        // fallback if a role is ever missing from this map.
         AppRole.VOLUNTEER to ModulePrivilege(
             homeModules = setOf(AppModule.HOUSEHOLD, AppModule.BENEFICIARIES),
             multiRoleHomeModules = setOf(AppModule.HOUSEHOLD, AppModule.BENEFICIARIES),
@@ -144,9 +125,7 @@ object RoleModuleConfig {
             showCallButton = true,
             showExamineButtonDefault = true,
             allowQuickRefresh = false,
-            // Unreachable via real login (see comment above) — kept maximally permissive to
-            // match the old fallback's observed behavior (showExamineButtonDefault=true,
-            // examineRowSet=ALL_FOUR) rather than introducing a new restriction nobody asked for.
+            // Unreachable via real login — kept maximally permissive, matching old behavior.
             householdPermission = Permission.FULL,
             beneficiaryPermission = Permission.FULL,
             nonHouseholdPermission = Permission.FULL,

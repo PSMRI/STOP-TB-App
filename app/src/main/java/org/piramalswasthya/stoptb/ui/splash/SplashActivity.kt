@@ -50,8 +50,7 @@ class SplashActivity : AppCompatActivity() {
         )
         val pref = entryPoint.preferenceDao
         val loggedInUser = pref.getLoggedInUser()
-        // Legacy single-role gate — superseded by roleManager.hasAnyValidRole() below,
-        // left commented in place for reference (not deleted, per project convention).
+        // Legacy, kept for reference:
 //        val destination = if (
 //            loggedInUser != null && RoleConstants.isAllowedStopTbRole(loggedInUser.role)
 //        ) {

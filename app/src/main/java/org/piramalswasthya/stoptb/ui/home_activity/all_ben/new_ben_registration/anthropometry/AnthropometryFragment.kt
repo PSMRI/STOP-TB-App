@@ -55,9 +55,7 @@ class AnthropometryFragment : Fragment() {
     private var isUpdatingTemperatureSelection = false
     private val openedFromHousehold: Boolean
         get() = arguments?.getBoolean("openedFromHousehold", false) == true
-    // Gap 2: role-permission veto computed by ExamineBottomSheetFragment.navigateToForm() and
-    // forwarded through the ExamineCallback chain — true whenever the active union of roles
-    // only grants VIEW (not FULL) on Anthropometry, regardless of whether the record is filled.
+    // Role-permission veto, computed by ExamineBottomSheetFragment.navigateToForm().
     private val viewOnly: Boolean
         get() = arguments?.getBoolean("viewOnly", false) == true
 
@@ -77,9 +75,8 @@ class AnthropometryFragment : Fragment() {
         binding.etHeight.filters = arrayOf(decimalInputFilter())
         binding.etTemperature.filters = arrayOf(decimalInputFilter())
 
-        // Gap 2: lock immediately for a VIEW-only role, even on a brand-new/unfilled record —
-        // lockFormIfExistingData() below only fires once existing data loads, which would leave
-        // a not-yet-filled record fully editable for a VIEW-only user otherwise.
+        // Lock immediately for View-only — lockFormIfExistingData() below only fires once
+        // existing data loads, which would leave a brand-new record editable otherwise.
         if (viewOnly) lockForm()
 
         viewModel.benName.observe(viewLifecycleOwner) {

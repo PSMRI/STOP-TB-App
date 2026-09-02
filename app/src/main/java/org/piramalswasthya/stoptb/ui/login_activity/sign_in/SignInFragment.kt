@@ -334,8 +334,7 @@ class SignInFragment : Fragment() {
 
                     val user = state.data  // ya loggedInUser use karo
 
-                    // Legacy single-role gate — superseded by roleManager.hasAnyValidRole() below,
-                    // left commented in place for reference (not deleted, per project convention).
+                    // Legacy, kept for reference:
 //                    if (RoleConstants.isAllowedStopTbRole(user?.role)) {
                     if (roleManager.hasAnyValidRole()) {
 //                        showLoginRoleToast(user)

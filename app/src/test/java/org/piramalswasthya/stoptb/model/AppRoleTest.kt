@@ -20,11 +20,6 @@ class AppRoleTest {
         assertThat(AppRole.fromScreenName("")).isNull()
     }
 
-    // isRecognizedLegacyRoleString tests removed: the function itself is commented out in
-    // AppRole.kt (product decision — no more legacy-role-string fallback), so it's no longer
-    // callable. Left out rather than commented, since a commented-out test asserting on
-    // commented-out production code would just be dead weight either way.
-
     @Test
     fun `resolveAssignedRoles prioritizes screenNames, dedupes, sorts in canonical order`() {
         val roles = AppRole.resolveAssignedRoles(
@@ -53,9 +48,6 @@ class AppRoleTest {
 
     @Test
     fun `resolveAssignedRoles returns empty when no screenNames resolve - no legacy fallback anymore`() {
-        // Previously this would have fallen back to VOLUNTEER for an allowed legacy role
-        // string like "Volunteer" or "Registrar" — that fallback was removed by product
-        // decision. Now ANY account with no mapped screenName is denied, full stop.
         assertThat(AppRole.resolveAssignedRoles(screenNames = emptyList())).isEmpty()
         assertThat(AppRole.resolveAssignedRoles(screenNames = listOf("Volunteer"))).isEmpty()
         assertThat(AppRole.resolveAssignedRoles(screenNames = listOf("Asha"))).isEmpty()
