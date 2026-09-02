@@ -108,9 +108,11 @@ class SyncDashboardViewModel @Inject constructor(
 //        return preferenceDao.getLoggedInUser()?.role.isCounsellingOfficerRole()
 //    }
     fun isCounsellingOfficerRole(): Boolean {
-        val result = roleManager.privilegesForActiveRole().syncShowCounsellingStatusRow
+        // Union across ALL assigned roles, not just the active tab — a permission, not
+        // Home-card display.
+        val result = roleManager.privilegesUnion().syncShowCounsellingStatusRow
         // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-        Timber.d("RoleManager verify: SyncDashboardViewModel activeRole=${roleManager.activeRole.value}, syncShowCounsellingStatusRow=$result")
+        Timber.d("RoleManager verify: SyncDashboardViewModel assignedRoles=${roleManager.assignedRoles}, syncShowCounsellingStatusRow=$result")
         return result
     }
 

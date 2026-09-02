@@ -26,11 +26,21 @@ class AppRoleTest {
     // commented-out production code would just be dead weight either way.
 
     @Test
-    fun `resolveAssignedRoles prioritizes screenNames, dedupes, preserves order`() {
+    fun `resolveAssignedRoles prioritizes screenNames, dedupes, sorts in canonical order`() {
         val roles = AppRole.resolveAssignedRoles(
             screenNames = listOf("Nurse", "Registrar", "Nurse")
         )
-        assertThat(roles).containsExactly(AppRole.NURSE, AppRole.REGISTRAR).inOrder()
+        assertThat(roles).containsExactly(AppRole.REGISTRAR, AppRole.NURSE).inOrder()
+
+        val allRoles = AppRole.resolveAssignedRoles(
+            screenNames = listOf("Counseling", "Nurse", "Registrar")
+        )
+        assertThat(allRoles).containsExactly(AppRole.REGISTRAR, AppRole.NURSE, AppRole.COUNSELING).inOrder()
+
+        val nurseCounseling = AppRole.resolveAssignedRoles(
+            screenNames = listOf("Counseling", "Nurse")
+        )
+        assertThat(nurseCounseling).containsExactly(AppRole.NURSE, AppRole.COUNSELING).inOrder()
     }
 
     @Test

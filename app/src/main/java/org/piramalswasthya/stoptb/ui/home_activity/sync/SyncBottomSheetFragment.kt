@@ -61,9 +61,11 @@ class SyncBottomSheetFragment : BottomSheetDialogFragment() {
         // left commented in place for reference (not deleted, per project convention).
 //        val isRegistrar = prefDao.getLoggedInUser()?.role.isRegistrationOfficerRole()
 //        val isCounsellingOfficer = prefDao.getLoggedInUser()?.role.isCounsellingOfficerRole()
-        val rowFilter = roleManager.privilegesForActiveRole().syncBottomSheetRowFilter
+        // Union across ALL assigned roles, not just the active tab — sync-row visibility is
+        // a permission, not Home-card display, so it must not reset when switching tabs.
+        val rowFilter = roleManager.privilegesUnion().syncBottomSheetRowFilter
         // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-        Timber.d("RoleManager verify: SyncBottomSheetFragment activeRole=${roleManager.activeRole.value}, rowFilter=$rowFilter")
+        Timber.d("RoleManager verify: SyncBottomSheetFragment assignedRoles=${roleManager.assignedRoles}, rowFilter=$rowFilter")
 
         lifecycleScope.launch {
             viewModel.syncStatus.collect {
@@ -102,6 +104,10 @@ class SyncBottomSheetFragment : BottomSheetDialogFragment() {
                     }
                     SyncRowFilter.ALL_EXCEPT_COUNSELLING -> {
                         list = list.filter { item -> item.name != "Counselling" }
+                    }
+                    SyncRowFilter.SHOW_ALL -> {
+                        // Multiple roles disagree on which rows to show (e.g. Registrar's
+                        // whitelist vs Counselling's whitelist) — union means show everything.
                     }
                 }
                 binding.nsv.layoutParams.height = if (list.size * 150 < 800) list.size * 150 else 800

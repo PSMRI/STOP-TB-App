@@ -93,9 +93,27 @@ class BenPagingAdapter(
     }
 
     fun submitTBDiagnostics(list: List<TBDiagnosticsCache>) {
+        // Selective diff, same pattern as the other submit*() functions below — a blanket
+        // notifyDataSetChanged() here forces every visible row to rebind (including tearing
+        // down and reattaching every DataBinding android:onClick listener) on every emission of
+        // this Flow, which can fire on any write to the diagnostics table, not just ones
+        // affecting an on-screen row. A tap whose down/up straddles that rebind gets silently
+        // cancelled by RecyclerView, which was the root cause of beneficiary cards/ABHA/Examine
+        // needing multiple taps to register.
+        val oldByBenId = tbDiagnosticsList.associateBy { it.benId }
+        val newByBenId = list.associateBy { it.benId }
         tbDiagnosticsList.clear()
         tbDiagnosticsList.addAll(list)
-        notifyDataSetChanged()
+        val changedBenIds = (oldByBenId.keys + newByBenId.keys)
+            .filterTo(mutableSetOf()) { benId -> oldByBenId[benId] != newByBenId[benId] }
+        if (changedBenIds.isNotEmpty()) {
+            val items = snapshot()
+            items.forEachIndexed { index, item ->
+                if (item != null && item.benId in changedBenIds) {
+                    notifyItemChanged(index)
+                }
+            }
+        }
     }
 
     fun submitBenIds(list: List<Long>) {

@@ -151,9 +151,11 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 //        val allowLegacyAccess = !isKnownRestrictedRole
         val isReadOnlyReferralList = args.source in READ_ONLY_REFERRAL_SOURCES
         val showResultButton = args.source == 6 || args.source == 7 || args.source == 8
-        val privilege = roleManager.privilegesForActiveRole()
+        // Union across ALL assigned roles, not just the active tab — a permission, not
+        // Home-card display.
+        val privilege = roleManager.privilegesUnion()
         // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-        Timber.d("RoleManager verify: AllBenFragment activeRole=${roleManager.activeRole.value}, showAbhaButton=${privilege.showAbhaButton}, showCallButton=${privilege.showCallButton}")
+        Timber.d("RoleManager verify: AllBenFragment assignedRoles=${roleManager.assignedRoles}, showAbhaButton=${privilege.showAbhaButton}, showCallButton=${privilege.showCallButton}")
         // showAnthropometryButton/showBenActionButtons removed entirely: confirmed dead code —
         // the adapter always receives showAnthropometryButton = false (line ~424) regardless of
         // role, and showBenActionButtons was never referenced anywhere else in this file.
@@ -252,10 +254,12 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     if (isReadOnlyReferralList) return@BenClickListener
                     viewLifecycleOwner.lifecycleScope.launch {
                         val benRegId = viewModel.getBenFromId(benId)
-                        // was: autoFlow = isNurse (legacy role-string check)
-                        val vitalAutoFlow = roleManager.activeRole.value == AppRole.NURSE
+                        // was: autoFlow = isNurse (legacy role-string check). Union-based
+                        // (assignedRoles, not activeRole) — this is a permission decision, not
+                        // Home-card display, so it must hold regardless of which tab is active.
+                        val vitalAutoFlow = AppRole.NURSE in roleManager.assignedRoles
                         // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-                        Timber.d("RoleManager verify: AllBenFragment->VitalScreenFragment activeRole=${roleManager.activeRole.value}, autoFlow=$vitalAutoFlow")
+                        Timber.d("RoleManager verify: AllBenFragment->VitalScreenFragment assignedRoles=${roleManager.assignedRoles}, autoFlow=$vitalAutoFlow")
                         findNavController().navigate(
                             AllBenFragmentDirections.actionAllBenFragmentToVitalScreenFragment(
                                 benId = benId,
@@ -654,12 +658,6 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             }
         }
 
-        lifecycleScope.launch {
-            while (viewLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
-                benAdapter.notifyDataSetChanged()
-                kotlinx.coroutines.delay(1000L)
-            }
-        }
     }
 
     private fun checkAndGenerateABHA(benId: Long) {
@@ -701,7 +699,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     bundleOf(
                         "benId" to benId,
                         "autoFlow" to false,
-                        "examineFlow" to !viewOnly
+                        "examineFlow" to !viewOnly,
+                        "viewOnly" to viewOnly
                     )
                 )
             }
@@ -722,7 +721,12 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     R.id.TBScreeningFormFragment,
                     bundleOf(
                         "benId" to benId,
-                        "autoFlow" to !viewOnly
+                        "autoFlow" to !viewOnly,
+                        // Gap 2 fix: TBScreeningFormFragment already supports a real viewOnly
+                        // lock (see its own Fragment/ViewModel) but this call site was never
+                        // passing it — the sheet only forwarded autoFlow, silently dropping the
+                        // Gap-2 role-permission veto for this one form.
+                        "viewOnly" to viewOnly
                     )
                 )
             }

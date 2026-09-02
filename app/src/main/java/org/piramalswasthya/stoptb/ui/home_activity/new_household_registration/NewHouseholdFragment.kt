@@ -37,7 +37,9 @@ import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentNewHouseholdBinding
 import org.piramalswasthya.stoptb.helpers.Konstants
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.LocationState
+import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.home_activity.new_household_registration.NewHouseholdViewModel.State
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import timber.log.Timber
@@ -48,6 +50,9 @@ class NewHouseholdFragment : Fragment() {
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private var _binding: FragmentNewHouseholdBinding? = null
     private val binding get() = _binding!!
@@ -201,7 +206,11 @@ class NewHouseholdFragment : Fragment() {
                 if (recordExists) getString(R.string.view_household_information)
                 else getString(R.string.frag_nhhr_title)
             )
-            binding.fabEdit.visibility = if (recordExists) View.VISIBLE else View.GONE
+            // Gap 2: the Edit FAB is the sole path from view-mode back into an editable form —
+            // hide it whenever the union of assigned roles only grants VIEW (not FULL) on
+            // Household, so a Nurse/Counsellor viewing an existing household stays locked.
+            val canEditHousehold = roleManager.privilegesUnion().householdPermission == Permission.FULL
+            binding.fabEdit.visibility = if (recordExists && canEditHousehold) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (!recordExists) View.VISIBLE else View.GONE
             binding.btnCancel.visibility = if (!recordExists) View.VISIBLE else View.GONE
             binding.btnRefreshLocation.isEnabled = !recordExists

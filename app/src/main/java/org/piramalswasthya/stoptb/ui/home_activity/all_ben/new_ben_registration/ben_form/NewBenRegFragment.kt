@@ -46,8 +46,10 @@ import org.piramalswasthya.stoptb.databinding.AlertConsentBinding
 import org.piramalswasthya.stoptb.databinding.FragmentNewBenRegBinding
 import org.piramalswasthya.stoptb.databinding.LayoutViewMediaBinding
 import org.piramalswasthya.stoptb.helpers.Konstants
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.model.LocationState
+import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel.State
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.work.WorkerUtils
@@ -59,6 +61,9 @@ class NewBenRegFragment : Fragment() {
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private var _binding: FragmentNewBenRegBinding? = null
     private val binding get() = _binding!!
@@ -199,7 +204,11 @@ class NewBenRegFragment : Fragment() {
         // Death badge visibility
         viewModel.isDeath.observe(viewLifecycleOwner) { isDeath ->
             val recordExists = viewModel.recordExists.value ?: false
-            binding.fabEdit.visibility = if (isDeath || !recordExists) View.GONE else View.VISIBLE
+            // Gap 2: this observer fires independently of (and can run after) the recordExists
+            // observer below, so it needs the same role-permission gate — otherwise it silently
+            // re-shows the Edit FAB for a VIEW-only Nurse/Counsellor once isDeath loads.
+            binding.fabEdit.visibility =
+                if (isDeath || !recordExists || !canEditRecord()) View.GONE else View.VISIBLE
         }
 
         // Set up adapter
@@ -249,7 +258,11 @@ class NewBenRegFragment : Fragment() {
 
         // Record exists observer
         viewModel.recordExists.observe(viewLifecycleOwner) { recordExists ->
-            binding.fabEdit.visibility = if (recordExists) View.VISIBLE else View.GONE
+            // Gap 2: the Edit FAB is the sole path from view-mode back into an editable form —
+            // hide it whenever the union of assigned roles only grants VIEW (not FULL) on
+            // whichever module this form represents (Beneficiary vs Non-Household, selected by
+            // the isNonHH nav arg), so a Nurse/Counsellor viewing an existing record stays locked.
+            binding.fabEdit.visibility = if (recordExists && canEditRecord()) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (recordExists) View.GONE else View.VISIBLE
             binding.btnLinkHousehold.visibility = if (!recordExists && viewModel.showLinkHouseholdButton) View.VISIBLE else View.GONE
             adapter.isEnabled = !recordExists
@@ -302,6 +315,19 @@ class NewBenRegFragment : Fragment() {
             binding.btnSubmit.visibility = View.VISIBLE
             adapter.isEnabled = true
             adapter.notifyDataSetChanged()
+        }
+    }
+
+    // Gap 2: single source of truth for "can this role edit this record" — selects
+    // nonHouseholdPermission vs beneficiaryPermission per the isNonHH nav arg. Both fabEdit
+    // visibility observers must use this (not recompute it separately), since isDeath and
+    // recordExists are independent LiveData that can fire in either order.
+    private fun canEditRecord(): Boolean {
+        val union = roleManager.privilegesUnion()
+        return if (viewModel.isNonHHArg) {
+            union.nonHouseholdPermission == Permission.FULL
+        } else {
+            union.beneficiaryPermission == Permission.FULL
         }
     }
 

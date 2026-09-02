@@ -93,9 +93,11 @@ class VolunteerHomeFragment : Fragment() {
 //        val canUseQuickRefresh = role.isNurseRole() ||
 //                role.isRegistrationOfficerRole() ||
 //                role.isCounsellingOfficerRole()
-        val canUseQuickRefresh = roleManager.privilegesForActiveRole().allowQuickRefresh
+        // Union across ALL assigned roles, not just the active tab — a permission, not
+        // Home-card display.
+        val canUseQuickRefresh = roleManager.privilegesUnion().allowQuickRefresh
         // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-        Timber.d("RoleManager verify: VolunteerHomeFragment activeRole=${roleManager.activeRole.value}, allowQuickRefresh=$canUseQuickRefresh")
+        Timber.d("RoleManager verify: VolunteerHomeFragment assignedRoles=${roleManager.assignedRoles}, allowQuickRefresh=$canUseQuickRefresh")
         if (!canUseQuickRefresh) {
             binding.llQuickRefresh.visibility = View.GONE
             return

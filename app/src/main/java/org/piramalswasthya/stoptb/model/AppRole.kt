@@ -50,9 +50,13 @@ enum class AppRole {
          * previlegeObj-derived screenNames are the ONLY source of truth for role resolution.
          * An account whose screenNames don't map to any known AppRole has no usable role —
          * there is no legacy-role-string fallback to VOLUNTEER anymore (product decision).
+         * Roles are ordered canonically (REGISTRAR, NURSE, COUNSELING, VOLUNTEER) so that
+         * multi-role accounts always default to the 0th index tab on launch.
          */
         fun resolveAssignedRoles(screenNames: List<String>): List<AppRole> {
-            return screenNames.mapNotNull { fromScreenName(it) }.distinct()
+            val resolved = screenNames.mapNotNull { fromScreenName(it) }.toSet()
+            val canonicalOrder = listOf(REGISTRAR, NURSE, COUNSELING, VOLUNTEER)
+            return canonicalOrder.filter { it in resolved }
         }
     }
 }

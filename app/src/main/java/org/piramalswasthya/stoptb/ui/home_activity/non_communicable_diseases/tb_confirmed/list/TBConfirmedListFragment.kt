@@ -25,6 +25,7 @@ import org.piramalswasthya.stoptb.ui.counselling_activity.CounsellingActivity
 import org.piramalswasthya.stoptb.ui.counselling_activity.CounsellingViewModel
 import org.piramalswasthya.stoptb.model.BenWithTbSuspectedDomain
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
+import org.piramalswasthya.stoptb.model.AppRole
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import javax.inject.Inject
@@ -96,11 +97,14 @@ class TBConfirmedListFragment : Fragment() {
                     )
                 },
                 clickedViewMember = { item ->
+                    val isCounsellingWorkflow = roleManager.activeRole.value == AppRole.COUNSELING ||
+                            restrictToAction == TbConfirmedListAdapter.Action.CONTACT_TRACING ||
+                            restrictToAction == TbConfirmedListAdapter.Action.COUNSELLING
                     findNavController().navigate(
                         TBConfirmedListFragmentDirections
                             .actionTBConfirmedListFragmentToHouseholdMembersFragment(
                                 hhId = item.ben.hhId ?: 0L,
-                                fromContactTracing = true
+                                fromContactTracing = isCounsellingWorkflow
                             )
                     )
                 },

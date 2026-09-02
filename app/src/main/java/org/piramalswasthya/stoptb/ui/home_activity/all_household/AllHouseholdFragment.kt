@@ -18,14 +18,17 @@ import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.HouseHoldListAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertNewBenBinding
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchRvButtonBinding
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.HouseHoldBasicDomain
+import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import javax.inject.Inject
 
@@ -34,6 +37,9 @@ class AllHouseholdFragment : Fragment() {
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private var _binding: FragmentDisplaySearchRvButtonBinding? = null
     private val binding: FragmentDisplaySearchRvButtonBinding get() = _binding!!
@@ -93,8 +99,15 @@ class AllHouseholdFragment : Fragment() {
         // val isNurse = prefDao.getLoggedInUser()?.role.isNurseRole()
         // val isCounsellorOfficer = role.isCounsellingOfficerRole()
 
+        // Gap 2: "Add household" is a create action — only visible with FULL household
+        // permission (Registrar). Nurse/Counsellor are View-only per the acceptance criteria.
+        val privilege = roleManager.privilegesUnion()
+        val canAddHousehold = privilege.householdPermission == Permission.FULL
+        val canAddBeneficiary = privilege.beneficiaryPermission == Permission.FULL
+        Timber.d("RoleManager verify: AllHouseholdFragment assignedRoles=${roleManager.assignedRoles}, householdPermission=${privilege.householdPermission}, beneficiaryPermission=${privilege.beneficiaryPermission}")
+
         binding.btnNextPage.text = getString(R.string.btn_text_frag_home_nhhr)
-        binding.btnNextPage.visibility = View.VISIBLE
+        binding.btnNextPage.visibility = if (canAddHousehold) View.VISIBLE else View.GONE
 
         val householdAdapter = HouseHoldListAdapter(
             diseaseType = "",
@@ -109,7 +122,7 @@ class AllHouseholdFragment : Fragment() {
                 softDeleteHh = {}
             )
         )
-        householdAdapter.setAddMemberVisible(true)
+        householdAdapter.setAddMemberVisible(canAddBeneficiary)
         binding.rvAny.adapter = householdAdapter
 
         viewLifecycleOwner.lifecycleScope.launch {

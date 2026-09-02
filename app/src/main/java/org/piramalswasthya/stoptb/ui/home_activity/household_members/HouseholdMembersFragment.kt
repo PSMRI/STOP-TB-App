@@ -23,6 +23,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertNewBenBinding
 import org.piramalswasthya.stoptb.databinding.FragmentHouseholdMembersBinding
 import org.piramalswasthya.stoptb.model.Gender
+import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
@@ -72,9 +73,11 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
         // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole() below,
         // left commented in place for reference (not deleted, per project convention).
 //        val role = prefDao.getLoggedInUser()?.role
-        val privilege = roleManager.privilegesForActiveRole()
+        // Union across ALL assigned roles, not just the active tab — a permission, not
+        // Home-card display.
+        val privilege = roleManager.privilegesUnion()
         // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-        Timber.d("RoleManager verify: HouseholdMembersFragment activeRole=${roleManager.activeRole.value}, showExamineButtonDefault=${privilege.showExamineButtonDefault}, fromContactTracing=${args.fromContactTracing}")
+        Timber.d("RoleManager verify: HouseholdMembersFragment assignedRoles=${roleManager.assignedRoles}, showExamineButtonDefault=${privilege.showExamineButtonDefault}, fromContactTracing=${args.fromContactTracing}")
 
         val benAdapter = BenListAdapter(
             clickListener = BenListAdapter.BenClickListener(
@@ -210,7 +213,10 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
             }
         }
 
-        binding.fabAddMember.visibility = View.VISIBLE
+        // Gap 2: adding a member is a Beneficiary create action — only visible with FULL
+        // beneficiary permission (Registrar).
+        binding.fabAddMember.visibility =
+            if (privilege.beneficiaryPermission == Permission.FULL) View.VISIBLE else View.GONE
         binding.fabAddMember.setOnClickListener {
             addBenAlert?.show()
         }
@@ -242,7 +248,8 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
                         "benId" to benId,
                         "autoFlow" to false,
                         "examineFlow" to !viewOnly,
-                        "openedFromHousehold" to true
+                        "openedFromHousehold" to true,
+                        "viewOnly" to viewOnly
                     )
                 )
             }
@@ -266,7 +273,10 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
                     bundleOf(
                         "benId" to benId,
                         "autoFlow" to !viewOnly,
-                        "openedFromHousehold" to true
+                        "openedFromHousehold" to true,
+                        // Gap 2 fix: same missing viewOnly forward as AllBenFragment's copy of
+                        // this callback — see its comment.
+                        "viewOnly" to viewOnly
                     )
                 )
             }

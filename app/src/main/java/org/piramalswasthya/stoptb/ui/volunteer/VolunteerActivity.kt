@@ -301,7 +301,12 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             return
         }
 
-        roleToItemId[roleManager.activeRole.value]?.let { itemId ->
+        val initialRole = if (roleManager.activeRole.value in visibleRoles) {
+            roleManager.activeRole.value
+        } else {
+            visibleRoles.firstOrNull() ?: AppRole.VOLUNTEER
+        }
+        roleToItemId[initialRole]?.let { itemId ->
             binding.bottomNavRole.selectedItemId = itemId
         }
 

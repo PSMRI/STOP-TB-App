@@ -89,9 +89,11 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             // Legacy single-role gate — superseded by roleManager.privilegesForActiveRole() below,
             // left commented in place for reference (not deleted, per project convention).
 //            val role = pref?.getLoggedInUser()?.role
-            val showCounsellingUi = roleManager?.privilegesForActiveRole()?.showTbConfirmedCounsellingUi == true
+            // Union across ALL assigned roles, not just the active tab — a permission, not
+            // Home-card display.
+            val showCounsellingUi = roleManager?.privilegesUnion()?.showTbConfirmedCounsellingUi == true
             // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-            Timber.d("RoleManager verify: TbConfirmedListAdapter activeRole=${roleManager?.activeRole?.value}, showTbConfirmedCounsellingUi=$showCounsellingUi")
+            Timber.d("RoleManager verify: TbConfirmedListAdapter assignedRoles=${roleManager?.assignedRoles}, showTbConfirmedCounsellingUi=$showCounsellingUi")
 
             binding.ivSyncState.visibility = if (item.tbConfirmedList == null) View.INVISIBLE else View.VISIBLE
 

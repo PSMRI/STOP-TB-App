@@ -55,6 +55,11 @@ class AnthropometryFragment : Fragment() {
     private var isUpdatingTemperatureSelection = false
     private val openedFromHousehold: Boolean
         get() = arguments?.getBoolean("openedFromHousehold", false) == true
+    // Gap 2: role-permission veto computed by ExamineBottomSheetFragment.navigateToForm() and
+    // forwarded through the ExamineCallback chain — true whenever the active union of roles
+    // only grants VIEW (not FULL) on Anthropometry, regardless of whether the record is filled.
+    private val viewOnly: Boolean
+        get() = arguments?.getBoolean("viewOnly", false) == true
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -71,6 +76,11 @@ class AnthropometryFragment : Fragment() {
         binding.etWeight.filters = arrayOf(decimalInputFilter())
         binding.etHeight.filters = arrayOf(decimalInputFilter())
         binding.etTemperature.filters = arrayOf(decimalInputFilter())
+
+        // Gap 2: lock immediately for a VIEW-only role, even on a brand-new/unfilled record —
+        // lockFormIfExistingData() below only fires once existing data loads, which would leave
+        // a not-yet-filled record fully editable for a VIEW-only user otherwise.
+        if (viewOnly) lockForm()
 
         viewModel.benName.observe(viewLifecycleOwner) {
             binding.tvBenName.text = it
@@ -256,7 +266,10 @@ class AnthropometryFragment : Fragment() {
         val hasSavedAnthropometry =
             ben.weight != null || ben.height != null || ben.bmi != null || ben.temperature != null
         if (!hasSavedAnthropometry) return
+        lockForm()
+    }
 
+    private fun lockForm() {
         isFormLocked = true  // set before any setText triggers doAfterTextChanged
         binding.etWeight.isEnabled = false
         binding.etHeight.isEnabled = false

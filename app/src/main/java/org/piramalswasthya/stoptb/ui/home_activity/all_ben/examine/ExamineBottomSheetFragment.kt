@@ -30,6 +30,7 @@ import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.ExamineRowSet
+import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.contact_tracing.ContactTracingActivity
 import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
 import timber.log.Timber
@@ -117,9 +118,16 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
             FormRow(view.findViewById(R.id.row_general_opd),    getString(R.string.general_opd),            FORM_GENERAL_OPD)
         )
 
-        val privilege = roleManager.privilegesForActiveRole()
+        // Union across assigned roles — this screen gates form access, not Home-card display,
+        // so a Registrar+Nurse user keeps Nurse's full row set even while sitting on the
+        // Registrar tab. See RoleManager.privilegesUnion() doc. examineRowSet specifically is
+        // workflow-scoped, not purely role-scoped — examinePrivilegesFor() overrides it (and
+        // examineDenominatorRule) to Counselling's own values when showContactTracingForms is
+        // true, so a Registrar+Nurse+Counsellor user reached via the TPT-module flow still sees
+        // only the 4 TPT-relevant rows, not Nurse's General Exam/OPD leaking in.
+        val privilege = roleManager.examinePrivilegesFor(showContactTracingForms)
         // TEMP verification log for the multi-role migration — safe to remove once confirmed working.
-        Timber.d("RoleManager verify: ExamineBottomSheetFragment activeRole=${roleManager.activeRole.value}, examineRowSet=${privilege.examineRowSet}, reorder=${privilege.examineReorderTbScreeningBeforeAnthropometry}, lockGeneralForms=${privilege.examineLockGeneralFormsBehindTbScreening}, showContactTracingRows=${privilege.examineShowContactTracingRows}")
+        Timber.d("RoleManager verify: ExamineBottomSheetFragment assignedRoles=${roleManager.assignedRoles}, examineRowSet=${privilege.examineRowSet}, reorder=${privilege.examineReorderTbScreeningBeforeAnthropometry}, lockGeneralForms=${privilege.examineLockGeneralFormsBehindTbScreening}, showContactTracingRows=${privilege.examineShowContactTracingRows}")
 
 //        if (isRegistrar || isNurse) {
         if (privilege.examineReorderTbScreeningBeforeAnthropometry) {
@@ -378,6 +386,18 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
         }
     }
 
+    // Gap 2: only Anthropometry/TB Screening ever have a VIEW-only case reachable through this
+    // sheet — General Exam/OPD are always FULL-or-unreachable (see ModulePrivilege's doc), so
+    // they fall through to FULL here rather than getting their own field.
+    private fun formPermissionFor(formIndex: Int): Permission {
+        val union = roleManager.privilegesUnion()
+        return when (formIndex) {
+            FORM_ANTHROPOMETRY -> union.anthropometryPermission
+            FORM_TB_SCREENING -> union.tbScreeningPermission
+            else -> Permission.FULL
+        }
+    }
+
     private fun observeFormStatus(
         filledFlow: Flow<Boolean>,
         btn: MaterialButton,
@@ -395,6 +415,24 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
                     )
                     btn.setOnClickListener {
                         navigateToForm(benId, formIndex, viewOnly = true)
+                    }
+                } else if (formPermissionFor(formIndex) != Permission.FULL) {
+                    // Grey — not filled, but this role can't fill it either (View-only). Red
+                    // "Fill" would read as "action needed", which is misleading for a user who
+                    // isn't allowed to take that action — grey it out instead, same visual
+                    // treatment this file already uses for the TB-Screening-prerequisite lock
+                    // below, and stay tappable so the Toast can explain why.
+                    btn.visibility = View.VISIBLE
+                    btn.text = getString(R.string.examine_btn_fill)
+                    btn.backgroundTintList = ContextCompat.getColorStateList(
+                        requireContext(), android.R.color.darker_gray
+                    )
+                    btn.setOnClickListener {
+                        android.widget.Toast.makeText(
+                            requireContext(),
+                            getString(R.string.examine_form_view_only_msg),
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
                     }
                 } else {
                         btn.visibility = View.VISIBLE
@@ -414,7 +452,11 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
     private fun navigateToForm(benId: Long, formIndex: Int, viewOnly: Boolean) {
         isDismissingForNavigation = true
         dismiss()
-        examineCallback?.onNavigateToExamineForm(benId, formIndex, viewOnly)
+        // Gap 2: role permission is an additional veto on top of whatever fill-state-derived
+        // viewOnly the caller computed above — a VIEW-only Counsellor can't "Fill" a brand-new
+        // Anthropometry/TB Screening record either.
+        val effectiveViewOnly = viewOnly || formPermissionFor(formIndex) != Permission.FULL
+        examineCallback?.onNavigateToExamineForm(benId, formIndex, effectiveViewOnly)
     }
 
     override fun onDismiss(dialog: DialogInterface) {

@@ -181,12 +181,14 @@ class IconDataset @Inject constructor(
 
     /**
      * Multi-role bottom-nav tab card sets — exclusive per role, per the product spec:
-     * Registration = Household/Beneficiaries/Non-Household; Treatment = Referral/Tuberculosis
-     * only (no Household/Beneficiaries, unlike the single-role set above); Counselling = 4
-     * "Coming soon" placeholder cards (no landing screens exist yet for any of them).
+     * Registration = Household/Beneficiaries/Non-Household; Treatment = Referral/Tuberculosis;
+     * Counselling = the 4 counselling-family modules, plus Referral/Tuberculosis too UNLESS
+     * Nurse is also assigned (Nurse's own tab already covers those two — see
+     * RoleManager.multiRoleHomeModulesFor()'s doc for why this needs cross-role awareness that
+     * a plain per-role lookup can't provide).
      */
     private fun getMultiRoleIconDataset(resources: Resources): List<Icon> {
-        val modules = roleManager.privilegesForActiveRole().multiRoleHomeModules
+        val modules = roleManager.multiRoleHomeModulesFor(roleManager.activeRole.value)
         val iconList = mutableListOf<Icon>()
 
         if (AppModule.HOUSEHOLD in modules) {

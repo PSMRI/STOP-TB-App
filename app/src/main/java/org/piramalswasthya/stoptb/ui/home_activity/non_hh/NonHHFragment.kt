@@ -25,6 +25,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchAndToggleRvButtonBinding
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.BenBasicDomain
+import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import androidx.core.os.bundleOf
 import javax.inject.Inject
@@ -84,8 +85,11 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // unused DataBinding variable in rv_item_ben.xml/rv_item_ben_with_form.xml (no
         // android:* attribute or binding expression reads it). Left commented, not deleted.
 //        val roleName = prefDao.getLoggedInUser()?.role
+        // Gap 2: "Add beneficiary (non-HH)" is a create action — only visible with FULL
+        // non-household permission (Registrar).
+        val canAddNonHH = roleManager.privilegesUnion().nonHouseholdPermission == Permission.FULL
         binding.btnNextPage.text = getString(R.string.btn_Add_beneficiary_nonHH)
-        binding.btnNextPage.visibility = View.VISIBLE
+        binding.btnNextPage.visibility = if (canAddNonHH) View.VISIBLE else View.GONE
         binding.ibFilter.visibility = View.GONE
         binding.ibDownload.visibility = View.GONE
         binding.llQuickRefresh.visibility = View.GONE
@@ -421,7 +425,8 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     bundleOf(
                         "benId" to benId,
                         "autoFlow" to false,
-                        "examineFlow" to !viewOnly
+                        "examineFlow" to !viewOnly,
+                        "viewOnly" to viewOnly
                     )
                 )
             }
@@ -444,7 +449,10 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     R.id.TBScreeningFormFragment,
                     bundleOf(
                         "benId" to benId,
-                        "autoFlow" to !viewOnly
+                        "autoFlow" to !viewOnly,
+                        // Gap 2 fix: same missing viewOnly forward as AllBenFragment's copy of
+                        // this callback — see its comment.
+                        "viewOnly" to viewOnly
                     )
                 )
             }
