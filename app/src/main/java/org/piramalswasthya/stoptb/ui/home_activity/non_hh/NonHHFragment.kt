@@ -23,11 +23,11 @@ import org.piramalswasthya.stoptb.adapters.BenListAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchAndToggleRvButtonBinding
-import org.piramalswasthya.stoptb.helpers.isNurseRole
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.BenBasicDomain
+import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import androidx.core.os.bundleOf
-import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import javax.inject.Inject
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
@@ -37,6 +37,9 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private var _binding: FragmentDisplaySearchAndToggleRvButtonBinding? = null
     private val binding get() = _binding!!
@@ -78,9 +81,13 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        val roleName = prefDao.getLoggedInUser()?.role
+        // Dead code — confirmed unused: the numeric `role` param this fed only reaches an
+        // unused DataBinding variable in rv_item_ben.xml/rv_item_ben_with_form.xml (no
+        // android:* attribute or binding expression reads it). Left commented, not deleted.
+//        val roleName = prefDao.getLoggedInUser()?.role
+        val canAddNonHH = roleManager.privilegesUnion().nonHouseholdPermission == Permission.FULL
         binding.btnNextPage.text = getString(R.string.btn_Add_beneficiary_nonHH)
-        binding.btnNextPage.visibility = View.VISIBLE
+        binding.btnNextPage.visibility = if (canAddNonHH) View.VISIBLE else View.GONE
         binding.ibFilter.visibility = View.GONE
         binding.ibDownload.visibility = View.GONE
         binding.llQuickRefresh.visibility = View.GONE
@@ -135,9 +142,10 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             showRegistrationDate = true,
             showSyncIcon = true,
             showCall = true,
-            role = roleName?.let { if (it.isNurseRole()) 2 else 0 } ?: 0,
+//            role = roleName?.let { if (it.isNurseRole()) 2 else 0 } ?: 0,
             pref = prefDao,
             context = requireActivity(),
+            roleManager = roleManager,
             showActionButtons = false,
             showExamineButton = true
         )
@@ -415,7 +423,8 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     bundleOf(
                         "benId" to benId,
                         "autoFlow" to false,
-                        "examineFlow" to !viewOnly
+                        "examineFlow" to !viewOnly,
+                        "viewOnly" to viewOnly
                     )
                 )
             }
@@ -438,7 +447,8 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     R.id.TBScreeningFormFragment,
                     bundleOf(
                         "benId" to benId,
-                        "autoFlow" to !viewOnly
+                        "autoFlow" to !viewOnly,
+                        "viewOnly" to viewOnly
                     )
                 )
             }

@@ -132,6 +132,10 @@
             android:name="autoFlow"
             android:defaultValue="true"
             app:argType="boolean" />
+        <argument
+            android:name="viewOnly"
+            android:defaultValue="false"
+            app:argType="boolean" />
     </fragment>
 
     <!-- TB -->

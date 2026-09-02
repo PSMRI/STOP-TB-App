@@ -46,8 +46,10 @@ import org.piramalswasthya.stoptb.databinding.AlertConsentBinding
 import org.piramalswasthya.stoptb.databinding.FragmentNewBenRegBinding
 import org.piramalswasthya.stoptb.databinding.LayoutViewMediaBinding
 import org.piramalswasthya.stoptb.helpers.Konstants
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.model.LocationState
+import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel.State
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.work.WorkerUtils
@@ -59,6 +61,9 @@ class NewBenRegFragment : Fragment() {
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private var _binding: FragmentNewBenRegBinding? = null
     private val binding get() = _binding!!
@@ -199,7 +204,10 @@ class NewBenRegFragment : Fragment() {
         // Death badge visibility
         viewModel.isDeath.observe(viewLifecycleOwner) { isDeath ->
             val recordExists = viewModel.recordExists.value ?: false
-            binding.fabEdit.visibility = if (isDeath || !recordExists) View.GONE else View.VISIBLE
+            // Can fire after the recordExists observer below — needs the same permission gate,
+            // or it silently re-shows the Edit FAB once isDeath loads.
+            binding.fabEdit.visibility =
+                if (isDeath || !recordExists || !canEditRecord()) View.GONE else View.VISIBLE
         }
 
         // Set up adapter
@@ -249,7 +257,8 @@ class NewBenRegFragment : Fragment() {
 
         // Record exists observer
         viewModel.recordExists.observe(viewLifecycleOwner) { recordExists ->
-            binding.fabEdit.visibility = if (recordExists) View.VISIBLE else View.GONE
+            // Edit FAB is the only way back into edit mode — hide it below full permission.
+            binding.fabEdit.visibility = if (recordExists && canEditRecord()) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (recordExists) View.GONE else View.VISIBLE
             binding.btnLinkHousehold.visibility = if (!recordExists && viewModel.showLinkHouseholdButton) View.VISIBLE else View.GONE
             adapter.isEnabled = !recordExists
@@ -302,6 +311,17 @@ class NewBenRegFragment : Fragment() {
             binding.btnSubmit.visibility = View.VISIBLE
             adapter.isEnabled = true
             adapter.notifyDataSetChanged()
+        }
+    }
+
+    // Both fabEdit observers must call this rather than recompute their own check — isDeath
+    // and recordExists are independent LiveData that can fire in either order.
+    private fun canEditRecord(): Boolean {
+        val union = roleManager.privilegesUnion()
+        return if (viewModel.isNonHHArg) {
+            union.nonHouseholdPermission == Permission.FULL
+        } else {
+            union.beneficiaryPermission == Permission.FULL
         }
     }
 

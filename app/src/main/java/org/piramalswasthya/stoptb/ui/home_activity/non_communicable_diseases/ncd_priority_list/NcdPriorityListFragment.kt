@@ -17,6 +17,7 @@ import org.piramalswasthya.stoptb.adapters.BenListAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchRvButtonBinding
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.home_activity.home.HomeViewModel
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
@@ -29,6 +30,8 @@ class NcdPriorityListFragment : Fragment() {
     @Inject
     lateinit var prefDao: PreferenceDao
 
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private val binding: FragmentDisplaySearchRvButtonBinding by lazy {
         FragmentDisplaySearchRvButtonBinding.inflate(layoutInflater)
@@ -71,6 +74,7 @@ class NcdPriorityListFragment : Fragment() {
             showBeneficiaries = true,
             pref = prefDao,
             context = requireActivity(),
+            roleManager = roleManager,
             showActionButtons = false
         )
         binding.rvAny.adapter = benAdapter

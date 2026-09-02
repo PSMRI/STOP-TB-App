@@ -28,8 +28,12 @@ import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
+import org.piramalswasthya.stoptb.helpers.RoleManager
+import org.piramalswasthya.stoptb.model.ExamineRowSet
+import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.contact_tracing.ContactTracingActivity
 import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
+import timber.log.Timber
 
 @AndroidEntryPoint
 class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
@@ -57,12 +61,15 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
     @Inject
     lateinit var prefDao: PreferenceDao
 
+    @Inject
+    lateinit var roleManager: RoleManager
+
     private val viewModel: ExamineViewModel by viewModels()
 
     // Set to true when we dismiss programmatically for navigation (not user swipe)
     private var isDismissingForNavigation = false
 
-    /** True when logged-in user is Registrar — Anthropometry and TB Screening forms shown */
+    // Kept live (not superseded) — only used by the dead autoFlow block further down.
     private val isRegistrar: Boolean
         get() = prefDao.getLoggedInUser()?.role.isRegistrationOfficerRole()
 
@@ -107,7 +114,13 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
             FormRow(view.findViewById(R.id.row_general_opd),    getString(R.string.general_opd),            FORM_GENERAL_OPD)
         )
 
-        if (isRegistrar || isNurse) {
+        // examinePrivilegesFor() unions across all assigned roles, and overrides the row set to
+        // Counselling's own values when showContactTracingForms is true (the TPT workflow).
+        val privilege = roleManager.examinePrivilegesFor(showContactTracingForms)
+        Timber.d("RoleManager: examineRowSet=${privilege.examineRowSet}, showContactTracingRows=${privilege.examineShowContactTracingRows}")
+
+//        if (isRegistrar || isNurse) {
+        if (privilege.examineReorderTbScreeningBeforeAnthropometry) {
             val container = view as? LinearLayout
             val anthropometryRow = view.findViewById<View>(R.id.row_anthropometry)
             val tbScreeningRow = view.findViewById<View>(R.id.row_tb_screening)
@@ -127,12 +140,18 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
 
         rows.forEachIndexed { index, (rowView, formName, formIndex) ->
             // Registrar role: show Anthropometry and TB Screening; Nurse: show all 5
-            if (isRegistrar && formIndex != FORM_ANTHROPOMETRY && formIndex != FORM_TB_SCREENING) {
-                rowView.visibility = View.GONE
-                return@forEachIndexed
-            }
+//            if (isRegistrar && formIndex != FORM_ANTHROPOMETRY && formIndex != FORM_TB_SCREENING) {
+//                rowView.visibility = View.GONE
+//                return@forEachIndexed
+//            }
             // Counselling Officer: show TB Screening and Anthropometry here.
-            if (isCounsellingOfficer && formIndex != FORM_TB_SCREENING && formIndex != FORM_ANTHROPOMETRY) {
+//            if (isCounsellingOfficer && formIndex != FORM_TB_SCREENING && formIndex != FORM_ANTHROPOMETRY) {
+//                rowView.visibility = View.GONE
+//                return@forEachIndexed
+//            }
+            if (privilege.examineRowSet == ExamineRowSet.ANTHROPOMETRY_AND_TB_SCREENING_ONLY &&
+                formIndex != FORM_ANTHROPOMETRY && formIndex != FORM_TB_SCREENING
+            ) {
                 rowView.visibility = View.GONE
                 return@forEachIndexed
             }
@@ -141,8 +160,11 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
             val btn = rowView.findViewById<MaterialButton>(R.id.btn_form_action)
             val notFilled = rowView.findViewById<TextView>(R.id.tv_not_filled)
 
-            if ((isNurse && formIndex == FORM_GENERAL_EXAM) ||
-                (isNurse && formIndex == FORM_GENERAL_OPD)
+//            if ((isNurse && formIndex == FORM_GENERAL_EXAM) ||
+//                (isNurse && formIndex == FORM_GENERAL_OPD)
+//            ) {
+            if (privilege.examineLockGeneralFormsBehindTbScreening &&
+                (formIndex == FORM_GENERAL_EXAM || formIndex == FORM_GENERAL_OPD)
             ) {
                 viewLifecycleOwner.lifecycleScope.launch {
                     combine(
@@ -197,7 +219,8 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
         // submission status (isContactFollowUpDone), gated on TPT_FOLLOW_UP completion only when
         // the screening answer was Tpt Eligible — see ExamineViewModel.isContactFollowUpDone.
         val followupRow = view.findViewById<View>(R.id.row_followup)
-        if (isCounsellingOfficer && showContactTracingForms) {
+//        if (isCounsellingOfficer && showContactTracingForms) {
+        if (privilege.examineShowContactTracingRows && showContactTracingForms) {
             followupRow.visibility = View.VISIBLE
             followupRow.findViewById<TextView>(R.id.tv_form_name).text = getString(R.string.contact_tracing_follow_up)
             followupRow.findViewById<TextView>(R.id.tv_not_filled).visibility = View.GONE
@@ -232,7 +255,8 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
 
         // TPT Followup — Counselling Officer only.
         val tptFollowupRow = view.findViewById<View>(R.id.row_tpt_followup)
-        if (isCounsellingOfficer && showContactTracingForms) {
+//        if (isCounsellingOfficer && showContactTracingForms) {
+        if (privilege.examineShowContactTracingRows && showContactTracingForms) {
             viewLifecycleOwner.lifecycleScope.launch {
                 viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                     combine(
@@ -311,6 +335,10 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
         }
 
         // Auto-flow: if opened with autoFlow=true, immediately navigate to next unfilled form
+        // CONFIRMED DEAD CODE (verified this session): every call site that constructs this
+        // fragment (NonHHFragment, AllBenFragment, HouseholdMembersFragment) hardcodes
+        // autoFlow = false, so this block never executes. Left entirely untouched — not part
+        // of the RoleManager migration (there is deliberately no ExamineAutoFlowOrder field).
         if (autoFlow) {
             viewLifecycleOwner.lifecycleScope.launch {
                 val nextIndex = if (isRegistrar) {
@@ -348,6 +376,17 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
         }
     }
 
+    // Only Anthropometry/TB Screening ever have a View-only case here — General Exam/OPD are
+    // always FULL-or-unreachable, so they fall through to FULL.
+    private fun formPermissionFor(formIndex: Int): Permission {
+        val union = roleManager.privilegesUnion()
+        return when (formIndex) {
+            FORM_ANTHROPOMETRY -> union.anthropometryPermission
+            FORM_TB_SCREENING -> union.tbScreeningPermission
+            else -> Permission.FULL
+        }
+    }
+
     private fun observeFormStatus(
         filledFlow: Flow<Boolean>,
         btn: MaterialButton,
@@ -365,6 +404,21 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
                     )
                     btn.setOnClickListener {
                         navigateToForm(benId, formIndex, viewOnly = true)
+                    }
+                } else if (formPermissionFor(formIndex) != Permission.FULL) {
+                    // Grey, not red — this role has View-only access, so "Fill" isn't a valid
+                    // action. Stays tappable so the Toast can explain why.
+                    btn.visibility = View.VISIBLE
+                    btn.text = getString(R.string.examine_btn_fill)
+                    btn.backgroundTintList = ContextCompat.getColorStateList(
+                        requireContext(), android.R.color.darker_gray
+                    )
+                    btn.setOnClickListener {
+                        android.widget.Toast.makeText(
+                            requireContext(),
+                            getString(R.string.examine_form_view_only_msg),
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
                     }
                 } else {
                         btn.visibility = View.VISIBLE
@@ -384,7 +438,10 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
     private fun navigateToForm(benId: Long, formIndex: Int, viewOnly: Boolean) {
         isDismissingForNavigation = true
         dismiss()
-        examineCallback?.onNavigateToExamineForm(benId, formIndex, viewOnly)
+        // Role permission is an extra veto on top of the fill-state-derived viewOnly above —
+        // a View-only Counsellor can't "Fill" a brand-new record either.
+        val effectiveViewOnly = viewOnly || formPermissionFor(formIndex) != Permission.FULL
+        examineCallback?.onNavigateToExamineForm(benId, formIndex, effectiveViewOnly)
     }
 
     override fun onDismiss(dialog: DialogInterface) {

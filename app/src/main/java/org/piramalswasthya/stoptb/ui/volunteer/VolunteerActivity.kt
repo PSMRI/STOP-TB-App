@@ -43,7 +43,10 @@ import org.piramalswasthya.stoptb.helpers.AutoFlowBackNavigationHost
 import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.helpers.TapjackingProtectionHelper
+import org.piramalswasthya.stoptb.model.AppRole
+import timber.log.Timber
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.sync.SyncBottomSheetFragment
 import org.piramalswasthya.stoptb.ui.login_activity.LoginActivity
@@ -117,6 +120,9 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
 
     @Inject
     lateinit var pref: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private var _binding: ActivityVolunteerBinding? = null
     private val binding: ActivityVolunteerBinding
@@ -212,12 +218,16 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     override fun onCreate(savedInstanceState: Bundle?) {
         TapjackingProtectionHelper.applyWindowSecurity(this)
         super.onCreate(savedInstanceState)
+        // Resolve assigned/active role for this cold start. Always resets to the first
+        // assigned role — no persistence across app restarts, by design.
+        roleManager.initializeFromLoggedInUser()
         _binding = ActivityVolunteerBinding.inflate(layoutInflater)
         setContentView(binding.root)
         TapjackingProtectionHelper.enableTouchFiltering(this)
         setUpActionBar()
         setUpNavHeader()
         setUpMenu()
+        setUpRoleBottomNav()
         askForPermissions()
         binding.tvCampHubOffline.setOnClickListener {
             openCampHubConnect()
@@ -249,6 +259,59 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             WorkerUtils.triggerAmritPullWorker(this)
         }
         WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
+    }
+
+    /**
+     * Wires the role-switcher bottom nav: one tab per role actually assigned to this user
+     * (Registrar/Nurse/Counseling only — VOLUNTEER intentionally has no tab, see below),
+     * tapping a tab updates [RoleManager.activeRole], which every migrated screen already
+     * reads via [RoleManager.privilegesForActiveRole].
+     *
+     * Only shown on the Home screen (volunteerHomeFragment) — role switching only affects
+     * Home-screen content, and most other screens read [RoleManager.privilegesForActiveRole]
+     * once at build time rather than reactively, so leaving the bar visible elsewhere would
+     * let a role switch silently go stale on whatever screen the user is looking at.
+     */
+    private fun setUpRoleBottomNav() {
+        val roleToItemId = mapOf(
+            AppRole.REGISTRAR to R.id.roleTabRegistrar,
+            AppRole.NURSE to R.id.roleTabNurse,
+            AppRole.COUNSELING to R.id.roleTabCounseling
+        )
+        val itemIdToRole = roleToItemId.entries.associate { (role, id) -> id to role }
+        val visibleRoles = roleManager.assignedRoles.filter { it in roleToItemId }
+        Timber.d("RoleManager: bottomNav visibleTabs=$visibleRoles, activeRole=${roleManager.activeRole.value}")
+
+        binding.bottomNavRole.menu.let { menu ->
+            roleToItemId.forEach { (role, id) ->
+                menu.findItem(id)?.isVisible = role in visibleRoles
+            }
+        }
+        if (visibleRoles.isEmpty()) {
+            binding.bottomNavRole.visibility = View.GONE
+            return
+        }
+
+        val initialRole = if (roleManager.activeRole.value in visibleRoles) {
+            roleManager.activeRole.value
+        } else {
+            visibleRoles.firstOrNull() ?: AppRole.VOLUNTEER
+        }
+        roleToItemId[initialRole]?.let { itemId ->
+            binding.bottomNavRole.selectedItemId = itemId
+        }
+
+        binding.bottomNavRole.setOnItemSelectedListener { item ->
+            itemIdToRole[item.itemId]?.let { roleManager.setActiveRole(it) }
+            true
+        }
+
+        // Visible on Home only; addOnDestinationChangedListener fires immediately with the
+        // current destination, so this also sets the correct initial state.
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            binding.bottomNavRole.visibility =
+                if (destination.id == R.id.volunteerHomeFragment) View.VISIBLE else View.GONE
+        }
     }
 
     private fun askForPermissions() {

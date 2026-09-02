@@ -25,7 +25,9 @@ import org.piramalswasthya.stoptb.ui.counselling_activity.CounsellingActivity
 import org.piramalswasthya.stoptb.ui.counselling_activity.CounsellingViewModel
 import org.piramalswasthya.stoptb.model.BenWithTbSuspectedDomain
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
+import org.piramalswasthya.stoptb.model.AppRole
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import javax.inject.Inject
 import kotlin.getValue
 
@@ -36,6 +38,8 @@ class TBConfirmedListFragment : Fragment() {
     @Inject
     lateinit var prefDao: PreferenceDao
 
+    @Inject
+    lateinit var roleManager: RoleManager
     private val args: TBConfirmedListFragmentArgs by navArgs()
 
     private val restrictToAction: TbConfirmedListAdapter.Action?
@@ -93,11 +97,14 @@ class TBConfirmedListFragment : Fragment() {
                     )
                 },
                 clickedViewMember = { item ->
+                    val isCounsellingWorkflow = roleManager.activeRole.value == AppRole.COUNSELING ||
+                            restrictToAction == TbConfirmedListAdapter.Action.CONTACT_TRACING ||
+                            restrictToAction == TbConfirmedListAdapter.Action.COUNSELLING
                     findNavController().navigate(
                         TBConfirmedListFragmentDirections
                             .actionTBConfirmedListFragmentToHouseholdMembersFragment(
                                 hhId = item.ben.hhId ?: 0L,
-                                fromContactTracing = true
+                                fromContactTracing = isCounsellingWorkflow
                             )
                     )
                 },
@@ -107,6 +114,7 @@ class TBConfirmedListFragment : Fragment() {
                 }
             ),
             pref = prefDao,
+            roleManager = roleManager,
             restrictToAction = restrictToAction
         )
         binding.rvAny.adapter = benAdapter

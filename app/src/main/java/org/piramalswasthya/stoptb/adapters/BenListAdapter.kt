@@ -15,13 +15,14 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.RvItemBenBinding
 import org.piramalswasthya.stoptb.helpers.getDateFromLong
 import org.piramalswasthya.stoptb.helpers.getPatientTypeByAge
-import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
-import org.piramalswasthya.stoptb.helpers.isNurseRole
-import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
+import org.piramalswasthya.stoptb.helpers.RoleManager
+import org.piramalswasthya.stoptb.model.AppRole
 import org.piramalswasthya.stoptb.model.BenBasicDomain
+import org.piramalswasthya.stoptb.model.ExamineDenominatorRule
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.ui.setSyncStateForBen
+import timber.log.Timber
 
 data class ButtonConfig(
     val text: String,
@@ -41,6 +42,7 @@ class BenListAdapter(
     private val pref: PreferenceDao? = null,
     private val context: FragmentActivity,
     private val role: Int? = null,
+    private val roleManager: RoleManager? = null,
     private val showActionButtons: Boolean = true,
     private val showResultButton: Boolean = false,
     private val showAnthropometryButton: Boolean = false,
@@ -101,7 +103,8 @@ class BenListAdapter(
             tbDiagnosticsList: List<TBDiagnosticsCache> = emptyList(),
             source: Int = 0,
             retryingBenIds: List<Long> = emptyList(),
-            showContactTracingForms: Boolean = false
+            showContactTracingForms: Boolean = false,
+            roleManager: RoleManager? = null
         ) {
 
             binding.btnAbha.visibility = View.VISIBLE
@@ -178,9 +181,12 @@ class BenListAdapter(
             if (binding.btnVitalScreen.visibility == View.VISIBLE) {
                 if (showResultButton) {
                     val tbDiag = tbDiagnosticsList.find { it.benId == item.benId }
-                    val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
-                    val isCounsellingOfficer = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
-                    val canActOnReferral = isNurse || isCounsellingOfficer
+                    // Legacy, kept for reference:
+//                    val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
+//                    val isCounsellingOfficer = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
+//                    val canActOnReferral = isNurse || isCounsellingOfficer
+                    val canActOnReferral = roleManager?.privilegesUnion()?.canActOnReferral == true
+                    Timber.d("RoleManager: canActOnReferral=$canActOnReferral")
                     val config = when (source) {
                         6 -> {
                             val status = tbDiag?.xrayOrderStatus
@@ -585,49 +591,95 @@ class BenListAdapter(
             // ClinicalScreeningStatus answer is TPT_ELIGIBLE (see IContactTracingRepository.observeTptEligibleBenIds) ?
             // otherwise FULL_TREATMENT/NO_TREATMENT beneficiaries would incorrectly get stuck at x/4.
             // Others: all 5 forms
-            val currentRole = pref?.getLoggedInUser()?.role
-            val isCounsellingOfficer = currentRole.isCounsellingOfficerRole()
-            val isRegistrar = pref?.getLoggedInUser()?.role.isRegistrationOfficerRole()
-            val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
-            val isCounsellingOfficerForExamine = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
-            val (examineFilledCount, examineTotal) = if (isCounsellingOfficerForExamine) {
-                if (showContactTracingForms) {
-                    val requiredItems = if (isTptEligible) {
-                        listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone, hasTptFollowUpDone)
+            // Legacy, kept for reference:
+//            val currentRole = pref?.getLoggedInUser()?.role
+//            val isCounsellingOfficer = currentRole.isCounsellingOfficerRole()
+//            val isRegistrar = pref?.getLoggedInUser()?.role.isRegistrationOfficerRole()
+//            val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
+//            val isCounsellingOfficerForExamine = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
+//            val (examineFilledCount, examineTotal) = if (isCounsellingOfficerForExamine) {
+//                if (showContactTracingForms) {
+//                    val requiredItems = if (isTptEligible) {
+//                        listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone, hasTptFollowUpDone)
+//                    } else {
+//                        listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone)
+//                    }
+//                    Pair(requiredItems.count { it }, requiredItems.size)
+//                } else {
+//                    val filled = listOf(
+//                        hasAnthropometry,
+//                        hasTbScreening
+//                    ).count { it }
+//                    Pair(filled, 2)
+//                }
+//            } else if (isRegistrar) {
+//                val filled = listOf(
+//                    hasAnthropometry,
+//                    hasTbScreening
+//                ).count { it }
+//                Pair(filled, 2)
+//            } else if (isNurse || isCounsellingOfficer) {
+//                val filled = listOf(
+//                    hasAnthropometry,
+//                    isMatched,
+//                    hasTbScreening,
+//                    hasGeneralOpd
+//                ).count { it }
+//                Pair(filled, 4)
+//            } else {
+//                val filled = listOf(
+//                    hasAnthropometry,
+//                    isMatched,
+//                    hasTbScreening,
+//                    hasGeneralOpd
+//                ).count { it }
+//                Pair(filled, 4)
+//            }
+
+            // Reused below for relevantUnsynced/relevantSyncing too, not just the denominator.
+            val assignedRoles = roleManager?.assignedRoles.orEmpty()
+            val isRegistrar = AppRole.REGISTRAR in assignedRoles
+            val isNurse = AppRole.NURSE in assignedRoles
+            val isCounsellingOfficer = AppRole.COUNSELING in assignedRoles
+            // examinePrivilegesFor() switches to Counselling's own denominator rule when this is
+            // the TPT-module card (showContactTracingForms), regardless of other assigned roles.
+            val examineDenominatorRule = roleManager?.examinePrivilegesFor(showContactTracingForms)?.examineDenominatorRule
+                ?: ExamineDenominatorRule.GENERIC_FOUR
+            val (examineFilledCount, examineTotal) = when (examineDenominatorRule) {
+                ExamineDenominatorRule.COUNSELLING_DYNAMIC -> {
+                    if (showContactTracingForms) {
+                        val requiredItems = if (isTptEligible) {
+                            listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone, hasTptFollowUpDone)
+                        } else {
+                            listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone)
+                        }
+                        Pair(requiredItems.count { it }, requiredItems.size)
                     } else {
-                        listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone)
+                        val filled = listOf(
+                            hasAnthropometry,
+                            hasTbScreening
+                        ).count { it }
+                        Pair(filled, 2)
                     }
-                    Pair(requiredItems.count { it }, requiredItems.size)
-                } else {
+                }
+                ExamineDenominatorRule.REGISTRAR_TWO -> {
                     val filled = listOf(
                         hasAnthropometry,
                         hasTbScreening
                     ).count { it }
                     Pair(filled, 2)
                 }
-            } else if (isRegistrar) {
-                val filled = listOf(
-                    hasAnthropometry,
-                    hasTbScreening
-                ).count { it }
-                Pair(filled, 2)
-            } else if (isNurse || isCounsellingOfficer) {
-                val filled = listOf(
-                    hasAnthropometry,
-                    isMatched,
-                    hasTbScreening,
-                    hasGeneralOpd
-                ).count { it }
-                Pair(filled, 4)
-            } else {
-                val filled = listOf(
-                    hasAnthropometry,
-                    isMatched,
-                    hasTbScreening,
-                    hasGeneralOpd
-                ).count { it }
-                Pair(filled, 4)
+                ExamineDenominatorRule.GENERIC_FOUR -> {
+                    val filled = listOf(
+                        hasAnthropometry,
+                        isMatched,
+                        hasTbScreening,
+                        hasGeneralOpd
+                    ).count { it }
+                    Pair(filled, 4)
+                }
             }
+            Timber.d("RoleManager: denominatorRule=$examineDenominatorRule, filled=$examineFilledCount/$examineTotal")
 
             binding.btnExamine.text = "Examine ($examineFilledCount/$examineTotal)"
             val isExamineFilled = examineFilledCount > 0
@@ -645,10 +697,17 @@ class BenListAdapter(
             binding.llBenDetails4.visibility = View.GONE
             binding.btnAddChildren.visibility = View.GONE
 
-            // Register Wife / Register Husband ? Registrar only (hidden for Nurse & Counselling officer)
-            val isNurseRole = currentRole.isNurseRole()
+            // Register Wife / Register Husband ? Registrar tab only (hidden when on Nurse or Counselling tab,
+            // or in TPT/Referral workflows)
+            val showRegisterSpouseButtons =
+                roleManager?.privilegesForActiveRole()?.showRegisterSpouseButtons == true &&
+                !showContactTracingForms &&
+                source !in 5..8
+            Timber.d("RoleManager: showRegisterSpouseButtons=$showRegisterSpouseButtons")
             when {
-                !isNurseRole && !isCounsellingOfficer && !item.isNonHH && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
+//                !isNurseRole && !isCounsellingOfficer && !item.isNonHH && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
+//                        && !item.isDeath && !item.isDeactivate -> {
+                showRegisterSpouseButtons && !item.isNonHH && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
                         && !item.isDeath && !item.isDeactivate -> {
                     binding.llAddSpouseBtn.visibility = View.VISIBLE
                     binding.btnAddSpouse.visibility = View.VISIBLE
@@ -657,7 +716,9 @@ class BenListAdapter(
                         clickListener?.onClickedWifeBen(item)
                     }
                 }
-                (!isNurseRole && !isCounsellingOfficer) && !item.isNonHH && item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
+//                (!isNurseRole && !isCounsellingOfficer) && !item.isNonHH && item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
+//                        && !item.isDeath && !item.isDeactivate -> {
+                showRegisterSpouseButtons && !item.isNonHH && item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
                         && !item.isDeath && !item.isDeactivate -> {
                     binding.llAddSpouseBtn.visibility = View.VISIBLE
                     binding.btnAddSpouse.visibility = View.VISIBLE
@@ -825,7 +886,8 @@ class BenListAdapter(
             tbDiagnosticsList = tbDiagnosticsList,
             source = source,
             showExamineButton = showExamineButton,
-            showContactTracingForms = showContactTracingForms
+            showContactTracingForms = showContactTracingForms,
+            roleManager = roleManager
         )
     }
 
@@ -845,9 +907,20 @@ class BenListAdapter(
     }
 
     fun submitTBDiagnostics(list: List<TBDiagnosticsCache>) {
+        // Diff instead of notifyDataSetChanged() — a blanket refresh here rebinds every visible
+        // row (including its click listeners) on every emission, which was the root cause of
+        // cards needing multiple taps to register.
+        val oldByBenId = tbDiagnosticsList.associateBy { it.benId }
+        val newByBenId = list.associateBy { it.benId }
         tbDiagnosticsList.clear()
         tbDiagnosticsList.addAll(list)
-        notifyDataSetChanged()
+        val changedBenIds = (oldByBenId.keys + newByBenId.keys)
+            .filterTo(mutableSetOf()) { benId -> oldByBenId[benId] != newByBenId[benId] }
+        if (changedBenIds.isNotEmpty()) {
+            currentList.forEachIndexed { index, item ->
+                if (item.benId in changedBenIds) notifyItemChanged(index)
+            }
+        }
     }
 
     fun submitBenIds(list: List<Long>)           = applyIdList(benIds, list)

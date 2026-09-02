@@ -28,9 +28,8 @@ import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertFilterBinding
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchAndToggleRvButtonBinding
-import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
-import org.piramalswasthya.stoptb.helpers.isNurseRole
-import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
+import org.piramalswasthya.stoptb.helpers.RoleManager
+import org.piramalswasthya.stoptb.model.AppRole
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
@@ -56,6 +55,9 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private var _binding: FragmentDisplaySearchAndToggleRvButtonBinding? = null
 
@@ -139,19 +141,30 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val roleName = prefDao.getLoggedInUser()?.role
-        val isRegistrar = roleName.isRegistrationOfficerRole()
-        val isNurse = roleName.isNurseRole()
-        val isCounsellor = roleName.isCounsellingOfficerRole()
-        val isKnownRestrictedRole = isRegistrar || isNurse || isCounsellor
-        val allowLegacyAccess = !isKnownRestrictedRole
+        // Legacy, kept for reference:
+//        val roleName = prefDao.getLoggedInUser()?.role
+//        val isRegistrar = roleName.isRegistrationOfficerRole()
+//        val isNurse = roleName.isNurseRole()
+//        val isCounsellor = roleName.isCounsellingOfficerRole()
+//        val isKnownRestrictedRole = isRegistrar || isNurse || isCounsellor
+//        val allowLegacyAccess = !isKnownRestrictedRole
         val isReadOnlyReferralList = args.source in READ_ONLY_REFERRAL_SOURCES
         val showResultButton = args.source == 6 || args.source == 7 || args.source == 8
-        val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
-        val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
-        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess || isCounsellor) &&
-                !isReadOnlyReferralList && !args.showContactTracingForms
-        val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
+        val privilege = roleManager.privilegesUnion()
+        Timber.d("RoleManager: showAbhaButton=${privilege.showAbhaButton}, showCallButton=${privilege.showCallButton}")
+        // showAnthropometryButton/showBenActionButtons: confirmed dead code, not used anywhere.
+//        val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
+//        val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
+//        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess || isCounsellor) && !isReadOnlyReferralList
+//        val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
+        // Legacy, kept for reference:
+//        val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
+//        val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
+//        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess || isCounsellor) &&
+//                !isReadOnlyReferralList && !args.showContactTracingForms
+//        val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
+        val showAbhaButton = privilege.showAbhaButton && !isReadOnlyReferralList && !args.showContactTracingForms
+        val showCallButton = privilege.showCallButton && !isReadOnlyReferralList
         binding.llQuickRefresh.visibility = View.GONE
 
         // Add Ben button hidden — ben registration only via Household flow
@@ -230,11 +243,13 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     if (isReadOnlyReferralList) return@BenClickListener
                     viewLifecycleOwner.lifecycleScope.launch {
                         val benRegId = viewModel.getBenFromId(benId)
+                        val vitalAutoFlow = AppRole.NURSE in roleManager.assignedRoles
+                        Timber.d("RoleManager: VitalScreenFragment autoFlow=$vitalAutoFlow")
                         findNavController().navigate(
                             AllBenFragmentDirections.actionAllBenFragmentToVitalScreenFragment(
                                 benId = benId,
                                 benRegId = benRegId,
-                                autoFlow = isNurse
+                                autoFlow = vitalAutoFlow
                             )
                         )
                     }
@@ -399,7 +414,11 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     )
                 },
                 { item, benId, hhId, viewOnly ->
-                    if (!showAnthropometryButton) return@BenClickListener
+                    // Dead code — the Anthropometry icon this guards is unreachable: the
+                    // adapter always passes showAnthropometryButton = false below, so this
+                    // listener never fires regardless of role. Kept as-is, not deleted.
+//                    if (!showAnthropometryButton) return@BenClickListener
+                    if (true) return@BenClickListener
                     findNavController().navigate(
                         R.id.anthropometryFragment,
                         bundleOf(
@@ -420,6 +439,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             showCall = showCallButton,
             pref = prefDao,
             context = requireActivity(),
+            roleManager = roleManager,
             showActionButtons = false,
             showResultButton = showResultButton,
             showAnthropometryButton = false,
@@ -623,12 +643,6 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             }
         }
 
-        lifecycleScope.launch {
-            while (viewLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
-                benAdapter.notifyDataSetChanged()
-                kotlinx.coroutines.delay(1000L)
-            }
-        }
     }
 
     private fun checkAndGenerateABHA(benId: Long) {
@@ -670,7 +684,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     bundleOf(
                         "benId" to benId,
                         "autoFlow" to false,
-                        "examineFlow" to !viewOnly
+                        "examineFlow" to !viewOnly,
+                        "viewOnly" to viewOnly
                     )
                 )
             }
@@ -691,7 +706,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     R.id.TBScreeningFormFragment,
                     bundleOf(
                         "benId" to benId,
-                        "autoFlow" to !viewOnly
+                        "autoFlow" to !viewOnly,
+                        "viewOnly" to viewOnly
                     )
                 )
             }

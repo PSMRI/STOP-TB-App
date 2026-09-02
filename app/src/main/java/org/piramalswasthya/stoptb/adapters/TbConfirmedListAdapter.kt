@@ -13,13 +13,18 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.RvItemTbConfirmedListBinding
 import org.piramalswasthya.stoptb.helpers.getDateFromLong
 import org.piramalswasthya.stoptb.helpers.getPatientTypeByAge
+// Used by the legacy checkIfCounsellingOfficerOrNot() overload below — don't remove as "unused".
 import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.BenWithTbSuspectedDomain
+import timber.log.Timber
+
 
 class TbConfirmedListAdapter(
     private val clickListener: ClickListener? = null,
     private val pref: PreferenceDao? = null,
+    private val roleManager: RoleManager? = null,
     private val restrictToAction: Action? = null
 ) :
 ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
@@ -60,6 +65,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             benIdList: List<Long>?,
             totalSectionsFallback: Int?,
             localFilledCounts: Map<Long, Int>?,
+            roleManager: RoleManager? = null,
             restrictToAction: Action?
         ) {
             binding.btnFormTb.visibility = View.VISIBLE
@@ -79,13 +85,18 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
                     sectionsFilled == 0
             // Provides a single source of truth for determining whether a row should show “Counselled.”
             val isCounselledFinal = !isRefused && (isCounselledByProgress || item.isCounselled || isBenAlreadyCounselled)
-            val role = pref?.getLoggedInUser()?.role
+            // Legacy, kept for reference:
+//            val role = pref?.getLoggedInUser()?.role
+            val showCounsellingUi = roleManager?.privilegesUnion()?.showTbConfirmedCounsellingUi == true
+            Timber.d("RoleManager: showTbConfirmedCounsellingUi=$showCounsellingUi")
 
             binding.ivSyncState.visibility = if (item.tbConfirmedList == null) View.INVISIBLE else View.VISIBLE
 
             binding.counsellingSectionProgress.setProgress(sectionsFilled, totalSections)
-            binding.counsellingSectionProgress.visibility = if(role.isCounsellingOfficerRole()) View.VISIBLE else View.INVISIBLE
-            binding.btnContactTracing.visibility = if(role.isCounsellingOfficerRole()) View.VISIBLE else View.GONE
+//            binding.counsellingSectionProgress.visibility = if(role.isCounsellingOfficerRole()) View.VISIBLE else View.INVISIBLE
+//            binding.btnContactTracing.visibility = if(role.isCounsellingOfficerRole()) View.VISIBLE else View.GONE
+            binding.counsellingSectionProgress.visibility = if (showCounsellingUi) View.VISIBLE else View.INVISIBLE
+            binding.btnContactTracing.visibility = if (showCounsellingUi) View.VISIBLE else View.GONE
 
             if (isRefused) {
                 binding.btnCounselling.visibility = View.GONE
@@ -108,13 +119,15 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             }
 
 
-            if (role != null) {
-                checkIfCounsellingOfficerOrNot(role, (isRefused || isCounselledFinal))
-            } else {
-                binding.btnFormTb.visibility = View.GONE
-                binding.btnCounselling.visibility = View.GONE
-                binding.btnCounselled.visibility = View.GONE
-            }
+            // Legacy, kept for reference:
+//            if (role != null) {
+//                checkIfCounsellingOfficerOrNot(role, (isRefused || isCounselledFinal))
+//            } else {
+//                binding.btnFormTb.visibility = View.GONE
+//                binding.btnCounselling.visibility = View.GONE
+//                binding.btnCounselled.visibility = View.GONE
+//            }
+            checkIfCounsellingOfficerOrNot(showCounsellingUi, (isRefused || isCounselledFinal))
 
             if (restrictToAction != null) {
                 if (restrictToAction != Action.FOLLOW_UP) {
@@ -211,6 +224,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             binding.head.visibility = if (isHeadOfFamily) View.VISIBLE else View.GONE
         }
 
+        // Legacy, unused — kept for reference:
         private fun checkIfCounsellingOfficerOrNot(
             role: String,
             isCounselled: Boolean
@@ -230,6 +244,23 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
                 if(isCounsellingOfficer) View.VISIBLE else View.GONE
         }
 
+        private fun checkIfCounsellingOfficerOrNot(
+            isCounsellingOfficer: Boolean,
+            isCounselled: Boolean
+        ) {
+            binding.btnFormTb.visibility =
+                if (isCounsellingOfficer) View.VISIBLE else View.GONE
+
+            binding.btnCounselling.visibility =
+                if (isCounsellingOfficer && !isCounselled) View.VISIBLE else View.GONE
+
+            binding.btnCounselled.visibility =
+                if (isCounsellingOfficer && isCounselled) View.VISIBLE else View.GONE
+
+            binding.ivViewMember.visibility =
+                if (isCounsellingOfficer) View.VISIBLE else View.GONE
+        }
+
     }
 
     override fun onCreateViewHolder(
@@ -241,7 +272,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
         holder: BenViewHolder,
         position: Int
     ) {
-        holder.bind(getItem(position), clickListener, pref, benIdList, totalSectionsFallback, localFilledCounts, restrictToAction)
+        holder.bind(getItem(position), clickListener, pref, benIdList, totalSectionsFallback, localFilledCounts, roleManager,restrictToAction)
     }
 
     /*override fun onCreateViewHolder(

@@ -17,11 +17,10 @@ import org.piramalswasthya.stoptb.adapters.VolunteerPagerAdapter
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentHomeBinding
 import org.piramalswasthya.stoptb.helpers.Languages
-import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
-import org.piramalswasthya.stoptb.helpers.isNurseRole
-import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.work.WorkerUtils
+import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -40,6 +39,9 @@ class VolunteerHomeFragment : Fragment() {
 
     @Inject
     lateinit var pref: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private var _binding: FragmentHomeBinding? = null
     private val binding: FragmentHomeBinding
@@ -85,10 +87,13 @@ class VolunteerHomeFragment : Fragment() {
     }
 
     private fun setupNurseQuickRefresh() {
-        val role = pref.getLoggedInUser()?.role
-        val canUseQuickRefresh = role.isNurseRole() ||
-                role.isRegistrationOfficerRole() ||
-                role.isCounsellingOfficerRole()
+        // Legacy, kept for reference:
+//        val role = pref.getLoggedInUser()?.role
+//        val canUseQuickRefresh = role.isNurseRole() ||
+//                role.isRegistrationOfficerRole() ||
+//                role.isCounsellingOfficerRole()
+        val canUseQuickRefresh = roleManager.privilegesUnion().allowQuickRefresh
+        Timber.d("RoleManager: allowQuickRefresh=$canUseQuickRefresh")
         if (!canUseQuickRefresh) {
             binding.llQuickRefresh.visibility = View.GONE
             return

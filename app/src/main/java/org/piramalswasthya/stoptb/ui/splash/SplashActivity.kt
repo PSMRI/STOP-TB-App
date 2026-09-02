@@ -16,9 +16,9 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.ui.login_activity.LoginActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
-import org.piramalswasthya.stoptb.utils.RoleConstants
 
 class SplashActivity : AppCompatActivity() {
 
@@ -26,6 +26,7 @@ class SplashActivity : AppCompatActivity() {
     @InstallIn(SingletonComponent::class)
     interface WrapperEntryPoint {
         val preferenceDao: PreferenceDao
+        val roleManager: RoleManager
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -43,13 +44,18 @@ class SplashActivity : AppCompatActivity() {
     }
 
     private fun navigateToNextScreen() {
-        val pref = EntryPointAccessors.fromApplication(
+        val entryPoint = EntryPointAccessors.fromApplication(
             applicationContext,
             WrapperEntryPoint::class.java
-        ).preferenceDao
+        )
+        val pref = entryPoint.preferenceDao
         val loggedInUser = pref.getLoggedInUser()
+        // Legacy, kept for reference:
+//        val destination = if (
+//            loggedInUser != null && RoleConstants.isAllowedStopTbRole(loggedInUser.role)
+//        ) {
         val destination = if (
-            loggedInUser != null && RoleConstants.isAllowedStopTbRole(loggedInUser.role)
+            loggedInUser != null && entryPoint.roleManager.hasAnyValidRole()
         ) {
             VolunteerActivity::class.java
         } else {

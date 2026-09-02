@@ -53,7 +53,9 @@ class IconGridAdapter(
     }
 
     class GridIconClickListener(val selectedListener: (dest: NavDirections) -> Unit) {
-        fun onClicked(icon: Icon) = selectedListener(icon.navAction)
-
+        // "Coming soon" placeholder cards have navAction == null — tapping them is a no-op.
+        fun onClicked(icon: Icon) {
+            icon.navAction?.let(selectedListener)
+        }
     }
 }

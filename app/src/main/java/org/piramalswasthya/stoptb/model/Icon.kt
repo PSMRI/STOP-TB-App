@@ -9,7 +9,9 @@ data class Icon(
     val title: String,
     val subtitle: String? = null,
     val count: Flow<Int>?,
-    val navAction: NavDirections,
+    // Nullable: "Coming soon" placeholder cards (multi-role Counselling tab) have no
+    // destination yet — tapping them is a no-op, see IconGridAdapter.GridIconClickListener.
+    val navAction: NavDirections? = null,
     var colorPrimary: Boolean = true,
     val allowRedBorder: Boolean = false
 )
