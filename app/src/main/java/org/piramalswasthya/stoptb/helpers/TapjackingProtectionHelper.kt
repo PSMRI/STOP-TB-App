@@ -16,7 +16,6 @@ object TapjackingProtectionHelper {
         // Skip screenshot prevention in debug builds to allow demos/screen recording
         if (BuildConfig.DEBUG) return
 
-        // Prevent screenshot + some overlays
         if (!BuildConfig.FLAVOR.contains("uat", ignoreCase = true)) {
             // Prevent screenshot + some overlays
             activity.window.setFlags(
