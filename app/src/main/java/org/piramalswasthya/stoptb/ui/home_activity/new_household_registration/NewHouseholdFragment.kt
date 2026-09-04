@@ -35,6 +35,7 @@ import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.databinding.AlertConsentBinding
 import org.piramalswasthya.stoptb.databinding.FragmentNewHouseholdBinding
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.RoleManager
@@ -217,6 +218,10 @@ class NewHouseholdFragment : Fragment() {
             val adapter = binding.form.rvInputForm.adapter as? FormInputAdapter
             adapter?.isEnabled = !recordExists
             adapter?.notifyDataSetChanged()
+
+            if (!recordExists && !viewModel.getIsConsentAgreed()) {
+                consentAlert.show()
+            }
         }
 
         // Save state
@@ -524,7 +529,44 @@ class NewHouseholdFragment : Fragment() {
         activity?.currentFocus?.clearFocus()
         if (!validateCurrentPage()) return
         if (!validateLocationSection()) return
+        if (!viewModel.getIsConsentAgreed()) {
+            consentAlert.show()
+            return
+        }
         viewModel.saveForm()
+    }
+
+    private val consentAlert by lazy {
+        val alertBinding = AlertConsentBinding.inflate(layoutInflater, binding.root, false)
+        alertBinding.textView4.text = getString(R.string.consent_alert_title)
+        alertBinding.scrollableText.text = getString(R.string.consent_text)
+        alertBinding.scrollableText.movementMethod = android.text.method.ScrollingMovementMethod()
+
+        val alertDialog = MaterialAlertDialogBuilder(requireContext())
+            .setView(alertBinding.root)
+            .setCancelable(false)
+            .create()
+
+        alertBinding.scrollableText.setOnClickListener {
+            alertBinding.checkBox.isChecked = !alertBinding.checkBox.isChecked
+        }
+        alertBinding.btnNegative.setOnClickListener {
+            alertDialog.dismiss()
+            findNavController().navigateUp()
+        }
+        alertBinding.btnPositive.setOnClickListener {
+            if (alertBinding.checkBox.isChecked) {
+                viewModel.setConsentAgreed()
+                alertDialog.dismiss()
+            } else {
+                Toast.makeText(
+                    context,
+                    getString(R.string.please_tick_the_checkbox),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+        alertDialog
     }
 
     private fun validateCurrentPage(): Boolean {
