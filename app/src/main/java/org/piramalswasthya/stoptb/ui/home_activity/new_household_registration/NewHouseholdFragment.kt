@@ -4,38 +4,36 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.content.IntentSender
 import android.content.pm.PackageManager
+import android.location.LocationListener
+import android.location.LocationManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Looper
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.Toast
-import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
-import com.google.android.gms.common.api.ResolvableApiException
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.LocationSettingsRequest
-import com.google.android.gms.location.Priority
-import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentNewHouseholdBinding
+import org.piramalswasthya.stoptb.helpers.GpsDiagnostics
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.LocationState
@@ -62,7 +60,10 @@ class NewHouseholdFragment : Fragment() {
     private var micClickedElementId: Int = -1
     private var editMode: Boolean = false
 
-    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    // Acquired directly from the OS
+    private lateinit var locationManager: LocationManager
+    private var gpsWatchdogJob: Job? = null
+    private var activeLocationListener: LocationListener? = null
 
     private val sttContract = registerForActivityResult(SpeechToTextContract()) { value ->
         val formatted = value.uppercase()
@@ -86,15 +87,6 @@ class NewHouseholdFragment : Fragment() {
             }
         }
 
-    private val resolveGpsSettings =
-        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-            if (result.resultCode == android.app.Activity.RESULT_OK) {
-                fetchLocationNow()
-            } else {
-                viewModel.onLocationFailed(LocationState.Failed.GpsDisabled)
-            }
-        }
-
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
@@ -113,7 +105,7 @@ class NewHouseholdFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
+        locationManager = requireContext().getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
         setupReasonDropdown()
         setupFormAdapter()
@@ -271,6 +263,18 @@ class NewHouseholdFragment : Fragment() {
             }
         }
 
+        // Location diagnostic detail — why the status above is what it is
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.locationDetail.collect { detail ->
+                if (detail.isNullOrBlank()) {
+                    binding.tvLocationDetail.visibility = View.GONE
+                } else {
+                    binding.tvLocationDetail.text = detail
+                    binding.tvLocationDetail.visibility = View.VISIBLE
+                }
+            }
+        }
+
         // GPS Unavailable state
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.isGpsUnavailable.collect { unavailable ->
@@ -352,6 +356,16 @@ class NewHouseholdFragment : Fragment() {
                 clearLocationFields()
                 Toast.makeText(context, getString(R.string.loc_msg_outside_india), Toast.LENGTH_LONG).show()
             }
+            is LocationState.Failed.NoGpsProvider -> {
+                binding.btnRefreshLocation.isEnabled = isEditMode
+                setStatusText(getString(R.string.loc_status_no_gps_provider), "#F44336")
+                clearLocationFields()
+            }
+            is LocationState.Failed.Timeout -> {
+                binding.btnRefreshLocation.isEnabled = isEditMode
+                setStatusText(getString(R.string.loc_status_timeout), "#F44336")
+                clearLocationFields()
+            }
         }
     }
 
@@ -427,73 +441,139 @@ class NewHouseholdFragment : Fragment() {
 
     private fun checkSettingsAndFetch() {
         viewModel.setFetching()
-        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10_000L)
-            .setWaitForAccurateLocation(false)
-            .setMaxUpdates(1)
-            .build()
+        GpsDiagnostics.logPreflight(requireContext(), "NewHouseholdFragment")
 
-        val settingsRequest = LocationSettingsRequest.Builder()
-            .addLocationRequest(locationRequest)
-            .build()
+        if (!GpsDiagnostics.isGpsHardwareAvailable(requireContext())) {
+            Timber.tag(GpsDiagnostics.TAG).w("No GPS hardware on this device — failing fast")
+            viewModel.onLocationFailed(LocationState.Failed.NoGpsProvider, getString(R.string.loc_detail_no_gps_hardware))
+            return
+        }
+        if (!GpsDiagnostics.isGpsProviderEnabled(requireContext())) {
 
-        val client = LocationServices.getSettingsClient(requireActivity())
-        client.checkLocationSettings(settingsRequest)
-            .addOnSuccessListener {
-                fetchLocationNow()
+            Timber.tag(GpsDiagnostics.TAG).w("GPS provider disabled — sending user to system Location Settings")
+            viewModel.onLocationFailed(LocationState.Failed.GpsDisabled, getString(R.string.loc_detail_gps_provider_off))
+            showEnableLocationDialog()
+            return
+        }
+
+        fetchLocationNow()
+    }
+
+    private fun showEnableLocationDialog() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(getString(R.string.loc_section_title))
+            .setMessage(getString(R.string.loc_msg_enable_location_settings))
+            .setPositiveButton(getString(R.string.loc_dialog_open_settings)) { _, _ ->
+                startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
             }
-            .addOnFailureListener { exception ->
-                if (exception is ResolvableApiException) {
-                    try {
-                        val request = IntentSenderRequest.Builder(exception.resolution.intentSender).build()
-                        resolveGpsSettings.launch(request)
-                    } catch (e: IntentSender.SendIntentException) {
-                        Timber.e(e, "Could not launch GPS settings dialog")
-                        viewModel.onLocationFailed(LocationState.Failed.GpsDisabled)
-                    }
-                } else {
-                    viewModel.onLocationFailed(LocationState.Failed.GpsDisabled)
-                }
-            }
+            .setNegativeButton(getString(R.string.dialog_no), null)
+            .show()
+    }
+    private fun startGpsWatchdog() {
+        gpsWatchdogJob?.cancel()
+        gpsWatchdogJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(GpsDiagnostics.MASTER_TIMEOUT_MS)
+            // Defensive: only act if we're still Fetching. A terminal state (Captured/Failed)
+            // should always cancel this job itself, but this guard means a missed cancellation
+            // elsewhere can never clobber an already-resolved result — it's a last resort, not
+            // an unconditional override.
+            if (viewModel.locationState.value !is LocationState.Fetching) return@launch
+            Timber.tag(GpsDiagnostics.TAG).e(
+                "GPS watchdog fired — no terminal state after ${GpsDiagnostics.MASTER_TIMEOUT_MS}ms. " +
+                    "Forcing UI out of Fetching (likely an OEM battery/background-process throttle)."
+            )
+            viewModel.onLocationFailed(LocationState.Failed.Timeout, getString(R.string.loc_detail_watchdog_timeout))
+        }
     }
 
     @SuppressLint("MissingPermission")
     private fun fetchLocationNow() {
         if (!hasLocationPermission()) {
+            gpsWatchdogJob?.cancel()
             viewModel.onLocationFailed(LocationState.Failed.PermissionDenied)
             return
         }
         viewModel.setFetching()
+        startGpsWatchdog()
 
-        val cts = CancellationTokenSource()
-        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
-            .addOnSuccessListener { location ->
-                if (location != null) {
-                    viewModel.onLocationResult(location.latitude, location.longitude)
-                } else {
-                    // Fall back to last known location
-                    fusedLocationClient.lastLocation
-                        .addOnSuccessListener { lastLocation ->
-                            if (lastLocation != null) {
-                                viewModel.onLocationResult(lastLocation.latitude, lastLocation.longitude)
-                            } else {
-                                viewModel.onLocationFailed(LocationState.Failed.NoSignal)
-                                if (isAdded) {
-                                    Toast.makeText(context, getString(R.string.loc_msg_no_signal), Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        }
-                        .addOnFailureListener {
-                            viewModel.onLocationFailed(LocationState.Failed.NoSignal)
-                        }
-                }
+        val fetchStartElapsed = SystemClock.elapsedRealtime()
+
+        val fetchCancelJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(GpsDiagnostics.FETCH_TIMEOUT_MS)
+            Timber.tag(GpsDiagnostics.TAG).w(
+                "GPS fetch exceeded ${GpsDiagnostics.FETCH_TIMEOUT_MS}ms with no fix — removing listener. " +
+                    "Offline cold fixes can legitimately take this long without A-GPS assistance data."
+            )
+            stopListeningForLocation()
+            resolveWithCachedLocation(fetchStartElapsed)
+        }
+
+        val listener = object : LocationListener {
+            override fun onLocationChanged(location: android.location.Location) {
+                fetchCancelJob.cancel()
+                gpsWatchdogJob?.cancel()
+                stopListeningForLocation()
+                val elapsed = SystemClock.elapsedRealtime() - fetchStartElapsed
+                val detail = GpsDiagnostics.locationUiSummary(location, elapsed, fromCache = false)
+                Timber.tag(GpsDiagnostics.TAG).i("Fresh fix in ${elapsed}ms: ${GpsDiagnostics.locationLogLine(location, elapsed)}")
+                viewModel.onLocationResult(location.latitude, location.longitude, detail)
             }
-            .addOnFailureListener { e ->
-                Timber.e(e, "GPS fetch failed")
-                viewModel.onLocationFailed(LocationState.Failed.NoSignal)
-                if (isAdded) {
-                    Toast.makeText(context, getString(R.string.loc_timeout_msg), Toast.LENGTH_LONG).show()
-                }
+
+            @Deprecated("Deprecated in Java")
+            override fun onStatusChanged(provider: String?, status: Int, extras: android.os.Bundle?) {}
+            override fun onProviderEnabled(provider: String) {}
+            override fun onProviderDisabled(provider: String) {
+                Timber.tag(GpsDiagnostics.TAG).w("GPS provider was disabled while waiting for a fix")
             }
+        }
+        activeLocationListener = listener
+
+        try {
+            locationManager.requestLocationUpdates(
+                LocationManager.GPS_PROVIDER,
+                0L,
+                0f,
+                listener,
+                Looper.getMainLooper()
+            )
+        } catch (e: Exception) {
+            fetchCancelJob.cancel()
+            gpsWatchdogJob?.cancel()
+            stopListeningForLocation()
+            Timber.tag(GpsDiagnostics.TAG).e(e, "requestLocationUpdates failed: ${GpsDiagnostics.describeFailure(e)}")
+            viewModel.onLocationFailed(LocationState.Failed.NoSignal, GpsDiagnostics.describeFailure(e))
+        }
+    }
+
+    private fun stopListeningForLocation() {
+        activeLocationListener?.let { runCatching { locationManager.removeUpdates(it) } }
+        activeLocationListener = null
+    }
+
+    /** No fresh fix within the fetch timeout — try a cached last-known location (GPS, then network) before giving up. */
+    private fun resolveWithCachedLocation(fetchStartElapsed: Long) {
+        // This is a terminal outcome (Captured or Failed either way) — the 75s master watchdog
+        // must not be allowed to fire later and clobber whatever we're about to set.
+        gpsWatchdogJob?.cancel()
+        val elapsed = SystemClock.elapsedRealtime() - fetchStartElapsed
+        val cached = runCatching { locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER) }.getOrNull()
+            ?: runCatching { locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) }.getOrNull()
+
+        if (cached != null) {
+            val detail = GpsDiagnostics.locationUiSummary(cached, elapsed, fromCache = true)
+            Timber.tag(GpsDiagnostics.TAG).i("Using cached location: ${GpsDiagnostics.locationLogLine(cached, elapsed)}")
+            viewModel.onLocationResult(cached.latitude, cached.longitude, detail)
+        } else {
+            Timber.tag(GpsDiagnostics.TAG).w("No fresh fix and no cached location available after ${elapsed}ms")
+            if (elapsed >= GpsDiagnostics.FETCH_TIMEOUT_MS) {
+                viewModel.onLocationFailed(LocationState.Failed.Timeout, getString(R.string.loc_detail_timeout))
+            } else {
+                viewModel.onLocationFailed(LocationState.Failed.NoSignal, getString(R.string.loc_detail_no_fix_no_cache))
+            }
+            if (isAdded) {
+                Toast.makeText(context, getString(R.string.loc_msg_no_signal), Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun hasLocationPermission(): Boolean =
@@ -615,6 +695,8 @@ class NewHouseholdFragment : Fragment() {
 
 
     override fun onDestroyView() {
+        gpsWatchdogJob?.cancel()
+        stopListeningForLocation()
         super.onDestroyView()
         _binding = null
     }

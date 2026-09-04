@@ -1337,6 +1337,14 @@
     <string name="loc_status_permission_denied">Please grant location permission to fetch latitude and longitude.</string>
     <string name="loc_status_gps_unavailable">GPS Unavailable</string>
     <string name="loc_status_gps_disabled">GPS is disabled on this device</string>
+    <string name="loc_status_no_gps_provider">GPS is turned off on this device</string>
+    <string name="loc_status_timeout">GPS search timed out</string>
+    <string name="loc_detail_no_gps_hardware">No GPS hardware was detected on this device.</string>
+    <string name="loc_detail_gps_provider_off">Device location mode is set to network-only. Switch to \"Device only\" or \"High accuracy\" in Location settings so GPS works without internet.</string>
+    <string name="loc_msg_enable_location_settings">Location is turned off on this device. Please enable it in Location Settings, then come back and tap Refresh.</string>
+    <string name="loc_detail_no_fix_no_cache">No GPS fix was obtained and no previous location is cached on this device.</string>
+    <string name="loc_detail_timeout">No signal within 60 seconds. Cold GPS fixes can take longer without internet (no assisted-GPS data available). Move to open sky and try again.</string>
+    <string name="loc_detail_watchdog_timeout">GPS did not respond within 75 seconds. If a location dialog appears stuck on screen, press Back, then tap Refresh — or mark GPS Unavailable to continue.</string>
     <string name="loc_label_latitude">Latitude</string>
     <string name="loc_label_longitude">Longitude</string>
     <string name="loc_label_digipin">DIGIPIN</string>

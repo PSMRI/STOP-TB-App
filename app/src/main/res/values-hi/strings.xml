@@ -953,6 +953,14 @@
     <string name="loc_status_permission_denied">अक्षांश और देशांतर प्राप्त करने के लिए कृपया स्थान की अनुमति दें।</string>
     <string name="loc_status_gps_unavailable">GPS उपलब्ध नहीं</string>
     <string name="loc_status_gps_disabled">इस डिवाइस पर GPS अक्षम है</string>
+    <string name="loc_status_no_gps_provider">इस डिवाइस पर GPS बंद है</string>
+    <string name="loc_status_timeout">GPS खोज का समय समाप्त हो गया</string>
+    <string name="loc_detail_no_gps_hardware">इस डिवाइस पर कोई GPS हार्डवेयर नहीं मिला।</string>
+    <string name="loc_detail_gps_provider_off">डिवाइस का लोकेशन मोड केवल नेटवर्क पर सेट है। बिना इंटरनेट के GPS काम करे, इसके लिए लोकेशन सेटिंग में \"केवल डिवाइस\" या \"उच्च सटीकता\" चुनें।</string>
+    <string name="loc_msg_enable_location_settings">इस डिवाइस पर लोकेशन बंद है। कृपया लोकेशन सेटिंग में इसे चालू करें, फिर वापस आकर रिफ्रेश दबाएं।</string>
+    <string name="loc_detail_no_fix_no_cache">GPS स्थान प्राप्त नहीं हुआ और इस डिवाइस पर कोई पिछला स्थान सहेजा हुआ नहीं है।</string>
+    <string name="loc_detail_timeout">60 सेकंड में कोई सिग्नल नहीं मिला। बिना इंटरनेट के GPS को स्थान प्राप्त करने में अधिक समय लग सकता है। खुले आसमान के नीचे जाकर पुनः प्रयास करें।</string>
+    <string name="loc_detail_watchdog_timeout">75 सेकंड में GPS ने प्रतिक्रिया नहीं दी। यदि स्क्रीन पर कोई लोकेशन डायलॉग अटका हुआ दिखे, तो बैक दबाएं और फिर रिफ्रेश पर टैप करें — या आगे बढ़ने के लिए GPS अनुपलब्ध चिह्नित करें।</string>
     <string name="loc_label_latitude">अक्षांश</string>
     <string name="loc_label_longitude">देशांतर</string>
     <string name="loc_label_digipin">DIGIPIN</string>
