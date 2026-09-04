@@ -54,6 +54,14 @@ class NewHouseholdViewModel @Inject constructor(
     private val _readRecord = MutableLiveData(hhIdFromArgs > 0)
     val readRecord: LiveData<Boolean> get() = _readRecord
 
+    private var isConsentAgreed = false
+
+    fun setConsentAgreed() {
+        isConsentAgreed = true
+    }
+
+    fun getIsConsentAgreed() = isConsentAgreed
+
     private lateinit var user: User
     private lateinit var household: HouseholdCache
     private val dataset = HouseholdFormDataset(context, preferenceDao.getCurrentLanguage())
