@@ -19,6 +19,7 @@ import org.piramalswasthya.stoptb.configuration.HouseholdFormDataset
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.DigiPinHelper
+import org.piramalswasthya.stoptb.helpers.GpsDiagnostics
 import org.piramalswasthya.stoptb.model.HouseholdCache
 import org.piramalswasthya.stoptb.model.User
 import org.piramalswasthya.stoptb.repositories.BenRepo
@@ -71,6 +72,9 @@ class NewHouseholdViewModel @Inject constructor(
 
     private val _gpsUnavailableReason = MutableStateFlow<String?>(null)
     val gpsUnavailableReason: StateFlow<String?> = _gpsUnavailableReason.asStateFlow()
+
+    private val _locationDetail = MutableStateFlow<String?>(null)
+    val locationDetail: StateFlow<String?> = _locationDetail.asStateFlow()
 
     // ─── Init ─────────────────────────────────────────────────────────────────
 
@@ -128,13 +132,17 @@ class NewHouseholdViewModel @Inject constructor(
         _locationState.value = LocationState.Fetching
     }
 
-    fun onLocationResult(lat: Double, lon: Double) {
+    fun onLocationResult(lat: Double, lon: Double, detail: String? = null) {
         val digipin = DigiPinHelper.generate(lat, lon)
         if (digipin == null) {
+            Timber.tag(GpsDiagnostics.TAG).w("onLocationResult rejected: lat=$lat lon=$lon is outside supported bounds")
+            _locationDetail.value = "lat=$lat, lon=$lon is outside the supported India bounding box"
             _locationState.value = LocationState.Failed.OutsideIndia
             return
         }
+        Timber.tag(GpsDiagnostics.TAG).i("onLocationResult captured: lat=$lat lon=$lon digipin=$digipin detail=$detail")
         val ts = System.currentTimeMillis().toString()
+        _locationDetail.value = detail
         _locationState.value = LocationState.Captured(lat, lon, digipin, formatTimestamp(ts))
     }
 
@@ -144,7 +152,9 @@ class NewHouseholdViewModel @Inject constructor(
         return formatter.format(date)
     }
 
-    fun onLocationFailed(reason: LocationState.Failed) {
+    fun onLocationFailed(reason: LocationState.Failed, detail: String? = null) {
+        Timber.tag(GpsDiagnostics.TAG).w("onLocationFailed: reason=$reason detail=$detail")
+        _locationDetail.value = detail
         _locationState.value = reason
     }
 
