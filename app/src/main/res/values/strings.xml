@@ -1006,7 +1006,9 @@
     <string name="quick_refresh_action">Refresh</string>
     <string name="quick_refresh_camp_disconnected">Camp Hub is not connected. Please reconnect first.</string>
     <string name="quick_refresh_ip_not_reachable">IP address not reachable: %1$s</string>
-
+    <string name="error_message">Error Message : </string>
+    <string name="see_more">See more</string>
+    <string name="see_less">See less</string>
     <string name="vital_screen">General Examination</string>
     <string name="vital_screen_placeholder">Vitals and Anthropometric for beneficiary ID: %1$d</string>
     <string name="vital_details">Vitals (Optional)</string>

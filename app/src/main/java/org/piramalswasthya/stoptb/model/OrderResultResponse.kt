@@ -18,5 +18,6 @@ data class OrderResultData(
     val providerStatus: String? = null,
     val resultSummary: String? = null,
     val tbPresence: Boolean? = null,
-    val drugResistancePresence: Boolean? = null
+    val drugResistancePresence: Boolean? = null,
+    val errorMessage: String? = null
 )

@@ -534,6 +534,18 @@
                                 android:visibility="gone"
                                 tools:text="Status: Referred for X-ray" />
 
+                            <TextView
+                                android:id="@+id/tv_error_msg"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginBottom="4dp"
+                                android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                                android:textColor="@color/md_theme_light_error"
+                                android:maxLines="2"
+                                android:ellipsize="end"
+                                android:visibility="gone"
+                                tools:text="Error msg : Something went wrong… See more" />
+
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
