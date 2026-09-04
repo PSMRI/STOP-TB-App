@@ -1,11 +1,8 @@
 package org.piramalswasthya.stoptb.repositories
 
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -17,7 +14,6 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.GeneralOpdCache
-import org.piramalswasthya.stoptb.model.OrderPushedResponse
 import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
@@ -44,7 +40,6 @@ import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Locale
 import javax.inject.Inject
-import kotlin.time.Duration.Companion.milliseconds
 
 class TBRepo @Inject constructor(
     private val tbDao: TBDao,
@@ -1481,14 +1476,16 @@ class TBRepo @Inject constructor(
                                         xrayOrderStatus = if (status.equals("COMPLETED", ignoreCase = true)) "COMPLETED" else if (status.equals("FAILED", ignoreCase = true)) "FAILED" else if (it.xrayOrderStatus == "AWAITING_PROVIDER_RESULT") "AWAITING_PROVIDER_RESULT" else status,
                                         isChestXRayDone = true,
                                         isReferredForDigitalChestXray = true,
-                                        syncState = SyncState.UNSYNCED
+                                        syncState = SyncState.UNSYNCED,
+                                        errorMsgXray = responseBody.data.errorMessage
                                     )
                                 } else if (testType.equals("MDR_RIF", ignoreCase = true)) {
                                     it.copy(
                                         rifOrderId = orderId,
                                         rifOrderStatus = if (status.equals("COMPLETED", ignoreCase = true)) "COMPLETED" else if (status.equals("FAILED", ignoreCase = true)) "FAILED" else if (it.rifOrderStatus == "AWAITING_PROVIDER_RESULT") "AWAITING_PROVIDER_RESULT" else status,
                                         trueNatRifResult = null,
-                                        syncState = SyncState.UNSYNCED
+                                        syncState = SyncState.UNSYNCED,
+                                        errorMsgRif = responseBody.data.errorMessage
                                     )
                                 } else {
                                     it.copy(
@@ -1499,7 +1496,8 @@ class TBRepo @Inject constructor(
                                         isSputumCollected = true,
                                         isNaatConducted = true,
                                         sputumSubmittedAt = it.sputumSubmittedAt ?: "TB Screening Camp",
-                                        syncState = SyncState.UNSYNCED
+                                        syncState = SyncState.UNSYNCED,
+                                        errorMsgTrueNat = responseBody.data.errorMessage
                                     )
                                 }
                             }
@@ -1517,15 +1515,16 @@ class TBRepo @Inject constructor(
                             return@withContext NetworkResponse.Success(orderId ?: "")
                         } else {
                             val errorMsg =  response.body()?.errorMessage?: "Failed to push order"
-                            saveFailedOrderStatus(benId, testType)
+                            saveFailedOrderStatus(benId, testType, errorMsg)
                             return@withContext NetworkResponse.Error(errorMsg)
                         }
                     }
                 }
-                saveFailedOrderStatus(benId, testType)
+                saveFailedOrderStatus(benId, testType, "HTTP Error $statusCode")
                 NetworkResponse.Error("HTTP Error $statusCode")
             } catch (e: Exception) {
                 Timber.e(e, "createProdigiOrder failed")
+                // Keep errorMessage null on timeout/connect failure to flag the request for reconciliation.
                 saveFailedOrderStatus(benId, testType)
                 NetworkResponse.Error(e.message ?: "Unknown error")
             }
@@ -1755,14 +1754,27 @@ class TBRepo @Inject constructor(
         }
     }
 
-    private suspend fun saveFailedOrderStatus(benId: Long, testType: String) {
+    // Pass errorMessage only for confirmed server/HTTP failures; keep it null for ambiguous failures.
+    private suspend fun saveFailedOrderStatus(benId: Long, testType: String, errorMessage: String? = null) {
         try {
             val existing = tbDao.getTbDiagnosticsByBenId(benId)
             val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
-                if (testType.equals("XRAY_CHEST", ignoreCase = true)) {
-                    it.copy(xrayOrderStatus = "FAILED", syncState = SyncState.UNSYNCED)
-                } else {
-                    it.copy(trueNatOrderStatus = "FAILED", syncState = SyncState.UNSYNCED)
+                when {
+                    testType.equals("XRAY_CHEST", ignoreCase = true) -> it.copy(
+                        xrayOrderStatus = "FAILED",
+                        errorMsgXray = errorMessage ?: it.errorMsgXray,
+                        syncState = SyncState.UNSYNCED
+                    )
+                    testType.equals("MDR_RIF", ignoreCase = true) -> it.copy(
+                        rifOrderStatus = "FAILED",
+                        errorMsgRif = errorMessage ?: it.errorMsgRif,
+                        syncState = SyncState.UNSYNCED
+                    )
+                    else -> it.copy(
+                        trueNatOrderStatus = "FAILED",
+                        errorMsgTrueNat = errorMessage ?: it.errorMsgTrueNat,
+                        syncState = SyncState.UNSYNCED
+                    )
                 }
             }
             tbDao.saveTbDiagnostics(cache)
@@ -1772,10 +1784,59 @@ class TBRepo @Inject constructor(
         }
     }
 
+
+    // Returns true when a failed order has no error message and requires reconciliation.
+    suspend fun isAwaitingReconciliation(benId: Long, orderType: String, errorMsg: String?): Boolean {
+        if (!errorMsg.isNullOrBlank()) return false
+        reconcileOrderResult(benId, orderType)
+        return true
+    }
+
+    // Rechecks the order result and updates the diagnostic record.
+    private suspend fun reconcileOrderResult(benId: Long, orderType: String) {
+        try {
+            val existing = tbDao.getTbDiagnosticsByBenId(benId) ?: return
+            val response = tmcNetworkApiService.fetchOrderResult(
+                benId = benId,
+                orderType = orderType
+            )
+            if (response.code() != 200) return
+
+            val responseData = response.body()?.takeIf { it.statusCode == 200 }?.data
+                ?: return
+
+            val cache = when {
+                orderType.equals("XRAY_CHEST", ignoreCase = true) ->
+                    existing.copy(
+                        errorMsgXray = responseData.errorMessage,
+                        syncState = SyncState.UNSYNCED
+                    )
+
+                orderType.equals("MDR_RIF", ignoreCase = true) ->
+                    existing.copy(
+                        errorMsgRif = responseData.errorMessage,
+                        syncState = SyncState.UNSYNCED
+                    )
+
+                orderType.equals("SPUTUM_TRUENAT", ignoreCase = true) ->
+                    existing.copy(
+                        errorMsgTrueNat = responseData.errorMessage,
+                        syncState = SyncState.UNSYNCED
+                    )
+
+                else -> return
+            }
+
+            tbDao.saveTbDiagnostics(cache)
+        } catch (e: Exception) {
+            Timber.e(e, "giveUpReconciliation failed")
+        }
+    }
+
     suspend fun markTestCompleted(benId: Long, orderType: String): NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
             val ben = benDao.getBen(benId)
-                ?: return@withContext org.piramalswasthya.stoptb.helpers.NetworkResponse.Error("Beneficiary not found")
+                ?: return@withContext NetworkResponse.Error("Beneficiary not found")
             try {
                 val apiOrderType = if (orderType.equals("SPUTUM_TRUENAT", ignoreCase = true)) "MTB" else orderType
                 val response = tmcNetworkApiService.markTestCompleted(benRegID = ben.beneficiaryId, orderType = apiOrderType)
@@ -1859,8 +1920,8 @@ class TBRepo @Inject constructor(
                             val rawStatus = responseData.status
                             val status = if (rawStatus.isNullOrBlank()) "IN_PROGRESS" else rawStatus
                            Timber.d("STOP-TB polling debug: fetchOrderResult benId=$benId status=$status rawStatus=$rawStatus")
-                            
-val fetchedOrderId = responseData.externalOrderId.asValidOrderId()
+
+                            val fetchedOrderId = responseData.externalOrderId.asValidOrderId()
                             val existing = tbDao.getTbDiagnosticsByBenId(benId)
                             val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
                                 if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
@@ -1940,6 +2001,8 @@ val fetchedOrderId = responseData.externalOrderId.asValidOrderId()
                                             isReferredForDigitalChestXray = true,
                                             isChestXRayDone = if (isCompleted) true else it.isChestXRayDone,
                                             chestXRayResult = if (isCompleted) chestResult else it.chestXRayResult,
+                                            errorMsgXray = if (status.equals(OrderStatus.FAILED.name, ignoreCase = true))
+                                                responseData.errorMessage ?: it.errorMsgXray else it.errorMsgXray,
                                             syncState = SyncState.UNSYNCED
                                         )
                                     }
@@ -1977,6 +2040,8 @@ val fetchedOrderId = responseData.externalOrderId.asValidOrderId()
                                         rifOrderStatus = computedRifStatus,
                                         rifOrderId = computedRifOrderId ?: it.rifOrderId,
                                         trueNatRifResult = if (isCompleted) rifResult else it.trueNatRifResult,
+                                        errorMsgRif = if (status.equals(OrderStatus.FAILED.name, ignoreCase = true))
+                                            responseData.errorMessage ?: it.errorMsgRif else it.errorMsgRif,
                                         syncState = SyncState.UNSYNCED
                                     )
                                 } else {
@@ -2073,6 +2138,8 @@ val fetchedOrderId = responseData.externalOrderId.asValidOrderId()
                                         isConfirmed = if (isCompleted) isMtbDetected else it.isConfirmed,
                                         rifOrderStatus = computedRifStatus,
                                         rifOrderId = computedRifOrderId ?: it.rifOrderId,
+                                        errorMsgTrueNat = if (status.equals(OrderStatus.FAILED.name, ignoreCase = true))
+                                            responseData.errorMessage ?: it.errorMsgTrueNat else it.errorMsgTrueNat,
                                         syncState = SyncState.UNSYNCED
                                     )
                                 }
@@ -2158,6 +2225,26 @@ val fetchedOrderId = responseData.externalOrderId.asValidOrderId()
                             }
                             dataObj?.optJSONArray("failed")?.let { arr ->
                                 for (i in 0 until arr.length()) {
+                                    isAwaitingReconciliation(
+                                        arr.getLong(i),
+                                        apiOrderType,
+                                        tbDao.getDiagnosticsList()
+                                            .firstOrNull { it.id.toLong() == arr.getLong(i) }
+                                            ?.let { bens ->
+                                                when {
+                                                    orderType.equals("XRAY_CHEST", ignoreCase = true) ->
+                                                        bens.errorMsgXray
+
+                                                    orderType.equals("MDR_RIF", ignoreCase = true) ->
+                                                        bens.errorMsgRif
+
+                                                    orderType.equals("MTB", ignoreCase = true) ->
+                                                        bens.errorMsgTrueNat
+
+                                                    else -> null
+                                                }
+                                            }
+                                    )
                                     failedList.add(arr.getLong(i))
                                 }
                             }
