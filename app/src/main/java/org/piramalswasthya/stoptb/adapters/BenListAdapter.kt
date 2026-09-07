@@ -47,6 +47,7 @@ class BenListAdapter(
     private val showResultButton: Boolean = false,
     private val showAnthropometryButton: Boolean = false,
     private val showExamineButton: Boolean = true,
+    private val showScreeningStatus: Boolean = false,
     private val showContactTracingForms: Boolean = false
 ) : ListAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenDiffUtilCallBack) {
 
@@ -100,6 +101,7 @@ class BenListAdapter(
             showResultButton: Boolean = false,
             showAnthropometryButton: Boolean = false,
             showExamineButton: Boolean = true,
+            showScreeningStatus: Boolean = false,   // NEW
             tbDiagnosticsList: List<TBDiagnosticsCache> = emptyList(),
             source: Int = 0,
             retryingBenIds: List<Long> = emptyList(),
@@ -177,6 +179,37 @@ class BenListAdapter(
 
             binding.btnAnthropometry.visibility = View.GONE
             binding.llAnthropometryAction.visibility = View.GONE
+
+            // NEW — Screening status infographic (Symptoms / X-Ray / Trunat)
+            if (showScreeningStatus) {
+                binding.llScreeningStatus.visibility = View.VISIBLE
+
+                val doneColor = ContextCompat.getColor(binding.root.context, android.R.color.holo_green_dark)
+                val pendingColor = ContextCompat.getColor(binding.root.context, android.R.color.darker_gray)
+
+                val symptomsDone = item.symptomsScreenedDate != null
+                binding.tvSymptomsStatus.text = if (symptomsDone)
+                    binding.root.context.getString(R.string.status_symptoms_screened)
+                else
+                    binding.root.context.getString(R.string.status_pending)
+                binding.tvSymptomsStatus.setTextColor(if (symptomsDone) doneColor else pendingColor)
+
+                val xrayDone = item.chestXrayDoneDate != null
+                binding.tvXrayStatus.text = if (xrayDone)
+                    binding.root.context.getString(R.string.status_xray_done)
+                else
+                    binding.root.context.getString(R.string.status_pending)
+                binding.tvXrayStatus.setTextColor(if (xrayDone) doneColor else pendingColor)
+
+                val trunatDone = item.trunatTestDoneDate != null
+                binding.tvTruenatStatus.text = if (trunatDone)
+                    binding.root.context.getString(R.string.status_trunat_done)
+                else
+                    binding.root.context.getString(R.string.status_pending)
+                binding.tvTruenatStatus.setTextColor(if (trunatDone) doneColor else pendingColor)
+            } else {
+                binding.llScreeningStatus.visibility = View.GONE
+            }
 
             if (binding.btnVitalScreen.visibility == View.VISIBLE) {
                 if (showResultButton) {

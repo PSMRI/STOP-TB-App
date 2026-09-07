@@ -57,6 +57,14 @@ enum class BenStatus {
     Death,
 }
 
+enum class ScreeningStatus {
+    UNSCREENED,
+    SYMPTOMS_SCREENED,
+    CHEST_XRAY_DONE,
+    TRUNAT_TEST_DONE
+}
+
+
 // In your BenBasicCache.kt file, REPLACE the old @DatabaseView with this one.
 @DatabaseView(
     viewName = "BEN_BASIC_CACHE",

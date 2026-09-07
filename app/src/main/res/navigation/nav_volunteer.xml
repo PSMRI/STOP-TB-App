@@ -36,6 +36,17 @@
         <action
             android:id="@+id/action_volunteerHomeFragment_to_TBConfirmedListFragment"
             app:destination="@id/TBConfirmedListFragment" />
+
+        <action
+            android:id="@+id/action_volunteerHomeFragment_to_unScreenedPeople"
+            app:destination="@id/unScreenedPeople" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/unScreenedPeople"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.unscreened_people.UnScreenedPeople"
+        android:label="@string/icon_title_unscreened">
+
     </fragment>
 
     <fragment

@@ -76,6 +76,7 @@ class TBRepo @Inject constructor(
                 ben.gpsLongitude?.let { tbScreeningCache.longitude = it }
             }
             tbDao.saveTbScreening(tbScreeningCache)
+            benDao.markSymptomsScreened(tbScreeningCache.benId)   // NEW
         }
     }
 
