@@ -8,7 +8,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import org.piramalswasthya.stoptb.BuildConfig
+import org.piramalswasthya.stoptb. BuildConfig
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -916,6 +916,7 @@ class BenListAdapter(
             showActionButtons = showActionButtons,
             showResultButton = showResultButton,
             showAnthropometryButton = showAnthropometryButton,
+            showScreeningStatus = showScreeningStatus,
             tbDiagnosticsList = tbDiagnosticsList,
             source = source,
             showExamineButton = showExamineButton,
