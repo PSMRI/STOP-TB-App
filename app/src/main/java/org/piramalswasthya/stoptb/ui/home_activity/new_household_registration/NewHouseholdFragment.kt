@@ -23,6 +23,10 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Job
@@ -65,6 +69,10 @@ class NewHouseholdFragment : Fragment() {
     private lateinit var locationManager: LocationManager
     private var gpsWatchdogJob: Job? = null
     private var activeLocationListener: LocationListener? = null
+    // Fast path — only used when Google Play Services is available (GpsDiagnostics.isPlayServicesAvailable()).
+    // Lazily created so it's never touched at all on non-GMS devices.
+    private var fusedLocationClient: FusedLocationProviderClient? = null
+    private var activeCancellationTokenSource: CancellationTokenSource? = null
 
     private val sttContract = registerForActivityResult(SpeechToTextContract()) { value ->
         val formatted = value.uppercase()
@@ -453,6 +461,12 @@ class NewHouseholdFragment : Fragment() {
             viewModel.onLocationFailed(LocationState.Failed.NoGpsProvider, getString(R.string.loc_detail_no_gps_hardware))
             return
         }
+        if (!hasFineLocationPermission()) {
+            Timber.tag(GpsDiagnostics.TAG).w("Only approximate location permission granted — precise location required for offline GPS")
+            viewModel.onLocationFailed(LocationState.Failed.PermissionDenied, getString(R.string.loc_detail_precise_permission_required))
+            showOpenSettingsDialog()
+            return
+        }
         if (!GpsDiagnostics.isGpsProviderEnabled(requireContext())) {
 
             Timber.tag(GpsDiagnostics.TAG).w("GPS provider disabled — sending user to system Location Settings")
@@ -485,7 +499,8 @@ class NewHouseholdFragment : Fragment() {
             if (viewModel.locationState.value !is LocationState.Fetching) return@launch
             Timber.tag(GpsDiagnostics.TAG).e(
                 "GPS watchdog fired — no terminal state after ${GpsDiagnostics.MASTER_TIMEOUT_MS}ms. " +
-                    "Forcing UI out of Fetching (likely an OEM battery/background-process throttle)."
+                    "Forcing UI out of Fetching (likely an OEM battery/background-process throttle, " +
+                    "or a hung Play Services task on the fused fast path)."
             )
             viewModel.onLocationFailed(LocationState.Failed.Timeout, getString(R.string.loc_detail_watchdog_timeout))
         }
@@ -502,7 +517,92 @@ class NewHouseholdFragment : Fragment() {
         startGpsWatchdog()
 
         val fetchStartElapsed = SystemClock.elapsedRealtime()
+        if (GpsDiagnostics.isPlayServicesAvailable(requireContext())) {
+            Timber.tag(GpsDiagnostics.TAG).i("Play Services available — using FusedLocationProviderClient fast path")
+            fetchLocationViaFusedProvider(fetchStartElapsed)
+        } else {
+            Timber.tag(GpsDiagnostics.TAG).i("Play Services unavailable — using android.location.LocationManager")
+            fetchLocationViaLocationManager(fetchStartElapsed)
+        }
+    }
 
+    @SuppressLint("MissingPermission")
+    private fun fetchLocationViaFusedProvider(fetchStartElapsed: Long) {
+        val client = fusedLocationClient
+            ?: LocationServices.getFusedLocationProviderClient(requireActivity()).also { fusedLocationClient = it }
+        val cts = CancellationTokenSource()
+        activeCancellationTokenSource = cts
+
+        val fetchCancelJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(GpsDiagnostics.FETCH_TIMEOUT_MS)
+            Timber.tag(GpsDiagnostics.TAG).w(
+                "Fused fetch exceeded ${GpsDiagnostics.FETCH_TIMEOUT_MS}ms with no fix — cancelling."
+            )
+            stopListeningForLocation()
+            resolveWithCachedLocation(fetchStartElapsed)
+        }
+
+        try {
+            client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+                .addOnSuccessListener { location ->
+                    fetchCancelJob.cancel()
+                    gpsWatchdogJob?.cancel()
+                    stopListeningForLocation()
+                    if (location != null) {
+                        val elapsed = SystemClock.elapsedRealtime() - fetchStartElapsed
+                        val detail = GpsDiagnostics.locationUiSummary(location, elapsed, fromCache = false)
+                        Timber.tag(GpsDiagnostics.TAG).i("Fused fresh fix in ${elapsed}ms: ${GpsDiagnostics.locationLogLine(location, elapsed)}")
+                        viewModel.onLocationResult(location.latitude, location.longitude, detail)
+                    } else {
+                        Timber.tag(GpsDiagnostics.TAG).w("Fused getCurrentLocation returned null — trying lastLocation")
+                        try {
+                            client.lastLocation
+                                .addOnSuccessListener { last ->
+                                    val elapsed = SystemClock.elapsedRealtime() - fetchStartElapsed
+                                    if (last != null) {
+                                        val detail = GpsDiagnostics.locationUiSummary(last, elapsed, fromCache = true)
+                                        Timber.tag(GpsDiagnostics.TAG).i("Fused lastLocation: ${GpsDiagnostics.locationLogLine(last, elapsed)}")
+                                        viewModel.onLocationResult(last.latitude, last.longitude, detail)
+                                    } else {
+                                        viewModel.onLocationFailed(LocationState.Failed.NoSignal, getString(R.string.loc_detail_no_fix_no_cache))
+                                        if (isAdded) Toast.makeText(context, getString(R.string.loc_msg_no_signal), Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                                .addOnFailureListener { e ->
+                                    Timber.tag(GpsDiagnostics.TAG).e(e, "Fused lastLocation failed: ${GpsDiagnostics.describeFailure(e)}")
+                                    viewModel.onLocationFailed(LocationState.Failed.NoSignal, GpsDiagnostics.describeFailure(e))
+                                }
+                        } catch (e: SecurityException) {
+                            Timber.tag(GpsDiagnostics.TAG).e(e, "lastLocation SecurityException: ${GpsDiagnostics.describeFailure(e)}")
+                            viewModel.onLocationFailed(LocationState.Failed.PermissionDenied)
+                        }
+                    }
+                }
+                .addOnFailureListener { e ->
+                    fetchCancelJob.cancel()
+                    gpsWatchdogJob?.cancel()
+                    stopListeningForLocation()
+                    val elapsed = SystemClock.elapsedRealtime() - fetchStartElapsed
+                    Timber.tag(GpsDiagnostics.TAG).e(e, "Fused fetch failed after ${elapsed}ms: ${GpsDiagnostics.describeFailure(e)}")
+                    if (elapsed >= GpsDiagnostics.FETCH_TIMEOUT_MS) {
+                        viewModel.onLocationFailed(LocationState.Failed.Timeout, getString(R.string.loc_detail_timeout))
+                    } else {
+                        viewModel.onLocationFailed(LocationState.Failed.NoSignal, GpsDiagnostics.describeFailure(e))
+                    }
+                    if (isAdded) Toast.makeText(context, getString(R.string.loc_timeout_msg), Toast.LENGTH_LONG).show()
+                }
+        } catch (e: SecurityException) {
+            // Same race as above, but on the initial getCurrentLocation() call itself.
+            fetchCancelJob.cancel()
+            gpsWatchdogJob?.cancel()
+            stopListeningForLocation()
+            Timber.tag(GpsDiagnostics.TAG).e(e, "getCurrentLocation SecurityException: ${GpsDiagnostics.describeFailure(e)}")
+            viewModel.onLocationFailed(LocationState.Failed.PermissionDenied)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun fetchLocationViaLocationManager(fetchStartElapsed: Long) {
         val fetchCancelJob = viewLifecycleOwner.lifecycleScope.launch {
             delay(GpsDiagnostics.FETCH_TIMEOUT_MS)
             Timber.tag(GpsDiagnostics.TAG).w(
@@ -553,6 +653,8 @@ class NewHouseholdFragment : Fragment() {
     private fun stopListeningForLocation() {
         activeLocationListener?.let { runCatching { locationManager.removeUpdates(it) } }
         activeLocationListener = null
+        activeCancellationTokenSource?.let { runCatching { it.cancel() } }
+        activeCancellationTokenSource = null
     }
 
     /** No fresh fix within the fetch timeout — try a cached last-known location (GPS, then network) before giving up. */
@@ -588,6 +690,11 @@ class NewHouseholdFragment : Fragment() {
                 ActivityCompat.checkSelfPermission(
                     requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION
                 ) == PackageManager.PERMISSION_GRANTED
+
+    private fun hasFineLocationPermission(): Boolean =
+        ActivityCompat.checkSelfPermission(
+            requireContext(), Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
 
     private fun showOpenSettingsDialog() {
         MaterialAlertDialogBuilder(requireContext())

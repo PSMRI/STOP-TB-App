@@ -24,6 +24,9 @@ object GpsDiagnostics {
     fun isGpsHardwareAvailable(context: Context): Boolean =
         context.packageManager.hasSystemFeature(PackageManager.FEATURE_LOCATION_GPS)
 
+    fun isPlayServicesAvailable(context: Context): Boolean =
+        GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context) == ConnectionResult.SUCCESS
+
     fun isGpsProviderEnabled(context: Context): Boolean {
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
         return try {
