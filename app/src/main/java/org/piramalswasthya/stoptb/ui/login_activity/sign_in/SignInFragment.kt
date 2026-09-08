@@ -139,6 +139,12 @@ class SignInFragment : Fragment() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
             val imeBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
             val systemBottom = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom
+            val isKeyboardVisible = imeBottom > 0
+
+            // The footer is decorative; hiding it while typing prevents it from
+            // overlapping the Login button in the resized keyboard viewport.
+            binding.textView12.visibility = if (isKeyboardVisible) View.GONE else View.VISIBLE
+            binding.tvLoginVersion.visibility = if (isKeyboardVisible) View.GONE else View.VISIBLE
             v.updatePadding(
                 left = initialLeft,
                 top = initialTop,
