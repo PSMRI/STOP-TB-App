@@ -13,6 +13,8 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.snackbar.Snackbar
@@ -121,7 +123,7 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
 
 //        if (isRegistrar || isNurse) {
         if (privilege.examineReorderTbScreeningBeforeAnthropometry) {
-            val container = view as? LinearLayout
+            val container = view.findViewById<LinearLayout>(R.id.ll_examine_rows)
             val anthropometryRow = view.findViewById<View>(R.id.row_anthropometry)
             val tbScreeningRow = view.findViewById<View>(R.id.row_tb_screening)
             if (container != null && anthropometryRow != null && tbScreeningRow != null) {
@@ -442,6 +444,17 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
         // a View-only Counsellor can't "Fill" a brand-new record either.
         val effectiveViewOnly = viewOnly || formPermissionFor(formIndex) != Permission.FULL
         examineCallback?.onNavigateToExamineForm(benId, formIndex, effectiveViewOnly)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val dialog = dialog as? BottomSheetDialog
+        val bottomSheet = dialog?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+        bottomSheet?.let {
+            val behavior = BottomSheetBehavior.from(it)
+            behavior.state = BottomSheetBehavior.STATE_EXPANDED
+            behavior.skipCollapsed = true
+        }
     }
 
     override fun onDismiss(dialog: DialogInterface) {

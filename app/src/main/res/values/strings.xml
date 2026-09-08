@@ -1343,6 +1343,7 @@
     <string name="loc_status_timeout">GPS search timed out</string>
     <string name="loc_detail_no_gps_hardware">No GPS hardware was detected on this device.</string>
     <string name="loc_detail_gps_provider_off">Device location mode is set to network-only. Switch to \"Device only\" or \"High accuracy\" in Location settings so GPS works without internet.</string>
+    <string name="loc_detail_precise_permission_required">Only approximate location was granted. Grant \"Precise\" location permission in Settings so GPS can get an exact fix without needing internet.</string>
     <string name="loc_msg_enable_location_settings">Location is turned off on this device. Please enable it in Location Settings, then come back and tap Refresh.</string>
     <string name="loc_detail_no_fix_no_cache">No GPS fix was obtained and no previous location is cached on this device.</string>
     <string name="loc_detail_timeout">No signal within 60 seconds. Cold GPS fixes can take longer without internet (no assisted-GPS data available). Move to open sky and try again.</string>
