@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.adapters
 
+import android.content.res.ColorStateList
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -180,37 +181,77 @@ class BenListAdapter(
             binding.btnAnthropometry.visibility = View.GONE
             binding.llAnthropometryAction.visibility = View.GONE
 
-            // NEW — Screening status infographic (Symptoms / X-Ray / Trunat)
+            // Screening status infographic (Symptoms / X-Ray / TruNat) — Title → Icon → Status
             if (showScreeningStatus) {
                 binding.llScreeningStatus.visibility = View.VISIBLE
 
                 val doneColor = ContextCompat.getColor(binding.root.context, android.R.color.holo_green_dark)
-                val pendingColor = ContextCompat.getColor(binding.root.context, android.R.color.darker_gray)
+                val notDoneColor = ContextCompat.getColor(binding.root.context, android.R.color.holo_red_dark)
+                val tbDiagForStatus = tbDiagnosticsList.find { it.benId == item.benId }
 
+                // ---- 1. TB Symptoms: tick/cross + "Presumptive" only if flagged ----
                 val symptomsDone = item.symptomsScreenedDate != null
-                binding.tvSymptomsStatus.text = if (symptomsDone)
-                    binding.root.context.getString(R.string.status_symptoms_screened)
-                else
-                    binding.root.context.getString(R.string.status_pending)
-                binding.tvSymptomsStatus.setTextColor(if (symptomsDone) doneColor else pendingColor)
+                binding.ivSymptoms.setImageResource(
+                    if (symptomsDone) R.drawable.circle_check else R.drawable.circle_uncheck
+                )
+                binding.ivSymptoms.imageTintList = ColorStateList.valueOf(if (symptomsDone) doneColor else notDoneColor)
 
+                val isPresumptive = tbDiagForStatus?.chestXRayResult?.let {
+                    it.equals("Positive", ignoreCase = true) || it.equals("TB Presumptive", ignoreCase = true)
+                } == true
+                if (isPresumptive) {
+                    binding.tvSymptomsStatus.text = "Presumptive"
+                    binding.tvSymptomsStatus.visibility = View.VISIBLE
+                } else {
+                    binding.tvSymptomsStatus.visibility = View.GONE
+                }
+
+                // ---- 2. Chest X-Ray: tick/cross + result (only if test is done) ----
                 val xrayDone = item.chestXrayDoneDate != null
-                binding.tvXrayStatus.text = if (xrayDone)
-                    binding.root.context.getString(R.string.status_xray_done)
-                else
-                    binding.root.context.getString(R.string.status_pending)
-                binding.tvXrayStatus.setTextColor(if (xrayDone) doneColor else pendingColor)
+                binding.ivXray.setImageResource(
+                    if (xrayDone) R.drawable.circle_check else R.drawable.circle_uncheck
+                )
+                binding.ivXray.imageTintList = ColorStateList.valueOf(if (xrayDone) doneColor else notDoneColor)
 
+                val xrayRawResult = tbDiagForStatus?.chestXRayResult
+                if (xrayDone && !xrayRawResult.isNullOrBlank()) {
+                    val formatted = when {
+                        xrayRawResult.equals("Positive", ignoreCase = true) ||
+                                xrayRawResult.equals("TB Presumptive", ignoreCase = true) -> "TB Presumptive"
+                        xrayRawResult.equals("Negative", ignoreCase = true) ||
+                                xrayRawResult.equals("Normal", ignoreCase = true) -> "Normal"
+                        else -> xrayRawResult
+                    }
+                    binding.tvXrayResult.text = formatted
+                    binding.tvXrayResult.visibility = View.VISIBLE
+                } else {
+                    binding.tvXrayResult.visibility = View.GONE
+                }
+
+                // ---- 3. TrueNat: tick/cross + result (only if test is done) ----
                 val trunatDone = item.trunatTestDoneDate != null
-                binding.tvTruenatStatus.text = if (trunatDone)
-                    binding.root.context.getString(R.string.status_trunat_done)
-                else
-                    binding.root.context.getString(R.string.status_pending)
-                binding.tvTruenatStatus.setTextColor(if (trunatDone) doneColor else pendingColor)
+                binding.ivTruenat.setImageResource(
+                    if (trunatDone) R.drawable.circle_check else R.drawable.circle_uncheck
+                )
+                binding.ivTruenat.imageTintList = ColorStateList.valueOf(if (trunatDone) doneColor else notDoneColor)
+
+                val naatRawResult = tbDiagForStatus?.naatResult
+                if (trunatDone && !naatRawResult.isNullOrBlank()) {
+                    val formatted = when {
+                        naatRawResult.equals("TB Positive", ignoreCase = true) ||
+                                naatRawResult.equals("MTB detected", ignoreCase = true) -> "MTB Detected"
+                        naatRawResult.equals("TB Negative", ignoreCase = true) ||
+                                naatRawResult.equals("MTB not detected", ignoreCase = true) -> "MTB Not Detected"
+                        else -> naatRawResult
+                    }
+                    binding.tvTruenatResult.text = formatted
+                    binding.tvTruenatResult.visibility = View.VISIBLE
+                } else {
+                    binding.tvTruenatResult.visibility = View.GONE
+                }
             } else {
                 binding.llScreeningStatus.visibility = View.GONE
             }
-
             if (binding.btnVitalScreen.visibility == View.VISIBLE) {
                 if (showResultButton) {
                     val tbDiag = tbDiagnosticsList.find { it.benId == item.benId }

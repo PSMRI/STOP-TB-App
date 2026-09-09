@@ -323,9 +323,11 @@ data class BenBasicCache(
             isNonHH = isNonHH,
             placeOfCurrentLiving = placeOfCurrentLiving,
             otherPlaceOfCurrentLiving = otherPlaceOfCurrentLiving,
-            institutionName = institutionName
-
-
+            institutionName = institutionName,
+            screeningStatus = screeningStatus,
+            symptomsScreenedDate = symptomsScreenedDate,
+            chestXrayDoneDate = chestXrayDoneDate,
+            trunatTestDoneDate = trunatTestDoneDate
         )
     }
 

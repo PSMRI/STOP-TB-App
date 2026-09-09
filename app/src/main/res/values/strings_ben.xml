@@ -23,7 +23,7 @@
         <item>Disabled/Handicapped person</item>
         <item>Other</item>
     </string-array>
-
+    <string name="status_unscreened">Unscreened</string>
     <string name="status_pending">Pending</string>
     <string name="status_symptoms_screened">Symptoms Screened</string>
     <string name="status_xray_done">Chest X-Ray Done</string>

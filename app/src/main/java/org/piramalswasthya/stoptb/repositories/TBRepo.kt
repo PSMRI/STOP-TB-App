@@ -125,6 +125,8 @@ class TBRepo @Inject constructor(
                 ben.gpsLongitude?.let { tbDiagnosticsCache.longitude = it }
             }
             tbDao.saveTbDiagnostics(tbDiagnosticsCache)
+            if (tbDiagnosticsCache.isChestXRayDone == true) benDao.markChestXrayDone(tbDiagnosticsCache.benId)
+            if (tbDiagnosticsCache.isNaatConducted == true) benDao.markTrunatTestDone(tbDiagnosticsCache.benId)
         }
     }
 

@@ -471,7 +471,7 @@
         <item>उपलब्ध नहीं है</item>
     </string-array>
 
-
+    <string name="status_unscreened">स्क्रीनिंग नहीं हुई</string>
     <string name="status_pending">लंबित</string>
     <string name="status_symptoms_screened">लक्षण जांचे गए</string>
     <string name="status_xray_done">छाती एक्स-रे पूर्ण</string>

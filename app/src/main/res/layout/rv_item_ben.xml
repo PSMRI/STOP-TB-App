@@ -516,24 +516,29 @@
                     android:gravity="center"
                     android:orientation="vertical">
 
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="TB Symptoms"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+
                     <ImageView
                         android:id="@+id/ivSymptoms"
                         android:layout_width="28dp"
                         android:layout_height="28dp"
-                        android:src="@drawable/ic__ben" />
+                        android:layout_marginTop="2dp"
+                        android:src="@drawable/circle_check" />
 
                     <TextView
                         android:id="@+id/tvSymptomsStatus"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Pending"
+                        android:layout_marginTop="2dp"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:visibility="gone"
                         android:textStyle="bold"
-                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Symptoms"
+                        android:gravity="center"
                         android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
                 </LinearLayout>
 
@@ -545,24 +550,29 @@
                     android:gravity="center"
                     android:orientation="vertical">
 
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Chest X-Ray"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+
                     <ImageView
                         android:id="@+id/ivXray"
                         android:layout_width="28dp"
                         android:layout_height="28dp"
-                        android:src="@drawable/ic__ben" />
+                        android:layout_marginTop="2dp"
+                        android:src="@drawable/circle_check" />
 
                     <TextView
-                        android:id="@+id/tvXrayStatus"
+                        android:id="@+id/tvXrayResult"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Pending"
+                        android:layout_marginTop="2dp"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:visibility="gone"
                         android:textStyle="bold"
-                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="X-Ray"
+                        android:gravity="center"
                         android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
                 </LinearLayout>
 
@@ -574,30 +584,33 @@
                     android:gravity="center"
                     android:orientation="vertical">
 
-                    <ImageView
-                        android:id="@+id/ivTruenat"
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:src="@drawable/ic__ben" />
-
-                    <TextView
-                        android:id="@+id/tvTruenatStatus"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Pending"
-                        android:textStyle="bold"
-                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
-
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="TruNat"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+
+                    <ImageView
+                        android:id="@+id/ivTruenat"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:layout_marginTop="2dp"
+                        android:src="@drawable/circle_check" />
+
+                    <TextView
+                        android:id="@+id/tvTruenatResult"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:visibility="gone"
+                        android:textStyle="bold"
+                        android:gravity="center"
                         android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
                 </LinearLayout>
 
             </LinearLayout>
-
-
             <LinearLayout
                     android:id="@+id/ll_ben_details_3"
                     android:layout_width="match_parent"

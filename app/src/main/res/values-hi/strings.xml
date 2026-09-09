@@ -369,6 +369,7 @@
     <string name="enter_a_valid_number">एक मान्य संख्या दर्ज करें</string>
     <string name="allowed_range">अनुमत सीमा: %1$d से %2$d</string>
     <string name="minimum_allowed_value">न्यूनतम अनुमत मान: %1$d</string>
+    <string name="unscreened_population_title">स्क्रीनिंग न हुई आबादी</string>
 
     <string-array name="type_of_tb_case">
         <item>टीबी का नया मामला</item>

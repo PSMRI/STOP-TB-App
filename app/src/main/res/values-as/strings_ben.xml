@@ -425,7 +425,7 @@
         <item>উপলব্ধ নহয়</item>
     </string-array>
 
-
+    <string name="status_unscreened">স্ক্ৰীনিং কৰা হোৱা নাই</string>
     <string name="status_pending">বাকী আছে</string>
     <string name="status_symptoms_screened">লক্ষণ পৰীক্ষা কৰা হৈছে</string>
     <string name="status_xray_done">বুকৰ এক্স-ৰে সম্পূৰ্ণ</string>

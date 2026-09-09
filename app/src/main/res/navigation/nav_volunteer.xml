@@ -49,6 +49,8 @@
 
     </fragment>
 
+
+
     <fragment
         android:id="@+id/allHouseholdFragment"
         android:name="org.piramalswasthya.stoptb.ui.home_activity.all_household.AllHouseholdFragment"

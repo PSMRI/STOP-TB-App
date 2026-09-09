@@ -17,6 +17,7 @@ import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.BenListAdapter
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentUnScreenedPeopleBinding
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import javax.inject.Inject
@@ -27,6 +28,9 @@ class UnScreenedPeople : Fragment(),
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private var _binding: FragmentUnScreenedPeopleBinding? = null
     private val binding get() = _binding!!
@@ -101,18 +105,24 @@ class UnScreenedPeople : Fragment(),
             pref = prefDao,
             context = requireActivity(),
             showActionButtons = false,
-            showScreeningStatus  = true
+            showScreeningStatus  = true,
+            roleManager = roleManager
+
         )
+
+        // Add Ben button hidden — ben registration only via UnScreenPeople flow
+        binding.btnNextPage.visibility = View.GONE
+
 
         binding.rvUnscreened.adapter = benAdapter
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch {
-                    viewModel.unscreenedCount.collect {
-                        binding.tvUnscreenedCount.text = "Unscreened: $it"
-                    }
-                }
+//                launch {
+//                    viewModel.unscreenedCount.collect {
+//                        binding.tvUnscreenedCount.text = "Unscreened: $it"
+//                    }
+//                }
                 launch {
                     viewModel.unscreenedList.collect { list ->
                         benAdapter.submitList(list)
@@ -120,6 +130,22 @@ class UnScreenedPeople : Fragment(),
                             if (list.isEmpty()) View.VISIBLE else View.GONE
                     }
                 }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    viewModel.unscreenedList.collect { list ->
+                        benAdapter.submitList(list)
+                        binding.tvEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+                    }
+                }
+                launch { viewModel.vitalBenIds.collect { benAdapter.submitBenIds(it) } }
+                launch { viewModel.tbScreeningBenIds.collect { benAdapter.submitTbScreeningBenIds(it) } }
+                launch { viewModel.generalOpdBenIds.collect { benAdapter.submitGeneralOpdBenIds(it) } }
+                launch { viewModel.anthropometryBenIds.collect { benAdapter.submitAnthropometryBenIds(it) } }
+                launch { viewModel.diagnosisBenIds.collect { benAdapter.submitDiagnosisBenIds(it) } }
             }
         }
     }
@@ -221,5 +247,23 @@ class UnScreenedPeople : Fragment(),
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+    }
+
+
+    override fun onStart() {
+        super.onStart()
+        updateToolbarTitle()
+    }
+
+    private fun updateToolbarTitle() {
+        activity?.let {
+            val title = getString(R.string.unscreened_population_title)
+            when (it) {
+                is org.piramalswasthya.stoptb.ui.home_activity.HomeActivity ->
+                    it.updateActionBar(R.drawable.ic__ben, title)
+                is org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity ->
+                    it.updateActionBar(R.drawable.ic__ben, title)
+            }
+        }
     }
 }

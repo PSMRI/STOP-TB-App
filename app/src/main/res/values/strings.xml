@@ -306,7 +306,7 @@
     <string name="delivery_outcome_list">Delivery Outcome List</string>
     <string name="communicable_diseases">Communicable Diseases</string>
     <string name="dashboard">Dashboard</string>
-    <string name="total_unscreened">Unscreened Beneficiaries</string>
+    <string name="total_unscreened">Unscreened Population</string>
     <string name="abha_ids">ABHA IDs</string>
     <string name="pending_sync">Pending Sync</string>
     <string name="loading_form">Loading form...</string>
