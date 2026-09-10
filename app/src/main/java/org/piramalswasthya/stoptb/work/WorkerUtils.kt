@@ -27,8 +27,10 @@ object WorkerUtils {
 
     const val pushWorkerUniqueName = "PUSH-TO-AMRIT"
     const val pullWorkerUniqueName = "PULL-FROM-AMRIT"
-    const val campAutoPullIntervalMs = 30_000L
-    private const val campQuickPullDebounceMs = 30_000L
+    const val pullTriggerSourceKey = "pull_trigger_source"
+    const val pullStartedAtKey = "pull_started_at"
+    const val campAutoPullIntervalMs = 10_000L
+    private const val campQuickPullDebounceMs = 10_000L
     private var lastCampQuickPullAt = 0L
     @Volatile
     private var manualCampRefreshInProgress = false
@@ -140,7 +142,11 @@ object WorkerUtils {
         return listOf(registration.id, groupAbha.id) + groupTB.map { it.id }
     }
 
-    fun triggerAmritPullWorker(context: Context): List<java.util.UUID> {
+    fun triggerAmritPullWorker(
+        context: Context,
+        force: Boolean = false,
+        triggerSource: String = "DIRECT"
+    ): List<java.util.UUID> {
         if (!hasLoggedInUser(context)) {
             Timber.w("Pull worker skipped: no logged-in user is stored yet")
             return emptyList()
@@ -149,14 +155,16 @@ object WorkerUtils {
         val isCampHubSyncActive = isCampHubSyncActive(context)
         val workManager = WorkManager.getInstance(context)
         val activePullInfos = getActiveUniqueWorkInfos(workManager, pullWorkerUniqueName)
-        if (activePullInfos.any { it.state == WorkInfo.State.RUNNING }) {
-            Timber.d("Pull worker skipped: existing unique pull chain is already running")
+        if (!force && activePullInfos.isNotEmpty()) {
+            Timber.d("Pull [$triggerSource] skipped: existing unique pull chain is already active")
             return activePullInfos.map { it.id }
         }
-        if (activePullInfos.isNotEmpty() && isCampHubSyncActive) {
-            Timber.d("Replacing stale unique pull chain for camp sync")
-            workManager.cancelUniqueWork(pullWorkerUniqueName)
-        }
+
+        Timber.i("Pull [$triggerSource] enqueued")
+        val pullRunData = Data.Builder()
+            .putString(pullTriggerSourceKey, triggerSource)
+            .putLong(pullStartedAtKey, SystemClock.elapsedRealtime())
+            .build()
 
         // StopTB pull chain:
         // Beneficiaries → Referrals + TB data → Mark complete
@@ -164,20 +172,25 @@ object WorkerUtils {
             campSyncRequestBuilder<PullFromAmritWorker>()
         } else {
             syncRequestBuilder<PullFromAmritWorker>()
-        }.addTag("pull_phase1_foundation").build()
+        }.setInputData(pullRunData).addTag("pull_phase1_foundation").build()
 
         val afterFoundation = workManager.beginUniqueWork(
-            pullWorkerUniqueName, ExistingWorkPolicy.KEEP, pullWorkRequest)
+            pullWorkerUniqueName,
+            if (force) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
+            pullWorkRequest
+        )
 
         val groupTB = listOf(
             (if (isCampHubSyncActive) {
                 campSyncRequestBuilder<PullTBFromAmritWorker>()
             } else {
                 syncRequestBuilder<PullTBFromAmritWorker>()
-            }).addTag("pull_group5_tb").build(),
+            }).setInputData(pullRunData).addTag("pull_group5_tb").build(),
         )
 
-        val setSyncCompleteWorker = OneTimeWorkRequestBuilder<UpdatePrefForPullCompleteWorker>().build()
+        val setSyncCompleteWorker = OneTimeWorkRequestBuilder<UpdatePrefForPullCompleteWorker>()
+            .setInputData(pullRunData)
+            .build()
 
         val chainTB = afterFoundation.then(groupTB)
 
@@ -207,14 +220,13 @@ object WorkerUtils {
         preferenceDao: PreferenceDao,
         force: Boolean = false
     ) {
-        if (manualCampRefreshInProgress) return
         if (!preferenceDao.isCampModeEnabled() || !preferenceDao.isCampHubConnected()) return
 
         val now = SystemClock.elapsedRealtime()
         if (!force && now - lastCampQuickPullAt < campQuickPullDebounceMs) return
 
         lastCampQuickPullAt = now
-        triggerAmritPullWorker(context)
+        triggerAmritPullWorker(context, triggerSource = "AUTO_PULL")
     }
 
     fun startManualCampRefresh(
@@ -222,8 +234,13 @@ object WorkerUtils {
         preferenceDao: PreferenceDao
     ): List<java.util.UUID> {
         manualCampRefreshInProgress = true
+        Timber.i("Camp sync [MANUAL_REFRESH] requested by user")
         val pushIds = triggerAmritPushWorker(context)
-        val pullIds = triggerAmritPullWorker(context)
+        val pullIds = triggerAmritPullWorker(
+            context,
+            force = true,
+            triggerSource = "MANUAL_REFRESH"
+        )
         return pushIds + pullIds
     }
 

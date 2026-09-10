@@ -8,6 +8,8 @@ import android.widget.LinearLayout
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DividerItemDecoration
+import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -106,12 +108,21 @@ class SyncBottomSheetFragment : BottomSheetDialogFragment() {
                         // whitelist vs Counselling's whitelist) — union means show everything.
                     }
                 }
-                binding.nsv.layoutParams.height = if (list.size * 150 < 800) list.size * 150 else 800
                 adapter.submitList(list)
             }
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        val dialog = dialog as? BottomSheetDialog
+        val bottomSheet = dialog?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+        bottomSheet?.let {
+            val behavior = BottomSheetBehavior.from(it)
+            behavior.state = BottomSheetBehavior.STATE_EXPANDED
+            behavior.skipCollapsed = true
+        }
+    }
 
     override fun onDestroy() {
         super.onDestroy()

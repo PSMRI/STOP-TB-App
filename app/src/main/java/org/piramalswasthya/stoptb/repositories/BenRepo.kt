@@ -1872,22 +1872,17 @@ class BenRepo @Inject constructor(
                         ?: jsonObject.optStringOrNull("gpsUnavailableReason")
 
                     try {
+                        // Server sends key with typo ("houseoldId") or correct ("householdId") — check both.
+                        val resolvedHouseholdId = run {
+                            val fromTypo = if (jsonObject.has("houseoldId") && !jsonObject.isNull("houseoldId")) jsonObject.getLong("houseoldId").takeIf { it > 0L } else null
+                            val fromCorrect = if (jsonObject.has("householdId") && !jsonObject.isNull("householdId")) jsonObject.getLong("householdId").takeIf { it > 0L } else null
+                            fromTypo ?: fromCorrect ?: existingBen?.householdId?.takeIf { it > 0L }
+                        }
                         val serverBen =
                             BenRegCache(
-                                householdId = run {
-                                    // Server sends key with typo ("houseoldId") or correct ("householdId") — check both
-                                    val fromTypo = if (jsonObject.has("houseoldId") && !jsonObject.isNull("houseoldId")) jsonObject.getLong("houseoldId").takeIf { it > 0L } else null
-                                    val fromCorrect = if (jsonObject.has("householdId") && !jsonObject.isNull("householdId")) jsonObject.getLong("householdId").takeIf { it > 0L } else null
-                                    // Prefer server value; fall back to existing local value (helps non-reinstall flow)
-                                    fromTypo ?: fromCorrect ?: existingBen?.householdId?.takeIf { it > 0L }
-                                },
+                                householdId = resolvedHouseholdId,
 
-                                isNonHH = run {
-                                    val fromTypo = if (jsonObject.has("houseoldId") && !jsonObject.isNull("houseoldId")) jsonObject.getLong("houseoldId").takeIf { it > 0L } else null
-                                    val fromCorrect = if (jsonObject.has("householdId") && !jsonObject.isNull("householdId")) jsonObject.getLong("householdId").takeIf { it > 0L } else null
-                                    val hhIdVal = fromTypo ?: fromCorrect
-                                    hhIdVal == null
-                                },
+                                isNonHH = resolvedHouseholdId == null,
 
                                 placeOfCurrentLiving = if (jsonObject.has("placeOfCurrentLiving") && !jsonObject.isNull("placeOfCurrentLiving")) {
                                     val code = jsonObject.optString("placeOfCurrentLiving", "")

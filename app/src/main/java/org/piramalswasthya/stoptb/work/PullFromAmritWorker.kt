@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.work
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.content.Context
+import android.os.SystemClock
 import android.database.sqlite.SQLiteConstraintException
 import androidx.core.app.NotificationCompat
 import androidx.hilt.work.HiltWorker
@@ -50,6 +51,9 @@ class PullFromAmritWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         setForeground(getForegroundInfo())
+        val triggerSource = inputData.getString(WorkerUtils.pullTriggerSourceKey) ?: "DIRECT"
+        val startedAt = inputData.getLong(WorkerUtils.pullStartedAtKey, SystemClock.elapsedRealtime())
+        Timber.i("Pull [$triggerSource] beneficiary and household data started")
 
         if (preferenceDao.getLoggedInUser() == null) {
             Timber.w("[$name] Worker deferred: logged-in user is not available yet")
@@ -81,7 +85,10 @@ class PullFromAmritWorker @AssistedInject constructor(
                     }
                     val endTime = System.currentTimeMillis()
                     val timeTaken = TimeUnit.MILLISECONDS.toSeconds(endTime - startTime)
-                    Timber.d("Full load took $timeTaken seconds for $numPages pages  $result1")
+                    Timber.d(
+                        "Pull [$triggerSource] beneficiary and household data completed in ${TimeUnit.MILLISECONDS.toSeconds(SystemClock.elapsedRealtime() - startedAt)} seconds " +
+                                "($numPages pages, worker stage $timeTaken seconds)"
+                    )
 
                     if (result1.all { it }) {
                         return@withContext Result.success()

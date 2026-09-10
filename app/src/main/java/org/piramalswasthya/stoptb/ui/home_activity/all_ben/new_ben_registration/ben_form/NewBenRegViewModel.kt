@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.model.LocationState
 import org.piramalswasthya.stoptb.helpers.DigiPinHelper
+import org.piramalswasthya.stoptb.helpers.GpsDiagnostics
 import org.piramalswasthya.stoptb.configuration.BenRegFormDataset
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -104,6 +105,11 @@ class NewBenRegViewModel @Inject constructor(
 
     private val _gpsUnavailableReason = MutableStateFlow<String?>(null)
     val gpsUnavailableReason: StateFlow<String?> = _gpsUnavailableReason.asStateFlow()
+
+    // Human-readable diagnostic for whatever locationState currently holds — e.g. accuracy/fix
+    // time on a Captured result, or the specific reason behind a Failed one. UI-displayable.
+    private val _locationDetail = MutableStateFlow<String?>(null)
+    val locationDetail: StateFlow<String?> = _locationDetail.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -318,17 +324,25 @@ class NewBenRegViewModel @Inject constructor(
     // ─── Location callbacks (standalone registrations only) ─────────────
     fun setFetching() { _locationState.value = LocationState.Fetching }
 
-    fun onLocationResult(lat: Double, lon: Double) {
+    fun onLocationResult(lat: Double, lon: Double, detail: String? = null) {
         val digipin = DigiPinHelper.generate(lat, lon)
         if (digipin == null) {
+            Timber.tag(GpsDiagnostics.TAG).w("onLocationResult rejected: lat=$lat lon=$lon is outside supported bounds")
+            _locationDetail.value = "lat=$lat, lon=$lon is outside the supported India bounding box"
             _locationState.value = LocationState.Failed.OutsideIndia
             return
         }
+        Timber.tag(GpsDiagnostics.TAG).i("onLocationResult captured: lat=$lat lon=$lon digipin=$digipin detail=$detail")
         val ts = System.currentTimeMillis().toString()
+        _locationDetail.value = detail
         _locationState.value = LocationState.Captured(lat, lon, digipin, ts)
     }
 
-    fun onLocationFailed(reason: LocationState.Failed) { _locationState.value = reason }
+    fun onLocationFailed(reason: LocationState.Failed, detail: String? = null) {
+        Timber.tag(GpsDiagnostics.TAG).w("onLocationFailed: reason=$reason detail=$detail")
+        _locationDetail.value = detail
+        _locationState.value = reason
+    }
 
     fun onGpsUnavailableToggled(checked: Boolean) {
         _isGpsUnavailable.value = checked

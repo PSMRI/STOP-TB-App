@@ -63,7 +63,13 @@ data class TBDiagnosticsCache(
     var longitude: Double? = null,
     var address: String? = null,
     var serverUpdatedDate: Long? = null,
-    var syncState: SyncState = SyncState.UNSYNCED
+    var syncState: SyncState = SyncState.UNSYNCED,
+
+    // ── Error Msg ─────────────────────────────────────────────────────────────────
+    var errorMsgXray: String? = null,
+    var errorMsgTrueNat : String? = null,
+    var errorMsgRif : String? = null
+
 ) : FormDataModel {
     fun toDTO(): TBDiagnosticsDTO = TBDiagnosticsDTO(
         id = id.toLong(),

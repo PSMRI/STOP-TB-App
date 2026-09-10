@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.work
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.content.Context
+import android.os.SystemClock
 import android.database.sqlite.SQLiteConstraintException
 import androidx.core.app.NotificationCompat
 import androidx.hilt.work.HiltWorker
@@ -51,6 +52,9 @@ class PullTBFromAmritWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         setForeground(getForegroundInfo())
+        val triggerSource = inputData.getString(WorkerUtils.pullTriggerSourceKey) ?: "DIRECT"
+        val startedAt = inputData.getLong(WorkerUtils.pullStartedAtKey, SystemClock.elapsedRealtime())
+        Timber.i("Pull [$triggerSource] TB data started")
 
         return try {
             withContext(Dispatchers.IO) {
@@ -76,7 +80,11 @@ class PullTBFromAmritWorker @AssistedInject constructor(
 
                     val endTime = System.currentTimeMillis()
                     val timeTaken = TimeUnit.MILLISECONDS.toSeconds(endTime - startTime)
-                    Timber.d("Full tb fetching took $timeTaken seconds $result1")
+                    Timber.d(
+                        "Pull [$triggerSource] TB data completed in " +
+                                "${TimeUnit.MILLISECONDS.toSeconds(SystemClock.elapsedRealtime() - startedAt)} seconds " +
+                                "(worker stage $timeTaken seconds)"
+                    )
 
                     if (result1.all { it }) {
                         syncDiagnosticOrderStatuses()

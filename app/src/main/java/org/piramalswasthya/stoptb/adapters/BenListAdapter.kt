@@ -1,5 +1,14 @@
 package org.piramalswasthya.stoptb.adapters
 
+import android.graphics.Color
+import android.graphics.Typeface
+import android.text.Spannable
+import android.text.SpannableStringBuilder
+import android.text.TextPaint
+import android.text.method.LinkMovementMethod
+import android.text.style.ClickableSpan
+import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
 import android.content.res.ColorStateList
 import android.view.LayoutInflater
 import android.view.View
@@ -9,7 +18,9 @@ import androidx.fragment.app.FragmentActivity
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import org.piramalswasthya.stoptb. BuildConfig
+import com.google.android.material.R.attr.colorOnPrimary
+import com.google.android.material.color.MaterialColors
+import org.piramalswasthya.stoptb.BuildConfig
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -70,6 +81,68 @@ class BenListAdapter(
                 val binding = RvItemBenBinding.inflate(layoutInflater, parent, false)
                 return BenViewHolder(binding)
             }
+        }
+
+        // Approximate number of message characters shown before truncation and "See more" is appended.
+        private val ERROR_MSG_COLLAPSED_BODY_LENGTH = 30
+
+        private fun bindErrorMsg(text: String?) {
+            if (text.isNullOrBlank()) {
+                binding.tvErrorMsg.visibility = View.GONE
+                binding.tvErrorMsg.movementMethod = null
+                return
+            }
+            binding.tvErrorMsg.visibility = View.VISIBLE
+            binding.tvErrorMsg.highlightColor = Color.TRANSPARENT
+            binding.tvErrorMsg.movementMethod = LinkMovementMethod.getInstance()
+            renderErrorMsg(text, expanded = false)
+        }
+
+        private fun renderErrorMsg(text: String, expanded: Boolean) {
+            val prefix = binding.root.context.getString(R.string.error_message)
+            val onPrimaryColor = MaterialColors.getColor(
+                binding.root, colorOnPrimary, Color.WHITE
+            )
+            val isTruncated = !expanded && text.length > ERROR_MSG_COLLAPSED_BODY_LENGTH
+
+            val builder = SpannableStringBuilder(prefix)
+            builder.setSpan(
+                StyleSpan(Typeface.BOLD),
+                0, prefix.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            builder.setSpan(
+                ForegroundColorSpan(onPrimaryColor),
+                0, prefix.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+
+            if (expanded) {
+                binding.tvErrorMsg.maxLines = Int.MAX_VALUE
+                builder.append(text)
+            } else {
+                binding.tvErrorMsg.maxLines = 2
+                builder.append(if (isTruncated) text.take(ERROR_MSG_COLLAPSED_BODY_LENGTH).trimEnd() + "…" else text)
+            }
+
+            if (expanded || isTruncated) {
+                builder.append(" ")
+                val toggleStart = builder.length
+                builder.append(if (expanded) binding.root.context.getString(R.string.see_less) else binding.root.context.getString(R.string.see_more))
+                builder.setSpan(
+                    object : ClickableSpan() {
+                        override fun onClick(widget: View) {
+                            renderErrorMsg(text, expanded = !expanded)
+                        }
+
+                        override fun updateDrawState(ds: TextPaint) {
+                            ds.color = onPrimaryColor
+                            ds.isFakeBoldText = true
+                            ds.isUnderlineText = false
+                        }
+                    },
+                    toggleStart, builder.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
+            binding.tvErrorMsg.text = builder
         }
 
         fun bind(
@@ -173,6 +246,8 @@ class BenListAdapter(
                 showResultButton && !item.isDeath && !item.isDeactivate -> View.VISIBLE
                 else -> View.GONE
             }
+            // Reset per bind to prevent recycled views from showing a previous row's error message.
+            bindErrorMsg(null)
 
             binding.btnGeneralOpd.visibility = View.GONE
             binding.llGeneralOpdRow.visibility = View.GONE
@@ -274,6 +349,7 @@ class BenListAdapter(
                                     ButtonConfig("VIEW RESULT", android.R.color.holo_green_dark, "VIEW", "XRAY_CHEST")
                                 }
                                 status.equals("FAILED", ignoreCase = true) -> {
+                                    bindErrorMsg(tbDiag?.errorMsgXray)
                                     ButtonConfig("Retry Referral", android.R.color.holo_red_dark, "RETRY_PUSH", "XRAY_CHEST")
                                 }
                                 status.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) || status.equals("IN_PROGRESS", ignoreCase = true) || status.equals("PENDING", ignoreCase = true) || status.equals("CREATED", ignoreCase = true) || status.equals("AWAITING_TEST_COMPLETION", ignoreCase = true) -> {
@@ -321,6 +397,7 @@ class BenListAdapter(
                                                 binding.btnVitalScreenSecondary.setOnClickListener(null)
                                             }
                                             rifStatus == null || rifStatus.equals("FAILED", ignoreCase = true) -> {
+                                                bindErrorMsg(tbDiag?.errorMsgRif)
                                                 binding.btnVitalScreenSecondary.text = "Retry Referral"
                                                 binding.btnVitalScreenSecondary.setBackgroundTintList(ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_red_dark))
                                                 binding.btnVitalScreenSecondary.isEnabled = canActOnReferral && !retryingBenIds.contains(item.benId)
@@ -362,6 +439,7 @@ class BenListAdapter(
                                     conf
                                 }
                                 status.equals("FAILED", ignoreCase = true) -> {
+                                    bindErrorMsg(tbDiag?.errorMsgTrueNat)
                                     ButtonConfig("Retry Referral", android.R.color.holo_red_dark, "RETRY_PUSH", "SPUTUM_TRUENAT")
                                 }
                                 status.equals("POLLING_TIMEOUT", ignoreCase = true) || status.equals("MANUAL_ENTRY", ignoreCase = true) -> {
