@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.EditText
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -180,6 +181,14 @@ class AllHouseholdFragment : Fragment() {
 
     private fun addMemberToHousehold(household: HouseHoldBasicDomain) {
         if (household.isDeactivate) return
+        if (household.isMemberLimitReached) {
+            Toast.makeText(
+                requireContext(),
+                getString(R.string.hh_member_limit_reached, household.displayTotalMembers),
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
         if (household.numMembers == 0) {
             findNavController().navigate(
                 AllHouseholdFragmentDirections.actionAllHouseholdFragmentToNewBenRegFragment(

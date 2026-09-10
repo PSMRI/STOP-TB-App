@@ -139,6 +139,11 @@ class NewHouseholdFragment : Fragment() {
         }
     }
 
+    private fun updateSubmitButtonState() {
+        val isEditOrNew = viewModel.readRecord.value == false
+        binding.btnSubmit.isEnabled = isEditOrNew && viewModel.isTotalMembersValid()
+    }
+
     private fun setupFormAdapter() {
         val adapter = FormInputAdapter(
             formValueListener = FormInputAdapter.FormValueListener { formId, index ->
@@ -150,7 +155,7 @@ class NewHouseholdFragment : Fragment() {
                     else -> {
                         viewModel.updateListOnValueChanged(formId, index)
                         hardCodedListUpdate(formId)
-
+                        updateSubmitButtonState()
                     }
                 }
             },
@@ -159,7 +164,10 @@ class NewHouseholdFragment : Fragment() {
         binding.form.rvInputForm.adapter = adapter
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.formList.collect { list ->
-                if (list.isNotEmpty()) adapter.submitList(list)
+                if (list.isNotEmpty()) {
+                    adapter.submitList(list)
+                    updateSubmitButtonState()
+                }
             }
         }
     }
@@ -211,6 +219,7 @@ class NewHouseholdFragment : Fragment() {
             val canEditHousehold = roleManager.privilegesUnion().householdPermission == Permission.FULL
             binding.fabEdit.visibility = if (recordExists && canEditHousehold) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (!recordExists) View.VISIBLE else View.GONE
+            updateSubmitButtonState()
             binding.btnCancel.visibility = if (!recordExists) View.VISIBLE else View.GONE
             binding.btnRefreshLocation.isEnabled = !recordExists
             binding.cbGpsUnavailable.isEnabled = !recordExists
@@ -714,6 +723,7 @@ class NewHouseholdFragment : Fragment() {
 
     private fun submitForm() {
         activity?.currentFocus?.clearFocus()
+        if (!viewModel.isTotalMembersValid()) return
         if (!validateCurrentPage()) return
         if (!validateLocationSection()) return
         if (!viewModel.getIsConsentAgreed()) {

@@ -75,9 +75,19 @@ class HouseHoldListAdapter(private val diseaseType: String, private var isDiseas
                     binding.btnMda.visibility = View.GONE
                 }
             } else if (!isDisease) {
-                // Nurse role: invisible (takes space but not visible/clickable)
                 binding.button4.visibility = if (showAddMember) View.VISIBLE else View.INVISIBLE
                 binding.button4.isEnabled = showAddMember
+                if (item.isMemberLimitReached) {
+                    binding.button4.backgroundTintList = ColorStateList.valueOf(
+                        ContextCompat.getColor(binding.root.context, R.color.md_theme_light_outline)
+                    )
+                    binding.button4.alpha = 0.6f
+                } else {
+                    binding.button4.backgroundTintList = ColorStateList.valueOf(
+                        ContextCompat.getColor(binding.root.context, android.R.color.holo_green_dark)
+                    )
+                    binding.button4.alpha = 1f
+                }
                 binding.btnMda.visibility = View.GONE
             } else {
                 binding.button4.visibility = View.GONE
