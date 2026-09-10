@@ -72,15 +72,7 @@ class IconDataset @Inject constructor(
                         .actionVolunteerHomeFragmentToNonHHFragment()
                 )
             )
-            iconList.add(
-                Icon(
-                    R.drawable.ic__ben,
-                    resources.getString(R.string.icon_title_unscreened),
-                    resources.getString(R.string.home_card_unscreened_subtitle),
-                    recordsRepo.unscreenedListCount,
-                    VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToUnScreenedPeople()
-                )
-            )
+
         }
 
 
