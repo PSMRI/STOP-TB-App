@@ -106,7 +106,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 44, exportSchema = false
+    version = 45, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -1594,7 +1594,7 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_43_44 = object : Migration(25, 26) {
+        private val MIGRATION_44_45 = object : Migration(25, 26) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 val newColumns = listOf(
                     "isAvailableForCamp INTEGER NOT NULL DEFAULT 1",
@@ -1792,6 +1792,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_41_42)
                         .addMigrations(MIGRATION_42_43)
                         .addMigrations(MIGRATION_43_44)
+                        .addMigrations(MIGRATION_44_45)
                         .fallbackToDestructiveMigration()
                         .build()
 

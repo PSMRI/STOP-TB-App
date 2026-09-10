@@ -497,6 +497,18 @@
 
                     </LinearLayout>
 
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@android:color/white"
+                android:layout_marginTop="@dimen/margin_small"
+                android:layout_marginBottom="@dimen/margin_small"
+                android:layout_marginLeft="@dimen/margin_big"
+                android:layout_marginRight="@dimen/margin_big"
+                android:padding="@dimen/margin_small"
+                app:layout_constraintBottom_toBottomOf="@id/ll_ben_details_2"
+                app:layout_constraintBottom_toTopOf="@id/ll_screening_status"/>
+
             <LinearLayout
                 android:id="@+id/ll_screening_status"
                 android:layout_width="match_parent"
@@ -520,6 +532,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="TB Symptoms"
+                        android:textStyle="bold"
                         android:textColor="?attr/colorOnPrimary"
                         android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
 
@@ -553,6 +566,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:textStyle="bold"
                         android:text="Chest X-Ray"
                         android:textColor="?attr/colorOnPrimary"
                         android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
@@ -587,7 +601,8 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="TruNat"
+                        android:textStyle="bold"
+                        android:text="TrueNat"
                         android:textColor="?attr/colorOnPrimary"
                         android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
 

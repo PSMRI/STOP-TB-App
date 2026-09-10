@@ -98,6 +98,8 @@ class BenListAdapter(
             renderErrorMsg(text, expanded = false)
         }
 
+
+
         private fun renderErrorMsg(text: String, expanded: Boolean) {
             val prefix = binding.root.context.getString(R.string.error_message)
             val onPrimaryColor = MaterialColors.getColor(
@@ -260,33 +262,45 @@ class BenListAdapter(
             if (showScreeningStatus) {
                 binding.llScreeningStatus.visibility = View.VISIBLE
 
-                val doneColor = ContextCompat.getColor(binding.root.context, android.R.color.holo_green_dark)
-                val notDoneColor = ContextCompat.getColor(binding.root.context, android.R.color.holo_red_dark)
+            //    val doneColor = ContextCompat.getColor(binding.root.context, android.R.color.holo_green_dark)
+              //  val notDoneColor = ContextCompat.getColor(binding.root.context, android.R.color.holo_red_dark)
                 val tbDiagForStatus = tbDiagnosticsList.find { it.benId == item.benId }
 
-                // ---- 1. TB Symptoms: tick/cross + "Presumptive" only if flagged ----
-                val symptomsDone = item.symptomsScreenedDate != null
-                binding.ivSymptoms.setImageResource(
-                    if (symptomsDone) R.drawable.circle_check else R.drawable.circle_uncheck
-                )
-                binding.ivSymptoms.imageTintList = ColorStateList.valueOf(if (symptomsDone) doneColor else notDoneColor)
 
-                val isPresumptive = tbDiagForStatus?.chestXRayResult?.let {
-                    it.equals("Positive", ignoreCase = true) || it.equals("TB Presumptive", ignoreCase = true)
-                } == true
-                if (isPresumptive) {
+                // ---- 1. TB Symptoms ----
+                // New records: symptomsScreenedDate is populated.
+                // Existing records: fall back to the existing TB screening/diagnostic record.
+                val symptomsDone =
+//                    item.symptomsScreenedDate != null &&
+                            hasTbScreening
+
+                binding.ivSymptoms.setImageResource(
+                    if (symptomsDone) {
+                        R.drawable.circle_check
+                    } else {
+                        R.drawable.circle_uncheck
+                    }
+                )
+
+//                binding.ivSymptoms.imageTintList = ColorStateList.valueOf(
+//                    if (symptomsDone) doneColor else notDoneColor
+//                )
+
+                if (symptomsDone) {
                     binding.tvSymptomsStatus.text = "Presumptive"
                     binding.tvSymptomsStatus.visibility = View.VISIBLE
                 } else {
                     binding.tvSymptomsStatus.visibility = View.GONE
                 }
 
+                binding.tvSymptomsStatus.visibility = View.VISIBLE
+
                 // ---- 2. Chest X-Ray: tick/cross + result (only if test is done) ----
                 val xrayDone = item.chestXrayDoneDate != null
                 binding.ivXray.setImageResource(
                     if (xrayDone) R.drawable.circle_check else R.drawable.circle_uncheck
                 )
-                binding.ivXray.imageTintList = ColorStateList.valueOf(if (xrayDone) doneColor else notDoneColor)
+         //       binding.ivXray.imageTintList = ColorStateList.valueOf(if (xrayDone) doneColor else notDoneColor)
 
                 val xrayRawResult = tbDiagForStatus?.chestXRayResult
                 if (xrayDone && !xrayRawResult.isNullOrBlank()) {
@@ -308,7 +322,7 @@ class BenListAdapter(
                 binding.ivTruenat.setImageResource(
                     if (trunatDone) R.drawable.circle_check else R.drawable.circle_uncheck
                 )
-                binding.ivTruenat.imageTintList = ColorStateList.valueOf(if (trunatDone) doneColor else notDoneColor)
+            //    binding.ivTruenat.imageTintList = ColorStateList.valueOf(if (trunatDone) doneColor else notDoneColor)
 
                 val naatRawResult = tbDiagForStatus?.naatResult
                 if (trunatDone && !naatRawResult.isNullOrBlank()) {
