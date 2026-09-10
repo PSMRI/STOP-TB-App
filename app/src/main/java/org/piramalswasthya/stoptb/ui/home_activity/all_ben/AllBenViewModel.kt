@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.repositories.ABHAGenratedRepo
 import org.piramalswasthya.stoptb.repositories.BenRepo
+import org.piramalswasthya.stoptb.repositories.HouseholdRepo
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
@@ -46,10 +47,15 @@ class AllBenViewModel @Inject constructor(
     private val recordsRepo: RecordsRepo,
     abhaGenratedRepo: ABHAGenratedRepo,
     private val benRepo: BenRepo,
+    private val householdRepo: HouseholdRepo,
     private val vitalRepo: VitalRepo,
     val tbRepo: TBRepo,
     private val contactTracingRepo: IContactTracingRepository
 ) : ViewModel() {
+
+    suspend fun isHouseholdMemberLimitReached(hhId: Long) = householdRepo.isMemberLimitReached(hhId)
+
+    suspend fun getTotalHhMembers(hhId: Long) = householdRepo.getTotalHhMembers(hhId)
 
     private var sourceFromArgs = AllBenFragmentArgs.fromSavedStateHandle(savedStateHandle).source
 
@@ -205,7 +211,7 @@ class AllBenViewModel @Inject constructor(
     private val _retryingBenIds = MutableStateFlow<List<Long>>(emptyList())
     val retryingBenIds: StateFlow<List<Long>> = _retryingBenIds.asStateFlow()
 
-    fun initiateProdigiOrder(benId: Long, orderType: String) {
+    fun initiateOrder(benId: Long, orderType: String) {
         viewModelScope.launch {
             _orderActionState.value = OrderActionResult.Loading
             when (val response = tbRepo.createOrder(benId, orderType)) {

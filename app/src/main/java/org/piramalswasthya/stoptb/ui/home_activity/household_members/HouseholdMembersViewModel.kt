@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.repositories.BenRepo
+import org.piramalswasthya.stoptb.repositories.HouseholdRepo
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
@@ -20,6 +21,7 @@ import javax.inject.Inject
 class HouseholdMembersViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val benRepo: BenRepo,
+    private val householdRepo: HouseholdRepo,
     private val vitalRepo: VitalRepo,
     private val tbRepo: TBRepo,
     private val recordsRepo: RecordsRepo,
@@ -34,6 +36,15 @@ class HouseholdMembersViewModel @Inject constructor(
                 .thenBy { it.benName }
                 .thenBy { it.benId }
         )
+    }
+
+    var totalHhMembers: Int? = null
+        private set
+
+    val memberLimitReached: Flow<Boolean> = benList.map { list ->
+        if (totalHhMembers == null) totalHhMembers = householdRepo.getTotalHhMembers(hhId)
+        val total = totalHhMembers
+        total != null && list.size >= total
     }
 
     // ── Examine form fill status ──────────────────────────────────────────────
