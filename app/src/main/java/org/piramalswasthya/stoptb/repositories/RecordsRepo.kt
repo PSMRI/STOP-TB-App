@@ -64,6 +64,14 @@ class RecordsRepo @Inject constructor(
     val nonHHList get() = benDao.getNonHHBeneficiaries(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }
 
+
+
+    val unscreenedListCount get() = benDao.getUnscreenedCount(selectedVillage)
+    val unscreenedList get() = benDao.getUnscreenedList(selectedVillage)
+        .map { list -> list.map { it.asBasicDomainModel() } }
+
+
+
     fun searchNonHH(query: String) = benDao.searchNonHHBeneficiaries(selectedVillage, query)
         .map { list -> list.map { it.asBasicDomainModel() } }
 

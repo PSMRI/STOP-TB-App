@@ -198,6 +198,9 @@
     <string name="referred_to_facility">Referred to Facility</string>
     <string name="facility_referral_follow_ups">Facility Referral follow-ups</string>
 
+
+    <string name="unscreened_population_title">Unscreened Population</string>
+
     <string-array name="tb_submitted_yet">
         <item>DMC</item>
         <item>SC</item>

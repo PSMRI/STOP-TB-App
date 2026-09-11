@@ -9,6 +9,7 @@ import android.text.method.LinkMovementMethod
 import android.text.style.ClickableSpan
 import android.text.style.ForegroundColorSpan
 import android.text.style.StyleSpan
+import android.content.res.ColorStateList
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -58,6 +59,7 @@ class BenListAdapter(
     private val showResultButton: Boolean = false,
     private val showAnthropometryButton: Boolean = false,
     private val showExamineButton: Boolean = true,
+    private val showScreeningStatus: Boolean = false,
     private val showContactTracingForms: Boolean = false
 ) : ListAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenDiffUtilCallBack) {
 
@@ -95,6 +97,8 @@ class BenListAdapter(
             binding.tvErrorMsg.movementMethod = LinkMovementMethod.getInstance()
             renderErrorMsg(text, expanded = false)
         }
+
+
 
         private fun renderErrorMsg(text: String, expanded: Boolean) {
             val prefix = binding.root.context.getString(R.string.error_message)
@@ -173,6 +177,7 @@ class BenListAdapter(
             showResultButton: Boolean = false,
             showAnthropometryButton: Boolean = false,
             showExamineButton: Boolean = true,
+            showScreeningStatus: Boolean = false,   // NEW
             tbDiagnosticsList: List<TBDiagnosticsCache> = emptyList(),
             source: Int = 0,
             retryingBenIds: List<Long> = emptyList(),
@@ -252,6 +257,64 @@ class BenListAdapter(
 
             binding.btnAnthropometry.visibility = View.GONE
             binding.llAnthropometryAction.visibility = View.GONE
+
+            // Screening status infographic (Symptoms / X-Ray / TruNat) — Title → Icon → Status
+            if (showScreeningStatus || item.isNonHH) {
+                binding.llScreeningStatus.visibility = View.VISIBLE
+
+                val tbDiagForStatus = tbDiagnosticsList.find { it.benId == item.benId }
+
+                // ---------------------------------------------------------
+                // 1. TB Symptoms — driven purely by DB: symptomsScreenedDate + screeningStatus
+                // ---------------------------------------------------------
+             //   val symptomsDone =TbScreeningUtils.getTbScreeningResult()
+                binding.ivSymptoms.setImageResource(
+                    if (hasTbScreening) {
+                        R.drawable.circle_check
+                    } else {
+                        R.drawable.circle_uncheck
+                    }
+                )
+
+                if (hasTbScreening) {
+                    binding.tvSymptomsStatus.text = "Presumptive"
+                    binding.tvSymptomsStatus.visibility = View.VISIBLE
+                } else {
+                    binding.tvSymptomsStatus.visibility = View.GONE
+                }
+                // ---------------------------------------------------------
+                // 2. Chest X-Ray — driven purely by DB: chestXrayDoneDate + raw result
+                // ---------------------------------------------------------
+            //    val xrayDone = item.chestXrayDoneDate != null
+                val xrayResult = tbDiagForStatus?.chestXRayResult
+                binding.ivXray.setImageResource(
+                    if (xrayResult != null) R.drawable.circle_check else R.drawable.circle_uncheck
+                )
+                if (!xrayResult.isNullOrBlank()) {
+                    binding.tvXrayResult.text = xrayResult
+                    binding.tvXrayResult.visibility = View.VISIBLE
+                } else {
+                    binding.tvXrayResult.visibility = View.GONE
+                }
+
+                // ---------------------------------------------------------
+                // 3. TrueNat — driven purely by DB: trunatTestDoneDate + raw result
+                // ---------------------------------------------------------
+               // val truenatDone = item.trunatTestDoneDate != null
+                val truenatResult = tbDiagForStatus?.naatResult
+                binding.ivTruenat.setImageResource(
+                    if (truenatResult != null) R.drawable.circle_check else R.drawable.circle_uncheck
+                )
+                if (!truenatResult.isNullOrBlank()) {
+                    binding.tvTruenatResult.text = truenatResult
+                    binding.tvTruenatResult.visibility = View.VISIBLE
+                } else {
+                    binding.tvTruenatResult.visibility = View.GONE
+                }
+            } else {
+                binding.llScreeningStatus.visibility = View.GONE
+            }
+
 
             if (binding.btnVitalScreen.visibility == View.VISIBLE) {
                 if (showResultButton) {
@@ -961,6 +1024,7 @@ class BenListAdapter(
             showActionButtons = showActionButtons,
             showResultButton = showResultButton,
             showAnthropometryButton = showAnthropometryButton,
+            showScreeningStatus = showScreeningStatus,
             tbDiagnosticsList = tbDiagnosticsList,
             source = source,
             showExamineButton = showExamineButton,

@@ -28,6 +28,7 @@ import org.piramalswasthya.stoptb.model.InputType.RADIO
 import org.piramalswasthya.stoptb.model.InputType.TEXT_VIEW
 import org.piramalswasthya.stoptb.model.LocationRecord
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel.Companion.isConsentAgreed
+import org.piramalswasthya.stoptb.model.ScreeningStatus
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel.Companion.isOtpVerified
 import org.piramalswasthya.stoptb.utils.Log
 import java.text.SimpleDateFormat
@@ -1464,7 +1465,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             ben.kidDetails = null
 
             ben.isDraft        = false
-            ben.isConsent      = isConsentAgreed
+            ben.isConsent      = isOtpVerified
             // NOTE: isSpouseAdded / isChildrenAdded are managed by spouse/child registration flows.
             // Do NOT reset them here — in edit mode the existing value must be preserved.
             // For brand-new bens the model defaults both to false anyway.
