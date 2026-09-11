@@ -70,9 +70,7 @@ class RecordsRepo @Inject constructor(
     val unscreenedList get() = benDao.getUnscreenedList(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }
 
-    suspend fun markSymptomsScreened(benId: Long) = benDao.markSymptomsScreened(benId)
-    suspend fun markChestXrayDone(benId: Long) = benDao.markChestXrayDone(benId)
-    suspend fun markTrunatTestDone(benId: Long) = benDao.markTrunatTestDone(benId)
+
 
     fun searchNonHH(query: String) = benDao.searchNonHHBeneficiaries(selectedVillage, query)
         .map { list -> list.map { it.asBasicDomainModel() } }

@@ -259,81 +259,54 @@ class BenListAdapter(
             binding.llAnthropometryAction.visibility = View.GONE
 
             // Screening status infographic (Symptoms / X-Ray / TruNat) — Title → Icon → Status
-            if (showScreeningStatus) {
+            if (showScreeningStatus || item.isNonHH) {
                 binding.llScreeningStatus.visibility = View.VISIBLE
 
-            //    val doneColor = ContextCompat.getColor(binding.root.context, android.R.color.holo_green_dark)
-              //  val notDoneColor = ContextCompat.getColor(binding.root.context, android.R.color.holo_red_dark)
                 val tbDiagForStatus = tbDiagnosticsList.find { it.benId == item.benId }
 
-
-                // ---- 1. TB Symptoms ----
-                // New records: symptomsScreenedDate is populated.
-                // Existing records: fall back to the existing TB screening/diagnostic record.
-                val symptomsDone =
-//                    item.symptomsScreenedDate != null &&
-                            hasTbScreening
-
+                // ---------------------------------------------------------
+                // 1. TB Symptoms — driven purely by DB: symptomsScreenedDate + screeningStatus
+                // ---------------------------------------------------------
+             //   val symptomsDone =TbScreeningUtils.getTbScreeningResult()
                 binding.ivSymptoms.setImageResource(
-                    if (symptomsDone) {
+                    if (hasTbScreening) {
                         R.drawable.circle_check
                     } else {
                         R.drawable.circle_uncheck
                     }
                 )
 
-//                binding.ivSymptoms.imageTintList = ColorStateList.valueOf(
-//                    if (symptomsDone) doneColor else notDoneColor
-//                )
-
-                if (symptomsDone) {
+                if (hasTbScreening) {
                     binding.tvSymptomsStatus.text = "Presumptive"
                     binding.tvSymptomsStatus.visibility = View.VISIBLE
                 } else {
                     binding.tvSymptomsStatus.visibility = View.GONE
                 }
-
-                binding.tvSymptomsStatus.visibility = View.VISIBLE
-
-                // ---- 2. Chest X-Ray: tick/cross + result (only if test is done) ----
-                val xrayDone = item.chestXrayDoneDate != null
+                // ---------------------------------------------------------
+                // 2. Chest X-Ray — driven purely by DB: chestXrayDoneDate + raw result
+                // ---------------------------------------------------------
+            //    val xrayDone = item.chestXrayDoneDate != null
+                val xrayResult = tbDiagForStatus?.chestXRayResult
                 binding.ivXray.setImageResource(
-                    if (xrayDone) R.drawable.circle_check else R.drawable.circle_uncheck
+                    if (xrayResult != null) R.drawable.circle_check else R.drawable.circle_uncheck
                 )
-         //       binding.ivXray.imageTintList = ColorStateList.valueOf(if (xrayDone) doneColor else notDoneColor)
-
-                val xrayRawResult = tbDiagForStatus?.chestXRayResult
-                if (xrayDone && !xrayRawResult.isNullOrBlank()) {
-                    val formatted = when {
-                        xrayRawResult.equals("Positive", ignoreCase = true) ||
-                                xrayRawResult.equals("TB Presumptive", ignoreCase = true) -> "TB Presumptive"
-                        xrayRawResult.equals("Negative", ignoreCase = true) ||
-                                xrayRawResult.equals("Normal", ignoreCase = true) -> "Normal"
-                        else -> xrayRawResult
-                    }
-                    binding.tvXrayResult.text = formatted
+                if (!xrayResult.isNullOrBlank()) {
+                    binding.tvXrayResult.text = xrayResult
                     binding.tvXrayResult.visibility = View.VISIBLE
                 } else {
                     binding.tvXrayResult.visibility = View.GONE
                 }
 
-                // ---- 3. TrueNat: tick/cross + result (only if test is done) ----
-                val trunatDone = item.trunatTestDoneDate != null
+                // ---------------------------------------------------------
+                // 3. TrueNat — driven purely by DB: trunatTestDoneDate + raw result
+                // ---------------------------------------------------------
+               // val truenatDone = item.trunatTestDoneDate != null
+                val truenatResult = tbDiagForStatus?.naatResult
                 binding.ivTruenat.setImageResource(
-                    if (trunatDone) R.drawable.circle_check else R.drawable.circle_uncheck
+                    if (truenatResult != null) R.drawable.circle_check else R.drawable.circle_uncheck
                 )
-            //    binding.ivTruenat.imageTintList = ColorStateList.valueOf(if (trunatDone) doneColor else notDoneColor)
-
-                val naatRawResult = tbDiagForStatus?.naatResult
-                if (trunatDone && !naatRawResult.isNullOrBlank()) {
-                    val formatted = when {
-                        naatRawResult.equals("TB Positive", ignoreCase = true) ||
-                                naatRawResult.equals("MTB detected", ignoreCase = true) -> "MTB Detected"
-                        naatRawResult.equals("TB Negative", ignoreCase = true) ||
-                                naatRawResult.equals("MTB not detected", ignoreCase = true) -> "MTB Not Detected"
-                        else -> naatRawResult
-                    }
-                    binding.tvTruenatResult.text = formatted
+                if (!truenatResult.isNullOrBlank()) {
+                    binding.tvTruenatResult.text = truenatResult
                     binding.tvTruenatResult.visibility = View.VISIBLE
                 } else {
                     binding.tvTruenatResult.visibility = View.GONE
@@ -341,6 +314,8 @@ class BenListAdapter(
             } else {
                 binding.llScreeningStatus.visibility = View.GONE
             }
+
+
             if (binding.btnVitalScreen.visibility == View.VISIBLE) {
                 if (showResultButton) {
                     val tbDiag = tbDiagnosticsList.find { it.benId == item.benId }

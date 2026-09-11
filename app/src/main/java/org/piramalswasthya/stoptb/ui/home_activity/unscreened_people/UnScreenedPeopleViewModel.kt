@@ -34,21 +34,45 @@ class UnScreenedPeopleViewModel @Inject constructor(
 
 
     val unscreenedList: StateFlow<List<BenBasicDomain>> =
-        recordsRepo.unscreenedList
-            .combine(filter) { list, text -> filterUnscreened(list, text) }
-            .stateIn(
-                viewModelScope,
-                SharingStarted.WhileSubscribed(5000),
-                emptyList()
-            )
+        combine(
+            recordsRepo.unscreenedList,
+            tbRepo.tbScreeningBenIds,
+            filter
+        ) { list, tbScreenedIds, text ->
+
+            val filteredByTbScreening = list.filter { ben ->
+                ben.benId !in tbScreenedIds
+            }
+
+            filterUnscreened(filteredByTbScreening, text)
+
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            emptyList()
+        )
+
+
+//    val unscreenedCount: StateFlow<Int> =
+//        recordsRepo.unscreenedListCount
+//            .stateIn(
+//                viewModelScope,
+//                SharingStarted.WhileSubscribed(5000),
+//                0
+//            )
+
 
     val unscreenedCount: StateFlow<Int> =
-        recordsRepo.unscreenedListCount
-            .stateIn(
-                viewModelScope,
-                SharingStarted.WhileSubscribed(5000),
-                0
-            )
+        combine(
+            recordsRepo.unscreenedList,
+            tbRepo.tbScreeningBenIds
+        ) { list, tbScreenedIds ->
+            list.count { it.benId !in tbScreenedIds }
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            0
+        )
 
 
 
@@ -109,22 +133,5 @@ class UnScreenedPeopleViewModel @Inject constructor(
 
     // ---------------- Existing Functions ----------------
 
-    fun markSymptomsScreened(benId: Long) {
-        viewModelScope.launch {
-            recordsRepo.markSymptomsScreened(benId)
-        }
-    }
 
-    fun markChestXrayDone(benId: Long) {
-        viewModelScope.launch {
-            recordsRepo.markChestXrayDone(benId)
-        }
-
-    }
-
-    fun markTrunatTestDone(benId: Long) {
-        viewModelScope.launch {
-            recordsRepo.markTrunatTestDone(benId)
-        }
-    }
 }

@@ -1396,9 +1396,17 @@ interface BenDao {
 
 
     @Query("""
-        SELECT COUNT(*) FROM BEN_BASIC_CACHE
-        WHERE villageId = :selectedVillage AND isDeactivate = 0 AND screeningStatus = 'UNSCREENED'
-    """)
+    SELECT COUNT(*)
+    FROM BEN_BASIC_CACHE b
+    WHERE b.isDeactivate = 0
+      AND b.screeningStatus = 'UNSCREENED'
+      AND (:selectedVillage = 0 OR b.villageId = :selectedVillage)
+      AND NOT EXISTS (
+          SELECT 1
+          FROM TB_SCREENING ts
+          WHERE ts.benId = b.benId
+      )
+""")
     fun getUnscreenedCount(selectedVillage: Int): Flow<Int>
 
     @Query("""

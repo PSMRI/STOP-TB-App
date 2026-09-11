@@ -71,7 +71,7 @@ class TBRepo @Inject constructor(
                 ben.gpsLongitude?.let { tbScreeningCache.longitude = it }
             }
             tbDao.saveTbScreening(tbScreeningCache)
-            benDao.markSymptomsScreened(tbScreeningCache.benId)   // NEW
+            benDao.updateScreeningStatus(tbScreeningCache.benId,"SCREENED")   // NEW
         }
     }
 
@@ -120,8 +120,9 @@ class TBRepo @Inject constructor(
                 ben.gpsLongitude?.let { tbDiagnosticsCache.longitude = it }
             }
             tbDao.saveTbDiagnostics(tbDiagnosticsCache)
-            if (tbDiagnosticsCache.isChestXRayDone == true) benDao.markChestXrayDone(tbDiagnosticsCache.benId)
-            if (tbDiagnosticsCache.isNaatConducted == true) benDao.markTrunatTestDone(tbDiagnosticsCache.benId)
+            if (tbDiagnosticsCache.isChestXRayDone == true) benDao.updateScreeningStatus(tbDiagnosticsCache.benId,"SCREENED")   // NEW
+
+            if (tbDiagnosticsCache.isNaatConducted == true) benDao.updateScreeningStatus(tbDiagnosticsCache.benId,"SCREENED")   // NEW
         }
     }
 
