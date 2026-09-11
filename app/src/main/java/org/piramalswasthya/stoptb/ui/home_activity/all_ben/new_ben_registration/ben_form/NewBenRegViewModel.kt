@@ -74,7 +74,10 @@ class NewBenRegViewModel @Inject constructor(
     private val selectedBenIdFromArgs = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).selectedBenId
     private val isAddSpouseFromArgs   = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).isAddSpouse
 
-    companion object { var isOtpVerified = false }
+    companion object {
+        var isOtpVerified = false
+        var isConsentAgreed = false
+    }
 
     // ─── State ──────────────────────────────────────────────────────────
     private val _state = MutableLiveData(State.IDLE)
@@ -89,7 +92,6 @@ class NewBenRegViewModel @Inject constructor(
     private val _isDeath = MutableLiveData<Boolean>()
     val isDeath: LiveData<Boolean> get() = _isDeath
 
-    private var isConsentAgreed = false
     fun setConsentAgreed()    { isConsentAgreed = true }
     fun getIsConsentAgreed()  = isConsentAgreed
 
@@ -489,7 +491,7 @@ class NewBenRegViewModel @Inject constructor(
                             // to ensure ben's loc_village_id matches household's village
                             locationRecord = if (hhId > 0L && household.householdId > 0L)
                                 household.locationRecord else locationRecord,
-                            isConsent      = isOtpVerified,
+                            isConsent      = isConsentAgreed,
                             isNonHH        = isNonHHArg,
                             placeOfCurrentLiving = if (isNonHHArg) placeOfCurrentLivingArg else null,
                             otherPlaceOfCurrentLiving = if (isNonHHArg) otherPlaceArg else null,
@@ -764,5 +766,6 @@ class NewBenRegViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         isOtpVerified = false
+        isConsentAgreed = false
     }
 }
