@@ -219,7 +219,7 @@
                 android:layout_height="wrap_content"
                 android:drawableLeft="@drawable/ic__ben"
                 android:onClick="@{()->clickListener.onClickedForMembers(household)}"
-                android:text="@{@string/hh_members_text(household.numMembers)}"
+                android:text="@{@string/hh_members_text(household.numMembers, household.displayTotalMembers)}"
                 android:backgroundTint="@android:color/holo_green_dark"
                 android:textColor="?attr/colorOnPrimary"
                 android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
