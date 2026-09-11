@@ -120,11 +120,11 @@
                             android:background="@drawable/bg_dashboard_icon_orange">
 
                             <ImageView
-                                android:layout_width="30dp"
-                                android:layout_height="30dp"
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
                                 android:layout_gravity="center"
                                 android:contentDescription="@null"
-                                android:src="@drawable/ic__ben"
+                                android:src="@drawable/ic_health_tuberculosis"
                                 app:tint="@android:color/white" />
                         </FrameLayout>
 
@@ -217,11 +217,11 @@
                             android:background="@drawable/bg_dashboard_icon_orange">
 
                             <ImageView
-                                android:layout_width="30dp"
-                                android:layout_height="30dp"
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
                                 android:layout_gravity="center"
                                 android:contentDescription="@null"
-                                android:src="@drawable/ic__ncd"
+                                android:src="@drawable/ic_health_symptom"
                                 app:tint="@android:color/white" />
                         </FrameLayout>
 
@@ -410,11 +410,11 @@
                             android:background="@drawable/bg_dashboard_icon_teal">
 
                             <ImageView
-                                android:layout_width="30dp"
-                                android:layout_height="30dp"
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
                                 android:layout_gravity="center"
                                 android:contentDescription="@null"
-                                android:src="@drawable/ic__ncd"
+                                android:src="@drawable/ic_health_tuberculosis"
                                 app:tint="@android:color/white" />
                         </FrameLayout>
 
@@ -517,11 +517,11 @@
                             android:background="@drawable/bg_dashboard_icon_orange">
 
                             <ImageView
-                                android:layout_width="30dp"
-                                android:layout_height="30dp"
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
                                 android:layout_gravity="center"
                                 android:contentDescription="@null"
-                                android:src="@drawable/ic__ncd"
+                                android:src="@drawable/ic_health_medicines"
                                 app:tint="@android:color/white" />
                         </FrameLayout>
 
@@ -622,11 +622,11 @@
                             android:background="@drawable/bg_dashboard_icon_orange">
 
                             <ImageView
-                                android:layout_width="30dp"
-                                android:layout_height="30dp"
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
                                 android:layout_gravity="center"
                                 android:contentDescription="@null"
-                                android:src="@drawable/ic__ncd"
+                                android:src="@drawable/ic_health_xray"
                                 app:tint="@android:color/white" />
                         </FrameLayout>
 
@@ -727,11 +727,11 @@
                             android:background="@drawable/bg_dashboard_icon_teal">
 
                             <ImageView
-                                android:layout_width="30dp"
-                                android:layout_height="30dp"
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
                                 android:layout_gravity="center"
                                 android:contentDescription="@null"
-                                android:src="@drawable/ic__death"
+                                android:src="@drawable/ic_health_medical_sample"
                                 app:tint="@android:color/white" />
                         </FrameLayout>
 
@@ -832,11 +832,11 @@
                             android:background="@drawable/bg_dashboard_icon_orange">
 
                             <ImageView
-                                android:layout_width="30dp"
-                                android:layout_height="30dp"
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
                                 android:layout_gravity="center"
                                 android:contentDescription="@null"
-                                android:src="@drawable/ic__ncd"
+                                android:src="@drawable/ic_health_test_tubes"
                                 app:tint="@android:color/white" />
                         </FrameLayout>
 
@@ -937,11 +937,11 @@
                             android:background="@drawable/bg_dashboard_icon_teal">
 
                             <ImageView
-                                android:layout_width="30dp"
-                                android:layout_height="30dp"
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
                                 android:layout_gravity="center"
                                 android:contentDescription="@null"
-                                android:src="@drawable/ic__death"
+                                android:src="@drawable/ic_health_test_tubes"
                                 app:tint="@android:color/white" />
                         </FrameLayout>
 
@@ -1042,11 +1042,11 @@
                             android:background="@drawable/bg_dashboard_icon_orange">
 
                             <ImageView
-                                android:layout_width="30dp"
-                                android:layout_height="30dp"
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
                                 android:layout_gravity="center"
                                 android:contentDescription="@null"
-                                android:src="@drawable/ic__ben"
+                                android:src="@drawable/ic_health_rural_post"
                                 app:tint="@android:color/white" />
                         </FrameLayout>
 
@@ -1148,11 +1148,11 @@
                             android:background="@drawable/bg_dashboard_icon_teal">
 
                             <ImageView
-                                android:layout_width="30dp"
-                                android:layout_height="30dp"
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
                                 android:layout_gravity="center"
                                 android:contentDescription="@null"
-                                android:src="@drawable/ic__death"
+                                android:src="@drawable/ic_health_symptom"
                                 app:tint="@android:color/white" />
                         </FrameLayout>
 
@@ -1246,11 +1246,11 @@
                             android:background="@drawable/bg_dashboard_icon_orange">
 
                             <ImageView
-                                android:layout_width="30dp"
-                                android:layout_height="30dp"
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
                                 android:layout_gravity="center"
                                 android:contentDescription="@null"
-                                android:src="@drawable/ic__ncd"
+                                android:src="@drawable/ic_health_tuberculosis"
                                 app:tint="@android:color/white" />
                         </FrameLayout>
 
@@ -1343,11 +1343,11 @@
                             android:background="@drawable/bg_dashboard_icon_green">
 
                             <ImageView
-                                android:layout_width="30dp"
-                                android:layout_height="30dp"
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
                                 android:layout_gravity="center"
                                 android:contentDescription="@null"
-                                android:src="@drawable/ic_check_circle"
+                                android:src="@drawable/ic_health_register_book"
                                 app:tint="@android:color/white" />
                         </FrameLayout>
 
@@ -1405,11 +1405,11 @@
                             android:background="@drawable/bg_dashboard_icon_teal">
 
                             <ImageView
-                                android:layout_width="30dp"
-                                android:layout_height="30dp"
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
                                 android:layout_gravity="center"
                                 android:contentDescription="@null"
-                                android:src="@drawable/ic__ben"
+                                android:src="@drawable/ic_health_data_security"
                                 app:tint="@android:color/white" />
                         </FrameLayout>
 

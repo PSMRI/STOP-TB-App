@@ -52,8 +52,8 @@
 
                     <ImageView
                         android:id="@+id/imageView2"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
                         android:layout_gravity="center"
                         android:contentDescription="@string/cd_icon_grid_icon"
                         android:scaleType="centerInside"

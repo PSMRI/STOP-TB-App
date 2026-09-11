@@ -889,8 +889,8 @@ class BenListAdapter(
                         else -> null
                     }
                     "adult" -> when (gender) {
-                        Gender.MALE.name -> R.drawable.ic_males
-                        Gender.FEMALE.name -> R.drawable.ic_icon_female_2
+                        Gender.MALE.name -> if (item.ageInt >= 60) R.drawable.ic_health_old_man else R.drawable.ic_males
+                        Gender.FEMALE.name -> if (item.ageInt >= 60) R.drawable.ic_health_old_woman else R.drawable.ic_icon_female_2
                         else -> R.drawable.ic_unisex
                     }
                     else -> null

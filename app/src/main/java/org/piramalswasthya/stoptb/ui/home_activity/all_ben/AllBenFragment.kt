@@ -210,26 +210,38 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     }
                 },
                 clickedWifeBen = { _, hhId, benId, _ ->
-                    findNavController().navigate(
-                        AllBenFragmentDirections.actionAllBenFragmentToNewBenRegFragment(
-                            hhId = hhId,
-                            relToHeadId = 4,       // Wife
-                            gender = 2,            // Female
-                            selectedBenId = benId, // husband's benId → mark isSpouseAdded after save
-                            isAddSpouse = 1
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        if (viewModel.isHouseholdMemberLimitReached(hhId)) {
+                            showHouseholdMemberLimitReachedMessage(hhId)
+                            return@launch
+                        }
+                        findNavController().navigate(
+                            AllBenFragmentDirections.actionAllBenFragmentToNewBenRegFragment(
+                                hhId = hhId,
+                                relToHeadId = 4,       // Wife
+                                gender = 2,            // Female
+                                selectedBenId = benId, // husband's benId → mark isSpouseAdded after save
+                                isAddSpouse = 1
+                            )
                         )
-                    )
+                    }
                 },
                 clickedHusbandBen = { _, hhId, benId, _ ->
-                    findNavController().navigate(
-                        AllBenFragmentDirections.actionAllBenFragmentToNewBenRegFragment(
-                            hhId = hhId,
-                            relToHeadId = 5,       // Husband
-                            gender = 1,            // Male
-                            selectedBenId = benId, // wife's benId → mark isSpouseAdded after save
-                            isAddSpouse = 1
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        if (viewModel.isHouseholdMemberLimitReached(hhId)) {
+                            showHouseholdMemberLimitReachedMessage(hhId)
+                            return@launch
+                        }
+                        findNavController().navigate(
+                            AllBenFragmentDirections.actionAllBenFragmentToNewBenRegFragment(
+                                hhId = hhId,
+                                relToHeadId = 5,       // Husband
+                                gender = 1,            // Male
+                                selectedBenId = benId, // wife's benId → mark isSpouseAdded after save
+                                isAddSpouse = 1
+                            )
                         )
-                    )
+                    }
                 },
                 clickedChildben = { item, hhId, benId, relToHeadId -> },
                 { item, hhid -> },
@@ -644,6 +656,14 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             }
         }
 
+    }
+
+    private suspend fun showHouseholdMemberLimitReachedMessage(hhId: Long) {
+        Toast.makeText(
+            requireContext(),
+            getString(R.string.hh_member_limit_reached, viewModel.getTotalHhMembers(hhId) ?: 0),
+            Toast.LENGTH_SHORT
+        ).show()
     }
 
     private fun checkAndGenerateABHA(benId: Long) {

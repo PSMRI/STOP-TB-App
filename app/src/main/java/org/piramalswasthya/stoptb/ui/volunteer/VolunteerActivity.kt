@@ -455,6 +455,17 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
 
     fun updateActionBar(icon: Int, title: String) {
         binding.ivToolbar.setImageResource(icon)
+        val toolbarIconPadding = if (icon == R.drawable.ic_health_village) {
+            resources.getDimensionPixelSize(R.dimen.padding_small)
+        } else {
+            resources.getDimensionPixelSize(R.dimen.padding_normal)
+        }
+        binding.ivToolbar.setPadding(
+            toolbarIconPadding,
+            toolbarIconPadding,
+            toolbarIconPadding,
+            toolbarIconPadding
+        )
 //        binding.toolbar.title = null
         binding.toolbar.title = ""
         supportActionBar?.setDisplayShowTitleEnabled(false)
