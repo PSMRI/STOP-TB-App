@@ -62,8 +62,8 @@
     </string-array>
     <string name="nhhr_house_own">ঘৰৰ মালিকীস্বত্ব</string>
     <string-array name="nhhr_house_own_array">
-        <item>হয়</item>
-        <item>নহয়</item>
+        <item>ভাড়াৰ বাবে</item>
+        <item>নিজৰ</item>
     </string-array>
     <string name="nhhr_separate_kitchen">পৃথক পাকঘৰ</string>
     <string-array name="nhhr_separate_kitchen_array">

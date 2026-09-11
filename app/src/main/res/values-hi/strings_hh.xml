@@ -64,8 +64,8 @@
     </string-array>
     <string name="nhhr_house_own">घर का स्वामित्व</string>
     <string-array name="nhhr_house_own_array">
-        <item>हाँ</item>
-        <item>नहीं</item>
+        <item>किराए पर</item>
+        <item>अपना</item>
     </string-array>
     <string name="nhhr_separate_kitchen">अलग रसोई घर</string>
     <string-array name="nhhr_separate_kitchen_array">
