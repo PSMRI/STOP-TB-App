@@ -65,6 +65,7 @@ class NewChildBenViewModel @Inject constructor(
 
     companion object {
         var isOtpVerified = false
+        var isConsentAgreed = false
     }
 
     val benIdFromArgs = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
@@ -81,7 +82,6 @@ class NewChildBenViewModel @Inject constructor(
     private val _recordExists = MutableLiveData(SelectedbenIdFromArgs != 0L)
     val recordExists: LiveData<Boolean> get() = _recordExists
 
-    private var isConsentAgreed = false
     fun setConsentAgreed() { isConsentAgreed = true }
     fun getIsConsentAgreed() = isConsentAgreed
 
@@ -167,7 +167,7 @@ class NewChildBenViewModel @Inject constructor(
                             genDetails = BenRegGen(),
                             syncState = SyncState.UNSYNCED,
                             locationRecord = locationRecord,
-                            isConsent = isOtpVerified
+                            isConsent = isConsentAgreed
                         )
                         val mapped = dataset.mapChild(newBen, i)
                         mapped.apply {
@@ -245,4 +245,10 @@ class NewChildBenViewModel @Inject constructor(
     fun getIndexOfGap8() = dataset.getIndexOfGap8()
     fun getIndexOfAge9() = dataset.getIndexOfAge9()
     fun getIndexOfGap9() = dataset.getIndexOfGap9()
+
+    override fun onCleared() {
+        super.onCleared()
+        isOtpVerified = false
+        isConsentAgreed = false
+    }
 }
