@@ -339,9 +339,9 @@ fun ImageView.setSyncState(syncState: SyncState?) {
     syncState?.let {
         visibility = View.VISIBLE
         val drawable = when (it) {
-            SyncState.UNSYNCED -> R.drawable.ic_unsynced
-            SyncState.SYNCING -> R.drawable.ic_syncing
-            SyncState.SYNCED -> R.drawable.ic_synced
+            SyncState.UNSYNCED -> R.drawable.ic_cloud_off
+            SyncState.SYNCING -> R.drawable.ic_cloud_sync
+            SyncState.SYNCED -> R.drawable.ic_cloud_upload_green
         }
         setImageResource(drawable)
         isClickable = it == SyncState.UNSYNCED
@@ -356,9 +356,9 @@ fun ImageView.setSyncStateForBen(syncState: SyncState?) {
     syncState?.let {
 
         val drawable = when (it) {
-            SyncState.UNSYNCED -> R.drawable.ic_unsynced
-            SyncState.SYNCING -> R.drawable.ic_syncing
-            SyncState.SYNCED -> R.drawable.ic_synced
+            SyncState.UNSYNCED -> R.drawable.ic_cloud_off
+            SyncState.SYNCING -> R.drawable.ic_cloud_sync
+            SyncState.SYNCED -> R.drawable.ic_cloud_upload_green
         }
         setImageResource(drawable)
         isClickable = it == SyncState.UNSYNCED

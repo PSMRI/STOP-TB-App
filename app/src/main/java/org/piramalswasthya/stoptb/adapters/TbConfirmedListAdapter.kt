@@ -195,8 +195,8 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
                     else -> R.drawable.ic_unisex
                 }
                 "adult" -> when (ben.gender) {
-                    Gender.MALE.name -> R.drawable.ic_males
-                    Gender.FEMALE.name -> R.drawable.ic_icon_female_2
+                    Gender.MALE.name -> if (ben.ageInt >= 60) R.drawable.ic_health_old_man else R.drawable.ic_males
+                    Gender.FEMALE.name -> if (ben.ageInt >= 60) R.drawable.ic_health_old_woman else R.drawable.ic_icon_female_2
                     else -> R.drawable.ic_unisex
                 }
                 else -> R.drawable.ic_unisex

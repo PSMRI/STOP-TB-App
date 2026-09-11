@@ -27,27 +27,27 @@
 
         <ImageView
             android:layout_width="0dp"
-            android:layout_height="50dp"
+            android:layout_height="52dp"
             android:layout_weight="1"
             android:gravity="center"
-            android:padding="@dimen/padding_normal"
-            android:src="@drawable/ic_synced" />
+            android:padding="10dp"
+            android:src="@drawable/ic_cloud_upload_green" />
 
         <ImageView
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="52dp"
             android:layout_weight="1"
             android:gravity="center"
-            android:padding="@dimen/padding_normal"
-            android:src="@drawable/ic_unsynced" />
+            android:padding="10dp"
+            android:src="@drawable/ic_cloud_off" />
 
         <ImageView
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="52dp"
             android:layout_weight="1"
             android:gravity="center"
-            android:padding="@dimen/padding_normal"
-            android:src="@drawable/ic_syncing" />
+            android:padding="10dp"
+            android:src="@drawable/ic_cloud_sync" />
 
 
     </LinearLayout>
