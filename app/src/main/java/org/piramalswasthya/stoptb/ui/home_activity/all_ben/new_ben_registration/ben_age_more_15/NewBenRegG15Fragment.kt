@@ -211,7 +211,7 @@ class NewBenRegG15Fragment : Fragment() {
                     binding.rlSaving.visibility = View.GONE
                     Toast.makeText(
                         context,
-                        resources.getString(R.string.save_successful),
+                        resources.getString(R.string.registration_successful),
                         Toast.LENGTH_LONG
                     ).show()
                     WorkerUtils.triggerAmritPushWorker(requireContext())

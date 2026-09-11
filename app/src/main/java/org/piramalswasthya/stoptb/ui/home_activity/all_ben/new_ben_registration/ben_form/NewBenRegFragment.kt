@@ -280,7 +280,7 @@ class NewBenRegFragment : Fragment() {
                 State.SAVE_SUCCESS -> {
                     binding.llContent.visibility = View.VISIBLE
                     binding.pbForm.visibility = View.GONE
-                    Toast.makeText(context, resources.getString(R.string.save_successful), Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, resources.getString(R.string.registration_successful), Toast.LENGTH_LONG).show()
                     try {
                         WorkerUtils.triggerAmritPushWorker(requireContext())
                         if (viewModel.isNonHHArg) {
