@@ -61,8 +61,8 @@
     </string-array>
     <string name="nhhr_house_own">House ownership</string>
     <string-array name="nhhr_house_own_array">
-        <item>Yes</item>
-        <item>No</item>
+        <item>Rented</item>
+        <item>Owned</item>
     </string-array>
     <string name="nhhr_separate_kitchen">Separate Kitchen</string>
     <string-array name="nhhr_separate_kitchen_array">
