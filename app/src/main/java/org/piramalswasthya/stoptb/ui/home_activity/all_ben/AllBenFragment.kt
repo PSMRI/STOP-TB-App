@@ -782,6 +782,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 getString(R.string.referral_true_nat)
             } else if (args.source == 8) {
                 getString(R.string.referral_liquid_culture)
+            } else if (args.source == 9) {
+                getString(R.string.icon_title_tpt_module)
             } else {
                 getString(R.string.icon_title_ben)
             }
