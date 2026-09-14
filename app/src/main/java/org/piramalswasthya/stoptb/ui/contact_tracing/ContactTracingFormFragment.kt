@@ -103,8 +103,7 @@ class ContactTracingFormFragment : Fragment() {
                 val resolvingContinueTpt = viewModel.resolvingContinueTpt.value == true
 
 //                btnCtNext.visibility = if (editable || showContinueTpt ) View.VISIBLE else View.GONE
-                val hiddenSections = setOf("Contact & Exposure Details", "Occupation & Exposure Details")
-                btnCtNext.visibility = if (!editable && viewModel.currentSectionName.value in hiddenSections) View.GONE else View.VISIBLE
+                btnCtNext.visibility = if (!editable && viewModel.currentSectionName.value in REDUNDANT_SECTION_HEADERS) View.GONE else View.VISIBLE
                 btnCtNext.text = when {
                     showContinueTpt && tptAlreadySubmitted -> getString(R.string.view_tpt_follow_up)
                     showContinueTpt -> getString(R.string.tpt_follow_up)
@@ -127,8 +126,17 @@ class ContactTracingFormFragment : Fragment() {
                 renderQuestions()
             }
 
+            val headerDefaultPaddingV = llCtHeader.paddingTop
+
             viewModel.currentSectionName.observe(viewLifecycleOwner) {
-                tvCtSectionName.text = it
+
+                val isRedundant = it in REDUNDANT_SECTION_HEADERS
+                tvCtSectionName.visibility = if (isRedundant) View.GONE else View.VISIBLE
+                tvCtSectionName.text = if (isRedundant) "" else it
+                llCtHeader.updatePadding(
+                    top = if (isRedundant) headerDefaultPaddingV / 2 else headerDefaultPaddingV,
+                    bottom = if (isRedundant) headerDefaultPaddingV / 2 else headerDefaultPaddingV
+                )
             }
 
             viewModel.progress.observe(viewLifecycleOwner) { (current, total) ->
@@ -283,6 +291,7 @@ class ContactTracingFormFragment : Fragment() {
     }
 
     companion object {
+        private val REDUNDANT_SECTION_HEADERS = setOf("Contact & Exposure Details", "Occupation & Exposure Details")
         private const val ARG_FORM_TYPE = "formType"
         private const val ARG_INDEX_CASE_BEN_ID = "indexCaseBenId"
         private const val ARG_CONTACT_TYPE = "contactType"
