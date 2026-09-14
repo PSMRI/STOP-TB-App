@@ -1185,8 +1185,8 @@ interface BenDao {
             "            OR t.nightSweats = 1\n" +
             "            OR t.historyOfTb = 1\n" +
             "            OR t.takingAntiTBDrugs = 1\n" +
+            "            OR t.familySufferingFromTB = 1\n" +
 //            "            OR CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) <= 5\n" +
-            "            OR b.reproductiveStatusId = 1\n" +
             "            OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')\n" +
             "            OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')\n" +
             "        ) AND IFNULL(ts.isConfirmed, 0) = 0\n" +
