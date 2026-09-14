@@ -497,13 +497,142 @@
 
                     </LinearLayout>
 
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@android:color/white"
+                android:layout_marginTop="@dimen/margin_small"
+                android:layout_marginBottom="@dimen/margin_small"
+                android:layout_marginLeft="@dimen/margin_big"
+                android:layout_marginRight="@dimen/margin_big"
+                android:padding="@dimen/margin_small"
+                app:layout_constraintBottom_toBottomOf="@id/ll_ben_details_2"
+                app:layout_constraintBottom_toTopOf="@id/ll_screening_status"/>
+
+            <LinearLayout
+                android:id="@+id/ll_screening_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/padding_normal"
+                android:layout_marginTop="@dimen/padding_small"
+                android:layout_marginBottom="@dimen/padding_small"
+                android:orientation="horizontal"
+                android:weightSum="3"
+                app:layout_constraintTop_toBottomOf="@id/ll_ben_details_2">
+
+                <!-- Symptoms -->
                 <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="TB Symptoms"
+                        android:textStyle="bold"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+
+                    <ImageView
+                        android:id="@+id/ivSymptoms"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:layout_marginTop="2dp"
+                        android:src="@drawable/circle_check" />
+
+                    <TextView
+                        android:id="@+id/tvSymptomsStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:visibility="gone"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+                </LinearLayout>
+
+                <!-- X-Ray -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textStyle="bold"
+                        android:text="Chest X-Ray"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+
+                    <ImageView
+                        android:id="@+id/ivXray"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:layout_marginTop="2dp"
+                        android:src="@drawable/circle_check" />
+
+                    <TextView
+                        android:id="@+id/tvXrayResult"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:visibility="gone"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+                </LinearLayout>
+
+                <!-- TruNat -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textStyle="bold"
+                        android:text="TrueNat"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+
+                    <ImageView
+                        android:id="@+id/ivTruenat"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:layout_marginTop="2dp"
+                        android:src="@drawable/circle_check" />
+
+                    <TextView
+                        android:id="@+id/tvTruenatResult"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:visibility="gone"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+                </LinearLayout>
+
+            </LinearLayout>
+            <LinearLayout
                     android:id="@+id/ll_ben_details_3"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:layout_marginHorizontal="@dimen/padding_normal"
-                    app:layout_constraintTop_toBottomOf="@id/ll_ben_details_2">
+                    app:layout_constraintTop_toBottomOf="@id/ll_screening_status">
 
                         <LinearLayout
                             android:id="@+id/ll_vital_action"

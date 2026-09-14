@@ -13,14 +13,23 @@ import android.widget.ArrayAdapter
 import androidx.annotation.StringRes
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.fragment.findNavController
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.databinding.FragmentDashboardBinding
+import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class DashboardFragment : Fragment() {
 
+    @Inject
+    lateinit var recordsRepo: RecordsRepo
     private var _binding: FragmentDashboardBinding? = null
     private val binding get() = _binding!!
 
@@ -44,6 +53,7 @@ class DashboardFragment : Fragment() {
 
         setupFilters()
         observeData()
+        observeUnscreenedCount()
     }
 
     /**
@@ -101,6 +111,13 @@ class DashboardFragment : Fragment() {
             binding.actvTimePeriod.setText(timePeriodLabels[position], false)
         }
 
+        binding.cardUnscreened.setOnClickListener {
+            findNavController().navigate(
+                org.piramalswasthya.stoptb.ui.volunteer.fragment.VolunteerHomeFragmentDirections
+                    .actionVolunteerHomeFragmentToUnScreenedPeople()
+            )
+        }
+
         // Village dropdown
         val villages = viewModel.villageList
         val villageNames = mutableListOf(getString(R.string.filter_all_villages))
@@ -141,6 +158,17 @@ class DashboardFragment : Fragment() {
         }
     }
 
+    private fun observeUnscreenedCount() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                recordsRepo.unscreenedListCount.collect { count ->
+                    binding.tvUnscreenedTotal.text = count.toString()
+                }
+            }
+        }
+    }
+
+
     private fun observeData() {
         // TB Screening card
         viewModel.tbScreening.observe(viewLifecycleOwner) { data ->
@@ -159,6 +187,14 @@ class DashboardFragment : Fragment() {
             binding.tvPresumptiveTbFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
             binding.tvPresumptiveTbChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
             binding.tvPresumptiveTbOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
+        }
+
+        viewModel.unscreened.observe(viewLifecycleOwner) { data ->
+           // binding.tvUnscreenedTotal.text = data.total.toString()
+            binding.tvUnscreenedMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
+            binding.tvUnscreenedFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
+            binding.tvUnscreenedChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
+            binding.tvUnscreenedOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
         }
 
         viewModel.pastHistoryTb.observe(viewLifecycleOwner) { data ->

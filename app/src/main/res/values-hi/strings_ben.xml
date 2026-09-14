@@ -15,6 +15,10 @@
     <string name="enter_aadhaar_number_ben">आधार नंबर दर्ज करें</string>
     <string name="reproductive_status">क्या आप गर्भवती हैं?</string>
 
+    <string name="available_for_camp">क्या आप शिविर में भाग लेने के लिए उपलब्ध हैं?</string>
+    <string name="reason_not_attending_camp">शिविर में भाग न लेने का कारण</string>
+    <string name="other_reason_not_attending_camp">अन्य कारण</string>
+
     <string name="birth_certificate_number">Birth Certificate No.</string>
     <string name="beneficiary_details">लाभार्थी विवरण</string>
     <string name="wife_s_name">पत्नी का नाम</string>
@@ -466,6 +470,12 @@
     <string-array name="mobile_not_available_array">
         <item>उपलब्ध नहीं है</item>
     </string-array>
+
+    <string name="status_unscreened">स्क्रीनिंग नहीं हुई</string>
+    <string name="status_pending">लंबित</string>
+    <string name="status_symptoms_screened">लक्षण जांचे गए</string>
+    <string name="status_xray_done">छाती एक्स-रे पूर्ण</string>
+    <string name="status_trunat_done">ट्रूनैट परीक्षण पूर्ण</string>
 
 
 </resources>
