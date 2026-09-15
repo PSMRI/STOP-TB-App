@@ -40,6 +40,8 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -61,10 +63,10 @@ jobs:
           echo '${{ secrets.GOOGLE_SERVICES_JSON_PROD }}' > app/src/stoptb/google-services.json
 
       - name: Accept SDK licenses
-        run: yes 2>/dev/null | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+        run: yes 2>/dev/null | sdkmanager --licenses >/dev/null || true
 
       - name: Install NDK
-        run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;29.0.14033849"
+        run: sdkmanager "ndk;29.0.14033849"
 
       - name: Set app version
         env:
