@@ -38,6 +38,7 @@ object Konstants {
     const val minAgeForGenBen: Int = 15
     const val maxAgeForGenBen: Int = 99
     const val minAgeForMarriage: Int = 12
+    const val minAgeForHoF: Int = 15
 
     //HBNC
     const val hbncCardDay = 0
