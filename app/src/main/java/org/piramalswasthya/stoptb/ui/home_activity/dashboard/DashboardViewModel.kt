@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.TBDao
@@ -22,8 +23,26 @@ data class TbGenderBreakdown(
     val children: Int = 0,
     val others: Int = 0,
     val seniorCitizen: Int = 0
+)
 
-    )
+data class CoverageStats(
+    val population: Int = 0,
+    val screened: Int = 0,
+    val unscreened: Int = 0,
+) {
+    val coveragePercent: Int
+        get() = if (population <= 0) 0 else ((screened * 100f) / population).toInt()
+
+    val unscreenedPercent: Int
+        get() = if (population <= 0) 0 else ((unscreened * 100f) / population).toInt()
+}
+
+data class DashboardFilterState(
+    val districtId: Int = 0,
+    val blockId: Int = 0,
+    val villageId: Int = 0,
+    val periodKey: String = DashboardViewModel.PERIOD_MONTH,
+)
 
 // data class PositiveNegativeCount(
 //     val positive: Int = 0,
@@ -55,30 +74,37 @@ class DashboardViewModel @Inject constructor(
     private val preferenceDao: PreferenceDao,
 ) : ViewModel() {
 
+    companion object {
+        const val PERIOD_TODAY = "today"
+        const val PERIOD_YESTERDAY = "yesterday"
+        const val PERIOD_WEEK = "week"
+        const val PERIOD_MONTH = "month"
+        const val PERIOD_YEAR = "year"
+        const val PERIOD_ALL = "all"
+    }
+
     private val _unscreened = MutableLiveData(TbGenderBreakdown())
     val unscreened: LiveData<TbGenderBreakdown> get() = _unscreened
 
+    private val _filters = MutableLiveData(DashboardFilterState())
+    val filters: LiveData<DashboardFilterState> get() = _filters
 
-    // Filter state
-    private val _selectedTimePeriod = MutableLiveData("Today")
-    val selectedTimePeriod: LiveData<String> get() = _selectedTimePeriod
-
-    private val _selectedVillageName = MutableLiveData("All Villages")
-    val selectedVillageName: LiveData<String> get() = _selectedVillageName
-
-    private var selectedVillageId: Int = 0 // 0 = all villages
-
-    // Village list for dropdown
     val villageList: List<LocationEntity>
-        get() {
-            val user = preferenceDao.getLoggedInUser() ?: return emptyList()
-            return user.villages
-        }
+        get() = preferenceDao.getLoggedInUser()?.villages.orEmpty()
 
-    // Time period options
-    val timePeriodOptions = listOf(
-        "Today", "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
+    val districtList: List<LocationEntity>
+        get() = preferenceDao.getLoggedInUser()?.district?.let { listOf(it) }.orEmpty()
+
+    val blockList: List<LocationEntity>
+        get() = preferenceDao.getLoggedInUser()?.block?.let { listOf(it) }.orEmpty()
+
+    val periodKeys = listOf(
+        PERIOD_TODAY,
+        PERIOD_YESTERDAY,
+        PERIOD_WEEK,
+        PERIOD_MONTH,
+        PERIOD_YEAR,
+        PERIOD_ALL
     )
 
     // Dashboard data
@@ -121,26 +147,17 @@ class DashboardViewModel @Inject constructor(
     private val _abhaCount = MutableLiveData(0)
     val abhaCount: LiveData<Int> get() = _abhaCount
 
+    private val _coverage = MutableLiveData(CoverageStats())
+    val coverage: LiveData<CoverageStats> get() = _coverage
+
     private var collectJobs = mutableListOf<Job>()
 
     init {
         loadDashboardData()
     }
 
-    fun setTimePeriod(period: String) {
-        _selectedTimePeriod.value = period
-        loadDashboardData()
-    }
-
-    fun setVillage(villageName: String, villageId: Int) {
-        _selectedVillageName.value = villageName
-        selectedVillageId = villageId
-        loadDashboardData()
-    }
-
-    fun clearVillageFilter() {
-        _selectedVillageName.value = "All Villages"
-        selectedVillageId = 0
+    fun applyFilters(state: DashboardFilterState) {
+        _filters.value = state
         loadDashboardData()
     }
 
@@ -148,44 +165,60 @@ class DashboardViewModel @Inject constructor(
         villageList.map { it.id }.ifEmpty { listOf(-1) }
 
     private fun getTimeRange(): Pair<Long, Long> {
-        val period = _selectedTimePeriod.value ?: "Today"
+        val period = _filters.value?.periodKey ?: PERIOD_MONTH
         val cal = Calendar.getInstance()
 
-        if (period == "Today") {
-            cal.set(Calendar.HOUR_OF_DAY, 0)
-            cal.set(Calendar.MINUTE, 0)
-            cal.set(Calendar.SECOND, 0)
-            cal.set(Calendar.MILLISECOND, 0)
-            val start = cal.timeInMillis
-
-            cal.set(Calendar.HOUR_OF_DAY, 23)
-            cal.set(Calendar.MINUTE, 59)
-            cal.set(Calendar.SECOND, 59)
-            cal.set(Calendar.MILLISECOND, 999)
-            val end = cal.timeInMillis
-            return Pair(start, end)
+        fun startOfDay(calendar: Calendar): Long {
+            calendar.set(Calendar.HOUR_OF_DAY, 0)
+            calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+            return calendar.timeInMillis
         }
 
-        // Month filter
-        val monthIndex = timePeriodOptions.indexOf(period) - 1 // 0=Jan, 11=Dec
-        if (monthIndex < 0) return Pair(0L, 0L)
+        fun endOfDay(calendar: Calendar): Long {
+            calendar.set(Calendar.HOUR_OF_DAY, 23)
+            calendar.set(Calendar.MINUTE, 59)
+            calendar.set(Calendar.SECOND, 59)
+            calendar.set(Calendar.MILLISECOND, 999)
+            return calendar.timeInMillis
+        }
 
-        cal.set(Calendar.MONTH, monthIndex)
-        cal.set(Calendar.DAY_OF_MONTH, 1)
-        cal.set(Calendar.HOUR_OF_DAY, 0)
-        cal.set(Calendar.MINUTE, 0)
-        cal.set(Calendar.SECOND, 0)
-        cal.set(Calendar.MILLISECOND, 0)
-        val start = cal.timeInMillis
-
-        cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH))
-        cal.set(Calendar.HOUR_OF_DAY, 23)
-        cal.set(Calendar.MINUTE, 59)
-        cal.set(Calendar.SECOND, 59)
-        cal.set(Calendar.MILLISECOND, 999)
-        val end = cal.timeInMillis
-
-        return Pair(start, end)
+        return when (period) {
+            PERIOD_TODAY -> {
+                val start = startOfDay(cal)
+                val end = endOfDay(cal)
+                Pair(start, end)
+            }
+            PERIOD_YESTERDAY -> {
+                cal.add(Calendar.DAY_OF_MONTH, -1)
+                val start = startOfDay(cal)
+                val end = endOfDay(cal)
+                Pair(start, end)
+            }
+            PERIOD_WEEK -> {
+                cal.firstDayOfWeek = Calendar.MONDAY
+                cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+                val start = startOfDay(cal)
+                val endCal = Calendar.getInstance()
+                Pair(start, endOfDay(endCal))
+            }
+            PERIOD_MONTH -> {
+                cal.set(Calendar.DAY_OF_MONTH, 1)
+                val start = startOfDay(cal)
+                cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH))
+                Pair(start, endOfDay(cal))
+            }
+            PERIOD_YEAR -> {
+                cal.set(Calendar.MONTH, Calendar.JANUARY)
+                cal.set(Calendar.DAY_OF_MONTH, 1)
+                val start = startOfDay(cal)
+                cal.set(Calendar.MONTH, Calendar.DECEMBER)
+                cal.set(Calendar.DAY_OF_MONTH, 31)
+                Pair(start, endOfDay(cal))
+            }
+            else -> Pair(0L, 0L)
+        }
     }
 
 
@@ -196,7 +229,7 @@ class DashboardViewModel @Inject constructor(
         collectJobs.clear()
 
         val (startTime, endTime) = getTimeRange()
-        val village = selectedVillageId
+        val village = _filters.value?.villageId ?: 0
         val assignedVillageIds = getAssignedVillageIds()
 
         _tbScreening.value = TbGenderBreakdown()
@@ -210,6 +243,7 @@ class DashboardViewModel @Inject constructor(
         _trueNat.value = TbGenderBreakdown()
         _liquidCulture.value = TbGenderBreakdown()
         _hwcReferral.value = TbGenderBreakdown()
+        _coverage.value = CoverageStats()
 
         // TB Screening breakdown
         collectJobs += viewModelScope.launch {
@@ -470,6 +504,19 @@ class DashboardViewModel @Inject constructor(
             seniorCitizenQuery = { tbDao.getDashboardHwcReferralCount(village, assignedVillageIds, startTime, endTime, "", 0,1) }
 
             )
+
+        collectJobs += viewModelScope.launch {
+            combine(
+                tbDao.getDashboardTbScreeningCount(village, assignedVillageIds, 0, 0, "", 0, 0),
+                tbDao.getDashboardUnscreenedCount(village, assignedVillageIds, 0, 0, "", 0)
+            ) { screened, unscreened ->
+                CoverageStats(
+                    population = screened + unscreened,
+                    screened = screened,
+                    unscreened = unscreened
+                )
+            }.collect { _coverage.value = it }
+        }
 
         // NIKSHAY count
         collectJobs += viewModelScope.launch {

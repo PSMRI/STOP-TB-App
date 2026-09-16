@@ -101,4 +101,25 @@
     <color name="sakhi_login_wave_deep">#C6E5E0</color>
     <color name="sakhi_login_glow">#FFF1E8</color>
 
+    <color name="dashboard_page_bg">#F6F8F7</color>
+    <color name="dashboard_card_orange">#FDEBDE</color>
+    <color name="dashboard_card_teal">#E3F3EE</color>
+    <color name="dashboard_card_blue">#E7F1FB</color>
+    <color name="dashboard_icon_orange">#FF7A28</color>
+    <color name="dashboard_icon_teal">#169B92</color>
+    <color name="dashboard_icon_blue">#2F80ED</color>
+    <color name="dashboard_ink">#183234</color>
+    <color name="dashboard_ink_muted">#6B7979</color>
+    <color name="dashboard_donut_track">#E6EBEA</color>
+    <color name="dashboard_demo_male">#00897B</color>
+    <color name="dashboard_demo_female">#F4511E</color>
+    <color name="dashboard_demo_children">#E6B325</color>
+    <color name="dashboard_demo_others">#7E57C2</color>
+    <color name="dashboard_demo_senior">#7FA8C9</color>
+    <color name="dashboard_coverage_high">#00897B</color>
+    <color name="dashboard_coverage_mid">#F57C00</color>
+    <color name="dashboard_coverage_low">#E53935</color>
+    <color name="dashboard_highlight_text">#0F6B63</color>
+    <color name="dashboard_row_divider">#E4ECEA</color>
+
 </resources>
