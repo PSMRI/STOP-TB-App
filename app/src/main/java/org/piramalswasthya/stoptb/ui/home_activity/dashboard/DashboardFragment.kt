@@ -344,6 +344,7 @@ class DashboardFragment : Fragment() {
         }
     )
 
+
     private fun updateScreenedPeriodLabel(periodLabel: String) {
         binding.tvScreenedPeriodLabel.text =
             getString(R.string.dashboard_screened_period_label, periodLabel)
