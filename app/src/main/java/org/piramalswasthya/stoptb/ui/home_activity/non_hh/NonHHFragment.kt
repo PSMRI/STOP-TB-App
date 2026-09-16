@@ -147,7 +147,9 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             context = requireActivity(),
             roleManager = roleManager,
             showActionButtons = false,
-            showExamineButton = true
+            showExamineButton = true,
+            showScreeningStatus = true,
+            showRedesignedCard = true
         )
 
         benAdapter.submitBenIds(viewModel.vitalBenIds.value)
@@ -163,6 +165,8 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         benAdapter.submitDiagnosisBenIds(viewModel.diagnosisBenIds.value)
 
         binding.rvAny.adapter = benAdapter
+        (binding.rvAny.itemAnimator as? androidx.recyclerview.widget.SimpleItemAnimator)
+            ?.supportsChangeAnimations = false
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.nonHHList.collectLatest { list ->
@@ -196,6 +200,7 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 launch { viewModel.syncingGeneralOpdBenIds.collect { benAdapter.submitSyncingGeneralOpdBenIds(it) } }
                 launch { viewModel.anthropometryBenIds.collect { benAdapter.submitAnthropometryBenIds(it) } }
                 launch { viewModel.diagnosisBenIds.collect { benAdapter.submitDiagnosisBenIds(it) } }
+                launch { viewModel.allTbDiagnostics.collect { benAdapter.submitTBDiagnostics(it) } }
             }
         }
     }

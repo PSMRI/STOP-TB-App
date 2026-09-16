@@ -25,6 +25,7 @@ class BenPagingAdapter(
     private val showAnthropometryButton: Boolean = false,
     private val showExamineButton: Boolean = true,
     private val showScreeningStatus: Boolean = false,   // ADD THIS
+    private val showRedesignedCard: Boolean = false,
     private val source: Int = 0,
     private val showContactTracingForms: Boolean = false
 ) :
@@ -45,8 +46,14 @@ class BenPagingAdapter(
     private val tptFollowUpDoneIds = mutableListOf<Long>()
     private val tptEligibleIds = mutableListOf<Long>()
     private val childCountMap = mutableMapOf<Long, Int>()
+    private val householdMemberCountMap = mutableMapOf<Long, Int>()
+    private val expandedTbDetails = mutableSetOf<Long>()
     private val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
     private val retryingBenIds = mutableListOf<Long>()
+
+    private companion object {
+        const val TB_DETAILS_PAYLOAD = "tb_details_expanded"
+    }
 
     override fun onCreateViewHolder(
         parent: ViewGroup, viewType: Int
@@ -87,11 +94,28 @@ class BenPagingAdapter(
             showExamineButton = showExamineButton,
             tbDiagnosticsList = tbDiagnosticsList,
             showScreeningStatus = showScreeningStatus,   // ADD THIS
+            showRedesignedCard = showRedesignedCard,
+            householdMemberCountMap = householdMemberCountMap,
+            isTbDetailsExpanded = item.benId in expandedTbDetails,
+            onToggleTbDetails = { benId -> toggleTbDetails(benId) },
             source = source,
             retryingBenIds = retryingBenIds,
             showContactTracingForms = showContactTracingForms,
             roleManager = roleManager
         )
+    }
+
+    override fun onBindViewHolder(
+        holder: BenListAdapter.BenViewHolder,
+        position: Int,
+        payloads: MutableList<Any>
+    ) {
+        if (TB_DETAILS_PAYLOAD in payloads) {
+            val item = getItem(position) ?: return
+            holder.updateTbDetailsExpanded(item.benId in expandedTbDetails)
+            return
+        }
+        super.onBindViewHolder(holder, position, payloads)
     }
 
     fun submitTBDiagnostics(list: List<TBDiagnosticsCache>) {
@@ -220,5 +244,24 @@ class BenPagingAdapter(
                 }
             }
         }
+    }
+
+    fun submitHouseholdMemberCounts(map: Map<Long, Int>) {
+        val old = householdMemberCountMap.toMap()
+        householdMemberCountMap.clear()
+        householdMemberCountMap.putAll(map)
+        val changedHouseholds = (old.keys + map.keys).filterTo(mutableSetOf()) { old[it] != map[it] }
+        if (changedHouseholds.isNotEmpty()) {
+            snapshot().forEachIndexed { index, item ->
+                if (item != null && item.hhId in changedHouseholds) notifyItemChanged(index)
+            }
+        }
+    }
+
+    private fun toggleTbDetails(benId: Long) {
+        if (!expandedTbDetails.add(benId)) expandedTbDetails.remove(benId)
+        snapshot().indexOfFirst { it?.benId == benId }
+            .takeIf { it >= 0 }
+            ?.let { notifyItemChanged(it, TB_DETAILS_PAYLOAD) }
     }
 }
