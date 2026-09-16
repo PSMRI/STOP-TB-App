@@ -64,10 +64,14 @@ class PullFromAmritWorker @AssistedInject constructor(
             withContext(Dispatchers.IO) {
                 val startTime = System.currentTimeMillis()
                 var numPages: Int
-                val startPage =
-                    if (preferenceDao.getLastSyncedTimeStamp() == Konstants.defaultTimeStamp)
+                // Refreshes must start from the first page so changes that shift page offsets
+                // (such as a newly registered beneficiary) are not missed after a partial pull.
+                val startPage = when (triggerSource) {
+                    "AUTO_PULL", "MANUAL_REFRESH" -> 0
+                    else -> if (preferenceDao.getLastSyncedTimeStamp() == Konstants.defaultTimeStamp)
                         preferenceDao.getFirstSyncLastSyncedPage()
                     else 0
+                }
 
                 try {
                     do {

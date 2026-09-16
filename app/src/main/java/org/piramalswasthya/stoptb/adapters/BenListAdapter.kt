@@ -60,8 +60,9 @@ class BenListAdapter(
     private val showAnthropometryButton: Boolean = false,
     private val showExamineButton: Boolean = true,
     private val showScreeningStatus: Boolean = false,
+    private val showContactTracingForms: Boolean = false,
+    private val showAddMemberButton: Boolean = false,
     private val showRedesignedCard: Boolean = false,
-    private val showContactTracingForms: Boolean = false
 ) : ListAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenDiffUtilCallBack) {
 
     object BenDiffUtilCallBack : DiffUtil.ItemCallback<BenBasicDomain>() {
@@ -199,7 +200,8 @@ class BenListAdapter(
             showRedesignedCard: Boolean = false,
             householdMemberCountMap: Map<Long, Int> = emptyMap(),
             isTbDetailsExpanded: Boolean = false,
-            onToggleTbDetails: (Long) -> Unit = {}
+            onToggleTbDetails: (Long) -> Unit = {},
+            showAddMemberButton: Boolean = false
         ) {
 
             binding.btnAbha.visibility = View.VISIBLE
@@ -208,6 +210,7 @@ class BenListAdapter(
             binding.clickListener = clickListener
             binding.showAbha = showAbha
             binding.showActionButtons = showActionButtons
+            binding.showAddMemberButton = showAddMemberButton
             binding.showRegistrationDate = showRegistrationDate
             binding.registrationDate.visibility =
                 if (showRegistrationDate) View.VISIBLE else View.INVISIBLE
@@ -1110,7 +1113,9 @@ class BenListAdapter(
             source = source,
             showExamineButton = showExamineButton,
             showContactTracingForms = showContactTracingForms,
-            roleManager = roleManager
+            roleManager = roleManager,
+            showAddMemberButton = showAddMemberButton
+
         )
     }
 
@@ -1209,7 +1214,8 @@ class BenListAdapter(
         private val clickedGeneralOpd: (item: BenBasicDomain, benId: Long, hhId: Long, viewOnly: Boolean) -> Unit = { _, _, _, _ -> },
         private val clickedAnthropometry: (item: BenBasicDomain, benId: Long, hhId: Long, viewOnly: Boolean) -> Unit = { _, _, _, _ -> },
         private val clickedExamine: (item: BenBasicDomain, benId: Long) -> Unit = { _, _ -> },
-        private val clickedNonHHHousehold: (item: BenBasicDomain) -> Unit = {}
+        private val clickedNonHHHousehold: (item: BenBasicDomain) -> Unit = {},
+        private val clickedAddMember: (item: BenBasicDomain) -> Unit = {}
     ) {
         fun onClickedBen(item: BenBasicDomain) = clickedBen(
             item,
@@ -1260,5 +1266,6 @@ class BenListAdapter(
         fun onClickSoftDeleteBen(item: BenBasicDomain) = softDeleteBen(item)
         fun onClickExamine(item: BenBasicDomain) = clickedExamine(item, item.benId)
         fun onClickNonHHHousehold(item: BenBasicDomain) = clickedNonHHHousehold(item)
+        fun onClickAddMember(item: BenBasicDomain) = clickedAddMember(item)
     }
 }

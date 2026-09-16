@@ -516,6 +516,12 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             ?.takeIf { it > 0L && it != 9999999999L }
         val hasFamilyHeadMobile = normalizedFamilyHeadPhone != null
         isHeadOfFamilyRegistration = relToHeadId == 18
+        if (isHeadOfFamilyRegistration) {
+            // Minimum age 15 for Head of Family registration — restrict DOB picker upper bound
+            val maxDobForHoF = Calendar.getInstance()
+                .apply { add(Calendar.YEAR, -Konstants.minAgeForHoF) }.timeInMillis
+            agePopup.max = maxDobForHoF
+        }
         contactNumber.value = normalizedFamilyHeadPhone?.toString()
         contactNumber.isEnabled = true
         mobileNotAvailable.value = if (hasFamilyHeadMobile) null else "0"
@@ -805,7 +811,11 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
     private fun applyDraftPrefill(prefill: BenRegCache) {
         prefill.firstName?.takeIf { it.isNotBlank() }?.let { firstName.value = it }
-        prefill.lastName?.takeIf { it.isNotBlank() }?.let { lastName.value = it }
+        prefill.lastName?.takeIf { it.isNotBlank() }?.let {
+            lastName.value = it
+            lastName.isEnabled = false
+            lastName.hasPencilEdit = true
+        }
         prefill.genderId.takeIf { it > 0 }?.let { gender.value = gender.getStringFromPosition(it) }
         prefill.fatherName?.takeIf { it.isNotBlank() }?.let { fatherName.value = it }
         prefill.motherName?.takeIf { it.isNotBlank() }?.let { motherName.value = it }
@@ -843,6 +853,11 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     private var familyHeadPhoneNo: String? = null
     private var villageEntities: List<LocationEntity> = emptyList()
     private var isHeadOfFamilyRegistration: Boolean = false
+
+
+    fun enableFieldEdit(formId: Int) {
+        if (formId == lastName.id) lastName.isEnabled = true
+    }
 
     fun hasThirdPage(): Boolean {
         return (getAgeFromDob(getLongFromDate(agePopup.value)) >= Konstants.minAgeForGenBen
@@ -1487,6 +1502,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     fun enableEditMode() {
         if (fatherName.inputType == TEXT_VIEW) fatherName.inputType = EDIT_TEXT
         if (motherName.inputType == TEXT_VIEW) motherName.inputType = EDIT_TEXT
+        lastName.isEnabled = true
     }
     fun getTempMobileNoStatus()    = getIndexOfElement(contactNumber) // no temp contact in StopTB
     fun getIndexOfBirthCertificateFrontPath() = -1 // not used in StopTB

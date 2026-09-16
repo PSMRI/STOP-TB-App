@@ -397,7 +397,7 @@
     <string name="child_immunization">Child Immunization</string>
     <string name="relation_with_hof">Relation with HOF</string>
     <string name="add_family_member">Add Family Member</string>
-    <string name="add_household_member">Add HoF Member</string>
+    <string name="add_household_member">Register HoF member</string>
     <string name="app_native_name">TBMJA</string>
     <string name="non_pregnant_women_eligible_couple_section">Non-Pregnant Women (Eligible Couple) section</string>
     <string name="time_of_death">Time of Death</string>
@@ -923,6 +923,7 @@
     <string name="tb_asymptomatic_screening">Asymptomatic Screening</string>
     <string name="tb_is_beneficiary_asymptomatic">Is beneficiary asymptomatic</string>
     <string name="risk_factors">Risk Factors</string>
+    <string name="other_details">Other Details</string>
     <string name="tb_rise_of_fever">Rise of fever in evening</string>
     <string name="tb_loss_of_appetite">Loss of Appetite</string>
     <string name="tb_age_more_than_60">Age more than 60 years</string>

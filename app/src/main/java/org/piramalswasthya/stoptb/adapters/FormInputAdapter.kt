@@ -116,6 +116,7 @@ class FormInputAdapter(
     private val ageClickListener: AgeClickListener? = null,
     private val sendOtpClickListener: SendOtpClickListener? = null,
     private val formValueListener: FormValueListener? = null,
+    private val pencilEditClickListener: PencilEditClickListener? = null,
     var isEnabled: Boolean = true,
     private val selectImageClickListener: SelectUploadImageClickListener? = null,
     private val viewDocumentListner: ViewDocumentOnClick? = null,
@@ -150,8 +151,7 @@ class FormInputAdapter(
                 return EditTextInputViewHolder(binding)
             }
         }
-        fun bind(item: FormElement, isEnabled: Boolean, formValueListener: FormValueListener?) {
-            val effectiveEnabled = isEnabled && item.isEnabled
+        fun bind(item: FormElement, isEnabled: Boolean, formValueListener: FormValueListener?, pencilEditClickListener: PencilEditClickListener? = null) {            val effectiveEnabled = isEnabled && item.isEnabled
 
             currentWatcher?.let { binding.et.removeTextChangedListener(it) }
             currentWatcher = null
@@ -163,19 +163,30 @@ class FormInputAdapter(
             Timber.d("binding triggered!!! $effectiveEnabled ${item.id}")
             if (!effectiveEnabled) {
                 binding.et.clearFocus()
-                binding.tilEditText.isEnabled = false
+                // Keep the TextInputLayout itself enabled when it has a pencil-edit affordance,
+                // otherwise Material disables the end icon along with the whole layout and the
+                // pencil becomes visible but untappable. Only the inner EditText stays locked.
+                binding.tilEditText.isEnabled = item.hasPencilEdit
                 binding.et.isEnabled = false
                 binding.et.isClickable = false
                 binding.et.isFocusable = false
                 binding.et.isFocusableInTouchMode = false
                 binding.et.isCursorVisible = false
-                binding.tilEditText.endIconDrawable = null
-                binding.tilEditText.setEndIconOnClickListener(null)
+                if (item.hasPencilEdit) {
+                    binding.tilEditText.isEndIconVisible = true
+                    binding.tilEditText.endIconDrawable =
+                        ContextCompat.getDrawable(binding.root.context, android.R.drawable.ic_menu_edit)
+                    binding.tilEditText.setEndIconOnClickListener {
+                        pencilEditClickListener?.onPencilClick(item)
+                    }
+                } else {
+                    binding.tilEditText.endIconDrawable = null
+                    binding.tilEditText.setEndIconOnClickListener(null)
+                }
                 handleHintLength(item)
                 binding.form = item
                 binding.et.setText(item.value)
                 binding.executePendingBindings()
-                binding.tilEditText.isEnabled = false
                 binding.et.isEnabled = false
                 binding.et.isClickable = false
                 binding.et.isFocusable = false
@@ -1354,6 +1365,10 @@ class FormInputAdapter(
         fun onImageClick(form: FormElement) = imageClick(form.id)
     }
 
+    class PencilEditClickListener(private val pencilClick: (formId: Int) -> Unit) {
+        fun onPencilClick(form: FormElement) = pencilClick(form.id)
+    }
+
     class SendOtpClickListener(private val btnClick: (formId: Int,generateOtp:MaterialButton,timerInsec: TextView,tilEditText:TextInputLayout, isEnabled: Boolean,adapterPosition:Int,otpField: TextInputEditText) -> Unit) {
 
         fun onButtonClick(
@@ -1648,7 +1663,7 @@ class FormInputAdapter(
             val isEnabled = if (isEnabled) item.isEnabled else false
             when (item.inputType) {
                 EDIT_TEXT -> (holder as EditTextInputViewHolder).bind(
-                    item, isEnabled, formValueListener
+                    item, isEnabled, formValueListener, pencilEditClickListener
                 )
 
                 DROPDOWN -> (holder as DropDownInputViewHolder).bind(

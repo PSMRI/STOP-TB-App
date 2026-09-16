@@ -313,6 +313,21 @@ interface BenDao {
                     WHERE tbs.recommendedForLiquidCultureTest = 1
                 )
             ))
+            OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
+                SELECT 1
+                FROM BEN_BASIC_CACHE b2
+                LEFT JOIN TB_SUSPECTED ts ON b2.benId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON b2.benId = td.benId
+                WHERE b2.hhId = BEN_BASIC_CACHE.hhId
+                  AND b2.isDeactivate = 0
+                  AND b2.isDeath = 0
+                  AND (
+                        ts.isTbConfirmed = 1
+                        OR td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
+            ))
         )
         AND (:filterType = 0
             OR (:filterType = 1 AND abhaId IS NOT NULL)
@@ -454,6 +469,21 @@ interface BenDao {
                     WHERE tbs.recommendedForLiquidCultureTest = 1
                 )
             ))
+            OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
+                SELECT 1
+                FROM BEN_BASIC_CACHE b2
+                LEFT JOIN TB_SUSPECTED ts ON b2.benId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON b2.benId = td.benId
+                WHERE b2.hhId = BEN_BASIC_CACHE.hhId
+                  AND b2.isDeactivate = 0
+                  AND b2.isDeath = 0
+                  AND (
+                        ts.isTbConfirmed = 1
+                        OR td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
+            ))
         )
         AND (:filterType = 0
             OR (:filterType = 1 AND abhaId IS NOT NULL)
@@ -594,6 +624,21 @@ interface BenDao {
                     SELECT tbs.benId FROM TB_SCREENING tbs
                     WHERE tbs.recommendedForLiquidCultureTest = 1
                 )
+            ))
+            OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
+                SELECT 1
+                FROM BEN_BASIC_CACHE b2
+                LEFT JOIN TB_SUSPECTED ts ON b2.benId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON b2.benId = td.benId
+                WHERE b2.hhId = BEN_BASIC_CACHE.hhId
+                  AND b2.isDeactivate = 0
+                  AND b2.isDeath = 0
+                  AND (
+                        ts.isTbConfirmed = 1
+                        OR td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
             ))
         )
         AND (:filterType = 0
@@ -1196,8 +1241,8 @@ interface BenDao {
             "            OR t.nightSweats = 1\n" +
             "            OR t.historyOfTb = 1\n" +
             "            OR t.takingAntiTBDrugs = 1\n" +
+            "            OR t.familySufferingFromTB = 1\n" +
 //            "            OR CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) <= 5\n" +
-            "            OR b.reproductiveStatusId = 1\n" +
             "            OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')\n" +
             "            OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')\n" +
             "        ) AND IFNULL(ts.isConfirmed, 0) = 0\n" +

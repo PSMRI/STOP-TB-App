@@ -53,6 +53,9 @@
         <variable
             name="showActionButtons"
             type="Boolean" />
+        <variable
+            name="showAddMemberButton"
+            type="Boolean" />
 
 
     </data>
@@ -1155,6 +1158,27 @@
                     android:textSize="14sp"
                     app:cornerRadius="@dimen/padding_normal"
                     app:strokeColor="?attr/colorPrimary"
+                    app:strokeWidth="1dp" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_add_member"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:backgroundTint="#7C5CC4"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:singleLine="true"
+                    android:onClick="@{()-> clickListener.onClickAddMember(ben)}"
+                    android:paddingHorizontal="@dimen/padding_normal"
+                    android:text="Add Member"
+                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                    android:textColor="@android:color/white"
+                    android:textSize="14sp"
+                    android:visibility="@{showAddMemberButton &amp;&amp; !ben.isNonHH ? View.VISIBLE : View.GONE}"
+                    app:cornerRadius="@dimen/padding_normal"
+                    app:strokeColor="#7C5CC4"
                     app:strokeWidth="1dp" />
 
                 <!-- ABHA button (no ABHA linked) — right half -->

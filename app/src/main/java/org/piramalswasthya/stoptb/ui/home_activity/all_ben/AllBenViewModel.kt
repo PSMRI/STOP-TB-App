@@ -39,7 +39,11 @@ import java.io.FileWriter
 import javax.inject.Inject
 
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.database.room.SyncState
+import org.piramalswasthya.stoptb.model.BenRegCache
 
 @HiltViewModel
 class AllBenViewModel @Inject constructor(
@@ -56,6 +60,27 @@ class AllBenViewModel @Inject constructor(
     suspend fun isHouseholdMemberLimitReached(hhId: Long) = householdRepo.isMemberLimitReached(hhId)
 
     suspend fun getTotalHhMembers(hhId: Long) = householdRepo.getTotalHhMembers(hhId)
+
+    private var _selectedHouseholdIdForAddMember: Long = 0L
+    val selectedHouseholdIdForAddMember: Long get() = _selectedHouseholdIdForAddMember
+
+    private val _householdBenListForAddMember = mutableListOf<BenRegCache>()
+    val householdBenListForAddMember: List<BenRegCache> get() = _householdBenListForAddMember
+
+    fun resetSelectedHouseholdForAddMember() {
+        _selectedHouseholdIdForAddMember = 0L
+        _householdBenListForAddMember.clear()
+    }
+
+    fun setSelectedHouseholdForAddMember(hhId: Long) {
+        _selectedHouseholdIdForAddMember = hhId
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                _householdBenListForAddMember.clear()
+                _householdBenListForAddMember.addAll(benRepo.getBenListFromHousehold(hhId))
+            }
+        }
+    }
 
     private var sourceFromArgs = AllBenFragmentArgs.fromSavedStateHandle(savedStateHandle).source
 

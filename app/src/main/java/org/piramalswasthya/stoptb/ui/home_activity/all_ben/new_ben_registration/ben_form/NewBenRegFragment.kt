@@ -230,6 +230,10 @@ class NewBenRegFragment : Fragment() {
             sendOtpClickListener = FormInputAdapter.SendOtpClickListener { _, _, _, _, _, _, _ -> },
             selectImageClickListener = FormInputAdapter.SelectUploadImageClickListener { },
             viewDocumentListner = FormInputAdapter.ViewDocumentOnClick { },
+            pencilEditClickListener = FormInputAdapter.PencilEditClickListener { formId ->
+                val idx = viewModel.enableFieldEditAndGetIndex(formId)
+                if (idx >= 0) binding.form.rvInputForm.adapter?.notifyItemChanged(idx)
+            },
             isEnabled = true,
         )
         binding.form.rvInputForm.adapter = adapter
