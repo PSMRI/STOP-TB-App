@@ -1876,7 +1876,20 @@ class BenRepo @Inject constructor(
                         val resolvedHouseholdId = run {
                             val fromTypo = if (jsonObject.has("houseoldId") && !jsonObject.isNull("houseoldId")) jsonObject.getLong("houseoldId").takeIf { it > 0L } else null
                             val fromCorrect = if (jsonObject.has("householdId") && !jsonObject.isNull("householdId")) jsonObject.getLong("householdId").takeIf { it > 0L } else null
-                            fromTypo ?: fromCorrect ?: existingBen?.householdId?.takeIf { it > 0L }
+                            // Server payload can omit the household key even for a genuine household member (seen when
+                            // the household association hasn't fully propagated server-side at query time). Before
+                            // concluding this beneficiary is truly non-household, check the familyHeadRelationPosition:
+                            // a value in the normal household-relation range (1-20ish, excluding whatever code means
+                            // "not applicable") strongly implies household membership even without an explicit ID.
+                            val relationPosition = benDataObj.optInt(
+                                "familyHeadRelationPosition",
+                                jsonObject.optInt("familyHeadRelationPosition", 0)
+                            )
+                            val impliedByRelation = relationPosition in 1..20
+
+                            fromTypo ?: fromCorrect
+                            ?: existingBen?.householdId?.takeIf { it > 0L }
+                            ?: existingBen?.takeIf { impliedByRelation && !it.isNonHH }?.householdId
                         }
                         val serverBen =
                             BenRegCache(
