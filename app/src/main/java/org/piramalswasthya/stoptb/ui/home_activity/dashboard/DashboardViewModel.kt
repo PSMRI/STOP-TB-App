@@ -141,11 +141,11 @@ class DashboardViewModel @Inject constructor(
     private val _hwcReferral = MutableLiveData(TbGenderBreakdown())
     val hwcReferral: LiveData<TbGenderBreakdown> get() = _hwcReferral
 
-    private val _nikshayCount = MutableLiveData(0)
-    val nikshayCount: LiveData<Int> get() = _nikshayCount
+    private val _nikshayCount = MutableLiveData(TbGenderBreakdown())
+    val nikshayCount: LiveData<TbGenderBreakdown> get() = _nikshayCount
 
-    private val _abhaCount = MutableLiveData(0)
-    val abhaCount: LiveData<Int> get() = _abhaCount
+    private val _abhaCount = MutableLiveData(TbGenderBreakdown())
+    val abhaCount: LiveData<TbGenderBreakdown> get() = _abhaCount
 
     private val _coverage = MutableLiveData(CoverageStats())
     val coverage: LiveData<CoverageStats> get() = _coverage
@@ -243,6 +243,8 @@ class DashboardViewModel @Inject constructor(
         _trueNat.value = TbGenderBreakdown()
         _liquidCulture.value = TbGenderBreakdown()
         _hwcReferral.value = TbGenderBreakdown()
+        _nikshayCount.value = TbGenderBreakdown()
+        _abhaCount.value = TbGenderBreakdown()
         _coverage.value = CoverageStats()
 
         // TB Screening breakdown
@@ -518,19 +520,25 @@ class DashboardViewModel @Inject constructor(
             }.collect { _coverage.value = it }
         }
 
-        // NIKSHAY count
-        collectJobs += viewModelScope.launch {
-            tbDao.getDashboardNikshayCount(village, assignedVillageIds, startTime, endTime).collect {
-                _nikshayCount.value = it
-            }
-        }
+        collectBreakdown(
+            target = _nikshayCount,
+            totalQuery = { tbDao.getDashboardNikshayCount(village, assignedVillageIds, startTime, endTime, "", 0, 0) },
+            maleQuery = { tbDao.getDashboardNikshayCount(village, assignedVillageIds, startTime, endTime, "MALE", 0, 0) },
+            femaleQuery = { tbDao.getDashboardNikshayCount(village, assignedVillageIds, startTime, endTime, "FEMALE", 0, 0) },
+            childrenQuery = { tbDao.getDashboardNikshayCount(village, assignedVillageIds, startTime, endTime, "", 1, 0) },
+            othersQuery = { tbDao.getDashboardNikshayCount(village, assignedVillageIds, startTime, endTime, "OTHERS", 0, 0) },
+            seniorCitizenQuery = { tbDao.getDashboardNikshayCount(village, assignedVillageIds, startTime, endTime, "", 0, 1) },
+        )
 
-        // ABHA count
-        collectJobs += viewModelScope.launch {
-            benDao.getDashboardAbhaCount(village, assignedVillageIds, startTime, endTime).collect {
-                _abhaCount.value = it
-            }
-        }
+        collectBreakdown(
+            target = _abhaCount,
+            totalQuery = { benDao.getDashboardAbhaCount(village, assignedVillageIds, startTime, endTime, "", 0, 0) },
+            maleQuery = { benDao.getDashboardAbhaCount(village, assignedVillageIds, startTime, endTime, "MALE", 0, 0) },
+            femaleQuery = { benDao.getDashboardAbhaCount(village, assignedVillageIds, startTime, endTime, "FEMALE", 0, 0) },
+            childrenQuery = { benDao.getDashboardAbhaCount(village, assignedVillageIds, startTime, endTime, "", 1, 0) },
+            othersQuery = { benDao.getDashboardAbhaCount(village, assignedVillageIds, startTime, endTime, "OTHERS", 0, 0) },
+            seniorCitizenQuery = { benDao.getDashboardAbhaCount(village, assignedVillageIds, startTime, endTime, "", 0, 1) },
+        )
     }
 
     private fun collectBreakdown(
