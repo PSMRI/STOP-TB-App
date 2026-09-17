@@ -135,10 +135,10 @@ GitHub Actions workflows are available under `.github/workflows`.
   - Runs unit tests
   - Runs Android lint
   - Uploads test and lint reports as workflow artifacts
-- `distribute-uat.yml`
-  - Builds the UAT debug APK
-  - Uploads the APK as an artifact
-  - Distributes the APK to Firebase App Distribution
+- `distribute.yml` (**StopTB Build & Distribute**)
+  - Manual workflow: choose `uat` or `prod`, `debug` or `signed`, then Firebase / Intune / Play
+  - Builds the matching APK (and prod signed AAB when Play is selected)
+  - Uploads artifacts and publishes only to the selected channels
 
 Required GitHub secrets for CI/CD:
 
