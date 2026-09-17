@@ -12,6 +12,7 @@ import android.widget.EditText
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import androidx.navigation.fragment.navArgs
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
@@ -24,7 +25,9 @@ import org.piramalswasthya.stoptb.ui.counselling_activity.CounsellingActivity
 import org.piramalswasthya.stoptb.ui.counselling_activity.CounsellingViewModel
 import org.piramalswasthya.stoptb.model.BenWithTbSuspectedDomain
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
+import org.piramalswasthya.stoptb.model.AppRole
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import javax.inject.Inject
 import kotlin.getValue
 
@@ -34,6 +37,13 @@ class TBConfirmedListFragment : Fragment() {
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
+    private val args: TBConfirmedListFragmentArgs by navArgs()
+
+    private val restrictToAction: TbConfirmedListAdapter.Action?
+        get() = args.restrictToAction?.let { TbConfirmedListAdapter.Action.valueOf(it) }
 
     private var _binding: FragmentDisplaySearchRvButtonBinding? = null
     private val binding: FragmentDisplaySearchRvButtonBinding
@@ -87,11 +97,14 @@ class TBConfirmedListFragment : Fragment() {
                     )
                 },
                 clickedViewMember = { item ->
+                    val isCounsellingWorkflow = roleManager.activeRole.value == AppRole.COUNSELING ||
+                            restrictToAction == TbConfirmedListAdapter.Action.CONTACT_TRACING ||
+                            restrictToAction == TbConfirmedListAdapter.Action.COUNSELLING
                     findNavController().navigate(
                         TBConfirmedListFragmentDirections
                             .actionTBConfirmedListFragmentToHouseholdMembersFragment(
                                 hhId = item.ben.hhId ?: 0L,
-                                fromContactTracing = true
+                                fromContactTracing = isCounsellingWorkflow
                             )
                     )
                 },
@@ -100,7 +113,9 @@ class TBConfirmedListFragment : Fragment() {
                         .show(childFragmentManager, ContactTracingTypeBottomSheetFragment.TAG)
                 }
             ),
-            pref = prefDao
+            pref = prefDao,
+            roleManager = roleManager,
+            restrictToAction = restrictToAction
         )
         binding.rvAny.adapter = benAdapter
 
@@ -158,10 +173,16 @@ class TBConfirmedListFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
+        val title = when (restrictToAction) {
+            TbConfirmedListAdapter.Action.COUNSELLING -> getString(R.string.counselling_menu_title)
+            TbConfirmedListAdapter.Action.CONTACT_TRACING -> getString(R.string.contact_tracing)
+            TbConfirmedListAdapter.Action.FOLLOW_UP -> getString(R.string.follow_up)
+            TbConfirmedListAdapter.Action.VIEW_ONLY, null -> getString(R.string.tb_confirmed_list)
+        }
         activity?.let {
             when (it) {
-                is HomeActivity -> it.updateActionBar(R.drawable.ic__ncd, getString(R.string.tb_confirmed_list))
-                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ncd, getString(R.string.tb_confirmed_list))
+                is HomeActivity -> it.updateActionBar(R.drawable.ic__ncd, title)
+                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ncd, title)
             }
         }
     }

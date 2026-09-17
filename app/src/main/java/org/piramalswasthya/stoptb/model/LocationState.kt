@@ -11,8 +11,13 @@ sealed class LocationState {
     ) : LocationState()
     sealed class Failed : LocationState() {
         object PermissionDenied : Failed()
+        // Location is off system-wide. Acquired via raw android.location.LocationManager
         object GpsDisabled : Failed()
         object NoSignal : Failed()
         object OutsideIndia : Failed()
+        // Device has no GPS chip, or the GPS provider is specifically off
+        object NoGpsProvider : Failed()
+        // We hit our own explicit fetch cutoff
+        object Timeout : Failed()
     }
 }

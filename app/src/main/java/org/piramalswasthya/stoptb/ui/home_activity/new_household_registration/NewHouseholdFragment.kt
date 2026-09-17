@@ -4,40 +4,45 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.content.IntentSender
 import android.content.pm.PackageManager
+import android.location.LocationListener
+import android.location.LocationManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Looper
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.Toast
-import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
-import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.LocationSettingsRequest
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.databinding.AlertConsentBinding
 import org.piramalswasthya.stoptb.databinding.FragmentNewHouseholdBinding
+import org.piramalswasthya.stoptb.helpers.GpsDiagnostics
 import org.piramalswasthya.stoptb.helpers.Konstants
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.LocationState
+import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.home_activity.new_household_registration.NewHouseholdViewModel.State
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import timber.log.Timber
@@ -49,6 +54,9 @@ class NewHouseholdFragment : Fragment() {
     @Inject
     lateinit var prefDao: PreferenceDao
 
+    @Inject
+    lateinit var roleManager: RoleManager
+
     private var _binding: FragmentNewHouseholdBinding? = null
     private val binding get() = _binding!!
 
@@ -57,7 +65,14 @@ class NewHouseholdFragment : Fragment() {
     private var micClickedElementId: Int = -1
     private var editMode: Boolean = false
 
-    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    // Acquired directly from the OS
+    private lateinit var locationManager: LocationManager
+    private var gpsWatchdogJob: Job? = null
+    private var activeLocationListener: LocationListener? = null
+    // Fast path — only used when Google Play Services is available (GpsDiagnostics.isPlayServicesAvailable()).
+    // Lazily created so it's never touched at all on non-GMS devices.
+    private var fusedLocationClient: FusedLocationProviderClient? = null
+    private var activeCancellationTokenSource: CancellationTokenSource? = null
 
     private val sttContract = registerForActivityResult(SpeechToTextContract()) { value ->
         val formatted = value.uppercase()
@@ -81,15 +96,6 @@ class NewHouseholdFragment : Fragment() {
             }
         }
 
-    private val resolveGpsSettings =
-        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-            if (result.resultCode == android.app.Activity.RESULT_OK) {
-                fetchLocationNow()
-            } else {
-                viewModel.onLocationFailed(LocationState.Failed.GpsDisabled)
-            }
-        }
-
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
@@ -108,7 +114,7 @@ class NewHouseholdFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
+        locationManager = requireContext().getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
         setupReasonDropdown()
         setupFormAdapter()
@@ -133,6 +139,11 @@ class NewHouseholdFragment : Fragment() {
         }
     }
 
+    private fun updateSubmitButtonState() {
+        val isEditOrNew = viewModel.readRecord.value == false
+        binding.btnSubmit.isEnabled = isEditOrNew && viewModel.isTotalMembersValid()
+    }
+
     private fun setupFormAdapter() {
         val adapter = FormInputAdapter(
             formValueListener = FormInputAdapter.FormValueListener { formId, index ->
@@ -144,7 +155,7 @@ class NewHouseholdFragment : Fragment() {
                     else -> {
                         viewModel.updateListOnValueChanged(formId, index)
                         hardCodedListUpdate(formId)
-
+                        updateSubmitButtonState()
                     }
                 }
             },
@@ -153,7 +164,10 @@ class NewHouseholdFragment : Fragment() {
         binding.form.rvInputForm.adapter = adapter
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.formList.collect { list ->
-                if (list.isNotEmpty()) adapter.submitList(list)
+                if (list.isNotEmpty()) {
+                    adapter.submitList(list)
+                    updateSubmitButtonState()
+                }
             }
         }
     }
@@ -201,8 +215,11 @@ class NewHouseholdFragment : Fragment() {
                 if (recordExists) getString(R.string.view_household_information)
                 else getString(R.string.frag_nhhr_title)
             )
-            binding.fabEdit.visibility = if (recordExists) View.VISIBLE else View.GONE
+            // Edit FAB is the only way back into edit mode — hide it below full permission.
+            val canEditHousehold = roleManager.privilegesUnion().householdPermission == Permission.FULL
+            binding.fabEdit.visibility = if (recordExists && canEditHousehold) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (!recordExists) View.VISIBLE else View.GONE
+            updateSubmitButtonState()
             binding.btnCancel.visibility = if (!recordExists) View.VISIBLE else View.GONE
             binding.btnRefreshLocation.isEnabled = !recordExists
             binding.cbGpsUnavailable.isEnabled = !recordExists
@@ -210,6 +227,10 @@ class NewHouseholdFragment : Fragment() {
             val adapter = binding.form.rvInputForm.adapter as? FormInputAdapter
             adapter?.isEnabled = !recordExists
             adapter?.notifyDataSetChanged()
+
+            if (!recordExists && !viewModel.getIsConsentAgreed()) {
+                consentAlert.show()
+            }
         }
 
         // Save state
@@ -223,7 +244,11 @@ class NewHouseholdFragment : Fragment() {
                 State.SAVE_SUCCESS -> {
                     binding.llContent.visibility = View.VISIBLE
                     binding.pbForm.visibility = View.GONE
-                    Toast.makeText(context, getString(R.string.save_successful), Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        context,
+                        getString(if (!editMode) R.string.registration_successful else R.string.save_successful),
+                        Toast.LENGTH_LONG
+                    ).show()
                     if (!editMode) {
                         viewModel.setRecordExists(true)
                         showNextScreenAlert()
@@ -261,6 +286,18 @@ class NewHouseholdFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.locationState.collect { state ->
                 updateLocationUI(state)
+            }
+        }
+
+        // Location diagnostic detail — why the status above is what it is
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.locationDetail.collect { detail ->
+                if (detail.isNullOrBlank()) {
+                    binding.tvLocationDetail.visibility = View.GONE
+                } else {
+                    binding.tvLocationDetail.text = detail
+                    binding.tvLocationDetail.visibility = View.VISIBLE
+                }
             }
         }
 
@@ -345,6 +382,16 @@ class NewHouseholdFragment : Fragment() {
                 clearLocationFields()
                 Toast.makeText(context, getString(R.string.loc_msg_outside_india), Toast.LENGTH_LONG).show()
             }
+            is LocationState.Failed.NoGpsProvider -> {
+                binding.btnRefreshLocation.isEnabled = isEditMode
+                setStatusText(getString(R.string.loc_status_no_gps_provider), "#F44336")
+                clearLocationFields()
+            }
+            is LocationState.Failed.Timeout -> {
+                binding.btnRefreshLocation.isEnabled = isEditMode
+                setStatusText(getString(R.string.loc_status_timeout), "#F44336")
+                clearLocationFields()
+            }
         }
     }
 
@@ -420,73 +467,233 @@ class NewHouseholdFragment : Fragment() {
 
     private fun checkSettingsAndFetch() {
         viewModel.setFetching()
-        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10_000L)
-            .setWaitForAccurateLocation(false)
-            .setMaxUpdates(1)
-            .build()
+        GpsDiagnostics.logPreflight(requireContext(), "NewHouseholdFragment")
 
-        val settingsRequest = LocationSettingsRequest.Builder()
-            .addLocationRequest(locationRequest)
-            .build()
+        if (!GpsDiagnostics.isGpsHardwareAvailable(requireContext())) {
+            Timber.tag(GpsDiagnostics.TAG).w("No GPS hardware on this device — failing fast")
+            viewModel.onLocationFailed(LocationState.Failed.NoGpsProvider, getString(R.string.loc_detail_no_gps_hardware))
+            return
+        }
+        if (!hasFineLocationPermission()) {
+            Timber.tag(GpsDiagnostics.TAG).w("Only approximate location permission granted — precise location required for offline GPS")
+            viewModel.onLocationFailed(LocationState.Failed.PermissionDenied, getString(R.string.loc_detail_precise_permission_required))
+            showOpenSettingsDialog()
+            return
+        }
+        if (!GpsDiagnostics.isGpsProviderEnabled(requireContext())) {
 
-        val client = LocationServices.getSettingsClient(requireActivity())
-        client.checkLocationSettings(settingsRequest)
-            .addOnSuccessListener {
-                fetchLocationNow()
+            Timber.tag(GpsDiagnostics.TAG).w("GPS provider disabled — sending user to system Location Settings")
+            viewModel.onLocationFailed(LocationState.Failed.GpsDisabled, getString(R.string.loc_detail_gps_provider_off))
+            showEnableLocationDialog()
+            return
+        }
+
+        fetchLocationNow()
+    }
+
+    private fun showEnableLocationDialog() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(getString(R.string.loc_section_title))
+            .setMessage(getString(R.string.loc_msg_enable_location_settings))
+            .setPositiveButton(getString(R.string.loc_dialog_open_settings)) { _, _ ->
+                startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
             }
-            .addOnFailureListener { exception ->
-                if (exception is ResolvableApiException) {
-                    try {
-                        val request = IntentSenderRequest.Builder(exception.resolution.intentSender).build()
-                        resolveGpsSettings.launch(request)
-                    } catch (e: IntentSender.SendIntentException) {
-                        Timber.e(e, "Could not launch GPS settings dialog")
-                        viewModel.onLocationFailed(LocationState.Failed.GpsDisabled)
-                    }
-                } else {
-                    viewModel.onLocationFailed(LocationState.Failed.GpsDisabled)
-                }
-            }
+            .setNegativeButton(getString(R.string.dialog_no), null)
+            .show()
+    }
+    private fun startGpsWatchdog() {
+        gpsWatchdogJob?.cancel()
+        gpsWatchdogJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(GpsDiagnostics.MASTER_TIMEOUT_MS)
+            // Defensive: only act if we're still Fetching. A terminal state (Captured/Failed)
+            // should always cancel this job itself, but this guard means a missed cancellation
+            // elsewhere can never clobber an already-resolved result — it's a last resort, not
+            // an unconditional override.
+            if (viewModel.locationState.value !is LocationState.Fetching) return@launch
+            Timber.tag(GpsDiagnostics.TAG).e(
+                "GPS watchdog fired — no terminal state after ${GpsDiagnostics.MASTER_TIMEOUT_MS}ms. " +
+                    "Forcing UI out of Fetching (likely an OEM battery/background-process throttle, " +
+                    "or a hung Play Services task on the fused fast path)."
+            )
+            viewModel.onLocationFailed(LocationState.Failed.Timeout, getString(R.string.loc_detail_watchdog_timeout))
+        }
     }
 
     @SuppressLint("MissingPermission")
     private fun fetchLocationNow() {
         if (!hasLocationPermission()) {
+            gpsWatchdogJob?.cancel()
             viewModel.onLocationFailed(LocationState.Failed.PermissionDenied)
             return
         }
         viewModel.setFetching()
+        startGpsWatchdog()
 
+        val fetchStartElapsed = SystemClock.elapsedRealtime()
+        if (GpsDiagnostics.isPlayServicesAvailable(requireContext())) {
+            Timber.tag(GpsDiagnostics.TAG).i("Play Services available — using FusedLocationProviderClient fast path")
+            fetchLocationViaFusedProvider(fetchStartElapsed)
+        } else {
+            Timber.tag(GpsDiagnostics.TAG).i("Play Services unavailable — using android.location.LocationManager")
+            fetchLocationViaLocationManager(fetchStartElapsed)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun fetchLocationViaFusedProvider(fetchStartElapsed: Long) {
+        val client = fusedLocationClient
+            ?: LocationServices.getFusedLocationProviderClient(requireActivity()).also { fusedLocationClient = it }
         val cts = CancellationTokenSource()
-        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
-            .addOnSuccessListener { location ->
-                if (location != null) {
-                    viewModel.onLocationResult(location.latitude, location.longitude)
-                } else {
-                    // Fall back to last known location
-                    fusedLocationClient.lastLocation
-                        .addOnSuccessListener { lastLocation ->
-                            if (lastLocation != null) {
-                                viewModel.onLocationResult(lastLocation.latitude, lastLocation.longitude)
-                            } else {
-                                viewModel.onLocationFailed(LocationState.Failed.NoSignal)
-                                if (isAdded) {
-                                    Toast.makeText(context, getString(R.string.loc_msg_no_signal), Toast.LENGTH_LONG).show()
+        activeCancellationTokenSource = cts
+
+        val fetchCancelJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(GpsDiagnostics.FETCH_TIMEOUT_MS)
+            Timber.tag(GpsDiagnostics.TAG).w(
+                "Fused fetch exceeded ${GpsDiagnostics.FETCH_TIMEOUT_MS}ms with no fix — cancelling."
+            )
+            stopListeningForLocation()
+            resolveWithCachedLocation(fetchStartElapsed)
+        }
+
+        try {
+            client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+                .addOnSuccessListener { location ->
+                    fetchCancelJob.cancel()
+                    gpsWatchdogJob?.cancel()
+                    stopListeningForLocation()
+                    if (location != null) {
+                        val elapsed = SystemClock.elapsedRealtime() - fetchStartElapsed
+                        val detail = GpsDiagnostics.locationUiSummary(location, elapsed, fromCache = false)
+                        Timber.tag(GpsDiagnostics.TAG).i("Fused fresh fix in ${elapsed}ms: ${GpsDiagnostics.locationLogLine(location, elapsed)}")
+                        viewModel.onLocationResult(location.latitude, location.longitude, detail)
+                    } else {
+                        Timber.tag(GpsDiagnostics.TAG).w("Fused getCurrentLocation returned null — trying lastLocation")
+                        try {
+                            client.lastLocation
+                                .addOnSuccessListener { last ->
+                                    val elapsed = SystemClock.elapsedRealtime() - fetchStartElapsed
+                                    if (last != null) {
+                                        val detail = GpsDiagnostics.locationUiSummary(last, elapsed, fromCache = true)
+                                        Timber.tag(GpsDiagnostics.TAG).i("Fused lastLocation: ${GpsDiagnostics.locationLogLine(last, elapsed)}")
+                                        viewModel.onLocationResult(last.latitude, last.longitude, detail)
+                                    } else {
+                                        viewModel.onLocationFailed(LocationState.Failed.NoSignal, getString(R.string.loc_detail_no_fix_no_cache))
+                                        if (isAdded) Toast.makeText(context, getString(R.string.loc_msg_no_signal), Toast.LENGTH_LONG).show()
+                                    }
                                 }
-                            }
+                                .addOnFailureListener { e ->
+                                    Timber.tag(GpsDiagnostics.TAG).e(e, "Fused lastLocation failed: ${GpsDiagnostics.describeFailure(e)}")
+                                    viewModel.onLocationFailed(LocationState.Failed.NoSignal, GpsDiagnostics.describeFailure(e))
+                                }
+                        } catch (e: SecurityException) {
+                            Timber.tag(GpsDiagnostics.TAG).e(e, "lastLocation SecurityException: ${GpsDiagnostics.describeFailure(e)}")
+                            viewModel.onLocationFailed(LocationState.Failed.PermissionDenied)
                         }
-                        .addOnFailureListener {
-                            viewModel.onLocationFailed(LocationState.Failed.NoSignal)
-                        }
+                    }
                 }
-            }
-            .addOnFailureListener { e ->
-                Timber.e(e, "GPS fetch failed")
-                viewModel.onLocationFailed(LocationState.Failed.NoSignal)
-                if (isAdded) {
-                    Toast.makeText(context, getString(R.string.loc_timeout_msg), Toast.LENGTH_LONG).show()
+                .addOnFailureListener { e ->
+                    fetchCancelJob.cancel()
+                    gpsWatchdogJob?.cancel()
+                    stopListeningForLocation()
+                    val elapsed = SystemClock.elapsedRealtime() - fetchStartElapsed
+                    Timber.tag(GpsDiagnostics.TAG).e(e, "Fused fetch failed after ${elapsed}ms: ${GpsDiagnostics.describeFailure(e)}")
+                    if (elapsed >= GpsDiagnostics.FETCH_TIMEOUT_MS) {
+                        viewModel.onLocationFailed(LocationState.Failed.Timeout, getString(R.string.loc_detail_timeout))
+                    } else {
+                        viewModel.onLocationFailed(LocationState.Failed.NoSignal, GpsDiagnostics.describeFailure(e))
+                    }
+                    if (isAdded) Toast.makeText(context, getString(R.string.loc_timeout_msg), Toast.LENGTH_LONG).show()
                 }
+        } catch (e: SecurityException) {
+            // Same race as above, but on the initial getCurrentLocation() call itself.
+            fetchCancelJob.cancel()
+            gpsWatchdogJob?.cancel()
+            stopListeningForLocation()
+            Timber.tag(GpsDiagnostics.TAG).e(e, "getCurrentLocation SecurityException: ${GpsDiagnostics.describeFailure(e)}")
+            viewModel.onLocationFailed(LocationState.Failed.PermissionDenied)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun fetchLocationViaLocationManager(fetchStartElapsed: Long) {
+        val fetchCancelJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(GpsDiagnostics.FETCH_TIMEOUT_MS)
+            Timber.tag(GpsDiagnostics.TAG).w(
+                "GPS fetch exceeded ${GpsDiagnostics.FETCH_TIMEOUT_MS}ms with no fix — removing listener. " +
+                    "Offline cold fixes can legitimately take this long without A-GPS assistance data."
+            )
+            stopListeningForLocation()
+            resolveWithCachedLocation(fetchStartElapsed)
+        }
+
+        val listener = object : LocationListener {
+            override fun onLocationChanged(location: android.location.Location) {
+                fetchCancelJob.cancel()
+                gpsWatchdogJob?.cancel()
+                stopListeningForLocation()
+                val elapsed = SystemClock.elapsedRealtime() - fetchStartElapsed
+                val detail = GpsDiagnostics.locationUiSummary(location, elapsed, fromCache = false)
+                Timber.tag(GpsDiagnostics.TAG).i("Fresh fix in ${elapsed}ms: ${GpsDiagnostics.locationLogLine(location, elapsed)}")
+                viewModel.onLocationResult(location.latitude, location.longitude, detail)
             }
+
+            @Deprecated("Deprecated in Java")
+            override fun onStatusChanged(provider: String?, status: Int, extras: android.os.Bundle?) {}
+            override fun onProviderEnabled(provider: String) {}
+            override fun onProviderDisabled(provider: String) {
+                Timber.tag(GpsDiagnostics.TAG).w("GPS provider was disabled while waiting for a fix")
+            }
+        }
+        activeLocationListener = listener
+
+        try {
+            locationManager.requestLocationUpdates(
+                LocationManager.GPS_PROVIDER,
+                0L,
+                0f,
+                listener,
+                Looper.getMainLooper()
+            )
+        } catch (e: Exception) {
+            fetchCancelJob.cancel()
+            gpsWatchdogJob?.cancel()
+            stopListeningForLocation()
+            Timber.tag(GpsDiagnostics.TAG).e(e, "requestLocationUpdates failed: ${GpsDiagnostics.describeFailure(e)}")
+            viewModel.onLocationFailed(LocationState.Failed.NoSignal, GpsDiagnostics.describeFailure(e))
+        }
+    }
+
+    private fun stopListeningForLocation() {
+        activeLocationListener?.let { runCatching { locationManager.removeUpdates(it) } }
+        activeLocationListener = null
+        activeCancellationTokenSource?.let { runCatching { it.cancel() } }
+        activeCancellationTokenSource = null
+    }
+
+    /** No fresh fix within the fetch timeout — try a cached last-known location (GPS, then network) before giving up. */
+    private fun resolveWithCachedLocation(fetchStartElapsed: Long) {
+        // This is a terminal outcome (Captured or Failed either way) — the 75s master watchdog
+        // must not be allowed to fire later and clobber whatever we're about to set.
+        gpsWatchdogJob?.cancel()
+        val elapsed = SystemClock.elapsedRealtime() - fetchStartElapsed
+        val cached = runCatching { locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER) }.getOrNull()
+            ?: runCatching { locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) }.getOrNull()
+
+        if (cached != null) {
+            val detail = GpsDiagnostics.locationUiSummary(cached, elapsed, fromCache = true)
+            Timber.tag(GpsDiagnostics.TAG).i("Using cached location: ${GpsDiagnostics.locationLogLine(cached, elapsed)}")
+            viewModel.onLocationResult(cached.latitude, cached.longitude, detail)
+        } else {
+            Timber.tag(GpsDiagnostics.TAG).w("No fresh fix and no cached location available after ${elapsed}ms")
+            if (elapsed >= GpsDiagnostics.FETCH_TIMEOUT_MS) {
+                viewModel.onLocationFailed(LocationState.Failed.Timeout, getString(R.string.loc_detail_timeout))
+            } else {
+                viewModel.onLocationFailed(LocationState.Failed.NoSignal, getString(R.string.loc_detail_no_fix_no_cache))
+            }
+            if (isAdded) {
+                Toast.makeText(context, getString(R.string.loc_msg_no_signal), Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun hasLocationPermission(): Boolean =
@@ -496,6 +703,11 @@ class NewHouseholdFragment : Fragment() {
                 ActivityCompat.checkSelfPermission(
                     requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION
                 ) == PackageManager.PERMISSION_GRANTED
+
+    private fun hasFineLocationPermission(): Boolean =
+        ActivityCompat.checkSelfPermission(
+            requireContext(), Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
 
     private fun showOpenSettingsDialog() {
         MaterialAlertDialogBuilder(requireContext())
@@ -515,9 +727,47 @@ class NewHouseholdFragment : Fragment() {
 
     private fun submitForm() {
         activity?.currentFocus?.clearFocus()
+        if (!viewModel.isTotalMembersValid()) return
         if (!validateCurrentPage()) return
         if (!validateLocationSection()) return
+        if (!viewModel.getIsConsentAgreed()) {
+            consentAlert.show()
+            return
+        }
         viewModel.saveForm()
+    }
+
+    private val consentAlert by lazy {
+        val alertBinding = AlertConsentBinding.inflate(layoutInflater, binding.root, false)
+        alertBinding.textView4.text = getString(R.string.consent_alert_title)
+        alertBinding.scrollableText.text = getString(R.string.consent_text)
+        alertBinding.scrollableText.movementMethod = android.text.method.ScrollingMovementMethod()
+
+        val alertDialog = MaterialAlertDialogBuilder(requireContext())
+            .setView(alertBinding.root)
+            .setCancelable(false)
+            .create()
+
+        alertBinding.scrollableText.setOnClickListener {
+            alertBinding.checkBox.isChecked = !alertBinding.checkBox.isChecked
+        }
+        alertBinding.btnNegative.setOnClickListener {
+            alertDialog.dismiss()
+            findNavController().navigateUp()
+        }
+        alertBinding.btnPositive.setOnClickListener {
+            if (alertBinding.checkBox.isChecked) {
+                viewModel.setConsentAgreed()
+                alertDialog.dismiss()
+            } else {
+                Toast.makeText(
+                    context,
+                    getString(R.string.please_tick_the_checkbox),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+        alertDialog
     }
 
     private fun validateCurrentPage(): Boolean {
@@ -569,45 +819,38 @@ class NewHouseholdFragment : Fragment() {
 
     private fun showNextScreenAlert() {
         if (!isAdded) return
-        MaterialAlertDialogBuilder(requireContext())
-            .setMessage(getString(R.string.patient_registered_successfully))
-            .setCancelable(false)
-            .setPositiveButton(getString(R.string.ok)) { successDialog, _ ->
-                successDialog.dismiss()
-                if (isAdded) {
-                    if (viewModel.linkBenId != 0L) {
-                        android.widget.Toast.makeText(requireContext(), "Beneficiary linked as Head of Family successfully", android.widget.Toast.LENGTH_SHORT).show()
-                        org.piramalswasthya.stoptb.work.WorkerUtils.triggerAmritPushWorker(requireContext())
-                        val popped = findNavController().popBackStack(R.id.nonHHFragment, false)
-                        if (!popped) findNavController().navigateUp()
-                    } else {
-                        MaterialAlertDialogBuilder(requireContext())
-                            .setMessage(getString(R.string.proceed_to_register_hof))
-                            .setCancelable(false)
-                            .setPositiveButton(getString(R.string.yes)) { dialog, _ ->
-                                dialog.dismiss()
-                                if (isAdded) {
-                                    findNavController().navigate(
-                                        NewHouseholdFragmentDirections.actionNewHouseholdFragmentToNewBenRegFragment(
-                                            hhId = viewModel.getHHId(),
-                                            relToHeadId = 18
-                                        )
-                                    )
-                                }
-                            }
-                            .setNegativeButton(getString(R.string.no)) { dialog, _ ->
-                                dialog.dismiss()
-                                if (isAdded) findNavController().navigateUp()
-                            }
-                            .show()
+        if (viewModel.linkBenId != 0L) {
+            android.widget.Toast.makeText(requireContext(), "Beneficiary linked as Head of Family successfully", android.widget.Toast.LENGTH_SHORT).show()
+            org.piramalswasthya.stoptb.work.WorkerUtils.triggerAmritPushWorker(requireContext())
+            val popped = findNavController().popBackStack(R.id.nonHHFragment, false)
+            if (!popped) findNavController().navigateUp()
+        } else {
+            MaterialAlertDialogBuilder(requireContext())
+                .setMessage(getString(R.string.proceed_to_register_hof))
+                .setCancelable(false)
+                .setPositiveButton(getString(R.string.yes)) { dialog, _ ->
+                    dialog.dismiss()
+                    if (isAdded) {
+                        findNavController().navigate(
+                            NewHouseholdFragmentDirections.actionNewHouseholdFragmentToNewBenRegFragment(
+                                hhId = viewModel.getHHId(),
+                                relToHeadId = 18
+                            )
+                        )
                     }
                 }
-            }
-            .show()
+                .setNegativeButton(getString(R.string.no)) { dialog, _ ->
+                    dialog.dismiss()
+                    if (isAdded) findNavController().navigateUp()
+                }
+                .show()
+        }
     }
 
 
     override fun onDestroyView() {
+        gpsWatchdogJob?.cancel()
+        stopListeningForLocation()
         super.onDestroyView()
         _binding = null
     }

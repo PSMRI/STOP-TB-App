@@ -8,7 +8,7 @@
     <string name="rv_item_hh_ph_1">HHID : </string>
     <string name="rv_item_hh_ph_2">Family Head Name :</string>
     <string name="rv_item_hh_ph_3">Surname : </string>
-    <string name="hh_members_text">Members : %1d</string>
+    <string name="hh_members_text">Members : %1$d/%2$d</string>
     <string name="btn_rv_item_hh_add_ben">Add Beneficiary</string>
     <string name="btn_Add_beneficiary_nonHH">Add Beneficiary</string>
     <string name="str_duplicate_record">Deleted Record</string>
@@ -61,8 +61,8 @@
     </string-array>
     <string name="nhhr_house_own">House ownership</string>
     <string-array name="nhhr_house_own_array">
-        <item>Yes</item>
-        <item>No</item>
+        <item>Rented</item>
+        <item>Owned</item>
     </string-array>
     <string name="nhhr_separate_kitchen">Separate Kitchen</string>
     <string-array name="nhhr_separate_kitchen_array">
@@ -148,7 +148,8 @@
     <string name="hh_no_members">Household EMPTY!</string>
     <string name="add_head_of_family_message">Would you like to add <b>%1s</b> as a HoF Beneficiary ?</string>
 
-    <string name="nhhr_total_members_hh">Total number of members living in the HH</string>
+    <string name="nhhr_total_members_hh">Total no. of family members</string>
+    <string name="hh_member_limit_reached">All %1$d family members are already registered</string>
     <string name="nhhr_registered_camp_site">Registration done at camp site</string>
 
     <string-array name="nhhr_yes_no_array">

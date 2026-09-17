@@ -313,6 +313,21 @@ interface BenDao {
                     WHERE tbs.recommendedForLiquidCultureTest = 1
                 )
             ))
+            OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
+                SELECT 1
+                FROM BEN_BASIC_CACHE b2
+                LEFT JOIN TB_SUSPECTED ts ON b2.benId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON b2.benId = td.benId
+                WHERE b2.hhId = BEN_BASIC_CACHE.hhId
+                  AND b2.isDeactivate = 0
+                  AND b2.isDeath = 0
+                  AND (
+                        ts.isTbConfirmed = 1
+                        OR td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
+            ))
         )
         AND (:filterType = 0
             OR (:filterType = 1 AND abhaId IS NOT NULL)
@@ -454,6 +469,21 @@ interface BenDao {
                     WHERE tbs.recommendedForLiquidCultureTest = 1
                 )
             ))
+            OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
+                SELECT 1
+                FROM BEN_BASIC_CACHE b2
+                LEFT JOIN TB_SUSPECTED ts ON b2.benId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON b2.benId = td.benId
+                WHERE b2.hhId = BEN_BASIC_CACHE.hhId
+                  AND b2.isDeactivate = 0
+                  AND b2.isDeath = 0
+                  AND (
+                        ts.isTbConfirmed = 1
+                        OR td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
+            ))
         )
         AND (:filterType = 0
             OR (:filterType = 1 AND abhaId IS NOT NULL)
@@ -594,6 +624,21 @@ interface BenDao {
                     SELECT tbs.benId FROM TB_SCREENING tbs
                     WHERE tbs.recommendedForLiquidCultureTest = 1
                 )
+            ))
+            OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
+                SELECT 1
+                FROM BEN_BASIC_CACHE b2
+                LEFT JOIN TB_SUSPECTED ts ON b2.benId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON b2.benId = td.benId
+                WHERE b2.hhId = BEN_BASIC_CACHE.hhId
+                  AND b2.isDeactivate = 0
+                  AND b2.isDeath = 0
+                  AND (
+                        ts.isTbConfirmed = 1
+                        OR td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
             ))
         )
         AND (:filterType = 0
@@ -1185,8 +1230,8 @@ interface BenDao {
             "            OR t.nightSweats = 1\n" +
             "            OR t.historyOfTb = 1\n" +
             "            OR t.takingAntiTBDrugs = 1\n" +
+            "            OR t.familySufferingFromTB = 1\n" +
 //            "            OR CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) <= 5\n" +
-            "            OR b.reproductiveStatusId = 1\n" +
             "            OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')\n" +
             "            OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')\n" +
             "        ) AND IFNULL(ts.isConfirmed, 0) = 0\n" +
@@ -1393,4 +1438,37 @@ interface BenDao {
         AND (:query = '' OR benName LIKE '%' || :query || '%' OR benSurname LIKE '%' || :query || '%' OR (benName || ' ' || benSurname) LIKE '%' || :query || '%' OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%')
     """)
     fun searchNonHHBeneficiaries(selectedVillage: Int, query: String): Flow<List<BenBasicCache>>
+
+
+    @Query("""
+    SELECT COUNT(*)
+    FROM BEN_BASIC_CACHE b
+    WHERE b.isDeactivate = 0
+      AND b.screeningStatus = 'UNSCREENED'
+      AND (:selectedVillage = 0 OR b.villageId = :selectedVillage)
+      AND NOT EXISTS (
+          SELECT 1
+          FROM TB_SCREENING ts
+          WHERE ts.benId = b.benId
+      )
+""")
+    fun getUnscreenedCount(selectedVillage: Int): Flow<Int>
+
+    @Query("""
+        SELECT * FROM BEN_BASIC_CACHE
+        WHERE villageId = :selectedVillage AND isDeactivate = 0 AND screeningStatus = 'UNSCREENED'
+    """)
+    fun getUnscreenedList(selectedVillage: Int): Flow<List<BenBasicCache>>
+
+    @Query("UPDATE BENEFICIARY SET screeningStatus = :status, syncState = :unsynced, processed = 'U', serverUpdatedStatus = 2 WHERE beneficiaryId = :benId")
+    suspend fun updateScreeningStatus(benId: Long, status: String, unsynced: SyncState = SyncState.UNSYNCED)
+
+    @Query("UPDATE BENEFICIARY SET symptomsScreenedDate = :date, screeningStatus = 'SYMPTOMS_SCREENED', syncState = :unsynced, processed = 'U', serverUpdatedStatus = 2 WHERE beneficiaryId = :benId")
+    suspend fun markSymptomsScreened(benId: Long, date: Long = System.currentTimeMillis(), unsynced: SyncState = SyncState.UNSYNCED)
+
+    @Query("UPDATE BENEFICIARY SET chestXrayDoneDate = :date, screeningStatus = 'CHEST_XRAY_DONE', syncState = :unsynced, processed = 'U', serverUpdatedStatus = 2 WHERE beneficiaryId = :benId")
+    suspend fun markChestXrayDone(benId: Long, date: Long = System.currentTimeMillis(), unsynced: SyncState = SyncState.UNSYNCED)
+
+    @Query("UPDATE BENEFICIARY SET trunatTestDoneDate = :date, screeningStatus = 'TRUNAT_TEST_DONE', syncState = :unsynced, processed = 'U', serverUpdatedStatus = 2 WHERE beneficiaryId = :benId")
+    suspend fun markTrunatTestDone(benId: Long, date: Long = System.currentTimeMillis(), unsynced: SyncState = SyncState.UNSYNCED)
 }

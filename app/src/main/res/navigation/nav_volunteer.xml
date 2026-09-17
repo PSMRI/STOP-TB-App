@@ -33,7 +33,23 @@
         <action
             android:id="@+id/action_volunteerHomeFragment_to_nonHHFragment"
             app:destination="@id/nonHHFragment" />
+        <action
+            android:id="@+id/action_volunteerHomeFragment_to_TBConfirmedListFragment"
+            app:destination="@id/TBConfirmedListFragment" />
+
+        <action
+            android:id="@+id/action_volunteerHomeFragment_to_unScreenedPeople"
+            app:destination="@id/unScreenedPeople" />
     </fragment>
+
+    <fragment
+        android:id="@+id/unScreenedPeople"
+        android:name="org.piramalswasthya.stoptb.ui.home_activity.unscreened_people.UnScreenedPeople"
+        android:label="@string/icon_title_unscreened">
+
+    </fragment>
+
+
 
     <fragment
         android:id="@+id/allHouseholdFragment"
@@ -128,6 +144,10 @@
         <argument
             android:name="autoFlow"
             android:defaultValue="true"
+            app:argType="boolean" />
+        <argument
+            android:name="viewOnly"
+            android:defaultValue="false"
             app:argType="boolean" />
     </fragment>
 
@@ -225,6 +245,11 @@
         android:id="@+id/TBConfirmedListFragment"
         android:name="org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.tb_confirmed.list.TBConfirmedListFragment"
         android:label="TB Confirmed">
+        <argument
+            android:name="restrictToAction"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
         <action
             android:id="@+id/action_TBConfirmedListFragment_to_TBConfirmedFormFragment"
             app:destination="@id/TBConfirmedFormFragment" />
@@ -344,6 +369,10 @@
             android:name="source"
             android:defaultValue="0"
             app:argType="integer" />
+        <argument
+            android:name="showContactTracingForms"
+            android:defaultValue="false"
+            app:argType="boolean" />
     </fragment>
 
     <fragment

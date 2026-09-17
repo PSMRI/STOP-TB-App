@@ -98,6 +98,13 @@ class TBScreeningDataset(
         hasDependants = true
     )
 
+    private val otherDetailsHeading = FormElement(
+        id = 20,
+        inputType = InputType.HEADLINE,
+        title = resources.getString(R.string.other_details),
+        required = false
+    )
+
     private val historyOfTB = FormElement(
         id = 9,
         inputType = InputType.RADIO,
@@ -407,6 +414,7 @@ class TBScreeningDataset(
         lossOfAppetite,
         lossOfWeight,
         nightSweats,
+        otherDetailsHeading,
         historyOfTB,
         currentlyTakingDrugs,
         familyHistoryTB,

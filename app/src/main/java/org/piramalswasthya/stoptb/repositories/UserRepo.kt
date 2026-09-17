@@ -53,7 +53,12 @@ class UserRepo @Inject constructor(
         return withContext(Dispatchers.IO) {
             try {
                 val authData = getTokenAmrit(userName, password)
-                val user = setUserRole(authData.userId, password, authData.subCentre)
+                val user = setUserRole(
+                    authData.userId,
+                    password,
+                    authData.subCentre,
+                    authData.assignedRoleScreenNames
+                )
                 return@withContext NetworkResponse.Success(user)
             } catch (se: SocketTimeoutException) {
                 return@withContext NetworkResponse.Error(
@@ -86,7 +91,12 @@ class UserRepo @Inject constructor(
         return withContext(Dispatchers.IO) {
             try {
                 val authData = getTokenAmrit(userName, password)
-                val user = setUserRole(authData.userId, password, authData.subCentre)
+                val user = setUserRole(
+                    authData.userId,
+                    password,
+                    authData.subCentre,
+                    authData.assignedRoleScreenNames
+                )
                 return@withContext NetworkResponse.Success(user)
             } catch (se: SocketTimeoutException) {
                 return@withContext NetworkResponse.Error(
@@ -110,9 +120,17 @@ class UserRepo @Inject constructor(
         }
     }
 
-    private suspend fun setUserRole(userId: Int, password: String, subCentre: String?): User {
+    private suspend fun setUserRole(
+        userId: Int,
+        password: String,
+        subCentre: String?,
+        assignedRoleScreenNames: List<String> = emptyList()
+    ): User {
         val response = amritApiService.getUserDetailsById(userId = userId)
-        val user = response.data.toUser(password, subCentre)
+        val user = response.data.toUser(password, subCentre).copy(
+            assignedRoleScreenNames = assignedRoleScreenNames
+        )
+        Timber.d("RoleManager: assignedRoleScreenNames=${user.assignedRoleScreenNames}")
         preferenceDao.registerUser(user)
         // Auto-set location if user has exactly one village (common for ASHA workers)
         if (user.villages.size == 1) {
@@ -201,8 +219,37 @@ class UserRepo @Inject constructor(
 
     private data class AuthUserData(
         val userId: Int,
-        val subCentre: String?
+        val subCentre: String?,
+        val assignedRoleScreenNames: List<String> = emptyList()
     )
+
+    /**
+     * Walks `data.previlegeObj[]` (filtered to the Stop TB service) and collects every role's
+     * `serviceRoleScreenMappings[].screen.screenName`. Kept as manual org.json parsing to match
+     * this method's existing style — no new Moshi/Gson DTO.
+     */
+    private fun extractAssignedScreenNames(data: JSONObject): List<String> {
+        val screenNames = linkedSetOf<String>()
+        val privilegeArray = data.optJSONArray("previlegeObj") ?: return emptyList()
+        for (i in 0 until privilegeArray.length()) {
+            val privilegeEntry = privilegeArray.optJSONObject(i) ?: continue
+            val serviceName = privilegeEntry.optString("serviceName").takeIf { it.isNotBlank() }
+                ?: privilegeEntry.optJSONObject("m_ServiceMaster")?.optString("serviceName")
+            if (serviceName != null && !serviceName.equals("Stop TB", ignoreCase = true)) continue
+
+            val roles = privilegeEntry.optJSONArray("roles") ?: continue
+            for (j in 0 until roles.length()) {
+                val role = roles.optJSONObject(j) ?: continue
+                val mappings = role.optJSONArray("serviceRoleScreenMappings") ?: continue
+                for (k in 0 until mappings.length()) {
+                    mappings.optJSONObject(k)?.optJSONObject("screen")?.optString("screenName")
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { screenNames.add(it) }
+                }
+            }
+        }
+        return screenNames.toList()
+    }
 
     private suspend fun getTokenAmrit(userName: String, password: String): AuthUserData {
         return withContext(Dispatchers.IO) {
@@ -233,6 +280,8 @@ class UserRepo @Inject constructor(
                 ?.optJSONObject(0)
                 ?.optString("facilityName")
                 ?.takeIf { !it.isNullOrBlank() }
+            val assignedRoleScreenNames = extractAssignedScreenNames(data)
+            Timber.d("RoleManager: parsed screenNames=$assignedRoleScreenNames")
             val refreshToken = data.getString("refreshToken")
             //  db.clearAllTables()
             TokenInsertTmcInterceptor.setJwt(data.getString("jwtToken"))
@@ -241,7 +290,7 @@ class UserRepo @Inject constructor(
             TokenInsertTmcInterceptor.setToken(token)
             preferenceDao.registerAmritToken(token)
             preferenceDao.lastAmritTokenFetchTimestamp = System.currentTimeMillis()
-            return@withContext AuthUserData(userId, subCentre)
+            return@withContext AuthUserData(userId, subCentre, assignedRoleScreenNames)
         }
     }
 

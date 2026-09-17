@@ -4,6 +4,7 @@ import android.view.ViewGroup
 import androidx.fragment.app.FragmentActivity
 import androidx.paging.PagingDataAdapter
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 
@@ -17,13 +18,17 @@ class BenPagingAdapter(
     private val role: Int? = 0,
     private val pref: PreferenceDao? = null,
     var context: FragmentActivity,
+    private val roleManager: RoleManager? = null,
     private val isSoftDeleteEnabled: Boolean = false,
     private val showActionButtons: Boolean = false,
     private val showResultButton: Boolean = false,
     private val showAnthropometryButton: Boolean = false,
     private val showExamineButton: Boolean = true,
+    private val showScreeningStatus: Boolean = false,   // ADD THIS
     private val source: Int = 0,
-    private val showContactTracingForms: Boolean = false
+    private val showContactTracingForms: Boolean = false,
+    private val showAddMemberButton: Boolean = false
+
 ) :
     PagingDataAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenListAdapter.BenDiffUtilCallBack) {
 
@@ -83,16 +88,33 @@ class BenPagingAdapter(
             showAnthropometryButton = showAnthropometryButton,
             showExamineButton = showExamineButton,
             tbDiagnosticsList = tbDiagnosticsList,
+            showScreeningStatus = showScreeningStatus,   // ADD THIS
             source = source,
             retryingBenIds = retryingBenIds,
-            showContactTracingForms = showContactTracingForms
+            showContactTracingForms = showContactTracingForms,
+            roleManager = roleManager,
+            showAddMemberButton = showAddMemberButton
         )
     }
 
     fun submitTBDiagnostics(list: List<TBDiagnosticsCache>) {
+        // Diff instead of notifyDataSetChanged(), same pattern as the submit*() functions below
+        // — a blanket refresh here rebinds every visible row on every emission, which was the
+        // root cause of cards needing multiple taps to register.
+        val oldByBenId = tbDiagnosticsList.associateBy { it.benId }
+        val newByBenId = list.associateBy { it.benId }
         tbDiagnosticsList.clear()
         tbDiagnosticsList.addAll(list)
-        notifyDataSetChanged()
+        val changedBenIds = (oldByBenId.keys + newByBenId.keys)
+            .filterTo(mutableSetOf()) { benId -> oldByBenId[benId] != newByBenId[benId] }
+        if (changedBenIds.isNotEmpty()) {
+            val items = snapshot()
+            items.forEachIndexed { index, item ->
+                if (item != null && item.benId in changedBenIds) {
+                    notifyItemChanged(index)
+                }
+            }
+        }
     }
 
     fun submitBenIds(list: List<Long>) {

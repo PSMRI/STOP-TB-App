@@ -298,7 +298,7 @@
     <string name="eligible_couple_tracking_list">Eligible Couple Tracking List</string>
     <string name="tb_screening_list">TB Screening List</string>
     <string name="tb_suspected_list">Presumptive TB cases</string>
-    <string name="tb_screening_form">TB Screening Form</string>
+    <string name="tb_screening_form">TB Symptoms Screening</string>
     <string name="tb_confirmed_list">TB Confirmed List</string>
     <string name="tb_confirmed_form">TB Confirmed Form</string>
 
@@ -306,6 +306,7 @@
     <string name="delivery_outcome_list">Delivery Outcome List</string>
     <string name="communicable_diseases">Communicable Diseases</string>
     <string name="dashboard">Dashboard</string>
+    <string name="total_unscreened">Unscreened Population</string>
     <string name="abha_ids">ABHA IDs</string>
     <string name="pending_sync">Pending Sync</string>
     <string name="loading_form">Loading form...</string>
@@ -323,6 +324,7 @@
     <string name="home_card_household_subtitle">Register and manage households</string>
     <string name="home_card_tb_subtitle">Track screening and support TB cases</string>
     <string name="home_card_ncd_subtitle">Manage non-communicable disease workflows</string>
+    <string name="home_card_non_hh_subtitle">Wanderers, homeless, hostelites &amp; institutional residents</string>
     <string name="home_card_referral_subtitle">Follow up on referred cases</string>
     <string name="home_card_rch_subtitle">Beneficiaries linked with RCH IDs</string>
     <string name="home_card_ncd_eligible_subtitle">Screen and manage eligible beneficiaries</string>
@@ -395,7 +397,7 @@
     <string name="child_immunization">Child Immunization</string>
     <string name="relation_with_hof">Relation with HOF</string>
     <string name="add_family_member">Add Family Member</string>
-    <string name="add_household_member">Add HoF Member</string>
+    <string name="add_household_member">Register HoF member</string>
     <string name="app_native_name">TBMJA</string>
     <string name="non_pregnant_women_eligible_couple_section">Non-Pregnant Women (Eligible Couple) section</string>
     <string name="time_of_death">Time of Death</string>
@@ -921,6 +923,7 @@
     <string name="tb_asymptomatic_screening">Asymptomatic Screening</string>
     <string name="tb_is_beneficiary_asymptomatic">Is beneficiary asymptomatic</string>
     <string name="risk_factors">Risk Factors</string>
+    <string name="other_details">Other Details</string>
     <string name="tb_rise_of_fever">Rise of fever in evening</string>
     <string name="tb_loss_of_appetite">Loss of Appetite</string>
     <string name="tb_age_more_than_60">Age more than 60 years</string>
@@ -1005,7 +1008,9 @@
     <string name="quick_refresh_action">Refresh</string>
     <string name="quick_refresh_camp_disconnected">Camp Hub is not connected. Please reconnect first.</string>
     <string name="quick_refresh_ip_not_reachable">IP address not reachable: %1$s</string>
-
+    <string name="error_message">Error Message : </string>
+    <string name="see_more">See more</string>
+    <string name="see_less">See less</string>
     <string name="vital_screen">General Examination</string>
     <string name="vital_screen_placeholder">Vitals and Anthropometric for beneficiary ID: %1$d</string>
     <string name="vital_details">Vitals (Optional)</string>
@@ -1026,7 +1031,7 @@
     <string name="weight_kgs">Weight (Kgs)</string>
     <string name="height_cms">Height (cms)</string>
     <string name="temperature_degree_fahrenheit">Temperature (Degree Fahrenheit)</string>
-    <string name="anthropometry_screen">Anthropometry Screen</string>
+    <string name="anthropometry_screen">Anthropometry</string>
     <string name="temperature_hypothermia">&lt;97 - Hypothermia</string>
     <string name="normal_temperature_range">97-99 - Normal</string>
     <string name="temperature_100_or_more">&gt;99 - Fever</string>
@@ -1240,6 +1245,7 @@
     <string name="tpt_history_section_label">%1$s (Follow-up %2$d of %3$d)</string>
     <string name="diagnosis_locked_msg">Please fill TB Screening form first</string>
     <string name="tb_screening_locked_msg">Please fill TB Screening form first</string>
+    <string name="examine_form_view_only_msg">You have view-only access to this form</string>
     <string name="tb_screening_legend_xray_sputum">* Refer for Digital Chest X-Ray or for Sputum Collection</string>
     <string name="tb_screening_legend_family_members">** Advise for screening of all family members</string>
 
@@ -1335,6 +1341,15 @@
     <string name="loc_status_permission_denied">Please grant location permission to fetch latitude and longitude.</string>
     <string name="loc_status_gps_unavailable">GPS Unavailable</string>
     <string name="loc_status_gps_disabled">GPS is disabled on this device</string>
+    <string name="loc_status_no_gps_provider">GPS is turned off on this device</string>
+    <string name="loc_status_timeout">GPS search timed out</string>
+    <string name="loc_detail_no_gps_hardware">No GPS hardware was detected on this device.</string>
+    <string name="loc_detail_gps_provider_off">Device location mode is set to network-only. Switch to \"Device only\" or \"High accuracy\" in Location settings so GPS works without internet.</string>
+    <string name="loc_detail_precise_permission_required">Only approximate location was granted. Grant \"Precise\" location permission in Settings so GPS can get an exact fix without needing internet.</string>
+    <string name="loc_msg_enable_location_settings">Location is turned off on this device. Please enable it in Location Settings, then come back and tap Refresh.</string>
+    <string name="loc_detail_no_fix_no_cache">No GPS fix was obtained and no previous location is cached on this device.</string>
+    <string name="loc_detail_timeout">No signal within 60 seconds. Cold GPS fixes can take longer without internet (no assisted-GPS data available). Move to open sky and try again.</string>
+    <string name="loc_detail_watchdog_timeout">GPS did not respond within 75 seconds. If a location dialog appears stuck on screen, press Back, then tap Refresh — or mark GPS Unavailable to continue.</string>
     <string name="loc_label_latitude">Latitude</string>
     <string name="loc_label_longitude">Longitude</string>
     <string name="loc_label_digipin">DIGIPIN</string>
@@ -1364,9 +1379,24 @@
     <string name="counselling_consent">Counselling Consent</string>
 
     <string name="dialog_no">No</string>
+    <string name="registration_successful">Registration Successful</string>
     <string name="patient_registered_successfully">Patient Registered Successfully</string>
     <string name="proceed_to_register_hof">Do you want to proceed with registration of Head of the Family?</string>
     <string name="refused">Refused</string>
     <string name="form_submitted_successfully">Form submitted successfully</string>
+
+    <!-- Role bottom navigation (multi-role tab switcher) -->
+    <string name="role_tab_registrar">Registration</string>
+    <string name="role_tab_nurse">Treatment</string>
+    <string name="role_tab_counseling">Counselling</string>
+
+    <!-- Multi-role Home screen — Counselling tab "Coming soon" placeholder cards -->
+    <string name="home_card_counselling_title">Counselling</string>
+    <string name="home_card_contact_tracing_title">Contact Tracing</string>
+    <string name="home_card_tb_treatment_followup_title">TB Treatment Follow-up</string>
+    <string name="home_card_tpt_title">TPT</string>
+    <string name="home_card_coming_soon_subtitle">Coming soon</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
 </resources>
 

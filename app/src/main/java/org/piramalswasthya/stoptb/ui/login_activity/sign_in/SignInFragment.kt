@@ -45,7 +45,7 @@ import androidx.core.widget.doOnTextChanged
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.ui.login_activity.camp_mode.CampModeConnectFragment
 import org.piramalswasthya.stoptb.ui.login_activity.sign_in.SignInViewModel.CampHubStatus
-import org.piramalswasthya.stoptb.utils.RoleConstants
+import org.piramalswasthya.stoptb.helpers.RoleManager
 
 
 @AndroidEntryPoint
@@ -53,6 +53,9 @@ class SignInFragment : Fragment() {
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private var _binding: FragmentSignInBinding? = null
     private val binding: FragmentSignInBinding
@@ -136,6 +139,12 @@ class SignInFragment : Fragment() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
             val imeBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
             val systemBottom = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom
+            val isKeyboardVisible = imeBottom > 0
+
+            // The footer is decorative; hiding it while typing prevents it from
+            // overlapping the Login button in the resized keyboard viewport.
+            binding.textView12.visibility = if (isKeyboardVisible) View.GONE else View.VISIBLE
+            binding.tvLoginVersion.visibility = if (isKeyboardVisible) View.GONE else View.VISIBLE
             v.updatePadding(
                 left = initialLeft,
                 top = initialTop,
@@ -331,7 +340,9 @@ class SignInFragment : Fragment() {
 
                     val user = state.data  // ya loggedInUser use karo
 
-                    if (RoleConstants.isAllowedStopTbRole(user?.role)) {
+                    // Legacy, kept for reference:
+//                    if (RoleConstants.isAllowedStopTbRole(user?.role)) {
+                    if (roleManager.hasAnyValidRole()) {
 //                        showLoginRoleToast(user)
 
                         if (binding.cbRemember.isChecked) {
@@ -382,17 +393,18 @@ class SignInFragment : Fragment() {
             }
     }
 
-    private fun showLoginRoleToast(user: org.piramalswasthya.stoptb.model.User?) {
-        val role = user?.role?.takeIf { it.isNotBlank() } ?: "Unknown"
-        val tuStatus = if (user?.tus.orEmpty().isNotEmpty()) "TU: Yes" else "TU: No"
-        val healthFacilityStatus =
-            if (user?.healthFacilities.orEmpty().isNotEmpty()) "Health Facility: Yes" else "Health Facility: No"
-        Toast.makeText(
-            requireContext(),
-            "Role: $role\n$tuStatus, $healthFacilityStatus",
-            Toast.LENGTH_LONG
-        ).show()
-    }
+    // Dead code — only call site is already commented out above. Left in place, not deleted.
+//    private fun showLoginRoleToast(user: org.piramalswasthya.stoptb.model.User?) {
+//        val role = user?.role?.takeIf { it.isNotBlank() } ?: "Unknown"
+//        val tuStatus = if (user?.tus.orEmpty().isNotEmpty()) "TU: Yes" else "TU: No"
+//        val healthFacilityStatus =
+//            if (user?.healthFacilities.orEmpty().isNotEmpty()) "Health Facility: Yes" else "Health Facility: No"
+//        Toast.makeText(
+//            requireContext(),
+//            "Role: $role\n$tuStatus, $healthFacilityStatus",
+//            Toast.LENGTH_LONG
+//        ).show()
+//    }
 
     private fun updateLoginAppName() {
         val titleRes = if (BuildConfig.FLAVOR.contains("uat", ignoreCase = true)) {

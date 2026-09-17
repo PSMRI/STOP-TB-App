@@ -5,8 +5,8 @@ import org.piramalswasthya.stoptb.model.LogLevel
 import timber.log.Timber
 
 /**
- * Intercepts Timber logs and routes sync-related entries to [SyncLogManager]
- * for display in the Sync Dashboard logs tab.
+ * Intercepts Timber logs and routes sync- and GPS-related entries to [SyncLogManager]
+ * for display in the Sync Dashboard logs tab and inclusion in the exported log file.
  *
  * Extends [Timber.DebugTree] (not [Timber.Tree]) so that auto-generated tags
  * from the calling class name are available. Without this, tags are null for
@@ -18,11 +18,12 @@ class SyncLogTree(
 
     companion object {
         private val SYNC_TAG_KEYWORDS = listOf(
-            "Worker", "Sync", "Push", "Pull", "Amrit", "Repo"
+            "Worker", "Sync", "Push", "Pull", "Amrit", "Repo", "Gps"
         )
         private val SYNC_MESSAGE_KEYWORDS = listOf(
             "sync", "push", "pull", "worker", "batch",
-            "beneficiary", "amrit", "upload", "download"
+            "beneficiary", "amrit", "upload", "download",
+            "gps", "location"
         )
 
         // Safety net: promote log level when message content indicates an error

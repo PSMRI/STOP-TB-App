@@ -22,15 +22,16 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.adapters.BenListAdapter
 import org.piramalswasthya.stoptb.adapters.BenPagingAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertFilterBinding
+import org.piramalswasthya.stoptb.databinding.AlertNewBenBinding
+import android.widget.ArrayAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchAndToggleRvButtonBinding
-import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
-import org.piramalswasthya.stoptb.helpers.isNurseRole
-import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
+import org.piramalswasthya.stoptb.model.AppRole
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
@@ -57,6 +58,9 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     @Inject
     lateinit var prefDao: PreferenceDao
 
+    @Inject
+    lateinit var roleManager: RoleManager
+
     private var _binding: FragmentDisplaySearchAndToggleRvButtonBinding? = null
 
     private val binding: FragmentDisplaySearchAndToggleRvButtonBinding
@@ -69,6 +73,9 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     private lateinit var benAdapter: BenPagingAdapter
 
     private var selectedAbha = Abha.ALL
+
+    private var addMemberAlert: androidx.appcompat.app.AlertDialog? = null
+    private var addMemberAlertBinding: AlertNewBenBinding? = null
 
     private val viewModel: AllBenViewModel by viewModels()
 
@@ -139,18 +146,33 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val roleName = prefDao.getLoggedInUser()?.role
-        val isRegistrar = roleName.isRegistrationOfficerRole()
-        val isNurse = roleName.isNurseRole()
-        val isCounsellor = roleName.isCounsellingOfficerRole()
-        val isKnownRestrictedRole = isRegistrar || isNurse || isCounsellor
-        val allowLegacyAccess = !isKnownRestrictedRole
+        // Legacy, kept for reference:
+//        val roleName = prefDao.getLoggedInUser()?.role
+//        val isRegistrar = roleName.isRegistrationOfficerRole()
+//        val isNurse = roleName.isNurseRole()
+//        val isCounsellor = roleName.isCounsellingOfficerRole()
+//        val isKnownRestrictedRole = isRegistrar || isNurse || isCounsellor
+//        val allowLegacyAccess = !isKnownRestrictedRole
         val isReadOnlyReferralList = args.source in READ_ONLY_REFERRAL_SOURCES
         val showResultButton = args.source == 6 || args.source == 7 || args.source == 8
-        val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
-        val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
-        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess || isCounsellor) && !isReadOnlyReferralList
-        val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
+        val privilege = roleManager.privilegesUnion()
+        Timber.d("RoleManager: showAbhaButton=${privilege.showAbhaButton}, showCallButton=${privilege.showCallButton}")
+        // showAnthropometryButton/showBenActionButtons: confirmed dead code, not used anywhere.
+//        val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
+//        val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
+//        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess || isCounsellor) && !isReadOnlyReferralList
+//        val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
+        // Legacy, kept for reference:
+//        val showAnthropometryButton = isRegistrar && !isReadOnlyReferralList
+//        val showBenActionButtons = (isNurse || allowLegacyAccess) && !isReadOnlyReferralList
+//        val showAbhaButton = (isRegistrar || isNurse || allowLegacyAccess || isCounsellor) &&
+//                !isReadOnlyReferralList && !args.showContactTracingForms
+//        val showCallButton = (isNurse || isRegistrar || allowLegacyAccess) && !isReadOnlyReferralList
+        val showAbhaButton = privilege.showAbhaButton && !isReadOnlyReferralList && !args.showContactTracingForms
+        val showCallButton = privilege.showCallButton && !isReadOnlyReferralList
+
+        buildAddMemberDialog()
+
         binding.llQuickRefresh.visibility = View.GONE
 
         // Add Ben button hidden — ben registration only via Household flow
@@ -196,26 +218,38 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     }
                 },
                 clickedWifeBen = { _, hhId, benId, _ ->
-                    findNavController().navigate(
-                        AllBenFragmentDirections.actionAllBenFragmentToNewBenRegFragment(
-                            hhId = hhId,
-                            relToHeadId = 4,       // Wife
-                            gender = 2,            // Female
-                            selectedBenId = benId, // husband's benId → mark isSpouseAdded after save
-                            isAddSpouse = 1
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        if (viewModel.isHouseholdMemberLimitReached(hhId)) {
+                            showHouseholdMemberLimitReachedMessage(hhId)
+                            return@launch
+                        }
+                        findNavController().navigate(
+                            AllBenFragmentDirections.actionAllBenFragmentToNewBenRegFragment(
+                                hhId = hhId,
+                                relToHeadId = 4,       // Wife
+                                gender = 2,            // Female
+                                selectedBenId = benId, // husband's benId → mark isSpouseAdded after save
+                                isAddSpouse = 1
+                            )
                         )
-                    )
+                    }
                 },
                 clickedHusbandBen = { _, hhId, benId, _ ->
-                    findNavController().navigate(
-                        AllBenFragmentDirections.actionAllBenFragmentToNewBenRegFragment(
-                            hhId = hhId,
-                            relToHeadId = 5,       // Husband
-                            gender = 1,            // Male
-                            selectedBenId = benId, // wife's benId → mark isSpouseAdded after save
-                            isAddSpouse = 1
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        if (viewModel.isHouseholdMemberLimitReached(hhId)) {
+                            showHouseholdMemberLimitReachedMessage(hhId)
+                            return@launch
+                        }
+                        findNavController().navigate(
+                            AllBenFragmentDirections.actionAllBenFragmentToNewBenRegFragment(
+                                hhId = hhId,
+                                relToHeadId = 5,       // Husband
+                                gender = 1,            // Male
+                                selectedBenId = benId, // wife's benId → mark isSpouseAdded after save
+                                isAddSpouse = 1
+                            )
                         )
-                    )
+                    }
                 },
                 clickedChildben = { item, hhId, benId, relToHeadId -> },
                 { item, hhid -> },
@@ -229,11 +263,13 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     if (isReadOnlyReferralList) return@BenClickListener
                     viewLifecycleOwner.lifecycleScope.launch {
                         val benRegId = viewModel.getBenFromId(benId)
+                        val vitalAutoFlow = AppRole.NURSE in roleManager.assignedRoles
+                        Timber.d("RoleManager: VitalScreenFragment autoFlow=$vitalAutoFlow")
                         findNavController().navigate(
                             AllBenFragmentDirections.actionAllBenFragmentToVitalScreenFragment(
                                 benId = benId,
                                 benRegId = benRegId,
-                                autoFlow = isNurse
+                                autoFlow = vitalAutoFlow
                             )
                         )
                     }
@@ -398,7 +434,11 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     )
                 },
                 { item, benId, hhId, viewOnly ->
-                    if (!showAnthropometryButton) return@BenClickListener
+                    // Dead code — the Anthropometry icon this guards is unreachable: the
+                    // adapter always passes showAnthropometryButton = false below, so this
+                    // listener never fires regardless of role. Kept as-is, not deleted.
+//                    if (!showAnthropometryButton) return@BenClickListener
+                    if (true) return@BenClickListener
                     findNavController().navigate(
                         R.id.anthropometryFragment,
                         bundleOf(
@@ -410,6 +450,9 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 clickedExamine = { item, benId ->
                     pendingExamineBenId = benId
                     showExamineBottomSheet(benId)
+                },
+                clickedAddMember = { item ->
+                    if (!isReadOnlyReferralList) addMemberToBeneficiaryHousehold(item)
                 }
             ),
             showBeneficiaries = true,
@@ -419,11 +462,16 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             showCall = showCallButton,
             pref = prefDao,
             context = requireActivity(),
+            roleManager = roleManager,
             showActionButtons = false,
             showResultButton = showResultButton,
             showAnthropometryButton = false,
             showExamineButton = !isReadOnlyReferralList,
-            source = args.source
+            showScreeningStatus = true,
+            source = args.source,
+            showContactTracingForms = args.showContactTracingForms,
+            showAddMemberButton = !isReadOnlyReferralList
+
         )
 
         binding.rvAny.adapter = benAdapter
@@ -621,12 +669,14 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             }
         }
 
-        lifecycleScope.launch {
-            while (viewLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
-                benAdapter.notifyDataSetChanged()
-                kotlinx.coroutines.delay(1000L)
-            }
-        }
+    }
+
+    private suspend fun showHouseholdMemberLimitReachedMessage(hhId: Long) {
+        Toast.makeText(
+            requireContext(),
+            getString(R.string.hh_member_limit_reached, viewModel.getTotalHhMembers(hhId) ?: 0),
+            Toast.LENGTH_SHORT
+        ).show()
     }
 
     private fun checkAndGenerateABHA(benId: Long) {
@@ -653,7 +703,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         if (existing != null) return // already visible
         // Always show without autoFlow — user decides whether to continue or close.
         // autoFlow=true caused the form to re-open automatically when back was pressed.
-        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false, showContactTracingForms = false)
+
+        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false, showContactTracingForms = args.showContactTracingForms)
             .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
     }
 
@@ -667,7 +718,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     bundleOf(
                         "benId" to benId,
                         "autoFlow" to false,
-                        "examineFlow" to !viewOnly
+                        "examineFlow" to !viewOnly,
+                        "viewOnly" to viewOnly
                     )
                 )
             }
@@ -688,7 +740,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     R.id.TBScreeningFormFragment,
                     bundleOf(
                         "benId" to benId,
-                        "autoFlow" to !viewOnly
+                        "autoFlow" to !viewOnly,
+                        "viewOnly" to viewOnly
                     )
                 )
             }
@@ -763,6 +816,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 getString(R.string.referral_true_nat)
             } else if (args.source == 8) {
                 getString(R.string.referral_liquid_culture)
+            } else if (args.source == 9) {
+                getString(R.string.icon_title_tpt_module)
             } else {
                 getString(R.string.icon_title_ben)
             }
@@ -774,8 +829,166 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         }
     }
 
+    private fun addMemberToBeneficiaryHousehold(item: org.piramalswasthya.stoptb.model.BenBasicDomain) {
+        if (item.isNonHH || item.isDeath || item.isDeactivate) return
+        viewLifecycleOwner.lifecycleScope.launch {
+            if (viewModel.isHouseholdMemberLimitReached(item.hhId)) {
+                showHouseholdMemberLimitReachedMessage(item.hhId)
+                return@launch
+            }
+            viewModel.setSelectedHouseholdForAddMember(item.hhId)
+            addMemberAlert?.show()
+        }
+    }
+
+    private data class HofContext(
+        val hof: org.piramalswasthya.stoptb.model.BenRegCache?,
+        val fatherRegistered: Boolean,
+        val motherRegistered: Boolean,
+        val unmarried: Boolean,
+        val married: Boolean
+    )
+
+    private fun computeHofContextForAddMember(): HofContext {
+        val list = viewModel.householdBenListForAddMember
+        val hof = list.firstOrNull { it.familyHeadRelationPosition == 19 }
+        val fatherRegistered = list.any { it.familyHeadRelationPosition == 2 }
+        val motherRegistered = list.any { it.familyHeadRelationPosition == 1 }
+        val unmarried = hof?.genDetails?.maritalStatusId == 1
+        val married = hof?.genDetails?.maritalStatusId == 2
+        return HofContext(hof, fatherRegistered, motherRegistered, unmarried, married)
+    }
+
+    private fun baseRelationDropdownForAddMember(selectedGender: org.piramalswasthya.stoptb.model.Gender?): List<String> {
+        val relationArray = when (selectedGender) {
+            org.piramalswasthya.stoptb.model.Gender.FEMALE -> resources.getStringArray(R.array.nbr_relationship_to_head_female)
+            org.piramalswasthya.stoptb.model.Gender.MALE, org.piramalswasthya.stoptb.model.Gender.TRANSGENDER -> resources.getStringArray(R.array.nbr_relationship_to_head_male)
+            else -> null
+        }
+        return relationArray?.toList().orEmpty()
+    }
+
+    private fun filterRelationsForAddMember(
+        selectedGender: org.piramalswasthya.stoptb.model.Gender?,
+        baseList: List<String>,
+        context: HofContext
+    ): List<String> {
+        if (context.hof == null) return baseList
+
+        val relationList = baseList.toMutableList()
+        val commonRelations = resources.getStringArray(R.array.nbr_relationship_to_head)
+        val unmarriedFilter =
+            resources.getStringArray(R.array.nbr_relationship_to_head_unmarried_filter).toSet()
+
+        if (context.fatherRegistered) relationList.remove(commonRelations[1])
+        if (context.motherRegistered) relationList.remove(commonRelations[0])
+
+        if (context.unmarried) {
+            relationList.removeAll(unmarriedFilter)
+        } else if (!context.married) {
+            relationList.remove(commonRelations[5])
+            relationList.remove(commonRelations[4])
+        }
+
+        val hofGender = context.hof.gender
+        if (hofGender == org.piramalswasthya.stoptb.model.Gender.MALE && selectedGender == org.piramalswasthya.stoptb.model.Gender.MALE) {
+            relationList.remove(commonRelations[5])
+        }
+        if (hofGender == org.piramalswasthya.stoptb.model.Gender.FEMALE && selectedGender == org.piramalswasthya.stoptb.model.Gender.FEMALE) {
+            relationList.remove(commonRelations[4])
+        }
+
+        return relationList
+    }
+
+    private fun genderFromRadioIdForAddMember(alertBinding: AlertNewBenBinding, checkedId: Int): org.piramalswasthya.stoptb.model.Gender? =
+        when (checkedId) {
+            alertBinding.rbMale.id -> org.piramalswasthya.stoptb.model.Gender.MALE
+            alertBinding.rbFemale.id -> org.piramalswasthya.stoptb.model.Gender.FEMALE
+            alertBinding.rbTrans.id -> org.piramalswasthya.stoptb.model.Gender.TRANSGENDER
+            else -> null
+        }
+
+    private fun genderIntFromRadioIdForAddMember(alertBinding: AlertNewBenBinding): Int =
+        when (alertBinding.rgGender.checkedRadioButtonId) {
+            alertBinding.rbMale.id -> 1
+            alertBinding.rbFemale.id -> 2
+            alertBinding.rbTrans.id -> 3
+            else -> 0
+        }
+
+    private fun applyRelationAdapterForAddMember(alertBinding: AlertNewBenBinding, items: List<String>) {
+        alertBinding.actvRth.setAdapter(
+            ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, items)
+        )
+    }
+
+    private fun buildAddMemberDialog() {
+        val alertBinding = AlertNewBenBinding.inflate(layoutInflater, binding.root, false)
+        addMemberAlertBinding = alertBinding
+        alertBinding.btnOk.isEnabled = false
+
+        alertBinding.rgGender.setOnCheckedChangeListener { _, checkedId ->
+            val selectedGender = genderFromRadioIdForAddMember(alertBinding, checkedId) ?: run {
+                alertBinding.linearLayout4.visibility = View.GONE
+                return@setOnCheckedChangeListener
+            }
+            alertBinding.linearLayout4.visibility = View.VISIBLE
+            alertBinding.actvRth.text = null
+            alertBinding.btnOk.isEnabled = false
+            val items = filterRelationsForAddMember(
+                selectedGender = selectedGender,
+                baseList = baseRelationDropdownForAddMember(selectedGender),
+                context = computeHofContextForAddMember()
+            )
+            applyRelationAdapterForAddMember(alertBinding, items)
+        }
+
+        alertBinding.actvRth.setOnItemClickListener { _, _, _, _ ->
+            alertBinding.btnOk.isEnabled = true
+        }
+
+        addMemberAlert = MaterialAlertDialogBuilder(requireContext())
+            .setView(alertBinding.root)
+            .setOnCancelListener {
+                viewModel.resetSelectedHouseholdForAddMember()
+                alertBinding.rgGender.clearCheck()
+                alertBinding.linearLayout4.visibility = View.GONE
+                alertBinding.actvRth.text = null
+                alertBinding.btnOk.isEnabled = false
+            }
+            .create()
+
+        alertBinding.btnOk.setOnClickListener {
+            val relIndex = resources.getStringArray(R.array.nbr_relationship_to_head_src)
+                .indexOf(alertBinding.actvRth.text.toString())
+            val gender = genderIntFromRadioIdForAddMember(alertBinding)
+            if (relIndex < 0 || gender == 0) return@setOnClickListener
+
+            findNavController().navigate(
+                AllBenFragmentDirections.actionAllBenFragmentToNewBenRegFragment(
+                    hhId = viewModel.selectedHouseholdIdForAddMember,
+                    benId = 0L,
+                    relToHeadId = relIndex,
+                    isAddSpouse = 0,
+                    gender = gender
+                )
+            )
+            viewModel.resetSelectedHouseholdForAddMember()
+            addMemberAlert?.dismiss()
+        }
+
+        alertBinding.btnCancel.setOnClickListener {
+            viewModel.resetSelectedHouseholdForAddMember()
+            addMemberAlert?.dismiss()
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        addMemberAlert?.dismiss()
+        addMemberAlert = null
+        addMemberAlertBinding = null
         _binding = null
     }
 }

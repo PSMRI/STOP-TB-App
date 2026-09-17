@@ -35,6 +35,7 @@ import android.widget.RadioGroup
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.content.res.AppCompatResources
+import androidx.core.content.ContextCompat
 import androidx.core.view.children
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -115,6 +116,7 @@ class FormInputAdapter(
     private val ageClickListener: AgeClickListener? = null,
     private val sendOtpClickListener: SendOtpClickListener? = null,
     private val formValueListener: FormValueListener? = null,
+    private val pencilEditClickListener: PencilEditClickListener? = null,
     var isEnabled: Boolean = true,
     private val selectImageClickListener: SelectUploadImageClickListener? = null,
     private val viewDocumentListner: ViewDocumentOnClick? = null,
@@ -139,6 +141,9 @@ class FormInputAdapter(
 
     class EditTextInputViewHolder private constructor(private val binding: RvItemFormEditTextV2Binding) :
         ViewHolder(binding.root) {
+
+        private var currentWatcher: TextWatcher? = null   // ADD THIS
+
         companion object {
             fun from(parent: ViewGroup): ViewHolder {
                 val layoutInflater = LayoutInflater.from(parent.context)
@@ -146,9 +151,11 @@ class FormInputAdapter(
                 return EditTextInputViewHolder(binding)
             }
         }
+        fun bind(item: FormElement, isEnabled: Boolean, formValueListener: FormValueListener?, pencilEditClickListener: PencilEditClickListener? = null) {            val effectiveEnabled = isEnabled && item.isEnabled
 
-        fun bind(item: FormElement, isEnabled: Boolean, formValueListener: FormValueListener?) {
-            val effectiveEnabled = isEnabled && item.isEnabled
+            currentWatcher?.let { binding.et.removeTextChangedListener(it) }
+            currentWatcher = null
+
             val isReadOnlyUnavailableContact =
                 item.title.equals("Contact Number", ignoreCase = true) &&
                         !item.required &&
@@ -156,19 +163,30 @@ class FormInputAdapter(
             Timber.d("binding triggered!!! $effectiveEnabled ${item.id}")
             if (!effectiveEnabled) {
                 binding.et.clearFocus()
-                binding.tilEditText.isEnabled = false
+                // Keep the TextInputLayout itself enabled when it has a pencil-edit affordance,
+                // otherwise Material disables the end icon along with the whole layout and the
+                // pencil becomes visible but untappable. Only the inner EditText stays locked.
+                binding.tilEditText.isEnabled = item.hasPencilEdit
                 binding.et.isEnabled = false
                 binding.et.isClickable = false
                 binding.et.isFocusable = false
                 binding.et.isFocusableInTouchMode = false
                 binding.et.isCursorVisible = false
-                binding.tilEditText.endIconDrawable = null
-                binding.tilEditText.setEndIconOnClickListener(null)
+                if (item.hasPencilEdit) {
+                    binding.tilEditText.isEndIconVisible = true
+                    binding.tilEditText.endIconDrawable =
+                        ContextCompat.getDrawable(binding.root.context, android.R.drawable.ic_menu_edit)
+                    binding.tilEditText.setEndIconOnClickListener {
+                        pencilEditClickListener?.onPencilClick(item)
+                    }
+                } else {
+                    binding.tilEditText.endIconDrawable = null
+                    binding.tilEditText.setEndIconOnClickListener(null)
+                }
                 handleHintLength(item)
                 binding.form = item
                 binding.et.setText(item.value)
                 binding.executePendingBindings()
-                binding.tilEditText.isEnabled = false
                 binding.et.isEnabled = false
                 binding.et.isClickable = false
                 binding.et.isFocusable = false
@@ -194,15 +212,13 @@ class FormInputAdapter(
                 binding.et.isFocusable = false
             }
 
-            if (item.allCaps) {
-                val editFilters = binding.et.filters
-                var newFilters = arrayOfNulls<InputFilter>(editFilters.size + 1)
-                editFilters.forEachIndexed { index, inputFilter ->
-                    newFilters[index] = editFilters[index]
-                }
-                newFilters[editFilters.size] = AllCaps()
-                binding.et.filters = newFilters
-            }
+            // ALWAYS rebuild from a clean baseline — don't append onto whatever filters
+            // the previously-bound field left behind on this recycled view.
+            val baseFilters = mutableListOf<InputFilter>()
+            if (item.etMaxLength > 0) baseFilters.add(InputFilter.LengthFilter(item.etMaxLength))
+            if (item.allCaps) baseFilters.add(AllCaps())
+            binding.et.filters = baseFilters.toTypedArray()
+
             binding.form = item
             if (item.errorText == null) binding.tilEditText.isErrorEnabled = false
             Timber.d("Bound EditText item ${item.title} with ${item.required}")
@@ -255,6 +271,8 @@ class FormInputAdapter(
                         binding.tilEditText.isErrorEnabled = item.errorText != null
                         binding.tilEditText.error = item.errorText
                     }
+
+
 //                    binding.tilEditText.error = null
 //                    else if(item.errorText!= null && binding.tilEditText.error==null)
 //                        binding.tilEditText.error = item.errorText
@@ -339,6 +357,10 @@ class FormInputAdapter(
 
                 }
             }
+
+            // ADD THIS — attach immediately and remember it, so it's not dependent on focus events.
+            currentWatcher = textWatcher
+            binding.et.addTextChangedListener(textWatcher)
             binding.et.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus){
                     binding.et.requestFocus()
@@ -823,6 +845,8 @@ class FormInputAdapter(
         ) {
             val context = binding.root.context
             val density = context.resources.displayMetrics.density
+            val maxListHeightPx = (context.resources.displayMetrics.heightPixels * 0.58f).toInt()
+            val rowHeightPx = (48 * density).toInt()
             val container = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding((20 * density).toInt(), (8 * density).toInt(), (20 * density).toInt(), 0)
@@ -845,7 +869,7 @@ class FormInputAdapter(
                 listView,
                 LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    (320 * density).toInt()
+                    0
                 )
             )
 
@@ -869,6 +893,10 @@ class FormInputAdapter(
                 filteredIndices.forEachIndexed { position, originalIndex ->
                     listView.setItemChecked(position, checkedItems[originalIndex])
                 }
+                // Keep the native button panel below the scrollable list on every screen size.
+                listView.layoutParams = listView.layoutParams.apply {
+                    height = minOf(filteredIndices.size * rowHeightPx, maxListHeightPx)
+                }
             }
 
             refreshFilteredList("")
@@ -889,7 +917,7 @@ class FormInputAdapter(
                 }
             })
 
-            AlertDialog.Builder(context)
+            val dialog = AlertDialog.Builder(context)
                 .setTitle(item.title)
                 .setView(container)
                 .setPositiveButton(android.R.string.ok) { _, _ ->
@@ -897,6 +925,29 @@ class FormInputAdapter(
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
+
+            dialog.window?.setLayout(
+                (context.resources.displayMetrics.widthPixels * 0.9f).toInt(),
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+
+            val buttonPadding = (16 * density).toInt()
+            val actionTextColor = ContextCompat.getColor(context, R.color.md_theme_light_primary)
+            listOf(AlertDialog.BUTTON_NEGATIVE, AlertDialog.BUTTON_POSITIVE).forEach { which ->
+                dialog.getButton(which).apply {
+                    // Match the original dialog's text-button actions and prevent overlap.
+                    background = null
+                    minWidth = 0
+                    minimumWidth = 0
+                    setTextColor(actionTextColor)
+                    setPadding(buttonPadding, 0, buttonPadding, 0)
+                }
+            }
+            (dialog.getButton(AlertDialog.BUTTON_NEGATIVE).layoutParams as? ViewGroup.MarginLayoutParams)
+                ?.let { params ->
+                    params.marginEnd = buttonPadding
+                    dialog.getButton(AlertDialog.BUTTON_NEGATIVE).layoutParams = params
+                }
         }
 
         private fun Set<Int>.toDisplayText(item: FormElement): String =
@@ -1314,6 +1365,10 @@ class FormInputAdapter(
         fun onImageClick(form: FormElement) = imageClick(form.id)
     }
 
+    class PencilEditClickListener(private val pencilClick: (formId: Int) -> Unit) {
+        fun onPencilClick(form: FormElement) = pencilClick(form.id)
+    }
+
     class SendOtpClickListener(private val btnClick: (formId: Int,generateOtp:MaterialButton,timerInsec: TextView,tilEditText:TextInputLayout, isEnabled: Boolean,adapterPosition:Int,otpField: TextInputEditText) -> Unit) {
 
         fun onButtonClick(
@@ -1376,8 +1431,8 @@ class FormInputAdapter(
             val maxValue = item.max?.toInt()
             val allowNegative = item.minDecimal != null && item.minDecimal!! < 0
 
-            binding.etNumberInput.setText(minValue.toString())
-            binding.etNumberInput.setSelection(binding.etNumberInput.text!!.length)
+//            binding.etNumberInput.setText(minValue.toString())
+//            binding.etNumberInput.setSelection(binding.etNumberInput.text!!.length)
             var currentValue = item.value?.toIntOrNull() ?: minValue
 
             textWatcher?.let { binding.etNumberInput.removeTextChangedListener(it) }
@@ -1608,7 +1663,7 @@ class FormInputAdapter(
             val isEnabled = if (isEnabled) item.isEnabled else false
             when (item.inputType) {
                 EDIT_TEXT -> (holder as EditTextInputViewHolder).bind(
-                    item, isEnabled, formValueListener
+                    item, isEnabled, formValueListener, pencilEditClickListener
                 )
 
                 DROPDOWN -> (holder as DropDownInputViewHolder).bind(

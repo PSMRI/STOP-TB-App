@@ -24,8 +24,6 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.FormRespons
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.helpers.Konstants
-import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
-import org.piramalswasthya.stoptb.helpers.isNurseRole
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.helpers.dynamicMapper.PayloadBuilder
 import org.piramalswasthya.stoptb.model.*
@@ -87,6 +85,10 @@ class BenRepo @Inject constructor(
             benDao.updateHofSpouseAdded(householdId = householdId,unsynced,"U",2)
         }
     }
+
+    fun getUnscreenedList(selectedVillage: Int): Flow<List<BenBasicCache>> =
+        benDao.getUnscreenedList(selectedVillage)
+
     suspend fun updateBeneficiarySpouseAdded(householdId: Long,benID: Long,unsynced: SyncState) {
         withContext(Dispatchers.IO) {
             val processState = if (benID < 0L) "N" else "U"
@@ -1870,22 +1872,30 @@ class BenRepo @Inject constructor(
                         ?: jsonObject.optStringOrNull("gpsUnavailableReason")
 
                     try {
+                        // Server sends key with typo ("houseoldId") or correct ("householdId") — check both.
+                        val resolvedHouseholdId = run {
+                            val fromTypo = if (jsonObject.has("houseoldId") && !jsonObject.isNull("houseoldId")) jsonObject.getLong("houseoldId").takeIf { it > 0L } else null
+                            val fromCorrect = if (jsonObject.has("householdId") && !jsonObject.isNull("householdId")) jsonObject.getLong("householdId").takeIf { it > 0L } else null
+                            // Server payload can omit the household key even for a genuine household member (seen when
+                            // the household association hasn't fully propagated server-side at query time). Before
+                            // concluding this beneficiary is truly non-household, check the familyHeadRelationPosition:
+                            // a value in the normal household-relation range (1-20ish, excluding whatever code means
+                            // "not applicable") strongly implies household membership even without an explicit ID.
+                            val relationPosition = benDataObj.optInt(
+                                "familyHeadRelationPosition",
+                                jsonObject.optInt("familyHeadRelationPosition", 0)
+                            )
+                            val impliedByRelation = relationPosition in 1..20
+
+                            fromTypo ?: fromCorrect
+                            ?: existingBen?.householdId?.takeIf { it > 0L }
+                            ?: existingBen?.takeIf { impliedByRelation && !it.isNonHH }?.householdId
+                        }
                         val serverBen =
                             BenRegCache(
-                                householdId = run {
-                                    // Server sends key with typo ("houseoldId") or correct ("householdId") — check both
-                                    val fromTypo = if (jsonObject.has("houseoldId") && !jsonObject.isNull("houseoldId")) jsonObject.getLong("houseoldId").takeIf { it > 0L } else null
-                                    val fromCorrect = if (jsonObject.has("householdId") && !jsonObject.isNull("householdId")) jsonObject.getLong("householdId").takeIf { it > 0L } else null
-                                    // Prefer server value; fall back to existing local value (helps non-reinstall flow)
-                                    fromTypo ?: fromCorrect ?: existingBen?.householdId?.takeIf { it > 0L }
-                                },
+                                householdId = resolvedHouseholdId,
 
-                                isNonHH = run {
-                                    val fromTypo = if (jsonObject.has("houseoldId") && !jsonObject.isNull("houseoldId")) jsonObject.getLong("houseoldId").takeIf { it > 0L } else null
-                                    val fromCorrect = if (jsonObject.has("householdId") && !jsonObject.isNull("householdId")) jsonObject.getLong("householdId").takeIf { it > 0L } else null
-                                    val hhIdVal = fromTypo ?: fromCorrect
-                                    hhIdVal == null
-                                },
+                                isNonHH = resolvedHouseholdId == null,
 
                                 placeOfCurrentLiving = if (jsonObject.has("placeOfCurrentLiving") && !jsonObject.isNull("placeOfCurrentLiving")) {
                                     val code = jsonObject.optString("placeOfCurrentLiving", "")

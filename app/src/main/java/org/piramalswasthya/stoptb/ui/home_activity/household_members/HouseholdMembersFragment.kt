@@ -1,11 +1,14 @@
 package org.piramalswasthya.stoptb.ui.home_activity.household_members
 
+import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -23,9 +26,11 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertNewBenBinding
 import org.piramalswasthya.stoptb.databinding.FragmentHouseholdMembersBinding
 import org.piramalswasthya.stoptb.model.Gender
-import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
+import org.piramalswasthya.stoptb.model.Permission
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import timber.log.Timber
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -33,6 +38,9 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private val args: HouseholdMembersFragmentArgs by navArgs()
 
@@ -44,6 +52,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
     private var addBenAlertBinding: AlertNewBenBinding? = null
     private var selectedRelationIndex = -1
     private var pendingExamineBenId: Long? = null
+    private var isMemberLimitReached = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -65,7 +74,10 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         buildAddBenDialog()
-        val role = prefDao.getLoggedInUser()?.role
+        // Legacy, kept for reference:
+//        val role = prefDao.getLoggedInUser()?.role
+        val privilege = roleManager.privilegesUnion()
+        Timber.d("RoleManager: showExamineButtonDefault=${privilege.showExamineButtonDefault}, fromContactTracing=${args.fromContactTracing}")
 
         val benAdapter = BenListAdapter(
             clickListener = BenListAdapter.BenClickListener(
@@ -74,27 +86,35 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
                 },
                 clickedWifeBen = { _, hhId, benId, _ ->
                     // "Register Wife" button — navigate to new ben reg as Wife (index 4 = Wife)
-                    findNavController().navigate(
-                        HouseholdMembersFragmentDirections.actionHouseholdMembersFragmentToNewBenRegFragment(
-                            hhId = hhId,
-                            relToHeadId = 4,        // "Wife" index in nbr_relationship_to_head_src
-                            gender = 2,             // Female
-                            selectedBenId = benId,  // original member's ID → mark isSpouseAdded after save
-                            isAddSpouse = 1
+                    if (isMemberLimitReached) {
+                        showMemberLimitReachedMessage()
+                    } else {
+                        findNavController().navigate(
+                            HouseholdMembersFragmentDirections.actionHouseholdMembersFragmentToNewBenRegFragment(
+                                hhId = hhId,
+                                relToHeadId = 4,        // "Wife" index in nbr_relationship_to_head_src
+                                gender = 2,             // Female
+                                selectedBenId = benId,  // original member's ID → mark isSpouseAdded after save
+                                isAddSpouse = 1
+                            )
                         )
-                    )
+                    }
                 },
                 clickedHusbandBen = { _, hhId, benId, _ ->
                     // "Register Husband" button — navigate to new ben reg as Husband (index 5 = Husband)
-                    findNavController().navigate(
-                        HouseholdMembersFragmentDirections.actionHouseholdMembersFragmentToNewBenRegFragment(
-                            hhId = hhId,
-                            relToHeadId = 5,        // "Husband" index in nbr_relationship_to_head_src
-                            gender = 1,             // Male
-                            selectedBenId = benId,  // original member's ID → mark isSpouseAdded after save
-                            isAddSpouse = 1
+                    if (isMemberLimitReached) {
+                        showMemberLimitReachedMessage()
+                    } else {
+                        findNavController().navigate(
+                            HouseholdMembersFragmentDirections.actionHouseholdMembersFragmentToNewBenRegFragment(
+                                hhId = hhId,
+                                relToHeadId = 5,        // "Husband" index in nbr_relationship_to_head_src
+                                gender = 1,             // Male
+                                selectedBenId = benId,  // original member's ID → mark isSpouseAdded after save
+                                isAddSpouse = 1
+                            )
                         )
-                    )
+                    }
                 },
                 clickedChildben = { _, hhId, benId, relToHeadId ->
                     openMemberForm(hhId, benId, relToHeadId)
@@ -113,7 +133,9 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
             showSyncIcon = true,
             pref = prefDao,
             context = requireActivity(),
-            showExamineButton = !role.isCounsellingOfficerRole() || args.fromContactTracing,
+            roleManager = roleManager,
+            // showExamineButton = !role.isCounsellingOfficerRole() || args.fromContactTracing,
+            showExamineButton = privilege.showExamineButtonDefault || args.fromContactTracing,
             showContactTracingForms = args.fromContactTracing
         )
         binding.rvAny.adapter = benAdapter
@@ -199,9 +221,24 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
             }
         }
 
-        binding.fabAddMember.visibility = View.VISIBLE
+        // Adding a member requires full Beneficiary permission (Registrar).
+        val canAddMember = privilege.beneficiaryPermission == Permission.FULL
+        binding.fabAddMember.visibility = if (canAddMember) View.VISIBLE else View.GONE
         binding.fabAddMember.setOnClickListener {
-            addBenAlert?.show()
+            if (isMemberLimitReached) showMemberLimitReachedMessage() else addBenAlert?.show()
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.memberLimitReached.collect { reached ->
+                    isMemberLimitReached = reached
+                    binding.fabAddMember.backgroundTintList = if (reached) {
+                        ContextCompat.getColorStateList(requireContext(), R.color.md_theme_light_outline)
+                    } else {
+                        android.content.res.ColorStateList.valueOf(Color.parseColor("#4CAF50"))
+                    }
+                }
+            }
         }
     }
 
@@ -231,7 +268,8 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
                         "benId" to benId,
                         "autoFlow" to false,
                         "examineFlow" to !viewOnly,
-                        "openedFromHousehold" to true
+                        "openedFromHousehold" to true,
+                        "viewOnly" to viewOnly
                     )
                 )
             }
@@ -255,7 +293,8 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
                     bundleOf(
                         "benId" to benId,
                         "autoFlow" to !viewOnly,
-                        "openedFromHousehold" to true
+                        "openedFromHousehold" to true,
+                        "viewOnly" to viewOnly
                     )
                 )
             }
@@ -283,6 +322,14 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
 
     override fun onExamineDismissed() {
         pendingExamineBenId = null
+    }
+
+    private fun showMemberLimitReachedMessage() {
+        Toast.makeText(
+            requireContext(),
+            getString(R.string.hh_member_limit_reached, viewModel.totalHhMembers ?: 0),
+            Toast.LENGTH_SHORT
+        ).show()
     }
 
     private fun openMemberForm(hhId: Long, benId: Long, relToHeadId: Int) {
@@ -334,6 +381,11 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
         alertBinding.btnOk.setOnClickListener {
             val gender = genderIntFromRadioId(alertBinding)
             if (selectedRelationIndex < 0 || gender == 0) return@setOnClickListener
+            if (isMemberLimitReached) {
+                showMemberLimitReachedMessage()
+                addBenAlert?.dismiss()
+                return@setOnClickListener
+            }
 
             findNavController().navigate(
                 HouseholdMembersFragmentDirections.actionHouseholdMembersFragmentToNewBenRegFragment(

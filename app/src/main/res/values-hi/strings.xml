@@ -149,11 +149,12 @@
     <string name="eligible_couple_tracking_list">पात्र दंपत्ति ट्रैकिंग सूची</string>
     <string name="tb_screening_list">टीबी स्क्रीनिंग सूची</string>
     <string name="tb_suspected_list">संभावित टीबी मामले</string>
-    <string name="tb_screening_form">टीबी स्क्रीनिंग फॉर्म</string>
+    <string name="tb_screening_form">टीबी लक्षण स्क्रीनिंग</string>
     <string name="tb_suspected_form">संभावित टीबी मामला</string>
     <string name="delivery_outcome_list">प्रसव परिणाम सूची</string>
     <string name="communicable_diseases">संचारी (संक्रामक) रोग</string>
     <string name="dashboard">डैशबोर्ड</string>
+    <string name="total_unscreened">अस्क्रीन किए गए लाभार्थी</string>
     <string name="sign_in">साइन इन</string>
     <string name="save_successful">सफलतापूर्वक सहेजें</string>
     <string name="something_wend_wong_contact_testing">कुछ गड़बड़ है! संपर्क परीक्षण!</string>
@@ -193,6 +194,7 @@
     <string name="follow_up_history">फॉलो-अप रिकॉर्ड </string>
 
     <string name="risk_factors">जोखिम कारक</string>
+    <string name="other_details">अन्य विवरण</string>
     <string name="total_presumptive_tb">प्रकल्पित टीबी मामले</string>
 
     <string name="pending">बाकी है</string>
@@ -368,6 +370,7 @@
     <string name="enter_a_valid_number">एक मान्य संख्या दर्ज करें</string>
     <string name="allowed_range">अनुमत सीमा: %1$d से %2$d</string>
     <string name="minimum_allowed_value">न्यूनतम अनुमत मान: %1$d</string>
+    <string name="unscreened_population_title">स्क्रीनिंग न हुई आबादी</string>
 
     <string-array name="type_of_tb_case">
         <item>टीबी का नया मामला</item>
@@ -588,6 +591,7 @@
     <string name="home_card_household_subtitle">परिवार पंजीकरण और प्रबंधन करें</string>
     <string name="home_card_tb_subtitle">टीबी स्क्रीनिंग और सहायता को ट्रैक करें</string>
     <string name="home_card_ncd_subtitle">एनसीडी कार्यप्रवाह प्रबंधित करें</string>
+    <string name="home_card_non_hh_subtitle">घुमंतू, बेघर, छात्रावास में रहने वाले और संस्थागत निवासी</string>
     <string name="home_card_referral_subtitle">रेफर किए गए मामलों पर फॉलो-अप करें</string>
     <string name="home_card_rch_subtitle">RCH ID से जुड़े लाभार्थी</string>
     <string name="home_card_ncd_eligible_subtitle">पात्र लाभार्थियों की स्क्रीनिंग और प्रबंधन करें</string>
@@ -702,7 +706,7 @@
     <string name="random_blood_sugar">रैंडम ब्लड शुगर</string>
     <string name="vital_referral_reason">वाइटल स्क्रीनिंग रेफरल</string>
     <string name="clinical_examination">क्लिनिकल परीक्षण (वैकल्पिक)</string>
-    <string name="pallor">पीलापन</string>
+    <string name="pallor">फीकापन</string>
     <string name="icterus">पीलिया</string>
     <string name="cyanosis">सायनोसिस</string>
     <string name="clubbing">क्लबिंग</string>
@@ -854,6 +858,10 @@
     <string name="examine_btn_fill">भरें</string>
     <string name="examine_btn_view">देखें</string>
     <string name="diagnosis_locked_msg">कृपया पहले टीबी स्क्रीनिंग फॉर्म भरें</string>
+    <string name="tb_screening_locked_msg">कृपया पहले टीबी स्क्रीनिंग फॉर्म भरें</string>
+    <string name="examine_form_view_only_msg">आपके पास इस फॉर्म को केवल देखने की अनुमति है</string>
+    <string name="contact_tracing_load_error">यह फॉर्म लोड नहीं हो सका।</string>
+    <string name="examine_btn_history">पिछला रिकॉर्ड</string>
     <string name="tb_screening_legend_xray_sputum">* डिजिटल छाती एक्स-रे या थूक संग्रह के लिए रेफर करें</string>
     <string name="tb_screening_legend_family_members">** सभी परिवार के सदस्यों की जांच की सलाह दें</string>
 
@@ -948,6 +956,15 @@
     <string name="loc_status_permission_denied">अक्षांश और देशांतर प्राप्त करने के लिए कृपया स्थान की अनुमति दें।</string>
     <string name="loc_status_gps_unavailable">GPS उपलब्ध नहीं</string>
     <string name="loc_status_gps_disabled">इस डिवाइस पर GPS अक्षम है</string>
+    <string name="loc_status_no_gps_provider">इस डिवाइस पर GPS बंद है</string>
+    <string name="loc_status_timeout">GPS खोज का समय समाप्त हो गया</string>
+    <string name="loc_detail_no_gps_hardware">इस डिवाइस पर कोई GPS हार्डवेयर नहीं मिला।</string>
+    <string name="loc_detail_gps_provider_off">डिवाइस का लोकेशन मोड केवल नेटवर्क पर सेट है। बिना इंटरनेट के GPS काम करे, इसके लिए लोकेशन सेटिंग में \"केवल डिवाइस\" या \"उच्च सटीकता\" चुनें।</string>
+    <string name="loc_detail_precise_permission_required">केवल अनुमानित स्थान की अनुमति दी गई है। बिना इंटरनेट के सटीक GPS स्थान प्राप्त करने के लिए सेटिंग में \"सटीक\" (Precise) स्थान अनुमति दें।</string>
+    <string name="loc_msg_enable_location_settings">इस डिवाइस पर लोकेशन बंद है। कृपया लोकेशन सेटिंग में इसे चालू करें, फिर वापस आकर रिफ्रेश दबाएं।</string>
+    <string name="loc_detail_no_fix_no_cache">GPS स्थान प्राप्त नहीं हुआ और इस डिवाइस पर कोई पिछला स्थान सहेजा हुआ नहीं है।</string>
+    <string name="loc_detail_timeout">60 सेकंड में कोई सिग्नल नहीं मिला। बिना इंटरनेट के GPS को स्थान प्राप्त करने में अधिक समय लग सकता है। खुले आसमान के नीचे जाकर पुनः प्रयास करें।</string>
+    <string name="loc_detail_watchdog_timeout">75 सेकंड में GPS ने प्रतिक्रिया नहीं दी। यदि स्क्रीन पर कोई लोकेशन डायलॉग अटका हुआ दिखे, तो बैक दबाएं और फिर रिफ्रेश पर टैप करें — या आगे बढ़ने के लिए GPS अनुपलब्ध चिह्नित करें।</string>
     <string name="loc_label_latitude">अक्षांश</string>
     <string name="loc_label_longitude">देशांतर</string>
     <string name="loc_label_digipin">DIGIPIN</string>
@@ -974,9 +991,15 @@
     <string name="dialog_cancel_message">क्या आप इस पंजीकरण को छोड़कर वापस जाना चाहते हैं?</string>
     <string name="dialog_yes">हाँ</string>
     <string name="dialog_no">नहीं</string>
+    <string name="registration_successful">पंजीकरण सफलतापूर्वक हुआ</string>
     <string name="patient_registered_successfully">रोगी का पंजीकरण सफलतापूर्वक हुआ।</string>
     <string name="proceed_to_register_hof">क्या आप परिवार के मुखिया के पंजीकरण के साथ आगे बढ़ना चाहते हैं?</string>
     <string name="form_submitted_successfully">फॉर्म सफलतापूर्वक सबमिट किया गया</string>
+
+    <!-- Role bottom navigation (multi-role tab switcher) -->
+    <string name="role_tab_registrar">पंजीकरण</string>
+    <string name="role_tab_nurse">उपचार</string>
+    <string name="role_tab_counseling">परामर्श</string>
 </resources>
 
 

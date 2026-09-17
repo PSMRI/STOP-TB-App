@@ -22,6 +22,11 @@ import org.piramalswasthya.stoptb.ui.home_activity.home.SchedulerViewModel.State
 import org.piramalswasthya.stoptb.ui.home_activity.home.SchedulerViewModel.State.LOADING
 import javax.inject.Inject
 
+// NOTE: SchedulerFragment/HomeActivity is confirmed dead code — HomeActivity is never
+// launched from anywhere reachable in the app (the only reference is a commented-out line
+// in FBMessaging.kt). Left on the ORIGINAL legacy RoleUtils-based role check rather than
+// migrated to RoleManager: modeling behavior for an unreachable screen in the new
+// role/privilege system would only add confusion with no observable benefit.
 @AndroidEntryPoint
 class SchedulerFragment : Fragment() {
 
