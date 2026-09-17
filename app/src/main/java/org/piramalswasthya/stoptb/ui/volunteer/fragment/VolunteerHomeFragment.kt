@@ -281,6 +281,7 @@ class VolunteerHomeFragment : Fragment() {
     }
 
     private fun setUpViewPager() {
+        binding.vp2Home.offscreenPageLimit = 1
         binding.vp2Home.adapter = VolunteerPagerAdapter(this)
         TabLayoutMediator(binding.tlHomeViewpager, binding.vp2Home) { tab, position ->
             tab.text = when (position) {
