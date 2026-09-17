@@ -26,10 +26,55 @@ from cryptography.hazmat.primitives import hashes
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 LOB_TYPE = "microsoft.graph.androidLobApp"
 CHUNK_SIZE = 1024 * 1024
+INTUNE_APP_ROLES = (
+    "DeviceManagementApps.ReadWrite.All",
+    "DeviceManagementApps.Read.All",
+)
+INTUNE_PERMISSION_HELP = """
+Intune returned Forbidden. The Entra app can sign in to Graph, but it is not
+allowed to manage Intune LOB apps.
+
+In Entra ID -> App registrations -> this app -> API permissions:
+1. Add Microsoft Graph *Application* permission DeviceManagementApps.ReadWrite.All
+   (not Delegated / not a group Object ID).
+2. Click Grant admin consent for the tenant.
+3. Wait a minute, then re-run the workflow.
+
+Optionally assign the Enterprise application the Intune "Application Manager"
+or "Intune Administrator" role if admin consent alone is not enough.
+""".strip()
 
 
 def log(message: str) -> None:
     print(message, flush=True)
+
+
+def graph_token_claims(token: str) -> dict[str, Any]:
+    try:
+        payload = token.split(".")[1]
+        payload += "=" * (-len(payload) % 4)
+        return json.loads(base64.urlsafe_b64decode(payload))
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def log_graph_token_grants(token: str) -> None:
+    claims = graph_token_claims(token)
+    roles = claims.get("roles") or []
+    scopes = claims.get("scp") or ""
+    app_id = claims.get("appid") or claims.get("azp") or "unknown"
+    audience = claims.get("aud") or "unknown"
+    log(
+        "Graph token: "
+        f"aud={audience} appid={app_id} roles={roles or '[]'} scp={scopes or '(none)'}"
+    )
+    if not any(role in roles for role in INTUNE_APP_ROLES):
+        raise PermissionError(
+            "Graph token is missing application role DeviceManagementApps.ReadWrite.All. "
+            "Client-credential / OIDC tokens only include *Application* permissions "
+            "that have admin consent.\n"
+            f"{INTUNE_PERMISSION_HELP}"
+        )
 
 
 def graph_request(
@@ -55,7 +100,10 @@ def graph_request(
             return json.loads(payload.decode("utf-8"))
     except urllib.error.HTTPError as exc:
         details = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"Graph {method} {url} failed ({exc.code}): {details}") from exc
+        message = f"Graph {method} {url} failed ({exc.code}): {details}"
+        if exc.code in {401, 403} or "Forbidden" in details:
+            raise PermissionError(f"{message}\n{INTUNE_PERMISSION_HELP}") from exc
+        raise RuntimeError(message) from exc
 
 
 def get_token_from_client_secret(tenant_id: str, client_id: str, client_secret: str) -> str:
@@ -222,9 +270,13 @@ def list_android_lob_apps(token: str) -> list[dict[str, Any]]:
             apps = [app for app in _list_mobile_apps(token, start_url, headers) if _is_android_lob_app(app)]
             log(f"Listed {len(apps)} Intune Android LOB app(s)")
             return apps
+        except PermissionError:
+            raise
         except Exception as exc:  # noqa: BLE001
             last_error = exc
             log(f"Retrying Intune app lookup after: {exc}")
+    if isinstance(last_error, PermissionError):
+        raise last_error
     raise RuntimeError(f"Unable to list Intune Android LOB apps: {last_error}")
 
 
@@ -316,18 +368,31 @@ def ensure_group_assignment(token: str, app_id: str, group_id: str) -> None:
     log(f"Assigned Intune app as required to group {group_id}")
 
 
-def upload_apk(args: argparse.Namespace) -> None:
+def acquire_graph_token() -> str:
     token = os.environ.get("GRAPH_TOKEN", "").strip()
-    if not token:
-        tenant_id = os.environ.get("AZURE_TENANT_ID", "").strip()
-        client_id = os.environ.get("AZURE_CLIENT_ID", "").strip()
-        client_secret = os.environ.get("AZURE_CLIENT_SECRET", "").strip()
-        if not (tenant_id and client_id and client_secret):
-            raise RuntimeError(
-                "Provide GRAPH_TOKEN from Azure OIDC login, or AZURE_CLIENT_ID, "
-                "AZURE_TENANT_ID, and AZURE_CLIENT_SECRET."
-            )
-        token = get_token_from_client_secret(tenant_id, client_id, client_secret)
+    if token:
+        return token
+    tenant_id = os.environ.get("AZURE_TENANT_ID", "").strip()
+    client_id = os.environ.get("AZURE_CLIENT_ID", "").strip()
+    client_secret = os.environ.get("AZURE_CLIENT_SECRET", "").strip()
+    if not (tenant_id and client_id and client_secret):
+        raise RuntimeError(
+            "Provide GRAPH_TOKEN from Azure OIDC login, or AZURE_CLIENT_ID, "
+            "AZURE_TENANT_ID, and AZURE_CLIENT_SECRET."
+        )
+    return get_token_from_client_secret(tenant_id, client_id, client_secret)
+
+
+def preflight() -> None:
+    token = acquire_graph_token()
+    log_graph_token_grants(token)
+    apps = list_android_lob_apps(token)
+    log(f"Preflight OK: Intune app list succeeded ({len(apps)} Android LOB app(s)).")
+
+
+def upload_apk(args: argparse.Namespace) -> None:
+    token = acquire_graph_token()
+    log_graph_token_grants(token)
 
     apk = Path(args.apk).resolve()
     if not apk.is_file():
@@ -426,23 +491,41 @@ def upload_apk(args: argparse.Namespace) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--apk", required=True)
-    parser.add_argument("--package-id", required=True)
-    parser.add_argument("--version-name", required=True)
-    parser.add_argument("--version-code", required=True)
-    parser.add_argument("--group-id", required=True)
+    parser.add_argument(
+        "--preflight",
+        action="store_true",
+        help="Test Graph/Intune authentication and app listing only; do not upload an APK.",
+    )
+    parser.add_argument("--apk")
+    parser.add_argument("--package-id")
+    parser.add_argument("--version-name")
+    parser.add_argument("--version-code")
+    parser.add_argument("--group-id")
     parser.add_argument("--display-name", default="StopTB UAT")
     parser.add_argument("--publisher", default="Piramal Swasthya")
     parser.add_argument("--description", default="StopTB UAT signed build")
     parser.add_argument("--app-id", default="")
     args = parser.parse_args()
     args.app_id = args.app_id.strip() or None
+    if args.preflight:
+        return args
+    missing = [
+        name
+        for name in ("apk", "package_id", "version_name", "version_code", "group_id")
+        if not getattr(args, name)
+    ]
+    if missing:
+        parser.error("the following arguments are required unless --preflight: " + ", ".join(f"--{name.replace('_', '-')}" for name in missing))
     return args
 
 
 if __name__ == "__main__":
     try:
-        upload_apk(parse_args())
+        args = parse_args()
+        if args.preflight:
+            preflight()
+        else:
+            upload_apk(args)
     except Exception as exc:  # noqa: BLE001 - surface a short CI error
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)
