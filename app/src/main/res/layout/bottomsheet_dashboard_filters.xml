@@ -53,8 +53,7 @@
             android:background="@drawable/bg_dashboard_sheet_close"
             android:contentDescription="@string/dashboard_filters"
             android:padding="6dp"
-            android:src="@drawable/ic_close"
-            app:tint="@color/dashboard_ink" />
+            android:src="@drawable/ic_close_btn" />
     </FrameLayout>
 
     <TextView
