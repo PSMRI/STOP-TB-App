@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:minHeight="30dp"
+    android:orientation="horizontal"
+    android:paddingTop="2dp"
+    android:paddingBottom="2dp">
+
+    <View
+        android:id="@+id/classDot"
+        android:layout_width="7dp"
+        android:layout_height="7dp"
+        android:background="@drawable/bg_dashboard_demo_dot" />
+
+    <TextView
+        android:id="@+id/tvClassLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="7dp"
+        android:layout_weight="1"
+        android:textColor="@color/dashboard_ink"
+        android:textSize="11sp"
+        tools:text="Normal" />
+
+    <TextView
+        android:id="@+id/tvClassValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/dashboard_ink"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        tools:text="0" />
+</LinearLayout>
