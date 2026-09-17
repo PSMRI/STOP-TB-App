@@ -410,7 +410,7 @@
     <string name="dashboard_demo_children">Children (&lt;15y)</string>
     <string name="dashboard_demo_others">Others</string>
     <string name="dashboard_demo_senior">Senior Citizens (≥60y)</string>
-    <string name="dashboard_demo_transgender">Transgender</string>
+    <string name="dashboard_demo_transgender">Other</string>
     <string name="dashboard_demo_total">Total</string>
     <string name="dashboard_class_xray_normal">Normal</string>
     <string name="dashboard_class_xray_abnormal">Abnormal (Non-TB Presumptive)</string>
