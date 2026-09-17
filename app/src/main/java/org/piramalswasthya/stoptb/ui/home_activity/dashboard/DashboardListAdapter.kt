@@ -319,8 +319,22 @@ internal class DashboardListAdapter(
                 val pos = bindingAdapterPosition
                 if (pos == RecyclerView.NO_POSITION) return@setOnClickListener
                 val index = pos - 1
-                items[index] = items[index].copy(expanded = !items[index].expanded)
-                notifyItemChanged(pos)
+                val expanded = !items[index].expanded
+                items[index] = items[index].copy(expanded = expanded)
+                val item = items[index]
+                card.ivDemographicChevron.rotation = if (expanded) 180f else 0f
+                if (expanded) {
+                    val details = ensureAccordion()
+                    details.root.visibility = View.VISIBLE
+                    details.pregnantSection.visibility =
+                        if (item.showPregnant) View.VISIBLE else View.GONE
+                    details.seniorSection.visibility =
+                        if (item.showSenior) View.VISIBLE else View.GONE
+                    bindAccordion(details, item)
+                } else {
+                    accordion?.root?.visibility = View.GONE
+                }
+                relayoutItem(itemView)
             }
             if (item.expanded) {
                 val details = ensureAccordion()
@@ -378,6 +392,7 @@ internal class DashboardListAdapter(
                 if (nowOpen) fillDemoDetail(row, count, classifications)
                 row.layoutDemoDetail.visibility = if (nowOpen) View.VISIBLE else View.GONE
                 row.ivDemoChevron.rotation = if (nowOpen) 180f else 0f
+                relayoutItem(itemView)
             }
         }
     }
@@ -404,6 +419,7 @@ internal class DashboardListAdapter(
             if (expand) fillDemoDetail(row, count, classifications)
             row.layoutDemoDetail.visibility = if (expand) View.VISIBLE else View.GONE
             row.ivDemoChevron.rotation = if (expand) 180f else 0f
+            relayoutItem(row.root)
         }
         if (row.layoutDemoDetail.visibility == View.VISIBLE) {
             fillDemoDetail(row, count, classifications)
@@ -445,6 +461,17 @@ internal class DashboardListAdapter(
         row.findViewById<TextView>(R.id.tvClassLabel).text = label
         row.findViewById<TextView>(R.id.tvClassValue).text = value.toString()
         parent.addView(row)
+    }
+
+    private fun relayoutItem(itemView: View) {
+        val card = generateSequence(itemView) { it.parent as? View }
+            .firstOrNull { it.parent is RecyclerView } ?: itemView
+        card.layoutParams?.height = ViewGroup.LayoutParams.WRAP_CONTENT
+        card.forceLayout()
+        card.requestLayout()
+        val recyclerView = card.parent as? RecyclerView ?: return
+        recyclerView.invalidateItemDecorations()
+        recyclerView.requestLayout()
     }
 
     private fun color(view: View, @ColorRes colorRes: Int): Int =
