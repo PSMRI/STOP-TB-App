@@ -57,6 +57,7 @@ class DashboardFragment : Fragment() {
             override fun getSpanSize(position: Int): Int =
                 if (position == 0) spanCount else 1
         }
+        layoutManager.isMeasurementCacheEnabled = false
         binding.dashboardList.layoutManager = layoutManager
         binding.dashboardList.adapter = adapter
         binding.dashboardList.setHasFixedSize(false)
