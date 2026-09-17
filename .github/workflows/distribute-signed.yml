@@ -1,4 +1,4 @@
-name: StopTB Signed Build (UAT or PROD)
+name: StopTB MDM Signed Build (UAT or PROD)
 run-name: STOP TB ${{ inputs.environment }} signed - ${{ inputs.versionName }} (${{ inputs.versionCode }}) [${{ inputs.branch }}]
 
 on:

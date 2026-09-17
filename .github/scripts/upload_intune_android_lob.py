@@ -38,12 +38,15 @@ def graph_request(
     path: str,
     body: dict[str, Any] | None = None,
     raw_url: bool = False,
+    extra_headers: dict[str, str] | None = None,
 ) -> Any:
     url = path if raw_url else f"{GRAPH_BASE}/{path.lstrip('/')}"
     data = None if body is None else json.dumps(body).encode("utf-8")
     request = urllib.request.Request(url, data=data, method=method)
     request.add_header("Authorization", f"Bearer {token}")
     request.add_header("Content-Type", "application/json")
+    for key, value in (extra_headers or {}).items():
+        request.add_header(key, value)
     try:
         with urllib.request.urlopen(request) as response:
             payload = response.read()
@@ -174,47 +177,74 @@ def wait_until_published(token: str, app_id: str) -> None:
     raise RuntimeError("Timed out waiting for Intune app to publish")
 
 
-def list_android_lob_apps(token: str) -> list[dict[str, Any]]:
+def _is_android_lob_app(app: dict[str, Any]) -> bool:
+    odata_type = str(app.get("@odata.type", "")).lower()
+    return odata_type.endswith("androidlobapp") or bool(app.get("packageId") or app.get("identityName"))
+
+
+def _list_mobile_apps(
+    token: str,
+    start_url: str,
+    extra_headers: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
     apps: list[dict[str, Any]] = []
-    urls = [
+    url = start_url
+    while url:
+        payload = graph_request(token, "GET", url, raw_url=True, extra_headers=extra_headers)
+        apps.extend(payload.get("value") or [])
+        url = payload.get("@odata.nextLink")
+    return apps
+
+
+def list_android_lob_apps(token: str) -> list[dict[str, Any]]:
+    # packageId/identityName live on androidLobApp, not the mobileApp base type, so
+    # $select=packageId on /mobileApps returns 400. Query the derived type or omit $select.
+    attempts: list[tuple[str, dict[str, str] | None]] = [
+        (f"{GRAPH_BASE}/deviceAppManagement/mobileApps/{LOB_TYPE}", None),
         (
             f"{GRAPH_BASE}/deviceAppManagement/mobileApps"
-            "?$filter=isof('microsoft.graph.androidLobApp')"
-            "&$select=id,displayName,packageId,identityName,versionName,versionCode,publishingState"
+            f"?$filter=isof('{LOB_TYPE}')",
+            None,
         ),
         (
             f"{GRAPH_BASE}/deviceAppManagement/mobileApps"
-            "?$select=id,displayName,packageId,identityName,versionName,versionCode,publishingState,@odata.type"
+            f"?$count=true&$filter=isof('{LOB_TYPE}')",
+            {"ConsistencyLevel": "eventual"},
+        ),
+        (
+            f"{GRAPH_BASE}/deviceAppManagement/mobileApps",
+            None,
         ),
     ]
     last_error: Exception | None = None
-    for start_url in urls:
+    for start_url, headers in attempts:
         try:
-            url = start_url
-            while url:
-                payload = graph_request(token, "GET", url, raw_url=True)
-                apps.extend(payload.get("value") or [])
-                url = payload.get("@odata.nextLink")
-            return [
-                app
-                for app in apps
-                if str(app.get("@odata.type", "")).lower().endswith("androidlobapp")
-                or app.get("packageId")
-                or app.get("identityName")
-            ]
+            apps = [app for app in _list_mobile_apps(token, start_url, headers) if _is_android_lob_app(app)]
+            log(f"Listed {len(apps)} Intune Android LOB app(s)")
+            return apps
         except Exception as exc:  # noqa: BLE001
             last_error = exc
-            apps = []
             log(f"Retrying Intune app lookup after: {exc}")
     raise RuntimeError(f"Unable to list Intune Android LOB apps: {last_error}")
+
+
+def _app_package_ids(app: dict[str, Any]) -> set[str]:
+    return {
+        value
+        for value in (app.get("packageId"), app.get("identityName"))
+        if isinstance(value, str) and value
+    }
 
 
 def find_existing_app(token: str, package_id: str, app_id: str | None) -> dict[str, Any] | None:
     if app_id:
         return graph_request(token, "GET", f"deviceAppManagement/mobileApps/{app_id}")
     for app in list_android_lob_apps(token):
-        if app.get("packageId") == package_id or app.get("identityName") == package_id:
-            return app
+        detail = app
+        if package_id not in _app_package_ids(detail) and detail.get("id"):
+            detail = graph_request(token, "GET", f"deviceAppManagement/mobileApps/{detail['id']}")
+        if package_id in _app_package_ids(detail):
+            return detail
     return None
 
 
