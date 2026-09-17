@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="11dp"
+    android:layout_marginBottom="0dp"
     app:cardBackgroundColor="@color/dashboard_card_orange"
     app:cardCornerRadius="14dp"
     app:cardElevation="0dp"
@@ -14,10 +14,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingStart="18dp"
-        android:paddingTop="16dp"
-        android:paddingEnd="18dp"
-        android:paddingBottom="8dp">
+        android:paddingStart="12dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="6dp">
 
         <RelativeLayout
             android:layout_width="match_parent"
@@ -47,7 +47,7 @@
                 android:layout_alignParentEnd="true"
                 android:layout_centerVertical="true"
                 android:textColor="@color/dashboard_icon_orange"
-                android:textSize="26sp"
+                android:textSize="22sp"
                 android:textStyle="bold"
                 tools:text="9" />
         </RelativeLayout>
@@ -57,7 +57,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textColor="@color/dashboard_ink"
-            android:textSize="14sp"
+            android:textSize="13sp"
             android:textStyle="bold"
             tools:text="Total Presumptive Cases Summary" />
 
@@ -119,6 +119,22 @@
                 android:id="@+id/rowFemale"
                 layout="@layout/item_dashboard_demo_row" />
 
+            <LinearLayout
+                android:id="@+id/pregnantSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/dashboard_row_divider" />
+
+                <include
+                    android:id="@+id/rowPregnant"
+                    layout="@layout/item_dashboard_demo_row" />
+            </LinearLayout>
+
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
@@ -126,15 +142,6 @@
 
             <include
                 android:id="@+id/rowChildren"
-                layout="@layout/item_dashboard_demo_row" />
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="@color/dashboard_row_divider" />
-
-            <include
-                android:id="@+id/rowOthers"
                 layout="@layout/item_dashboard_demo_row" />
 
             <LinearLayout
@@ -152,6 +159,15 @@
                     android:id="@+id/rowSenior"
                     layout="@layout/item_dashboard_demo_row" />
             </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/dashboard_row_divider" />
+
+            <include
+                android:id="@+id/rowTransgender"
+                layout="@layout/item_dashboard_demo_row" />
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

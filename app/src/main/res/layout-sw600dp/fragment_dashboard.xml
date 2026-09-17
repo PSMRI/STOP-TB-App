@@ -12,10 +12,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingStart="14dp"
-        android:paddingTop="14dp"
-        android:paddingEnd="14dp"
-        android:paddingBottom="24dp">
+        android:paddingStart="20dp"
+        android:paddingTop="18dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="28dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -439,102 +439,172 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <include
-                android:id="@+id/cardPresumptive"
-                layout="@layout/item_dashboard_indicator"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="11dp" />
+                android:layout_marginBottom="12dp"
+                android:gravity="top"
+                android:orientation="horizontal">
 
-            <include
-                android:id="@+id/cardPastHistory"
-                layout="@layout/item_dashboard_indicator"
+                <include
+                    android:id="@+id/cardPresumptive"
+                    layout="@layout/item_dashboard_indicator"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1" />
+
+                <include
+                    android:id="@+id/cardPastHistory"
+                    layout="@layout/item_dashboard_indicator"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1" />
+            </LinearLayout>
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="11dp" />
+                android:layout_marginBottom="12dp"
+                android:gravity="top"
+                android:orientation="horizontal">
 
-            <include
-                android:id="@+id/cardAntiTb"
-                layout="@layout/item_dashboard_indicator"
+                <include
+                    android:id="@+id/cardAntiTb"
+                    layout="@layout/item_dashboard_indicator"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1" />
+
+                <include
+                    android:id="@+id/cardXray"
+                    layout="@layout/item_dashboard_indicator"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1" />
+            </LinearLayout>
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="11dp" />
+                android:layout_marginBottom="12dp"
+                android:gravity="top"
+                android:orientation="horizontal">
 
-            <include
-                android:id="@+id/cardXray"
-                layout="@layout/item_dashboard_indicator"
+                <include
+                    android:id="@+id/cardSputum"
+                    layout="@layout/item_dashboard_indicator"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1" />
+
+                <include
+                    android:id="@+id/cardTrueNat"
+                    layout="@layout/item_dashboard_indicator"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1" />
+            </LinearLayout>
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="11dp" />
+                android:layout_marginBottom="12dp"
+                android:gravity="top"
+                android:orientation="horizontal">
 
-            <include
-                android:id="@+id/cardSputum"
-                layout="@layout/item_dashboard_indicator"
+                <include
+                    android:id="@+id/cardRif"
+                    layout="@layout/item_dashboard_indicator"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1" />
+
+                <include
+                    android:id="@+id/cardLiquidCulture"
+                    layout="@layout/item_dashboard_indicator"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1" />
+            </LinearLayout>
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="11dp" />
+                android:layout_marginBottom="12dp"
+                android:gravity="top"
+                android:orientation="horizontal">
 
-            <include
-                android:id="@+id/cardTrueNat"
-                layout="@layout/item_dashboard_indicator"
+                <include
+                    android:id="@+id/cardHwc"
+                    layout="@layout/item_dashboard_indicator"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1" />
+
+                <include
+                    android:id="@+id/cardClinical"
+                    layout="@layout/item_dashboard_indicator"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1" />
+            </LinearLayout>
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="11dp" />
+                android:layout_marginBottom="12dp"
+                android:gravity="top"
+                android:orientation="horizontal">
 
-            <include
-                android:id="@+id/cardRif"
-                layout="@layout/item_dashboard_indicator"
+                <include
+                    android:id="@+id/cardConfirmed"
+                    layout="@layout/item_dashboard_indicator"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1" />
+
+                <include
+                    android:id="@+id/cardTpt"
+                    layout="@layout/item_dashboard_indicator"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1" />
+            </LinearLayout>
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="11dp" />
+                android:gravity="top"
+                android:orientation="horizontal">
 
-            <include
-                android:id="@+id/cardLiquidCulture"
-                layout="@layout/item_dashboard_indicator"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="11dp" />
+                <include
+                    android:id="@+id/cardNikshay"
+                    layout="@layout/item_dashboard_indicator"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1" />
 
-            <include
-                android:id="@+id/cardHwc"
-                layout="@layout/item_dashboard_indicator"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="11dp" />
-
-            <include
-                android:id="@+id/cardClinical"
-                layout="@layout/item_dashboard_indicator"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="11dp" />
-
-            <include
-                android:id="@+id/cardConfirmed"
-                layout="@layout/item_dashboard_indicator"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="11dp" />
-
-            <include
-                android:id="@+id/cardTpt"
-                layout="@layout/item_dashboard_indicator"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="11dp" />
-
-            <include
-                android:id="@+id/cardNikshay"
-                layout="@layout/item_dashboard_indicator"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="11dp" />
-
-            <include
-                android:id="@+id/cardAbha"
-                layout="@layout/item_dashboard_indicator"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
+                <include
+                    android:id="@+id/cardAbha"
+                    layout="@layout/item_dashboard_indicator"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

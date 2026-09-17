@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
 import androidx.annotation.ColorRes
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
@@ -64,11 +65,12 @@ class DashboardFragment : Fragment() {
     }
 
     private fun setupStaticContent() {
-        bindDemoRow(binding.rowScreenedMale, R.string.dashboard_demo_male, R.color.dashboard_demo_male)
-        bindDemoRow(binding.rowScreenedFemale, R.string.dashboard_demo_female, R.color.dashboard_demo_female)
-        bindDemoRow(binding.rowScreenedChildren, R.string.dashboard_demo_children, R.color.dashboard_demo_children)
-        bindDemoRow(binding.rowScreenedOthers, R.string.dashboard_demo_others, R.color.dashboard_demo_others)
-        bindDemoRow(binding.rowScreenedSenior, R.string.dashboard_demo_senior, R.color.dashboard_demo_senior)
+        setupDemoRow(binding.rowScreenedMale, R.string.dashboard_demo_male, R.color.dashboard_demo_male)
+        setupDemoRow(binding.rowScreenedFemale, R.string.dashboard_demo_female, R.color.dashboard_demo_female)
+        setupDemoRow(binding.rowScreenedPregnant, R.string.dashboard_demo_pregnant, R.color.dashboard_demo_pregnant)
+        setupDemoRow(binding.rowScreenedChildren, R.string.dashboard_demo_children, R.color.dashboard_demo_children)
+        setupDemoRow(binding.rowScreenedSenior, R.string.dashboard_demo_senior, R.color.dashboard_demo_senior)
+        setupDemoRow(binding.rowScreenedTransgender, R.string.dashboard_demo_transgender, R.color.dashboard_demo_transgender)
 
         styleIndicator(
             card = binding.cardPresumptive,
@@ -77,7 +79,8 @@ class DashboardFragment : Fragment() {
             accentColor = R.color.dashboard_icon_orange,
             icon = R.drawable.ic_health_symptom,
             title = R.string.dashboard_presumptive_summary,
-            showSenior = false
+            showSenior = true,
+            showPregnant = true
         )
         styleIndicator(
             card = binding.cardPastHistory,
@@ -101,7 +104,9 @@ class DashboardFragment : Fragment() {
             iconBackground = R.drawable.bg_dashboard_icon_orange,
             accentColor = R.color.dashboard_icon_orange,
             icon = R.drawable.ic_health_xray,
-            title = R.string.dashboard_xray_summary
+            title = R.string.dashboard_xray_summary,
+            showPregnant = false,
+            classifications = DashboardClassifications.chestXray
         )
         styleIndicator(
             card = binding.cardSputum,
@@ -109,7 +114,8 @@ class DashboardFragment : Fragment() {
             iconBackground = R.drawable.bg_dashboard_icon_teal,
             accentColor = R.color.dashboard_icon_teal,
             icon = R.drawable.ic_health_medical_sample,
-            title = R.string.dashboard_sputum_summary
+            title = R.string.dashboard_sputum_summary,
+            classifications = DashboardClassifications.sputum
         )
         styleIndicator(
             card = binding.cardTrueNat,
@@ -117,7 +123,17 @@ class DashboardFragment : Fragment() {
             iconBackground = R.drawable.bg_dashboard_icon_orange,
             accentColor = R.color.dashboard_icon_orange,
             icon = R.drawable.ic_health_test_tubes,
-            title = R.string.dashboard_mtb_summary
+            title = R.string.dashboard_mtb_summary,
+            classifications = DashboardClassifications.mtb
+        )
+        styleIndicator(
+            card = binding.cardRif,
+            backgroundColor = R.color.dashboard_card_teal,
+            iconBackground = R.drawable.bg_dashboard_icon_teal,
+            accentColor = R.color.dashboard_icon_teal,
+            icon = R.drawable.ic_health_test_tubes,
+            title = R.string.dashboard_rif_summary,
+            classifications = DashboardClassifications.rif
         )
         styleIndicator(
             card = binding.cardLiquidCulture,
@@ -125,7 +141,8 @@ class DashboardFragment : Fragment() {
             iconBackground = R.drawable.bg_dashboard_icon_orange,
             accentColor = R.color.dashboard_icon_orange,
             icon = R.drawable.ic_health_test_tubes,
-            title = R.string.dashboard_liquid_culture_summary
+            title = R.string.dashboard_liquid_culture_summary,
+            classifications = DashboardClassifications.liquidCulture
         )
         styleIndicator(
             card = binding.cardHwc,
@@ -136,12 +153,32 @@ class DashboardFragment : Fragment() {
             title = R.string.dashboard_hwc_summary
         )
         styleIndicator(
+            card = binding.cardClinical,
+            backgroundColor = R.color.dashboard_card_orange,
+            iconBackground = R.drawable.bg_dashboard_icon_orange,
+            accentColor = R.color.dashboard_icon_orange,
+            icon = R.drawable.ic_health_medicines,
+            title = R.string.dashboard_clinical_summary,
+            classifications = DashboardClassifications.clinical
+        )
+        styleIndicator(
             card = binding.cardConfirmed,
             backgroundColor = R.color.dashboard_card_teal,
             iconBackground = R.drawable.bg_dashboard_icon_teal,
             accentColor = R.color.dashboard_icon_teal,
             icon = R.drawable.ic_health_tuberculosis,
-            title = R.string.dashboard_confirmed_summary
+            title = R.string.dashboard_confirmed_summary,
+            classifications = DashboardClassifications.confirmed
+        )
+        styleIndicator(
+            card = binding.cardTpt,
+            backgroundColor = R.color.dashboard_card_orange,
+            iconBackground = R.drawable.bg_dashboard_icon_orange,
+            accentColor = R.color.dashboard_icon_orange,
+            icon = R.drawable.ic_tpt_module,
+            title = R.string.dashboard_tpt_summary,
+            showPregnant = false,
+            classifications = DashboardClassifications.tpt
         )
         styleIndicator(
             card = binding.cardNikshay,
@@ -149,8 +186,7 @@ class DashboardFragment : Fragment() {
             iconBackground = R.drawable.bg_dashboard_icon_green,
             accentColor = R.color.dashboard_icon_teal,
             icon = R.drawable.ic_health_register_book,
-            title = R.string.dashboard_nikshay_summary,
-            expandable = false
+            title = R.string.dashboard_nikshay_summary
         )
         styleIndicator(
             card = binding.cardAbha,
@@ -158,8 +194,7 @@ class DashboardFragment : Fragment() {
             iconBackground = R.drawable.bg_dashboard_icon_blue,
             accentColor = R.color.dashboard_icon_blue,
             icon = R.drawable.ic_health_data_security,
-            title = R.string.dashboard_abha_summary,
-            expandable = false
+            title = R.string.dashboard_abha_summary
         )
     }
 
@@ -189,6 +224,7 @@ class DashboardFragment : Fragment() {
         }
         viewModel.trueNat.observe(viewLifecycleOwner) {
             bindBreakdown(binding.cardTrueNat, it)
+            bindBreakdown(binding.cardRif, it)
         }
         viewModel.liquidCulture.observe(viewLifecycleOwner) {
             bindBreakdown(binding.cardLiquidCulture, it)
@@ -199,11 +235,15 @@ class DashboardFragment : Fragment() {
         viewModel.tbConfirmed.observe(viewLifecycleOwner) {
             bindBreakdown(binding.cardConfirmed, it)
         }
+        bindBreakdown(binding.cardClinical, TbGenderBreakdown())
+        bindBreakdown(binding.cardTpt, TbGenderBreakdown())
         viewModel.nikshayCount.observe(viewLifecycleOwner) {
             binding.cardNikshay.tvIndicatorCount.text = it.toString()
+            bindBreakdown(binding.cardNikshay, TbGenderBreakdown(total = it))
         }
         viewModel.abhaCount.observe(viewLifecycleOwner) {
             binding.cardAbha.tvIndicatorCount.text = it.toString()
+            bindBreakdown(binding.cardAbha, TbGenderBreakdown(total = it))
         }
     }
 
@@ -252,14 +292,18 @@ class DashboardFragment : Fragment() {
             segments = listOf(
                 DonutChartView.Segment(data.male.toFloat(), color(R.color.dashboard_demo_male)),
                 DonutChartView.Segment(data.female.toFloat(), color(R.color.dashboard_demo_female)),
-                DonutChartView.Segment(data.others.toFloat(), color(R.color.dashboard_demo_others)),
+                DonutChartView.Segment(0f, color(R.color.dashboard_demo_pregnant)),
+                DonutChartView.Segment(data.children.toFloat(), color(R.color.dashboard_demo_children)),
+                DonutChartView.Segment(data.seniorCitizen.toFloat(), color(R.color.dashboard_demo_senior)),
+                DonutChartView.Segment(data.others.toFloat(), color(R.color.dashboard_demo_transgender)),
             )
         )
-        binding.rowScreenedMale.tvDemoValue.text = data.male.toString()
-        binding.rowScreenedFemale.tvDemoValue.text = data.female.toString()
-        binding.rowScreenedChildren.tvDemoValue.text = data.children.toString()
-        binding.rowScreenedOthers.tvDemoValue.text = data.others.toString()
-        binding.rowScreenedSenior.tvDemoValue.text = data.seniorCitizen.toString()
+        bindDemoCount(binding.rowScreenedMale, data.male, null)
+        bindDemoCount(binding.rowScreenedFemale, data.female, null)
+        bindDemoCount(binding.rowScreenedPregnant, 0, null)
+        bindDemoCount(binding.rowScreenedChildren, data.children, null)
+        bindDemoCount(binding.rowScreenedSenior, data.seniorCitizen, null)
+        bindDemoCount(binding.rowScreenedTransgender, data.others, null)
     }
 
     private fun styleIndicator(
@@ -270,45 +314,107 @@ class DashboardFragment : Fragment() {
         @DrawableRes icon: Int,
         @StringRes title: Int,
         showSenior: Boolean = true,
-        expandable: Boolean = true,
+        showPregnant: Boolean = true,
+        classifications: List<DashboardClassDef>? = null,
     ) {
         (card.root as MaterialCardView).setCardBackgroundColor(color(backgroundColor))
         card.flIndicatorIcon.setBackgroundResource(iconBackground)
         card.ivIndicatorIcon.setImageResource(icon)
         card.tvIndicatorCount.setTextColor(color(accentColor))
         card.tvIndicatorTitle.setText(title)
+        card.root.tag = classifications
 
-        bindDemoRow(card.rowMale, R.string.dashboard_demo_male, R.color.dashboard_demo_male)
-        bindDemoRow(card.rowFemale, R.string.dashboard_demo_female, R.color.dashboard_demo_female)
-        bindDemoRow(card.rowChildren, R.string.dashboard_demo_children, R.color.dashboard_demo_children)
-        bindDemoRow(card.rowOthers, R.string.dashboard_demo_others, R.color.dashboard_demo_others)
-        bindDemoRow(card.rowSenior, R.string.dashboard_demo_senior, R.color.dashboard_demo_senior)
+        setupDemoRow(card.rowMale, R.string.dashboard_demo_male, R.color.dashboard_demo_male, classifications)
+        setupDemoRow(card.rowFemale, R.string.dashboard_demo_female, R.color.dashboard_demo_female, classifications)
+        setupDemoRow(card.rowPregnant, R.string.dashboard_demo_pregnant, R.color.dashboard_demo_pregnant, classifications)
+        setupDemoRow(card.rowChildren, R.string.dashboard_demo_children, R.color.dashboard_demo_children, classifications)
+        setupDemoRow(card.rowSenior, R.string.dashboard_demo_senior, R.color.dashboard_demo_senior, classifications)
+        setupDemoRow(card.rowTransgender, R.string.dashboard_demo_transgender, R.color.dashboard_demo_transgender, classifications)
+
+        card.pregnantSection.visibility = if (showPregnant) View.VISIBLE else View.GONE
         card.seniorSection.visibility = if (showSenior) View.VISIBLE else View.GONE
-        card.viewDemographicDivider.visibility = if (expandable) View.VISIBLE else View.GONE
-        card.btnViewDemographic.visibility = if (expandable) View.VISIBLE else View.GONE
         card.layoutDemographicDetails.visibility = View.GONE
         card.ivDemographicChevron.rotation = 0f
-        if (expandable) {
-            card.btnViewDemographic.setOnClickListener { toggleDetails(card) }
-        }
+        card.btnViewDemographic.setOnClickListener { toggleDetails(card) }
     }
 
-    private fun bindBreakdown(card: ItemDashboardIndicatorBinding, data: TbGenderBreakdown) {
-        card.tvIndicatorCount.text = data.total.toString()
-        card.rowMale.tvDemoValue.text = data.male.toString()
-        card.rowFemale.tvDemoValue.text = data.female.toString()
-        card.rowChildren.tvDemoValue.text = data.children.toString()
-        card.rowOthers.tvDemoValue.text = data.others.toString()
-        card.rowSenior.tvDemoValue.text = data.seniorCitizen.toString()
-    }
-
-    private fun bindDemoRow(
+    private fun setupDemoRow(
         row: ItemDashboardDemoRowBinding,
         @StringRes label: Int,
         @ColorRes dotColor: Int,
+        classifications: List<DashboardClassDef>? = null,
     ) {
         row.tvDemoLabel.setText(label)
         row.demoDot.backgroundTintList = ColorStateList.valueOf(color(dotColor))
+        fillDemoDetail(row, 0, classifications)
+        row.btnDemoHeader.setOnClickListener { toggleDemoRow(row) }
+    }
+
+    private fun bindBreakdown(card: ItemDashboardIndicatorBinding, data: TbGenderBreakdown) {
+        @Suppress("UNCHECKED_CAST")
+        val classifications = card.root.tag as? List<DashboardClassDef>
+        card.tvIndicatorCount.text = data.total.toString()
+        bindDemoCount(card.rowMale, data.male, classifications)
+        bindDemoCount(card.rowFemale, data.female, classifications)
+        bindDemoCount(card.rowPregnant, 0, classifications)
+        bindDemoCount(card.rowChildren, data.children, classifications)
+        bindDemoCount(card.rowSenior, data.seniorCitizen, classifications)
+        bindDemoCount(card.rowTransgender, data.others, classifications)
+    }
+
+    private fun bindDemoCount(
+        row: ItemDashboardDemoRowBinding,
+        count: Int,
+        classifications: List<DashboardClassDef>?,
+    ) {
+        row.tvDemoValue.text = count.toString()
+        fillDemoDetail(row, count, classifications)
+    }
+
+    private fun fillDemoDetail(
+        row: ItemDashboardDemoRowBinding,
+        count: Int,
+        classifications: List<DashboardClassDef>?,
+    ) {
+        row.layoutDemoDetail.removeAllViews()
+        val inflater = layoutInflater
+        if (classifications.isNullOrEmpty()) {
+            addClassRow(inflater, row.layoutDemoDetail, getString(R.string.dashboard_demo_total), count, R.color.dashboard_ink)
+            return
+        }
+        DashboardClassifications.split(count, classifications).forEachIndexed { index, (def, value) ->
+            addClassRow(
+                inflater,
+                row.layoutDemoDetail,
+                getString(def.labelRes),
+                value,
+                DashboardClassifications.palette[index % DashboardClassifications.palette.size]
+            )
+        }
+    }
+
+    private fun addClassRow(
+        inflater: LayoutInflater,
+        parent: ViewGroup,
+        label: String,
+        value: Int,
+        @ColorRes dotColor: Int,
+    ) {
+        val row = inflater.inflate(R.layout.item_dashboard_class_row, parent, false)
+        row.findViewById<View>(R.id.classDot).backgroundTintList =
+            ColorStateList.valueOf(color(dotColor))
+        row.findViewById<TextView>(R.id.tvClassLabel).text = label
+        row.findViewById<TextView>(R.id.tvClassValue).text = value.toString()
+        parent.addView(row)
+    }
+
+    private fun toggleDemoRow(row: ItemDashboardDemoRowBinding) {
+        val expand = row.layoutDemoDetail.visibility != View.VISIBLE
+        row.layoutDemoDetail.visibility = if (expand) View.VISIBLE else View.GONE
+        row.ivDemoChevron.animate()
+            .rotation(if (expand) 180f else 0f)
+            .setDuration(180)
+            .start()
     }
 
     private fun toggleDetails(card: ItemDashboardIndicatorBinding) {
