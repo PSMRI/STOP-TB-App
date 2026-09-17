@@ -386,17 +386,22 @@ class TBScreeningDataset(
         familyHistoryTB
     ).any(::isYes)
 
-    fun getPresumptiveTbAlert(): String? =
-        when {
+    fun getPresumptiveTbAlert(): String? {
+        val referText = resources.getString(
+            if (isPregnantBen) R.string.tb_presumptive_alert_refer_pregnant
+            else R.string.tb_presumptive_alert_refer
+        )
+        return when {
             hasDoubleStarYes() ->
                 resources.getString(R.string.tb_presumptive_alert_title) +
-                    "\n" + resources.getString(R.string.tb_presumptive_alert_refer) +
+                    "\n" + referText +
                     "\n" + resources.getString(R.string.tb_presumptive_alert_family)
             hasSingleStarYes() ->
                 resources.getString(R.string.tb_presumptive_alert_title) +
-                    "\n" + resources.getString(R.string.tb_presumptive_alert_refer)
+                    "\n" + referText
             else -> null
         }
+    }
 
     fun getFamilyContactAlert(): String? =
         if (requiresFamilyContactScreening())
