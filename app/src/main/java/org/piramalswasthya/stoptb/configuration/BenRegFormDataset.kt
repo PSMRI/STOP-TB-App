@@ -528,7 +528,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         mobileNotAvailable.isEnabled = true
         contactNumber.required = hasFamilyHeadMobile
         if (!hasFamilyHeadMobile) {
-            contactNumber.value = null
+            contactNumber.value = "9999999999"
             contactNumber.isEnabled = false
             list.remove(mobileNoOfRelation)
             list.remove(otherMobileNoOfRelation)
@@ -650,19 +650,30 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             mobileNoOfRelation.value = mobileNoOfRelation.getStringFromPosition(saved.mobileNoOfRelationId)
             otherMobileNoOfRelation.value = saved.mobileOthers
             contactNumber.value = saved.contactNumber?.toString()
-            if (contactNumber.value == "9999999999") {
+            val savedContactNumber = saved.contactNumber
+
+            if (savedContactNumber == null || savedContactNumber == 9999999999L) {
+
+                // Mobile number is not available
                 mobileNotAvailable.value = "0"
+                contactNumber.value = "9999999999"
                 contactNumber.required = false
-                contactNumber.value = null
                 contactNumber.isEnabled = false
                 mobileNotAvailable.isEnabled = true
+
                 list.remove(mobileNoOfRelation)
                 list.remove(otherMobileNoOfRelation)
+
             } else {
+
+                // Actual mobile number is available
+                mobileNotAvailable.value = null
+                contactNumber.value = savedContactNumber.toString()
                 contactNumber.required = true
                 contactNumber.isEnabled = true
                 mobileNotAvailable.isEnabled = true
             }
+
             address.value = saved.address ?: ""
             pinCode.value = saved.pinCode ?: ""
             state.entries = arrayOf(saved.locationRecord.state.name)
@@ -823,7 +834,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             if (it == 9999999999L) {
                 mobileNotAvailable.value = "0"
                 contactNumber.required = false
-                contactNumber.value = null
+                contactNumber.value = "9999999999"
                 contactNumber.isEnabled = false
             } else {
                 contactNumber.value = it.toString()
@@ -1206,13 +1217,23 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             }
             mobileNotAvailable.id -> {
                 val isChecked = index >= 0
+
                 if (isChecked) {
-                    // Keep checkbox value in index format so adapter can render it checked.
+                    // Save the current mobile before clearing the input.
+                    // This allows us to restore it when checkbox is unchecked.
+                    if (!contactNumber.value.isNullOrBlank()) {
+                        familyHeadPhoneNo = contactNumber.value
+                    }
+
                     mobileNotAvailable.value = "0"
+
                     contactNumber.required = false
-                    contactNumber.value = null
                     contactNumber.errorText = null
                     contactNumber.isEnabled = false
+
+                    // Display default value when mobile is unavailable
+                    contactNumber.value = "9999999999"
+
                     triggerDependants(
                         source = contactNumber,
                         passedIndex = 1,
@@ -1220,12 +1241,30 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                         target = listOf(mobileNoOfRelation),
                         targetSideEffect = listOf(otherMobileNoOfRelation)
                     )
+
+                    return 1
+
                 } else {
                     mobileNotAvailable.value = null
+
                     contactNumber.required = true
                     contactNumber.isEnabled = true
-                    contactNumber.value = null
                     contactNumber.errorText = null
+
+                    /*
+                     * If the current value is the default unavailable number,
+                     * clear it so that a real number can be entered.
+                     *
+                     * If there was an actual mobile number before checking,
+                     * restore that number.
+                     */
+                    contactNumber.value = when {
+                        familyHeadPhoneNo.isNullOrBlank() ||
+                                familyHeadPhoneNo == "9999999999" -> null
+
+                        else -> familyHeadPhoneNo
+                    }
+
                     if (mobileNoOfRelation.value.isNullOrBlank()) {
                         mobileNoOfRelation.value = if (isHeadOfFamilyRegistration) {
                             mobileNoOfRelation.entries?.firstOrNull()
@@ -1235,14 +1274,16 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                             mobileNoOfRelation.entries?.firstOrNull()
                         }
                     }
+
                     triggerDependants(
                         source = contactNumber,
                         passedIndex = 0,
                         triggerIndex = 0,
                         target = listOf(mobileNoOfRelation)
                     )
+
+                    return 1
                 }
-                return 1
             }
             address.id -> {
                 validateEmptyOnEditText(address)
@@ -1381,9 +1422,14 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             ben.mobileOthers         = otherMobileNoOfRelation.value
             ben.contactNumber        = when {
                 isMobileNotAvailableChecked() -> 9999999999L
-                ben.mobileNoOfRelationId == 5 -> familyHeadPhoneNo?.toLongOrNull()
-                contactNumber.value.isNullOrEmpty() -> null
-                else -> contactNumber.value!!.toLong()
+
+                ben.mobileNoOfRelationId == 5 -> {
+                    familyHeadPhoneNo?.toLongOrNull() ?: 9999999999L
+                }
+
+                contactNumber.value.isNullOrBlank() -> 9999999999L
+
+                else -> contactNumber.value!!.toLongOrNull() ?: 9999999999L
             }
             ben.tempMobileNoOfRelationId = 0
 
