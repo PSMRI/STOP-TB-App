@@ -103,10 +103,10 @@ class DashboardFragment : Fragment() {
             adapter.updateIndicator(DashboardListAdapter.ID_CONFIRMED, it)
         }
         viewModel.nikshayCount.observe(viewLifecycleOwner) {
-            adapter.updateIndicator(DashboardListAdapter.ID_NIKSHAY, TbGenderBreakdown(total = it))
+            adapter.updateIndicator(DashboardListAdapter.ID_NIKSHAY, it)
         }
         viewModel.abhaCount.observe(viewLifecycleOwner) {
-            adapter.updateIndicator(DashboardListAdapter.ID_ABHA, TbGenderBreakdown(total = it))
+            adapter.updateIndicator(DashboardListAdapter.ID_ABHA, it)
         }
     }
 
