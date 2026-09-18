@@ -394,11 +394,26 @@ class TBRepo @Inject constructor(
             }
             val cache = (existing ?: GeneralOpdCache(benId = ben.beneficiaryId)).copy(
                 chiefComplaints = item.optStringListOrNull("chiefComplaint"),
-                medications = item.optStringOrNull("medication")?.let { listOf(it) },
-                dosage = item.optStringOrNull("dosage"),
-                frequency = item.optStringOrNull("frequency"),
-                duration = item.optStringOrNull("duration"),
-                notes = item.optStringOrNull("notes"),
+
+                // Keep existing medication if server does not return it
+                medications = item.optStringOrNull("medication")
+                    ?.split(",")
+                    ?.map { it.trim() }
+                    ?.filter { it.isNotBlank() },
+
+
+                dosage = item.optStringOrNull("dosage")
+                    ?: existing?.dosage,
+
+                frequency = item.optStringOrNull("frequency")
+                    ?: existing?.frequency,
+
+                duration = item.optStringOrNull("duration")
+                    ?: existing?.duration,
+
+                notes = item.optStringOrNull("notes")
+                    ?: existing?.notes,
+
                 serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
                 syncState = SyncState.SYNCED
             )
