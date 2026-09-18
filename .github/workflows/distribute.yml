@@ -13,7 +13,7 @@ on:
           - uat
           - prod
       signing:
-        description: 'debug = testers/Firebase only. signed = release keystore (required for Intune and Play).'
+        description: 'debug = testers/Firebase only. signed = release keystore (required for Play and later Intune promote).'
         required: true
         type: choice
         default: signed
@@ -21,15 +21,10 @@ on:
           - debug
           - signed
       distributeFirebase:
-        description: 'Upload APK to Firebase App Distribution'
+        description: 'Upload APK to Firebase App Distribution (APK catalog)'
         required: true
         type: boolean
         default: true
-      distributeIntune:
-        description: 'Upload signed APK to Intune MDM (signed builds only)'
-        required: true
-        type: boolean
-        default: false
       distributePlay:
         description: 'Upload AAB to Google Play Internal (prod signed only)'
         required: true
@@ -58,7 +53,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: distribute-${{ inputs.environment }}-${{ inputs.signing }}-${{ inputs.branch }}
@@ -76,7 +70,6 @@ jobs:
           TARGET_ENV: ${{ inputs.environment }}
           SIGNING: ${{ inputs.signing }}
           WANT_FIREBASE: ${{ inputs.distributeFirebase }}
-          WANT_INTUNE: ${{ inputs.distributeIntune }}
           WANT_PLAY: ${{ inputs.distributePlay }}
           ENCRYPTED_PASS_KEY: ${{ secrets.ENCRYPTED_PASS_KEY }}
           ENCRYPTED_PASS_KEY_UAT: ${{ secrets.ENCRYPTED_PASS_KEY_UAT }}
@@ -105,21 +98,6 @@ jobs:
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
           FIREBASE_APP_ID_UAT: ${{ secrets.FIREBASE_APP_ID_UAT }}
           FIREBASE_APP_ID_PROD: ${{ secrets.FIREBASE_APP_ID_PROD }}
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_ID_UAT: ${{ secrets.AZURE_CLIENT_ID_UAT }}
-          AZURE_CLIENT_ID_PROD: ${{ secrets.AZURE_CLIENT_ID_PROD }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_TENANT_ID_UAT: ${{ secrets.AZURE_TENANT_ID_UAT }}
-          AZURE_TENANT_ID_PROD: ${{ secrets.AZURE_TENANT_ID_PROD }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          AZURE_CLIENT_SECRET_UAT: ${{ secrets.AZURE_CLIENT_SECRET_UAT }}
-          AZURE_CLIENT_SECRET_PROD: ${{ secrets.AZURE_CLIENT_SECRET_PROD }}
-          INTUNE_GROUP_ID: ${{ secrets.INTUNE_GROUP_ID }}
-          INTUNE_GROUP_ID_UAT: ${{ secrets.INTUNE_GROUP_ID_UAT }}
-          INTUNE_GROUP_ID_PROD: ${{ secrets.INTUNE_GROUP_ID_PROD }}
-          INTUNE_APP_ID: ${{ secrets.INTUNE_APP_ID }}
-          INTUNE_APP_ID_UAT: ${{ secrets.INTUNE_APP_ID_UAT }}
-          INTUNE_APP_ID_PROD: ${{ secrets.INTUNE_APP_ID_PROD }}
         run: |
           set -euo pipefail
           pick() {
@@ -135,10 +113,6 @@ jobs:
             pick "${!suffixed_name:-}" "${!base:-}"
           }
 
-          if [ "$WANT_INTUNE" = true ] && [ "$SIGNING" != signed ]; then
-            echo "Intune requires a signed release APK. Debug APKs are rejected as unsigned/debugging builds."
-            exit 1
-          fi
           if [ "$WANT_PLAY" = true ] && { [ "$TARGET_ENV" != prod ] || [ "$SIGNING" != signed ]; }; then
             echo "Play Internal is only available for prod signed AAB uploads."
             exit 1
@@ -179,10 +153,9 @@ jobs:
           fi
 
           DO_FIREBASE="$WANT_FIREBASE"
-          DO_INTUNE="$WANT_INTUNE"
           DO_PLAY="$WANT_PLAY"
           DO_APK=true
-          if [ "$DO_PLAY" = true ] && [ "$DO_FIREBASE" != true ] && [ "$DO_INTUNE" != true ]; then
+          if [ "$DO_PLAY" = true ] && [ "$DO_FIREBASE" != true ]; then
             DO_APK=false
           fi
 
@@ -197,7 +170,6 @@ jobs:
             echo "firebase_label=$FIREBASE_LABEL"
             echo "do_apk=$DO_APK"
             echo "do_firebase=$DO_FIREBASE"
-            echo "do_intune=$DO_INTUNE"
             echo "do_play=$DO_PLAY"
           } >> "$GITHUB_OUTPUT"
 
@@ -211,14 +183,9 @@ jobs:
             echo "ABHA_AUTH_URL=$(pick_env ABHA_AUTH_URL)"
             echo "CHAT_URL=$(pick_env CHAT_URL)"
             echo "FIREBASE_APP_ID=$(pick_env FIREBASE_APP_ID)"
-            echo "AZURE_CLIENT_ID=$(pick_env AZURE_CLIENT_ID)"
-            echo "AZURE_TENANT_ID=$(pick_env AZURE_TENANT_ID)"
-            echo "AZURE_CLIENT_SECRET=$(pick_env AZURE_CLIENT_SECRET)"
-            echo "INTUNE_GROUP_ID=$(pick_env INTUNE_GROUP_ID)"
-            echo "INTUNE_APP_ID=$(pick_env INTUNE_APP_ID)"
           } >> "$GITHUB_ENV"
 
-          echo "Plan: env=$TARGET_ENV signing=$SIGNING apk=$DO_APK firebase=$DO_FIREBASE intune=$DO_INTUNE play=$DO_PLAY"
+          echo "Plan: env=$TARGET_ENV signing=$SIGNING apk=$DO_APK firebase=$DO_FIREBASE play=$DO_PLAY"
 
       - name: Check required secrets
         env:
@@ -226,7 +193,6 @@ jobs:
           SIGNING: ${{ inputs.signing }}
           DO_APK: ${{ steps.plan.outputs.do_apk }}
           DO_FIREBASE: ${{ steps.plan.outputs.do_firebase }}
-          DO_INTUNE: ${{ steps.plan.outputs.do_intune }}
           DO_PLAY: ${{ steps.plan.outputs.do_play }}
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
@@ -274,11 +240,6 @@ jobs:
             require FIREBASE_APP_ID
             require FIREBASE_SERVICE_ACCOUNT_JSON
           fi
-          if [ "$DO_INTUNE" = true ]; then
-            require AZURE_CLIENT_ID
-            require AZURE_TENANT_ID
-            require INTUNE_GROUP_ID
-          fi
           if [ "$DO_PLAY" = true ]; then
             require GOOGLE_PLAY_SERVICE_ACCOUNT_JSON
           fi
@@ -291,10 +252,6 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v5
-
-      - name: Preserve Intune upload script
-        if: ${{ steps.plan.outputs.do_intune == 'true' }}
-        run: cp .github/scripts/upload_intune_android_lob.py "$RUNNER_TEMP/upload_intune_android_lob.py"
 
       - name: Checkout requested branch
         run: |
@@ -494,57 +451,13 @@ jobs:
           groups: testers
           file: ${{ steps.apk.outputs.apk_path }}
           releaseNotes: |
+            stoptb-meta: env=${{ inputs.environment }} signing=${{ inputs.signing }} package=${{ steps.plan.outputs.package_id }} versionName=${{ inputs.versionName }} versionCode=${{ inputs.versionCode }}
             Environment: ${{ steps.plan.outputs.firebase_label }}
             Signing: ${{ inputs.signing }}
             Version: ${{ inputs.versionName }} (${{ inputs.versionCode }})
             Branch: ${{ inputs.branch }}
             Package: ${{ steps.plan.outputs.package_id }}
             Description: ${{ inputs.description }}
-
-      - name: Resolve Azure authentication mode
-        if: ${{ steps.plan.outputs.do_intune == 'true' }}
-        id: azure_auth
-        run: |
-          if [ -n "${AZURE_CLIENT_SECRET:-}" ]; then
-            echo "auth_mode=secret" >> "$GITHUB_OUTPUT"
-          else
-            echo "auth_mode=oidc" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Azure login (OIDC)
-        if: ${{ steps.plan.outputs.do_intune == 'true' && steps.azure_auth.outputs.auth_mode == 'oidc' }}
-        uses: azure/login@v2
-        with:
-          client-id: ${{ env.AZURE_CLIENT_ID }}
-          tenant-id: ${{ env.AZURE_TENANT_ID }}
-          allow-no-subscriptions: true
-
-      - name: Get Microsoft Graph token
-        if: ${{ steps.plan.outputs.do_intune == 'true' && steps.azure_auth.outputs.auth_mode == 'oidc' }}
-        run: |
-          TOKEN="$(az account get-access-token --resource https://graph.microsoft.com --query accessToken -o tsv)"
-          echo "::add-mask::${TOKEN}"
-          echo "GRAPH_TOKEN=${TOKEN}" >> "$GITHUB_ENV"
-
-      - name: Upload signed APK to Intune MDM
-        if: ${{ steps.plan.outputs.do_intune == 'true' }}
-        run: |
-          set -euo pipefail
-          python3 -m pip install --quiet cryptography
-          EXTRA_ARGS=()
-          if [ -n "${INTUNE_APP_ID:-}" ]; then
-            EXTRA_ARGS+=(--app-id "${INTUNE_APP_ID}")
-          fi
-          python3 "$RUNNER_TEMP/upload_intune_android_lob.py" \
-            --apk "${{ steps.apk.outputs.apk_path }}" \
-            --package-id "${{ steps.plan.outputs.package_id }}" \
-            --version-name "${{ inputs.versionName }}" \
-            --version-code "${{ inputs.versionCode }}" \
-            --group-id "${INTUNE_GROUP_ID}" \
-            --display-name "StopTB ${{ steps.plan.outputs.firebase_label }}" \
-            --publisher "Piramal Swasthya" \
-            --description "${{ steps.plan.outputs.firebase_label }} ${{ inputs.signing }} build ${{ inputs.versionName }} (${{ inputs.versionCode }})" \
-            "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"
 
       - name: Build PROD Release AAB
         if: ${{ steps.plan.outputs.do_play == 'true' }}
