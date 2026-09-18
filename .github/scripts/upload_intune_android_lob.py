@@ -226,7 +226,9 @@ def wait_until_published(token: str, app_id: str) -> None:
         log(f"Intune publishingState={state}")
         if state == "published":
             return
-        if state not in {"processing", "notPublished"}:
+        if str(state).lower() == "published":
+            return
+        if str(state).lower() not in {"processing", "notpublished"}:
             raise RuntimeError(f"Intune app entered unexpected publishing state: {state}")
         time.sleep(2)
     raise RuntimeError("Timed out waiting for Intune app to publish")
@@ -415,19 +417,14 @@ def upload_apk(args: argparse.Namespace) -> None:
     existing = find_existing_app(token, args.package_id, args.app_id)
     if existing:
         app_id = existing["id"]
-        log(f"Updating existing Intune app {app_id} ({existing.get('displayName')})")
-        graph_request(
-            token,
-            "PATCH",
-            f"deviceAppManagement/mobileApps/{app_id}",
-            {
-                "@odata.type": f"#{LOB_TYPE}",
-                "fileName": filename,
-                "versionName": args.version_name,
-                "versionCode": args.version_code,
-                "description": args.description,
-            },
+        publishing_state = str(existing.get("publishingState") or "unknown")
+        log(
+            f"Updating existing Intune app {app_id} "
+            f"({existing.get('displayName')}) publishingState={publishing_state}"
         )
+        # Do not PATCH version/file metadata while unpublished. The previous run
+        # created this app and then failed, so Intune rejects that PATCH until a
+        # content version is committed.
     else:
         created = graph_request(
             token,
@@ -495,6 +492,7 @@ def upload_apk(args: argparse.Namespace) -> None:
             "fileName": filename,
             "versionName": args.version_name,
             "versionCode": args.version_code,
+            "description": args.description,
         },
     )
     wait_until_published(token, app_id)
