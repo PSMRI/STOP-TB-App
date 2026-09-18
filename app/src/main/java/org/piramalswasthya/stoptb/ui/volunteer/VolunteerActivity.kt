@@ -276,7 +276,8 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         val roleToItemId = mapOf(
             AppRole.REGISTRAR to R.id.roleTabRegistrar,
             AppRole.NURSE to R.id.roleTabNurse,
-            AppRole.COUNSELING to R.id.roleTabCounseling
+            AppRole.COUNSELING to R.id.roleTabCounseling,
+            AppRole.LAB_TECHNICIAN to R.id.roleTabLabTechnician
         )
         val itemIdToRole = roleToItemId.entries.associate { (role, id) -> id to role }
         val visibleRoles = roleManager.assignedRoles.filter { it in roleToItemId }

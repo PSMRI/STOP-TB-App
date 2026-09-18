@@ -4,20 +4,20 @@ enum class AppRole {
     REGISTRAR,
     NURSE,
     COUNSELING,
+    LAB_TECHNICIAN,
     VOLUNTEER;
 
     companion object {
 
         fun fromScreenName(screenName: String): AppRole? =
-            when (screenName.trim().lowercase()) {
+            when (screenName.trim().lowercase().replace(" ", "")) {
                 "registrar" -> REGISTRAR
                 "nurse" -> NURSE
                 "counseling" -> COUNSELING
+                "labtechnician" -> LAB_TECHNICIAN
                 else -> null
             }
 
-        // Legacy fallback, no longer used — screenNames are now the only source of truth for
-        // role resolution. Kept for reference.
 //        /**
 //         * Verbatim relocation of the normalized-match logic from the old
 //         * `RoleConstants.isAllowedStopTbRole` — preserved exactly so the Volunteer
@@ -50,7 +50,7 @@ enum class AppRole {
          */
         fun resolveAssignedRoles(screenNames: List<String>): List<AppRole> {
             val resolved = screenNames.mapNotNull { fromScreenName(it) }.toSet()
-            val canonicalOrder = listOf(REGISTRAR, NURSE, COUNSELING, VOLUNTEER)
+            val canonicalOrder = listOf(REGISTRAR, NURSE, COUNSELING, LAB_TECHNICIAN, VOLUNTEER)
             return canonicalOrder.filter { it in resolved }
         }
     }
