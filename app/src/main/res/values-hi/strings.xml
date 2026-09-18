@@ -853,6 +853,10 @@
     <string name="quick_refresh_ip_not_reachable">आईपी एड्रेस रीचेबल नहीं है: %1$s</string>
 
     <!-- Examine flow -->
+    <string name="ben_card_tb_symptoms">टीबी के लक्षण</string>
+    <string name="ben_card_chest_xray">छाती एक्स-रे</string>
+    <string name="ben_card_truenat">ट्रूनैट</string>
+    <string name="ben_card_result">परिणाम: %1$s</string>
     <string name="btn_examine">जांचें</string>
     <string name="btn_examine_count">जांचें %1$d/4</string>
     <string name="examine_bottomsheet_title">परीक्षण फॉर्म</string>

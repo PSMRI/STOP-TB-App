@@ -136,14 +136,21 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
             roleManager = roleManager,
             // showExamineButton = !role.isCounsellingOfficerRole() || args.fromContactTracing,
             showExamineButton = privilege.showExamineButtonDefault || args.fromContactTracing,
+            showScreeningStatus = true,
+            showRedesignedCard = true,
             showContactTracingForms = args.fromContactTracing
         )
         binding.rvAny.adapter = benAdapter
+        (binding.rvAny.itemAnimator as? androidx.recyclerview.widget.SimpleItemAnimator)
+            ?.supportsChangeAnimations = false
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.benList.collect { list ->
                     binding.flEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+                    benAdapter.submitHouseholdMemberCounts(
+                        list.groupingBy { it.hhId }.eachCount()
+                    )
                     benAdapter.submitList(list)
                 }
             }
@@ -218,6 +225,11 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.tptEligibleBenIds.collect { benAdapter.submitTptEligibleBenIds(it) }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.allTbDiagnostics.collect { benAdapter.submitTBDiagnostics(it) }
             }
         }
 

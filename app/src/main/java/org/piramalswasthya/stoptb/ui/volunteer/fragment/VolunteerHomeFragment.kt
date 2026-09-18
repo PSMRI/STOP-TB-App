@@ -304,7 +304,7 @@ class VolunteerHomeFragment : Fragment() {
         }
         activity?.let {
             (it as VolunteerActivity).updateActionBar(
-                R.drawable.ic_health_village,
+                R.drawable.ic_game_village_toolbar,
                 getHomeToolbarTitle()
             )
             it.addClickListenerToHomepageActionBarTitle()

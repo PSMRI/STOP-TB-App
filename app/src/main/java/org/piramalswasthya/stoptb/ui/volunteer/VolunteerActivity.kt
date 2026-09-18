@@ -456,7 +456,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
 
     fun updateActionBar(icon: Int, title: String) {
         binding.ivToolbar.setImageResource(icon)
-        val toolbarIconPadding = if (icon == R.drawable.ic_health_village) {
+        val toolbarIconPadding = if (icon == R.drawable.ic_game_village_toolbar) {
             resources.getDimensionPixelSize(R.dimen.padding_small)
         } else {
             resources.getDimensionPixelSize(R.dimen.padding_normal)
