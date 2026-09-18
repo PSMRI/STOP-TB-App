@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.model.BenBasicDomain
@@ -38,7 +39,6 @@ import java.io.File
 import java.io.FileWriter
 import javax.inject.Inject
 
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -86,6 +86,21 @@ class AllBenViewModel @Inject constructor(
 
     private val filterOrg = MutableStateFlow("")
     private val kindOrg = MutableStateFlow(0)
+    private val expandToBlock = MutableStateFlow(false)
+
+    /** True once the current search text can offer/has used the "search other villages" fallback. */
+    val canExpandSearchToBlock: Flow<Boolean> = combine(filterOrg, expandToBlock) { text, expanded ->
+        text.isNotBlank() && !expanded
+    }
+
+    /** True only while the user has typed search text - excludes the initial unfiltered page load. */
+    val isSearching: Flow<Boolean> = filterOrg.map { it.isNotBlank() }
+
+    /** Tracks genuinely new searches (text/filter/expand changes),
+     * not background reloads, so the UI can distinguish a fresh search from a silent re-run.
+     * */
+    private val _searchGeneration = MutableStateFlow(0)
+    val searchGeneration: Flow<Int> = _searchGeneration
 
     init {
         fetchBeneficiaryStatuses()
@@ -95,15 +110,16 @@ class AllBenViewModel @Inject constructor(
     }
 
     @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
-    val benList: Flow<PagingData<BenBasicDomain>> = combine(filterOrg, kindOrg) { text, kind ->
-        Pair(text, kind)
-    }.debounce { (text, _) ->
+    val benList: Flow<PagingData<BenBasicDomain>> = combine(filterOrg, kindOrg, expandToBlock) { text, kind, expanded ->
+        Triple(text, kind, expanded)
+    }.debounce { (text, _, _) ->
         if (text.isEmpty()) 0L else 300L
-    }.flatMapLatest { (text, kind) ->
+    }.flatMapLatest { (text, kind, expanded) ->
+        _searchGeneration.update { it + 1 }
         Pager(
             config = PagingConfig(pageSize = 30, prefetchDistance = 10)
         ) {
-            recordsRepo.searchBenPagedSource(text, kind, sourceFromArgs)
+            recordsRepo.searchBenPagedSource(text, kind, sourceFromArgs, expanded)
         }.flow.map { pagingData ->
             pagingData.map { it.asBasicDomainModel() }
         }
@@ -144,9 +160,15 @@ class AllBenViewModel @Inject constructor(
 
     fun filterText(text: String) {
         viewModelScope.launch {
+            expandToBlock.emit(false)
             filterOrg.emit(text)
         }
+    }
 
+    fun expandSearchToBlock() {
+        viewModelScope.launch {
+            expandToBlock.emit(true)
+        }
     }
 
     fun filterType(type: Int) {
