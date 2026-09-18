@@ -49,13 +49,8 @@ class BenPagingAdapter(
     private val tptEligibleIds = mutableListOf<Long>()
     private val childCountMap = mutableMapOf<Long, Int>()
     private val householdMemberCountMap = mutableMapOf<Long, Int>()
-    private val expandedTbDetails = mutableSetOf<Long>()
     private val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
     private val retryingBenIds = mutableListOf<Long>()
-
-    private companion object {
-        const val TB_DETAILS_PAYLOAD = "tb_details_expanded"
-    }
 
     override fun onCreateViewHolder(
         parent: ViewGroup, viewType: Int
@@ -98,27 +93,12 @@ class BenPagingAdapter(
             showScreeningStatus = showScreeningStatus,   // ADD THIS
             showRedesignedCard = showRedesignedCard,
             householdMemberCountMap = householdMemberCountMap,
-            isTbDetailsExpanded = item.benId in expandedTbDetails,
-            onToggleTbDetails = { benId -> toggleTbDetails(benId) },
             source = source,
             retryingBenIds = retryingBenIds,
             showContactTracingForms = showContactTracingForms,
             roleManager = roleManager,
             showAddMemberButton = showAddMemberButton
         )
-    }
-
-    override fun onBindViewHolder(
-        holder: BenListAdapter.BenViewHolder,
-        position: Int,
-        payloads: MutableList<Any>
-    ) {
-        if (TB_DETAILS_PAYLOAD in payloads) {
-            val item = getItem(position) ?: return
-            holder.updateTbDetailsExpanded(item.benId in expandedTbDetails)
-            return
-        }
-        super.onBindViewHolder(holder, position, payloads)
     }
 
     fun submitTBDiagnostics(list: List<TBDiagnosticsCache>) {
@@ -261,10 +241,4 @@ class BenPagingAdapter(
         }
     }
 
-    private fun toggleTbDetails(benId: Long) {
-        if (!expandedTbDetails.add(benId)) expandedTbDetails.remove(benId)
-        snapshot().indexOfFirst { it?.benId == benId }
-            .takeIf { it >= 0 }
-            ?.let { notifyItemChanged(it, TB_DETAILS_PAYLOAD) }
-    }
 }

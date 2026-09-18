@@ -212,7 +212,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
             val isHeadOfFamily = !isNonHH && item.ben.relToHeadId == 19
             if (isNonHH) {
                 binding.ivIsHead.visibility = View.VISIBLE
-                binding.ivIsHead.setImageResource(R.drawable.ic_no_hh)
+                binding.ivIsHead.setImageResource(R.drawable.ic_non_household_vector)
                 binding.ivIsHead.imageTintList = null
             } else {
                 binding.ivIsHead.setImageResource(R.drawable.ic__hh)

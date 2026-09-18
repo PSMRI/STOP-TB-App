@@ -85,11 +85,6 @@ class BenListAdapter(
             }
         }
 
-        fun updateTbDetailsExpanded(isExpanded: Boolean) {
-            binding.ivScreeningChevron.rotation = if (isExpanded) 180f else 0f
-            binding.llScreeningStatus.visibility = if (isExpanded) View.VISIBLE else View.GONE
-        }
-
         // Approximate number of message characters shown before truncation and "See more" is appended.
         private val ERROR_MSG_COLLAPSED_BODY_LENGTH = 30
 
@@ -199,8 +194,6 @@ class BenListAdapter(
             roleManager: RoleManager? = null,
             showRedesignedCard: Boolean = false,
             householdMemberCountMap: Map<Long, Int> = emptyMap(),
-            isTbDetailsExpanded: Boolean = false,
-            onToggleTbDetails: (Long) -> Unit = {},
             showAddMemberButton: Boolean = false
         ) {
 
@@ -257,6 +250,13 @@ class BenListAdapter(
             binding.llBenDetails2.visibility = if (showRedesignedCard) View.GONE else View.VISIBLE
             binding.detailsDivider.visibility = if (showRedesignedCard) View.GONE else View.VISIBLE
             if (showRedesignedCard) {
+                val fatherName = item.fatherName
+                    ?.trim()
+                    ?.takeUnless { it.isBlank() || it.equals("Not Available", ignoreCase = true) }
+                val showSeparateFatherName = hasFamilyHeadName &&
+                        !isHeadOfFamily &&
+                        fatherName != null &&
+                        !item.familyHeadName.trim().equals(fatherName, ignoreCase = true)
                 val relation = when {
                     isHeadOfFamily -> null
                     hasFamilyHeadName -> binding.root.context.getString(R.string.hof) to item.familyHeadName
@@ -268,6 +268,8 @@ class BenListAdapter(
                 binding.llRedesignRelation.visibility = if (relation == null) View.GONE else View.VISIBLE
                 binding.tvRedesignRelationLabel.text = relation?.first
                 binding.tvRedesignRelationValue.text = relation?.second
+                binding.llRedesignFatherName.visibility = if (showSeparateFatherName) View.VISIBLE else View.GONE
+                binding.tvRedesignFatherName.text = fatherName
                 binding.tvRedesignRegistrationDate.text = item.regDate
                 binding.llRedesignFamilyMembers.visibility = if (isNonHH) View.GONE else View.VISIBLE
                 binding.tvRedesignFamilyMembers.text = (
@@ -280,10 +282,10 @@ class BenListAdapter(
             binding.HOF.visibility = View.GONE
             if (isNonHH) {
                 binding.ivIsHead.visibility = View.VISIBLE
-                binding.ivIsHead.setImageResource(R.drawable.ic_no_hh)
+                binding.ivIsHead.setImageResource(R.drawable.ic_non_household_vector)
                 binding.ivIsHead.imageTintList = null
             } else {
-                binding.ivIsHead.setImageResource(R.drawable.ic__hh)
+                binding.ivIsHead.setImageResource(R.drawable.ic_icon_head_of_family)
                 binding.ivIsHead.imageTintList = android.content.res.ColorStateList.valueOf(
                     ContextCompat.getColor(binding.root.context, R.color.md_theme_light_primary)
                 )
@@ -312,12 +314,9 @@ class BenListAdapter(
 
             // Screening status infographic (Symptoms / X-Ray / TruNat) — Title → Icon → Status
             if (showScreeningStatus || item.isNonHH) {
-                binding.llScreeningHeader.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
-                binding.llScreeningHeader.setOnClickListener {
-                    if (showRedesignedCard) onToggleTbDetails(item.benId)
-                }
-                binding.ivScreeningChevron.rotation = if (isTbDetailsExpanded) 180f else 0f
-                binding.llScreeningStatus.visibility = if (!showRedesignedCard || isTbDetailsExpanded) View.VISIBLE else View.GONE
+                binding.detailsDivider.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
+                binding.tvScreeningSectionTitle.visibility = View.GONE
+                binding.llScreeningStatus.visibility = View.VISIBLE
 
                 val tbDiagForStatus = tbDiagnosticsList.find { it.benId == item.benId }
 
@@ -334,12 +333,16 @@ class BenListAdapter(
                 )
 
                 if (hasTbScreening) {
-                    binding.tvSymptomsStatus.text = "Presumptive"
-                    binding.tvSymptomsStatus.visibility = View.VISIBLE
+                    binding.tvSymptomsStatus.text = "Screened"
                 } else {
-                    binding.tvSymptomsStatus.text = "Not Done"
-                    binding.tvSymptomsStatus.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
+                    binding.tvSymptomsStatus.text = "Unscreened"
                 }
+                binding.tvSymptomsStatus.visibility = View.GONE
+                binding.tvSymptomsResult.text = context.getString(
+                    R.string.ben_card_result,
+                    if (hasTbScreening) "Presumptive" else "N/A"
+                )
+                binding.tvSymptomsResult.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
                 // ---------------------------------------------------------
                 // 2. Chest X-Ray — driven purely by DB: chestXrayDoneDate + raw result
                 // ---------------------------------------------------------
@@ -358,15 +361,16 @@ class BenListAdapter(
                     else -> 3f
                 }
                 binding.ivXray.setImageResource(
-                    if (xrayResult != null) R.drawable.circle_check else R.drawable.circle_uncheck
+                    if (!xrayResult.isNullOrBlank()) R.drawable.circle_check else R.drawable.circle_uncheck
                 )
+                binding.tvXrayStatus.text = if (xrayResult.isNullOrBlank()) "Unscreened" else "Screened"
+                binding.tvXrayStatus.visibility = View.GONE
                 if (!xrayResult.isNullOrBlank()) {
-                    binding.tvXrayResult.text = xrayResult
-                    binding.tvXrayResult.visibility = View.VISIBLE
+                    binding.tvXrayResult.text = context.getString(R.string.ben_card_result, xrayResult)
                 } else {
-                    binding.tvXrayResult.text = "Not Done"
-                    binding.tvXrayResult.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
+                    binding.tvXrayResult.text = context.getString(R.string.ben_card_result, "N/A")
                 }
+                binding.tvXrayResult.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
 
                 // ---------------------------------------------------------
                 // 3. TrueNat — driven purely by DB: trunatTestDoneDate + raw result
@@ -374,17 +378,19 @@ class BenListAdapter(
                // val truenatDone = item.trunatTestDoneDate != null
                 val truenatResult = tbDiagForStatus?.naatResult
                 binding.ivTruenat.setImageResource(
-                    if (truenatResult != null) R.drawable.circle_check else R.drawable.circle_uncheck
+                    if (!truenatResult.isNullOrBlank()) R.drawable.circle_check else R.drawable.circle_uncheck
                 )
+                binding.tvTruenatStatus.text = if (truenatResult.isNullOrBlank()) "Unscreened" else "Screened"
+                binding.tvTruenatStatus.visibility = View.GONE
                 if (!truenatResult.isNullOrBlank()) {
-                    binding.tvTruenatResult.text = truenatResult
-                    binding.tvTruenatResult.visibility = View.VISIBLE
+                    binding.tvTruenatResult.text = context.getString(R.string.ben_card_result, truenatResult)
                 } else {
-                    binding.tvTruenatResult.text = "Not Done"
-                    binding.tvTruenatResult.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
+                    binding.tvTruenatResult.text = context.getString(R.string.ben_card_result, "N/A")
                 }
+                binding.tvTruenatResult.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
             } else {
-                binding.llScreeningHeader.visibility = View.GONE
+                binding.detailsDivider.visibility = View.GONE
+                binding.tvScreeningSectionTitle.visibility = View.GONE
                 binding.llScreeningStatus.visibility = View.GONE
             }
 
@@ -1066,12 +1072,7 @@ class BenListAdapter(
     private val tptEligibleIds         = mutableListOf<Long>()
     private val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
     private val householdMemberCountMap = mutableMapOf<Long, Int>()
-    private val expandedTbDetails = mutableSetOf<Long>()
     var source: Int = 0
-
-    private companion object {
-        const val TB_DETAILS_PAYLOAD = "tb_details_expanded"
-    }
 
     override fun onBindViewHolder(holder: BenViewHolder, position: Int) {
         val item = getItem(position)
@@ -1108,8 +1109,6 @@ class BenListAdapter(
             tbDiagnosticsList = tbDiagnosticsList,
             showRedesignedCard = showRedesignedCard,
             householdMemberCountMap = householdMemberCountMap,
-            isTbDetailsExpanded = item.benId in expandedTbDetails,
-            onToggleTbDetails = ::toggleTbDetails,
             source = source,
             showExamineButton = showExamineButton,
             showContactTracingForms = showContactTracingForms,
@@ -1117,18 +1116,6 @@ class BenListAdapter(
             showAddMemberButton = showAddMemberButton
 
         )
-    }
-
-    override fun onBindViewHolder(
-        holder: BenViewHolder,
-        position: Int,
-        payloads: MutableList<Any>
-    ) {
-        if (TB_DETAILS_PAYLOAD in payloads) {
-            holder.updateTbDetailsExpanded(getItem(position).benId in expandedTbDetails)
-            return
-        }
-        super.onBindViewHolder(holder, position, payloads)
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -1189,14 +1176,6 @@ class BenListAdapter(
             }
         }
     }
-
-    private fun toggleTbDetails(benId: Long) {
-        if (!expandedTbDetails.add(benId)) expandedTbDetails.remove(benId)
-        currentList.indexOfFirst { it.benId == benId }
-            .takeIf { it >= 0 }
-            ?.let { notifyItemChanged(it, TB_DETAILS_PAYLOAD) }
-    }
-
 
     class BenClickListener(
         private val clickedBen: (item: BenBasicDomain, hhId: Long, benId: Long, relToHeadId: Int) -> Unit,
