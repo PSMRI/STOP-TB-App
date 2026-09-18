@@ -480,6 +480,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             showAnthropometryButton = false,
             showExamineButton = !isReadOnlyReferralList,
             showScreeningStatus = true,
+            showRedesignedCard = true,
             source = args.source,
             showContactTracingForms = args.showContactTracingForms,
             showAddMemberButton = !isReadOnlyReferralList
@@ -488,6 +489,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
         binding.rvAny.adapter = benAdapter
         binding.rvAny.setHasFixedSize(true)
+        (binding.rvAny.itemAnimator as? androidx.recyclerview.widget.SimpleItemAnimator)
+            ?.supportsChangeAnimations = false
         binding.rvAny.setItemViewCacheSize(20)
         (binding.rvAny.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager)?.apply {
             initialPrefetchItemCount = 10
@@ -561,6 +564,12 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         lifecycleScope.launch {
             viewModel.childCounts.collectLatest { countMap ->
                 benAdapter.submitChildCounts(countMap)
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.householdMemberCounts.collectLatest { countMap ->
+                benAdapter.submitHouseholdMemberCounts(countMap)
             }
         }
 

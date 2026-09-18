@@ -1234,6 +1234,10 @@
     </string-array>
 
     <!-- Examine flow -->
+    <string name="ben_card_tb_symptoms">TB Symptoms</string>
+    <string name="ben_card_chest_xray">Chest X-Ray</string>
+    <string name="ben_card_truenat">TrueNat</string>
+    <string name="ben_card_result">Result: %1$s</string>
     <string name="btn_examine">Examine</string>
     <string name="btn_examine_count">Examine %1$d/4</string>
     <string name="btn_examine_count_of">Examine %1$d/%2$d</string>
