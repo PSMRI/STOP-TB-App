@@ -1005,6 +1005,7 @@
     <string name="role_tab_registrar">पंजीकरण</string>
     <string name="role_tab_nurse">उपचार</string>
     <string name="role_tab_counseling">परामर्श</string>
+    <string name="role_tab_lab_technician">निदान</string>
 </resources>
 
 
