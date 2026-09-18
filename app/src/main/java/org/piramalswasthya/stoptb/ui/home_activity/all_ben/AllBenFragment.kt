@@ -20,6 +20,9 @@ import androidx.paging.LoadState
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.helpers.RoleManager
@@ -30,6 +33,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertFilterBinding
 import org.piramalswasthya.stoptb.databinding.AlertNewBenBinding
 import android.widget.ArrayAdapter
+import kotlinx.coroutines.delay
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchAndToggleRvButtonBinding
 import org.piramalswasthya.stoptb.model.AppRole
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
@@ -46,6 +50,14 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     private companion object {
         val READ_ONLY_REFERRAL_SOURCES = setOf(5, 6, 7, 8)
     }
+
+    private data class SearchUiState(
+        val isLoading: Boolean,
+        val isEmpty: Boolean,
+        val canExpand: Boolean,
+        val isSearching: Boolean,
+        val generation: Int
+    )
 
     /**
      * Tracks an in-progress Examine flow for a given benId.
@@ -490,12 +502,63 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             }
         }
 
+        binding.btnExpandSearchBlock.setOnClickListener {
+            viewModel.expandSearchToBlock()
+        }
+
+        var lastSearchGeneration = -1
+        var settledForGeneration = false
+        var currentlyShowingEmpty = false
+
         lifecycleScope.launch {
-            benAdapter.loadStateFlow.collectLatest { loadStates ->
-                val isEmpty = loadStates.refresh is LoadState.NotLoading
-                        && benAdapter.itemCount == 0
-                binding.flEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
+            combine(
+                benAdapter.loadStateFlow.map { it.refresh is LoadState.Loading },
+                benAdapter.loadStateFlow.map { loadStates ->
+                    loadStates.refresh is LoadState.NotLoading && benAdapter.itemCount == 0
+                },
+                viewModel.canExpandSearchToBlock,
+                viewModel.isSearching,
+                viewModel.searchGeneration
+            ) { isLoading, isEmpty, canExpand, isSearching, generation ->
+                SearchUiState(isLoading, isEmpty, canExpand, isSearching, generation)
             }
+                .distinctUntilChanged()
+                .collectLatest { state ->
+                    if (state.generation != lastSearchGeneration) {
+                        // A genuinely new search started (typed text/filter/expand changed) - reset.
+                        lastSearchGeneration = state.generation
+                        settledForGeneration = false
+                    }
+
+                    if (settledForGeneration && state.isLoading) {
+                        return@collectLatest
+                    }
+                    if (!state.isLoading) {
+                        settledForGeneration = true
+                    }
+
+                    if (state.isEmpty) {
+                        if (currentlyShowingEmpty) {
+                            binding.btnExpandSearchBlock.visibility =
+                                if (state.canExpand) View.VISIBLE else View.GONE
+                            return@collectLatest
+                        }
+                        binding.pbSearchLoading.visibility = if (state.isSearching) View.VISIBLE else View.GONE
+                        binding.flEmpty.visibility = View.GONE
+                        binding.btnExpandSearchBlock.visibility = View.GONE
+                        delay(300)
+                        binding.pbSearchLoading.visibility = View.GONE
+                        binding.flEmpty.visibility = View.VISIBLE
+                        binding.btnExpandSearchBlock.visibility = if (state.canExpand) View.VISIBLE else View.GONE
+                        currentlyShowingEmpty = true
+                    } else {
+                        binding.pbSearchLoading.visibility =
+                            if (state.isLoading && state.isSearching) View.VISIBLE else View.GONE
+                        binding.flEmpty.visibility = View.GONE
+                        binding.btnExpandSearchBlock.visibility = View.GONE
+                        currentlyShowingEmpty = false
+                    }
+                }
         }
 
         lifecycleScope.launch {
@@ -649,7 +712,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             override fun beforeTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {}
             override fun onTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {}
             override fun afterTextChanged(p0: Editable?) {
-                viewModel.filterText(p0?.toString() ?: "")
+                viewModel.filterText(p0?.toString()?.trim() ?: "")
             }
         }
 

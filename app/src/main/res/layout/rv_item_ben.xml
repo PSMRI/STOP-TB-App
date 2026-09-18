@@ -484,8 +484,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:orientation="vertical"
-                            android:padding="@dimen/padding_small"
-                            android:visibility="@{ben.isPlaceholderMobileNo ? View.GONE : View.VISIBLE}">
+                            android:padding="@dimen/padding_small">
 
                             <TextView
                                 android:id="@+id/mob"

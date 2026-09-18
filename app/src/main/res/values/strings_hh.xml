@@ -4,6 +4,7 @@
     <string name="btn_text_frag_home_nhhr">New Household Registration</string>
     <string name="no_records_found">No Records Found</string>
     <string name="household_search">Search</string>
+    <string name="search_other_villages">Search in other villages</string>
 
     <string name="rv_item_hh_ph_1">HHID : </string>
     <string name="rv_item_hh_ph_2">Family Head Name :</string>

@@ -220,7 +220,7 @@ interface BenDao {
 
     @Query("""
         SELECT * FROM BEN_BASIC_CACHE
-        WHERE villageId = :selectedVillage
+        WHERE villageId IN (:villageIds)
         AND isDeactivate = 0
         AND (:source = 0
             OR (:source = 1 AND abhaId IS NOT NULL)
@@ -340,7 +340,7 @@ interface BenDao {
         AND (:query = '' OR
             benName LIKE '%' || :query || '%'
             OR benSurname LIKE '%' || :query || '%'
-            OR (benName || ' ' || benSurname) LIKE '%' || :query || '%'
+            OR (IFNULL(benName, '') || ' ' || IFNULL(benSurname, '')) LIKE '%' || :query || '%'
             OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
             OR REPLACE(IFNULL(abhaId, ''), '-', '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
             OR IFNULL(familyHeadName, '') LIKE '%' || :query || '%'
@@ -372,11 +372,11 @@ interface BenDao {
             ELSE dob
         END DESC
     """)
-    fun searchBen(selectedVillage: Int, source: Int, filterType: Int, query: String): Flow<List<BenBasicCache>>
+    fun searchBen(villageIds: List<Int>, source: Int, filterType: Int, query: String): Flow<List<BenBasicCache>>
 
     @Query("""
         SELECT * FROM BEN_BASIC_CACHE
-        WHERE villageId = :selectedVillage
+        WHERE villageId IN (:villageIds)
         AND isDeactivate = 0
         AND (:source = 0
             OR (:source = 1 AND abhaId IS NOT NULL)
@@ -496,7 +496,7 @@ interface BenDao {
         AND (:query = '' OR
             benName LIKE '%' || :query || '%'
             OR benSurname LIKE '%' || :query || '%'
-            OR (benName || ' ' || benSurname) LIKE '%' || :query || '%'
+            OR (IFNULL(benName, '') || ' ' || IFNULL(benSurname, '')) LIKE '%' || :query || '%'
             OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
             OR REPLACE(IFNULL(abhaId, ''), '-', '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
             OR IFNULL(familyHeadName, '') LIKE '%' || :query || '%'
@@ -528,11 +528,11 @@ interface BenDao {
             ELSE dob
         END DESC
     """)
-    fun searchBenPaged(selectedVillage: Int, source: Int, filterType: Int, query: String): PagingSource<Int, BenBasicCache>
+    fun searchBenPaged(villageIds: List<Int>, source: Int, filterType: Int, query: String): PagingSource<Int, BenBasicCache>
 
     @Query("""
         SELECT * FROM BEN_BASIC_CACHE
-        WHERE villageId = :selectedVillage
+        WHERE villageId IN (:villageIds)
         AND isDeactivate = 0
         AND (:source = 0
             OR (:source = 1 AND abhaId IS NOT NULL)
@@ -652,7 +652,7 @@ interface BenDao {
         AND (:query = '' OR
             benName LIKE '%' || :query || '%'
             OR benSurname LIKE '%' || :query || '%'
-            OR (benName || ' ' || benSurname) LIKE '%' || :query || '%'
+            OR (IFNULL(benName, '') || ' ' || IFNULL(benSurname, '')) LIKE '%' || :query || '%'
             OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
             OR REPLACE(IFNULL(abhaId, ''), '-', '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
             OR IFNULL(familyHeadName, '') LIKE '%' || :query || '%'
@@ -696,7 +696,7 @@ interface BenDao {
             ELSE dob
         END DESC
     """)
-    suspend fun searchBenOnce(selectedVillage: Int, source: Int, filterType: Int, query: String): List<BenBasicCache>
+    suspend fun searchBenOnce(villageIds: List<Int>, source: Int, filterType: Int, query: String): List<BenBasicCache>
 
     @Query("SELECT * FROM BEN_BASIC_CACHE where villageId = :selectedVillage AND abhaId IS NOT NULL AND isDeactivate = 0")
     fun getAllBenWithAbha(selectedVillage: Int): Flow<List<BenBasicCache>>
@@ -1446,7 +1446,7 @@ interface BenDao {
     @Query("""
         SELECT * FROM BEN_BASIC_CACHE
         WHERE villageId = :selectedVillage AND isDeactivate = 0 AND isNonHH = 1
-        AND (:query = '' OR benName LIKE '%' || :query || '%' OR benSurname LIKE '%' || :query || '%' OR (benName || ' ' || benSurname) LIKE '%' || :query || '%' OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%')
+        AND (:query = '' OR benName LIKE '%' || :query || '%' OR benSurname LIKE '%' || :query || '%' OR (IFNULL(benName, '') || ' ' || IFNULL(benSurname, '')) LIKE '%' || :query || '%' OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%')
     """)
     fun searchNonHHBeneficiaries(selectedVillage: Int, query: String): Flow<List<BenBasicCache>>
 

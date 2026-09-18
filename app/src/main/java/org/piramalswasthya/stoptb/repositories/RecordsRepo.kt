@@ -25,6 +25,12 @@ class RecordsRepo @Inject constructor(
 //    private val selectedVillage = preferenceDao.getLocationRecord()?.village?.id ?: 0
     private val selectedVillage get() = preferenceDao.getLocationRecord()?.village?.id ?: 0
 
+    private val allVillageIds: List<Int>
+        get() = preferenceDao.getLoggedInUser()?.villages
+            ?.map { it.id }
+            ?.takeIf { it.isNotEmpty() }
+            ?: listOf(selectedVillage)
+
     init {
         Timber.d("RecordsRepo INIT: selectedVillage = $selectedVillage, locationRecord = ${preferenceDao.getLocationRecord()}")
     }
@@ -52,15 +58,15 @@ class RecordsRepo @Inject constructor(
     val anthropometryFilledBenIds: Flow<List<Long>> get() =
         benDao.getAnthropometryFilledBenIds(selectedVillage)
 
-    fun searchBen(query: String, filterType: Int, source: Int): Flow<List<BenBasicDomain>> =
-        benDao.searchBen(selectedVillage, source, filterType, query)
+    fun searchBen(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false): Flow<List<BenBasicDomain>> =
+        benDao.searchBen(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query)
             .map { list -> list.map { it.asBasicDomainModel() } }
 
-    fun searchBenPagedSource(query: String, filterType: Int, source: Int): PagingSource<Int, BenBasicCache> =
-        benDao.searchBenPaged(selectedVillage, source, filterType, query)
+    fun searchBenPagedSource(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false): PagingSource<Int, BenBasicCache> =
+        benDao.searchBenPaged(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query)
 
-    suspend fun searchBenOnce(query: String, filterType: Int, source: Int): List<BenBasicDomain> =
-        benDao.searchBenOnce(selectedVillage, source, filterType, query)
+    suspend fun searchBenOnce(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false): List<BenBasicDomain> =
+        benDao.searchBenOnce(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query)
             .map { it.asBasicDomainModel() }
 
     val allBenListCount get() = benDao.getAllBenCount(selectedVillage)
