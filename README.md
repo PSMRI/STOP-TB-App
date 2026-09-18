@@ -137,8 +137,9 @@ GitHub Actions workflows are available under `.github/workflows`.
   - Uploads test and lint reports as workflow artifacts
 - `distribute.yml` (**StopTB Build & Distribute**)
   - Manual workflow: choose `uat` or `prod` and `debug` or `signed`
-  - Uploads the APK to Firebase App Distribution with version, signing, and environment metadata
-  - Optionally uploads a prod signed AAB to Play Internal
+  - Firebase, Intune MDM, and/or Play Internal checkboxes
+  - UAT Intune uses `AZURE_*_UAT` / `INTUNE_GROUP_ID_UAT`; prod Intune uses `*_PROD`
+  - Play Internal is prod signed AAB only; debug never goes to Intune
 - `promote-intune.yml` (**StopTB Push to Intune**)
   - `list` prints the Firebase APK catalog for UAT or prod
   - `push` downloads that exact signed APK and uploads it to the matching Intune tenant/group
