@@ -199,14 +199,21 @@ def upload_to_azure_blob(sas_uri: str, filepath: Path) -> None:
 
 
 def wait_for_file(token: str, file_uri: str, stage: str) -> dict[str, Any]:
-    success = f"{stage}Success"
-    pending = f"{stage}Pending"
+    # Graph returns camelCase values such as azureStorageUriRequestSuccess, not
+    # AzureStorageUriRequestSuccess. Compare case-insensitively.
+    want_success = f"{stage}Success".lower()
+    want_pending = f"{stage}Pending".lower()
     for _ in range(90):
         file_info = graph_request(token, "GET", file_uri)
-        state = file_info.get("uploadState")
-        if state == success:
+        state = str(file_info.get("uploadState") or "")
+        normalized = state.lower()
+        log(f"Intune file {stage} uploadState={state}")
+        if normalized == want_success:
             return file_info
-        if state not in {pending, None}:
+        if normalized in {want_pending, ""} or normalized.endswith("pending"):
+            time.sleep(2)
+            continue
+        if normalized.endswith("failed") or normalized.endswith("timedout") or normalized.endswith("error"):
             raise RuntimeError(f"Intune file {stage} failed with state: {state}")
         time.sleep(2)
     raise RuntimeError(f"Timed out waiting for Intune file {stage}")
@@ -245,10 +252,9 @@ def _list_mobile_apps(
 
 
 def list_android_lob_apps(token: str) -> list[dict[str, Any]]:
-    # packageId/identityName live on androidLobApp, not the mobileApp base type, so
-    # $select=packageId on /mobileApps returns 400. Query the derived type or omit $select.
+    # Intune Graph does not support /mobileApps/microsoft.graph.androidLobApp GET,
+    # and $select=packageId on the mobileApp collection returns 400.
     attempts: list[tuple[str, dict[str, str] | None]] = [
-        (f"{GRAPH_BASE}/deviceAppManagement/mobileApps/{LOB_TYPE}", None),
         (
             f"{GRAPH_BASE}/deviceAppManagement/mobileApps"
             f"?$filter=isof('{LOB_TYPE}')",
@@ -265,16 +271,23 @@ def list_android_lob_apps(token: str) -> list[dict[str, Any]]:
         ),
     ]
     last_error: Exception | None = None
+    empty_result: list[dict[str, Any]] | None = None
     for start_url, headers in attempts:
         try:
             apps = [app for app in _list_mobile_apps(token, start_url, headers) if _is_android_lob_app(app)]
-            log(f"Listed {len(apps)} Intune Android LOB app(s)")
-            return apps
+            if apps:
+                log(f"Listed {len(apps)} Intune Android LOB app(s)")
+                return apps
+            empty_result = apps
+            log("Intune app list succeeded with 0 Android LOB apps; trying next lookup")
         except PermissionError:
             raise
         except Exception as exc:  # noqa: BLE001
             last_error = exc
             log(f"Retrying Intune app lookup after: {exc}")
+    if empty_result is not None:
+        log("Listed 0 Intune Android LOB app(s)")
+        return empty_result
     if isinstance(last_error, PermissionError):
         raise last_error
     raise RuntimeError(f"Unable to list Intune Android LOB apps: {last_error}")
