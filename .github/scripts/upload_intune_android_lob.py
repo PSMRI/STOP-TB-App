@@ -383,6 +383,57 @@ def ensure_group_assignment(token: str, app_id: str, group_id: str) -> None:
     log(f"Assigned Intune app as required to group {group_id}")
 
 
+def content_versions_path(app_id: str) -> str:
+    return f"deviceAppManagement/mobileApps/{app_id}/{LOB_TYPE}/contentVersions"
+
+
+def list_content_versions(token: str, app_id: str) -> list[dict[str, Any]]:
+    return graph_request(token, "GET", content_versions_path(app_id)).get("value") or []
+
+
+def refresh_app(token: str, app_id: str) -> dict[str, Any]:
+    return graph_request(token, "GET", f"deviceAppManagement/mobileApps/{app_id}")
+
+
+def pending_content_version_ids(token: str, app: dict[str, Any]) -> list[str]:
+    app_id = str(app["id"])
+    committed = str(app.get("committedContentVersion") or "").strip()
+    published = str(app.get("publishingState") or "").lower() == "published"
+    pending: list[str] = []
+    for version in list_content_versions(token, app_id):
+        version_id = str(version.get("id") or "")
+        if not version_id:
+            continue
+        if published and committed and version_id == committed:
+            log(f"Keeping committed Intune content version {version_id}")
+            continue
+        pending.append(version_id)
+    return pending
+
+
+def delete_pending_content_versions(token: str, app: dict[str, Any]) -> None:
+    app_id = str(app["id"])
+    pending_ids = pending_content_version_ids(token, app)
+    if not pending_ids:
+        log("No pending Intune content version. Will upload the current APK.")
+        return
+    log(
+        f"Found {len(pending_ids)} pending Intune content version(s): "
+        f"{', '.join(pending_ids)}. Deleting them before uploading the current APK."
+    )
+    for version_id in pending_ids:
+        try:
+            graph_request(token, "DELETE", f"{content_versions_path(app_id)}/{version_id}")
+            log(f"Deleted pending Intune content version {version_id}")
+        except Exception as exc:  # noqa: BLE001
+            log(f"Could not delete Intune content version {version_id}: {exc}")
+
+
+def delete_mobile_app(token: str, app_id: str) -> None:
+    graph_request(token, "DELETE", f"deviceAppManagement/mobileApps/{app_id}")
+    log(f"Deleted unpublished Intune app {app_id}")
+
+
 def acquire_graph_token() -> str:
     token = os.environ.get("GRAPH_TOKEN", "").strip()
     if token:
@@ -414,18 +465,8 @@ def upload_apk(args: argparse.Namespace) -> None:
         raise RuntimeError(f"APK not found: {apk}")
 
     filename = apk.name
-    existing = find_existing_app(token, args.package_id, args.app_id)
-    if existing:
-        app_id = existing["id"]
-        publishing_state = str(existing.get("publishingState") or "unknown")
-        log(
-            f"Updating existing Intune app {app_id} "
-            f"({existing.get('displayName')}) publishingState={publishing_state}"
-        )
-        # Do not PATCH version/file metadata while unpublished. The previous run
-        # created this app and then failed, so Intune rejects that PATCH until a
-        # content version is committed.
-    else:
+
+    def create_app() -> str:
         created = graph_request(
             token,
             "POST",
@@ -440,17 +481,43 @@ def upload_apk(args: argparse.Namespace) -> None:
                 args.version_name,
             ),
         )
-        app_id = created["id"]
-        log(f"Created Intune app {app_id}")
+        log(f"Created Intune app {created['id']}")
+        return str(created["id"])
 
-    content_version = graph_request(
-        token,
-        "POST",
-        f"deviceAppManagement/mobileApps/{app_id}/{LOB_TYPE}/contentVersions",
-        {},
-    )
+    def create_content_version() -> dict[str, Any]:
+        return graph_request(token, "POST", content_versions_path(app_id), {})
+
+    existing = find_existing_app(token, args.package_id, args.app_id)
+    if existing:
+        app_id = str(existing["id"])
+        existing = refresh_app(token, app_id)
+        publishing_state = str(existing.get("publishingState") or "unknown")
+        log(
+            f"Found Intune app {app_id} ({existing.get('displayName')}) "
+            f"publishingState={publishing_state}"
+        )
+        delete_pending_content_versions(token, existing)
+        leftover = pending_content_version_ids(token, refresh_app(token, app_id))
+        if publishing_state.lower() != "published" and leftover:
+            log("Pending content could not be cleared; recreating the unpublished Intune app")
+            delete_mobile_app(token, app_id)
+            app_id = create_app()
+    else:
+        log("No existing Intune app. Uploading as a new app.")
+        app_id = create_app()
+
+    try:
+        content_version = create_content_version()
+    except RuntimeError as exc:
+        message = str(exc).lower()
+        if "first content version is committed" not in message and "cannot be updated" not in message:
+            raise
+        log("Intune still has a blocked first content version; recreating the app")
+        delete_mobile_app(token, app_id)
+        app_id = create_app()
+        content_version = create_content_version()
     content_version_id = content_version["id"]
-    log(f"Created Intune content version {content_version_id}")
+    log(f"Uploading current APK as Intune content version {content_version_id}")
 
     with tempfile.TemporaryDirectory() as tmp:
         encrypted_path = Path(tmp) / f"{apk.stem}_temp.bin"
