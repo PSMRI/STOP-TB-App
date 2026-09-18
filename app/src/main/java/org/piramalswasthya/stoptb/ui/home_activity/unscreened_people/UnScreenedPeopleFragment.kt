@@ -99,13 +99,14 @@ class UnScreenedPeople : Fragment(),
             ),
             showBeneficiaries = true,
             showRegistrationDate = true,
-            showSyncIcon = false,
+            showSyncIcon = true,
             showCall = false,
             // role = prefDao.getRole(),
             pref = prefDao,
             context = requireActivity(),
             showActionButtons = false,
             showScreeningStatus  = true,
+            showRedesignedCard = true,
             roleManager = roleManager
 
         )
@@ -115,6 +116,8 @@ class UnScreenedPeople : Fragment(),
 
 
         binding.rvUnscreened.adapter = benAdapter
+        (binding.rvUnscreened.itemAnimator as? androidx.recyclerview.widget.SimpleItemAnimator)
+            ?.supportsChangeAnimations = false
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -146,6 +149,8 @@ class UnScreenedPeople : Fragment(),
                 launch { viewModel.generalOpdBenIds.collect { benAdapter.submitGeneralOpdBenIds(it) } }
                 launch { viewModel.anthropometryBenIds.collect { benAdapter.submitAnthropometryBenIds(it) } }
                 launch { viewModel.diagnosisBenIds.collect { benAdapter.submitDiagnosisBenIds(it) } }
+                launch { viewModel.allTbDiagnostics.collect { benAdapter.submitTBDiagnostics(it) } }
+                launch { viewModel.householdMemberCounts.collect { benAdapter.submitHouseholdMemberCounts(it) } }
             }
         }
     }

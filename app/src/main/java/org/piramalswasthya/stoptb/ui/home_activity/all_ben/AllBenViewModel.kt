@@ -126,6 +126,7 @@ class AllBenViewModel @Inject constructor(
     }
 
     val childCounts: Flow<Map<Long, Int>> = recordsRepo.childCountsByBen
+    val householdMemberCounts: Flow<Map<Long, Int>> = recordsRepo.householdMemberCounts
     val vitalBenIds: Flow<List<Long>> = vitalRepo.vitalBenIds
     val unsyncedVitalBenIds: Flow<List<Long>> = vitalRepo.unsyncedVitalBenIds
     val syncingVitalBenIds: Flow<List<Long>> = vitalRepo.syncingVitalBenIds

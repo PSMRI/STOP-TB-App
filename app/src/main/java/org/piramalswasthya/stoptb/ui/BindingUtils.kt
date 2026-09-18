@@ -339,14 +339,20 @@ fun ImageView.setSyncState(syncState: SyncState?) {
     syncState?.let {
         visibility = View.VISIBLE
         val drawable = when (it) {
-            SyncState.UNSYNCED -> R.drawable.ic_cloud_off
-            SyncState.SYNCING -> R.drawable.ic_cloud_sync
-            SyncState.SYNCED -> R.drawable.ic_cloud_upload_green
+            SyncState.UNSYNCED -> R.drawable.ic_cloud_off_bottom_sheet
+            SyncState.SYNCING -> R.drawable.ic_cloud_sync_bottom_sheet
+            SyncState.SYNCED -> R.drawable.ic_cloud_upload_bottom_sheet
         }
         setImageResource(drawable)
         isClickable = it == SyncState.UNSYNCED
-        if (it == SyncState.SYNCING) startAnimation(rotate)
+        if (it == SyncState.SYNCING) {
+            startAnimation(rotate)
+        } else {
+            // RecyclerView can reuse a previously rotating sync icon for a synced row.
+            clearAnimation()
+        }
     } ?: run {
+        clearAnimation()
         visibility = View.INVISIBLE
     }
 }
@@ -356,14 +362,20 @@ fun ImageView.setSyncStateForBen(syncState: SyncState?) {
     syncState?.let {
 
         val drawable = when (it) {
-            SyncState.UNSYNCED -> R.drawable.ic_cloud_off
-            SyncState.SYNCING -> R.drawable.ic_cloud_sync
-            SyncState.SYNCED -> R.drawable.ic_cloud_upload_green
+            SyncState.UNSYNCED -> R.drawable.ic_cloud_off_bottom_sheet
+            SyncState.SYNCING -> R.drawable.ic_cloud_sync_bottom_sheet
+            SyncState.SYNCED -> R.drawable.ic_cloud_upload_bottom_sheet
         }
         setImageResource(drawable)
         isClickable = it == SyncState.UNSYNCED
-        if (it == SyncState.SYNCING) startAnimation(rotate)
+        if (it == SyncState.SYNCING) {
+            startAnimation(rotate)
+        } else {
+            // Clear rotation inherited from a recycled beneficiary-card view.
+            clearAnimation()
+        }
     } ?: run {
+        clearAnimation()
         visibility = View.INVISIBLE
     }
 }
