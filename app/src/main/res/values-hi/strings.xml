@@ -612,6 +612,7 @@
     <string name="tb_family_contact_screening_alert">परिवार के सभी सदस्यों की ट्रेसिंग और स्क्रीनिंग की सलाह दें</string>
     <string name="tb_presumptive_alert_title">संभावित टीबी मामला!</string>
     <string name="tb_presumptive_alert_refer">एक्स-रे के लिए रेफर करें और ट्रूनैट टेस्ट के लिए थूक एकत्र करें</string>
+    <string name="tb_presumptive_alert_refer_pregnant">ट्रूनैट टेस्ट के लिए थूक एकत्र करें</string>
     <string name="tb_presumptive_alert_family">परिवार के सभी सदस्यों की स्क्रीनिंग की सलाह दें</string>
     <string name="referred_for_digital_chest_xray">डिजिटल चेस्ट एक्स-रे के लिए रेफर किया गया</string>
     <string name="referred_for_sputum_collection">स्पुटम कलेक्शन के लिए रेफर किया गया</string>
@@ -852,6 +853,10 @@
     <string name="quick_refresh_ip_not_reachable">आईपी एड्रेस रीचेबल नहीं है: %1$s</string>
 
     <!-- Examine flow -->
+    <string name="ben_card_tb_symptoms">टीबी के लक्षण</string>
+    <string name="ben_card_chest_xray">छाती एक्स-रे</string>
+    <string name="ben_card_truenat">ट्रूनैट</string>
+    <string name="ben_card_result">परिणाम: %1$s</string>
     <string name="btn_examine">जांचें</string>
     <string name="btn_examine_count">जांचें %1$d/4</string>
     <string name="examine_bottomsheet_title">परीक्षण फॉर्म</string>
@@ -1000,6 +1005,7 @@
     <string name="role_tab_registrar">पंजीकरण</string>
     <string name="role_tab_nurse">उपचार</string>
     <string name="role_tab_counseling">परामर्श</string>
+    <string name="role_tab_lab_technician">निदान</string>
 </resources>
 
 

@@ -938,6 +938,7 @@
     <string name="total_presumptive_tb">Presumptive TB Cases</string>
     <string name="tb_presumptive_alert_title">A Presumptive TB case!</string>
     <string name="tb_presumptive_alert_refer">Refer to X-ray and collect sputum for Truenat test</string>
+    <string name="tb_presumptive_alert_refer_pregnant">Collect sputum for Truenat test</string>
     <string name="tb_presumptive_alert_family">Advise screening of all family members</string>
     <string name="referred_for_digital_chest_xray">Referred for digital chest x-ray</string>
     <string name="referred_for_sputum_collection">Referred for Sputum Collection</string>
@@ -1233,6 +1234,10 @@
     </string-array>
 
     <!-- Examine flow -->
+    <string name="ben_card_tb_symptoms">TB Symptoms</string>
+    <string name="ben_card_chest_xray">Chest X-Ray</string>
+    <string name="ben_card_truenat">TrueNat</string>
+    <string name="ben_card_result">Result: %1$s</string>
     <string name="btn_examine">Examine</string>
     <string name="btn_examine_count">Examine %1$d/4</string>
     <string name="btn_examine_count_of">Examine %1$d/%2$d</string>
@@ -1389,6 +1394,7 @@
     <string name="role_tab_registrar">Registration</string>
     <string name="role_tab_nurse">Treatment</string>
     <string name="role_tab_counseling">Counselling</string>
+    <string name="role_tab_lab_technician">Diagnostics</string>
 
     <!-- Multi-role Home screen — Counselling tab "Coming soon" placeholder cards -->
     <string name="home_card_counselling_title">Counselling</string>

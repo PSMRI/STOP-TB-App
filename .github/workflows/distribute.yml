@@ -1,17 +1,40 @@
-name: StopTB Signed Build (UAT or PROD)
-run-name: STOP TB ${{ inputs.environment }} signed - ${{ inputs.versionName }} (${{ inputs.versionCode }}) [${{ inputs.branch }}]
+name: StopTB Build & Distribute
+run-name: STOP TB ${{ inputs.environment }} ${{ inputs.signing }} - ${{ inputs.versionName }} (${{ inputs.versionCode }}) [${{ inputs.branch }}]
 
 on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Target environment'
+        description: 'Target environment (flavor and secrets)'
         required: true
         type: choice
         default: uat
         options:
           - uat
           - prod
+      signing:
+        description: 'debug = testers/Firebase only. signed = required for Play Internal and Intune MDM.'
+        required: true
+        type: choice
+        default: signed
+        options:
+          - debug
+          - signed
+      distributeFirebase:
+        description: 'Upload APK to Firebase App Distribution'
+        required: true
+        type: boolean
+        default: true
+      distributeIntune:
+        description: 'Upload signed APK to Intune MDM (uat uses UAT Azure/Intune secrets, prod uses PROD secrets). Signed builds only.'
+        required: true
+        type: boolean
+        default: false
+      distributePlay:
+        description: 'Upload AAB to Google Play Internal (prod signed only)'
+        required: true
+        type: boolean
+        default: false
       description:
         description: 'Release notes / description for this build'
         required: false
@@ -38,7 +61,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: distribute-signed-${{ inputs.environment }}-${{ inputs.branch }}
+  group: distribute-${{ inputs.environment }}-${{ inputs.signing }}-${{ inputs.branch }}
   cancel-in-progress: true
 
 jobs:
@@ -47,10 +70,14 @@ jobs:
     timeout-minutes: 90
 
     steps:
-      - name: Resolve environment config
-        id: envcfg
+      - name: Resolve build plan
+        id: plan
         env:
           TARGET_ENV: ${{ inputs.environment }}
+          SIGNING: ${{ inputs.signing }}
+          WANT_FIREBASE: ${{ inputs.distributeFirebase }}
+          WANT_INTUNE: ${{ inputs.distributeIntune }}
+          WANT_PLAY: ${{ inputs.distributePlay }}
           ENCRYPTED_PASS_KEY: ${{ secrets.ENCRYPTED_PASS_KEY }}
           ENCRYPTED_PASS_KEY_UAT: ${{ secrets.ENCRYPTED_PASS_KEY_UAT }}
           ENCRYPTED_PASS_KEY_PROD: ${{ secrets.ENCRYPTED_PASS_KEY_PROD }}
@@ -75,6 +102,7 @@ jobs:
           CHAT_URL: ${{ secrets.CHAT_URL }}
           CHAT_URL_UAT: ${{ secrets.CHAT_URL_UAT }}
           CHAT_URL_PROD: ${{ secrets.CHAT_URL_PROD }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
           FIREBASE_APP_ID_UAT: ${{ secrets.FIREBASE_APP_ID_UAT }}
           FIREBASE_APP_ID_PROD: ${{ secrets.FIREBASE_APP_ID_PROD }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -101,73 +129,113 @@ jobs:
               printf '%s' "${2:-}"
             fi
           }
+          pick_env() {
+            local base="$1"
+            local suffixed_name="${base}_${SUFFIX}"
+            pick "${!suffixed_name:-}" "${!base:-}"
+          }
+
+          if [ "$WANT_INTUNE" = true ] && [ "$SIGNING" != signed ]; then
+            echo "Intune MDM requires a signed release APK. Debug APKs are rejected."
+            exit 1
+          fi
+          if [ "$WANT_PLAY" = true ] && { [ "$TARGET_ENV" != prod ] || [ "$SIGNING" != signed ]; }; then
+            echo "Play Internal is only available for prod signed AAB uploads."
+            exit 1
+          fi
 
           if [ "$TARGET_ENV" = prod ]; then
-            {
-              echo "gradle_apk_task=assembleStoptbRelease"
-              echo "gradle_aab_task=bundleStoptbRelease"
-              echo "package_id=org.piramalswasthya.stoptb"
-              echo "apk_dir=app/build/outputs/apk/stoptb/release"
-              echo "apk_name=app-stoptb"
-              echo "artifact_apk=prod-release-apk"
-              echo "do_intune=true"
-              echo "do_play=true"
-              echo "firebase_label=PROD"
-            } >> "$GITHUB_OUTPUT"
-            {
-              echo "ENCRYPTED_PASS_KEY=$(pick "${ENCRYPTED_PASS_KEY_PROD:-}" "${ENCRYPTED_PASS_KEY:-}")"
-              echo "ABHA_CLIENT_SECRET=$(pick "${ABHA_CLIENT_SECRET_PROD:-}" "${ABHA_CLIENT_SECRET:-}")"
-              echo "ABHA_CLIENT_ID=$(pick "${ABHA_CLIENT_ID_PROD:-}" "${ABHA_CLIENT_ID:-}")"
-              echo "BASE_TMC_URL=$(pick "${BASE_TMC_URL_PROD:-}" "${BASE_TMC_URL:-}")"
-              echo "BASE_ABHA_URL=$(pick "${BASE_ABHA_URL_PROD:-}" "${BASE_ABHA_URL:-}")"
-              echo "ABHA_TOKEN_URL=$(pick "${ABHA_TOKEN_URL_PROD:-}" "${ABHA_TOKEN_URL:-}")"
-              echo "ABHA_AUTH_URL=$(pick "${ABHA_AUTH_URL_PROD:-}" "${ABHA_AUTH_URL:-}")"
-              echo "CHAT_URL=$(pick "${CHAT_URL_PROD:-}" "${CHAT_URL:-}")"
-              echo "FIREBASE_APP_ID=${FIREBASE_APP_ID_PROD:-}"
-              echo "AZURE_CLIENT_ID=$(pick "${AZURE_CLIENT_ID_PROD:-}" "${AZURE_CLIENT_ID:-}")"
-              echo "AZURE_TENANT_ID=$(pick "${AZURE_TENANT_ID_PROD:-}" "${AZURE_TENANT_ID:-}")"
-              echo "AZURE_CLIENT_SECRET=$(pick "${AZURE_CLIENT_SECRET_PROD:-}" "${AZURE_CLIENT_SECRET:-}")"
-              echo "INTUNE_GROUP_ID=$(pick "${INTUNE_GROUP_ID_PROD:-}" "${INTUNE_GROUP_ID:-}")"
-              echo "INTUNE_APP_ID=$(pick "${INTUNE_APP_ID_PROD:-}" "${INTUNE_APP_ID:-}")"
-            } >> "$GITHUB_ENV"
+            SUFFIX=PROD
+            PACKAGE_ID=org.piramalswasthya.stoptb
+            FLAVOR_DIR=stoptb
+            APK_NAME=app-stoptb
+            GRADLE_AAB_TASK=bundleStoptbRelease
+            FIREBASE_LABEL=PROD
           else
-            {
-              echo "gradle_apk_task=assembleStoptbUatRelease"
-              echo "gradle_aab_task="
-              echo "package_id=org.piramalswasthya.stoptb.uat"
-              echo "apk_dir=app/build/outputs/apk/stoptbUat/release"
-              echo "apk_name=app-stoptbUat"
-              echo "artifact_apk=uat-release-apk"
-              echo "do_intune=true"
-              echo "do_play=false"
-              echo "firebase_label=UAT"
-            } >> "$GITHUB_OUTPUT"
-            {
-              echo "ENCRYPTED_PASS_KEY=$(pick "${ENCRYPTED_PASS_KEY_UAT:-}" "${ENCRYPTED_PASS_KEY:-}")"
-              echo "ABHA_CLIENT_SECRET=$(pick "${ABHA_CLIENT_SECRET_UAT:-}" "${ABHA_CLIENT_SECRET:-}")"
-              echo "ABHA_CLIENT_ID=$(pick "${ABHA_CLIENT_ID_UAT:-}" "${ABHA_CLIENT_ID:-}")"
-              echo "BASE_TMC_URL=$(pick "${BASE_TMC_URL_UAT:-}" "${BASE_TMC_URL:-}")"
-              echo "BASE_ABHA_URL=$(pick "${BASE_ABHA_URL_UAT:-}" "${BASE_ABHA_URL:-}")"
-              echo "ABHA_TOKEN_URL=$(pick "${ABHA_TOKEN_URL_UAT:-}" "${ABHA_TOKEN_URL:-}")"
-              echo "ABHA_AUTH_URL=$(pick "${ABHA_AUTH_URL_UAT:-}" "${ABHA_AUTH_URL:-}")"
-              echo "CHAT_URL=$(pick "${CHAT_URL_UAT:-}" "${CHAT_URL:-}")"
-              echo "FIREBASE_APP_ID=${FIREBASE_APP_ID_UAT:-}"
-              echo "AZURE_CLIENT_ID=$(pick "${AZURE_CLIENT_ID_UAT:-}" "${AZURE_CLIENT_ID:-}")"
-              echo "AZURE_TENANT_ID=$(pick "${AZURE_TENANT_ID_UAT:-}" "${AZURE_TENANT_ID:-}")"
-              echo "AZURE_CLIENT_SECRET=$(pick "${AZURE_CLIENT_SECRET_UAT:-}" "${AZURE_CLIENT_SECRET:-}")"
-              echo "INTUNE_GROUP_ID=$(pick "${INTUNE_GROUP_ID_UAT:-}" "${INTUNE_GROUP_ID:-}")"
-              echo "INTUNE_APP_ID=$(pick "${INTUNE_APP_ID_UAT:-}" "${INTUNE_APP_ID:-}")"
-            } >> "$GITHUB_ENV"
+            SUFFIX=UAT
+            PACKAGE_ID=org.piramalswasthya.stoptb.uat
+            FLAVOR_DIR=stoptbUat
+            APK_NAME=app-stoptbUat
+            GRADLE_AAB_TASK=
+            FIREBASE_LABEL=UAT
           fi
-          echo "Selected environment: $TARGET_ENV"
+
+          if [ "$SIGNING" = signed ]; then
+            APK_VARIANT=release
+            ARTIFACT_APK="${TARGET_ENV}-release-apk"
+            if [ "$TARGET_ENV" = prod ]; then
+              GRADLE_APK_TASK=assembleStoptbRelease
+            else
+              GRADLE_APK_TASK=assembleStoptbUatRelease
+            fi
+          else
+            APK_VARIANT=debug
+            ARTIFACT_APK="${TARGET_ENV}-debug-apk"
+            if [ "$TARGET_ENV" = prod ]; then
+              GRADLE_APK_TASK=assembleStoptbDebug
+            else
+              GRADLE_APK_TASK=assembleStoptbUatDebug
+            fi
+          fi
+
+          DO_FIREBASE="$WANT_FIREBASE"
+          DO_INTUNE="$WANT_INTUNE"
+          DO_PLAY="$WANT_PLAY"
+          DO_APK=true
+          if [ "$DO_PLAY" = true ] && [ "$DO_FIREBASE" != true ] && [ "$DO_INTUNE" != true ]; then
+            DO_APK=false
+          fi
+
+          {
+            echo "package_id=$PACKAGE_ID"
+            echo "apk_dir=app/build/outputs/apk/${FLAVOR_DIR}/${APK_VARIANT}"
+            echo "apk_name=$APK_NAME"
+            echo "apk_variant=$APK_VARIANT"
+            echo "artifact_apk=$ARTIFACT_APK"
+            echo "gradle_apk_task=$GRADLE_APK_TASK"
+            echo "gradle_aab_task=$GRADLE_AAB_TASK"
+            echo "firebase_label=$FIREBASE_LABEL"
+            echo "do_apk=$DO_APK"
+            echo "do_firebase=$DO_FIREBASE"
+            echo "do_intune=$DO_INTUNE"
+            echo "do_play=$DO_PLAY"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "ENCRYPTED_PASS_KEY=$(pick_env ENCRYPTED_PASS_KEY)"
+            echo "ABHA_CLIENT_SECRET=$(pick_env ABHA_CLIENT_SECRET)"
+            echo "ABHA_CLIENT_ID=$(pick_env ABHA_CLIENT_ID)"
+            echo "BASE_TMC_URL=$(pick_env BASE_TMC_URL)"
+            echo "BASE_ABHA_URL=$(pick_env BASE_ABHA_URL)"
+            echo "ABHA_TOKEN_URL=$(pick_env ABHA_TOKEN_URL)"
+            echo "ABHA_AUTH_URL=$(pick_env ABHA_AUTH_URL)"
+            echo "CHAT_URL=$(pick_env CHAT_URL)"
+            echo "FIREBASE_APP_ID=$(pick_env FIREBASE_APP_ID)"
+            echo "AZURE_CLIENT_ID=$(pick_env AZURE_CLIENT_ID)"
+            echo "AZURE_TENANT_ID=$(pick_env AZURE_TENANT_ID)"
+            echo "AZURE_CLIENT_SECRET=$(pick_env AZURE_CLIENT_SECRET)"
+            echo "INTUNE_GROUP_ID=$(pick_env INTUNE_GROUP_ID)"
+            echo "INTUNE_APP_ID=$(pick_env INTUNE_APP_ID)"
+          } >> "$GITHUB_ENV"
+
+          echo "Plan: env=$TARGET_ENV signing=$SIGNING apk=$DO_APK firebase=$DO_FIREBASE intune=$DO_INTUNE play=$DO_PLAY"
 
       - name: Check required secrets
         env:
           TARGET_ENV: ${{ inputs.environment }}
+          SIGNING: ${{ inputs.signing }}
+          DO_APK: ${{ steps.plan.outputs.do_apk }}
+          DO_FIREBASE: ${{ steps.plan.outputs.do_firebase }}
+          DO_INTUNE: ${{ steps.plan.outputs.do_intune }}
+          DO_PLAY: ${{ steps.plan.outputs.do_play }}
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          DEBUG_KEYSTORE_FILE: ${{ secrets.DEBUG_KEYSTORE_FILE }}
+          DEBUG_KEYSTORE_PASSWORD: ${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
+          DEBUG_KEY_ALIAS: ${{ secrets.DEBUG_KEY_ALIAS }}
+          DEBUG_KEY_PASSWORD: ${{ secrets.DEBUG_KEY_PASSWORD }}
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
           GOOGLE_SERVICES_JSON_UAT: ${{ secrets.GOOGLE_SERVICES_JSON_UAT }}
           GOOGLE_SERVICES_JSON_PROD: ${{ secrets.GOOGLE_SERVICES_JSON_PROD }}
@@ -175,16 +243,46 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for name in RELEASE_KEYSTORE_BASE64 RELEASE_STORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD FIREBASE_SERVICE_ACCOUNT_JSON GOOGLE_SERVICES_JSON_UAT GOOGLE_SERVICES_JSON_PROD FIREBASE_APP_ID ENCRYPTED_PASS_KEY ABHA_CLIENT_ID ABHA_CLIENT_SECRET BASE_TMC_URL AZURE_CLIENT_ID AZURE_TENANT_ID INTUNE_GROUP_ID; do
+          require() {
+            local name="$1"
             if [ -z "${!name:-}" ]; then
-              echo "Missing required secret/value for $TARGET_ENV: $name"
+              echo "Missing required secret/value for $TARGET_ENV $SIGNING: $name"
               missing=1
             fi
-          done
-          if [ "$TARGET_ENV" = prod ] && [ -z "${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:-}" ]; then
-            echo "Missing required secret for PROD Play upload: GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"
-            missing=1
+          }
+
+          require GOOGLE_SERVICES_JSON_UAT
+          require GOOGLE_SERVICES_JSON_PROD
+          require ENCRYPTED_PASS_KEY
+          require ABHA_CLIENT_ID
+          require ABHA_CLIENT_SECRET
+          require BASE_TMC_URL
+
+          if [ "$SIGNING" = signed ]; then
+            require RELEASE_KEYSTORE_BASE64
+            require RELEASE_STORE_PASSWORD
+            require RELEASE_KEY_ALIAS
+            require RELEASE_KEY_PASSWORD
+          elif [ "$DO_APK" = true ]; then
+            require DEBUG_KEYSTORE_FILE
+            require DEBUG_KEYSTORE_PASSWORD
+            require DEBUG_KEY_ALIAS
+            require DEBUG_KEY_PASSWORD
           fi
+
+          if [ "$DO_FIREBASE" = true ]; then
+            require FIREBASE_APP_ID
+            require FIREBASE_SERVICE_ACCOUNT_JSON
+          fi
+          if [ "$DO_INTUNE" = true ]; then
+            require AZURE_CLIENT_ID
+            require AZURE_TENANT_ID
+            require INTUNE_GROUP_ID
+          fi
+          if [ "$DO_PLAY" = true ]; then
+            require GOOGLE_PLAY_SERVICE_ACCOUNT_JSON
+          fi
+
           if [ "$missing" -ne 0 ]; then
             echo "Add the missing repository secrets, then re-run this workflow."
             echo "UAT uses *_UAT secrets (or unsuffixed fallback). PROD uses *_PROD secrets (or unsuffixed fallback)."
@@ -195,7 +293,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Preserve Intune upload script
-        if: ${{ steps.envcfg.outputs.do_intune == 'true' }}
+        if: ${{ steps.plan.outputs.do_intune == 'true' }}
         run: cp .github/scripts/upload_intune_android_lob.py "$RUNNER_TEMP/upload_intune_android_lob.py"
 
       - name: Checkout requested branch
@@ -246,6 +344,9 @@ jobs:
           mkdir -p app/src/stoptbUat app/src/stoptb
           printf '%s\n' "$GOOGLE_SERVICES_JSON_UAT" > app/src/stoptbUat/google-services.json
           printf '%s\n' "$GOOGLE_SERVICES_JSON_PROD" > app/src/stoptb/google-services.json
+          test -s app/src/stoptbUat/google-services.json
+          test -s app/src/stoptb/google-services.json
+          python3 -c "import json; json.load(open('app/src/stoptbUat/google-services.json')); json.load(open('app/src/stoptb/google-services.json'))"
 
       - name: Accept SDK licenses
         run: yes 2>/dev/null | sdkmanager --licenses >/dev/null || true
@@ -261,13 +362,28 @@ jobs:
           set -euo pipefail
           if [ -z "${VERSION_CODE}" ] || ! [[ "${VERSION_CODE}" =~ ^[1-9][0-9]*$ ]]; then
             echo "versionCode must be a positive integer (got: '${VERSION_CODE}')."
+            echo "For Play Internal, use a value higher than the last uploaded version code."
+            exit 1
+          fi
+          if [ -z "${VERSION_NAME}" ]; then
+            echo "versionName is required (got: '${VERSION_NAME}')."
             exit 1
           fi
           printf 'VERSION=%s\nVERSIONCODE=%s\n' "${VERSION_NAME}" "${VERSION_CODE}" > version/version.properties
           echo "Using app version:"
           cat version/version.properties
 
+      - name: Create debug keystore
+        if: ${{ inputs.signing == 'debug' && steps.plan.outputs.do_apk == 'true' }}
+        env:
+          DEBUG_KEYSTORE_FILE: ${{ secrets.DEBUG_KEYSTORE_FILE }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$DEBUG_KEYSTORE_FILE" | base64 --decode > "$GITHUB_WORKSPACE/app/debug-keystore.jks"
+          test -s "$GITHUB_WORKSPACE/app/debug-keystore.jks"
+
       - name: Create release keystore
+        if: ${{ inputs.signing == 'signed' }}
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
@@ -292,53 +408,85 @@ jobs:
               )
           )
           PY
+          test -s "$GITHUB_WORKSPACE/keystore.properties"
+
+      - name: Build debug APK
+        if: ${{ inputs.signing == 'debug' && steps.plan.outputs.do_apk == 'true' }}
+        env:
+          DEBUG_KEYSTORE_PASSWORD: ${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
+          DEBUG_KEY_ALIAS: ${{ secrets.DEBUG_KEY_ALIAS }}
+          DEBUG_KEY_PASSWORD: ${{ secrets.DEBUG_KEY_PASSWORD }}
+        run: >
+          ./gradlew ${{ steps.plan.outputs.gradle_apk_task }} --no-daemon --stacktrace
+          -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/app/debug-keystore.jks
+          -Pandroid.injected.signing.store.password=$DEBUG_KEYSTORE_PASSWORD
+          -Pandroid.injected.signing.key.alias=$DEBUG_KEY_ALIAS
+          -Pandroid.injected.signing.key.password=$DEBUG_KEY_PASSWORD
 
       - name: Build signed APK
-        run: ./gradlew ${{ steps.envcfg.outputs.gradle_apk_task }} --no-daemon --stacktrace
+        if: ${{ inputs.signing == 'signed' && steps.plan.outputs.do_apk == 'true' }}
+        run: ./gradlew ${{ steps.plan.outputs.gradle_apk_task }} --no-daemon --stacktrace
 
-      - name: Verify signed APK
+      - name: Verify APK
+        if: ${{ steps.plan.outputs.do_apk == 'true' }}
         id: apk
+        env:
+          SIGNING: ${{ inputs.signing }}
+          TARGET_ENV: ${{ inputs.environment }}
+          RELEASE_DIR: ${{ steps.plan.outputs.apk_dir }}
+          NAME: ${{ steps.plan.outputs.apk_name }}
+          VARIANT: ${{ steps.plan.outputs.apk_variant }}
         run: |
           set -euo pipefail
-          RELEASE_DIR="${{ steps.envcfg.outputs.apk_dir }}"
-          NAME="${{ steps.envcfg.outputs.apk_name }}"
-          echo "Release APKs:"
+          echo "APKs:"
           ls -la "$RELEASE_DIR"
 
-          APK="$RELEASE_DIR/${NAME}-release.apk"
+          APK="$RELEASE_DIR/${NAME}-${VARIANT}.apk"
           if [ ! -f "$APK" ]; then
-            APK="$RELEASE_DIR/${NAME}-universal-release.apk"
+            APK="$RELEASE_DIR/${NAME}-universal-${VARIANT}.apk"
           fi
           if [ ! -f "$APK" ]; then
-            APK="$(find "$RELEASE_DIR" -name '*release*.apk' ! -name '*-armeabi-*' ! -name '*-arm64-*' ! -name '*-x86*' | head -n 1 || true)"
+            APK="$(find "$RELEASE_DIR" -name "*${VARIANT}*.apk" ! -name '*-armeabi-*' ! -name '*-arm64-*' ! -name '*-x86*' | head -n 1 || true)"
           fi
           if [ -z "$APK" ] || [ ! -f "$APK" ]; then
-            echo "Release APK not found in $RELEASE_DIR"
+            echo "APK not found in $RELEASE_DIR"
             exit 1
           fi
 
           BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)"
-          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK"
-          CERTS="$("$BUILD_TOOLS/apksigner" verify --print-certs "$APK")"
-          if echo "$CERTS" | grep -qi "CN=Android Debug"; then
-            echo "ERROR: APK is signed with the Android debug certificate."
-            exit 1
+          echo "Using APK: $APK"
+          echo "Using build-tools: $BUILD_TOOLS"
+
+          if [ "$SIGNING" = signed ]; then
+            "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK"
+            CERTS="$("$BUILD_TOOLS/apksigner" verify --print-certs "$APK")"
+            if echo "$CERTS" | grep -qi "CN=Android Debug"; then
+              echo "ERROR: APK is signed with the Android debug certificate. Intune/Play will reject this."
+              exit 1
+            fi
+            BADGING="$("$BUILD_TOOLS/aapt" dump badging "$APK")"
+            echo "$BADGING" | grep -E "package:|native-code:|application-debuggable" || true
+            if echo "$BADGING" | grep -q "application-debuggable"; then
+              echo "ERROR: APK is marked debuggable."
+              exit 1
+            fi
+            if [ "$TARGET_ENV" = prod ] && echo "$BADGING" | grep -qE "^split[ =]"; then
+              echo "ERROR: APK is a config split, not a fat APK. This would cause INSTALL_FAILED_MISSING_SPLIT."
+              exit 1
+            fi
           fi
-          BADGING="$("$BUILD_TOOLS/aapt" dump badging "$APK")"
-          echo "$BADGING" | grep -E "package:|application-debuggable" || true
-          if echo "$BADGING" | grep -q "application-debuggable"; then
-            echo "ERROR: APK is marked debuggable."
-            exit 1
-          fi
+
           echo "apk_path=$APK" >> "$GITHUB_OUTPUT"
 
       - name: Upload APK as GitHub artifact
+        if: ${{ steps.plan.outputs.do_apk == 'true' }}
         uses: actions/upload-artifact@v5
         with:
-          name: ${{ steps.envcfg.outputs.artifact_apk }}
+          name: ${{ steps.plan.outputs.artifact_apk }}
           path: ${{ steps.apk.outputs.apk_path }}
 
       - name: Distribute APK to Firebase App Distribution
+        if: ${{ steps.plan.outputs.do_firebase == 'true' }}
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
           appId: ${{ env.FIREBASE_APP_ID }}
@@ -346,14 +494,16 @@ jobs:
           groups: testers
           file: ${{ steps.apk.outputs.apk_path }}
           releaseNotes: |
-            Environment: ${{ steps.envcfg.outputs.firebase_label }}
+            stoptb-meta: env=${{ inputs.environment }} signing=${{ inputs.signing }} package=${{ steps.plan.outputs.package_id }} versionName=${{ inputs.versionName }} versionCode=${{ inputs.versionCode }}
+            Environment: ${{ steps.plan.outputs.firebase_label }}
+            Signing: ${{ inputs.signing }}
             Version: ${{ inputs.versionName }} (${{ inputs.versionCode }})
             Branch: ${{ inputs.branch }}
-            Package: ${{ steps.envcfg.outputs.package_id }}
+            Package: ${{ steps.plan.outputs.package_id }}
             Description: ${{ inputs.description }}
 
       - name: Resolve Azure authentication mode
-        if: ${{ steps.envcfg.outputs.do_intune == 'true' }}
+        if: ${{ steps.plan.outputs.do_intune == 'true' }}
         id: azure_auth
         run: |
           if [ -n "${AZURE_CLIENT_SECRET:-}" ]; then
@@ -363,7 +513,7 @@ jobs:
           fi
 
       - name: Azure login (OIDC)
-        if: ${{ steps.envcfg.outputs.do_intune == 'true' && steps.azure_auth.outputs.auth_mode == 'oidc' }}
+        if: ${{ steps.plan.outputs.do_intune == 'true' && steps.azure_auth.outputs.auth_mode == 'oidc' }}
         uses: azure/login@v2
         with:
           client-id: ${{ env.AZURE_CLIENT_ID }}
@@ -371,14 +521,14 @@ jobs:
           allow-no-subscriptions: true
 
       - name: Get Microsoft Graph token
-        if: ${{ steps.envcfg.outputs.do_intune == 'true' && steps.azure_auth.outputs.auth_mode == 'oidc' }}
+        if: ${{ steps.plan.outputs.do_intune == 'true' && steps.azure_auth.outputs.auth_mode == 'oidc' }}
         run: |
           TOKEN="$(az account get-access-token --resource https://graph.microsoft.com --query accessToken -o tsv)"
           echo "::add-mask::${TOKEN}"
           echo "GRAPH_TOKEN=${TOKEN}" >> "$GITHUB_ENV"
 
       - name: Upload signed APK to Intune MDM
-        if: ${{ steps.envcfg.outputs.do_intune == 'true' }}
+        if: ${{ steps.plan.outputs.do_intune == 'true' }}
         run: |
           set -euo pipefail
           python3 -m pip install --quiet cryptography
@@ -388,45 +538,50 @@ jobs:
           fi
           python3 "$RUNNER_TEMP/upload_intune_android_lob.py" \
             --apk "${{ steps.apk.outputs.apk_path }}" \
-            --package-id "${{ steps.envcfg.outputs.package_id }}" \
+            --package-id "${{ steps.plan.outputs.package_id }}" \
             --version-name "${{ inputs.versionName }}" \
             --version-code "${{ inputs.versionCode }}" \
             --group-id "${INTUNE_GROUP_ID}" \
-            --display-name "StopTB ${{ steps.envcfg.outputs.firebase_label }}" \
+            --display-name "StopTB ${{ steps.plan.outputs.firebase_label }}" \
             --publisher "Piramal Swasthya" \
-            --description "${{ steps.envcfg.outputs.firebase_label }} signed build ${{ inputs.versionName }} (${{ inputs.versionCode }})" \
+            --description "${{ steps.plan.outputs.firebase_label }} signed build ${{ inputs.versionName }} (${{ inputs.versionCode }})" \
             "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"
 
       - name: Build PROD Release AAB
-        if: ${{ steps.envcfg.outputs.do_play == 'true' }}
-        run: ./gradlew ${{ steps.envcfg.outputs.gradle_aab_task }} --no-daemon --stacktrace
+        if: ${{ steps.plan.outputs.do_play == 'true' }}
+        run: ./gradlew ${{ steps.plan.outputs.gradle_aab_task }} --no-daemon --stacktrace
 
       - name: Find and prepare AAB
-        if: ${{ steps.envcfg.outputs.do_play == 'true' }}
+        if: ${{ steps.plan.outputs.do_play == 'true' }}
         id: aab
         run: |
           set -euo pipefail
           AAB_FILE="$(find app/build/outputs/bundle -type f -name '*.aab' | head -n 1 || true)"
           if [ -z "$AAB_FILE" ] || [ ! -f "$AAB_FILE" ]; then
             echo "ERROR: AAB file not found"
+            find app/build/outputs/bundle -type f || true
             exit 1
           fi
+          echo "AAB found at: $AAB_FILE"
           cp "$AAB_FILE" app-stoptb-release.aab
           echo "aab_path=app-stoptb-release.aab" >> "$GITHUB_OUTPUT"
           MAPPING_FILE="app/build/outputs/mapping/stoptbRelease/mapping.txt"
           if [ -f "$MAPPING_FILE" ]; then
             echo "mapping_file=$MAPPING_FILE" >> "$GITHUB_OUTPUT"
+          else
+            echo "WARNING: mapping.txt not found at $MAPPING_FILE"
+            find app/build/outputs/mapping -type f || true
           fi
 
       - name: Upload AAB as GitHub artifact
-        if: ${{ steps.envcfg.outputs.do_play == 'true' }}
+        if: ${{ steps.plan.outputs.do_play == 'true' }}
         uses: actions/upload-artifact@v5
         with:
           name: prod-release-aab
           path: app-stoptb-release.aab
 
       - name: Upload AAB to Google Play Internal Testing
-        if: ${{ steps.envcfg.outputs.do_play == 'true' && steps.aab.outputs.mapping_file != '' }}
+        if: ${{ steps.plan.outputs.do_play == 'true' && steps.aab.outputs.mapping_file != '' }}
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
@@ -437,7 +592,7 @@ jobs:
           mappingFile: ${{ steps.aab.outputs.mapping_file }}
 
       - name: Upload AAB to Google Play Internal Testing
-        if: ${{ steps.envcfg.outputs.do_play == 'true' && steps.aab.outputs.mapping_file == '' }}
+        if: ${{ steps.plan.outputs.do_play == 'true' && steps.aab.outputs.mapping_file == '' }}
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}

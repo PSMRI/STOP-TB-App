@@ -1,0 +1,260 @@
+name: StopTB Push to Intune
+run-name: STOP TB ${{ inputs.action }} ${{ inputs.environment }} ${{ inputs.versionName }} (${{ inputs.versionCode }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'list = show Firebase APK catalog. push = download that version and upload to matching Intune.'
+        required: true
+        type: choice
+        default: list
+        options:
+          - list
+          - push
+      environment:
+        description: 'Firebase app and Intune tenant/group to use'
+        required: true
+        type: choice
+        default: uat
+        options:
+          - uat
+          - prod
+      versionName:
+        description: 'Firebase display version to push (example: 1.0.3). Required for push.'
+        required: false
+        type: string
+        default: ''
+      versionCode:
+        description: 'Firebase build number to push (example: 4). Required for push.'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: promote-intune-${{ inputs.environment }}-${{ inputs.action }}
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Resolve environment
+        id: cfg
+        env:
+          TARGET_ENV: ${{ inputs.environment }}
+          ACTION: ${{ inputs.action }}
+          VERSION_NAME: ${{ inputs.versionName }}
+          VERSION_CODE: ${{ inputs.versionCode }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_APP_ID_UAT: ${{ secrets.FIREBASE_APP_ID_UAT }}
+          FIREBASE_APP_ID_PROD: ${{ secrets.FIREBASE_APP_ID_PROD }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_ID_UAT: ${{ secrets.AZURE_CLIENT_ID_UAT }}
+          AZURE_CLIENT_ID_PROD: ${{ secrets.AZURE_CLIENT_ID_PROD }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_TENANT_ID_UAT: ${{ secrets.AZURE_TENANT_ID_UAT }}
+          AZURE_TENANT_ID_PROD: ${{ secrets.AZURE_TENANT_ID_PROD }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_CLIENT_SECRET_UAT: ${{ secrets.AZURE_CLIENT_SECRET_UAT }}
+          AZURE_CLIENT_SECRET_PROD: ${{ secrets.AZURE_CLIENT_SECRET_PROD }}
+          INTUNE_GROUP_ID: ${{ secrets.INTUNE_GROUP_ID }}
+          INTUNE_GROUP_ID_UAT: ${{ secrets.INTUNE_GROUP_ID_UAT }}
+          INTUNE_GROUP_ID_PROD: ${{ secrets.INTUNE_GROUP_ID_PROD }}
+          INTUNE_APP_ID: ${{ secrets.INTUNE_APP_ID }}
+          INTUNE_APP_ID_UAT: ${{ secrets.INTUNE_APP_ID_UAT }}
+          INTUNE_APP_ID_PROD: ${{ secrets.INTUNE_APP_ID_PROD }}
+        run: |
+          set -euo pipefail
+          pick() {
+            if [ -n "${1:-}" ]; then
+              printf '%s' "$1"
+            else
+              printf '%s' "${2:-}"
+            fi
+          }
+          pick_env() {
+            local base="$1"
+            local suffixed_name="${base}_${SUFFIX}"
+            pick "${!suffixed_name:-}" "${!base:-}"
+          }
+
+          if [ "$TARGET_ENV" = prod ]; then
+            SUFFIX=PROD
+            PACKAGE_ID=org.piramalswasthya.stoptb
+            LABEL=PROD
+          else
+            SUFFIX=UAT
+            PACKAGE_ID=org.piramalswasthya.stoptb.uat
+            LABEL=UAT
+          fi
+
+          {
+            echo "package_id=$PACKAGE_ID"
+            echo "label=$LABEL"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "FIREBASE_APP_ID=$(pick_env FIREBASE_APP_ID)"
+            echo "AZURE_CLIENT_ID=$(pick_env AZURE_CLIENT_ID)"
+            echo "AZURE_TENANT_ID=$(pick_env AZURE_TENANT_ID)"
+            echo "AZURE_CLIENT_SECRET=$(pick_env AZURE_CLIENT_SECRET)"
+            echo "INTUNE_GROUP_ID=$(pick_env INTUNE_GROUP_ID)"
+            echo "INTUNE_APP_ID=$(pick_env INTUNE_APP_ID)"
+          } >> "$GITHUB_ENV"
+
+          if [ "$ACTION" = push ]; then
+            if [ -z "${VERSION_NAME}" ] || [ -z "${VERSION_CODE}" ]; then
+              echo "push requires versionName and versionCode from the Firebase catalog."
+              exit 1
+            fi
+            if ! [[ "${VERSION_CODE}" =~ ^[1-9][0-9]*$ ]]; then
+              echo "versionCode must be a positive integer (got: '${VERSION_CODE}')."
+              exit 1
+            fi
+          fi
+          echo "Promote plan: action=$ACTION env=$TARGET_ENV package=$PACKAGE_ID version=${VERSION_NAME:-n/a} (${VERSION_CODE:-n/a})"
+
+      - name: Check required secrets
+        env:
+          ACTION: ${{ inputs.action }}
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          missing=0
+          require() {
+            local name="$1"
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required secret/value: $name"
+              missing=1
+            fi
+          }
+          require FIREBASE_APP_ID
+          require FIREBASE_SERVICE_ACCOUNT_JSON
+          if [ "$ACTION" = push ]; then
+            require AZURE_CLIENT_ID
+            require AZURE_TENANT_ID
+            require INTUNE_GROUP_ID
+          fi
+          if [ "$missing" -ne 0 ]; then
+            echo "Add the missing repository secrets, then re-run this workflow."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: List Firebase APK catalog
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          python3 -m pip install --quiet google-auth
+          python3 .github/scripts/fetch_firebase_apk.py --list --app-id "${FIREBASE_APP_ID}"
+
+      - name: Download selected APK from Firebase
+        if: ${{ inputs.action == 'push' }}
+        id: apk
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          python3 -m pip install --quiet google-auth
+          python3 .github/scripts/fetch_firebase_apk.py \
+            --download \
+            --app-id "${FIREBASE_APP_ID}" \
+            --version-name "${{ inputs.versionName }}" \
+            --version-code "${{ inputs.versionCode }}" \
+            --output "$RUNNER_TEMP/stoptb-${{ inputs.environment }}-${{ inputs.versionName }}-${{ inputs.versionCode }}.apk" \
+            --require-signed \
+            --expect-env "${{ inputs.environment }}" \
+            --expect-package "${{ steps.cfg.outputs.package_id }}"
+
+      - name: Set up Android SDK
+        if: ${{ inputs.action == 'push' }}
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools build-tools;34.0.0'
+
+      - name: Verify downloaded APK is signed and matches environment
+        if: ${{ inputs.action == 'push' }}
+        env:
+          APK: ${{ steps.apk.outputs.apk_path }}
+          EXPECT_PACKAGE: ${{ steps.cfg.outputs.package_id }}
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)"
+          echo "Using APK: $APK"
+          echo "Using build-tools: $BUILD_TOOLS"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK"
+          CERTS="$("$BUILD_TOOLS/apksigner" verify --print-certs "$APK")"
+          if echo "$CERTS" | grep -qi "CN=Android Debug"; then
+            echo "ERROR: Firebase APK is signed with the Android debug certificate. Refusing Intune push."
+            exit 1
+          fi
+          BADGING="$("$BUILD_TOOLS/aapt" dump badging "$APK")"
+          echo "$BADGING" | grep -E "package:|application-debuggable|versionCode|versionName" || true
+          if echo "$BADGING" | grep -q "application-debuggable"; then
+            echo "ERROR: Firebase APK is marked debuggable. Refusing Intune push."
+            exit 1
+          fi
+          PACKAGE="$(echo "$BADGING" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n 1)"
+          if [ "$PACKAGE" != "$EXPECT_PACKAGE" ]; then
+            echo "ERROR: APK package $PACKAGE does not match ${{ inputs.environment }} package $EXPECT_PACKAGE."
+            exit 1
+          fi
+
+      - name: Upload downloaded APK as GitHub artifact
+        if: ${{ inputs.action == 'push' }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: intune-${{ inputs.environment }}-${{ inputs.versionName }}-${{ inputs.versionCode }}
+          path: ${{ steps.apk.outputs.apk_path }}
+
+      - name: Resolve Azure authentication mode
+        if: ${{ inputs.action == 'push' }}
+        id: azure_auth
+        run: |
+          if [ -n "${AZURE_CLIENT_SECRET:-}" ]; then
+            echo "auth_mode=secret" >> "$GITHUB_OUTPUT"
+          else
+            echo "auth_mode=oidc" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Azure login (OIDC)
+        if: ${{ inputs.action == 'push' && steps.azure_auth.outputs.auth_mode == 'oidc' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Get Microsoft Graph token
+        if: ${{ inputs.action == 'push' && steps.azure_auth.outputs.auth_mode == 'oidc' }}
+        run: |
+          TOKEN="$(az account get-access-token --resource https://graph.microsoft.com --query accessToken -o tsv)"
+          echo "::add-mask::${TOKEN}"
+          echo "GRAPH_TOKEN=${TOKEN}" >> "$GITHUB_ENV"
+
+      - name: Push signed APK to Intune MDM
+        if: ${{ inputs.action == 'push' }}
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet cryptography
+          EXTRA_ARGS=()
+          if [ -n "${INTUNE_APP_ID:-}" ]; then
+            EXTRA_ARGS+=(--app-id "${INTUNE_APP_ID}")
+          fi
+          python3 .github/scripts/upload_intune_android_lob.py \
+            --apk "${{ steps.apk.outputs.apk_path }}" \
+            --package-id "${{ steps.cfg.outputs.package_id }}" \
+            --version-name "${{ inputs.versionName }}" \
+            --version-code "${{ inputs.versionCode }}" \
+            --group-id "${INTUNE_GROUP_ID}" \
+            --display-name "StopTB ${{ steps.cfg.outputs.label }}" \
+            --publisher "Piramal Swasthya" \
+            --description "${{ steps.cfg.outputs.label }} signed build ${{ inputs.versionName }} (${{ inputs.versionCode }}) promoted from Firebase" \
+            "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"

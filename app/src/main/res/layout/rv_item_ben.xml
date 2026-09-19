@@ -120,9 +120,23 @@
                             android:ellipsize="end"
                             android:layout_marginEnd="@dimen/padding_small"
                             android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorPrimaryVariant"
+                        app:drawableTint="?attr/colorPrimary"
+                        tools:text="Hello Meister" />
+
+                        <TextView
+                            android:id="@+id/tv_age_gender"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="center_vertical"
+                            android:layout_marginEnd="@dimen/padding_small"
+                            android:background="@drawable/bg_dashboard_chip"
+                            android:paddingHorizontal="@dimen/padding_small"
+                            android:paddingVertical="@dimen/padding_tiny"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
                             android:textColor="?attr/colorPrimaryVariant"
-                            app:drawableTint="?attr/colorPrimary"
-                            tools:text="Hello Meister" />
+                            android:visibility="gone"
+                            tools:text="Female | 32 Years" />
 
                         <Button
                             android:id="@+id/btn_new_ben"
@@ -199,7 +213,7 @@
                             android:layout_gravity="center_vertical|end"
                             android:layout_marginHorizontal="@dimen/padding_small"
                             android:contentDescription="@string/iv_sync_state_tv"
-                            app:syncState="@{ben.syncState}"
+                            app:syncStateForBen="@{ben.syncState}"
                             tools:src="@drawable/ic_synced" />
 
                     </LinearLayout>
@@ -380,7 +394,7 @@
                            <ImageView
                                android:layout_width="wrap_content"
                                android:layout_height="wrap_content"
-                                android:src="@drawable/ic_no_hh" />
+                                android:src="@drawable/ic_non_household_vector" />
 
                             <TextView
                                 android:layout_width="wrap_content"
@@ -470,8 +484,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:orientation="vertical"
-                            android:padding="@dimen/padding_small"
-                            android:visibility="@{ben.isPlaceholderMobileNo ? View.GONE : View.VISIBLE}">
+                            android:padding="@dimen/padding_small">
 
                             <TextView
                                 android:id="@+id/mob"
@@ -500,132 +513,496 @@
 
                     </LinearLayout>
 
+                <LinearLayout
+                    android:id="@+id/ll_redesigned_details"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="@dimen/padding_normal"
+                    android:layout_marginTop="@dimen/padding_small"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    app:layout_constraintTop_toBottomOf="@id/ll_ben_details_2">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Demographic Details"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/padding_small"
+                        android:baselineAligned="false"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <LinearLayout
+                                android:id="@+id/ll_redesign_relation"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginBottom="@dimen/padding_small"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tv_redesign_relation_label"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                                    android:textColor="?attr/colorOnPrimary" />
+
+                                <TextView
+                                    android:id="@+id/tv_redesign_relation_value"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:maxLines="1"
+                                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                    android:textColor="?attr/colorOnPrimary"
+                                android:textStyle="bold" />
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:id="@+id/ll_redesign_father_name"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginBottom="@dimen/padding_small"
+                                android:orientation="vertical"
+                                android:visibility="gone">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/tv_father_name_ph"
+                                    android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                                    android:textColor="?attr/colorOnPrimary" />
+
+                                <TextView
+                                    android:id="@+id/tv_redesign_father_name"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:maxLines="1"
+                                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                    android:textColor="?attr/colorOnPrimary"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Registration Date"
+                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                                android:textColor="?attr/colorOnPrimary" />
+
+                            <TextView
+                                android:id="@+id/tv_redesign_registration_date"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginBottom="@dimen/padding_small"
+                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                android:textColor="?attr/colorOnPrimary"
+                                android:textStyle="bold" />
+
+                            <LinearLayout
+                                android:id="@+id/ll_redesign_family_members"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Family Members"
+                                    android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                                    android:textColor="?attr/colorOnPrimary" />
+
+                                <TextView
+                                    android:id="@+id/tv_redesign_family_members"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                    android:textColor="?attr/colorOnPrimary"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="match_parent"
+                            android:layout_marginHorizontal="@dimen/padding_normal"
+                            android:background="@android:color/white" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Beneficiary ID"
+                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                                android:textColor="?attr/colorOnPrimary" />
+
+                            <TextView
+                                android:id="@+id/tv_redesign_beneficiary_id"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                android:textColor="?attr/colorOnPrimary"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/padding_small"
+                                android:text="Nikshay ID"
+                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                                android:textColor="?attr/colorOnPrimary" />
+
+                            <TextView
+                                android:id="@+id/tv_redesign_nikshay_id"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                android:textColor="?attr/colorOnPrimary"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/padding_small"
+                                android:text="Mobile Number"
+                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                                android:textColor="?attr/colorOnPrimary" />
+
+                            <TextView
+                                android:id="@+id/tv_redesign_mobile_number"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                android:textColor="?attr/colorOnPrimary"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+
             <View
+                android:id="@+id/details_divider"
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:background="@android:color/white"
-                android:layout_marginTop="@dimen/margin_small"
-                android:layout_marginBottom="@dimen/margin_small"
-                android:layout_marginLeft="@dimen/margin_big"
-                android:layout_marginRight="@dimen/margin_big"
-                android:padding="@dimen/margin_small"
-                app:layout_constraintBottom_toBottomOf="@id/ll_ben_details_2"
-                app:layout_constraintBottom_toTopOf="@id/ll_screening_status"/>
+                android:layout_marginHorizontal="@dimen/padding_normal"
+                android:layout_marginTop="@dimen/padding_normal"
+                android:layout_marginBottom="@dimen/padding_small"
+                android:background="#66FFFFFF"
+                app:layout_constraintTop_toBottomOf="@id/ll_redesigned_details" />
+
+            <TextView
+                android:id="@+id/tv_screening_section_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/padding_normal"
+                android:layout_marginTop="0dp"
+                android:text="TB Screening Details"
+                android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
+                android:textColor="@android:color/white"
+                android:textStyle="bold"
+                android:visibility="gone"
+                app:layout_constraintTop_toBottomOf="@id/details_divider" />
 
             <LinearLayout
                 android:id="@+id/ll_screening_status"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="@dimen/padding_normal"
-                android:layout_marginTop="@dimen/padding_small"
+                android:layout_marginTop="0dp"
                 android:layout_marginBottom="@dimen/padding_small"
                 android:orientation="horizontal"
                 android:weightSum="3"
-                app:layout_constraintTop_toBottomOf="@id/ll_ben_details_2">
+                app:layout_constraintTop_toBottomOf="@id/details_divider">
 
                 <!-- Symptoms -->
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:background="@android:color/transparent"
                     android:gravity="center"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="TB Symptoms"
-                        android:textStyle="bold"
-                        android:textColor="?attr/colorOnPrimary"
-                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+                    android:minHeight="64dp"
+                    android:orientation="vertical"
+                    android:padding="@dimen/padding_small">
 
                     <ImageView
-                        android:id="@+id/ivSymptoms"
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:layout_marginTop="2dp"
-                        android:src="@drawable/circle_check" />
-
-                    <TextView
-                        android:id="@+id/tvSymptomsStatus"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:textColor="?attr/colorOnPrimary"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_marginEnd="6dp"
                         android:visibility="gone"
-                        android:textStyle="bold"
-                        android:gravity="center"
-                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+                        android:src="@drawable/ic_tb_symptoms_clipboard" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/ben_card_tb_symptoms"
+                            android:textStyle="bold"
+                            android:textColor="@android:color/white"
+                            android:textSize="14sp"
+                            android:visibility="gone"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:text="@string/ben_card_tb_symptoms"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                            android:textColor="@android:color/white"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:layout_marginTop="5dp"
+                            android:orientation="horizontal">
+
+                            <ImageView
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:layout_marginEnd="10dp"
+                                android:src="@drawable/ic_tb_symptoms_clipboard"
+                                app:tint="@android:color/white" />
+
+                            <TextView
+                                android:id="@+id/tvSymptomsStatus"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textColor="@android:color/white"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                android:visibility="gone"
+                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+
+                            <ImageView
+                                android:id="@+id/ivSymptoms"
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:src="@drawable/circle_check" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvSymptomsResult"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:gravity="center"
+                            android:textColor="@android:color/white"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+                    </LinearLayout>
                 </LinearLayout>
 
                 <!-- X-Ray -->
                 <LinearLayout
+                    android:id="@+id/ll_xray_tile"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:layout_marginHorizontal="2dp"
+                    android:background="@android:color/transparent"
                     android:gravity="center"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textStyle="bold"
-                        android:text="Chest X-Ray"
-                        android:textColor="?attr/colorOnPrimary"
-                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+                    android:minHeight="64dp"
+                    android:orientation="vertical"
+                    android:padding="@dimen/padding_small">
 
                     <ImageView
-                        android:id="@+id/ivXray"
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:layout_marginTop="2dp"
-                        android:src="@drawable/circle_check" />
-
-                    <TextView
-                        android:id="@+id/tvXrayResult"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:textColor="?attr/colorOnPrimary"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_marginEnd="6dp"
                         android:visibility="gone"
-                        android:textStyle="bold"
-                        android:gravity="center"
-                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+                        android:src="@drawable/ic_health_xray"
+                        app:tint="@android:color/white" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textStyle="bold"
+                            android:text="@string/ben_card_chest_xray"
+                            android:textColor="@android:color/white"
+                            android:textSize="14sp"
+                            android:visibility="gone"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:text="@string/ben_card_chest_xray"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                            android:textColor="@android:color/white"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:layout_marginTop="2dp"
+                            android:orientation="horizontal">
+
+                            <ImageView
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:layout_marginEnd="10dp"
+                                android:src="@drawable/ic_health_xray"
+                                app:tint="@android:color/white" />
+
+                            <TextView
+                                android:id="@+id/tvXrayStatus"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textColor="@android:color/white"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                android:visibility="gone"
+                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+
+                            <ImageView
+                                android:id="@+id/ivXray"
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:src="@drawable/circle_check" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvXrayResult"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:gravity="center"
+                            android:textColor="@android:color/white"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+                    </LinearLayout>
                 </LinearLayout>
 
                 <!-- TruNat -->
                 <LinearLayout
+                    android:id="@+id/ll_truenat_tile"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:background="@android:color/transparent"
                     android:gravity="center"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textStyle="bold"
-                        android:text="TrueNat"
-                        android:textColor="?attr/colorOnPrimary"
-                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+                    android:minHeight="64dp"
+                    android:orientation="vertical"
+                    android:padding="@dimen/padding_small">
 
                     <ImageView
-                        android:id="@+id/ivTruenat"
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:layout_marginTop="2dp"
-                        android:src="@drawable/circle_check" />
-
-                    <TextView
-                        android:id="@+id/tvTruenatResult"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:textColor="?attr/colorOnPrimary"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_marginEnd="6dp"
                         android:visibility="gone"
-                        android:textStyle="bold"
-                        android:gravity="center"
-                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+                        android:src="@drawable/ic_truenat_device"
+                        app:tint="@android:color/white" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textStyle="bold"
+                            android:text="@string/ben_card_truenat"
+                            android:textColor="@android:color/white"
+                            android:textSize="14sp"
+                            android:visibility="gone"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:text="@string/ben_card_truenat"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                            android:textColor="@android:color/white"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:layout_marginTop="2dp"
+                            android:orientation="horizontal">
+
+                            <ImageView
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:layout_marginEnd="10dp"
+                                android:src="@drawable/ic_truenat_device"
+                                app:tint="@android:color/white" />
+
+                            <TextView
+                                android:id="@+id/tvTruenatStatus"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textColor="@android:color/white"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                android:visibility="gone"
+                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+
+                            <ImageView
+                                android:id="@+id/ivTruenat"
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:src="@drawable/circle_check" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvTruenatResult"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:gravity="center"
+                            android:textColor="@android:color/white"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelSmall" />
+                    </LinearLayout>
                 </LinearLayout>
 
             </LinearLayout>
@@ -900,19 +1277,22 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginStart="8dp"
-                    android:backgroundTint="#7C5CC4"
+                    android:backgroundTint="@android:color/holo_green_dark"
                     android:gravity="center"
                     android:maxLines="1"
                     android:singleLine="true"
+                    app:icon="@drawable/person_add"
+                    app:iconSize="24dp"
+                    app:iconGravity="textStart"
+                    app:iconPadding="8dp"
+                    app:iconTint="@android:color/white"
                     android:onClick="@{()-> clickListener.onClickAddMember(ben)}"
                     android:paddingHorizontal="@dimen/padding_normal"
-                    android:text="Add Member"
                     android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
                     android:textColor="@android:color/white"
                     android:textSize="14sp"
                     android:visibility="@{showAddMemberButton &amp;&amp; !ben.isNonHH ? View.VISIBLE : View.GONE}"
                     app:cornerRadius="@dimen/padding_normal"
-                    app:strokeColor="#7C5CC4"
                     app:strokeWidth="1dp" />
 
                 <!-- ABHA button (no ABHA linked) — right half -->

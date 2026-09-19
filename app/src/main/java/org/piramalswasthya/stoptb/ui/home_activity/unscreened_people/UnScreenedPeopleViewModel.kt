@@ -105,6 +105,9 @@ class UnScreenedPeopleViewModel @Inject constructor(
         tbRepo.tbScreeningBenIds
             .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    val allTbDiagnostics = tbRepo.allTbDiagnostics
+    val householdMemberCounts = recordsRepo.householdMemberCounts
+
     val generalOpdBenIds: StateFlow<List<Long>> =
         tbRepo.generalOpdBenIds
             .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())

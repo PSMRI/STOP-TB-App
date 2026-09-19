@@ -40,6 +40,7 @@ class NonHHViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val tbScreeningBenIds: StateFlow<List<Long>> = tbRepo.tbScreeningBenIds
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val allTbDiagnostics = tbRepo.allTbDiagnostics
     val unsyncedTbScreeningBenIds: StateFlow<List<Long>> = tbRepo.unsyncedTbScreeningBenIds
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val syncingTbScreeningBenIds: StateFlow<List<Long>> = tbRepo.syncingTbScreeningBenIds
