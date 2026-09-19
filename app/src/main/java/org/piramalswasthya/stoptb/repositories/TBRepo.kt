@@ -1966,7 +1966,8 @@ class TBRepo @Inject constructor(
                                     val chestResult = serverResultSummary ?: ""
 
                                     val isCompleted = status.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
-                                    val xrayPos = isCompleted && isChestXrayPositive(chestResult)
+                                    val xrayPos = isCompleted &&
+                                        (isChestXrayPositive(chestResult) || isChestXrayAbnormalNonTB(chestResult))
 
                                      if (xrayPos && isTruenatIntegrated()) {
                                         val hasTruenat = !it.trueNatOrderId.isNullOrBlank() ||
@@ -2668,5 +2669,10 @@ class TBRepo @Inject constructor(
     private fun isChestXrayPositive(value: String?): Boolean {
         if (value.isNullOrBlank()) return false
         return value.trim().lowercase() == "tb presumptive"
+    }
+
+    private fun isChestXrayAbnormalNonTB(value: String?): Boolean {
+        if (value.isNullOrBlank()) return false
+        return value.trim().lowercase() == "abnormal but not tb presumptive"
     }
 }
