@@ -22,6 +22,7 @@ import com.google.android.material.R.attr.colorOnPrimary
 import com.google.android.material.color.MaterialColors
 import org.piramalswasthya.stoptb.BuildConfig
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.configuration.TBScreeningDataset
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.RvItemBenBinding
@@ -33,6 +34,7 @@ import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.ExamineDenominatorRule
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
+import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.ui.setSyncStateForBen
 import timber.log.Timber
 
@@ -188,6 +190,7 @@ class BenListAdapter(
             showExamineButton: Boolean = true,
             showScreeningStatus: Boolean = false,   // NEW
             tbDiagnosticsList: List<TBDiagnosticsCache> = emptyList(),
+            tbScreeningMap: Map<Long, TBScreeningCache> = emptyMap(),
             source: Int = 0,
             retryingBenIds: List<Long> = emptyList(),
             showContactTracingForms: Boolean = false,
@@ -320,29 +323,31 @@ class BenListAdapter(
 
                 val tbDiagForStatus = tbDiagnosticsList.find { it.benId == item.benId }
 
+
+
                 // ---------------------------------------------------------
                 // 1. TB Symptoms — driven purely by DB: symptomsScreenedDate + screeningStatus
                 // ---------------------------------------------------------
              //   val symptomsDone =TbScreeningUtils.getTbScreeningResult()
+                val tbScreeningCache = tbScreeningMap[item.benId]
+                val isPresumptive = TBScreeningDataset.TbScreeningUtils.isPresumptive(tbScreeningCache)
+
                 binding.ivSymptoms.setImageResource(
-                    if (hasTbScreening) {
-                        R.drawable.circle_check
-                    } else {
-                        R.drawable.circle_uncheck
-                    }
+                    if (hasTbScreening || tbScreeningCache != null) R.drawable.circle_check
+                    else R.drawable.circle_uncheck
                 )
 
-                if (hasTbScreening) {
-                    binding.tvSymptomsStatus.text = "Screened"
-                } else {
-                    binding.tvSymptomsStatus.text = "Unscreened"
-                }
+                binding.tvSymptomsStatus.text = if (hasTbScreening) "Screened" else "Unscreened"
                 binding.tvSymptomsStatus.visibility = View.GONE
-                binding.tvSymptomsResult.text = context.getString(
-                    R.string.ben_card_result,
-                    if (hasTbScreening) "Presumptive" else "N/A"
-                )
+
+                val symptomsResultText = when (isPresumptive) {
+                    true -> "Presumptive"
+                    false -> "Asymptomatic"
+                    null -> "N/A"
+                }
+                binding.tvSymptomsResult.text = context.getString(R.string.ben_card_result, symptomsResultText)
                 binding.tvSymptomsResult.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
+
                 // ---------------------------------------------------------
                 // 2. Chest X-Ray — driven purely by DB: chestXrayDoneDate + raw result
                 // ---------------------------------------------------------
@@ -1071,6 +1076,8 @@ class BenListAdapter(
     private val tptFollowUpDoneIds     = mutableListOf<Long>()
     private val tptEligibleIds         = mutableListOf<Long>()
     private val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
+
+    private val tbScreeningMap = mutableMapOf<Long, TBScreeningCache>()
     private val householdMemberCountMap = mutableMapOf<Long, Int>()
     var source: Int = 0
 
@@ -1107,6 +1114,7 @@ class BenListAdapter(
             showAnthropometryButton = showAnthropometryButton,
             showScreeningStatus = showScreeningStatus,
             tbDiagnosticsList = tbDiagnosticsList,
+            tbScreeningMap = tbScreeningMap,
             showRedesignedCard = showRedesignedCard,
             householdMemberCountMap = householdMemberCountMap,
             source = source,
@@ -1146,6 +1154,19 @@ class BenListAdapter(
         if (changedBenIds.isNotEmpty()) {
             currentList.forEachIndexed { index, item ->
                 if (item.benId in changedBenIds) notifyItemChanged(index)
+            }
+        }
+    }
+
+    fun submitTbScreeningList(list: List<TBScreeningCache>) {
+        val old = tbScreeningMap.toMap()
+        val new = list.associateBy { it.benId }
+        tbScreeningMap.clear()
+        tbScreeningMap.putAll(new)
+        val changed = (old.keys + new.keys).filterTo(mutableSetOf()) { old[it] != new[it] }
+        if (changed.isNotEmpty()) {
+            currentList.forEachIndexed { index, item ->
+                if (item.benId in changed) notifyItemChanged(index)
             }
         }
     }

@@ -44,6 +44,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.model.BenRegCache
+import org.piramalswasthya.stoptb.model.TBScreeningCache
 
 @HiltViewModel
 class AllBenViewModel @Inject constructor(
@@ -240,6 +241,8 @@ class AllBenViewModel @Inject constructor(
     }
 
     val allTbDiagnostics: Flow<List<TBDiagnosticsCache>> = tbRepo.allTbDiagnostics
+
+    val allTbScreening: Flow<List<TBScreeningCache>> = tbRepo.allTbScreening
 
     sealed class OrderActionResult {
         object Idle : OrderActionResult()

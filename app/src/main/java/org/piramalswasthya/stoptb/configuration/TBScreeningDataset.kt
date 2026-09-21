@@ -221,6 +221,43 @@ class TBScreeningDataset(
         }
     }
 
+
+    object TbScreeningUtils {
+
+        /**
+         * true  = Presumptive (any of the 10 answers is Yes)
+         * false = Non-presumptive (all 10 answers are No)
+         * null  = cannot decide (no record / unanswered)
+         */
+        fun isPresumptive(saved: TBScreeningCache?): Boolean? {
+            if (saved == null) return null
+
+            val answers = listOf(
+                saved.coughMoreThan2Weeks,
+                saved.bloodInSputum,
+                saved.feverMoreThan2Weeks,
+                saved.riseOfFever,
+                saved.lossOfAppetite,
+                saved.lossOfWeight,
+                saved.nightSweats,
+                saved.historyOfTb,
+                saved.takingAntiTBDrugs,
+                saved.familySufferingFromTB
+            )
+
+            return when {
+                answers.any { it == true } -> true
+                answers.all { it == false } -> false
+                // Fallback to the stored value (asymptomatic YES = not presumptive)
+                else -> when (saved.asymptomatic) {
+                    "NO" -> true
+                    "YES" -> false
+                    else -> null
+                }
+            }
+        }
+    }
+
     // ── Page setup ───────────────────────────────────────────────────────────
 
     suspend fun setUpPage(ben: BenRegCache?, saved: TBScreeningCache?) {
@@ -336,7 +373,11 @@ class TBScreeningDataset(
             form.historyOfTb           = isYes(historyOfTB)
             form.takingAntiTBDrugs     = isYes(currentlyTakingDrugs)
             form.familySufferingFromTB = isYes(familyHistoryTB)
-            form.asymptomatic          = isAsymptomatic.value?.takeIf { it.isNotBlank() }
+            form.asymptomatic = when (isAsymptomatic.value) {
+                yesValue -> "YES"
+                noValue -> "NO"
+                else -> null
+            }
             form.familyContactScreeningRequired = requiresFamilyContactScreening()
             val selectedRiskFactors = keyPopulationRiskFactors.value
                 ?.split("|")?.mapNotNull { it.toIntOrNull() }
