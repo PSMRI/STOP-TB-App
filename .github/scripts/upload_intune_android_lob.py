@@ -113,7 +113,12 @@ def graph_request(
             message = f"Graph {method} {url} failed ({exc.code}): {details}"
             if exc.code in {401, 403} or "Forbidden" in details:
                 raise PermissionError(f"{message}\n{INTUNE_PERMISSION_HELP}") from exc
-            retryable = exc.code in {429, 502, 503, 504} or "ServerBusy" in details or "throttl" in details.lower()
+            retryable = (
+                exc.code in {429, 500, 502, 503, 504}
+                or "ServerBusy" in details
+                or "InternalServerError" in details
+                or "throttl" in details.lower()
+            )
             if retryable and attempt < 5:
                 wait_s = min(40, 5 * (2 ** (attempt - 1)))
                 retry_after = exc.headers.get("Retry-After") if exc.headers else None
@@ -240,6 +245,78 @@ def wait_for_file(token: str, file_uri: str, stage: str) -> dict[str, Any]:
             raise RuntimeError(f"Intune file {stage} failed with state: {state}")
         time.sleep(2)
     raise RuntimeError(f"Timed out waiting for Intune file {stage}")
+
+
+def _is_transient_graph_error(exc: Exception) -> bool:
+    message = str(exc)
+    return any(
+        token in message
+        for token in (
+            " failed (429)",
+            " failed (500)",
+            " failed (502)",
+            " failed (503)",
+            " failed (504)",
+            "InternalServerError",
+            "ServerBusy",
+            "throttl",
+        )
+    )
+
+
+def commit_content_version(token: str, app_id: str, content_version_id: str) -> None:
+    path = f"deviceAppManagement/mobileApps/{app_id}"
+    body = {
+        "@odata.type": f"#{LOB_TYPE}",
+        "committedContentVersion": str(content_version_id),
+    }
+    headers = {"Prefer": "return=minimal"}
+    last_error: Exception | None = None
+    for attempt in range(1, 8):
+        try:
+            current = refresh_app(token, app_id)
+            committed = str(current.get("committedContentVersion") or "").strip()
+            state = str(current.get("publishingState") or "").lower()
+            if committed == str(content_version_id) or state == "published":
+                log(
+                    f"Intune app {app_id} already has committedContentVersion="
+                    f"{committed or content_version_id} publishingState={state or 'unknown'}"
+                )
+                return
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            log(f"Could not read Intune app before commit PATCH: {exc}")
+        for api in ("beta", "v1.0"):
+            try:
+                log(
+                    f"Committing Intune content version {content_version_id} "
+                    f"via Graph {api} (attempt {attempt}/7)"
+                )
+                graph_request(token, "PATCH", path, body, extra_headers=headers, api=api)
+                return
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+                log(f"Intune commit PATCH {api} failed: {exc}")
+                if not _is_transient_graph_error(exc):
+                    break
+        wait_s = min(45, 4 * (2 ** (attempt - 1)))
+        log(f"Waiting {wait_s}s for Intune app metadata before retrying commit PATCH")
+        time.sleep(wait_s)
+    try:
+        current = refresh_app(token, app_id)
+        committed = str(current.get("committedContentVersion") or "").strip()
+        state = str(current.get("publishingState") or "").lower()
+        if committed == str(content_version_id) or state in {"published", "processing"}:
+            log(
+                "Intune commit PATCH returned an error, but the app content is already "
+                f"committed (committedContentVersion={committed} publishingState={state}). Continuing."
+            )
+            return
+    except Exception as exc:  # noqa: BLE001
+        last_error = exc
+    raise last_error or RuntimeError(
+        f"Could not commit Intune content version {content_version_id} for app {app_id}"
+    )
 
 
 def wait_until_published(token: str, app_id: str) -> None:
@@ -1053,30 +1130,36 @@ def upload_apk(args: argparse.Namespace) -> None:
             log("Uploading encrypted APK to Intune storage")
             upload_to_azure_blob(sas_uri, encrypted_path)
             graph_request(token, "POST", f"{file_uri}/commit", encryption_info)
-            wait_for_file(token, file_uri, "CommitFile")
+            file_info = wait_for_file(token, file_uri, "CommitFile")
+            if not file_info.get("isCommitted"):
+                log("Waiting for Intune file isCommitted=true before app commit PATCH")
+                for _ in range(30):
+                    file_info = graph_request(token, "GET", file_uri)
+                    if file_info.get("isCommitted"):
+                        break
+                    time.sleep(2)
+                else:
+                    raise RuntimeError("Intune file commit finished without isCommitted=true")
+            time.sleep(5)
 
-        commit_body = {
-            "@odata.type": f"#{LOB_TYPE}",
-            "committedContentVersion": content_version_id,
-            "fileName": filename,
-            "displayName": app_display_name,
-            "versionName": args.version_name,
-            "versionCode": args.version_code,
-            "description": args.description,
-        }
+        commit_content_version(token, app_id, content_version_id)
         try:
-            graph_request(token, "PATCH", f"deviceAppManagement/mobileApps/{app_id}", commit_body)
-        except RuntimeError as exc:
-            log(f"Retrying Intune commit PATCH with committedContentVersion only after: {exc}")
             graph_request(
                 token,
                 "PATCH",
                 f"deviceAppManagement/mobileApps/{app_id}",
                 {
                     "@odata.type": f"#{LOB_TYPE}",
-                    "committedContentVersion": content_version_id,
+                    "fileName": filename,
+                    "displayName": app_display_name,
+                    "versionName": args.version_name,
+                    "versionCode": args.version_code,
+                    "description": args.description,
                 },
+                extra_headers={"Prefer": "return=minimal"},
             )
+        except Exception as exc:  # noqa: BLE001
+            log(f"Could not patch Intune version metadata after commit: {exc}")
         wait_until_published(token, app_id)
         log_published_app(token, app_id, args.version_code, args.version_name)
 
