@@ -93,25 +93,40 @@ def graph_request(
         url = f"{GRAPH_BETA}/{path.lstrip('/')}"
     else:
         url = f"{GRAPH_BASE}/{path.lstrip('/')}"
-    data = None if body is None else json.dumps(body).encode("utf-8")
-    request = urllib.request.Request(url, data=data, method=method)
-    request.add_header("Authorization", f"Bearer {token}")
-    if body is not None:
-        request.add_header("Content-Type", "application/json")
-    for key, value in (extra_headers or {}).items():
-        request.add_header(key, value)
-    try:
-        with urllib.request.urlopen(request) as response:
-            payload = response.read()
-            if not payload:
-                return {}
-            return json.loads(payload.decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        details = exc.read().decode("utf-8", errors="replace")
-        message = f"Graph {method} {url} failed ({exc.code}): {details}"
-        if exc.code in {401, 403} or "Forbidden" in details:
-            raise PermissionError(f"{message}\n{INTUNE_PERMISSION_HELP}") from exc
-        raise RuntimeError(message) from exc
+    encoded = None if body is None else json.dumps(body).encode("utf-8")
+    last_error: Exception | None = None
+    for attempt in range(1, 6):
+        request = urllib.request.Request(url, data=encoded, method=method)
+        request.add_header("Authorization", f"Bearer {token}")
+        if body is not None:
+            request.add_header("Content-Type", "application/json")
+        for key, value in (extra_headers or {}).items():
+            request.add_header(key, value)
+        try:
+            with urllib.request.urlopen(request) as response:
+                payload = response.read()
+                if not payload:
+                    return {}
+                return json.loads(payload.decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            details = exc.read().decode("utf-8", errors="replace")
+            message = f"Graph {method} {url} failed ({exc.code}): {details}"
+            if exc.code in {401, 403} or "Forbidden" in details:
+                raise PermissionError(f"{message}\n{INTUNE_PERMISSION_HELP}") from exc
+            retryable = exc.code in {429, 502, 503, 504} or "ServerBusy" in details or "throttl" in details.lower()
+            if retryable and attempt < 5:
+                wait_s = min(40, 5 * (2 ** (attempt - 1)))
+                retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                try:
+                    wait_s = max(wait_s, int(retry_after)) if retry_after else wait_s
+                except (TypeError, ValueError):
+                    pass
+                log(f"{message.splitlines()[0]} Retrying in {wait_s}s (attempt {attempt}/5)")
+                time.sleep(wait_s)
+                last_error = RuntimeError(message)
+                continue
+            raise RuntimeError(message) from exc
+    raise last_error or RuntimeError(f"Graph {method} {url} failed after retries")
 
 
 def get_token_from_client_secret(tenant_id: str, client_id: str, client_secret: str) -> str:
@@ -335,7 +350,10 @@ def _looks_like_same_stoptb_app(app: dict[str, Any], package_id: str) -> bool:
 
 
 def list_all_mobile_apps(token: str) -> list[dict[str, Any]]:
-    return _list_mobile_apps(token, f"{GRAPH_BASE}/deviceAppManagement/mobileApps")
+    apps = _list_mobile_apps(token, f"{GRAPH_BASE}/deviceAppManagement/mobileApps")
+    stoptb_named = [app.get("displayName") for app in apps if "stoptb" in _normalized_app_name(app)]
+    log(f"Listed {len(apps)} Intune mobile app(s); StopTB-named: {stoptb_named or 'none'}")
+    return apps
 
 
 def find_apps_for_package(token: str, package_id: str, app_id: str | None) -> list[dict[str, Any]]:
@@ -808,7 +826,7 @@ def upload_apk(args: argparse.Namespace) -> None:
             raise RuntimeError(
                 "Could not create an Android Enterprise Intune LOB app "
                 "(targetedPlatforms=androidOpenSourceProject). "
-                "A Device Administrator app would not install on MDM devices. "
+                "If Graph returned 503 ServerBusy, re-run the job; Intune was temporarily unavailable. "
                 f"Graph error: {exc}"
             ) from exc
         created_id = str(created["id"])
