@@ -303,16 +303,17 @@ def _app_package_ids(app: dict[str, Any]) -> set[str]:
     }
 
 
-def find_existing_app(token: str, package_id: str, app_id: str | None) -> dict[str, Any] | None:
+def find_apps_for_package(token: str, package_id: str, app_id: str | None) -> list[dict[str, Any]]:
+    found: dict[str, dict[str, Any]] = {}
     if app_id:
-        return graph_request(token, "GET", f"deviceAppManagement/mobileApps/{app_id}")
+        found[app_id] = graph_request(token, "GET", f"deviceAppManagement/mobileApps/{app_id}")
     for app in list_android_lob_apps(token):
         detail = app
         if package_id not in _app_package_ids(detail) and detail.get("id"):
             detail = graph_request(token, "GET", f"deviceAppManagement/mobileApps/{detail['id']}")
-        if package_id in _app_package_ids(detail):
-            return detail
-    return None
+        if package_id in _app_package_ids(detail) and detail.get("id"):
+            found[str(detail["id"])] = detail
+    return list(found.values())
 
 
 def android_app_body(
@@ -358,29 +359,176 @@ def manifest_xml(package_id: str, version_code: str, version_name: str, filename
     return base64.b64encode(xml.encode("ascii")).decode("ascii")
 
 
-def ensure_group_assignment(token: str, app_id: str, group_id: str) -> None:
-    assignments = graph_request(
+def _assignment_body(group_id: str, intent: str) -> dict[str, Any]:
+    return {
+        "@odata.type": "#microsoft.graph.mobileAppAssignment",
+        "intent": intent,
+        "target": {
+            "@odata.type": "#microsoft.graph.groupAssignmentTarget",
+            "groupId": group_id,
+        },
+    }
+
+
+def list_app_assignments(token: str, app_id: str) -> list[dict[str, Any]]:
+    return graph_request(
         token, "GET", f"deviceAppManagement/mobileApps/{app_id}/assignments"
     ).get("value") or []
+
+
+def ensure_group_assignment(token: str, app_id: str, group_id: str, intent: str = "required") -> None:
+    want = intent.lower()
+    assignments = list_app_assignments(token, app_id)
     for assignment in assignments:
+        current_intent = str(assignment.get("intent") or "")
         target = assignment.get("target") or {}
-        if target.get("groupId") == group_id:
-            log(f"Intune group {group_id} is already assigned")
+        target_type = str(target.get("@odata.type") or "")
+        log(
+            f"Existing Intune assignment {assignment.get('id')} "
+            f"intent={current_intent or '(none)'} target={target_type} groupId={target.get('groupId') or '-'}"
+        )
+        if target.get("groupId") != group_id:
+            continue
+        assignment_id = str(assignment.get("id") or "")
+        if current_intent.lower() == want:
+            log(f"Intune group {group_id} is already assigned as {want}")
             return
+        if not assignment_id:
+            break
+        graph_request(
+            token,
+            "PATCH",
+            f"deviceAppManagement/mobileApps/{app_id}/assignments/{assignment_id}",
+            _assignment_body(group_id, want),
+        )
+        log(f"Updated Intune assignment {assignment_id} from intent={current_intent} to {want}")
+        return
     graph_request(
         token,
         "POST",
         f"deviceAppManagement/mobileApps/{app_id}/assignments",
-        {
-            "@odata.type": "#microsoft.graph.mobileAppAssignment",
-            "intent": "required",
-            "target": {
-                "@odata.type": "#microsoft.graph.groupAssignmentTarget",
-                "groupId": group_id,
-            },
-        },
+        _assignment_body(group_id, want),
     )
-    log(f"Assigned Intune app as required to group {group_id}")
+    log(f"Assigned Intune app as {want} to group {group_id}")
+
+
+def _version_int(value: Any) -> int | None:
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def existing_app_version_code(app: dict[str, Any]) -> int | None:
+    candidates = [app.get("identityVersion"), app.get("versionCode")]
+    versions = [parsed for parsed in (_version_int(value) for value in candidates) if parsed is not None]
+    return max(versions) if versions else None
+
+
+def log_existing_version(app: dict[str, Any]) -> None:
+    log(
+        "Existing Intune app version: "
+        f"id={app.get('id')} name={app.get('displayName')} "
+        f"identityVersion={app.get('identityVersion')} "
+        f"versionCode={app.get('versionCode')} "
+        f"versionName={app.get('versionName')} "
+        f"committedContentVersion={app.get('committedContentVersion')}"
+    )
+
+
+def assignment_intents_for_group(token: str, app_id: str, group_id: str) -> set[str]:
+    intents: set[str] = set()
+    for assignment in list_app_assignments(token, app_id):
+        target = assignment.get("target") or {}
+        if target.get("groupId") == group_id:
+            intents.add(str(assignment.get("intent") or "").lower())
+    return intents
+
+
+def pick_in_place_target(
+    token: str,
+    apps: list[dict[str, Any]],
+    group_id: str,
+    preferred_id: str | None,
+) -> dict[str, Any] | None:
+    if preferred_id:
+        for app in apps:
+            if str(app.get("id")) == preferred_id:
+                return app
+    ranked: list[tuple[int, int, int, dict[str, Any]]] = []
+    for app in apps:
+        app_id = str(app.get("id") or "")
+        intents = assignment_intents_for_group(token, app_id, group_id) if app_id else set()
+        required = 1 if "required" in intents else 0
+        published = 1 if str(app.get("publishingState") or "").lower() == "published" else 0
+        version = existing_app_version_code(app) or 0
+        ranked.append((required, published, version, app))
+    if not ranked:
+        return None
+    ranked.sort(key=lambda item: (item[0], item[1], item[2]))
+    return ranked[-1][3]
+
+
+def can_update_in_place(app: dict[str, Any], version_code: str) -> bool:
+    if str(app.get("publishingState") or "").lower() != "published":
+        return False
+    current_code = existing_app_version_code(app)
+    new_code = _version_int(version_code)
+    return current_code is not None and new_code is not None and new_code > current_code
+
+
+def mark_app_for_uninstall(token: str, app: dict[str, Any], group_id: str) -> None:
+    app_id = str(app["id"])
+    display_name = str(app.get("displayName") or "StopTB")
+    if "(previous)" not in display_name.lower():
+        try:
+            graph_request(
+                token,
+                "PATCH",
+                f"deviceAppManagement/mobileApps/{app_id}",
+                {
+                    "@odata.type": f"#{LOB_TYPE}",
+                    "displayName": f"{display_name} (previous)",
+                },
+            )
+        except Exception as exc:  # noqa: BLE001
+            log(f"Could not rename previous Intune app {app_id}: {exc}")
+    ensure_group_assignment(token, app_id, group_id, intent="uninstall")
+    log(
+        f"Previous Intune app {app_id} is assigned as uninstall so devices can drop "
+        f"package version {existing_app_version_code(app) or app.get('versionCode')}"
+    )
+
+
+def log_published_app(token: str, app_id: str, version_code: str, version_name: str) -> None:
+    app = refresh_app(token, app_id)
+    log(
+        "Published Intune app: "
+        f"id={app_id} publishingState={app.get('publishingState')} "
+        f"identityVersion={app.get('identityVersion')} "
+        f"versionCode={app.get('versionCode')} versionName={app.get('versionName')} "
+        f"committedContentVersion={app.get('committedContentVersion')} "
+        f"packageId={app.get('packageId')}"
+    )
+    published_code = existing_app_version_code(app)
+    expected_code = _version_int(version_code)
+    if published_code is not None and expected_code is not None and published_code != expected_code:
+        raise RuntimeError(
+            "Intune published a different version than this upload. "
+            f"App identity/versionCode={published_code}, upload {version_name} ({version_code}). "
+            "MDM devices will keep the published version."
+        )
+    try:
+        summary = graph_request(token, "GET", f"deviceAppManagement/mobileApps/{app_id}/installSummary")
+        log(
+            "Intune install summary: "
+            f"installed={summary.get('installedDeviceCount')} "
+            f"notInstalled={summary.get('notInstalledDeviceCount')} "
+            f"failed={summary.get('failedDeviceCount')} "
+            f"pending={summary.get('pendingInstallDeviceCount')}"
+        )
+    except Exception as exc:  # noqa: BLE001
+        log(f"Could not read Intune install summary: {exc}")
 
 
 def content_versions_path(app_id: str) -> str:
@@ -465,6 +613,16 @@ def upload_apk(args: argparse.Namespace) -> None:
         raise RuntimeError(f"APK not found: {apk}")
 
     filename = apk.name
+    app_display_name = str(args.display_name).strip() or "StopTB"
+    version_label = f"{args.version_name} ({args.version_code})"
+    if version_label not in app_display_name:
+        app_display_name = f"{app_display_name} {version_label}"
+    log(
+        "Uploading APK with "
+        f"versionName={args.version_name} versionCode={args.version_code}. "
+        "Android and Intune only replace an installed package when versionCode is higher; "
+        "versionName is display-only."
+    )
 
     def create_app() -> str:
         created = graph_request(
@@ -472,7 +630,7 @@ def upload_apk(args: argparse.Namespace) -> None:
             "POST",
             "deviceAppManagement/mobileApps",
             android_app_body(
-                args.display_name,
+                app_display_name,
                 args.publisher,
                 args.description,
                 filename,
@@ -481,20 +639,48 @@ def upload_apk(args: argparse.Namespace) -> None:
                 args.version_name,
             ),
         )
-        log(f"Created Intune app {created['id']}")
+        log(f"Created Intune app {created['id']} displayName={app_display_name}")
         return str(created["id"])
 
     def create_content_version() -> dict[str, Any]:
         return graph_request(token, "POST", content_versions_path(app_id), {})
 
-    existing = find_existing_app(token, args.package_id, args.app_id)
-    if existing:
-        app_id = str(existing["id"])
+    apps = find_apps_for_package(token, args.package_id, args.app_id)
+    if args.app_id:
+        pinned = next((app for app in apps if str(app.get("id")) == args.app_id), None)
+        if pinned is None:
+            raise RuntimeError(f"INTUNE_APP_ID {args.app_id} was not found in Intune.")
+        found_packages = _app_package_ids(pinned)
+        log(
+            f"INTUNE_APP_ID {args.app_id} ({pinned.get('displayName')}) "
+            f"package={found_packages or '{unknown}'}"
+        )
+        if found_packages and args.package_id not in found_packages:
+            raise RuntimeError(
+                f"INTUNE_APP_ID {args.app_id} is package {found_packages}, not {args.package_id}. "
+                "MDM devices assigned to that app will not get this APK."
+            )
+
+    matching = [
+        app
+        for app in apps
+        if args.package_id in _app_package_ids(app) or not _app_package_ids(app)
+    ]
+    for app in matching:
+        log_existing_version(app)
+
+    target = pick_in_place_target(token, matching, args.group_id, args.app_id) if matching else None
+    replace_mode = "new"
+    if target is not None and can_update_in_place(target, args.version_code):
+        replace_mode = "in-place"
+        app_id = str(target["id"])
         existing = refresh_app(token, app_id)
         publishing_state = str(existing.get("publishingState") or "unknown")
+        current_code = existing_app_version_code(existing)
         log(
-            f"Found Intune app {app_id} ({existing.get('displayName')}) "
-            f"publishingState={publishing_state}"
+            f"In-place Intune upgrade: published versionCode {current_code} -> {args.version_code} "
+            f"on app {app_id} ({existing.get('displayName')}). "
+            "New versionCode is higher, so MDM can replace the APK without uninstall."
         )
         delete_pending_content_versions(token, existing)
         leftover = pending_content_version_ids(token, refresh_app(token, app_id))
@@ -502,8 +688,30 @@ def upload_apk(args: argparse.Namespace) -> None:
             log("Pending content could not be cleared; recreating the unpublished Intune app")
             delete_mobile_app(token, app_id)
             app_id = create_app()
+    elif matching:
+        replace_mode = "reinstall"
+        existing_codes = [existing_app_version_code(app) for app in matching]
+        log(
+            "Force Intune uninstall+reinstall: new versionCode "
+            f"{args.version_code} is not higher than existing {existing_codes} "
+            f"(versionName {args.version_name} is ignored by Android). "
+            "Same or lower versionCode cannot replace an installed package in place."
+        )
+        for app in matching:
+            other_id = str(app.get("id") or "")
+            if not other_id:
+                continue
+            state = str(app.get("publishingState") or "").lower()
+            if state == "published":
+                mark_app_for_uninstall(token, app, args.group_id)
+            else:
+                try:
+                    delete_mobile_app(token, other_id)
+                except Exception as exc:  # noqa: BLE001
+                    log(f"Could not delete unpublished Intune app {other_id}: {exc}")
+        app_id = create_app()
     else:
-        log("No existing Intune app. Uploading as a new app.")
+        log("No existing Intune app for this package. Uploading as a new app.")
         app_id = create_app()
 
     try:
@@ -549,22 +757,46 @@ def upload_apk(args: argparse.Namespace) -> None:
         graph_request(token, "POST", f"{file_uri}/commit", encryption_info)
         wait_for_file(token, file_uri, "CommitFile")
 
-    graph_request(
-        token,
-        "PATCH",
-        f"deviceAppManagement/mobileApps/{app_id}",
-        {
-            "@odata.type": f"#{LOB_TYPE}",
-            "committedContentVersion": content_version_id,
-            "fileName": filename,
-            "versionName": args.version_name,
-            "versionCode": args.version_code,
-            "description": args.description,
-        },
-    )
+    commit_body = {
+        "@odata.type": f"#{LOB_TYPE}",
+        "committedContentVersion": content_version_id,
+        "fileName": filename,
+        "displayName": app_display_name,
+        "identityVersion": args.version_code,
+        "identityName": args.package_id,
+        "packageId": args.package_id,
+        "versionName": args.version_name,
+        "versionCode": args.version_code,
+        "description": args.description,
+    }
+    try:
+        graph_request(token, "PATCH", f"deviceAppManagement/mobileApps/{app_id}", commit_body)
+    except RuntimeError as exc:
+        message = str(exc)
+        if "identityVersion" not in message and "identityName" not in message:
+            raise
+        log(f"Retrying Intune commit PATCH without identity fields after: {exc}")
+        commit_body.pop("identityVersion", None)
+        commit_body.pop("identityName", None)
+        graph_request(token, "PATCH", f"deviceAppManagement/mobileApps/{app_id}", commit_body)
     wait_until_published(token, app_id)
-    ensure_group_assignment(token, app_id, args.group_id)
-    log(f"Intune upload complete for {args.package_id} {args.version_name} ({args.version_code})")
+    log_published_app(token, app_id, args.version_code, args.version_name)
+    ensure_group_assignment(token, app_id, args.group_id, intent="required")
+    if replace_mode == "in-place":
+        log(
+            f"Intune in-place upgrade complete for {args.package_id} "
+            f"{args.version_name} ({args.version_code})"
+        )
+    elif replace_mode == "reinstall":
+        log(
+            f"Intune uninstall+reinstall complete for {args.package_id} "
+            f"{args.version_name} ({args.version_code}). "
+            "Devices must check in so Uninstall removes the old package before the new "
+            "Required APK can install. Android will not silently downgrade over a higher "
+            "installed versionCode."
+        )
+    else:
+        log(f"Intune upload complete for {args.package_id} {args.version_name} ({args.version_code})")
 
 
 def parse_args() -> argparse.Namespace:
