@@ -347,9 +347,7 @@ def android_app_body(
             "@odata.type": "#microsoft.graph.androidMinimumOperatingSystem",
             "v7_1": True,
         },
-        # Default Graph LOB apps are Android device administrator only, which
-        # Android Enterprise / fully managed devices ignore.
-        "targetedPlatforms": "androidDeviceAdministrator,androidOpenSourceProject",
+        "targetedPlatforms": "androidOpenSourceProject",
     }
 
 
@@ -429,6 +427,22 @@ def _version_int(value: Any) -> int | None:
         return None
 
 
+def targets_android_enterprise(app: dict[str, Any]) -> bool:
+    value = str(app.get("targetedPlatforms") or "").lower()
+    return "opensource" in value or "aosp" in value
+
+
+def with_platform_details(token: str, app: dict[str, Any]) -> dict[str, Any]:
+    app_id = str(app.get("id") or "")
+    if not app_id:
+        return app
+    try:
+        return {**app, **refresh_app(token, app_id, api="beta")}
+    except Exception as exc:  # noqa: BLE001
+        log(f"Could not read Intune targetedPlatforms for {app_id}: {exc}")
+        return app
+
+
 def existing_app_version_code(app: dict[str, Any]) -> int | None:
     candidates = [app.get("identityVersion"), app.get("versionCode")]
     versions = [parsed for parsed in (_version_int(value) for value in candidates) if parsed is not None]
@@ -442,7 +456,8 @@ def log_existing_version(app: dict[str, Any]) -> None:
         f"identityVersion={app.get('identityVersion')} "
         f"versionCode={app.get('versionCode')} "
         f"versionName={app.get('versionName')} "
-        f"committedContentVersion={app.get('committedContentVersion')}"
+        f"committedContentVersion={app.get('committedContentVersion')} "
+        f"targetedPlatforms={app.get('targetedPlatforms') or 'androidDeviceAdministrator'}"
     )
 
 
@@ -624,47 +639,9 @@ def delete_pending_content_versions(token: str, app: dict[str, Any]) -> None:
             log(f"Could not delete Intune content version {version_id}: {exc}")
 
 
-def ensure_android_enterprise_target(token: str, app_id: str) -> None:
-    platforms = "androidDeviceAdministrator,androidOpenSourceProject"
-    body = {
-        "@odata.type": f"#{LOB_TYPE}",
-        "targetedPlatforms": platforms,
-    }
-    try:
-        graph_request(
-            token,
-            "PATCH",
-            f"deviceAppManagement/mobileApps/{app_id}",
-            body,
-            api="beta",
-        )
-    except Exception as exc:  # noqa: BLE001
-        log(f"Could not set both Intune targeted platforms after: {exc}")
-        try:
-            body["targetedPlatforms"] = "androidOpenSourceProject"
-            graph_request(
-                token,
-                "PATCH",
-                f"deviceAppManagement/mobileApps/{app_id}",
-                body,
-                api="beta",
-            )
-        except Exception as retry_exc:  # noqa: BLE001
-            log(f"Could not set Intune targetedPlatforms to Android Enterprise: {retry_exc}")
-            return
-    app = {}
-    try:
-        app = refresh_app(token, app_id, api="beta")
-    except Exception as exc:  # noqa: BLE001
-        log(f"Could not re-read Intune targetedPlatforms: {exc}")
-        return
-    log(f"Intune targetedPlatforms={app.get('targetedPlatforms')}")
-    platforms_value = str(app.get("targetedPlatforms") or "").lower()
-    if "opensource" not in platforms_value and "aosp" not in platforms_value:
-        log(
-            "WARNING: Intune app is still Android device administrator only. "
-            "Android Enterprise / fully managed devices in the assignment group will not install this APK."
-        )
+def delete_mobile_app(token: str, app_id: str) -> None:
+    graph_request(token, "DELETE", f"deviceAppManagement/mobileApps/{app_id}")
+    log(f"Deleted unpublished Intune app {app_id}")
 
 
 def acquire_graph_token() -> str:
@@ -710,23 +687,46 @@ def upload_apk(args: argparse.Namespace) -> None:
     )
 
     def create_app() -> str:
-        created = graph_request(
-            token,
-            "POST",
-            "deviceAppManagement/mobileApps",
-            android_app_body(
-                app_display_name,
-                args.publisher,
-                args.description,
-                filename,
-                args.package_id,
-                args.version_code,
-                args.version_name,
-            ),
-            api="beta",
+        body = android_app_body(
+            app_display_name,
+            args.publisher,
+            args.description,
+            filename,
+            args.package_id,
+            args.version_code,
+            args.version_name,
         )
-        log(f"Created Intune app {created['id']} displayName={app_display_name}")
-        return str(created["id"])
+        try:
+            created = graph_request(
+                token,
+                "POST",
+                "deviceAppManagement/mobileApps",
+                body,
+                api="beta",
+            )
+        except RuntimeError as exc:
+            log(f"Creating Intune Android Enterprise LOB app failed, retrying without platform flag: {exc}")
+            body.pop("targetedPlatforms", None)
+            created = graph_request(token, "POST", "deviceAppManagement/mobileApps", body)
+        created_id = str(created["id"])
+        platforms = created.get("targetedPlatforms")
+        if not platforms:
+            try:
+                platforms = refresh_app(token, created_id, api="beta").get("targetedPlatforms")
+            except Exception as exc:  # noqa: BLE001
+                log(f"Could not read targetedPlatforms for new app {created_id}: {exc}")
+        log(
+            f"Created Intune app {created_id} displayName={app_display_name} "
+            f"targetedPlatforms={platforms or 'androidDeviceAdministrator'}"
+        )
+        if not targets_android_enterprise({"targetedPlatforms": platforms}):
+            raise RuntimeError(
+                "Intune created the LOB app as Android device administrator. "
+                "Android Enterprise devices will not install it. "
+                "Delete this app in Intune and create an Android Enterprise LOB app, "
+                "or ensure Graph beta accepts targetedPlatforms=androidOpenSourceProject."
+            )
+        return created_id
 
     def create_content_version() -> dict[str, Any]:
         return graph_request(token, "POST", content_versions_path(app_id), {})
@@ -748,14 +748,19 @@ def upload_apk(args: argparse.Namespace) -> None:
             )
 
     matching = [
-        app
+        with_platform_details(token, app)
         for app in apps
         if args.package_id in _app_package_ids(app) or not _app_package_ids(app)
     ]
     for app in matching:
         log_existing_version(app)
 
-    target = pick_in_place_target(token, matching, args.group_id, args.app_id) if matching else None
+    enterprise_apps = [app for app in matching if targets_android_enterprise(app)]
+    target = (
+        pick_in_place_target(token, enterprise_apps, args.group_id, args.app_id)
+        if enterprise_apps
+        else None
+    )
     replace_mode = "new"
     if target is not None and can_update_in_place(target, args.version_code):
         replace_mode = "in-place"
@@ -765,7 +770,7 @@ def upload_apk(args: argparse.Namespace) -> None:
         current_code = existing_app_version_code(existing)
         log(
             f"In-place Intune upgrade: published versionCode {current_code} -> {args.version_code} "
-            f"on app {app_id} ({existing.get('displayName')}). "
+            f"on Android Enterprise app {app_id} ({existing.get('displayName')}). "
             "New versionCode is higher, so MDM can replace the APK without uninstall."
         )
         delete_pending_content_versions(token, existing)
@@ -774,16 +779,16 @@ def upload_apk(args: argparse.Namespace) -> None:
             log("Pending content could not be cleared; recreating the unpublished Intune app")
             delete_mobile_app(token, app_id)
             app_id = create_app()
-    elif matching:
+    elif enterprise_apps:
         replace_mode = "reinstall"
-        existing_codes = [existing_app_version_code(app) for app in matching]
+        existing_codes = [existing_app_version_code(app) for app in enterprise_apps]
         log(
             "Force Intune uninstall+reinstall: new versionCode "
-            f"{args.version_code} is not higher than existing {existing_codes} "
+            f"{args.version_code} is not higher than existing Android Enterprise {existing_codes} "
             f"(versionName {args.version_name} is ignored by Android). "
             "Same or lower versionCode cannot replace an installed package in place."
         )
-        for app in matching:
+        for app in enterprise_apps:
             other_id = str(app.get("id") or "")
             if not other_id:
                 continue
@@ -797,7 +802,14 @@ def upload_apk(args: argparse.Namespace) -> None:
                     log(f"Could not delete unpublished Intune app {other_id}: {exc}")
         app_id = create_app()
     else:
-        log("No existing Intune app for this package. Uploading as a new app.")
+        if matching:
+            log(
+                "Existing Intune LOB app is Android device administrator only. "
+                "TargetedPlatforms is read-only after create, so a new Android Enterprise "
+                "LOB app will be created for fully managed/dedicated devices."
+            )
+        else:
+            log("No existing Intune app for this package. Uploading as a new Android Enterprise app.")
         app_id = create_app()
 
     try:
@@ -866,7 +878,6 @@ def upload_apk(args: argparse.Namespace) -> None:
         commit_body.pop("identityName", None)
         graph_request(token, "PATCH", f"deviceAppManagement/mobileApps/{app_id}", commit_body)
     wait_until_published(token, app_id)
-    ensure_android_enterprise_target(token, app_id)
     log_published_app(token, app_id, args.version_code, args.version_name)
     ensure_group_assignment(token, app_id, args.group_id, intent="required")
     if replace_mode == "in-place":
