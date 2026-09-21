@@ -402,14 +402,14 @@ def ensure_group_assignment(token: str, app_id: str, group_id: str, intent: str 
             return
         if not assignment_id:
             break
+        # Intent and Target are read-only on PATCH. Replace the assignment instead.
         graph_request(
             token,
-            "PATCH",
+            "DELETE",
             f"deviceAppManagement/mobileApps/{app_id}/assignments/{assignment_id}",
-            _assignment_body(group_id, want),
         )
-        log(f"Updated Intune assignment {assignment_id} from intent={current_intent} to {want}")
-        return
+        log(f"Removed Intune assignment {assignment_id} (intent={current_intent})")
+        break
     graph_request(
         token,
         "POST",
@@ -568,10 +568,6 @@ def content_versions_path(app_id: str) -> str:
 
 def list_content_versions(token: str, app_id: str) -> list[dict[str, Any]]:
     return graph_request(token, "GET", content_versions_path(app_id)).get("value") or []
-
-
-def refresh_app(token: str, app_id: str) -> dict[str, Any]:
-    return graph_request(token, "GET", f"deviceAppManagement/mobileApps/{app_id}")
 
 
 def pending_content_version_ids(token: str, app: dict[str, Any]) -> list[str]:
