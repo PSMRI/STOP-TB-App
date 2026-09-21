@@ -48,6 +48,9 @@ interface TBDao {
     @Query("SELECT * FROM TB_DIAGNOSTICS")
     fun getAllTbDiagnostics(): Flow<List<TBDiagnosticsCache>>
 
+    @Query("SELECT * FROM TB_SCREENING")
+    fun getAllTbScreening(): Flow<List<TBScreeningCache>>
+
     @Query("SELECT * FROM TB_DIAGNOSTICS")
     suspend fun getDiagnosticsList(): List<TBDiagnosticsCache>
 

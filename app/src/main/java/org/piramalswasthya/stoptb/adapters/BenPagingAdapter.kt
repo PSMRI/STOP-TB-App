@@ -7,6 +7,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
+import org.piramalswasthya.stoptb.model.TBScreeningCache
 
 class BenPagingAdapter(
     private val clickListener: BenListAdapter.BenClickListener? = null,
@@ -50,6 +51,7 @@ class BenPagingAdapter(
     private val childCountMap = mutableMapOf<Long, Int>()
     private val householdMemberCountMap = mutableMapOf<Long, Int>()
     private val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
+    private val tbScreeningMap = mutableMapOf<Long, TBScreeningCache>()
     private val retryingBenIds = mutableListOf<Long>()
 
     override fun onCreateViewHolder(
@@ -90,6 +92,7 @@ class BenPagingAdapter(
             showAnthropometryButton = showAnthropometryButton,
             showExamineButton = showExamineButton,
             tbDiagnosticsList = tbDiagnosticsList,
+            tbScreeningMap = tbScreeningMap,
             showScreeningStatus = showScreeningStatus,   // ADD THIS
             showRedesignedCard = showRedesignedCard,
             householdMemberCountMap = householdMemberCountMap,
@@ -119,6 +122,13 @@ class BenPagingAdapter(
                 }
             }
         }
+    }
+
+
+    fun submitTbScreeningList(list: List<TBScreeningCache>) {
+        tbScreeningMap.clear()
+        tbScreeningMap.putAll(list.associateBy { it.benId })
+        notifyDataSetChanged()
     }
 
     fun submitBenIds(list: List<Long>) {

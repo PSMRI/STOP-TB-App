@@ -595,6 +595,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 benAdapter.submitTbScreeningBenIds(benIds)
             }
         }
+
         lifecycleScope.launch {
             viewModel.unsyncedTbScreeningBenIds.collectLatest { benIds ->
                 benAdapter.submitUnsyncedTbScreeningBenIds(benIds)
@@ -655,6 +656,12 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         lifecycleScope.launch {
             viewModel.allTbDiagnostics.collectLatest { diagnosticsList ->
                 benAdapter.submitTBDiagnostics(diagnosticsList)
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.allTbScreening.collectLatest { screeningList ->
+                benAdapter.submitTbScreeningList(screeningList)
             }
         }
 
