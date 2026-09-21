@@ -531,9 +531,9 @@ def log_published_app(token: str, app_id: str, version_code: str, version_name: 
         f"committedContentVersion={app.get('committedContentVersion')} "
         f"packageId={app.get('packageId')}"
     )
-    if app.get("identityVersion") in (None, ""):
+    if not identity_version:
         log(
-            "Graph v1.0 does not return identityVersion; Intune uses versionCode "
+            "Graph did not return identityVersion; Intune uses versionCode "
             f"{app.get('versionCode')} from the committed APK for device updates."
         )
     published_code = existing_app_version_code({**app, "identityVersion": identity_version})
@@ -559,7 +559,11 @@ def log_published_app(token: str, app_id: str, version_code: str, version_name: 
             f"pending={summary.get('pendingInstallDeviceCount')}"
         )
     except Exception as exc:  # noqa: BLE001
-        log(f"Could not read Intune install summary: {exc}")
+        message = str(exc)
+        if "NotSupported" in message or "not found for the segment" in message.lower():
+            log("Intune install summary is not available in this tenant Graph API.")
+        else:
+            log(f"Could not read Intune install summary: {exc}")
 
 
 def content_versions_path(app_id: str) -> str:
@@ -574,6 +578,7 @@ def pending_content_version_ids(token: str, app: dict[str, Any]) -> list[str]:
     app_id = str(app["id"])
     committed = str(app.get("committedContentVersion") or "").strip()
     published = str(app.get("publishingState") or "").lower() == "published"
+    committed_num = _version_int(committed)
     pending: list[str] = []
     for version in list_content_versions(token, app_id):
         version_id = str(version.get("id") or "")
@@ -581,6 +586,10 @@ def pending_content_version_ids(token: str, app: dict[str, Any]) -> list[str]:
             continue
         if published and committed and version_id == committed:
             log(f"Keeping committed Intune content version {version_id}")
+            continue
+        version_num = _version_int(version_id)
+        if published and committed_num is not None and version_num is not None and version_num < committed_num:
+            log(f"Skipping historical Intune content version {version_id} (committed is {committed})")
             continue
         pending.append(version_id)
     return pending
@@ -601,6 +610,13 @@ def delete_pending_content_versions(token: str, app: dict[str, Any]) -> None:
             graph_request(token, "DELETE", f"{content_versions_path(app_id)}/{version_id}")
             log(f"Deleted pending Intune content version {version_id}")
         except Exception as exc:  # noqa: BLE001
+            message = str(exc)
+            if "NotSupported" in message or "(501)" in message:
+                log(
+                    f"Intune does not allow deleting content version {version_id}; "
+                    "leaving it in place and uploading a new version."
+                )
+                continue
             log(f"Could not delete Intune content version {version_id}: {exc}")
 
 
