@@ -151,6 +151,7 @@ jobs:
             APK_NAME=app-stoptb
             GRADLE_AAB_TASK=bundleStoptbRelease
             FIREBASE_LABEL=PROD
+            INTUNE_DISPLAY_NAME=STOPTB
           else
             SUFFIX=UAT
             PACKAGE_ID=org.piramalswasthya.stoptb.uat
@@ -158,6 +159,7 @@ jobs:
             APK_NAME=app-stoptbUat
             GRADLE_AAB_TASK=
             FIREBASE_LABEL=UAT
+            INTUNE_DISPLAY_NAME=STOPTB_UAT
           fi
 
           if [ "$SIGNING" = signed ]; then
@@ -542,7 +544,7 @@ jobs:
             --version-name "${{ inputs.versionName }}" \
             --version-code "${{ inputs.versionCode }}" \
             --group-id "${INTUNE_GROUP_ID}" \
-            --display-name "StopTB ${{ steps.plan.outputs.firebase_label }}" \
+            --display-name "STOPTB_UAT" \
             --publisher "Piramal Swasthya" \
             --description "${{ steps.plan.outputs.firebase_label }} signed build ${{ inputs.versionName }} (${{ inputs.versionCode }})" \
             "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"

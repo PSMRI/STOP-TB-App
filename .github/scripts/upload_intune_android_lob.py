@@ -334,6 +334,15 @@ def _app_package_ids(app: dict[str, Any]) -> set[str]:
     }
 
 
+def canonical_display_name(package_id: str, requested: str | None = None) -> str:
+    if ".uat" in package_id:
+        return "STOPTB_UAT"
+    requested_name = str(requested or "").strip()
+    if requested_name.upper() in {"STOPTB", "STOPTB_PROD"}:
+        return "STOPTB"
+    return "STOPTB"
+
+
 def _normalized_app_name(app: dict[str, Any]) -> str:
     return "".join(ch for ch in str(app.get("displayName") or "").lower() if ch.isalnum())
 
@@ -796,7 +805,8 @@ def upload_apk(args: argparse.Namespace) -> None:
         raise RuntimeError(f"APK not found: {apk}")
 
     filename = apk.name
-    app_display_name = str(args.display_name).strip() or "StopTB"
+    app_display_name = canonical_display_name(args.package_id, args.display_name)
+    log(f"Intune displayName will stay {app_display_name} (version stays in versionName/versionCode, not the app name)")
     log(
         "Uploading APK with "
         f"versionName={args.version_name} versionCode={args.version_code}. "
@@ -871,8 +881,6 @@ def upload_apk(args: argparse.Namespace) -> None:
     matching = [with_platform_details(token, app) for app in apps]
     for app in matching:
         log_existing_version(app)
-        if _normalized_app_name(app) == "stoptbuat":
-            app_display_name = str(app.get("displayName") or app_display_name)
 
     enterprise_apps = [
         app
@@ -901,8 +909,6 @@ def upload_apk(args: argparse.Namespace) -> None:
         existing = refresh_app(token, app_id)
         publishing_state = str(existing.get("publishingState") or "unknown")
         current_code = existing_app_version_code(existing)
-        keep_name = str(existing.get("displayName") or app_display_name).replace(" (previous)", "")
-        app_display_name = keep_name
         log(
             f"In-place Intune upgrade: published versionCode {current_code} -> {args.version_code} "
             f"on Android Enterprise app {app_id} ({existing.get('displayName')}). "
