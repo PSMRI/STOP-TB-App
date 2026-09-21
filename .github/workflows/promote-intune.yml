@@ -89,15 +89,18 @@ jobs:
             SUFFIX=PROD
             PACKAGE_ID=org.piramalswasthya.stoptb
             LABEL=PROD
+            INTUNE_DISPLAY_NAME=STOPTB
           else
             SUFFIX=UAT
             PACKAGE_ID=org.piramalswasthya.stoptb.uat
             LABEL=UAT
+            INTUNE_DISPLAY_NAME=STOPTB_UAT
           fi
 
           {
             echo "package_id=$PACKAGE_ID"
             echo "label=$LABEL"
+            echo "intune_display_name=$INTUNE_DISPLAY_NAME"
           } >> "$GITHUB_OUTPUT"
           {
             echo "FIREBASE_APP_ID=$(pick_env FIREBASE_APP_ID)"
@@ -254,7 +257,7 @@ jobs:
             --version-name "${{ inputs.versionName }}" \
             --version-code "${{ inputs.versionCode }}" \
             --group-id "${INTUNE_GROUP_ID}" \
-            --display-name "StopTB ${{ steps.cfg.outputs.label }}" \
+            --display-name "${{ steps.cfg.outputs.intune_display_name }}" \
             --publisher "Piramal Swasthya" \
             --description "${{ steps.cfg.outputs.label }} signed build ${{ inputs.versionName }} (${{ inputs.versionCode }}) promoted from Firebase" \
             "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"

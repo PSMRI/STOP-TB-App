@@ -197,6 +197,7 @@ jobs:
             echo "gradle_apk_task=$GRADLE_APK_TASK"
             echo "gradle_aab_task=$GRADLE_AAB_TASK"
             echo "firebase_label=$FIREBASE_LABEL"
+            echo "intune_display_name=$INTUNE_DISPLAY_NAME"
             echo "do_apk=$DO_APK"
             echo "do_firebase=$DO_FIREBASE"
             echo "do_intune=$DO_INTUNE"
@@ -544,7 +545,7 @@ jobs:
             --version-name "${{ inputs.versionName }}" \
             --version-code "${{ inputs.versionCode }}" \
             --group-id "${INTUNE_GROUP_ID}" \
-            --display-name "STOPTB_UAT" \
+            --display-name "${{ steps.plan.outputs.intune_display_name }}" \
             --publisher "Piramal Swasthya" \
             --description "${{ steps.plan.outputs.firebase_label }} signed build ${{ inputs.versionName }} (${{ inputs.versionCode }})" \
             "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"

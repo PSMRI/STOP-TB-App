@@ -358,6 +358,23 @@ def _looks_like_same_stoptb_app(app: dict[str, Any], package_id: str) -> bool:
     return has_uat if wants_uat else not has_uat
 
 
+def rename_app_display_name(token: str, app: dict[str, Any], display_name: str) -> None:
+    app_id = str(app.get("id") or "")
+    if not app_id:
+        return
+    odata_type = str(app.get("@odata.type") or f"#{LOB_TYPE}")
+    graph_request(
+        token,
+        "PATCH",
+        f"deviceAppManagement/mobileApps/{app_id}",
+        {
+            "@odata.type": odata_type if odata_type.startswith("#") else f"#{odata_type.lstrip('#')}",
+            "displayName": display_name,
+        },
+    )
+    app["displayName"] = display_name
+
+
 def list_all_mobile_apps(token: str) -> list[dict[str, Any]]:
     apps = _list_mobile_apps(token, f"{GRAPH_BASE}/deviceAppManagement/mobileApps")
     stoptb_named = [app.get("displayName") for app in apps if "stoptb" in _normalized_app_name(app)]
@@ -673,7 +690,7 @@ def log_published_app(token: str, app_id: str, version_code: str, version_name: 
     )
     log(
         "Published Intune app: "
-        f"id={app_id} publishingState={app.get('publishingState')} "
+        f"id={app_id} name={app.get('displayName')} publishingState={app.get('publishingState')} "
         f"identityVersion={identity_version} "
         f"versionCode={app.get('versionCode')} versionName={app.get('versionName')} "
         f"committedContentVersion={app.get('committedContentVersion')} "
@@ -814,7 +831,45 @@ def upload_apk(args: argparse.Namespace) -> None:
         "versionName is display-only."
     )
 
+    def free_canonical_display_name(keep_app_id: str | None = None) -> None:
+        want = _normalized_app_name({"displayName": app_display_name})
+        for app in matching:
+            other_id = str(app.get("id") or "")
+            if not other_id or other_id == keep_app_id:
+                continue
+            current = str(app.get("displayName") or "")
+            if _normalized_app_name(app) != want:
+                continue
+            previous_name = f"{app_display_name} (previous)"
+            if current == previous_name:
+                continue
+            try:
+                rename_app_display_name(token, app, previous_name)
+                log(
+                    f"Renamed {current} ({other_id}) to {previous_name} "
+                    f"so the Required app can keep the name {app_display_name}"
+                )
+            except Exception as exc:  # noqa: BLE001
+                log(f"Could not rename {current} ({other_id}) off {app_display_name}: {exc}")
+
+    def ensure_canonical_display_name(target_app_id: str) -> None:
+        free_canonical_display_name(keep_app_id=target_app_id)
+        try:
+            current = refresh_app(token, target_app_id)
+        except Exception as exc:  # noqa: BLE001
+            log(f"Could not read Intune app {target_app_id} to confirm displayName: {exc}")
+            return
+        current_name = str(current.get("displayName") or "")
+        if current_name == app_display_name:
+            return
+        try:
+            rename_app_display_name(token, current, app_display_name)
+            log(f"Renamed Intune app {target_app_id} from {current_name} to {app_display_name}")
+        except Exception as exc:  # noqa: BLE001
+            log(f"Could not set Intune displayName to {app_display_name}: {exc}")
+
     def create_app() -> str:
+        free_canonical_display_name()
         body = android_app_body(
             app_display_name,
             args.publisher,
@@ -1025,6 +1080,7 @@ def upload_apk(args: argparse.Namespace) -> None:
         wait_until_published(token, app_id)
         log_published_app(token, app_id, args.version_code, args.version_name)
 
+    ensure_canonical_display_name(app_id)
     ensure_group_assignment(token, app_id, args.group_id, intent="required")
     try:
         uninstall_competing_apps(token, args.package_id, app_id, args.group_id, matching)
@@ -1067,7 +1123,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--version-name")
     parser.add_argument("--version-code")
     parser.add_argument("--group-id")
-    parser.add_argument("--display-name", default="StopTB UAT")
+    parser.add_argument("--display-name", default="STOPTB_UAT")
     parser.add_argument("--publisher", default="Piramal Swasthya")
     parser.add_argument("--description", default="StopTB UAT signed build")
     parser.add_argument("--app-id", default="")
