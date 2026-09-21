@@ -24,6 +24,7 @@ from cryptography.hazmat.primitives import hashes
 
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+GRAPH_BETA = "https://graph.microsoft.com/beta"
 LOB_TYPE = "microsoft.graph.androidLobApp"
 CHUNK_SIZE = 1024 * 1024
 INTUNE_APP_ROLES = (
@@ -84,8 +85,14 @@ def graph_request(
     body: dict[str, Any] | None = None,
     raw_url: bool = False,
     extra_headers: dict[str, str] | None = None,
+    api: str = "v1.0",
 ) -> Any:
-    url = path if raw_url else f"{GRAPH_BASE}/{path.lstrip('/')}"
+    if raw_url:
+        url = path
+    elif api == "beta":
+        url = f"{GRAPH_BETA}/{path.lstrip('/')}"
+    else:
+        url = f"{GRAPH_BASE}/{path.lstrip('/')}"
     data = None if body is None else json.dumps(body).encode("utf-8")
     request = urllib.request.Request(url, data=data, method=method)
     request.add_header("Authorization", f"Bearer {token}")
@@ -500,17 +507,36 @@ def mark_app_for_uninstall(token: str, app: dict[str, Any], group_id: str) -> No
     )
 
 
+def refresh_app(token: str, app_id: str, api: str = "v1.0") -> dict[str, Any]:
+    return graph_request(token, "GET", f"deviceAppManagement/mobileApps/{app_id}", api=api)
+
+
 def log_published_app(token: str, app_id: str, version_code: str, version_name: str) -> None:
     app = refresh_app(token, app_id)
+    beta_app: dict[str, Any] = {}
+    try:
+        beta_app = refresh_app(token, app_id, api="beta")
+    except Exception as exc:  # noqa: BLE001
+        log(f"Could not read Intune app from Graph beta: {exc}")
+    identity_version = (
+        beta_app.get("identityVersion")
+        or app.get("identityVersion")
+        or app.get("versionCode")
+    )
     log(
         "Published Intune app: "
         f"id={app_id} publishingState={app.get('publishingState')} "
-        f"identityVersion={app.get('identityVersion')} "
+        f"identityVersion={identity_version} "
         f"versionCode={app.get('versionCode')} versionName={app.get('versionName')} "
         f"committedContentVersion={app.get('committedContentVersion')} "
         f"packageId={app.get('packageId')}"
     )
-    published_code = existing_app_version_code(app)
+    if app.get("identityVersion") in (None, ""):
+        log(
+            "Graph v1.0 does not return identityVersion; Intune uses versionCode "
+            f"{app.get('versionCode')} from the committed APK for device updates."
+        )
+    published_code = existing_app_version_code({**app, "identityVersion": identity_version})
     expected_code = _version_int(version_code)
     if published_code is not None and expected_code is not None and published_code != expected_code:
         raise RuntimeError(
@@ -519,7 +545,12 @@ def log_published_app(token: str, app_id: str, version_code: str, version_name: 
             "MDM devices will keep the published version."
         )
     try:
-        summary = graph_request(token, "GET", f"deviceAppManagement/mobileApps/{app_id}/installSummary")
+        summary = graph_request(
+            token,
+            "GET",
+            f"deviceAppManagement/mobileApps/{app_id}/installSummary",
+            api="beta",
+        )
         log(
             "Intune install summary: "
             f"installed={summary.get('installedDeviceCount')} "
