@@ -17,11 +17,14 @@ class GeneralOpdDataset(
         inputType = InputType.CHECKBOXES,
         title = resources.getString(R.string.chief_complaint),
         arrayId = R.array.general_opd_chief_complaint_array,
-        entries = resources.getStringArray(R.array.general_opd_chief_complaint_array),
+        entries = emptyArray(),
         required = false,
         hasDependants = true,
-        showAsMultiSelectDialog = true
+        showAsMultiSelectDialog = true,
+        enableSearchInMultiSelect = true
     )
+
+    private var chiefComplaintEnglishEntries = emptyArray<String>()
 
     private val medication = FormElement(
         id = 2,
@@ -75,7 +78,7 @@ class GeneralOpdDataset(
     suspend fun setUpPage(saved: GeneralOpdCache?) {
         saved?.let {
             chiefComplaint.value =
-                englishValuesToSelectionIndexes(it.chiefComplaints, R.array.general_opd_chief_complaint_array)
+                valuesToSelectionIndexes(it.chiefComplaints, chiefComplaintEnglishEntries)
             medication.value =
                 englishValuesToSelectionIndexes(it.medications, R.array.general_opd_medication_array)
             dosage.value = it.dosage
@@ -85,6 +88,17 @@ class GeneralOpdDataset(
         }
         syncRequiredFlags()
 //        setUpPage(listOf(chiefComplaint, medication, dosage, frequency, duration, notes))
+        setUpPage(listOf(chiefComplaint, medication, frequency, duration, notes))
+    }
+
+    fun setChiefComplaintEntries(entries: List<String>) {
+        chiefComplaint.entries = entries.toTypedArray()
+        chiefComplaintEnglishEntries = entries.toTypedArray()
+    }
+
+    suspend fun refreshChiefComplaintEntries(entries: List<String>) {
+        setChiefComplaintEntries(entries)
+        // Re-emit the current form elements without resetting values the user may have entered.
         setUpPage(listOf(chiefComplaint, medication, frequency, duration, notes))
     }
 
@@ -99,10 +113,7 @@ class GeneralOpdDataset(
 
     override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
         (cacheModel as GeneralOpdCache).let { form ->
-            form.chiefComplaints = getSelectedEnglishValues(
-                chiefComplaint,
-                R.array.general_opd_chief_complaint_array
-            )
+            form.chiefComplaints = getSelectedValues(chiefComplaint, chiefComplaintEnglishEntries)
             form.medications = getSelectedEnglishValues(
                 medication,
                 R.array.general_opd_medication_array
@@ -151,22 +162,28 @@ class GeneralOpdDataset(
     private fun hasMedication(): Boolean = !medication.value.isNullOrBlank()
 
     private fun getSelectedEnglishValues(formElement: FormElement, arrayId: Int): List<String>? {
+        return getSelectedValues(formElement, englishResources.getStringArray(arrayId))
+    }
+
+    private fun getSelectedValues(formElement: FormElement, entries: Array<String>): List<String>? {
         val selectedIndexes = formElement.value
             ?.split("|")
             ?.mapNotNull { it.toIntOrNull() }
             .orEmpty()
         if (selectedIndexes.isEmpty()) return null
 
-        val englishEntries = englishResources.getStringArray(arrayId)
-        return selectedIndexes.mapNotNull { idx -> englishEntries.getOrNull(idx) }
+        return selectedIndexes.mapNotNull { idx -> entries.getOrNull(idx) }
     }
 
     private fun englishValuesToSelectionIndexes(values: List<String>?, arrayId: Int): String? {
+        return valuesToSelectionIndexes(values, englishResources.getStringArray(arrayId))
+    }
+
+    private fun valuesToSelectionIndexes(values: List<String>?, entries: Array<String>): String? {
         if (values.isNullOrEmpty()) return null
 
-        val englishEntries = englishResources.getStringArray(arrayId)
         val selectedIndexes = values.mapNotNull { value ->
-            englishEntries.indexOf(value).takeIf { it >= 0 }
+            entries.indexOf(value).takeIf { it >= 0 }
         }
         return selectedIndexes.takeIf { it.isNotEmpty() }?.joinToString("|")
     }
