@@ -10,6 +10,7 @@ import android.content.res.Resources
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
+import android.util.TypedValue
 import android.text.Editable
 import android.text.InputFilter
 import android.text.InputFilter.AllCaps
@@ -26,7 +27,6 @@ import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.CheckBox
-import android.widget.CheckedTextView
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ListView
@@ -846,7 +846,7 @@ class FormInputAdapter(
             val context = binding.root.context
             val density = context.resources.displayMetrics.density
             val maxListHeightPx = (context.resources.displayMetrics.heightPixels * 0.58f).toInt()
-            val rowHeightPx = (48 * density).toInt()
+            val rowHeightPx = (56 * density).toInt()
             val container = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding((20 * density).toInt(), (8 * density).toInt(), (20 * density).toInt(), 0)
@@ -877,16 +877,31 @@ class FormInputAdapter(
 
             fun refreshFilteredList(query: String) {
                 filteredIndices = labels.indices.filter { labels[it].contains(query, ignoreCase = true) }
-                val adapter = object : ArrayAdapter<String>(
-                    context,
-                    android.R.layout.simple_list_item_multiple_choice,
-                    filteredIndices.map { labels[it] }
-                ) {
+                val adapter = object : ArrayAdapter<String>(context, 0, filteredIndices.map { labels[it] }) {
                     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                        val view = super.getView(position, convertView, parent) as CheckedTextView
+                        val row = (convertView as? LinearLayout) ?: LinearLayout(context).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            gravity = Gravity.CENTER_VERTICAL
+                            minimumHeight = rowHeightPx
+                            val horizontalPadding = (16 * density).toInt()
+                            setPadding(horizontalPadding, 0, horizontalPadding, 0)
+
+                            addView(CheckBox(context).apply {
+                                isClickable = false
+                                isFocusable = false
+                            })
+                            addView(TextView(context).apply {
+                                gravity = Gravity.CENTER_VERTICAL or Gravity.LEFT
+                                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                                setPadding((12 * density).toInt(), 0, 0, 0)
+                            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
+                        }
                         val originalIndex = filteredIndices[position]
-                        view.isChecked = checkedItems[originalIndex]
-                        return view
+                        val checkbox = row.getChildAt(0) as CheckBox
+                        val label = row.getChildAt(1) as TextView
+                        checkbox.isChecked = checkedItems[originalIndex]
+                        label.text = labels[originalIndex]
+                        return row
                     }
                 }
                 listView.adapter = adapter
