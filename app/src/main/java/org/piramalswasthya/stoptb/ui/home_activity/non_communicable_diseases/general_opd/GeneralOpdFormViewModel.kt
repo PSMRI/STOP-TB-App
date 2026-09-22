@@ -65,6 +65,8 @@ class GeneralOpdFormViewModel @Inject constructor(
                 generalOpdCache = GeneralOpdCache(benId = it.beneficiaryId)
             }
 
+            dataset.setChiefComplaintEntries(tbRepo.getCachedChiefComplaintNames())
+
             tbRepo.getGeneralOpd(benId)?.let {
                 generalOpdCache = it
                 _recordExists.value = true
