@@ -43,22 +43,32 @@ class IconDataset @Inject constructor(
         // Legacy, kept for reference:
 //        val role = preferenceDao.getLoggedInUser()?.role
         val homeModules = roleManager.privilegesForActiveRole().homeModules
-        val iconList = mutableListOf(
-            Icon(
-                R.drawable.ic_health_home,
-                resources.getString(R.string.icon_title_household),
-                resources.getString(R.string.home_card_household_subtitle),
-                recordsRepo.hhListCount,
-                VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllHouseholdFragment()
-            ),
-            Icon(
-                R.drawable.ic_health_person,
-                resources.getString(R.string.icon_title_ben),
-                resources.getString(R.string.home_card_all_ben_subtitle),
-                recordsRepo.allBenListCount,
-                VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment()
+        // Household/Beneficiaries used to be unconditional here — every existing role
+        // (Registrar/Nurse/Counsellor) always had both. Lab Technician is the first role
+        // without Household access, so both are now gated on homeModules like everything else.
+        val iconList = mutableListOf<Icon>()
+        if (AppModule.HOUSEHOLD in homeModules) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic_health_home,
+                    resources.getString(R.string.icon_title_household),
+                    resources.getString(R.string.home_card_household_subtitle),
+                    recordsRepo.hhListCount,
+                    VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllHouseholdFragment()
+                )
             )
-        )
+        }
+        if (AppModule.BENEFICIARIES in homeModules) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic_health_person,
+                    resources.getString(R.string.icon_title_ben),
+                    resources.getString(R.string.home_card_all_ben_subtitle),
+                    recordsRepo.allBenListCount,
+                    VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment()
+                )
+            )
+        }
 
 //        if (role.isRegistrationOfficerRole() || role.isCounsellingOfficerRole() || role.isNurseRole()) {
         if (AppModule.NON_HOUSEHOLD in homeModules) {
@@ -160,6 +170,7 @@ class IconDataset @Inject constructor(
                     resources.getString(R.string.home_card_tpt_module_subtitle),
                     null,
                     VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment(
+                        source = 9,
                         showContactTracingForms = true
                     )
                 )
@@ -283,6 +294,7 @@ class IconDataset @Inject constructor(
                     subtitle = resources.getString(R.string.home_card_tpt_module_subtitle),
                     count = null,
                     navAction = VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment(
+                        source = 9,
                         showContactTracingForms = true
                     )
                 )

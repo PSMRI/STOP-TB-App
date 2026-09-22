@@ -820,7 +820,7 @@ data class BenBasicCache(
 }
 
 fun getAgeDisplayString(dob: Long): String {
-    if (dob <= 0L) return "N/A"
+    if (dob == 0L) return "N/A"
 
     val calDob = Calendar.getInstance().apply { timeInMillis = dob }
     val calNow = Calendar.getInstance()
@@ -874,7 +874,7 @@ fun getAgeDisplayString(dob: Long): String {
 }
 
 fun BenRegCache.getAgeGenderDisplayString(): String {
-    val ageText = if (dob > 0L) {
+    val fullAgeText = if (dob > 0L) {
         getAgeDisplayString(dob)
     } else {
         when (ageUnit) {
@@ -884,6 +884,12 @@ fun BenRegCache.getAgeGenderDisplayString(): String {
             else -> "N/A"
         }
     }
+
+    // Keep form headers compact: show the largest available age unit only.
+    val ageText = Regex("\\d+\\s+(?:Years|Year|Months|Month|Days|Day)")
+        .find(fullAgeText)
+        ?.value
+        ?: fullAgeText
 
     val genderText = gender?.name
         ?.replace('_', ' ')
@@ -978,6 +984,11 @@ data class BenBasicDomain(
 data class BenChildCount(
     val benId: Long,
     val childCount: Int
+)
+
+data class HouseholdMemberCount(
+    val hhId: Long,
+    val memberCount: Int
 )
 
 data class BenBasicDomainForForm(

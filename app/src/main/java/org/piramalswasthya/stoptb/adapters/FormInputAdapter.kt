@@ -10,6 +10,7 @@ import android.content.res.Resources
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
+import android.util.TypedValue
 import android.text.Editable
 import android.text.InputFilter
 import android.text.InputFilter.AllCaps
@@ -26,7 +27,6 @@ import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.CheckBox
-import android.widget.CheckedTextView
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ListView
@@ -116,6 +116,7 @@ class FormInputAdapter(
     private val ageClickListener: AgeClickListener? = null,
     private val sendOtpClickListener: SendOtpClickListener? = null,
     private val formValueListener: FormValueListener? = null,
+    private val pencilEditClickListener: PencilEditClickListener? = null,
     var isEnabled: Boolean = true,
     private val selectImageClickListener: SelectUploadImageClickListener? = null,
     private val viewDocumentListner: ViewDocumentOnClick? = null,
@@ -150,8 +151,7 @@ class FormInputAdapter(
                 return EditTextInputViewHolder(binding)
             }
         }
-        fun bind(item: FormElement, isEnabled: Boolean, formValueListener: FormValueListener?) {
-            val effectiveEnabled = isEnabled && item.isEnabled
+        fun bind(item: FormElement, isEnabled: Boolean, formValueListener: FormValueListener?, pencilEditClickListener: PencilEditClickListener? = null) {            val effectiveEnabled = isEnabled && item.isEnabled
 
             currentWatcher?.let { binding.et.removeTextChangedListener(it) }
             currentWatcher = null
@@ -163,19 +163,30 @@ class FormInputAdapter(
             Timber.d("binding triggered!!! $effectiveEnabled ${item.id}")
             if (!effectiveEnabled) {
                 binding.et.clearFocus()
-                binding.tilEditText.isEnabled = false
+                // Keep the TextInputLayout itself enabled when it has a pencil-edit affordance,
+                // otherwise Material disables the end icon along with the whole layout and the
+                // pencil becomes visible but untappable. Only the inner EditText stays locked.
+                binding.tilEditText.isEnabled = item.hasPencilEdit
                 binding.et.isEnabled = false
                 binding.et.isClickable = false
                 binding.et.isFocusable = false
                 binding.et.isFocusableInTouchMode = false
                 binding.et.isCursorVisible = false
-                binding.tilEditText.endIconDrawable = null
-                binding.tilEditText.setEndIconOnClickListener(null)
+                if (item.hasPencilEdit) {
+                    binding.tilEditText.isEndIconVisible = true
+                    binding.tilEditText.endIconDrawable =
+                        ContextCompat.getDrawable(binding.root.context, android.R.drawable.ic_menu_edit)
+                    binding.tilEditText.setEndIconOnClickListener {
+                        pencilEditClickListener?.onPencilClick(item)
+                    }
+                } else {
+                    binding.tilEditText.endIconDrawable = null
+                    binding.tilEditText.setEndIconOnClickListener(null)
+                }
                 handleHintLength(item)
                 binding.form = item
                 binding.et.setText(item.value)
                 binding.executePendingBindings()
-                binding.tilEditText.isEnabled = false
                 binding.et.isEnabled = false
                 binding.et.isClickable = false
                 binding.et.isFocusable = false
@@ -835,7 +846,7 @@ class FormInputAdapter(
             val context = binding.root.context
             val density = context.resources.displayMetrics.density
             val maxListHeightPx = (context.resources.displayMetrics.heightPixels * 0.58f).toInt()
-            val rowHeightPx = (48 * density).toInt()
+            val rowHeightPx = (56 * density).toInt()
             val container = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding((20 * density).toInt(), (8 * density).toInt(), (20 * density).toInt(), 0)
@@ -866,16 +877,31 @@ class FormInputAdapter(
 
             fun refreshFilteredList(query: String) {
                 filteredIndices = labels.indices.filter { labels[it].contains(query, ignoreCase = true) }
-                val adapter = object : ArrayAdapter<String>(
-                    context,
-                    android.R.layout.simple_list_item_multiple_choice,
-                    filteredIndices.map { labels[it] }
-                ) {
+                val adapter = object : ArrayAdapter<String>(context, 0, filteredIndices.map { labels[it] }) {
                     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                        val view = super.getView(position, convertView, parent) as CheckedTextView
+                        val row = (convertView as? LinearLayout) ?: LinearLayout(context).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            gravity = Gravity.CENTER_VERTICAL
+                            minimumHeight = rowHeightPx
+                            val horizontalPadding = (16 * density).toInt()
+                            setPadding(horizontalPadding, 0, horizontalPadding, 0)
+
+                            addView(CheckBox(context).apply {
+                                isClickable = false
+                                isFocusable = false
+                            })
+                            addView(TextView(context).apply {
+                                gravity = Gravity.CENTER_VERTICAL or Gravity.LEFT
+                                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                                setPadding((12 * density).toInt(), 0, 0, 0)
+                            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
+                        }
                         val originalIndex = filteredIndices[position]
-                        view.isChecked = checkedItems[originalIndex]
-                        return view
+                        val checkbox = row.getChildAt(0) as CheckBox
+                        val label = row.getChildAt(1) as TextView
+                        checkbox.isChecked = checkedItems[originalIndex]
+                        label.text = labels[originalIndex]
+                        return row
                     }
                 }
                 listView.adapter = adapter
@@ -1354,6 +1380,10 @@ class FormInputAdapter(
         fun onImageClick(form: FormElement) = imageClick(form.id)
     }
 
+    class PencilEditClickListener(private val pencilClick: (formId: Int) -> Unit) {
+        fun onPencilClick(form: FormElement) = pencilClick(form.id)
+    }
+
     class SendOtpClickListener(private val btnClick: (formId: Int,generateOtp:MaterialButton,timerInsec: TextView,tilEditText:TextInputLayout, isEnabled: Boolean,adapterPosition:Int,otpField: TextInputEditText) -> Unit) {
 
         fun onButtonClick(
@@ -1648,7 +1678,7 @@ class FormInputAdapter(
             val isEnabled = if (isEnabled) item.isEnabled else false
             when (item.inputType) {
                 EDIT_TEXT -> (holder as EditTextInputViewHolder).bind(
-                    item, isEnabled, formValueListener
+                    item, isEnabled, formValueListener, pencilEditClickListener
                 )
 
                 DROPDOWN -> (holder as DropDownInputViewHolder).bind(

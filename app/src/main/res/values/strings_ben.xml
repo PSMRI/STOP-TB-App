@@ -235,7 +235,7 @@ personal health profile.</string>
         <item>Daughter in Law</item>
         <item>Self</item>
         <item>Sister in Law</item>
-        <item>Other</item>
+        <item>Guest</item>
     </string-array>
     <string-array name="nbr_relationship_to_head">
         <item>Mother</item>
@@ -256,7 +256,7 @@ personal health profile.</string>
         <item>Grand Daughter</item>
         <item>Son in Law</item>
         <item>Daughter in Law</item>
-        <item>Other</item>
+        <item>Guest</item>
     </string-array>
     <string-array name="nbr_relationship_to_head_unmarried_filter">
         <item>Wife</item>
@@ -281,7 +281,7 @@ personal health profile.</string>
         <item>Father in Law</item>
         <item>Grand Son</item>
         <item>Son in Law</item>
-        <item>Other</item>
+        <item>Guest</item>
     </string-array>
 
     <string name="marital_status">Marital Status</string>
@@ -309,7 +309,7 @@ personal health profile.</string>
         <item>Grand Daughter</item>
         <item>Daughter in Law</item>
         <item>Sister in Law</item>
-        <item>Other</item>
+        <item>Guest</item>
     </string-array>
 
     <string-array name="community_array">

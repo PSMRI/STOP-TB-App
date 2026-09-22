@@ -98,6 +98,13 @@ class TBScreeningDataset(
         hasDependants = true
     )
 
+    private val otherDetailsHeading = FormElement(
+        id = 20,
+        inputType = InputType.HEADLINE,
+        title = resources.getString(R.string.other_details),
+        required = false
+    )
+
     private val historyOfTB = FormElement(
         id = 9,
         inputType = InputType.RADIO,
@@ -211,6 +218,43 @@ class TBScreeningDataset(
             fields.any  { isYes(it) }                  -> noValue   // any Yes  → Not asymptomatic
             fields.all { it.value == noValue } -> yesValue  // all No   → Asymptomatic
             else                                        -> null      // still answering → blank
+        }
+    }
+
+
+    object TbScreeningUtils {
+
+        /**
+         * true  = Presumptive (any of the 10 answers is Yes)
+         * false = Non-presumptive (all 10 answers are No)
+         * null  = cannot decide (no record / unanswered)
+         */
+        fun isPresumptive(saved: TBScreeningCache?): Boolean? {
+            if (saved == null) return null
+
+            val answers = listOf(
+                saved.coughMoreThan2Weeks,
+                saved.bloodInSputum,
+                saved.feverMoreThan2Weeks,
+                saved.riseOfFever,
+                saved.lossOfAppetite,
+                saved.lossOfWeight,
+                saved.nightSweats,
+                saved.historyOfTb,
+                saved.takingAntiTBDrugs,
+                saved.familySufferingFromTB
+            )
+
+            return when {
+                answers.any { it == true } -> true
+                answers.all { it == false } -> false
+                // Fallback to the stored value (asymptomatic YES = not presumptive)
+                else -> when (saved.asymptomatic) {
+                    "NO" -> true
+                    "YES" -> false
+                    else -> null
+                }
+            }
         }
     }
 
@@ -329,7 +373,11 @@ class TBScreeningDataset(
             form.historyOfTb           = isYes(historyOfTB)
             form.takingAntiTBDrugs     = isYes(currentlyTakingDrugs)
             form.familySufferingFromTB = isYes(familyHistoryTB)
-            form.asymptomatic          = isAsymptomatic.value?.takeIf { it.isNotBlank() }
+            form.asymptomatic = when (isAsymptomatic.value) {
+                yesValue -> "YES"
+                noValue -> "NO"
+                else -> null
+            }
             form.familyContactScreeningRequired = requiresFamilyContactScreening()
             val selectedRiskFactors = keyPopulationRiskFactors.value
                 ?.split("|")?.mapNotNull { it.toIntOrNull() }
@@ -379,17 +427,22 @@ class TBScreeningDataset(
         familyHistoryTB
     ).any(::isYes)
 
-    fun getPresumptiveTbAlert(): String? =
-        when {
+    fun getPresumptiveTbAlert(): String? {
+        val referText = resources.getString(
+            if (isPregnantBen) R.string.tb_presumptive_alert_refer_pregnant
+            else R.string.tb_presumptive_alert_refer
+        )
+        return when {
             hasDoubleStarYes() ->
                 resources.getString(R.string.tb_presumptive_alert_title) +
-                    "\n" + resources.getString(R.string.tb_presumptive_alert_refer) +
+                    "\n" + referText +
                     "\n" + resources.getString(R.string.tb_presumptive_alert_family)
             hasSingleStarYes() ->
                 resources.getString(R.string.tb_presumptive_alert_title) +
-                    "\n" + resources.getString(R.string.tb_presumptive_alert_refer)
+                    "\n" + referText
             else -> null
         }
+    }
 
     fun getFamilyContactAlert(): String? =
         if (requiresFamilyContactScreening())
@@ -407,6 +460,7 @@ class TBScreeningDataset(
         lossOfAppetite,
         lossOfWeight,
         nightSweats,
+        otherDetailsHeading,
         historyOfTB,
         currentlyTakingDrugs,
         familyHistoryTB,

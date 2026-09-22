@@ -64,17 +64,26 @@ class RoleManager @Inject constructor(
 
     /**
      * Multi-role Home-card set for [role]'s tab, with duplicates removed across tabs.
-     * Counselling's own set includes Referral/Tuberculosis (so a Registrar+Counsellor account
-     * can still reach them). But if Nurse is also assigned, Nurse's tab already shows them, so
-     * Counselling's tab drops them. Needs [assignedRoles], not just [role] — that's why this
-     * cross-role adjustment lives here rather than in the per-role-static [RoleModuleConfig].
+     * Each role's own [RoleModuleConfig] entry includes modules another assigned role's tab
+     * might already cover (needed so a solo/2-role account can still reach them at all); this
+     * function removes the overlap once a role whose tab actually covers it is also assigned.
+     * Needs [assignedRoles], not just [role] — that's why this cross-role adjustment lives here
+     * rather than in the per-role-static [RoleModuleConfig].
      */
     fun multiRoleHomeModulesFor(role: AppRole): Set<AppModule> {
-        val base = RoleModuleConfig.privilegeFor(role).multiRoleHomeModules
+        var result = RoleModuleConfig.privilegeFor(role).multiRoleHomeModules
         if (role == AppRole.COUNSELING && AppRole.NURSE in _assignedRoles) {
-            return base - setOf(AppModule.REFERRAL, AppModule.TUBERCULOSIS)
+            result = result - setOf(AppModule.REFERRAL, AppModule.TUBERCULOSIS)
         }
-        return base
+        if (role == AppRole.LAB_TECHNICIAN) {
+            if (AppRole.REGISTRAR in _assignedRoles) {
+                result = result - AppModule.BENEFICIARIES
+            }
+            if (AppRole.NURSE in _assignedRoles || AppRole.COUNSELING in _assignedRoles) {
+                result = result - setOf(AppModule.REFERRAL, AppModule.TUBERCULOSIS)
+            }
+        }
+        return result
     }
 
     /** Union of every assigned role's privileges — see class doc. Falls back to VOLUNTEER's

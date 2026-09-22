@@ -75,7 +75,8 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                             async { getTbSuspectedDetails() },
                             async { getTbConfirmedDetails() },
                             async { getCounsellingCompletedDetails() },
-                            async { getContactAndTptFollowUpDetails() }
+                            async { getContactAndTptFollowUpDetails() },
+                            async { refreshVisitCategories() }
                         )
 
                     val endTime = System.currentTimeMillis()
@@ -148,6 +149,13 @@ class PullTBFromAmritWorker @AssistedInject constructor(
             }
             true
         }
+    }
+
+    private suspend fun refreshVisitCategories(): Boolean {
+        tbRepo.refreshVisitCategories()
+        tbRepo.refreshChiefComplaintMasters()
+        // A failed master refresh must not block the core beneficiary/form pull.
+        return true
     }
 
     private suspend fun getTbSuspectedDetails(): Boolean {

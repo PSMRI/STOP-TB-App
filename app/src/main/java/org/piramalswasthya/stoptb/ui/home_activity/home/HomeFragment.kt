@@ -181,7 +181,7 @@ class HomeFragment : Fragment() {
         (activity as HomeActivity?)?.let { homeActivity ->
             homeActivity.addClickListenerToHomepageActionBarTitle()
             homeActivity.updateActionBar(
-                R.drawable.ic_home,
+                R.drawable.ic_game_village_toolbar,
                 viewModel.homeToolbarTitle ?: getString(R.string.home)
             )
             homeActivity.setHomeMenuItemVisibility(false)

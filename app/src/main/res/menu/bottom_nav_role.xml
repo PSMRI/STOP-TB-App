@@ -12,4 +12,8 @@
         android:id="@+id/roleTabCounseling"
         android:icon="@drawable/ic_role_counseling"
         android:title="@string/role_tab_counseling" />
+    <item
+        android:id="@+id/roleTabLabTechnician"
+        android:icon="@drawable/ic_role_lab_technician"
+        android:title="@string/role_tab_lab_technician" />
 </menu>

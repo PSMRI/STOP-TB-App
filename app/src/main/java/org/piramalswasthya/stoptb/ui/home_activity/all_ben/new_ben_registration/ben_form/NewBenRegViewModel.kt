@@ -763,6 +763,11 @@ class NewBenRegViewModel @Inject constructor(
         return benRepo.getBenFromId(benId)
     }
 
+    fun enableFieldEditAndGetIndex(formId: Int): Int {
+        dataset.enableFieldEdit(formId)
+        return dataset.getIndexById(formId)
+    }
+
     override fun onCleared() {
         super.onCleared()
         isOtpVerified = false

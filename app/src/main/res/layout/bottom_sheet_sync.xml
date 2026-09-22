@@ -31,7 +31,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:padding="10dp"
-            android:src="@drawable/ic_cloud_upload_green" />
+            android:src="@drawable/ic_cloud_upload_bottom_sheet" />
 
         <ImageView
             android:layout_width="0dp"
@@ -39,7 +39,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:padding="10dp"
-            android:src="@drawable/ic_cloud_off" />
+            android:src="@drawable/ic_cloud_off_bottom_sheet" />
 
         <ImageView
             android:layout_width="0dp"
@@ -47,7 +47,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:padding="10dp"
-            android:src="@drawable/ic_cloud_sync" />
+            android:src="@drawable/ic_cloud_sync_bottom_sheet" />
 
 
     </LinearLayout>

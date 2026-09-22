@@ -179,7 +179,7 @@
         <item>শহুৰেক</item>
         <item>নাতি</item>
         <item>জোঁৱাই</item>
-        <item>অন্যান্য</item>
+        <item>অতিথি</item>
     </string-array>
 
     <string-array name="nbr_relationship_to_head_src">
@@ -202,7 +202,7 @@
         <item>নাতি</item>
         <item>জোঁৱাই</item>
         <item>আত্ম</item>
-        <item>অন্যান্য</item>
+        <item>অতিথি</item>
     </string-array>
 
     <string-array name="nbr_relationship_to_head_male">
@@ -215,7 +215,7 @@
         <item>শহুৰেক</item>
         <item>নাতি</item>
         <item>জোঁৱাই</item>
-        <item>অন্যান্য</item>
+        <item>অতিথি</item>
     </string-array>
 
     <string-array name="nbr_relationship_to_head_female">
@@ -229,7 +229,7 @@
         <item>নাতিনী/নাতিনীয়েক</item>
         <item>বোৱাৰী</item>
         <item>নবৌ/নন্দ</item>
-        <item>অন্যান্য</item>
+        <item>অতিথি</item>
     </string-array>
 
     <string-array name="community_array">

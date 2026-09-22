@@ -52,6 +52,7 @@ class HouseholdMembersViewModel @Inject constructor(
     val unsyncedVitalBenIds: Flow<List<Long>>  = vitalRepo.unsyncedVitalBenIds
     val syncingVitalBenIds: Flow<List<Long>>   = vitalRepo.syncingVitalBenIds
     val tbScreeningBenIds: Flow<List<Long>>    = tbRepo.tbScreeningBenIds
+    val allTbDiagnostics = tbRepo.allTbDiagnostics
     val unsyncedTbScreeningBenIds: Flow<List<Long>> = tbRepo.unsyncedTbScreeningBenIds
     val syncingTbScreeningBenIds: Flow<List<Long>> = tbRepo.syncingTbScreeningBenIds
     val generalOpdBenIds: Flow<List<Long>>     = tbRepo.generalOpdBenIds

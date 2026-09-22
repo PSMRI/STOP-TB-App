@@ -129,7 +129,7 @@
                 android:layout_height="48dp"
                 android:layout_weight="1"
                 android:padding="4dp"
-                android:src="@drawable/ic_cloud_upload_green"
+                android:src="@drawable/ic_cloud_upload_bottom_sheet"
                 android:contentDescription="Synced" />
 
             <ImageView
@@ -137,7 +137,7 @@
                 android:layout_height="48dp"
                 android:layout_weight="1"
                 android:padding="4dp"
-                android:src="@drawable/ic_cloud_off"
+                android:src="@drawable/ic_cloud_off_bottom_sheet"
                 android:contentDescription="Unsynced" />
 
             <ImageView

@@ -2,23 +2,27 @@ package org.piramalswasthya.stoptb.repositories
 
 import android.content.Context
 import com.google.gson.Gson
+import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import org.piramalswasthya.stoptb.database.room.SyncState
+import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.TBDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.GeneralOpdCache
+import org.piramalswasthya.stoptb.model.ChiefComplaintMasterCache
 import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.model.OrderStatus
+import org.piramalswasthya.stoptb.model.VisitCategoryMasterCache
 import org.piramalswasthya.stoptb.network.AmritApiService
 import org.piramalswasthya.stoptb.network.GeneralOpdRequestDTO
 import org.piramalswasthya.stoptb.network.GeneralOpdSaveRequest
@@ -47,12 +51,15 @@ class TBRepo @Inject constructor(
     val preferenceDao: PreferenceDao,
     private val userRepo: UserRepo,
     private val tmcNetworkApiService: AmritApiService,
+    private val database: InAppDb,
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context
 ) {
     private val orderCreatedTimestamps = java.util.concurrent.ConcurrentHashMap<String, Long>()
     private val ORDER_STATUS_GRACE_PERIOD_MS = 90_000L
 
     val allTbDiagnostics: Flow<List<TBDiagnosticsCache>> = tbDao.getAllTbDiagnostics()
+
+    val allTbScreening: Flow<List<TBScreeningCache>> = tbDao.getAllTbScreening()
 
     suspend fun getDiagnosticsList(): List<TBDiagnosticsCache> = withContext(Dispatchers.IO) {
         tbDao.getDiagnosticsList()
@@ -78,6 +85,61 @@ class TBRepo @Inject constructor(
     suspend fun getGeneralOpd(benId: Long): GeneralOpdCache? {
         return withContext(Dispatchers.IO) {
             tbDao.getGeneralOpd(benId)
+        }
+    }
+
+    suspend fun getCachedChiefComplaintNames(): List<String> =
+        database.chiefComplaintMasterDao.getChiefComplaints().map { it.chiefComplaint }
+
+    suspend fun refreshVisitCategories(): Boolean {
+        return try {
+            val categoriesResponse = tmcNetworkApiService.getVisitReasonAndCategories()
+            val categoriesBody = categoriesResponse.body()
+            if (!categoriesResponse.isSuccessful || categoriesBody?.statusCode != 200) return false
+
+            val categories = categoriesBody.data?.visitCategories.orEmpty()
+            if (categories.isEmpty()) return false
+
+            database.withTransaction {
+                database.chiefComplaintMasterDao.deleteVisitCategories()
+                database.chiefComplaintMasterDao.insertVisitCategories(
+                    categories.map { VisitCategoryMasterCache(it.visitCategoryID, it.visitCategory) }
+                )
+            }
+            true
+        } catch (e: Exception) {
+            Timber.e(e, "Visit category master refresh failed")
+            false
+        }
+    }
+
+    suspend fun refreshChiefComplaintMasters(): Boolean {
+        val loggedInUser = preferenceDao.getLoggedInUser() ?: return false
+
+        return try {
+            val generalOpdCategoryId = database.chiefComplaintMasterDao.getGeneralOpdCategoryId()
+                ?: GENERAL_OPD_CATEGORY_FALLBACK
+
+            val complaintsResponse = tmcNetworkApiService.getChiefComplaintMaster(
+                visitCategoryId = generalOpdCategoryId,
+                providerServiceMapId = loggedInUser.serviceMapId
+            )
+            val complaintsBody = complaintsResponse.body()
+            if (!complaintsResponse.isSuccessful || complaintsBody?.statusCode != 200) return false
+
+            val complaints = complaintsBody.data?.chiefComplaintMaster.orEmpty()
+            if (complaints.isEmpty()) return false
+
+            database.withTransaction {
+                database.chiefComplaintMasterDao.deleteChiefComplaints()
+                database.chiefComplaintMasterDao.insertChiefComplaints(
+                    complaints.map { ChiefComplaintMasterCache(it.chiefComplaintID, it.chiefComplaint) }
+                )
+            }
+            true
+        } catch (e: Exception) {
+            Timber.e(e, "Chief complaint master refresh failed")
+            false
         }
     }
 
@@ -394,11 +456,26 @@ class TBRepo @Inject constructor(
             }
             val cache = (existing ?: GeneralOpdCache(benId = ben.beneficiaryId)).copy(
                 chiefComplaints = item.optStringListOrNull("chiefComplaint"),
-                medications = item.optStringOrNull("medication")?.let { listOf(it) },
-                dosage = item.optStringOrNull("dosage"),
-                frequency = item.optStringOrNull("frequency"),
-                duration = item.optStringOrNull("duration"),
-                notes = item.optStringOrNull("notes"),
+
+                // Keep existing medication if server does not return it
+                medications = item.optStringOrNull("medication")
+                    ?.split(",")
+                    ?.map { it.trim() }
+                    ?.filter { it.isNotBlank() },
+
+
+                dosage = item.optStringOrNull("dosage")
+                    ?: existing?.dosage,
+
+                frequency = item.optStringOrNull("frequency")
+                    ?: existing?.frequency,
+
+                duration = item.optStringOrNull("duration")
+                    ?: existing?.duration,
+
+                notes = item.optStringOrNull("notes")
+                    ?: existing?.notes,
+
                 serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
                 syncState = SyncState.SYNCED
             )
@@ -1237,6 +1314,7 @@ class TBRepo @Inject constructor(
     }
 
     companion object {
+        private const val GENERAL_OPD_CATEGORY_FALLBACK = 6
         private val pollCounts = java.util.concurrent.ConcurrentHashMap<String, Int>()
         private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
         private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.ENGLISH)
@@ -1951,7 +2029,8 @@ class TBRepo @Inject constructor(
                                     val chestResult = serverResultSummary ?: ""
 
                                     val isCompleted = status.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
-                                    val xrayPos = isCompleted && isChestXrayPositive(chestResult)
+                                    val xrayPos = isCompleted &&
+                                        (isChestXrayPositive(chestResult) || isChestXrayAbnormalNonTB(chestResult))
 
                                      if (xrayPos && isTruenatIntegrated()) {
                                         val hasTruenat = !it.trueNatOrderId.isNullOrBlank() ||
@@ -2653,5 +2732,10 @@ class TBRepo @Inject constructor(
     private fun isChestXrayPositive(value: String?): Boolean {
         if (value.isNullOrBlank()) return false
         return value.trim().lowercase() == "tb presumptive"
+    }
+
+    private fun isChestXrayAbnormalNonTB(value: String?): Boolean {
+        if (value.isNullOrBlank()) return false
+        return value.trim().lowercase() == "abnormal but not tb presumptive"
     }
 }

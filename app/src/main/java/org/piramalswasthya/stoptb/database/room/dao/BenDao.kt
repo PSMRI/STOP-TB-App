@@ -220,7 +220,7 @@ interface BenDao {
 
     @Query("""
         SELECT * FROM BEN_BASIC_CACHE
-        WHERE villageId = :selectedVillage
+        WHERE villageId IN (:villageIds)
         AND isDeactivate = 0
         AND (:source = 0
             OR (:source = 1 AND abhaId IS NOT NULL)
@@ -313,6 +313,21 @@ interface BenDao {
                     WHERE tbs.recommendedForLiquidCultureTest = 1
                 )
             ))
+            OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
+                SELECT 1
+                FROM BEN_BASIC_CACHE b2
+                LEFT JOIN TB_SUSPECTED ts ON b2.benId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON b2.benId = td.benId
+                WHERE b2.hhId = BEN_BASIC_CACHE.hhId
+                  AND b2.isDeactivate = 0
+                  AND b2.isDeath = 0
+                  AND (
+                        ts.isTbConfirmed = 1
+                        OR td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
+            ))
         )
         AND (:filterType = 0
             OR (:filterType = 1 AND abhaId IS NOT NULL)
@@ -325,7 +340,7 @@ interface BenDao {
         AND (:query = '' OR
             benName LIKE '%' || :query || '%'
             OR benSurname LIKE '%' || :query || '%'
-            OR (benName || ' ' || benSurname) LIKE '%' || :query || '%'
+            OR (IFNULL(benName, '') || ' ' || IFNULL(benSurname, '')) LIKE '%' || :query || '%'
             OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
             OR REPLACE(IFNULL(abhaId, ''), '-', '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
             OR IFNULL(familyHeadName, '') LIKE '%' || :query || '%'
@@ -357,11 +372,11 @@ interface BenDao {
             ELSE dob
         END DESC
     """)
-    fun searchBen(selectedVillage: Int, source: Int, filterType: Int, query: String): Flow<List<BenBasicCache>>
+    fun searchBen(villageIds: List<Int>, source: Int, filterType: Int, query: String): Flow<List<BenBasicCache>>
 
     @Query("""
         SELECT * FROM BEN_BASIC_CACHE
-        WHERE villageId = :selectedVillage
+        WHERE villageId IN (:villageIds)
         AND isDeactivate = 0
         AND (:source = 0
             OR (:source = 1 AND abhaId IS NOT NULL)
@@ -454,6 +469,21 @@ interface BenDao {
                     WHERE tbs.recommendedForLiquidCultureTest = 1
                 )
             ))
+            OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
+                SELECT 1
+                FROM BEN_BASIC_CACHE b2
+                LEFT JOIN TB_SUSPECTED ts ON b2.benId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON b2.benId = td.benId
+                WHERE b2.hhId = BEN_BASIC_CACHE.hhId
+                  AND b2.isDeactivate = 0
+                  AND b2.isDeath = 0
+                  AND (
+                        ts.isTbConfirmed = 1
+                        OR td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
+            ))
         )
         AND (:filterType = 0
             OR (:filterType = 1 AND abhaId IS NOT NULL)
@@ -466,7 +496,7 @@ interface BenDao {
         AND (:query = '' OR
             benName LIKE '%' || :query || '%'
             OR benSurname LIKE '%' || :query || '%'
-            OR (benName || ' ' || benSurname) LIKE '%' || :query || '%'
+            OR (IFNULL(benName, '') || ' ' || IFNULL(benSurname, '')) LIKE '%' || :query || '%'
             OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
             OR REPLACE(IFNULL(abhaId, ''), '-', '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
             OR IFNULL(familyHeadName, '') LIKE '%' || :query || '%'
@@ -498,11 +528,11 @@ interface BenDao {
             ELSE dob
         END DESC
     """)
-    fun searchBenPaged(selectedVillage: Int, source: Int, filterType: Int, query: String): PagingSource<Int, BenBasicCache>
+    fun searchBenPaged(villageIds: List<Int>, source: Int, filterType: Int, query: String): PagingSource<Int, BenBasicCache>
 
     @Query("""
         SELECT * FROM BEN_BASIC_CACHE
-        WHERE villageId = :selectedVillage
+        WHERE villageId IN (:villageIds)
         AND isDeactivate = 0
         AND (:source = 0
             OR (:source = 1 AND abhaId IS NOT NULL)
@@ -595,6 +625,21 @@ interface BenDao {
                     WHERE tbs.recommendedForLiquidCultureTest = 1
                 )
             ))
+            OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
+                SELECT 1
+                FROM BEN_BASIC_CACHE b2
+                LEFT JOIN TB_SUSPECTED ts ON b2.benId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON b2.benId = td.benId
+                WHERE b2.hhId = BEN_BASIC_CACHE.hhId
+                  AND b2.isDeactivate = 0
+                  AND b2.isDeath = 0
+                  AND (
+                        ts.isTbConfirmed = 1
+                        OR td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
+            ))
         )
         AND (:filterType = 0
             OR (:filterType = 1 AND abhaId IS NOT NULL)
@@ -607,7 +652,7 @@ interface BenDao {
         AND (:query = '' OR
             benName LIKE '%' || :query || '%'
             OR benSurname LIKE '%' || :query || '%'
-            OR (benName || ' ' || benSurname) LIKE '%' || :query || '%'
+            OR (IFNULL(benName, '') || ' ' || IFNULL(benSurname, '')) LIKE '%' || :query || '%'
             OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
             OR REPLACE(IFNULL(abhaId, ''), '-', '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
             OR IFNULL(familyHeadName, '') LIKE '%' || :query || '%'
@@ -651,7 +696,7 @@ interface BenDao {
             ELSE dob
         END DESC
     """)
-    suspend fun searchBenOnce(selectedVillage: Int, source: Int, filterType: Int, query: String): List<BenBasicCache>
+    suspend fun searchBenOnce(villageIds: List<Int>, source: Int, filterType: Int, query: String): List<BenBasicCache>
 
     @Query("SELECT * FROM BEN_BASIC_CACHE where villageId = :selectedVillage AND abhaId IS NOT NULL AND isDeactivate = 0")
     fun getAllBenWithAbha(selectedVillage: Int): Flow<List<BenBasicCache>>
@@ -815,6 +860,17 @@ interface BenDao {
         GROUP BY parent.beneficiaryId
     """)
     fun getChildCountsForAllBen(selectedVillage: Int): Flow<List<BenChildCount>>
+
+    @Query("""
+        SELECT householdId AS hhId, COUNT(*) AS memberCount
+        FROM BENEFICIARY
+        WHERE isDraft = 0
+          AND isDeactivate = 0
+          AND loc_village_id = :selectedVillage
+          AND householdId IS NOT NULL
+        GROUP BY householdId
+    """)
+    fun getHouseholdMemberCounts(selectedVillage: Int): Flow<List<HouseholdMemberCount>>
 
     @Query("""
         SELECT COUNT(child.beneficiaryId)
@@ -1196,8 +1252,8 @@ interface BenDao {
             "            OR t.nightSweats = 1\n" +
             "            OR t.historyOfTb = 1\n" +
             "            OR t.takingAntiTBDrugs = 1\n" +
+            "            OR t.familySufferingFromTB = 1\n" +
 //            "            OR CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) <= 5\n" +
-            "            OR b.reproductiveStatusId = 1\n" +
             "            OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')\n" +
             "            OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')\n" +
             "        ) AND IFNULL(ts.isConfirmed, 0) = 0\n" +
@@ -1401,7 +1457,7 @@ interface BenDao {
     @Query("""
         SELECT * FROM BEN_BASIC_CACHE
         WHERE villageId = :selectedVillage AND isDeactivate = 0 AND isNonHH = 1
-        AND (:query = '' OR benName LIKE '%' || :query || '%' OR benSurname LIKE '%' || :query || '%' OR (benName || ' ' || benSurname) LIKE '%' || :query || '%' OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%')
+        AND (:query = '' OR benName LIKE '%' || :query || '%' OR benSurname LIKE '%' || :query || '%' OR (IFNULL(benName, '') || ' ' || IFNULL(benSurname, '')) LIKE '%' || :query || '%' OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%')
     """)
     fun searchNonHHBeneficiaries(selectedVillage: Int, query: String): Flow<List<BenBasicCache>>
 
