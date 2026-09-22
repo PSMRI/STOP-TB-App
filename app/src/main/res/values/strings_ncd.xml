@@ -24,6 +24,15 @@
     <string name="cbac_feverwks">Fever for > 2 weeks</string>
     <string name="cbac_lsweight">Loss of weight</string>
     <string name="cbac_ntswets">Night Sweats</string>
+    <string name="chest_pain">Chest pain</string>
+    <string name="shortness_of_breath">Shortness of breath</string>
+    <string name="fatique">Fatigue</string>
+    <string name="failure_to_gain_weight_children">Failure to gain weight (in Children)</string>
+    <string name="decreased_activity_or_playfulness_children">Decreased activity or Playfulness (in Children)</string>
+    <string name="others">Others</string>
+    <string name="other_details">Other details</string>
+
+
     <string name="cbac_recurrent_ulceration">Recurrent ulceration on palm or sole</string>
     <string name="cbac_recurrent_tingling">Recurrent tingling on palm(s) or sole (s)</string>
     <string name="cbac_recurrent_cloudy">Cloudy or blurred vision</string>

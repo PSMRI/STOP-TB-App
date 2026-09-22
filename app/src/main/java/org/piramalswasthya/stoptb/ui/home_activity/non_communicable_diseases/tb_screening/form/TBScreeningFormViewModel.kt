@@ -182,6 +182,12 @@ class TBScreeningFormViewModel @Inject constructor(
                     tbScreeningCache.lossOfAppetite == true ||
                     tbScreeningCache.lossOfWeight == true ||
                     tbScreeningCache.nightSweats == true ||
+                    tbScreeningCache.chestPain == true ||
+                    tbScreeningCache.shortnessOfBreath == true ||
+                    tbScreeningCache.fatigue == true ||
+                    tbScreeningCache.failureToGainWeightInChildren == true ||
+                    tbScreeningCache.decreasedActivityOrPlayfulnessInChildren == true ||
+                    tbScreeningCache.otherSymptoms == true ||
                     tbScreeningCache.historyOfTb == true ||
                     tbScreeningCache.takingAntiTBDrugs == true ||
                     tbScreeningCache.familySufferingFromTB == true

@@ -1523,6 +1523,13 @@ abstract class InAppDb : RoomDatabase() {
                     ", 0 as isDelivered, 0 as pwHrp" +
                     ", 0 as irFilled, 0 as crFilled, 0 as doFilled" +
                     ", b.isNonHH" +
+                    ", b.isAvailableForCamp" +
+                    ", b.reasonForNotAttendingCamp" +
+                    ", b.otherReasonForNotAttendingCamp" +
+                    ", b.screeningStatus" +
+                    ", b.symptomsScreenedDate" +
+                    ", b.chestXrayDoneDate" +
+                    ", b.trunatTestDoneDate" +
                     ", b.placeOfCurrentLiving" +
                     ", b.otherPlaceOfCurrentLiving" +
                     ", b.institutionName" +
@@ -1580,6 +1587,25 @@ abstract class InAppDb : RoomDatabase() {
                 }
                 if (!columnExists(database, "TB_DIAGNOSTICS", "rifOrderStatus")) {
                     database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN rifOrderStatus TEXT DEFAULT NULL")
+                }
+            }
+        }
+
+        private val MIGRATION_44_45 = object : Migration(45, 46) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val columns = listOf(
+                    "chestPain INTEGER DEFAULT NULL",
+                    "shortnessOfBreath INTEGER DEFAULT NULL",
+                    "fatigue INTEGER DEFAULT NULL",
+                    "failureToGainWeightInChildren INTEGER DEFAULT NULL",
+                    "decreasedActivityOrPlayfulnessInChildren INTEGER DEFAULT NULL",
+                    "otherSymptoms INTEGER DEFAULT NULL"
+                )
+                columns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "TB_SCREENING", columnName)) {
+                        database.execSQL("ALTER TABLE TB_SCREENING ADD COLUMN $columnDefinition")
+                    }
                 }
             }
         }
@@ -1760,6 +1786,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_41_42)
                         .addMigrations(MIGRATION_42_43)
                         .addMigrations(MIGRATION_43_44)
+                        .addMigrations(MIGRATION_44_45)
                         .fallbackToDestructiveMigration()
                         .build()
 

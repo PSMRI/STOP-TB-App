@@ -430,7 +430,7 @@
     <string name="symptomatic_tb_screening">লক্ষণযুক্ত TB স্ক্ৰিনিং</string>
     <string name="check_if_the_person_has_any_of_these_symptoms">ব্যক্তিজনৰ এই লক্ষণসমূহৰ যিকোনো এটা আছে নে নাই পৰীক্ষা কৰক:</string>
     <string name="tb_asymptomatic_symptoms">লক্ষণবিহীন TB স্ক্ৰিনিং</string>
-    <string name="tb_is_beneficiary_asymptomatic">লাভাৰ্থী জন লক্ষণবিহীন নেকি</string>
+    <string name="tb_is_beneficiary_asymptomatic">লাভাৰ্থী জন লক্ষণবিহীন</string>
     <string name="tb_rise_of_fever">সন্ধিয়া সময়ত জ্বৰ বৃদ্ধি পায়</string>
     <string name="tb_loss_of_appetite">ভোক কমি যোৱা</string>
     <string name="tb_age_more_than_60">বয়স ৬০ বছৰৰ অধিক</string>
