@@ -71,6 +71,8 @@ class DashboardFragment : Fragment() {
         )
     }
 
+//    Observe data
+
     private fun observeData() {
         viewModel.coverage.observe(viewLifecycleOwner) { adapter.updateCoverage(it) }
         viewModel.tbScreening.observe(viewLifecycleOwner) { adapter.updateScreened(it) }
