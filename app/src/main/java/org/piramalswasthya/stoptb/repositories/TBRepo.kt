@@ -336,6 +336,13 @@ class TBRepo @Inject constructor(
                 familySufferingFromTB = item.optNullableBoolean("familySufferingFromTB"),
                 riseOfFever = item.optNullableBoolean("riseOfFever"),
                 lossOfAppetite = item.optNullableBoolean("lossOfAppetite"),
+
+                chestPain = item.optNullableBoolean("chestPain") ?: existing?.chestPain,
+                shortnessOfBreath = item.optNullableBoolean("shortnessOfBreath") ?: existing?.shortnessOfBreath,
+                fatigue = item.optNullableBoolean("fatigue") ?: existing?.fatigue,
+                failureToGainWeightInChildren = item.optNullableBoolean("failureToGainWeightInChildren") ?: existing?.failureToGainWeightInChildren,
+                decreasedActivityOrPlayfulnessInChildren = item.optNullableBoolean("decreasedActivityOrPlayfulnessInChildren") ?: existing?.decreasedActivityOrPlayfulnessInChildren,
+                otherSymptoms = item.optNullableBoolean("otherSymptoms") ?: existing?.otherSymptoms,
                 referredForDigitalChestXray = item.optNullableBoolean("referredForDigitalChestXray"),
                 referredForSputumCollection = item.optNullableBoolean("referredForSputumCollection"),
                 sputumSampleSubmittedAt = item.optStringOrNull("sputumSampleSubmittedAt"),

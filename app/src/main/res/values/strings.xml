@@ -920,7 +920,7 @@
     <string name="symptomatic_tb_screening">Symptomatic TB Screening</string>
     <string name="check_if_the_person_has_any_of_these_symptoms">Check if the person has any of these Symptoms:</string>
     <string name="tb_asymptomatic_screening">Asymptomatic Screening</string>
-    <string name="tb_is_beneficiary_asymptomatic">Is beneficiary asymptomatic</string>
+    <string name="tb_is_beneficiary_asymptomatic">Beneficiary is Asymptomatic</string>
     <string name="risk_factors">Risk Factors</string>
     <string name="tb_rise_of_fever">Rise of fever in evening</string>
     <string name="tb_loss_of_appetite">Loss of Appetite</string>
@@ -936,6 +936,7 @@
     <string name="total_presumptive_tb">Presumptive TB Cases</string>
     <string name="tb_presumptive_alert_title">A Presumptive TB case!</string>
     <string name="tb_presumptive_alert_refer">Refer to X-ray and collect sputum for Truenat test</string>
+    <string name="tb_presumptive_alert_refer_pregnant">Collect sputum for Truenat test</string>
     <string name="tb_presumptive_alert_family">Advise screening of all family members</string>
     <string name="referred_for_digital_chest_xray">Referred for digital chest x-ray</string>
     <string name="referred_for_sputum_collection">Referred for Sputum Collection</string>
