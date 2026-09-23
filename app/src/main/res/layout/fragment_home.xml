@@ -101,11 +101,10 @@
                 android:id="@+id/tl_home_viewpager"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
+                android:layout_marginStart="26dp"
                 android:layout_marginTop="16dp"
-                android:layout_marginEnd="16dp"
+                android:layout_marginEnd="26dp"
                 android:background="@drawable/bg_tab_strip"
-                android:padding="6dp"
                 app:tabIndicator="@drawable/bg_tab_indicator"
                 app:tabIndicatorFullWidth="false"
                 app:tabIndicatorHeight="0dp"
@@ -118,9 +117,7 @@
                 app:tabInlineLabel="true"
                 app:tabMode="fixed"
                 app:tabPaddingStart="20dp"
-                app:tabPaddingEnd="20dp"
-                app:tabPaddingTop="14dp"
-                app:tabPaddingBottom="14dp" />
+                app:tabPaddingEnd="20dp" />
 
             <androidx.viewpager2.widget.ViewPager2
                 android:id="@+id/vp2_home"
