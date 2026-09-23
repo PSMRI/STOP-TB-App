@@ -293,8 +293,19 @@ interface TBDao {
         AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
         AND (:startTime = 0 OR ts.visitDate >= :startTime)
         AND (:endTime = 0 OR ts.visitDate <= :endTime)
+        AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
+        AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
+        AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
     """)
-    fun getDashboardNikshayCount(villageId: Int, assignedVillageIds: List<Int>, startTime: Long, endTime: Long): Flow<Int>
+    fun getDashboardNikshayCount(
+        villageId: Int,
+        assignedVillageIds: List<Int>,
+        startTime: Long,
+        endTime: Long,
+        gender: String,
+        isChild: Int,
+        isSeniorCitizen: Int,
+    ): Flow<Int>
 
     @Query("""
         SELECT COUNT(*) FROM (

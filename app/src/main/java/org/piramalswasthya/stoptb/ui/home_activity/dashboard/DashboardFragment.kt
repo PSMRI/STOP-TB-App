@@ -1,44 +1,38 @@
 package org.piramalswasthya.stoptb.ui.home_activity.dashboard
 
-import android.content.Context
-import android.graphics.Typeface
 import android.os.Bundle
-import android.text.SpannableString
-import android.text.Spanned
-import android.text.style.StyleSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
-import androidx.annotation.StringRes
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.GridLayoutManager
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.databinding.FragmentDashboardBinding
-import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
-import javax.inject.Inject
 
 @AndroidEntryPoint
 class DashboardFragment : Fragment() {
 
-    @Inject
-    lateinit var recordsRepo: RecordsRepo
     private var _binding: FragmentDashboardBinding? = null
     private val binding get() = _binding!!
 
     private val viewModel: DashboardViewModel by viewModels()
-
-    // Kept as fields so onResume can re-apply them after Android state restoration
-    // resets AutoCompleteTextView filtering (causing dropdown to show only 1 item).
-    private var timePeriodAdapter: ArrayAdapter<String>? = null
-    private var villageAdapter: ArrayAdapter<String>? = null
+    private val adapter = DashboardListAdapter(
+        onOpenFilters = {
+            if (childFragmentManager.findFragmentByTag(DashboardFilterBottomSheet.TAG) == null) {
+                DashboardFilterBottomSheet().show(childFragmentManager, DashboardFilterBottomSheet.TAG)
+            }
+        },
+        onUnscreenedClick = {
+            findNavController().navigate(
+                org.piramalswasthya.stoptb.ui.volunteer.fragment.VolunteerHomeFragmentDirections
+                    .actionVolunteerHomeFragmentToUnScreenedPeople()
+            )
+        }
+    )
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -50,249 +44,97 @@ class DashboardFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
-        setupFilters()
+        setupList()
         observeData()
-        observeUnscreenedCount()
+        bindFilterScope(viewModel.filters.value ?: DashboardFilterState())
+        viewModel.filters.observe(viewLifecycleOwner) { bindFilterScope(it) }
     }
 
-    /**
-     * Re-apply adapters every time the fragment becomes visible.
-     *
-     * Android's view-state restoration calls AutoCompleteTextView.setText() with
-     * filter=true, which hides all dropdown options except the one matching the
-     * saved text ("Today" / "All Villages"). Re-setting the adapter in onResume
-     * (which runs AFTER onViewStateRestored) clears the stale filter state.
-     */
-    override fun onResume() {
-        super.onResume()
-        timePeriodAdapter?.let { binding.actvTimePeriod.setAdapter(it) }
-        villageAdapter?.let { binding.actvVillage.setAdapter(it) }
-    }
-
-    private fun setupFilters() {
-        // Time Period dropdown - localized labels
-        val timePeriodLabels = listOf(
-            getString(R.string.filter_today),
-            getString(R.string.month_january),
-            getString(R.string.month_february),
-            getString(R.string.month_march),
-            getString(R.string.month_april),
-            getString(R.string.month_may),
-            getString(R.string.month_june),
-            getString(R.string.month_july),
-            getString(R.string.month_august),
-            getString(R.string.month_september),
-            getString(R.string.month_october),
-            getString(R.string.month_november),
-            getString(R.string.month_december),
-        )
-        timePeriodAdapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_dropdown_item_1line,
-            timePeriodLabels
-        )
-        binding.actvTimePeriod.setAdapter(timePeriodAdapter)
-        // Restore previously selected time period (ViewModel persists across view recreation)
-        val savedPeriod = viewModel.selectedTimePeriod.value ?: viewModel.timePeriodOptions[0]
-        val savedPeriodIndex = viewModel.timePeriodOptions.indexOf(savedPeriod).coerceAtLeast(0)
-        binding.actvTimePeriod.setText(timePeriodLabels[savedPeriodIndex], false)
-        // Show ALL items when dropdown opens (prevent AutoCompleteTextView from filtering by selected text)
-        binding.actvTimePeriod.apply {
-            threshold = 0
-
-            setOnClickListener {
-                setText("", false)
-                showDropDown()
-            }
+    private fun setupList() {
+        val spanCount = if (resources.configuration.smallestScreenWidthDp >= 600) 2 else 1
+        val layoutManager = GridLayoutManager(requireContext(), spanCount)
+        layoutManager.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+            override fun getSpanSize(position: Int): Int =
+                if (position == 0) spanCount else 1
         }
-        binding.actvTimePeriod.setOnItemClickListener { _, _, position, _ ->
-            viewModel.setTimePeriod(viewModel.timePeriodOptions[position])
-            binding.actvTimePeriod.setText(timePeriodLabels[position], false)
-        }
-
-        binding.cardUnscreened.setOnClickListener {
-            findNavController().navigate(
-                org.piramalswasthya.stoptb.ui.volunteer.fragment.VolunteerHomeFragmentDirections
-                    .actionVolunteerHomeFragmentToUnScreenedPeople()
+        layoutManager.isMeasurementCacheEnabled = false
+        binding.dashboardList.layoutManager = layoutManager
+        binding.dashboardList.adapter = adapter
+        binding.dashboardList.setHasFixedSize(false)
+        binding.dashboardList.setItemViewCacheSize(8)
+        binding.dashboardList.itemAnimator = null
+        binding.dashboardList.addItemDecoration(
+            DashboardGridSpacingDecoration(
+                spanCount = spanCount,
+                gapPx = (12 * resources.displayMetrics.density).toInt()
             )
-        }
-
-        // Village dropdown
-        val villages = viewModel.villageList
-        val villageNames = mutableListOf(getString(R.string.filter_all_villages))
-        villageNames.addAll(villages.map { it.name })
-
-        villageAdapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_dropdown_item_1line,
-            villageNames
         )
-        binding.actvVillage.setAdapter(villageAdapter)
-        // Restore previously selected village (ViewModel persists across view recreation)
-        binding.actvVillage.setText(viewModel.selectedVillageName.value ?: villageNames[0], false)
-        // Show ALL items when dropdown opens
-        binding.actvVillage.apply {
-            threshold = 0
-
-            setOnClickListener {
-                setText("", false)
-                showDropDown()
-            }
-
-            setOnFocusChangeListener { _, hasFocus ->
-                if (hasFocus) {
-                    setText("", false)
-                    showDropDown()
-                }
-            }
-        }
-        binding.actvVillage.setOnItemClickListener { _, _, position, _ ->
-            if (position == 0) {
-                viewModel.clearVillageFilter()
-            } else {
-                val village = villages[position - 1]
-                viewModel.setVillage(village.name, village.id)
-            }
-            binding.actvVillage.setText(villageNames[position], false)
-        }
     }
 
-    private fun observeUnscreenedCount() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                recordsRepo.unscreenedListCount.collect { count ->
-                    binding.tvUnscreenedTotal.text = count.toString()
-                }
-            }
-        }
-    }
-
+//    Observe data
 
     private fun observeData() {
-        // TB Screening card
-        viewModel.tbScreening.observe(viewLifecycleOwner) { data ->
-            binding.tvTbScreeningTotal.text = data.total.toString()
-           // binding.tvTbScreeningMale.text = getString(R.string.label_male, data.male)
-            binding.tvTbScreeningMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
-            binding.tvTbScreeningFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
-            binding.tvTbScreeningChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
-            binding.tvTbScreeningOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
-
+        viewModel.coverage.observe(viewLifecycleOwner) { adapter.updateCoverage(it) }
+        viewModel.tbScreening.observe(viewLifecycleOwner) { adapter.updateScreened(it) }
+        viewModel.presumptiveTb.observe(viewLifecycleOwner) {
+            adapter.updateIndicator(DashboardListAdapter.ID_PRESUMPTIVE, it)
         }
-
-        viewModel.presumptiveTb.observe(viewLifecycleOwner) { data ->
-            binding.tvPresumptiveTbTotal.text = data.total.toString()
-            binding.tvPresumptiveTbMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
-            binding.tvPresumptiveTbFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
-            binding.tvPresumptiveTbChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
-            binding.tvPresumptiveTbOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
+        viewModel.pastHistoryTb.observe(viewLifecycleOwner) {
+            adapter.updateIndicator(DashboardListAdapter.ID_PAST_HISTORY, it)
         }
-
-        viewModel.unscreened.observe(viewLifecycleOwner) { data ->
-           // binding.tvUnscreenedTotal.text = data.total.toString()
-            binding.tvUnscreenedMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
-            binding.tvUnscreenedFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
-            binding.tvUnscreenedChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
-            binding.tvUnscreenedOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
+        viewModel.antiTbDrugs.observe(viewLifecycleOwner) {
+            adapter.updateIndicator(DashboardListAdapter.ID_ANTI_TB, it)
         }
-
-        viewModel.pastHistoryTb.observe(viewLifecycleOwner) { data ->
-            binding.tvPastHistoryTbTotal.text = data.total.toString()
-            binding.tvPastHistoryTbMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
-            binding.tvPastHistoryTbFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
-            binding.tvPastHistoryTbChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
-            binding.tvPastHistoryTbOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
-            binding.tvPastHistoryTbSeniorCitizen.text = requireContext().getBoldSecondValue(R.string.label_senior_citizen, data.seniorCitizen)
+        viewModel.digitalChestXray.observe(viewLifecycleOwner) {
+            adapter.updateIndicator(DashboardListAdapter.ID_XRAY, it)
         }
-
-        viewModel.antiTbDrugs.observe(viewLifecycleOwner) { data ->
-            binding.tvAntiTbDrugsTotal.text = data.total.toString()
-            binding.tvAntiTbDrugsMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
-            binding.tvAntiTbDrugsFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
-            binding.tvAntiTbDrugsChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
-            binding.tvAntiTbDrugsOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
-            binding.tvAntiTbDrugsSeniorCitizen.text = requireContext().getBoldSecondValue(R.string.label_senior_citizen, data.seniorCitizen)
+        viewModel.sputumCollection.observe(viewLifecycleOwner) {
+            adapter.updateIndicator(DashboardListAdapter.ID_SPUTUM, it)
         }
-
-        // TB Suspected card commented out
-        /*
-        viewModel.tbSuspected.observe(viewLifecycleOwner) { data ->
-            binding.tvTbSuspectedTotal.text = data.total.toString()
-            binding.tvTbSuspectedMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
-            binding.tvTbSuspectedFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
-            binding.tvTbSuspectedChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
-            binding.tvTbSuspectedOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
+        viewModel.trueNat.observe(viewLifecycleOwner) {
+            adapter.updateIndicator(DashboardListAdapter.ID_MTB, it)
+            adapter.updateIndicator(DashboardListAdapter.ID_RIF, it)
         }
-        */
-
-        // TB Confirmed card
-        viewModel.tbConfirmed.observe(viewLifecycleOwner) { data ->
-            binding.tvTbConfirmedTotal.text = data.total.toString()
-            binding.tvTbConfirmedMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
-            binding.tvTbConfirmedFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
-            binding.tvTbConfirmedChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
-            binding.tvTbConfirmedOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
+        viewModel.liquidCulture.observe(viewLifecycleOwner) {
+            adapter.updateIndicator(DashboardListAdapter.ID_LIQUID, it)
         }
-
-        viewModel.digitalChestXray.observe(viewLifecycleOwner) { data ->
-            binding.tvDigitalXrayTotal.text = data.total.toString()
-            binding.tvDigitalXrayMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
-            binding.tvDigitalXrayFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
-            binding.tvDigitalXrayChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
-            binding.tvDigitalXrayOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
-            binding.tvDigitalXraySeniorCitizen.text = requireContext().getBoldSecondValue(R.string.label_senior_citizen, data.seniorCitizen)
+        viewModel.hwcReferral.observe(viewLifecycleOwner) {
+            adapter.updateIndicator(DashboardListAdapter.ID_HWC, it)
         }
-
-        viewModel.sputumCollection.observe(viewLifecycleOwner) { data ->
-            binding.tvSputumTotal.text = data.total.toString()
-            binding.tvSputumMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
-            binding.tvSputumFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
-            binding.tvSputumChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
-            binding.tvSputumOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
-            binding.tvSputumSeniorCitizen.text = requireContext().getBoldSecondValue(R.string.label_senior_citizen, data.seniorCitizen)
+        viewModel.tbConfirmed.observe(viewLifecycleOwner) {
+            adapter.updateIndicator(DashboardListAdapter.ID_CONFIRMED, it)
         }
-
-        viewModel.trueNat.observe(viewLifecycleOwner) { data ->
-            binding.tvTrueNatTotal.text = data.total.toString()
-            binding.tvTrueNatMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
-            binding.tvTrueNatFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
-            binding.tvTrueNatChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
-            binding.tvTrueNatOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
-            binding.tvTrueNatSeniorCitizen.text = requireContext().getBoldSecondValue(R.string.label_senior_citizen, data.seniorCitizen)
-        }
-
-        viewModel.liquidCulture.observe(viewLifecycleOwner) { data ->
-            binding.tvLiquidCultureTotal.text = data.total.toString()
-            binding.tvLiquidCultureMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
-            binding.tvLiquidCultureFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
-            binding.tvLiquidCultureChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
-            binding.tvLiquidCultureOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
-            binding.tvLiquidCultureSeniorCitizen.text = requireContext().getBoldSecondValue(R.string.label_senior_citizen, data.seniorCitizen)
-        }
-
-        viewModel.hwcReferral.observe(viewLifecycleOwner) { data ->
-            binding.tvHwcReferralTotal.text = data.total.toString()
-            binding.tvHwcReferralMale.text = requireContext().getBoldSecondValue(R.string.label_male, data.male)
-            binding.tvHwcReferralFemale.text = requireContext().getBoldSecondValue(R.string.label_female, data.female)
-            binding.tvHwcReferralChildren.text = requireContext().getBoldSecondValue(R.string.label_children, data.children)
-            binding.tvHwcReferralOthers.text = requireContext().getBoldSecondValue(R.string.label_others, data.others)
-            binding.tvHwcReferralSeniorCitizen.text = requireContext().getBoldSecondValue(R.string.label_senior_citizen, data.seniorCitizen)
-        }
-
-        // NIKSHAY count
         viewModel.nikshayCount.observe(viewLifecycleOwner) {
-            binding.tvNikshayCount.text = it.toString()
+            adapter.updateIndicator(DashboardListAdapter.ID_NIKSHAY, it)
         }
-
-        // ABHA count
         viewModel.abhaCount.observe(viewLifecycleOwner) {
-            binding.tvAbhaCount.text = it.toString()
+            adapter.updateIndicator(DashboardListAdapter.ID_ABHA, it)
         }
     }
 
-    override fun onStart() {
-        super.onStart()
+    private fun bindFilterScope(state: DashboardFilterState) {
+        val scopeName = when {
+            state.villageId != 0 -> viewModel.villageList.firstOrNull { it.id == state.villageId }?.name
+            state.blockId != 0 -> viewModel.blockList.firstOrNull { it.id == state.blockId }?.name
+            state.districtId != 0 -> viewModel.districtList.firstOrNull { it.id == state.districtId }?.name
+            else -> null
+        } ?: getString(R.string.filter_all_villages)
+        adapter.updateScope(scopeName, periodLabel(state.periodKey))
+    }
+
+    private fun periodLabel(key: String): String = getString(
+        when (key) {
+            DashboardViewModel.PERIOD_TODAY -> R.string.filter_today
+            DashboardViewModel.PERIOD_YESTERDAY -> R.string.filter_yesterday
+            DashboardViewModel.PERIOD_WEEK -> R.string.filter_this_week
+            DashboardViewModel.PERIOD_MONTH -> R.string.filter_this_month
+            DashboardViewModel.PERIOD_YEAR -> R.string.filter_this_year
+            else -> R.string.filter_all_time
+        }
+    )
+
+    override fun onResume() {
+        super.onResume()
         (activity as? HomeActivity)?.updateActionBar(
             R.drawable.ic_dashboard,
             getString(R.string.dashboard)
@@ -300,29 +142,8 @@ class DashboardFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        binding.dashboardList.adapter = null
         super.onDestroyView()
         _binding = null
-    }
-
-
-    private fun Context.getBoldSecondValue(
-        @StringRes labelRes: Int,
-        value: Any
-    ): SpannableString {
-
-        val fullText = getString(labelRes, value)
-        val valueText = value.toString()
-
-        val start = fullText.lastIndexOf(valueText)
-        val end = start + valueText.length
-
-        return SpannableString(fullText).apply {
-            setSpan(
-                StyleSpan(Typeface.BOLD),
-                start,
-                end,
-                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-            )
-        }
     }
 }

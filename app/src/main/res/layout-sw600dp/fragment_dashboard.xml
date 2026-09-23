@@ -8,8 +8,8 @@
     android:clipToPadding="false"
     android:descendantFocusability="blocksDescendants"
     android:overScrollMode="never"
-    android:paddingStart="14dp"
-    android:paddingTop="14dp"
-    android:paddingEnd="14dp"
-    android:paddingBottom="24dp"
+    android:paddingStart="20dp"
+    android:paddingTop="18dp"
+    android:paddingEnd="20dp"
+    android:paddingBottom="28dp"
     tools:context=".ui.home_activity.dashboard.DashboardFragment" />
