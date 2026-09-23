@@ -225,10 +225,10 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
                 lastNameHeadOfFamily,
                 mobileNotAvailable,
                 mobileNoHeadOfFamily,
-                houseNo,
-                wardNo,
-                wardName,
-                mohallaName,
+              //  houseNo,
+              //  wardNo,
+              //  wardName,
+              //  mohallaName,
                 povertyLine,
                 address,
             //    pinCode,
@@ -262,10 +262,10 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             saved.familyHeadName?.takeIf { it.isNotEmpty() }?.let { firstNameHeadOfFamily.inputType = TEXT_VIEW }
             saved.familyName?.takeIf { it.isNotEmpty() }?.let { lastNameHeadOfFamily.inputType = TEXT_VIEW }
             saved.familyHeadPhoneNo.takeIf { it != null }?.let { mobileNoHeadOfFamily.inputType = TEXT_VIEW }
-            houseNo.value = saved.houseNo
-            wardNo.value = saved.wardNo
-            wardName.value = saved.wardName
-            mohallaName.value = saved.mohallaName
+//            houseNo.value = saved.houseNo
+//            wardNo.value = saved.wardNo
+//            wardName.value = saved.wardName
+//            mohallaName.value = saved.mohallaName
             povertyLine.value = povertyLine.getStringFromPosition(saved.povertyLineId)
             address.value = saved.address?.takeIf { it.isNotBlank() } ?: villageHamlet.value
            // pinCode.value = saved.pinCode
@@ -332,10 +332,10 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
                 lastNameHeadOfFamily,
                 mobileNotAvailable,
                 mobileNoHeadOfFamily,
-                houseNo,
-                wardNo,
-                wardName,
-                mohallaName,
+//                houseNo,
+//                wardNo,
+//                wardName,
+//                mohallaName,
                 povertyLine
             )
         }
@@ -346,10 +346,10 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             val isPlaceholderPhone = saved.familyHeadPhoneNo == 9999999999L
             mobileNoHeadOfFamily.value = saved.familyHeadPhoneNo?.toString()?.takeIf { !isPlaceholderPhone }
             mobileNotAvailable.value = if (isPlaceholderPhone) "0" else null
-            houseNo.value = saved.houseNo
-            wardNo.value = saved.wardNo
-            wardName.value = saved.wardName
-            mohallaName.value = saved.mohallaName
+//            houseNo.value = saved.houseNo
+//            wardNo.value = saved.wardNo
+//            wardName.value = saved.wardName
+//            mohallaName.value = saved.mohallaName
             povertyLine.value = povertyLine.getStringFromPosition(saved.povertyLineId)
         }
         setDefaultPovertyLineIfNeeded()
@@ -704,10 +704,10 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             family.isRegisteredAtCampSite = registeredAtCampSite.getEnglishStringFromPosition(family.isRegisteredAtCampSiteId)
             family.familyName = lastNameHeadOfFamily.value
             family.familyHeadPhoneNo =  mobileNoHeadOfFamily.value?.toLongOrNull() ?: 9999999999L
-            family.houseNo = houseNo.value
-            family.wardNo = wardNo.value
-            family.wardName = wardName.value
-            family.mohallaName = mohallaName.value
+//            family.houseNo = houseNo.value
+//            family.wardNo = wardNo.value
+//            family.wardName = wardName.value
+//            family.mohallaName = mohallaName.value
             family.povertyLineId = povertyLine.getPosition()
             family.povertyLine =
                 povertyLine.getEnglishStringFromPosition(family.povertyLineId)
