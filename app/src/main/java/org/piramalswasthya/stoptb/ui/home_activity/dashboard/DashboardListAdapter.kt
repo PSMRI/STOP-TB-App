@@ -149,24 +149,24 @@ internal class DashboardListAdapter(
 
     fun updateCoverage(stats: CoverageStats) {
         header = header.copy(coverage = stats)
-        notifyItemChanged(0, PAYLOAD_COUNT)
+        notifyItemChanged(0)
     }
 
     fun updateScreened(data: TbGenderBreakdown) {
         header = header.copy(screened = data)
-        notifyItemChanged(0, PAYLOAD_COUNT)
+        notifyItemChanged(0)
     }
 
     fun updateScope(scopeName: String, periodLabel: String) {
         header = header.copy(scopeName = scopeName, periodLabel = periodLabel)
-        notifyItemChanged(0, PAYLOAD_COUNT)
+        notifyItemChanged(0)
     }
 
     fun updateIndicator(id: Int, data: TbGenderBreakdown) {
         val index = items.indexOfFirst { it.id == id }
         if (index < 0) return
         items[index] = items[index].copy(data = data)
-        notifyItemChanged(index + 1, PAYLOAD_COUNT)
+        notifyItemChanged(index + 1)
     }
 
     override fun getItemViewType(position: Int): Int =
@@ -302,11 +302,7 @@ internal class DashboardListAdapter(
         private var boundItemId: Int = -1
 
         fun bind(item: DashboardIndicatorItem, payloads: List<Any>) {
-            if (payloads.contains(PAYLOAD_COUNT) && boundItemId == item.id) {
-                card.tvIndicatorCount.text = item.data.total.toString()
-                accordion?.let { bindAccordion(it, item) }
-                return
-            }
+            // Always fully rebind so filtered counts are never stuck at stale/zero payload state.
             boundItemId = item.id
             (card.root as MaterialCardView).setCardBackgroundColor(color(card.root, item.backgroundColor))
             card.flIndicatorIcon.setBackgroundResource(item.iconBackground)
