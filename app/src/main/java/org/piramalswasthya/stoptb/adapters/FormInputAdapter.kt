@@ -258,6 +258,8 @@ class FormInputAdapter(
 //                        } else
 //                            item.errorText = null
 //                    }
+                    // Ignore events if this view has since been rebound to a different field.
+                    if (binding.form !== item) return
                     item.value = editable?.toString()
                     val emptyError = binding.root.context.getString(R.string.form_input_empty_error)
                     if (!item.value.isNullOrBlank() && item.errorText == emptyError) {
@@ -364,16 +366,21 @@ class FormInputAdapter(
             binding.et.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus){
                     binding.et.requestFocus()
+                    // Already attached in bind(); remove first so focus never registers a duplicate
+                    // that bind() can't fully detach when this view is recycled for another field.
+                    binding.et.removeTextChangedListener(textWatcher)
                     binding.et.addTextChangedListener(textWatcher)
+                    // Explicit show/hide, not toggleSoftInput(): a toggle flips the keyboard, so losing
+                    // focus while it is closed (e.g. ticking "Mobile Number Not Available") opened it.
                     val imm =
                         binding.root.context.getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager?
-                    imm!!.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0)
+                    imm?.showSoftInput(binding.et, InputMethodManager.SHOW_IMPLICIT)
                 } else {
                     binding.et.removeTextChangedListener(textWatcher)
                     binding.et.clearFocus()
                     val imm =
                         binding.root.context.getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager?
-                    imm!!.toggleSoftInput(InputMethodManager.HIDE_IMPLICIT_ONLY, 0)
+                    imm?.hideSoftInputFromWindow(binding.et.windowToken, 0)
                 }
             }
             binding.et.setOnEditorActionListener { v, actionId, _ ->

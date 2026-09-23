@@ -15,6 +15,7 @@ import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -321,25 +322,26 @@ class NewHouseholdFragment : Fragment() {
     }
 
 
+    // Refresh only the row whose value the dataset changed. notifyDataSetChanged() here rebinds every
+    // row and reshuffles recycled views between fields; a focused EditText then keeps showing another
+    // field's text (e.g. village name inside Mobile No).
     private fun hardCodedListUpdate(formId: Int) {
-        binding.form.rvInputForm.adapter?.apply {
-            when (formId) {
-
-                // Village dropdown changed
-                23 -> {      // <-- villageHamlet.id
-                    notifyDataSetChanged()
-                }
-
-                // Address changed
-                24 -> {      // <-- address.id
-                    notifyDataSetChanged()
-                }
-
-                // Mobile number not available checkbox changed
-                1002 -> {    // <-- mobileNotAvailable.id
-                    notifyDataSetChanged()
-                }
-            }
+        val targetId = when (formId) {
+            23 -> 24      // villageHamlet changed → address is auto-filled
+            1002 -> 2     // mobileNotAvailable toggled → mobileNoHeadOfFamily cleared/enabled/disabled
+            else -> return // address (24) edits: its own watcher already shows the validation error
+        }
+        requireActivity().currentFocus?.clearFocus()
+        val rv = binding.form.rvInputForm
+        if (formId == 1002) {
+            // Toggling "Mobile Number Not Available" must never leave a keyboard open.
+            (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)
+                ?.hideSoftInputFromWindow(rv.windowToken, 0)
+        }
+        rv.post {
+            val adapter = rv.adapter as? FormInputAdapter ?: return@post
+            val position = adapter.currentList.indexOfFirst { it.id == targetId }
+            if (position >= 0) adapter.notifyItemChanged(position)
         }
     }
 
