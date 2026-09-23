@@ -150,7 +150,7 @@ class TBScreeningDataset(
         inputType = InputType.RADIO,
         title = resources.getString(R.string.others),
         entries = resources.getStringArray(R.array.yes_no),
-        required = false,
+        required = true,
         hasDependants = true
     )
 
