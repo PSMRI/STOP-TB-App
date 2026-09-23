@@ -382,6 +382,19 @@ internal class DashboardListAdapter(
             openKeys: MutableSet<Int>,
         ) {
             row.tvDemoValue.text = count.toString()
+            val canExpand = !classifications.isNullOrEmpty()
+            if (!canExpand) {
+                openKeys.remove(key)
+                row.layoutDemoDetail.visibility = View.GONE
+                row.layoutDemoDetail.removeAllViews()
+                row.ivDemoChevron.visibility = View.GONE
+                row.ivDemoChevron.rotation = 0f
+                row.btnDemoHeader.setOnClickListener(null)
+                row.btnDemoHeader.isClickable = false
+                return
+            }
+            row.ivDemoChevron.visibility = View.VISIBLE
+            row.btnDemoHeader.isClickable = true
             val expanded = key in openKeys
             row.layoutDemoDetail.visibility = if (expanded) View.VISIBLE else View.GONE
             row.ivDemoChevron.rotation = if (expanded) 180f else 0f
@@ -414,6 +427,18 @@ internal class DashboardListAdapter(
         classifications: List<DashboardClassDef>?,
     ) {
         row.tvDemoValue.text = count.toString()
+        val canExpand = !classifications.isNullOrEmpty()
+        if (!canExpand) {
+            row.layoutDemoDetail.visibility = View.GONE
+            row.layoutDemoDetail.removeAllViews()
+            row.ivDemoChevron.visibility = View.GONE
+            row.ivDemoChevron.rotation = 0f
+            row.btnDemoHeader.setOnClickListener(null)
+            row.btnDemoHeader.isClickable = false
+            return
+        }
+        row.ivDemoChevron.visibility = View.VISIBLE
+        row.btnDemoHeader.isClickable = true
         row.btnDemoHeader.setOnClickListener {
             val expand = row.layoutDemoDetail.visibility != View.VISIBLE
             if (expand) fillDemoDetail(row, count, classifications)

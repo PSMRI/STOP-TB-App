@@ -386,7 +386,7 @@
     <string name="dashboard_value_with_percent">%1$d (%2$d%%)</string>
     <string name="dashboard_screened_population">Screened Population</string>
     <string name="dashboard_screened_period_label">— %1$s</string>
-    <string name="dashboard_screened_population_subtitle">By demographic, for the selected Village and Period (not cumulative)</string>
+    <string name="dashboard_screened_population_subtitle">By Demographic, for the selected Village and Period (not cumulative)</string>
     <string name="dashboard_overview_title">Screening &amp; Testing Overview</string>
     <string name="dashboard_overview_subtitle">Tap a KPI to view demographic details.</string>
     <string name="dashboard_view_by_demographic">View by demographic</string>
@@ -410,7 +410,7 @@
     <string name="dashboard_demo_children">Children (&lt;15y)</string>
     <string name="dashboard_demo_others">Others</string>
     <string name="dashboard_demo_senior">Senior Citizens (≥60y)</string>
-    <string name="dashboard_demo_transgender">Other</string>
+    <string name="dashboard_demo_transgender">Transgender</string>
     <string name="dashboard_demo_total">Total</string>
     <string name="dashboard_class_xray_normal">Normal</string>
     <string name="dashboard_class_xray_abnormal">Abnormal (Non-TB Presumptive)</string>
