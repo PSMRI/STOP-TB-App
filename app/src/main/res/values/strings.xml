@@ -1327,7 +1327,22 @@
     <string name="ben_card_tb_symptoms">TB Symptoms</string>
     <string name="ben_card_chest_xray">Chest X-Ray</string>
     <string name="ben_card_truenat">TrueNat</string>
+    <string name="ben_card_clinical_assessment">Clinical Assessment</string>
     <string name="ben_card_result">Result: %1$s</string>
+
+    <!-- TrueNat & RIF order lifecycle redesign — Order Status area pill/caption/button copy,
+         reused identically by Chest X-Ray's own retrofit of the same design language. -->
+    <string name="order_status_fetching_from_device">Fetching result from device…</string>
+    <string name="order_status_manual_action_required">Manual Action Required</string>
+    <string name="order_status_polling_stopped">Device polling has stopped — results won\'t be fetched automatically.</string>
+    <string name="order_status_last_checked_caption">Last checked %1$s ago · Auto-refresh every %2$d seconds</string>
+    <string name="order_status_enter_result">Enter Result Manually</string>
+    <string name="order_status_not_conducted">Mark Test Not Conducted</string>
+    <string name="order_status_view_mtb_result">View MTB Result</string>
+    <string name="order_status_view_rif_result">View RIF Result</string>
+    <string name="order_status_rif_block_label">RIF Test · triggered by MTB Positive</string>
+    <string name="order_status_create_new_order">Create New Order</string>
+    <string name="order_status_clinical_assessment_referred">Referred for Clinical Assessment &amp; Diagnosis</string>
     <string name="btn_examine">Examine</string>
     <string name="btn_examine_count">Examine %1$d/4</string>
     <string name="btn_examine_count_of">Examine %1$d/%2$d</string>

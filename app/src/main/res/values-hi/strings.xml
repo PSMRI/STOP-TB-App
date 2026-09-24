@@ -946,7 +946,21 @@
     <string name="ben_card_tb_symptoms">टीबी के लक्षण</string>
     <string name="ben_card_chest_xray">छाती एक्स-रे</string>
     <string name="ben_card_truenat">ट्रूनैट</string>
+    <string name="ben_card_clinical_assessment">क्लिनिकल आकलन</string>
     <string name="ben_card_result">परिणाम: %1$s</string>
+
+    <!-- TrueNat & RIF order lifecycle redesign -->
+    <string name="order_status_fetching_from_device">डिवाइस से परिणाम प्राप्त हो रहा है…</string>
+    <string name="order_status_manual_action_required">मैन्युअल कार्रवाई आवश्यक</string>
+    <string name="order_status_polling_stopped">डिवाइस पोलिंग बंद हो गई है — परिणाम स्वतः प्राप्त नहीं होंगे।</string>
+    <string name="order_status_last_checked_caption">%1$s पहले जांचा गया · हर %2$d सेकंड में स्वतः रिफ्रेश</string>
+    <string name="order_status_enter_result">परिणाम मैन्युअल रूप से दर्ज करें</string>
+    <string name="order_status_not_conducted">परीक्षण नहीं किया गया चिह्नित करें</string>
+    <string name="order_status_view_mtb_result">एमटीबी परिणाम देखें</string>
+    <string name="order_status_view_rif_result">आरआईएफ परिणाम देखें</string>
+    <string name="order_status_rif_block_label">आरआईएफ परीक्षण · एमटीबी पॉजिटिव द्वारा ट्रिगर</string>
+    <string name="order_status_create_new_order">नया ऑर्डर बनाएं</string>
+    <string name="order_status_clinical_assessment_referred">क्लिनिकल आकलन एवं निदान हेतु संदर्भित</string>
     <string name="btn_examine">जांचें</string>
     <string name="btn_examine_count">जांचें %1$d/4</string>
     <string name="examine_bottomsheet_title">परीक्षण फॉर्म</string>
