@@ -39,7 +39,7 @@ class CounsellingRepositoryImpl @Inject constructor(
         return metadataDao.getSectionsByPhase(versionId, phase.value)
     }
 
-    override suspend fun downloadAndStoreAllForms(): Boolean {
+    override suspend fun downloadAndStoreAllForms(forceUpdate: Boolean): Boolean {
         return try {
             val jwt = preferenceDao.getJWTAmritToken()
             val authHeader = jwt ?: run {
@@ -59,6 +59,14 @@ class CounsellingRepositoryImpl @Inject constructor(
 
                     apiSchemas.forEach { apiSchema ->
                         val formId = apiSchema.formId.toIntOrNull() ?: 0
+                        if (forceUpdate) {
+                            // Login refresh: overwrite in place so same-version backend edits apply. No wipe —
+                            // t_form_response RESTRICTs deleting a version that has responses, and upsert keeps answers.
+                            storeFormSchemaInDb(apiSchema, wipeExistingVersions = false)
+                            val versionId = formId * 1000 + apiSchema.versionNumber
+                            metadataDao.deactivateOtherVersions(formId, versionId)
+                            return@forEach
+                        }
                         val activeVersion = metadataDao.getActiveVersionNumber(formId)
                         if (activeVersion == null || apiSchema.versionNumber > activeVersion || forceRefresh) {
                             storeFormSchemaInDb(apiSchema)
@@ -77,13 +85,13 @@ class CounsellingRepositoryImpl @Inject constructor(
 
     private val gson = com.google.gson.Gson()
 
-    private suspend fun storeFormSchemaInDb(apiSchema: FormSchemaDto) {
+    private suspend fun storeFormSchemaInDb(apiSchema: FormSchemaDto, wipeExistingVersions: Boolean = true) {
         storeFormSchemaInDb(
             metadataDao = metadataDao,
             gson = gson,
             apiSchema = apiSchema,
             idStrategy = QuestionIdStrategy.HASH_BASED,
-            wipeExistingVersions = true
+            wipeExistingVersions = wipeExistingVersions
         )
     }
 

@@ -8,7 +8,8 @@ interface ICounsellingRepository {
     suspend fun getFormDefinition(formType: FormType): CompleteFormDefinition?
     suspend fun getSectionsByPhase(formType: FormType, phase: SectionPhase): List<FormSectionWithQuestions>
 //    suspend fun downloadLatestFormSchema(formType: String): Boolean
-    suspend fun downloadAndStoreAllForms(): Boolean
+    /** @param forceUpdate true (login refresh) overwrites stored forms even when the version is unchanged. */
+    suspend fun downloadAndStoreAllForms(forceUpdate: Boolean = false): Boolean
     suspend fun getOrCreateDraft(beneficiaryId: Long, formVersionId: Int): CompleteFormResponse
     suspend fun saveDraftSection(
         responseId: Long,
