@@ -5,11 +5,11 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/dashboard_page_bg"
-    android:clipToPadding="false"
+    android:clipToPadding="true"
     android:descendantFocusability="blocksDescendants"
     android:overScrollMode="never"
     android:paddingStart="20dp"
-    android:paddingTop="18dp"
+    android:paddingTop="14dp"
     android:paddingEnd="20dp"
     android:paddingBottom="28dp"
     tools:context=".ui.home_activity.dashboard.DashboardFragment" />
