@@ -4,6 +4,13 @@
 
 
     <item
+        android:id="@+id/toolbar_menu_refresh"
+        android:icon="@drawable/ic_cloud_sync"
+        android:title="@string/quick_refresh_action"
+        android:visible="false"
+        app:iconTint="@android:color/white"
+        app:showAsAction="always" />
+    <item
         android:id="@+id/sync_status"
         android:icon="@drawable/ic_cloud_done_white"
         android:title="@string/sync_status"
@@ -14,8 +21,6 @@
         android:icon="@drawable/ic_home"
         android:title="@string/go_to_home"
         app:showAsAction="ifRoom" />
-
-
     <item
         android:id="@+id/toolbar_menu_language"
         android:icon="@drawable/ic_icon_language"

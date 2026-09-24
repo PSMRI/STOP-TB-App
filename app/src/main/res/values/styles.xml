@@ -186,6 +186,8 @@
 
     <style name="TextAppearance.Sakhi.HomeTab" parent="TextAppearance.Material3.TitleMedium">
         <item name="android:textStyle">bold</item>
+        <item name="android:fontFamily">@font/roboto_bold</item>
+        <item name="fontFamily">@font/roboto_bold</item>
         <item name="android:textColor">@color/md_theme_light_onSurface</item>
     </style>
 
