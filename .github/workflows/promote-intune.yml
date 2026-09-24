@@ -259,5 +259,5 @@ jobs:
             --group-id "${INTUNE_GROUP_ID}" \
             --display-name "${{ steps.cfg.outputs.intune_display_name }}" \
             --publisher "Piramal Swasthya" \
-            --description "${{ steps.cfg.outputs.label }} signed build ${{ inputs.versionName }} (${{ inputs.versionCode }}) promoted from Firebase" \
+            --description "${{ steps.cfg.outputs.label }} signed build updated to ${{ inputs.versionName }} (${{ inputs.versionCode }}) promoted from Firebase" \
             "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"
