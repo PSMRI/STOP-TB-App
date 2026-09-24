@@ -65,6 +65,9 @@ import kotlinx.coroutines.launch
 class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
 
     private var autoFlowBackNavigationBlocked: Boolean = false
+    private var refreshMenuItem: MenuItem? = null
+    private var showQuickRefreshAction: Boolean = false
+    private var quickRefreshActionEnabled: Boolean = true
 
     /** Mirrors the same listener in HomeActivity — see comments there. */
     private val campHubPrefListener =
@@ -338,12 +341,19 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
                 menuInflater.inflate(R.menu.home_toolbar, menu)
                 menu.findItem(R.id.toolbar_menu_home)?.isVisible = false
                 menu.findItem(R.id.toolbar_menu_language)?.isVisible = true
+                refreshMenuItem = menu.findItem(R.id.toolbar_menu_refresh)
+                refreshMenuItem?.isVisible = showQuickRefreshAction
+                refreshMenuItem?.isEnabled = quickRefreshActionEnabled
             }
 
             override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
                 when (menuItem.itemId) {
                     R.id.toolbar_menu_language -> {
                         langChooseAlert.show()
+                        return true
+                    }
+                    R.id.toolbar_menu_refresh -> {
+                        findVolunteerHomeFragment()?.requestQuickRefresh()
                         return true
                     }
                     R.id.sync_status -> {
@@ -640,6 +650,23 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             binding.pbQuickRefreshTop.progress = 0
         }
     }
+
+    fun setQuickRefreshActionVisible(visible: Boolean) {
+        showQuickRefreshAction = visible
+        refreshMenuItem?.isVisible = visible
+    }
+
+    fun setQuickRefreshActionEnabled(enabled: Boolean) {
+        quickRefreshActionEnabled = enabled
+        refreshMenuItem?.isEnabled = enabled
+    }
+
+    private fun findVolunteerHomeFragment() =
+        (supportFragmentManager.findFragmentById(R.id.nav_host_fragment_volunteer) as? NavHostFragment)
+            ?.childFragmentManager
+            ?.fragments
+            ?.filterIsInstance<org.piramalswasthya.stoptb.ui.volunteer.fragment.VolunteerHomeFragment>()
+            ?.firstOrNull()
 
     fun updateQuickRefreshProgress(progress: Int) {
         binding.pbQuickRefreshTop.progress = progress.coerceIn(0, 100)
