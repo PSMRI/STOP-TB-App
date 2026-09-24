@@ -40,6 +40,13 @@ interface HouseholdDao {
     @Query("SELECT COUNT(*) FROM HOUSEHOLD WHERE isDraft = 0 and loc_village_Id = :selectedVillage and isDeactivate =0")
     fun getAllHouseholdsCount(selectedVillage: Int): Flow<Int>
 
+    @Query("""
+        SELECT COUNT(*) FROM HOUSEHOLD
+        WHERE isDraft = 0 AND isDeactivate = 0
+        AND ((:villageId != 0 AND loc_village_Id = :villageId) OR (:villageId = 0 AND loc_village_Id IN (:assignedVillageIds)))
+    """)
+    fun getGlanceHouseholdCount(villageId: Int, assignedVillageIds: List<Int>): Flow<Int>
+
     @Query("SELECT * FROM HOUSEHOLD WHERE householdId =:hhId LIMIT 1")
     suspend fun getHousehold(hhId: Long): HouseholdCache?
 

@@ -814,6 +814,13 @@ interface BenDao {
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0")
     fun getAllBenCount(selectedVillage: Int): Flow<Int>
 
+    @Query("""
+        SELECT COUNT(*) FROM BEN_BASIC_CACHE
+        WHERE isDeactivate = 0
+        AND ((:villageId != 0 AND villageId = :villageId) OR (:villageId = 0 AND villageId IN (:assignedVillageIds)))
+    """)
+    fun getGlancePopulationCount(villageId: Int, assignedVillageIds: List<Int>): Flow<Int>
+
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage AND isDeactivate=0 AND abhaId IS NOT NULL")
     fun getAllBenWithAbhaCount(selectedVillage: Int): Flow<Int>
 
@@ -1475,6 +1482,18 @@ interface BenDao {
       )
 """)
     fun getUnscreenedCount(selectedVillage: Int): Flow<Int>
+
+    @Query("""
+        SELECT COUNT(*)
+        FROM BEN_BASIC_CACHE b
+        WHERE b.isDeactivate = 0
+          AND b.screeningStatus = 'UNSCREENED'
+          AND ((:villageId != 0 AND b.villageId = :villageId) OR (:villageId = 0 AND b.villageId IN (:assignedVillageIds)))
+          AND NOT EXISTS (
+              SELECT 1 FROM TB_SCREENING ts WHERE ts.benId = b.benId
+          )
+    """)
+    fun getGlanceUnscreenedCount(villageId: Int, assignedVillageIds: List<Int>): Flow<Int>
 
     @Query("""
         SELECT * FROM BEN_BASIC_CACHE

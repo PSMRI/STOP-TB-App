@@ -1097,6 +1097,15 @@
     <string name="quick_refresh_refreshing">Refreshing beneficiary data...</string>
     <string name="quick_refresh_failed">Refresh failed. Try again</string>
     <string name="quick_refresh_action">Refresh</string>
+    <plurals name="home_presumptive_referral">
+        <item quantity="one">%d presumptive case needs referral</item>
+        <item quantity="other">%d presumptive cases need referral</item>
+    </plurals>
+    <string name="home_presumptive_referral_subtitle">Flagged from recent TB screenings</string>
+    <string name="home_today_at_a_glance">TODAY AT A GLANCE</string>
+    <string name="home_glance_households">Households</string>
+    <string name="home_glance_population">Total Population</string>
+    <string name="home_glance_unscreened">Unscreened Population</string>
     <string name="quick_refresh_camp_disconnected">Camp Hub is not connected. Please reconnect first.</string>
     <string name="quick_refresh_ip_not_reachable">IP address not reachable: %1$s</string>
     <string name="error_message">Error Message : </string>
