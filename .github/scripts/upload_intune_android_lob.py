@@ -269,14 +269,33 @@ def _is_missing_app_error(exc: Exception) -> bool:
     return " failed (404)" in message or "ResourceNotFound" in message or "not found" in message.lower()
 
 
-def commit_content_version(token: str, app_id: str, content_version_id: str) -> None:
+def _version_mismatch_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return "versioncode" in message and "does not match" in message
+
+
+def commit_content_version(
+    token: str,
+    app_id: str,
+    content_version_id: str,
+    version_code: str,
+    version_name: str,
+) -> None:
     path = f"deviceAppManagement/mobileApps/{app_id}"
-    body = {
-        "@odata.type": f"#{LOB_TYPE}",
-        "committedContentVersion": str(content_version_id),
-    }
     headers = {"Prefer": "return=minimal"}
     commit_url = f"{GRAPH_BETA}/{path}"
+    bodies = [
+        {
+            "@odata.type": f"#{LOB_TYPE}",
+            "committedContentVersion": str(content_version_id),
+            "versionCode": str(version_code),
+            "versionName": str(version_name),
+        },
+        {
+            "@odata.type": f"#{LOB_TYPE}",
+            "committedContentVersion": str(content_version_id),
+        },
+    ]
     last_error: Exception | None = None
     for attempt in range(1, 8):
         current: dict[str, Any] | None = None
@@ -305,28 +324,76 @@ def commit_content_version(token: str, app_id: str, content_version_id: str) -> 
             if committed:
                 log(
                     f"Intune app {app_id} is {state or 'unknown'} on committedContentVersion="
-                    f"{committed}; committing uploaded content version {content_version_id}"
+                    f"{committed} versionCode={current.get('versionCode')}; "
+                    f"committing uploaded content version {content_version_id} "
+                    f"as versionCode={version_code}"
                 )
-        try:
-            log(
-                f"Committing Intune content version {content_version_id} "
-                f"via {commit_url} (attempt {attempt}/7)"
-            )
-            graph_request(
-                token,
-                "PATCH",
-                commit_url,
-                body,
-                raw_url=True,
-                extra_headers=headers,
-            )
-            wait_for_committed_version(token, app_id, content_version_id)
-            return
-        except Exception as exc:  # noqa: BLE001
-            last_error = exc
-            log(f"Intune commit PATCH failed: {exc}")
-            if not _is_transient_graph_error(exc) and not _is_missing_app_error(exc):
-                raise
+        for body in bodies:
+            try:
+                log(
+                    f"Committing Intune content version {content_version_id} "
+                    f"via {commit_url} (attempt {attempt}/7) "
+                    f"fields={sorted(k for k in body if k != '@odata.type')}"
+                )
+                graph_request(
+                    token,
+                    "PATCH",
+                    commit_url,
+                    body,
+                    raw_url=True,
+                    extra_headers=headers,
+                )
+                wait_for_committed_version(token, app_id, content_version_id)
+                return
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+                log(f"Intune commit PATCH failed: {exc}")
+                if _version_mismatch_error(exc) and "versionCode" not in body:
+                    continue
+                if not _is_transient_graph_error(exc) and not _is_missing_app_error(exc) and not _version_mismatch_error(exc):
+                    raise
+                if _version_mismatch_error(exc):
+                    break
+        if last_error and _version_mismatch_error(last_error):
+            try:
+                log(
+                    f"Updating Intune versionCode to {version_code} before committing "
+                    f"content version {content_version_id}"
+                )
+                graph_request(
+                    token,
+                    "PATCH",
+                    commit_url,
+                    {
+                        "@odata.type": f"#{LOB_TYPE}",
+                        "versionCode": str(version_code),
+                        "versionName": str(version_name),
+                    },
+                    raw_url=True,
+                    extra_headers=headers,
+                )
+                graph_request(
+                    token,
+                    "PATCH",
+                    commit_url,
+                    {
+                        "@odata.type": f"#{LOB_TYPE}",
+                        "committedContentVersion": str(content_version_id),
+                    },
+                    raw_url=True,
+                    extra_headers=headers,
+                )
+                wait_for_committed_version(token, app_id, content_version_id)
+                return
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+                log(f"Intune version-then-commit PATCH failed: {exc}")
+            raise RuntimeError(
+                "Intune refused to publish this APK because the app record versionCode "
+                f"does not match the uploaded APK. The Intune app is still on the previous "
+                f"version; this upload is {version_name} ({version_code}). No extra secrets "
+                "are needed; re-run after this commit-body fix is pushed."
+            ) from last_error
         wait_s = min(45, 4 * (2 ** (attempt - 1)))
         log(f"Waiting {wait_s}s for Intune app metadata before retrying commit PATCH")
         time.sleep(wait_s)
@@ -1287,7 +1354,13 @@ def upload_apk(args: argparse.Namespace) -> None:
                     raise RuntimeError("Intune file commit finished without isCommitted=true")
             time.sleep(5)
 
-        commit_content_version(token, app_id, content_version_id)
+        commit_content_version(
+            token,
+            app_id,
+            content_version_id,
+            str(args.version_code),
+            str(args.version_name),
+        )
         try:
             graph_request(
                 token,
