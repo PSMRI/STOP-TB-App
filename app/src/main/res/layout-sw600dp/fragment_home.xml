@@ -74,6 +74,7 @@
                 app:tabIndicatorHeight="48dp"
                 app:tabMode="fixed"
                 app:tabGravity="fill"
+                app:tabMaxWidth="0dp"
                 app:tabRippleColor="@android:color/transparent"
                 app:tabSelectedTextColor="@color/md_theme_light_primary"
                 app:tabTextAppearance="@style/TextAppearance.Sakhi.HomeTab"
