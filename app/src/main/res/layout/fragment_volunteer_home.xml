@@ -75,33 +75,39 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="14dp"
+            android:baselineAligned="false"
             android:orientation="horizontal">
 
             <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_marginEnd="6dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_home_glance_card"
                 android:gravity="center"
                 android:orientation="vertical"
+                android:paddingStart="6dp"
                 android:paddingTop="16dp"
+                android:paddingEnd="6dp"
                 android:paddingBottom="14dp">
 
                 <TextView
                     android:id="@+id/tvGlanceHouseholds"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:gravity="center"
                     android:textColor="#1A1A1A"
                     android:textSize="22sp"
                     android:textStyle="bold"
-                    tools:text="234" />
+                    tools:text="0" />
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
                     android:gravity="center"
+                    android:maxLines="2"
+                    android:minLines="2"
                     android:text="@string/home_glance_households"
                     android:textColor="#6B6B6B"
                     android:textSize="12sp" />
@@ -109,30 +115,35 @@
 
             <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_marginStart="6dp"
                 android:layout_marginEnd="6dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_home_glance_card"
                 android:gravity="center"
                 android:orientation="vertical"
+                android:paddingStart="6dp"
                 android:paddingTop="16dp"
+                android:paddingEnd="6dp"
                 android:paddingBottom="14dp">
 
                 <TextView
                     android:id="@+id/tvGlancePopulation"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:gravity="center"
                     android:textColor="#1A1A1A"
                     android:textSize="22sp"
                     android:textStyle="bold"
-                    tools:text="18,161" />
+                    tools:text="0" />
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
                     android:gravity="center"
+                    android:maxLines="2"
+                    android:minLines="2"
                     android:text="@string/home_glance_population"
                     android:textColor="#6B6B6B"
                     android:textSize="12sp" />
@@ -140,31 +151,34 @@
 
             <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_marginStart="6dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_home_glance_card"
                 android:gravity="center"
                 android:orientation="vertical"
+                android:paddingStart="6dp"
                 android:paddingTop="16dp"
+                android:paddingEnd="6dp"
                 android:paddingBottom="14dp">
 
                 <TextView
                     android:id="@+id/tvGlanceUnscreened"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:gravity="center"
                     android:textColor="#1A1A1A"
                     android:textSize="22sp"
                     android:textStyle="bold"
-                    tools:text="6,544" />
+                    tools:text="0" />
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
                     android:gravity="center"
-                    android:paddingStart="4dp"
-                    android:paddingEnd="4dp"
+                    android:maxLines="2"
+                    android:minLines="2"
                     android:text="@string/home_glance_unscreened"
                     android:textColor="#6B6B6B"
                     android:textSize="12sp" />
