@@ -55,6 +55,12 @@ interface DynamicFormMetadataDao {
     @Query("UPDATE t_form_version SET isActive = 0 WHERE formId = :formId AND versionId != :activeVersionId")
     suspend fun deactivateOtherVersions(formId: Int, activeVersionId: Int)
 
+    @Query("DELETE FROM t_option_condition WHERE optionId IN (:optionIds)")
+    suspend fun deleteConditionsForOptions(optionIds: List<Int>)
+
+    @Query("DELETE FROM t_question_validation WHERE questionId IN (:questionIds)")
+    suspend fun deleteValidationsForQuestions(questionIds: List<Int>)
+
     @Query("SELECT COUNT(*) FROM t_section_question WHERE serverQuestionId IS NULL")
     suspend fun getQuestionsWithNullServerIdCount(): Int
 
