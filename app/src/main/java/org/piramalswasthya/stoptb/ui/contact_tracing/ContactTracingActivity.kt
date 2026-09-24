@@ -4,14 +4,40 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
 import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.ActivityContactTracingBinding
+import org.piramalswasthya.stoptb.helpers.MyContextWrapper
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import org.piramalswasthya.stoptb.ui.counselling_activity.SectionPhase
 
 @AndroidEntryPoint
 class ContactTracingActivity : AppCompatActivity(), ContactTracingNavigator {
+
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface WrapperEntryPoint {
+        val pref: PreferenceDao
+    }
+
+    // Apply the app language;
+    override fun attachBaseContext(newBase: Context) {
+        val pref = EntryPointAccessors.fromApplication(
+            newBase, WrapperEntryPoint::class.java
+        ).pref
+        super.attachBaseContext(
+            MyContextWrapper.wrap(
+                newBase,
+                newBase.applicationContext,
+                pref.getCurrentLanguage().symbol
+            )
+        )
+    }
 
     private lateinit var binding: ActivityContactTracingBinding
 
