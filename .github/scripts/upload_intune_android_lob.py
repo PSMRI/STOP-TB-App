@@ -296,12 +296,17 @@ def commit_content_version(token: str, app_id: str, content_version_id: str) -> 
         if current is not None:
             committed = str(current.get("committedContentVersion") or "").strip()
             state = str(current.get("publishingState") or "").lower()
-            if committed == str(content_version_id) or state == "published":
+            if committed == str(content_version_id):
                 log(
                     f"Intune app {app_id} already has committedContentVersion="
-                    f"{committed or content_version_id} publishingState={state or 'unknown'}"
+                    f"{committed} publishingState={state or 'unknown'}"
                 )
                 return
+            if committed:
+                log(
+                    f"Intune app {app_id} is {state or 'unknown'} on committedContentVersion="
+                    f"{committed}; committing uploaded content version {content_version_id}"
+                )
         try:
             log(
                 f"Committing Intune content version {content_version_id} "
@@ -315,6 +320,7 @@ def commit_content_version(token: str, app_id: str, content_version_id: str) -> 
                 raw_url=True,
                 extra_headers=headers,
             )
+            wait_for_committed_version(token, app_id, content_version_id)
             return
         except Exception as exc:  # noqa: BLE001
             last_error = exc
@@ -328,7 +334,7 @@ def commit_content_version(token: str, app_id: str, content_version_id: str) -> 
         current = refresh_app(token, app_id)
         committed = str(current.get("committedContentVersion") or "").strip()
         state = str(current.get("publishingState") or "").lower()
-        if committed == str(content_version_id) or state in {"published", "processing"}:
+        if committed == str(content_version_id):
             log(
                 "Intune commit PATCH returned an error, but the app content is already "
                 f"committed (committedContentVersion={committed} publishingState={state}). Continuing."
@@ -359,6 +365,54 @@ def wait_until_published(token: str, app_id: str) -> None:
             raise RuntimeError(f"Intune app entered unexpected publishing state: {state}")
         time.sleep(2)
     raise RuntimeError("Timed out waiting for Intune app to publish")
+
+
+def wait_for_committed_version(token: str, app_id: str, content_version_id: str) -> dict[str, Any]:
+    expected = str(content_version_id)
+    last: dict[str, Any] = {}
+    for _ in range(45):
+        last = refresh_app(token, app_id)
+        committed = str(last.get("committedContentVersion") or "").strip()
+        state = last.get("publishingState")
+        log(
+            f"Intune committedContentVersion={committed or 'none'} "
+            f"publishingState={state} (want {expected})"
+        )
+        if committed == expected:
+            return last
+        time.sleep(2)
+    raise RuntimeError(
+        f"Intune did not switch committedContentVersion to {expected} "
+        f"(still {last.get('committedContentVersion')}). The new APK is uploaded but not published."
+    )
+
+
+def wait_for_published_version(
+    token: str,
+    app_id: str,
+    version_code: str,
+    content_version_id: str,
+) -> dict[str, Any]:
+    expected = _version_int(version_code)
+    last: dict[str, Any] = {}
+    for _ in range(45):
+        last = refresh_app(token, app_id)
+        current = existing_app_version_code(last)
+        committed = str(last.get("committedContentVersion") or "").strip()
+        log(
+            f"Intune published versionCode={last.get('versionCode')} "
+            f"committedContentVersion={committed or 'none'} "
+            f"(want versionCode={version_code} committed={content_version_id})"
+        )
+        if current == expected and committed == str(content_version_id):
+            return last
+        time.sleep(2)
+    raise RuntimeError(
+        "Intune did not publish the uploaded APK version. "
+        f"App versionCode={last.get('versionCode')} committedContentVersion="
+        f"{last.get('committedContentVersion')}, upload {version_code} "
+        f"(content {content_version_id}). MDM devices will keep the published version."
+    )
 
 
 def is_android_lob_type(app: dict[str, Any]) -> bool:
@@ -806,12 +860,6 @@ def uninstall_competing_apps(
             log(f"Could not uninstall competing Intune app {app_id}: {exc}")
 
 
-APP_IDENTITY_SELECT = (
-    "id,displayName,publishingState,committedContentVersion,packageId,"
-    "identityName,identityVersion,versionCode,versionName,fileName,targetedPlatforms"
-)
-
-
 def refresh_app(token: str, app_id: str, api: str | None = None) -> dict[str, Any]:
     path = f"deviceAppManagement/mobileApps/{app_id}"
     if api:
@@ -828,19 +876,9 @@ def refresh_app(token: str, app_id: str, api: str | None = None) -> dict[str, An
 
 
 def read_app_identity(token: str, app_id: str) -> dict[str, Any]:
-    path = f"deviceAppManagement/mobileApps/{app_id}?$select={APP_IDENTITY_SELECT}"
-    merged: dict[str, Any] = {}
-    for api in ("beta", "v1.0"):
-        try:
-            payload = graph_request(token, "GET", path, api=api)
-            merged = {**merged, **payload, "_graphApi": api}
-            if payload.get("identityVersion") not in (None, ""):
-                return merged
-        except Exception as exc:  # noqa: BLE001
-            log(f"Could not read Intune identity fields from Graph {api}: {exc}")
-    if not merged:
-        merged = refresh_app(token, app_id)
-    return merged
+    # Do not $select LOB-only fields. Graph validates $select against mobileApp
+    # and returns 400 for committedContentVersion / identityVersion / versionCode.
+    return refresh_app(token, app_id)
 
 
 def ensure_identity_version(
@@ -850,39 +888,17 @@ def ensure_identity_version(
     version_code: str,
     version_name: str,
 ) -> dict[str, Any]:
-    body = {
-        "@odata.type": f"#{LOB_TYPE}",
-        "identityName": package_id,
-        "identityVersion": str(version_code),
-        "packageId": package_id,
-        "versionCode": str(version_code),
-        "versionName": str(version_name),
-    }
-    try:
-        graph_request(
-            token,
-            "PATCH",
-            f"deviceAppManagement/mobileApps/{app_id}",
-            body,
-            extra_headers={"Prefer": "return=minimal"},
-            api="beta",
-        )
-        log(f"Set Intune identityVersion={version_code} identityName={package_id}")
-    except Exception as exc:  # noqa: BLE001
-        log(f"Could not PATCH Intune identityVersion={version_code}: {exc}")
+    del package_id, version_name
     app = read_app_identity(token, app_id)
     if app.get("identityVersion") in (None, ""):
-        time.sleep(3)
-        app = read_app_identity(token, app_id)
-    if app.get("identityVersion") in (None, ""):
         log(
-            "Graph still omits identityVersion after PATCH; Intune updates devices "
-            f"from versionCode={app.get('versionCode') or version_code} on the committed APK."
+            "Graph omits identityVersion; Intune updates devices from "
+            f"versionCode={app.get('versionCode') or version_code} on the committed APK."
         )
     else:
         log(
             f"Intune identityVersion={app.get('identityVersion')} "
-            f"identityName={app.get('identityName') or package_id}"
+            f"versionCode={app.get('versionCode')}"
         )
     return app
 
@@ -1279,21 +1295,16 @@ def upload_apk(args: argparse.Namespace) -> None:
                 f"deviceAppManagement/mobileApps/{app_id}",
                 {
                     "@odata.type": f"#{LOB_TYPE}",
-                    "fileName": filename,
                     "displayName": app_display_name,
-                    "identityName": args.package_id,
-                    "identityVersion": str(args.version_code),
-                    "packageId": args.package_id,
-                    "versionName": args.version_name,
-                    "versionCode": args.version_code,
                     "description": args.description,
                 },
                 extra_headers={"Prefer": "return=minimal"},
                 api="beta",
             )
         except Exception as exc:  # noqa: BLE001
-            log(f"Could not patch Intune version metadata after commit: {exc}")
+            log(f"Could not patch Intune display metadata after commit: {exc}")
         wait_until_published(token, app_id)
+        wait_for_published_version(token, app_id, args.version_code, content_version_id)
 
     ensure_identity_version(
         token,
