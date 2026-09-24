@@ -398,7 +398,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_house_own),
         arrayId = R.array.nhhr_house_own_array,
         entries = resources.getStringArray(R.array.nhhr_house_own_array),
-        required = false
+        required = true
     )
 
 

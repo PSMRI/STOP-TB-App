@@ -392,6 +392,8 @@ object QuestionRenderer {
             .filter { it.actionType == ActionType.SHOW_QUESTION.value }
             .mapNotNull { it.targetQuestionId }
             .mapNotNull { targetId -> allQuestions.firstOrNull { it.questionId == targetId } }
+            // Two conditions can target the same question (e.g. left over from an older schema version); draw it once.
+            .distinctBy { it.questionId }
             // Conditions come back from Room in no guaranteed order; the schema's displayOrder decides the layout.
             .sortedBy { it.displayOrder }
 
