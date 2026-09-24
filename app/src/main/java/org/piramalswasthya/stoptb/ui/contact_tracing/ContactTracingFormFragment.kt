@@ -103,7 +103,7 @@ class ContactTracingFormFragment : Fragment() {
                 val resolvingContinueTpt = viewModel.resolvingContinueTpt.value == true
 
 //                btnCtNext.visibility = if (editable || showContinueTpt ) View.VISIBLE else View.GONE
-                btnCtNext.visibility = if (!editable && viewModel.currentSectionName.value in REDUNDANT_SECTION_HEADERS) View.GONE else View.VISIBLE
+                btnCtNext.visibility = if (!editable && formType in SINGLE_SECTION_FORMS) View.GONE else View.VISIBLE
                 btnCtNext.text = when {
                     showContinueTpt && tptAlreadySubmitted -> getString(R.string.view_tpt_follow_up)
                     showContinueTpt -> getString(R.string.tpt_follow_up)
@@ -130,7 +130,7 @@ class ContactTracingFormFragment : Fragment() {
 
             viewModel.currentSectionName.observe(viewLifecycleOwner) {
 
-                val isRedundant = it in REDUNDANT_SECTION_HEADERS
+                val isRedundant = formType in SINGLE_SECTION_FORMS
                 tvCtSectionName.visibility = if (isRedundant) View.GONE else View.VISIBLE
                 tvCtSectionName.text = if (isRedundant) "" else it
                 llCtHeader.updatePadding(
@@ -291,7 +291,9 @@ class ContactTracingFormFragment : Fragment() {
     }
 
     companion object {
-        private val REDUNDANT_SECTION_HEADERS = setOf("Contact & Exposure Details", "Occupation & Exposure Details")
+        // Community / Occupational CT: one section whose header repeats the toolbar title, and no Submit once submitted.
+        // Keyed on form type (not the section name) so it keeps working when the section name is shown in Hindi.
+        private val SINGLE_SECTION_FORMS = setOf(FormType.COMMUNITY_CONTACT_TRACING, FormType.OCCUPATION_CONTACT_TRACING)
         private const val ARG_FORM_TYPE = "formType"
         private const val ARG_INDEX_CASE_BEN_ID = "indexCaseBenId"
         private const val ARG_CONTACT_TYPE = "contactType"
