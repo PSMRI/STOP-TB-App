@@ -266,6 +266,7 @@
     <string name="contact_tracing_section_progress">Section %1$d of %2$d</string>
     <string name="contact_tracing_number_picker_decrement">Decrease</string>
     <string name="contact_tracing_number_picker_increment">Increase</string>
+    <string name="contact_tracing_number_picker_value">Value</string>
     <string name="contact_tracing_type_bottomsheet_title">Start Contact Tracing</string>
     <string name="home">Home</string>
     <string name="asha_profile">Profile</string>

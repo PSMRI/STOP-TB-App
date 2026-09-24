@@ -28,6 +28,7 @@ import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.contactTracing.IContactTracingRepository
+import org.piramalswasthya.stoptb.helpers.QuestionRenderer
 import org.piramalswasthya.stoptb.ui.counselling_activity.ActionType
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import org.piramalswasthya.stoptb.ui.counselling_activity.QuestionType
@@ -401,7 +402,11 @@ class ContactTracingFormViewModel @Inject constructor(
         if (question.questionUuid == "CCT_NO_OF_CONTACTS" || question.questionId in countFieldIds) {
             val allQuestions = questionsByUuid.values.toList()
             val newSum = allQuestions
-                .filter { it.questionId in countFieldIds }
+                .filter { it.questionId in countFieldIds
+                        && it.questionUuid.startsWith(
+                    QuestionRenderer.CT_RELATIONSHIP_COUNT_PREFIX
+                        )
+                }
                 .sumOf { it.value?.toString()?.toIntOrNull() ?: 0 }
                 .toString()
 
