@@ -191,7 +191,7 @@
     <string name="dashboard_demo_children">बच्चे (&lt;15 वर्ष)</string>
     <string name="dashboard_demo_others">अन्य</string>
     <string name="dashboard_demo_senior">वरिष्ठ नागरिक (≥60 वर्ष)</string>
-    <string name="dashboard_demo_transgender">अन्य</string>
+    <string name="dashboard_demo_transgender">ट्रांसजेंडर</string>
     <string name="dashboard_demo_total">कुल</string>
     <string name="dashboard_class_xray_normal">सामान्य</string>
     <string name="dashboard_class_xray_abnormal">असामान्य (गैर-टीबी संभावित)</string>

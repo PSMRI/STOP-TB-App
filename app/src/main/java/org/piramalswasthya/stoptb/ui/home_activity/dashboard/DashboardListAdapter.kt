@@ -149,24 +149,24 @@ internal class DashboardListAdapter(
 
     fun updateCoverage(stats: CoverageStats) {
         header = header.copy(coverage = stats)
-        notifyItemChanged(0, PAYLOAD_COUNT)
+        notifyItemChanged(0)
     }
 
     fun updateScreened(data: TbGenderBreakdown) {
         header = header.copy(screened = data)
-        notifyItemChanged(0, PAYLOAD_COUNT)
+        notifyItemChanged(0)
     }
 
     fun updateScope(scopeName: String, periodLabel: String) {
         header = header.copy(scopeName = scopeName, periodLabel = periodLabel)
-        notifyItemChanged(0, PAYLOAD_COUNT)
+        notifyItemChanged(0)
     }
 
     fun updateIndicator(id: Int, data: TbGenderBreakdown) {
         val index = items.indexOfFirst { it.id == id }
         if (index < 0) return
         items[index] = items[index].copy(data = data)
-        notifyItemChanged(index + 1, PAYLOAD_COUNT)
+        notifyItemChanged(index + 1)
     }
 
     override fun getItemViewType(position: Int): Int =
@@ -302,11 +302,7 @@ internal class DashboardListAdapter(
         private var boundItemId: Int = -1
 
         fun bind(item: DashboardIndicatorItem, payloads: List<Any>) {
-            if (payloads.contains(PAYLOAD_COUNT) && boundItemId == item.id) {
-                card.tvIndicatorCount.text = item.data.total.toString()
-                accordion?.let { bindAccordion(it, item) }
-                return
-            }
+            // Always fully rebind so filtered counts are never stuck at stale/zero payload state.
             boundItemId = item.id
             (card.root as MaterialCardView).setCardBackgroundColor(color(card.root, item.backgroundColor))
             card.flIndicatorIcon.setBackgroundResource(item.iconBackground)
@@ -382,6 +378,19 @@ internal class DashboardListAdapter(
             openKeys: MutableSet<Int>,
         ) {
             row.tvDemoValue.text = count.toString()
+            val canExpand = !classifications.isNullOrEmpty()
+            if (!canExpand) {
+                openKeys.remove(key)
+                row.layoutDemoDetail.visibility = View.GONE
+                row.layoutDemoDetail.removeAllViews()
+                row.ivDemoChevron.visibility = View.GONE
+                row.ivDemoChevron.rotation = 0f
+                row.btnDemoHeader.setOnClickListener(null)
+                row.btnDemoHeader.isClickable = false
+                return
+            }
+            row.ivDemoChevron.visibility = View.VISIBLE
+            row.btnDemoHeader.isClickable = true
             val expanded = key in openKeys
             row.layoutDemoDetail.visibility = if (expanded) View.VISIBLE else View.GONE
             row.ivDemoChevron.rotation = if (expanded) 180f else 0f
@@ -414,6 +423,18 @@ internal class DashboardListAdapter(
         classifications: List<DashboardClassDef>?,
     ) {
         row.tvDemoValue.text = count.toString()
+        val canExpand = !classifications.isNullOrEmpty()
+        if (!canExpand) {
+            row.layoutDemoDetail.visibility = View.GONE
+            row.layoutDemoDetail.removeAllViews()
+            row.ivDemoChevron.visibility = View.GONE
+            row.ivDemoChevron.rotation = 0f
+            row.btnDemoHeader.setOnClickListener(null)
+            row.btnDemoHeader.isClickable = false
+            return
+        }
+        row.ivDemoChevron.visibility = View.VISIBLE
+        row.btnDemoHeader.isClickable = true
         row.btnDemoHeader.setOnClickListener {
             val expand = row.layoutDemoDetail.visibility != View.VISIBLE
             if (expand) fillDemoDetail(row, count, classifications)
