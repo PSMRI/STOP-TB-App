@@ -85,7 +85,7 @@ def graph_request(
     body: dict[str, Any] | None = None,
     raw_url: bool = False,
     extra_headers: dict[str, str] | None = None,
-    api: str = "v1.0",
+    api: str = "beta",
 ) -> Any:
     if raw_url:
         url = path
@@ -264,6 +264,11 @@ def _is_transient_graph_error(exc: Exception) -> bool:
     )
 
 
+def _is_missing_app_error(exc: Exception) -> bool:
+    message = str(exc)
+    return " failed (404)" in message or "ResourceNotFound" in message or "not found" in message.lower()
+
+
 def commit_content_version(token: str, app_id: str, content_version_id: str) -> None:
     path = f"deviceAppManagement/mobileApps/{app_id}"
     body = {
@@ -271,10 +276,24 @@ def commit_content_version(token: str, app_id: str, content_version_id: str) -> 
         "committedContentVersion": str(content_version_id),
     }
     headers = {"Prefer": "return=minimal"}
+    commit_url = f"{GRAPH_BETA}/{path}"
     last_error: Exception | None = None
     for attempt in range(1, 8):
+        current: dict[str, Any] | None = None
         try:
             current = refresh_app(token, app_id)
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            if _is_missing_app_error(exc):
+                wait_s = min(45, 4 * (2 ** (attempt - 1)))
+                log(
+                    f"Intune app {app_id} is not visible in Graph beta yet after the APK "
+                    f"upload; waiting {wait_s}s before commit ({attempt}/7)"
+                )
+                time.sleep(wait_s)
+                continue
+            log(f"Could not read Intune app before commit PATCH: {exc}")
+        if current is not None:
             committed = str(current.get("committedContentVersion") or "").strip()
             state = str(current.get("publishingState") or "").lower()
             if committed == str(content_version_id) or state == "published":
@@ -283,22 +302,25 @@ def commit_content_version(token: str, app_id: str, content_version_id: str) -> 
                     f"{committed or content_version_id} publishingState={state or 'unknown'}"
                 )
                 return
+        try:
+            log(
+                f"Committing Intune content version {content_version_id} "
+                f"via {commit_url} (attempt {attempt}/7)"
+            )
+            graph_request(
+                token,
+                "PATCH",
+                commit_url,
+                body,
+                raw_url=True,
+                extra_headers=headers,
+            )
+            return
         except Exception as exc:  # noqa: BLE001
             last_error = exc
-            log(f"Could not read Intune app before commit PATCH: {exc}")
-        for api in ("beta", "v1.0"):
-            try:
-                log(
-                    f"Committing Intune content version {content_version_id} "
-                    f"via Graph {api} (attempt {attempt}/7)"
-                )
-                graph_request(token, "PATCH", path, body, extra_headers=headers, api=api)
-                return
-            except Exception as exc:  # noqa: BLE001
-                last_error = exc
-                log(f"Intune commit PATCH {api} failed: {exc}")
-                if not _is_transient_graph_error(exc):
-                    break
+            log(f"Intune commit PATCH failed: {exc}")
+            if not _is_transient_graph_error(exc) and not _is_missing_app_error(exc):
+                raise
         wait_s = min(45, 4 * (2 ** (attempt - 1)))
         log(f"Waiting {wait_s}s for Intune app metadata before retrying commit PATCH")
         time.sleep(wait_s)
@@ -321,11 +343,16 @@ def commit_content_version(token: str, app_id: str, content_version_id: str) -> 
 
 def wait_until_published(token: str, app_id: str) -> None:
     for _ in range(90):
-        app = graph_request(token, "GET", f"deviceAppManagement/mobileApps/{app_id}")
+        try:
+            app = refresh_app(token, app_id)
+        except Exception as exc:  # noqa: BLE001
+            if _is_missing_app_error(exc):
+                log("Intune publishingState=unknown (Graph beta cannot see the app yet)")
+                time.sleep(2)
+                continue
+            raise
         state = app.get("publishingState")
         log(f"Intune publishingState={state}")
-        if state == "published":
-            return
         if str(state).lower() == "published":
             return
         if str(state).lower() not in {"processing", "notpublished"}:
@@ -357,9 +384,19 @@ def _list_mobile_apps(
 
 
 def list_android_lob_apps(token: str) -> list[dict[str, Any]]:
-    # Intune Graph does not support /mobileApps/microsoft.graph.androidLobApp GET,
-    # and $select=packageId on the mobileApp collection returns 400.
+    # Android Enterprise LOB apps created with targetedPlatforms live on Graph beta
+    # and are often invisible to v1.0. Merge both catalogs so we do not create a
+    # new AE app on every run.
     attempts: list[tuple[str, dict[str, str] | None]] = [
+        (
+            f"{GRAPH_BETA}/deviceAppManagement/mobileApps"
+            f"?$filter=isof('{LOB_TYPE}')",
+            None,
+        ),
+        (
+            f"{GRAPH_BETA}/deviceAppManagement/mobileApps",
+            None,
+        ),
         (
             f"{GRAPH_BASE}/deviceAppManagement/mobileApps"
             f"?$filter=isof('{LOB_TYPE}')",
@@ -375,24 +412,23 @@ def list_android_lob_apps(token: str) -> list[dict[str, Any]]:
             None,
         ),
     ]
+    found: dict[str, dict[str, Any]] = {}
     last_error: Exception | None = None
-    empty_result: list[dict[str, Any]] | None = None
+    listed_ok = False
     for start_url, headers in attempts:
         try:
-            apps = [app for app in _list_mobile_apps(token, start_url, headers) if _is_android_lob_app(app)]
-            if apps:
-                log(f"Listed {len(apps)} Intune Android LOB app(s)")
-                return apps
-            empty_result = apps
-            log("Intune app list succeeded with 0 Android LOB apps; trying next lookup")
+            for app in _list_mobile_apps(token, start_url, headers):
+                if _is_android_lob_app(app) and app.get("id"):
+                    found[str(app["id"])] = app
+            listed_ok = True
         except PermissionError:
             raise
         except Exception as exc:  # noqa: BLE001
             last_error = exc
             log(f"Retrying Intune app lookup after: {exc}")
-    if empty_result is not None:
-        log("Listed 0 Intune Android LOB app(s)")
-        return empty_result
+    if found or listed_ok:
+        log(f"Listed {len(found)} Intune Android LOB app(s)")
+        return list(found.values())
     if isinstance(last_error, PermissionError):
         raise last_error
     raise RuntimeError(f"Unable to list Intune Android LOB apps: {last_error}")
@@ -453,7 +489,18 @@ def rename_app_display_name(token: str, app: dict[str, Any], display_name: str) 
 
 
 def list_all_mobile_apps(token: str) -> list[dict[str, Any]]:
-    apps = _list_mobile_apps(token, f"{GRAPH_BASE}/deviceAppManagement/mobileApps")
+    found: dict[str, dict[str, Any]] = {}
+    for start_url in (
+        f"{GRAPH_BETA}/deviceAppManagement/mobileApps",
+        f"{GRAPH_BASE}/deviceAppManagement/mobileApps",
+    ):
+        try:
+            for app in _list_mobile_apps(token, start_url):
+                if app.get("id"):
+                    found[str(app["id"])] = app
+        except Exception as exc:  # noqa: BLE001
+            log(f"Could not list Intune mobile apps from {start_url}: {exc}")
+    apps = list(found.values())
     stoptb_named = [app.get("displayName") for app in apps if "stoptb" in _normalized_app_name(app)]
     log(f"Listed {len(apps)} Intune mobile app(s); StopTB-named: {stoptb_named or 'none'}")
     return apps
@@ -618,7 +665,7 @@ def with_platform_details(token: str, app: dict[str, Any]) -> dict[str, Any]:
     if not app_id:
         return app
     try:
-        return {**app, **refresh_app(token, app_id, api="beta")}
+        return {**app, **read_app_identity(token, app_id)}
     except Exception as exc:  # noqa: BLE001
         log(f"Could not read Intune targetedPlatforms for {app_id}: {exc}")
         return app
@@ -630,11 +677,21 @@ def existing_app_version_code(app: dict[str, Any]) -> int | None:
     return max(versions) if versions else None
 
 
+def app_identity_label(app: dict[str, Any]) -> str:
+    identity = app.get("identityVersion")
+    version_code = app.get("versionCode")
+    if identity not in (None, ""):
+        return str(identity)
+    if version_code not in (None, ""):
+        return f"{version_code} (from versionCode)"
+    return "unknown"
+
+
 def log_existing_version(app: dict[str, Any]) -> None:
     log(
         "Existing Intune app version: "
         f"id={app.get('id')} name={app.get('displayName')} "
-        f"identityVersion={app.get('identityVersion')} "
+        f"identityVersion={app_identity_label(app)} "
         f"versionCode={app.get('versionCode')} "
         f"versionName={app.get('versionName')} "
         f"committedContentVersion={app.get('committedContentVersion')} "
@@ -749,35 +806,107 @@ def uninstall_competing_apps(
             log(f"Could not uninstall competing Intune app {app_id}: {exc}")
 
 
-def refresh_app(token: str, app_id: str, api: str = "v1.0") -> dict[str, Any]:
-    return graph_request(token, "GET", f"deviceAppManagement/mobileApps/{app_id}", api=api)
+APP_IDENTITY_SELECT = (
+    "id,displayName,publishingState,committedContentVersion,packageId,"
+    "identityName,identityVersion,versionCode,versionName,fileName,targetedPlatforms"
+)
+
+
+def refresh_app(token: str, app_id: str, api: str | None = None) -> dict[str, Any]:
+    path = f"deviceAppManagement/mobileApps/{app_id}"
+    if api:
+        return graph_request(token, "GET", path, api=api)
+    last_error: Exception | None = None
+    for candidate in ("beta", "v1.0"):
+        try:
+            return graph_request(token, "GET", path, api=candidate)
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            if not _is_missing_app_error(exc):
+                raise
+    raise last_error or RuntimeError(f"Intune app {app_id} was not found in Graph")
+
+
+def read_app_identity(token: str, app_id: str) -> dict[str, Any]:
+    path = f"deviceAppManagement/mobileApps/{app_id}?$select={APP_IDENTITY_SELECT}"
+    merged: dict[str, Any] = {}
+    for api in ("beta", "v1.0"):
+        try:
+            payload = graph_request(token, "GET", path, api=api)
+            merged = {**merged, **payload, "_graphApi": api}
+            if payload.get("identityVersion") not in (None, ""):
+                return merged
+        except Exception as exc:  # noqa: BLE001
+            log(f"Could not read Intune identity fields from Graph {api}: {exc}")
+    if not merged:
+        merged = refresh_app(token, app_id)
+    return merged
+
+
+def ensure_identity_version(
+    token: str,
+    app_id: str,
+    package_id: str,
+    version_code: str,
+    version_name: str,
+) -> dict[str, Any]:
+    body = {
+        "@odata.type": f"#{LOB_TYPE}",
+        "identityName": package_id,
+        "identityVersion": str(version_code),
+        "packageId": package_id,
+        "versionCode": str(version_code),
+        "versionName": str(version_name),
+    }
+    try:
+        graph_request(
+            token,
+            "PATCH",
+            f"deviceAppManagement/mobileApps/{app_id}",
+            body,
+            extra_headers={"Prefer": "return=minimal"},
+            api="beta",
+        )
+        log(f"Set Intune identityVersion={version_code} identityName={package_id}")
+    except Exception as exc:  # noqa: BLE001
+        log(f"Could not PATCH Intune identityVersion={version_code}: {exc}")
+    app = read_app_identity(token, app_id)
+    if app.get("identityVersion") in (None, ""):
+        time.sleep(3)
+        app = read_app_identity(token, app_id)
+    if app.get("identityVersion") in (None, ""):
+        log(
+            "Graph still omits identityVersion after PATCH; Intune updates devices "
+            f"from versionCode={app.get('versionCode') or version_code} on the committed APK."
+        )
+    else:
+        log(
+            f"Intune identityVersion={app.get('identityVersion')} "
+            f"identityName={app.get('identityName') or package_id}"
+        )
+    return app
 
 
 def log_published_app(token: str, app_id: str, version_code: str, version_name: str) -> None:
-    app = refresh_app(token, app_id)
-    beta_app: dict[str, Any] = {}
+    app = read_app_identity(token, app_id)
     try:
-        beta_app = refresh_app(token, app_id, api="beta")
+        app = {**app, **refresh_app(token, app_id, api="beta")}
     except Exception as exc:  # noqa: BLE001
         log(f"Could not read Intune app from Graph beta: {exc}")
-    identity_version = (
-        beta_app.get("identityVersion")
-        or app.get("identityVersion")
-        or app.get("versionCode")
-    )
+    identity_version = app.get("identityVersion") or app.get("versionCode")
     log(
         "Published Intune app: "
         f"id={app_id} name={app.get('displayName')} publishingState={app.get('publishingState')} "
-        f"identityVersion={identity_version} "
+        f"identityVersion={app_identity_label(app)} "
         f"versionCode={app.get('versionCode')} versionName={app.get('versionName')} "
         f"committedContentVersion={app.get('committedContentVersion')} "
         f"packageId={app.get('packageId')} "
-        f"targetedPlatforms={beta_app.get('targetedPlatforms') or app.get('targetedPlatforms')}"
+        f"targetedPlatforms={app.get('targetedPlatforms')}"
     )
-    if not identity_version:
+    if app.get("identityVersion") in (None, ""):
         log(
             "Graph did not return identityVersion; Intune uses versionCode "
-            f"{app.get('versionCode')} from the committed APK for device updates."
+            f"{app.get('versionCode') or version_code} from the committed APK for device updates."
         )
     published_code = existing_app_version_code({**app, "identityVersion": identity_version})
     expected_code = _version_int(version_code)
@@ -1152,17 +1281,29 @@ def upload_apk(args: argparse.Namespace) -> None:
                     "@odata.type": f"#{LOB_TYPE}",
                     "fileName": filename,
                     "displayName": app_display_name,
+                    "identityName": args.package_id,
+                    "identityVersion": str(args.version_code),
+                    "packageId": args.package_id,
                     "versionName": args.version_name,
                     "versionCode": args.version_code,
                     "description": args.description,
                 },
                 extra_headers={"Prefer": "return=minimal"},
+                api="beta",
             )
         except Exception as exc:  # noqa: BLE001
             log(f"Could not patch Intune version metadata after commit: {exc}")
         wait_until_published(token, app_id)
-        log_published_app(token, app_id, args.version_code, args.version_name)
 
+    ensure_identity_version(
+        token,
+        app_id,
+        args.package_id,
+        str(args.version_code),
+        str(args.version_name),
+    )
+    if not skip_upload:
+        log_published_app(token, app_id, args.version_code, args.version_name)
     ensure_canonical_display_name(app_id)
     ensure_group_assignment(token, app_id, args.group_id, intent="required")
     try:
