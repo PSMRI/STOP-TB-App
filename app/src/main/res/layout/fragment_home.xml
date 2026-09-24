@@ -130,9 +130,7 @@
                 app:tabRippleColor="@android:color/transparent"
                 app:tabSelectedTextColor="@color/md_theme_light_primary"
                 app:tabTextColor="@color/md_theme_light_onSurfaceVariant"
-                android:layout_marginStart="26dp"
-                android:layout_marginTop="16dp"
-                android:layout_marginEnd="26dp"/>
+                android:layout_margin="22dp"/>
 
             <androidx.viewpager2.widget.ViewPager2
                 android:id="@+id/vp2_home"
