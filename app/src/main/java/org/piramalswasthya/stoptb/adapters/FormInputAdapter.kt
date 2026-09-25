@@ -8,6 +8,7 @@ import android.content.DialogInterface
 import android.content.res.ColorStateList
 import android.content.res.Resources
 import android.graphics.Color
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.text.Editable
@@ -648,6 +649,10 @@ class FormInputAdapter(
                 binding.tvNullable.text = spannableString
             }
 
+            val boldTitle = item.boldTitleOnYes && item.value == item.entries?.getOrNull(0)
+            val titleStyle = if (boldTitle) Typeface.BOLD else Typeface.NORMAL
+            binding.tvTitle.setTypeface(binding.tvTitle.typeface, titleStyle)
+            binding.tvTitleHr.setTypeface(binding.tvTitleHr.typeface, titleStyle)
         }
     }
 

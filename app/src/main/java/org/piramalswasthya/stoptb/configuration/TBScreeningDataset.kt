@@ -98,6 +98,69 @@ class TBScreeningDataset(
         hasDependants = true
     )
 
+    private val chestPain = FormElement(
+        id = 21,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.chest_pain),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = true,
+        hasDependants = true
+    )
+
+    private val shortnessOfBreath = FormElement(
+        id = 22,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.shortness_of_breath),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = true,
+        hasDependants = true
+    )
+
+    private val fatigue = FormElement(
+        id = 23,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.fatique),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = true,
+        hasDependants = true
+    )
+
+    /** Shown only for beneficiaries below 15 years of age — see [buildFormList] */
+    private val failureToGainWeightInChildren = FormElement(
+        id = 24,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.failure_to_gain_weight_children),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = true,
+        hasDependants = true
+    )
+
+    /** Shown only for beneficiaries below 15 years of age — see [buildFormList] */
+    private val decreasedActivityOrPlayfulnessInChildren = FormElement(
+        id = 25,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.decreased_activity_or_playfulness_children),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = true,
+        hasDependants = true
+    )
+
+    private val others = FormElement(
+        id = 26,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.others),
+        entries = resources.getStringArray(R.array.yes_no),
+        required = true,
+        hasDependants = true
+    )
+
+    private val otherDetailsHeading = FormElement(
+        id = 20,
+        inputType = InputType.HEADLINE,
+        title = resources.getString(R.string.other_details),
+        required = false
+    )
+
     private val historyOfTB = FormElement(
         id = 9,
         inputType = InputType.RADIO,
@@ -135,7 +198,8 @@ class TBScreeningDataset(
         entries = resources.getStringArray(R.array.yes_no),
         required = false,
         isEnabled = false,
-        hasDependants = true
+        hasDependants = true,
+        boldTitleOnYes = true
     )
 
     private data class CodedOption(val id: Int, val code: String, val label: String)
@@ -188,28 +252,40 @@ class TBScreeningDataset(
 
     // ── Asymptomatic logic ───────────────────────────────────────────────────
 
-    /** IDs of the 10 symptom questions that drive asymptomatic auto-select */
-    private val symptomQuestionIds = setOf(
-        isCoughing.id, bloodInSputum.id, isFever.id, riseOfFever.id,
-        lossOfAppetite.id, lossOfWeight.id, nightSweats.id,
-        historyOfTB.id, currentlyTakingDrugs.id, familyHistoryTB.id
-    )
+    /** Children (< 15 years) get 2 extra mandatory symptom questions; see [buildFormList] */
+    private val isChildBeneficiary: Boolean
+        get() = benAgeYears < 15
+
+    /** The mandatory symptom questions that drive asymptomatic auto-select, age-gated */
+    private fun requiredSymptomFields(): List<FormElement> {
+        val fields = mutableListOf(
+            isCoughing, bloodInSputum, isFever, riseOfFever,
+            lossOfAppetite, lossOfWeight, nightSweats,
+            chestPain, shortnessOfBreath, fatigue,
+            historyOfTB, currentlyTakingDrugs, familyHistoryTB
+        )
+        if (isChildBeneficiary) {
+            fields += failureToGainWeightInChildren
+            fields += decreasedActivityOrPlayfulnessInChildren
+        }
+        return fields
+    }
+
+    /** IDs of the symptom questions that drive asymptomatic auto-select (mandatory ones, plus "Others") */
+    private val symptomQuestionIds: Set<Int>
+        get() = requiredSymptomFields().map { it.id }.toSet() + others.id
 
     /**
      * PRD rule:
-     *  - Any 1  = "Yes"  →  asymptomatic = "No"
-     *  - All 10 = "No"   →  asymptomatic = "Yes"
-     *  - Not all answered yet → null (blank)
+     *  - Any mandatory symptom (or "Others") = "Yes"  →  asymptomatic = "No"
+     *  - All mandatory symptoms = "No"                →  asymptomatic = "Yes"
+     *  - Not all mandatory symptoms answered yet      →  null (blank)
      */
     private fun computeAsymptomatic(): String? {
-        val fields = listOf(
-            isCoughing, bloodInSputum, isFever, riseOfFever,
-            lossOfAppetite, lossOfWeight, nightSweats,
-            historyOfTB, currentlyTakingDrugs, familyHistoryTB
-        )
+        val fields = requiredSymptomFields()
         return when {
-            fields.any  { isYes(it) }                  -> noValue   // any Yes  → Not asymptomatic
-            fields.all { it.value == noValue } -> yesValue  // all No   → Asymptomatic
+            fields.any { isYes(it) } || isYes(others)  -> noValue   // any Yes  → Not asymptomatic
+            fields.all { it.value == noValue }         -> yesValue  // all No   → Asymptomatic
             else                                        -> null      // still answering → blank
         }
     }
@@ -253,6 +329,12 @@ class TBScreeningDataset(
             lossOfAppetite.value     = boolToYesNo(saved.lossOfAppetite)
             lossOfWeight.value       = boolToYesNo(saved.lossOfWeight)
             nightSweats.value        = boolToYesNo(saved.nightSweats)
+            chestPain.value          = boolToYesNo(saved.chestPain)
+            shortnessOfBreath.value  = boolToYesNo(saved.shortnessOfBreath)
+            fatigue.value            = boolToYesNo(saved.fatigue)
+            failureToGainWeightInChildren.value = boolToYesNo(saved.failureToGainWeightInChildren)
+            decreasedActivityOrPlayfulnessInChildren.value = boolToYesNo(saved.decreasedActivityOrPlayfulnessInChildren)
+            others.value              = boolToYesNo(saved.otherSymptoms)
             historyOfTB.value        = boolToYesNo(saved.historyOfTb)
             currentlyTakingDrugs.value = boolToYesNo(saved.takingAntiTBDrugs)
             familyHistoryTB.value    = boolToYesNo(saved.familySufferingFromTB)
@@ -288,6 +370,12 @@ class TBScreeningDataset(
             lossOfAppetite.id       -> lossOfAppetite.value       = yesNoFromIndex(index)
             lossOfWeight.id         -> lossOfWeight.value         = yesNoFromIndex(index)
             nightSweats.id          -> nightSweats.value          = yesNoFromIndex(index)
+            chestPain.id            -> chestPain.value            = yesNoFromIndex(index)
+            shortnessOfBreath.id    -> shortnessOfBreath.value    = yesNoFromIndex(index)
+            fatigue.id              -> fatigue.value              = yesNoFromIndex(index)
+            failureToGainWeightInChildren.id -> failureToGainWeightInChildren.value = yesNoFromIndex(index)
+            decreasedActivityOrPlayfulnessInChildren.id -> decreasedActivityOrPlayfulnessInChildren.value = yesNoFromIndex(index)
+            others.id               -> others.value               = yesNoFromIndex(index)
             historyOfTB.id          -> historyOfTB.value          = yesNoFromIndex(index)
             currentlyTakingDrugs.id -> currentlyTakingDrugs.value = yesNoFromIndex(index)
             familyHistoryTB.id      -> familyHistoryTB.value      = yesNoFromIndex(index)
@@ -326,6 +414,12 @@ class TBScreeningDataset(
             form.lossOfAppetite        = isYes(lossOfAppetite)
             form.lossOfWeight          = isYes(lossOfWeight)
             form.nightSweats           = isYes(nightSweats)
+            form.chestPain             = isYes(chestPain)
+            form.shortnessOfBreath     = isYes(shortnessOfBreath)
+            form.fatigue               = isYes(fatigue)
+            form.failureToGainWeightInChildren = if (isChildBeneficiary) isYes(failureToGainWeightInChildren) else null
+            form.decreasedActivityOrPlayfulnessInChildren = if (isChildBeneficiary) isYes(decreasedActivityOrPlayfulnessInChildren) else null
+            form.otherSymptoms         = others.value?.takeIf { it.isNotBlank() }?.let { isYes(others) }
             form.historyOfTb           = isYes(historyOfTB)
             form.takingAntiTBDrugs     = isYes(currentlyTakingDrugs)
             form.familySufferingFromTB = isYes(familyHistoryTB)
@@ -363,33 +457,48 @@ class TBScreeningDataset(
 
     fun requiresFamilyContactScreening(): Boolean = isYes(familyHistoryTB)
 
-    private fun hasSingleStarYes(): Boolean = listOf(
-        isCoughing,
-        bloodInSputum,
-        isFever,
-        riseOfFever,
-        lossOfAppetite,
-        lossOfWeight,
-        nightSweats,
-        historyOfTB
-    ).any(::isYes)
+    private fun hasSingleStarYes(): Boolean = buildList {
+        addAll(listOf(
+            isCoughing,
+            bloodInSputum,
+            isFever,
+            riseOfFever,
+            lossOfAppetite,
+            lossOfWeight,
+            nightSweats,
+            historyOfTB,
+            chestPain,
+            shortnessOfBreath,
+            fatigue,
+            others
+        ))
+        if (isChildBeneficiary) {
+            add(failureToGainWeightInChildren)
+            add(decreasedActivityOrPlayfulnessInChildren)
+        }
+    }.any(::isYes)
 
     private fun hasDoubleStarYes(): Boolean = listOf(
         currentlyTakingDrugs,
         familyHistoryTB
     ).any(::isYes)
 
-    fun getPresumptiveTbAlert(): String? =
-        when {
+    fun getPresumptiveTbAlert(): String? {
+        val referText = resources.getString(
+            if (isPregnantBen) R.string.tb_presumptive_alert_refer_pregnant
+            else R.string.tb_presumptive_alert_refer
+        )
+        return when {
             hasDoubleStarYes() ->
                 resources.getString(R.string.tb_presumptive_alert_title) +
-                    "\n" + resources.getString(R.string.tb_presumptive_alert_refer) +
+                    "\n" + referText +
                     "\n" + resources.getString(R.string.tb_presumptive_alert_family)
             hasSingleStarYes() ->
                 resources.getString(R.string.tb_presumptive_alert_title) +
-                    "\n" + resources.getString(R.string.tb_presumptive_alert_refer)
+                    "\n" + referText
             else -> null
         }
+    }
 
     fun getFamilyContactAlert(): String? =
         if (requiresFamilyContactScreening())
@@ -399,22 +508,35 @@ class TBScreeningDataset(
     fun getIndexOfDate(): Int        = listFlow.value.indexOf(dateOfVisit)
     fun getIndexOfAsymptomatic(): Int = listFlow.value.indexOf(isAsymptomatic)
 
-    private fun buildFormList(): List<FormElement> = listOf(
-        isCoughing,
-        bloodInSputum,
-        isFever,
-        riseOfFever,
-        lossOfAppetite,
-        lossOfWeight,
-        nightSweats,
-        historyOfTB,
-        currentlyTakingDrugs,
-        familyHistoryTB,
-        isAsymptomatic,
-        riskFactorsHeading,
-        keyPopulationRiskFactors,
-        hivStatus
-    )
+    private fun buildFormList(): List<FormElement> = buildList {
+        addAll(listOf(
+            isCoughing,
+            bloodInSputum,
+            isFever,
+            riseOfFever,
+            lossOfAppetite,
+            lossOfWeight,
+            nightSweats,
+            chestPain,
+            shortnessOfBreath,
+            fatigue
+        ))
+        if (isChildBeneficiary) {
+            add(failureToGainWeightInChildren)
+            add(decreasedActivityOrPlayfulnessInChildren)
+        }
+        add(others)
+        addAll(listOf(
+            otherDetailsHeading,
+            historyOfTB,
+            currentlyTakingDrugs,
+            familyHistoryTB,
+            isAsymptomatic,
+            riskFactorsHeading,
+            keyPopulationRiskFactors,
+            hivStatus
+        ))
+    }
 
     private fun yesNoFromIndex(index: Int): String? = if (index == 0) yesValue else noValue
 

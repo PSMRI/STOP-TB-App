@@ -95,6 +95,12 @@
     <string name="cbac_feverwks">জ্বৰ 2 সপ্তাহৰ বাবে</string>
     <string name="cbac_lsweight">ওজন হ্ৰাস</string>
     <string name="cbac_ntswets">নিশাৰ ঘাম</string>
+    <string name="chest_pain">বুকৰ বিষ</string>
+    <string name="shortness_of_breath">উশাহ লোৱাত অসুবিধা</string>
+    <string name="fatique">ভাগৰ</string>
+    <string name="failure_to_gain_weight_children">শিশুৰ ওজন বৃদ্ধি নোহোৱা</string>
+    <string name="decreased_activity_or_playfulness_children">শিশুৰ কাৰ্যকলাপ বা খেলাৰ আগ্ৰহ হ্ৰাস</string>
+    <string name="others">অন্যান্য</string>
     <string name="cbac_recurrent_ulceration">বৰহিত বা পাৰমলৰ উপৰত পুনৰাবৃত্তি</string>
     <string name="cbac_recurrent_tingling">হাতৰ বা পাৰমলৰ উপৰত পুনৰাবৃত্তি</string>
     <string name="cbac_recurrent_cloudy">মেঘপৰা অথবা মিহিলৰ দৃষ্টি পৰা সমস্যা</string>

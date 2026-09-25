@@ -355,7 +355,7 @@
     <string name="check_if_the_person_has_any_of_these_symptoms">जांचें कि व्यक्ति में इनमें से कोई लक्षण है या नहीं</string>
     <string name="symptomatic_tb_screening">टीबी के लक्षणों की जांच</string>
     <string name="tb_asymptomatic_symptoms">बिना लक्षण वाले लोगों की टीबी जांच</string>
-    <string name="tb_is_beneficiary_asymptomatic">क्या लाभार्थी बिना लक्षण वाला है</string>
+    <string name="tb_is_beneficiary_asymptomatic">लाभार्थी लक्षणरहित है</string>
     <string name="tb_rise_of_fever">रोजाना शाम को तेज बुखार आता है?</string>
     <string name="tb_loss_of_appetite">भूख कम लगना</string>
     <string name="tb_age_more_than_60">उम्र 60 वर्ष से अधिक</string>
@@ -609,6 +609,7 @@
     <string name="tb_family_contact_screening_alert">परिवार के सभी सदस्यों की ट्रेसिंग और स्क्रीनिंग की सलाह दें</string>
     <string name="tb_presumptive_alert_title">संभावित टीबी मामला!</string>
     <string name="tb_presumptive_alert_refer">एक्स-रे के लिए रेफर करें और ट्रूनैट टेस्ट के लिए थूक एकत्र करें</string>
+    <string name="tb_presumptive_alert_refer_pregnant">ट्रूनैट टेस्ट के लिए थूक एकत्र करें</string>
     <string name="tb_presumptive_alert_family">परिवार के सभी सदस्यों की स्क्रीनिंग की सलाह दें</string>
     <string name="referred_for_digital_chest_xray">डिजिटल चेस्ट एक्स-रे के लिए रेफर किया गया</string>
     <string name="referred_for_sputum_collection">स्पुटम कलेक्शन के लिए रेफर किया गया</string>
