@@ -11,6 +11,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.dynamicEntity.CompleteFormResponse
 import org.piramalswasthya.stoptb.model.dynamicEntity.ConditionRefDto
@@ -28,6 +30,7 @@ import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.contactTracing.IContactTracingRepository
+import org.piramalswasthya.stoptb.helpers.QuestionRenderer
 import org.piramalswasthya.stoptb.ui.counselling_activity.ActionType
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import org.piramalswasthya.stoptb.ui.counselling_activity.QuestionType
@@ -46,10 +49,15 @@ private const val QUESTION_UUID_TFU_REGISTRATION_DATE = "TFU_REGISTRATION_DATE"
 class ContactTracingFormViewModel @Inject constructor(
     private val repository: IContactTracingRepository,
     private val tbRepo: TBRepo,
+    private val preferenceDao: PreferenceDao,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val gson = Gson()
+
+    // Same language switch as CounsellingRepo.getFormSchema; read at build time so a reopened form follows the app language.
+    private val isHindi: Boolean
+        get() = preferenceDao.getCurrentLanguage() == Languages.HINDI
 
     private var sections: List<FormSectionWithQuestions> = emptyList()
     private var rawQuestionsByUuid: Map<String, SectionQuestionEntity> = emptyMap()
@@ -312,7 +320,10 @@ class ContactTracingFormViewModel @Inject constructor(
 
         val builtQuestions = sectionWithQuestions.questions
             .sortedBy { it.question.questionOrder }
-            .map { it.toCounsellingQuestionDto() }
+            .map { it.toCounsellingQuestionDto(isHindi) }
+        val sectionName = localized(
+            sectionWithQuestions.section.sectionName, sectionWithQuestions.section.sectionNameHindi, isHindi
+        )
 
         questionsByUuid = questionsByUuid + builtQuestions.associateBy { it.questionUuid }
 
@@ -336,12 +347,12 @@ class ContactTracingFormViewModel @Inject constructor(
                 val followUpNumber = visitsBeforeThisResponse + historyVisitIndex + 1
                 _currentSectionName.value = context.getString(
                     R.string.tpt_history_section_label,
-                    sectionWithQuestions.section.sectionName, followUpNumber, totalVisits
+                    sectionName, followUpNumber, totalVisits
                 )
                 _progress.value = ((followUpNumber - 1) * sections.size + index + 1) to
                     (totalVisits * sections.size)
             } else {
-                _currentSectionName.value = sectionWithQuestions.section.sectionName
+                _currentSectionName.value = sectionName
                 _progress.value = (index + 1) to sections.size
             }
             _formSchemaState.value = NetworkResponse.Success(Unit)
@@ -401,7 +412,11 @@ class ContactTracingFormViewModel @Inject constructor(
         if (question.questionUuid == "CCT_NO_OF_CONTACTS" || question.questionId in countFieldIds) {
             val allQuestions = questionsByUuid.values.toList()
             val newSum = allQuestions
-                .filter { it.questionId in countFieldIds }
+                .filter { it.questionId in countFieldIds
+                        && it.questionUuid.startsWith(
+                    QuestionRenderer.CT_RELATIONSHIP_COUNT_PREFIX
+                        )
+                }
                 .sumOf { it.value?.toString()?.toIntOrNull() ?: 0 }
                 .toString()
 
@@ -762,7 +777,9 @@ class ContactTracingFormViewModel @Inject constructor(
     private fun getMandatoryError(q: CounsellingQuestionDto): String? {
         val mandatoryIf = q.validations?.firstOrNull { it.validationType == ActionType.MANDATORY_IF.value }
         if (mandatoryIf != null && matchesMandatoryIfValidation(q)) return mandatoryIf.errorMessage
-        return if (q.isMandatory) "This field is required" else null
+
+        if (!q.isMandatory) return null
+        return if (isHindi) "यह जानकारी अनिवार्य है।" else "This field is required"
     }
 
 
@@ -860,14 +877,19 @@ private fun computeExpectedCompletionDate(startDateStr: String, regimen: Regimen
     }
 }
 
-private fun SectionQuestionWithDetails.toCounsellingQuestionDto(): CounsellingQuestionDto {
+// Hindi text when the app is in Hindi and the schema provides it, otherwise English.
+private fun localized(english: String, hindi: String?, isHindi: Boolean): String =
+    if (isHindi) hindi.takeIf { !it.isNullOrEmpty() } ?: english else english
+
+// Only display text is localized; optionValue / ids stay the same so answers, conditions and sync are unaffected.
+private fun SectionQuestionWithDetails.toCounsellingQuestionDto(isHindi: Boolean): CounsellingQuestionDto {
     val q = question
     val maxLength = q.maxLength
         ?: validations.find { it.validationType == "MAX_LENGTH" }?.validationValue?.toIntOrNull()
     return CounsellingQuestionDto(
         questionId = q.questionId,
         questionUuid = q.questionUuid ?: q.questionId.toString(),
-        questionText = q.questionText,
+        questionText = localized(q.questionText, q.questionTextHindi, isHindi),
         questionType = q.questionType,
         isMandatory = q.isRequired,
         displayOrder = q.questionOrder,
@@ -896,7 +918,7 @@ private fun SectionQuestionWithDetails.toCounsellingQuestionDto(): CounsellingQu
         options = options.sortedBy { it.option.optionOrder }.map { owc ->
             CounsellingOptionDto(
                 optionId = owc.option.optionId,
-                optionLabel = owc.option.optionText,
+                optionLabel = localized(owc.option.optionText, owc.option.optionTextHindi, isHindi),
                 optionValue = owc.option.optionValue,
                 displayOrder = owc.option.optionOrder,
                 conditions = owc.conditions.map { c ->

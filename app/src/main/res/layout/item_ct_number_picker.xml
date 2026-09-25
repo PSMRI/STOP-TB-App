@@ -52,6 +52,31 @@
                 android:textAppearance="?attr/textAppearanceTitleMedium"
                 android:textStyle="bold" />
 
+            <!-- Typed entry, shown instead of tv_value only for Approximate Area of Shared Space. -->
+            <EditText
+                android:id="@+id/et_value"
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="4dp"
+                android:gravity="center"
+                android:importantForAutofill="no"
+                android:imeOptions="actionDone"
+                android:inputType="number"
+                android:maxLines="1"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textStyle="bold"
+                android:visibility="gone"
+                android:contentDescription="@string/contact_tracing_number_picker_value" />
+
+            <!-- Unit from the question's UNIT validation (e.g. "sq. m."), shown after a value is entered. -->
+            <TextView
+                android:id="@+id/tv_unit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:textAppearance="?attr/textAppearanceBodyMedium"
+                android:visibility="gone" />
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_increment"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"

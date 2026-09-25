@@ -35,6 +35,7 @@ import org.piramalswasthya.stoptb.helpers.Languages.ENGLISH
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.ui.login_activity.LoginActivity
 import org.piramalswasthya.stoptb.utils.NoCopyPasteHelper
+import org.piramalswasthya.stoptb.work.FormSchemaRefreshWorker
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import javax.inject.Inject
 import androidx.core.view.ViewCompat
@@ -357,6 +358,9 @@ class SignInFragment : Fragment() {
                         binding.pbSignIn.visibility = View.VISIBLE
                         binding.tvError.visibility = View.GONE
                         clearLoginFieldErrors()
+
+                        // Refresh all dynamic form schemas in the background so backend form changes apply on re-login.
+                        FormSchemaRefreshWorker.schedule(requireContext().applicationContext)
 
                         activity?.finish()
                         startActivity(Intent(requireContext(), VolunteerActivity::class.java))
