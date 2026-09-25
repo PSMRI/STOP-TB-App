@@ -250,7 +250,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
 
         // Redirect to ServiceLocationActivity if location not set (multi-village users)
         if (pref.getLocationRecord() == null) {
-            val intent = Intent(this, org.piramalswasthya.stoptb.ui.service_location_activity.ServiceLocationActivity::class.java)
+            val intent = Intent(this, ServiceLocationActivity::class.java)
             intent.putExtra("fromVolunteer", true)
             startActivity(intent)
             finish()
@@ -478,10 +478,10 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             toolbarIconPadding
         )
 //        binding.toolbar.title = null
+        val titleName = title.substringBefore("(").trim()
         binding.toolbar.title = ""
         supportActionBar?.setDisplayShowTitleEnabled(false)
-        binding.tvToolbar.text = title
-
+        binding.tvToolbar.text = titleName
     }
 
     fun addClickListenerToHomepageActionBarTitle() {
