@@ -28,7 +28,7 @@
                     android:textColor="@color/dashboard_ink"
                     android:textSize="13sp"
                     android:textStyle="bold"
-                    tools:text="All Villages" />
+                    tools:text="Selected Village" />
 
                 <TextView
                     android:id="@+id/tvFilterScopePeriod"
@@ -195,6 +195,15 @@
                     android:paddingTop="6dp"
                     android:paddingBottom="6dp">
 
+                    <View
+                        android:id="@+id/dotCoverageScreened"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:layout_gravity="center_vertical"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/bg_dashboard_demo_dot"
+                        android:backgroundTint="@color/dashboard_demo_male" />
+
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -227,6 +236,15 @@
                     android:orientation="horizontal"
                     android:paddingTop="6dp"
                     android:paddingBottom="6dp">
+
+                    <View
+                        android:id="@+id/dotCoverageUnscreened"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:layout_gravity="center_vertical"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/bg_dashboard_demo_dot"
+                        android:backgroundTint="@color/dashboard_demo_female" />
 
                     <TextView
                         android:layout_width="0dp"

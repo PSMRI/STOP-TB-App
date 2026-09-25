@@ -237,23 +237,20 @@ internal class DashboardListAdapter(
         }
 
         private fun bindCoverage(stats: CoverageStats) {
-            val coverageColorRes = when {
-                stats.coveragePercent >= 70 -> R.color.dashboard_coverage_high
-                stats.coveragePercent >= 40 -> R.color.dashboard_coverage_mid
-                else -> R.color.dashboard_coverage_low
-            }
-            val coverageColor = color(binding.root, coverageColorRes)
+            val screenedColor = color(binding.root, R.color.dashboard_demo_male)
+            val unscreenedColor = color(binding.root, R.color.dashboard_demo_female)
             binding.donutCoverage.setChart(
                 segments = listOf(
-                    DonutChartView.Segment(stats.screened.toFloat(), coverageColor),
-                    DonutChartView.Segment(stats.unscreened.toFloat(), color(binding.root, R.color.dashboard_donut_track))
-                )
+                    DonutChartView.Segment(stats.screened.toFloat(), screenedColor),
+                    DonutChartView.Segment(stats.unscreened.toFloat(), unscreenedColor)
+                ),
+                trackColor = unscreenedColor,
             )
             binding.tvCoveragePercent.text = binding.root.context.getString(
                 R.string.dashboard_percent,
                 stats.coveragePercent
             )
-            binding.tvCoveragePercent.setTextColor(coverageColor)
+            binding.tvCoveragePercent.setTextColor(screenedColor)
             binding.tvCoveragePopulation.text = stats.population.toString()
             binding.tvCoverageScreened.text = binding.root.context.getString(
                 R.string.dashboard_value_with_percent,
