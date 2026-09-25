@@ -1103,7 +1103,7 @@
         <item quantity="other">%d presumptive cases need referral</item>
     </plurals>
     <string name="home_presumptive_referral_subtitle">Flagged from recent TB screenings</string>
-    <string name="home_village_at_a_glance">VILLAGE AT A GLANCE</string>
+    <string name="home_village_at_a_glance">Village %1$s at Glance</string>
     <string name="home_glance_households">Total Households</string>
     <string name="home_glance_population">Total Population</string>
     <string name="home_glance_unscreened">Unscreened Population</string>

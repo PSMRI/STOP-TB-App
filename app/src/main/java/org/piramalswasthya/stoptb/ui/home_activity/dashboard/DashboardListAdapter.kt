@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.ui.home_activity.dashboard
 
 import android.content.res.ColorStateList
 import android.graphics.Rect
+import android.provider.Settings.Global.getString
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -82,7 +83,7 @@ internal class DashboardListAdapter(
         ),
         DashboardIndicatorItem(
             ID_PAST_HISTORY, R.color.dashboard_card_teal, R.drawable.bg_dashboard_icon_teal,
-            R.color.dashboard_icon_teal, R.drawable.ic_health_tuberculosis, R.string.dashboard_past_history_summary
+            R.color.dashboard_icon_teal, R.drawable.ic_pass_history, R.string.dashboard_past_history_summary
         ),
         DashboardIndicatorItem(
             ID_ANTI_TB, R.color.dashboard_card_orange, R.drawable.bg_dashboard_icon_orange,
@@ -100,12 +101,12 @@ internal class DashboardListAdapter(
         ),
         DashboardIndicatorItem(
             ID_MTB, R.color.dashboard_card_orange, R.drawable.bg_dashboard_icon_orange,
-            R.color.dashboard_icon_orange, R.drawable.ic_health_test_tubes, R.string.dashboard_mtb_summary,
+            R.color.dashboard_icon_orange, R.drawable.ic_truenat_device, R.string.dashboard_mtb_summary,
             classifications = DashboardClassifications.mtb
         ),
         DashboardIndicatorItem(
             ID_RIF, R.color.dashboard_card_teal, R.drawable.bg_dashboard_icon_teal,
-            R.color.dashboard_icon_teal, R.drawable.ic_health_test_tubes, R.string.dashboard_rif_summary,
+            R.color.dashboard_icon_teal, R.drawable.ic_truenat_device, R.string.dashboard_rif_summary,
             classifications = DashboardClassifications.rif
         ),
         DashboardIndicatorItem(
@@ -119,7 +120,7 @@ internal class DashboardListAdapter(
         ),
         DashboardIndicatorItem(
             ID_CLINICAL, R.color.dashboard_card_orange, R.drawable.bg_dashboard_icon_orange,
-            R.color.dashboard_icon_orange, R.drawable.ic_health_medicines, R.string.dashboard_clinical_summary,
+            R.color.dashboard_icon_orange, R.drawable.ic_clinical_assessment, R.string.dashboard_clinical_summary,
             classifications = DashboardClassifications.clinical
         ),
         DashboardIndicatorItem(
@@ -134,11 +135,11 @@ internal class DashboardListAdapter(
         ),
         DashboardIndicatorItem(
             ID_NIKSHAY, R.color.dashboard_card_teal, R.drawable.bg_dashboard_icon_green,
-            R.color.dashboard_icon_teal, R.drawable.ic_health_register_book, R.string.dashboard_nikshay_summary
+            R.color.dashboard_icon_teal, R.drawable.ic_nikshay_id, R.string.dashboard_nikshay_summary
         ),
         DashboardIndicatorItem(
             ID_ABHA, R.color.dashboard_card_blue, R.drawable.bg_dashboard_icon_blue,
-            R.color.dashboard_icon_blue, R.drawable.ic_health_data_security, R.string.dashboard_abha_summary
+            R.color.dashboard_icon_blue, R.drawable.ic_abha_id_card, R.string.dashboard_abha_summary
         ),
     )
 
@@ -215,7 +216,7 @@ internal class DashboardListAdapter(
             }
             bindCoverage(state.coverage)
             bindScreened(state.screened)
-            binding.tvFilterScope.text = state.scopeName
+            binding.tvFilterScope.text = itemView.context.getString(R.string.home_village_at_a_glance, state.scopeName)
             binding.tvFilterScopePeriod.text = state.periodLabel
             binding.tvScreenedPeriodLabel.text = binding.root.context.getString(
                 R.string.dashboard_screened_period_label,

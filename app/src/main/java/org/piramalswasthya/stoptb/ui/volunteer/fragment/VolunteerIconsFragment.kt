@@ -51,6 +51,10 @@ class VolunteerIconsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setUpIconRvAdapter()
+        val villageName = roleManager.getVillage().substringBefore("(").trim()
+        binding.tvglanceHeading.text =
+            getString(R.string.home_village_at_a_glance, villageName)
+
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 glanceViewModel.glance.collect { glance ->
