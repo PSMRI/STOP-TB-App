@@ -1003,6 +1003,7 @@
     <string name="no_records_found_hh">No Household records found.</string>
     <string name="something_went_wrong_nunable_to_connect_to_server_ntry_again_later">Something went wrong !\nUnable to connect to server !\nTry again later!</string>
     <string name="try_again">Try Again!</string>
+    <string name="error_login_server_error">Server is busy, please try again in a moment</string>
 
     <string name="camera">Camera</string>
 
