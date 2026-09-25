@@ -216,7 +216,7 @@ internal class DashboardListAdapter(
             }
             bindCoverage(state.coverage)
             bindScreened(state.screened)
-            binding.tvFilterScope.text = itemView.context.getString(R.string.home_village_at_a_glance, state.scopeName)
+            binding.tvFilterScope.text = itemView.context.getString(R.string.home_village_at_a_glance, state.scopeName.substringBefore("(").trim())
             binding.tvFilterScopePeriod.text = state.periodLabel
             binding.tvScreenedPeriodLabel.text = binding.root.context.getString(
                 R.string.dashboard_screened_period_label,
