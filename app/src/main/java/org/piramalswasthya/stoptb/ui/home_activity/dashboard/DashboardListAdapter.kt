@@ -245,7 +245,7 @@ internal class DashboardListAdapter(
                     DonutChartView.Segment(stats.screened.toFloat(), screenedColor),
                     DonutChartView.Segment(stats.unscreened.toFloat(), unscreenedColor)
                 ),
-                trackColor = unscreenedColor,
+                trackColor = color(binding.root, R.color.dashboard_donut_track),
             )
             binding.tvCoveragePercent.text = binding.root.context.getString(
                 R.string.dashboard_percent,
