@@ -73,23 +73,21 @@ class DashboardFilterBottomSheet : BottomSheetDialogFragment() {
     }
 
     private fun setupLocationDropdowns() {
-        val districtNames = mutableListOf(getString(R.string.filter_all_districts))
-        districtNames.addAll(viewModel.districtList.map { it.name })
-        bindDropdown(binding.actvDistrict, districtNames) { position ->
-            draftDistrictId = if (position == 0) 0 else viewModel.districtList[position - 1].id
+        val district = viewModel.districtList.firstOrNull()
+        draftDistrictId = district?.id ?: 0
+        binding.tilDistrict.isEnabled = false
+        binding.actvDistrict.apply {
+            isEnabled = false
+            setText(district?.name.orEmpty(), false)
         }
-        val districtIndex = viewModel.districtList.indexOfFirst { it.id == draftDistrictId }
-            .takeIf { draftDistrictId != 0 }?.plus(1) ?: 0
-        binding.actvDistrict.setText(districtNames.getOrElse(districtIndex) { districtNames.first() }, false)
 
-        val blockNames = mutableListOf(getString(R.string.filter_all_blocks))
-        blockNames.addAll(viewModel.blockList.map { it.name })
-        bindDropdown(binding.actvBlock, blockNames) { position ->
-            draftBlockId = if (position == 0) 0 else viewModel.blockList[position - 1].id
+        val block = viewModel.blockList.firstOrNull()
+        draftBlockId = block?.id ?: 0
+        binding.tilBlock.isEnabled = false
+        binding.actvBlock.apply {
+            isEnabled = false
+            setText(block?.name.orEmpty(), false)
         }
-        val blockIndex = viewModel.blockList.indexOfFirst { it.id == draftBlockId }
-            .takeIf { draftBlockId != 0 }?.plus(1) ?: 0
-        binding.actvBlock.setText(blockNames.getOrElse(blockIndex) { blockNames.first() }, false)
 
         val villageNames = mutableListOf(getString(R.string.filter_all_villages))
         villageNames.addAll(viewModel.villageList.map { it.name })
@@ -111,12 +109,10 @@ class DashboardFilterBottomSheet : BottomSheetDialogFragment() {
     }
 
     private fun resetDraft() {
-        draftDistrictId = 0
-        draftBlockId = 0
+        draftDistrictId = viewModel.districtList.firstOrNull()?.id ?: 0
+        draftBlockId = viewModel.blockList.firstOrNull()?.id ?: 0
         draftVillageId = 0
         draftPeriodKey = DashboardViewModel.PERIOD_MONTH
-        binding.actvDistrict.setText(getString(R.string.filter_all_districts), false)
-        binding.actvBlock.setText(getString(R.string.filter_all_blocks), false)
         binding.actvVillage.setText(getString(R.string.filter_all_villages), false)
         binding.actvPeriod.setText(periodLabel(draftPeriodKey), false)
     }
