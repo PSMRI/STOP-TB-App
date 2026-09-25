@@ -5,10 +5,9 @@
 
     <item
         android:id="@+id/toolbar_menu_refresh"
-        android:icon="@drawable/ic_cloud_sync"
+        android:icon="@drawable/ic_synced"
         android:title="@string/quick_refresh_action"
         android:visible="false"
-        app:iconTint="@android:color/white"
         app:showAsAction="always" />
     <item
         android:id="@+id/sync_status"
