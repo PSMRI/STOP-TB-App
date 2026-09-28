@@ -1526,7 +1526,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             ben.kidDetails = null
 
             ben.isDraft        = false
-            ben.isConsent      = isOtpVerified
+            ben.isConsent      = ben.isConsent || isConsentAgreed
             // NOTE: isSpouseAdded / isChildrenAdded are managed by spouse/child registration flows.
             // Do NOT reset them here — in edit mode the existing value must be preserved.
             // For brand-new bens the model defaults both to false anyway.
