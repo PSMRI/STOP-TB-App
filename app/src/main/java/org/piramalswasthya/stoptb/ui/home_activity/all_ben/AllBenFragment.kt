@@ -33,6 +33,9 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertFilterBinding
 import org.piramalswasthya.stoptb.databinding.AlertNewBenBinding
 import android.widget.ArrayAdapter
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.SimpleItemAnimator
 import kotlinx.coroutines.delay
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchAndToggleRvButtonBinding
 import org.piramalswasthya.stoptb.model.AppRole
@@ -446,12 +449,23 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
         binding.rvAny.adapter = benAdapter
         binding.rvAny.setHasFixedSize(true)
-        (binding.rvAny.itemAnimator as? androidx.recyclerview.widget.SimpleItemAnimator)
+        (binding.rvAny.itemAnimator as? SimpleItemAnimator)
             ?.supportsChangeAnimations = false
         binding.rvAny.setItemViewCacheSize(20)
-        (binding.rvAny.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager)?.apply {
+        (binding.rvAny.layoutManager as? LinearLayoutManager)?.apply {
             initialPrefetchItemCount = 10
         }
+
+        benAdapter.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
+            override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
+                val rv = _binding?.rvAny ?: return
+                val lm = rv.layoutManager as? LinearLayoutManager
+                    ?: return
+                if (positionStart == 0 && lm.findFirstCompletelyVisibleItemPosition() <= 0) {
+                    rv.scrollToPosition(0)
+                }
+            }
+        })
 
         lifecycleScope.launch {
             viewModel.benList.collectLatest {

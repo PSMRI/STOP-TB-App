@@ -375,8 +375,9 @@ interface BenDao {
                 ),
                 0
             )
-            ELSE dob
-        END DESC
+            ELSE COALESCE(createdDate, regDate, 0)
+        END DESC,
+        benId DESC
     """)
     fun searchBen(villageIds: List<Int>, source: Int, filterType: Int, query: String): Flow<List<BenBasicCache>>
 
@@ -537,8 +538,9 @@ interface BenDao {
                 ),
                 0
             )
-            ELSE dob
-        END DESC
+            ELSE COALESCE(createdDate, regDate, 0)
+        END DESC,
+        benId DESC
     """)
     fun searchBenPaged(villageIds: List<Int>, source: Int, filterType: Int, query: String): PagingSource<Int, BenBasicCache>
 
@@ -711,8 +713,9 @@ interface BenDao {
                 ),
                 0
             )
-            ELSE dob
-        END DESC
+            ELSE COALESCE(createdDate, regDate, 0)
+        END DESC,
+        benId DESC
     """)
     suspend fun searchBenOnce(villageIds: List<Int>, source: Int, filterType: Int, query: String): List<BenBasicCache>
 
