@@ -304,4 +304,51 @@ object WorkerUtils {
     fun triggerRifDiagnosticResultPollWorker(context: Context) {
         triggerDiagnosticResultPollWorker(context)
     }
+
+    private fun diagnosticOrderPushWorkName(benId: Long) = "DIAGNOSTIC-ORDER-PUSH-$benId"
+
+    private fun buildOrderPushRequest(benId: Long, testType: String) =
+        OneTimeWorkRequestBuilder<DiagnosticOrderPushWorker>()
+            .setInputData(
+                Data.Builder()
+                    .putLong(DiagnosticOrderPushWorker.KEY_BEN_ID, benId)
+                    .putString(DiagnosticOrderPushWorker.KEY_TEST_TYPE, testType)
+                    .build()
+            ).build()
+
+    /**
+     * Pushes order creation (order/push) for one or more test types for the same beneficiary as
+     * background work instead of awaited inline network calls — see [DiagnosticOrderPushWorker]
+     * for why. Multiple call sites can push orders for the same beneficiary (the TB Screening
+     * Form's initial referral, the X-ray-positive auto-TrueNat cascade in TBRepo.fetchOrderResult,
+     * a manual retry) — createOrder()'s read-then-write plus syncTBSuspectedFromDiagnostics'
+     * get-or-create have no transaction/lock, so two concurrent pushes for the same benId can
+     * race and create duplicate orders/tb_suspected rows. Requests are always chained under one
+     * unique work name per benId (APPEND_OR_REPLACE — appends to whatever's still in flight,
+     * starts fresh otherwise), so every push for a beneficiary is fully serialized and, when more
+     * than one testType is passed, runs in the given order (e.g. X-ray before TrueNat).
+     */
+    fun triggerDiagnosticOrderPushWorkers(context: Context, benId: Long, testTypes: List<String>) {
+        if (testTypes.isEmpty()) return
+        val requests = testTypes.map { testType -> buildOrderPushRequest(benId, testType) }
+        val workManager = WorkManager.getInstance(context)
+        var continuation = workManager.beginUniqueWork(
+            diagnosticOrderPushWorkName(benId), ExistingWorkPolicy.APPEND_OR_REPLACE, requests.first()
+        )
+        for (request in requests.drop(1)) {
+            continuation = continuation.then(request)
+        }
+        continuation.enqueue()
+    }
+
+    /**
+     * Whether a [DiagnosticOrderPushWorker] chain is currently enqueued/running/blocked for this
+     * beneficiary. Used to guard entry points that call tbRepo.createOrder() directly (e.g.
+     * AllBenViewModel.retryTest) instead of going through the chain, so they don't race a
+     * still-active automatic push for the same benId.
+     */
+    fun isDiagnosticOrderPushActive(context: Context, benId: Long): Boolean {
+        val workManager = WorkManager.getInstance(context)
+        return getActiveUniqueWorkInfos(workManager, diagnosticOrderPushWorkName(benId)).isNotEmpty()
+    }
 }

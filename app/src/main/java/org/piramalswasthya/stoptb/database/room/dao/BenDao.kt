@@ -328,6 +328,12 @@ interface BenDao {
                         OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
                   )
             ))
+            OR (:source = 10 AND isDeath = 0 AND benId IN (
+                SELECT td.benId FROM TB_DIAGNOSTICS td
+                WHERE (UPPER(TRIM(IFNULL(td.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
+                       AND UPPER(TRIM(IFNULL(td.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED'))
+                   OR UPPER(TRIM(IFNULL(td.trueNatRifResult,''))) = 'INDETERMINATE'
+            ))
         )
         AND (:filterType = 0
             OR (:filterType = 1 AND abhaId IS NOT NULL)
@@ -484,6 +490,12 @@ interface BenDao {
                         OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
                   )
             ))
+            OR (:source = 10 AND isDeath = 0 AND benId IN (
+                SELECT td.benId FROM TB_DIAGNOSTICS td
+                WHERE (UPPER(TRIM(IFNULL(td.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
+                       AND UPPER(TRIM(IFNULL(td.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED'))
+                   OR UPPER(TRIM(IFNULL(td.trueNatRifResult,''))) = 'INDETERMINATE'
+            ))
         )
         AND (:filterType = 0
             OR (:filterType = 1 AND abhaId IS NOT NULL)
@@ -639,6 +651,12 @@ interface BenDao {
                         OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
                         OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
                   )
+            ))
+            OR (:source = 10 AND isDeath = 0 AND benId IN (
+                SELECT td.benId FROM TB_DIAGNOSTICS td
+                WHERE (UPPER(TRIM(IFNULL(td.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
+                       AND UPPER(TRIM(IFNULL(td.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED'))
+                   OR UPPER(TRIM(IFNULL(td.trueNatRifResult,''))) = 'INDETERMINATE'
             ))
         )
         AND (:filterType = 0
@@ -1117,6 +1135,18 @@ interface BenDao {
           )
     """)
     fun getLiquidCultureBenCount(selectedVillage: Int): Flow<Int>
+
+    @Query("""
+        SELECT COUNT(*) FROM BEN_BASIC_CACHE
+        WHERE villageId = :selectedVillage AND isDeactivate = 0 AND isDeath = 0
+          AND benId IN (
+            SELECT td.benId FROM TB_DIAGNOSTICS td
+            WHERE (UPPER(TRIM(IFNULL(td.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
+                   AND UPPER(TRIM(IFNULL(td.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED'))
+               OR UPPER(TRIM(IFNULL(td.trueNatRifResult,''))) = 'INDETERMINATE'
+          )
+    """)
+    fun getClinicalAssessmentBenCount(selectedVillage: Int): Flow<Int>
 
 
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE WHERE reproductiveStatusId = 1 and gender = 'FEMALE' and isDeactivate=0 and villageId=:selectedVillage")

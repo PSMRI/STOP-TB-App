@@ -125,6 +125,7 @@ class RecordsRepo @Inject constructor(
     val trueNatReferralCount get() = benDao.getTrueNatBenCount(selectedVillage)
     val liquidCultureReferralCount get() = benDao.getLiquidCultureBenCount(selectedVillage)
     val hwcReferralCount get() = benDao.getHwcBenDataCount(selectedVillage)
+    val clinicalAssessmentReferralCount get() = benDao.getClinicalAssessmentBenCount(selectedVillage)
 
     val getNcdPriorityList get() = getNcdEligibleList.map {
         it.filter { it.savedCbacRecords.isNotEmpty() && it.savedCbacRecords.maxBy { it.createdDate }.total_score > 4 }

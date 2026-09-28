@@ -601,16 +601,17 @@ class SuspectedTBDataset(
         return positiveNegativeEntries.getOrNull(if (isPositive) 0 else 1)
     }
 
-    private fun hasActiveOrder(status: String?): Boolean =
-        !status.isNullOrBlank() && !status.equals(OrderStatus.NONE.name, ignoreCase = true)
+    // "NONE" was never actually written anywhere as a status value — no order existing is
+    // represented by a null/blank status, not a magic string — so this only needs the blank
+    // check.
+    private fun hasActiveOrder(status: String?): Boolean = !status.isNullOrBlank()
 
     private fun resultPlaceholder(status: String?): String? = when {
         status.isNullOrBlank() -> null
-        status.equals(OrderStatus.NONE.name, ignoreCase = true) -> null
         status.equals(OrderStatus.COMPLETED.name, ignoreCase = true) -> null
-        status.equals(OrderStatus.REFUSED.name, ignoreCase = true) -> "Test Refused"
+        status.equals(OrderStatus.CLOSED.name, ignoreCase = true) -> "Test Closed"
         status.equals(OrderStatus.FAILED.name, ignoreCase = true) -> "Referral Failed"
-        else -> "Waiting for Result" // PENDING, CREATED, AWAITING_TEST_COMPLETION, AWAITING_PROVIDER_RESULT, POLLING_TIMEOUT, MANUAL_ENTRY
+        else -> "Waiting for Result" // PENDING or MANUAL_ENTRY
     }
 
     private fun applyResultPlaceholders() {

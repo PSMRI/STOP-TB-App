@@ -953,9 +953,14 @@
     <string name="order_status_fetching_from_device">डिवाइस से परिणाम प्राप्त हो रहा है…</string>
     <string name="order_status_manual_action_required">मैन्युअल कार्रवाई आवश्यक</string>
     <string name="order_status_polling_stopped">डिवाइस पोलिंग बंद हो गई है — परिणाम स्वतः प्राप्त नहीं होंगे।</string>
+    <string name="order_status_manual_unavailable">स्वचालित डिवाइस परिणाम उपलब्ध नहीं है। कृपया परीक्षण परिणाम मैन्युअल रूप से दर्ज करें।</string>
+    <string name="order_status_polling_stopped_title">डिवाइस पोलिंग बंद हो गई है।</string>
+    <string name="order_status_polling_stopped_desc">परिणाम स्वतः प्राप्त नहीं होंगे।</string>
+    <string name="order_status_manual_unavailable_title">स्वचालित डिवाइस परिणाम उपलब्ध नहीं है।</string>
+    <string name="order_status_manual_unavailable_desc">कृपया परीक्षण परिणाम मैन्युअल रूप से दर्ज करें।</string>
     <string name="order_status_last_checked_caption">%1$s पहले जांचा गया · हर %2$d सेकंड में स्वतः रिफ्रेश</string>
-    <string name="order_status_enter_result">परिणाम मैन्युअल रूप से दर्ज करें</string>
-    <string name="order_status_not_conducted">परीक्षण नहीं किया गया चिह्नित करें</string>
+    <string name="order_status_enter_result">परिणाम दर्ज करें</string>
+    <string name="order_status_not_conducted">नहीं किया गया</string>
     <string name="order_status_view_mtb_result">एमटीबी परिणाम देखें</string>
     <string name="order_status_view_rif_result">आरआईएफ परिणाम देखें</string>
     <string name="order_status_rif_block_label">आरआईएफ परीक्षण · एमटीबी पॉजिटिव द्वारा ट्रिगर</string>

@@ -338,7 +338,7 @@ interface TBDao {
             SELECT b.beneficiaryId FROM TB_SUSPECTED ts
             INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
             LEFT JOIN TB_DIAGNOSTICS td ON td.benId = ts.benId
-            WHERE ts.isSputumCollected = 1 AND (td.benId IS NULL OR td.trueNatOrderStatus IN ('COMPLETED', 'REFUSED'))
+            WHERE ts.isSputumCollected = 1 AND (td.benId IS NULL OR td.trueNatOrderStatus = 'COMPLETED' OR (td.trueNatOrderStatus = 'CLOSED' AND td.reasonForDenialSputum IS NOT NULL))
             AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
             AND (:startTime = 0 OR ts.visitDate >= :startTime)
             AND (:endTime = 0 OR ts.visitDate <= :endTime)
@@ -348,7 +348,7 @@ interface TBDao {
             UNION
             SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
             INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
-            WHERE td.isSputumCollected = 1 AND td.trueNatOrderStatus IN ('COMPLETED', 'REFUSED')
+            WHERE td.isSputumCollected = 1 AND (td.trueNatOrderStatus = 'COMPLETED' OR (td.trueNatOrderStatus = 'CLOSED' AND td.reasonForDenialSputum IS NOT NULL))
             AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
             AND (:startTime = 0 OR td.visitDate >= :startTime)
             AND (:endTime = 0 OR td.visitDate <= :endTime)

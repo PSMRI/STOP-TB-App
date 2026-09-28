@@ -65,36 +65,12 @@ class TBSuspectedQuickFragment : Fragment() {
             viewModel.formList.collect {
                 if (it.isNotEmpty()) {
                     adapter.submitList(it)
-                    
-                    if (viewModel.viewOnly && viewModel.referralType == 7) {
-                        val naatRes = viewModel.getNaatResult()
-                        val rifRes = viewModel.getTrueNatRifResult()
-                        if (naatRes != null && naatRes.equals("Invalid", ignoreCase = true)) {
-                            androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                                .setTitle("Invalid Test Result")
-                                .setMessage("The test results are invalid, repeat the test")
-                                .setPositiveButton("REPEAT TEST") { d, _ ->
-                                    viewModel.repeatTest("SPUTUM_TRUENAT")
-                                    Toast.makeText(requireContext(), "Repeat test order created. Please mark test complete on the listing page.", Toast.LENGTH_LONG).show()
-                                    d.dismiss()
-                                    findNavController().popBackStack()
-                                }
-                                .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
-                                .show()
-                        } else if (rifRes != null && rifRes.equals("Indeterminate", ignoreCase = true)) {
-                            androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                                .setTitle("Indeterminate Test Result")
-                                .setMessage("The test results are indeterminate, repeat the test")
-                                .setPositiveButton("REPEAT TEST") { d, _ ->
-                                    viewModel.repeatTest("MDR_RIF")
-                                    Toast.makeText(requireContext(), "Repeat test order created. Please mark test complete on the listing page.", Toast.LENGTH_LONG).show()
-                                    d.dismiss()
-                                    findNavController().popBackStack()
-                                }
-                                .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
-                                .show()
-                        }
-                    }
+                    // TrueNat & RIF order lifecycle redesign: the AlertDialog-based "REPEAT TEST"
+                    // prompt that used to fire here on naatResult == "Invalid" /
+                    // trueNatRifResult == "Indeterminate" is fully superseded by the
+                    // Closed-status-driven "Create New Order" button on the beneficiary card
+                    // (Invalid/Error is the repeat-trigger now; Indeterminate is terminal) — see
+                    // AllBenFragment's "REORDER" action.
                 }
             }
         }
@@ -125,9 +101,14 @@ class TBSuspectedQuickFragment : Fragment() {
         viewModel.state.observe(viewLifecycleOwner) {
             when (it) {
                 TBSuspectedQuickViewModel.State.SAVE_SUCCESS -> {
+                    val message = if (viewModel.savedOfflinePendingSync.value == true) {
+                        getString(R.string.diagnostics_saved_offline_pending_sync)
+                    } else {
+                        getString(R.string.diagnostics_submitted)
+                    }
                     Toast.makeText(
                         requireContext(),
-                        getString(R.string.diagnostics_submitted),
+                        message,
                         Toast.LENGTH_SHORT
                     ).show()
                     WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)

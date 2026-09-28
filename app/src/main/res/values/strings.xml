@@ -353,6 +353,7 @@
     <string name="referral_true_nat">True NAT</string>
     <string name="referral_hwc">Health and Wellness Centre</string>
     <string name="referral_liquid_culture">Liquid Culture</string>
+    <string name="referral_clinical_assessment">Clinical Assessment &amp; Diagnosis</string>
     <string name="dashboard_tb_screening_subtitle">Track outreach and screening volume</string>
     <string name="dashboard_tb_suspected_subtitle">Follow up high-risk suspected cases</string>
     <string name="dashboard_tb_confirmed_subtitle">Monitor confirmed patients and support</string>
@@ -1183,6 +1184,7 @@
     <string name="pulse_option_70_80">70-80</string>
     <string name="pulse_option_above_90">More than 90</string>
     <string name="diagnostics_submitted">Diagnostics submitted</string>
+    <string name="diagnostics_saved_offline_pending_sync">Result saved locally — will sync when Camp Hub reconnects</string>
     <string-array name="vital_temperature_options">
         <item>@string/temperature_option_97_5</item>
         <item>@string/temperature_option_98_5</item>
@@ -1335,9 +1337,21 @@
     <string name="order_status_fetching_from_device">Fetching result from device…</string>
     <string name="order_status_manual_action_required">Manual Action Required</string>
     <string name="order_status_polling_stopped">Device polling has stopped — results won\'t be fetched automatically.</string>
+    <string name="order_status_manual_unavailable">Automatic device result is unavailable. Please record the test result manually.</string>
+    <string name="order_status_polling_stopped_title">Device polling has stopped.</string>
+    <string name="order_status_polling_stopped_desc">Results won\'t be fetched automatically.</string>
+    <string name="order_status_manual_unavailable_title">Automatic device result is unavailable.</string>
+    <string name="order_status_manual_unavailable_desc">Please record the test result manually.</string>
+    <string name="order_status_hub_disconnected">Hub Disconnected</string>
+    <string name="order_status_saved_locally_syncing">Saved Locally — Syncing…</string>
+    <string name="order_status_hub_disconnected_title">Camp Hub is disconnected.</string>
+    <string name="order_status_hub_disconnected_desc">Not polling for result — please connect to Camp Hub.</string>
     <string name="order_status_last_checked_caption">Last checked %1$s ago · Auto-refresh every %2$d seconds</string>
-    <string name="order_status_enter_result">Enter Result Manually</string>
-    <string name="order_status_not_conducted">Mark Test Not Conducted</string>
+    <!-- Kept short deliberately: these sit side-by-side in two half-width buttons with an
+         icon, and "Enter Result Manually"/"Mark Test Not Conducted" truncate on narrower
+         phone widths. -->
+    <string name="order_status_enter_result">Enter Result</string>
+    <string name="order_status_not_conducted">Not Conducted</string>
     <string name="order_status_view_mtb_result">View MTB Result</string>
     <string name="order_status_view_rif_result">View RIF Result</string>
     <string name="order_status_rif_block_label">RIF Test · triggered by MTB Positive</string>

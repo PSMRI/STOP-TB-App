@@ -5,8 +5,11 @@ import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.model.AgeUnit
 import org.piramalswasthya.stoptb.model.BenRegCache
+import org.piramalswasthya.stoptb.model.ChestXrayResult
 import org.piramalswasthya.stoptb.model.FormElement
 import org.piramalswasthya.stoptb.model.InputType
+import org.piramalswasthya.stoptb.model.OrderStatus
+import org.piramalswasthya.stoptb.model.RifResult
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.VitalCache
@@ -27,6 +30,11 @@ class TBSuspectedQuickDataset(
     private var referralMode = false
     private var referralType = 0
     private var diagnosticsCache: TBDiagnosticsCache? = null
+    // "COMPLETE" or "NOT_CONDUCTED" — which action button was tapped on the beneficiary card to
+    // reach this screen, so the corresponding Conducted field can be pre-set and locked instead
+    // of asking the user to re-decide something they already told us. Null for any other entry
+    // path (e.g. the first-time REFER flow, or a read-only VIEW), where Conducted stays as-is.
+    private var manualEntryAction: String? = null
 
     private var lockDigitalChestXray = false
     private var lockTrueNat = false
@@ -109,12 +117,15 @@ class TBSuspectedQuickDataset(
         etMaxLength = 250
     )
 
+    // Chest X-Ray order lifecycle redesign: 4 standardized results (Normal, TB Presumptive,
+    // Abnormal but not TB Presumptive, AI Invalid Result) instead of a generic Positive/Negative
+    // binary — see model.ChestXrayResult for the mapping used at save time.
     val digitalChestXrayResult = FormElement(
         id = 5,
-        inputType = InputType.RADIO,
+        inputType = InputType.DROPDOWN,
         title = resources.getString(R.string.tb_digital_chest_xray_result),
-        arrayId = R.array.tb_test_result,
-        entries = resources.getStringArray(R.array.tb_test_result),
+        arrayId = R.array.tb_digital_xray_result,
+        entries = resources.getStringArray(R.array.tb_digital_xray_result),
         required = false,
         hasDependants = true
     )
@@ -190,7 +201,7 @@ class TBSuspectedQuickDataset(
 
     private val trueNatResult = FormElement(
         id = 6,
-        inputType = InputType.RADIO,
+        inputType = InputType.DROPDOWN,
         title = resources.getString(R.string.tb_naat_result),
         arrayId = R.array.tb_truenat_mtb_result,
         entries = resources.getStringArray(R.array.tb_truenat_mtb_result),
@@ -200,7 +211,7 @@ class TBSuspectedQuickDataset(
 
     val trueNatRifResult = FormElement(
         id = 20,
-        inputType = InputType.RADIO,
+        inputType = InputType.DROPDOWN,
         title = "TrueNat Rif Test Result",
         arrayId = R.array.tb_truenat_rif_result,
         entries = resources.getStringArray(R.array.tb_truenat_rif_result),
@@ -262,7 +273,8 @@ class TBSuspectedQuickDataset(
         saved: TBDiagnosticsCache?,
         vital: VitalCache? = null,
         referralMode: Boolean = false,
-        referralType: Int = 0
+        referralType: Int = 0,
+        manualEntryAction: String? = null
     ) {
         benCache = ben
         screeningCache = screening
@@ -270,6 +282,7 @@ class TBSuspectedQuickDataset(
         diagnosticsCache = saved
         this.referralMode = referralMode
         this.referralType = referralType
+        this.manualEntryAction = manualEntryAction
 
         // Date of visit — same min/default logic as TBScreeningDataset
         dateOfVisit.value = saved?.visitDate?.takeIf { it > 0 }
@@ -303,17 +316,16 @@ class TBSuspectedQuickDataset(
         if (!saved?.chestXRayResult.isNullOrBlank()) {
             digitalChestXrayResult.inputType = InputType.TEXT_VIEW
             digitalChestXrayResult.value = getLocalValueInArray(R.array.tb_digital_xray_result, saved?.chestXRayResult) ?: saved?.chestXRayResult
-        } else if (isXrayDeviceIntegrated && referralType == 6 && isYes(digitalChestXrayConducted)) {
+        } else if (isXrayDeviceIntegrated && referralType == 6 && isYes(digitalChestXrayConducted) && manualEntryAction != "COMPLETE") {
             digitalChestXrayResult.inputType = InputType.TEXT_VIEW
             digitalChestXrayResult.value = "Waiting for Result"
         } else {
-            digitalChestXrayResult.inputType = InputType.RADIO
+            digitalChestXrayResult.inputType = InputType.DROPDOWN
             digitalChestXrayResult.value = null
         }
 
         // ── Sputum Collection ──────────────────────────────────────────────
-        val isMtbManualState = saved?.trueNatOrderStatus.equals("POLLING_TIMEOUT", ignoreCase = true) ||
-                saved?.trueNatOrderStatus.equals("FAILED", ignoreCase = true) ||
+        val isMtbManualState = saved?.trueNatOrderStatus.equals("FAILED", ignoreCase = true) ||
                 saved?.trueNatOrderStatus.equals("MANUAL_ENTRY", ignoreCase = true)
         val isSputumCollectedVal = saved?.isSputumCollected == true || !saved?.naatResult.isNullOrBlank()
         referredForSputumCollection.value = boolToYesNo(if (isTruenatDeviceIntegrated && referralType == 7 && !isMtbManualState) true else isSputumCollectedVal)
@@ -336,33 +348,40 @@ class TBSuspectedQuickDataset(
         if (!saved?.naatResult.isNullOrBlank()) {
             trueNatResult.inputType = InputType.TEXT_VIEW
             trueNatResult.value = getLocalValueInArray(R.array.tb_truenat_mtb_result, mapMtbResultForUi(saved?.naatResult)) ?: mapMtbResultForUi(saved?.naatResult)
-        } else if (isTruenatDeviceIntegrated && referralType == 7 && isYes(trueNatConducted)) {
+        } else if (isTruenatDeviceIntegrated && referralType == 7 && isYes(trueNatConducted) && manualEntryAction != "COMPLETE") {
             trueNatResult.inputType = InputType.TEXT_VIEW
             trueNatResult.value = "Waiting for Result"
         } else {
-            trueNatResult.inputType = InputType.RADIO
+            trueNatResult.inputType = InputType.DROPDOWN
             trueNatResult.value = null
         }
 
         // ── RIF Conducted & Results ───────────────────────────────────────
         val isRifConductedVal = saved?.rifOrderStatus.equals("COMPLETED", ignoreCase = true) ||
-                saved?.rifOrderStatus.equals("IN_PROGRESS", ignoreCase = true) ||
-                saved?.rifOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) ||
+                saved?.rifOrderStatus.equals("PENDING", ignoreCase = true) ||
                 !saved?.trueNatRifResult.isNullOrBlank()
-        rifConducted.value = boolToYesNo(if (isRifConductedVal) true else if (saved?.rifOrderStatus.equals("NOT_CONDUCTED", ignoreCase = true)) false else null)
-        reasonNotConductedRif.value = getLocalValueInArray(
-            R.array.tb_reason_not_conducted_naat, preferenceDao.getRifNotConductedReason(ben?.beneficiaryId ?: saved?.benId ?: 0L)
+        // RIF order lifecycle redesign: "Not Conducted" is now a Closed order/manualResult
+        // closure (see TBRepo.submitManualResult) using RIF's own reasonNotConductedRif/Other
+        // columns, not the old rifOrderStatus == "NOT_CONDUCTED" (never a real wire value) +
+        // PreferenceDao-backed reason.
+        rifConducted.value = boolToYesNo(
+            if (isRifConductedVal) true
+            else if (saved?.rifOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)) false
+            else null
         )
-        reasonNotConductedRifOther.value = saved?.reasonNotConductedChestXrayOther // Wait, this doesn't matter since we don't have separate table column, but let's load it if we need to.
+        reasonNotConductedRif.value = getLocalValueInArray(
+            R.array.tb_reason_not_conducted_naat, saved?.reasonNotConductedRif
+        )
+        reasonNotConductedRifOther.value = saved?.reasonNotConductedRifOther
 
         if (!saved?.trueNatRifResult.isNullOrBlank()) {
             trueNatRifResult.inputType = InputType.TEXT_VIEW
             trueNatRifResult.value = getLocalValueInArray(R.array.tb_truenat_rif_result, mapRifResultForUi(saved?.trueNatRifResult)) ?: mapRifResultForUi(saved?.trueNatRifResult)
-        } else if (isTruenatDeviceIntegrated && referralType == 7 && isYes(rifConducted)) {
+        } else if (isTruenatDeviceIntegrated && referralType == 7 && isYes(rifConducted) && manualEntryAction != "COMPLETE") {
             trueNatRifResult.inputType = InputType.TEXT_VIEW
             trueNatRifResult.value = "Waiting for Result"
         } else {
-            trueNatRifResult.inputType = InputType.RADIO
+            trueNatRifResult.inputType = InputType.DROPDOWN
             trueNatRifResult.value = null
         }
 
@@ -798,7 +817,7 @@ class TBSuspectedQuickDataset(
                     else null
                 form.chestXRayResult =
                     if (isYes(digitalChestXrayConducted))
-                        getEnglishValueInArray(R.array.tb_test_result, digitalChestXrayResult.value)
+                        getEnglishValueInArray(R.array.tb_digital_xray_result, digitalChestXrayResult.value)
                     else null
             }
 
@@ -834,15 +853,27 @@ class TBSuspectedQuickDataset(
                     if (isYes(trueNatConducted))
                         getEnglishValueInArray(R.array.tb_truenat_mtb_result, trueNatResult.value)
                     else null
+                val showRifSection = shouldShowTrueNatConducted() && isYes(trueNatConducted) && isMtbDetected()
                 form.trueNatRifResult =
-                    if (shouldShowTrueNatConducted() && isYes(trueNatConducted) && isMtbDetected())
+                    if (showRifSection && isYes(rifConducted))
                         getEnglishValueInArray(R.array.tb_truenat_rif_result, trueNatRifResult.value)
                     else null
-
-                val benIdVal = benCache?.beneficiaryId ?: form.benId ?: 0L
-                if (benIdVal > 0L) {
-                    val rNotConductedVal = getEnglishValueInArray(R.array.tb_reason_not_conducted_naat, reasonNotConductedRif.value)
-                    preferenceDao.setRifNotConductedReason(benIdVal, rNotConductedVal ?: "")
+                // RIF's own "Not Conducted" reason — distinct columns from NAAT's
+                // reasonNotConductedNaat/Other above (RIF order lifecycle redesign).
+                form.reasonNotConductedRif =
+                    if (showRifSection && isNo(rifConducted))
+                        getEnglishValueInArray(R.array.tb_reason_not_conducted_naat, reasonNotConductedRif.value)
+                    else null
+                form.reasonNotConductedRifOther =
+                    if (showRifSection && isNo(rifConducted))
+                        reasonNotConductedRifOther.value?.takeIf { it.isNotBlank() }
+                    else null
+                // "Confirmed DR-TB Case" — distinguishable from the generic isConfirmed/
+                // isTBConfirmed below (only true for RIF's DR TB result specifically).
+                if (showRifSection && isYes(rifConducted)) {
+                    form.isDrTbConfirmed =
+                        RifResult.fromResultText(form.trueNatRifResult) ==
+                                RifResult.DR_TB
                 }
             }
 
@@ -983,7 +1014,6 @@ class TBSuspectedQuickDataset(
     // ── Field state sync ──────────────────────────────────────────────────────
 
     private fun syncFieldStates() {
-        val isXrayDevIntegrated = preferenceDao.getXrayIntegrated()
         val isTruenatDevIntegrated = preferenceDao.getTruenatIntegrated()
         val xrayStatus = diagnosticsCache?.xrayOrderStatus
         val isXrayFailed = xrayStatus.equals("FAILED", ignoreCase = true)
@@ -1020,7 +1050,11 @@ class TBSuspectedQuickDataset(
         }
 
         // Conducted
-        digitalChestXrayConducted.isEnabled = shouldShowDigitalChestXray() && !lockDigitalChestXray && !isXrayFailed
+        val canForceXrayConducted = manualEntryAction != null && shouldShowDigitalChestXray() && !lockDigitalChestXray && !isXrayFailed
+        if (canForceXrayConducted) {
+            digitalChestXrayConducted.value = if (manualEntryAction == "COMPLETE") yesValue else noValue
+        }
+        digitalChestXrayConducted.isEnabled = shouldShowDigitalChestXray() && !lockDigitalChestXray && !isXrayFailed && !canForceXrayConducted
         digitalChestXrayConducted.required = shouldShowDigitalChestXray() && !lockDigitalChestXray && !isXrayFailed
         if (!shouldShowDigitalChestXray()) resetField(digitalChestXrayConducted)
 
@@ -1053,15 +1087,14 @@ class TBSuspectedQuickDataset(
             reasonNotConductedChestXrayOther.errorText = null
         }
 
-        // X-Ray result
+        // X-Ray result — Enter Result is now a standing action whenever the order is
+        // Pending/Awaiting Manual Entry, not gated on device integration or camp-hub
+        // connectivity (see the Chest X-Ray order lifecycle redesign). Role gating happens one
+        // level up, at the beneficiary-list card's canActOnReferral check before this screen is
+        // even reachable, so no device/connectivity gate is needed here any more.
         val isXrayCompleted = xrayStatus.equals("COMPLETED", ignoreCase = true) || !diagnosticsCache?.chestXRayResult.isNullOrBlank()
-        val isXrayWaiting = isXrayDevIntegrated && preferenceDao.isCampHubConnected() && referralType == 6 &&
-            !xrayStatus.equals("POLLING_TIMEOUT", ignoreCase = true) &&
-            !xrayStatus.equals("FAILED", ignoreCase = true) &&
-            !xrayStatus.equals("MANUAL_ENTRY", ignoreCase = true) &&
-            !isXrayCompleted
 
-        if (isXrayWaiting || isXrayCompleted || isXrayFailed) {
+        if (isXrayCompleted || isXrayFailed) {
             digitalChestXrayResult.inputType = InputType.TEXT_VIEW
             digitalChestXrayResult.isEnabled = false
             digitalChestXrayResult.required = false
@@ -1083,10 +1116,11 @@ class TBSuspectedQuickDataset(
                 }
             }
         } else {
-            digitalChestXrayResult.inputType = InputType.RADIO
-            digitalChestXrayResult.isEnabled =
-                shouldShowDigitalChestXray() && isYes(digitalChestXrayConducted) && !lockDigitalChestXray
-            if (!shouldShowDigitalChestXray() || !isYes(digitalChestXrayConducted)) {
+            digitalChestXrayResult.inputType = InputType.DROPDOWN
+            val showXrayResult = shouldShowDigitalChestXray() && isYes(digitalChestXrayConducted)
+            digitalChestXrayResult.isEnabled = showXrayResult && !lockDigitalChestXray
+            digitalChestXrayResult.required = showXrayResult && !lockDigitalChestXray
+            if (!showXrayResult) {
                 resetField(digitalChestXrayResult)
             }
         }
@@ -1094,8 +1128,7 @@ class TBSuspectedQuickDataset(
         // Sputum section
         val sputumVisible = referralType == 7 || shouldShowSputumCollected()
         val currentMtbStatus = diagnosticsCache?.trueNatOrderStatus
-        val isMtbManualState = currentMtbStatus.equals("POLLING_TIMEOUT", ignoreCase = true) ||
-                currentMtbStatus.equals("FAILED", ignoreCase = true) ||
+        val isMtbManualState = currentMtbStatus.equals("FAILED", ignoreCase = true) ||
                 currentMtbStatus.equals("MANUAL_ENTRY", ignoreCase = true)
 
         if (isTruenatDevIntegrated && referralType == 7 && !isMtbManualState) {
@@ -1135,7 +1168,11 @@ class TBSuspectedQuickDataset(
         // TrueNAT
         val mtbStatus = diagnosticsCache?.trueNatOrderStatus
         val isMtbFailed = mtbStatus.equals("FAILED", ignoreCase = true)
-        trueNatConducted.isEnabled = shouldShowTrueNatConducted() && !lockTrueNat && !isMtbFailed
+        val canForceTrueNatConducted = manualEntryAction != null && shouldShowTrueNatConducted() && !lockTrueNat && !isMtbFailed
+        if (canForceTrueNatConducted) {
+            trueNatConducted.value = if (manualEntryAction == "COMPLETE") yesValue else noValue
+        }
+        trueNatConducted.isEnabled = shouldShowTrueNatConducted() && !lockTrueNat && !isMtbFailed && !canForceTrueNatConducted
         trueNatConducted.required = shouldShowTrueNatConducted() && !lockTrueNat && !isMtbFailed
         if (!shouldShowTrueNatConducted()) resetField(trueNatConducted)
 
@@ -1163,11 +1200,15 @@ class TBSuspectedQuickDataset(
         }
 
         val isMtbCompleted = mtbStatus.equals("COMPLETED", ignoreCase = true) || !diagnosticsCache?.naatResult.isNullOrBlank()
+        // manualEntryAction == "COMPLETE" means the user explicitly tapped "Enter Result
+        // Manually" for this order — that's a standing action regardless of device
+        // integration/camp-hub state, so it must not be overridden back into a locked
+        // "Waiting for Result" view here.
         val isMtbWaiting = isTruenatDevIntegrated && preferenceDao.isCampHubConnected() && referralType == 7 &&
-            !mtbStatus.equals("POLLING_TIMEOUT", ignoreCase = true) &&
             !mtbStatus.equals("FAILED", ignoreCase = true) &&
             !mtbStatus.equals("MANUAL_ENTRY", ignoreCase = true) &&
-            !isMtbCompleted
+            !isMtbCompleted &&
+            manualEntryAction != "COMPLETE"
 
         if (isMtbWaiting || isMtbCompleted || isMtbFailed) {
             trueNatResult.inputType = InputType.TEXT_VIEW
@@ -1191,10 +1232,11 @@ class TBSuspectedQuickDataset(
                 }
             }
         } else {
-            trueNatResult.inputType = InputType.RADIO
-            trueNatResult.isEnabled =
-                shouldShowTrueNatConducted() && isYes(trueNatConducted) && !lockTrueNat
-            if (!shouldShowTrueNatConducted() || !isYes(trueNatConducted)) {
+            trueNatResult.inputType = InputType.DROPDOWN
+            val showTrueNatResult = shouldShowTrueNatConducted() && isYes(trueNatConducted)
+            trueNatResult.isEnabled = showTrueNatResult && !lockTrueNat
+            trueNatResult.required = showTrueNatResult && !lockTrueNat
+            if (!showTrueNatResult) {
                 resetField(trueNatResult)
             }
         }
@@ -1207,7 +1249,11 @@ class TBSuspectedQuickDataset(
         }
         val rifStatus = diagnosticsCache?.rifOrderStatus
         val isRifFailed = rifStatus.equals("FAILED", ignoreCase = true)
-        rifConducted.isEnabled = showRif && !lockRif && !isRifFailed
+        val canForceRifConducted = manualEntryAction != null && showRif && !lockRif && !isRifFailed
+        if (canForceRifConducted) {
+            rifConducted.value = if (manualEntryAction == "COMPLETE") yesValue else noValue
+        }
+        rifConducted.isEnabled = showRif && !lockRif && !isRifFailed && !canForceRifConducted
         rifConducted.required = showRif && !lockRif && !isRifFailed
         if (!showRif) {
             resetField(rifConducted)
@@ -1227,11 +1273,13 @@ class TBSuspectedQuickDataset(
         }
 
         val isRifCompleted = rifStatus.equals("COMPLETED", ignoreCase = true) || !diagnosticsCache?.trueNatRifResult.isNullOrBlank()
+        // Same reasoning as isMtbWaiting above — an explicit "Enter Result Manually" tap must
+        // not be overridden back into a locked "Waiting for Result" view.
         val isRifWaiting = isTruenatDevIntegrated && preferenceDao.isCampHubConnected() && referralType == 7 &&
-            !rifStatus.equals("POLLING_TIMEOUT", ignoreCase = true) &&
             !rifStatus.equals("FAILED", ignoreCase = true) &&
             !rifStatus.equals("MANUAL_ENTRY", ignoreCase = true) &&
-            !isRifCompleted
+            !isRifCompleted &&
+            manualEntryAction != "COMPLETE"
 
         if (isRifWaiting || isRifCompleted || isRifFailed) {
             trueNatRifResult.inputType = InputType.TEXT_VIEW
@@ -1256,7 +1304,7 @@ class TBSuspectedQuickDataset(
                 }
             }
         } else {
-            trueNatRifResult.inputType = InputType.RADIO
+            trueNatRifResult.inputType = InputType.DROPDOWN
             val showRifResult = showRif && isYes(rifConducted)
             trueNatRifResult.isEnabled = showRifResult && !lockRif
             trueNatRifResult.required = showRifResult && !lockRif
@@ -1293,7 +1341,7 @@ class TBSuspectedQuickDataset(
         screeningCache?.historyOfTb == true ||
             isPregnant() ||
             screeningCache?.takingAntiTBDrugs == true ||
-            isPositive(digitalChestXrayResult.value) ||
+            isXrayResultReferable(digitalChestXrayResult.value) ||
             screeningCache?.coughMoreThan2Weeks == true ||
             screeningCache?.bloodInSputum == true ||
             screeningCache?.feverMoreThan2Weeks == true ||
@@ -1336,6 +1384,16 @@ class TBSuspectedQuickDataset(
             return false
         }
         return clean.contains("positive") || clean.contains("detected") || clean.contains("tb") || clean.contains("abnormal")
+    }
+
+    /** True when the (localized) selected/displayed Chest X-Ray result is one of the two
+     *  standardized results that should show the Sputum/TrueNat referral section — TB
+     *  Presumptive or Abnormal-but-not-presumptive. Replaces the old generic [isPositive]
+     *  keyword match for this field now that "Abnormal but not TB Presumptive" is a real,
+     *  selectable value (it contains "not", which [isPositive] would have misread as negative). */
+    private fun isXrayResultReferable(localizedValue: String?): Boolean {
+        val englishValue = getEnglishValueInArray(R.array.tb_digital_xray_result, localizedValue)
+        return ChestXrayResult.fromResultText(englishValue)?.triggersTrueNatReferral == true
     }
 
     private fun boolToYesNo(value: Boolean?): String = when (value) {
@@ -1423,8 +1481,9 @@ class TBSuspectedQuickDataset(
     private fun mapMtbResultForUi(value: String?): String? {
         if (value == null) return null
         return when {
-            value.equals("TB Positive", ignoreCase = true) || value.equals("MTB detected", ignoreCase = true) -> "MTB detected"
-            value.equals("TB Negative", ignoreCase = true) || value.equals("MTB not detected", ignoreCase = true) -> "MTB not detected"
+            value.equals("TB Positive", ignoreCase = true) || value.equals("MTB detected", ignoreCase = true) || value.equals("MTB Positive", ignoreCase = true) -> "MTB Positive"
+            value.equals("TB Negative", ignoreCase = true) || value.equals("MTB not detected", ignoreCase = true) || value.equals("MTB Negative", ignoreCase = true) -> "MTB Negative"
+            value.equals("Invalid", ignoreCase = true) || value.equals("Invalid/Error", ignoreCase = true) -> "Invalid/Error"
             else -> value
         }
     }

@@ -731,7 +731,7 @@
                 android:layout_marginTop="0dp"
                 android:layout_marginBottom="@dimen/padding_small"
                 android:orientation="horizontal"
-                android:weightSum="3"
+                android:weightSum="4"
                 app:layout_constraintTop_toBottomOf="@id/details_divider">
 
                 <!-- Symptoms -->
@@ -1005,6 +1005,74 @@
                     </LinearLayout>
                 </LinearLayout>
 
+                <!-- Clinical Assessment & Diagnosis — NEW tile, appended after Liquid Culture,
+                     per the TrueNat & RIF order lifecycle redesign. Read-only status reflection
+                     (RIF Indeterminate or MTB-Negative-with-abnormal-X-ray); no order/poll cycle,
+                     no action buttons. Hidden by default; adapter shows it only when eligible. -->
+                <LinearLayout
+                    android:id="@+id/ll_clinical_assessment_tile"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:background="@android:color/transparent"
+                    android:gravity="center"
+                    android:minHeight="64dp"
+                    android:orientation="vertical"
+                    android:padding="@dimen/padding_small"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:text="@string/ben_card_clinical_assessment"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                            android:textColor="@android:color/white"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:layout_marginTop="2dp"
+                            android:orientation="horizontal">
+
+                            <ImageView
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:layout_marginEnd="10dp"
+                                android:src="@drawable/ic_health_person"
+                                app:tint="@android:color/white" />
+
+                            <ImageView
+                                android:id="@+id/ivClinicalAssessment"
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:src="@drawable/circle_uncheck" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvClinicalAssessmentReason"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:gravity="center"
+                            android:textColor="@android:color/white"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                            tools:text="Referred: RIF Indeterminate" />
+                    </LinearLayout>
+                </LinearLayout>
+
             </LinearLayout>
             <LinearLayout
                     android:id="@+id/ll_ben_details_3"
@@ -1055,6 +1123,153 @@
                                 android:visibility="gone"
                                 tools:text="Error msg : Something went wrong… See more" />
 
+                            <!-- ── Order-status bar + banner ──────────────────────────────────
+                                 Additive-only per the approved mockup: reused identically for
+                                 Chest X-Ray (source 6) and the MTB block of TrueNat (source 7).
+                                 Single bordered bar groups the pill + last-checked/auto-refresh
+                                 into one row (rather than a floating chip + a separate caption
+                                 line below it) so they read as one piece of information. -->
+                            <LinearLayout
+                                android:id="@+id/ll_order_status_pill"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginBottom="6dp"
+                                android:background="@drawable/bg_status_bar_outline"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal"
+                                android:paddingHorizontal="10dp"
+                                android:paddingVertical="6dp"
+                                android:visibility="gone">
+
+                                <ImageView
+                                    android:id="@+id/iv_order_status_pill_icon"
+                                    android:layout_width="14dp"
+                                    android:layout_height="14dp"
+                                    android:layout_marginEnd="4dp"
+                                    android:src="@drawable/ic_refresh" />
+
+                                <TextView
+                                    android:id="@+id/tv_order_status_pill_text"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textSize="11sp"
+                                    android:textStyle="bold"
+                                    tools:text="Fetching result from device…" />
+
+                                <View
+                                    android:id="@+id/view_order_status_divider"
+                                    android:layout_width="1dp"
+                                    android:layout_height="12dp"
+                                    android:layout_marginHorizontal="8dp"
+                                    android:background="?attr/colorOnPrimary"
+                                    android:alpha="0.3"
+                                    android:visibility="gone" />
+
+                                <TextView
+                                    android:id="@+id/tv_last_checked_caption"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:textSize="11sp"
+                                    android:textColor="?attr/colorOnPrimary"
+                                    android:alpha="0.85"
+                                    android:visibility="gone"
+                                    tools:text="Last checked 12s ago · Auto-refresh every 60 seconds" />
+                            </LinearLayout>
+
+                            <!-- Manual-entry banner: shown either when the device isn't
+                                 integrated (Pending, no automated fetch possible at all) or in
+                                 Awaiting-Manual-Entry — same container, text swapped in Kotlin. -->
+                            <LinearLayout
+                                android:id="@+id/ll_polling_stopped_caption"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginBottom="6dp"
+                                android:background="@drawable/bg_status_bar_outline"
+                                android:orientation="horizontal"
+                                android:paddingHorizontal="10dp"
+                                android:paddingVertical="8dp"
+                                android:visibility="gone">
+
+                                <ImageView
+                                    android:layout_width="16dp"
+                                    android:layout_height="16dp"
+                                    android:layout_marginEnd="8dp"
+                                    android:layout_marginTop="1dp"
+                                    android:src="@drawable/ic_info_small"
+                                    app:tint="?attr/colorOnPrimary" />
+
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:orientation="vertical">
+
+                                    <TextView
+                                        android:id="@+id/tv_polling_stopped_caption_title"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:textSize="12sp"
+                                        android:textStyle="bold"
+                                        android:textColor="?attr/colorOnPrimary"
+                                        tools:text="Automatic device result is unavailable." />
+
+                                    <TextView
+                                        android:id="@+id/tv_polling_stopped_caption_text"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:textSize="11.5sp"
+                                        android:textColor="?attr/colorOnPrimary"
+                                        android:alpha="0.85"
+                                        tools:text="Please record the test result manually." />
+                                </LinearLayout>
+                            </LinearLayout>
+
+                            <!-- MTB result compact summary strip — shown once the MTB order
+                                 (source 7) is Completed, replacing the pill/caption block above so
+                                 it doesn't compete visually with the RIF block below it. -->
+                            <LinearLayout
+                                android:id="@+id/ll_mtb_summary_strip"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginBottom="4dp"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal"
+                                android:visibility="gone">
+
+                                <ImageView
+                                    android:layout_width="16dp"
+                                    android:layout_height="16dp"
+                                    android:layout_marginEnd="4dp"
+                                    android:src="@drawable/circle_check" />
+
+                                <TextView
+                                    android:id="@+id/tv_mtb_summary_text"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                                    android:textColor="?attr/colorOnPrimary"
+                                    android:textStyle="bold"
+                                    tools:text="MTB Result: TB Positive" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btn_view_mtb_result"
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:minWidth="0dp"
+                                    android:minHeight="0dp"
+                                    android:paddingHorizontal="10dp"
+                                    android:paddingVertical="2dp"
+                                    android:text="@string/order_status_view_mtb_result"
+                                    android:textAllCaps="false"
+                                    android:textColor="?attr/colorOnPrimary"
+                                    android:textSize="11sp"
+                                    app:cornerRadius="14dp"
+                                    app:strokeColor="?attr/colorOnPrimary" />
+                            </LinearLayout>
+
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
@@ -1100,6 +1315,243 @@
                                     app:cornerRadius="@dimen/padding_normal"
                                     app:strokeColor="?attr/colorPrimary"
                                     app:strokeWidth="1dp" />
+                            </LinearLayout>
+
+                            <!-- ── RIF block — TrueNat tile only (source 7), appears only once
+                                 MTB is Positive (triggered-by-MTB-Positive), below a thin divider,
+                                 as its own full-sized order-status block with its own complete
+                                 Enter-Result/Not-Conducted button pair — NOT squeezed into
+                                 btn_vital_screen_secondary. The TrueNat tile's rendered height is
+                                 expected to grow by this block when RIF becomes active. -->
+                            <View
+                                android:id="@+id/view_rif_divider"
+                                android:layout_width="match_parent"
+                                android:layout_height="1dp"
+                                android:layout_marginVertical="8dp"
+                                android:background="?attr/colorOnPrimary"
+                                android:alpha="0.3"
+                                android:visibility="gone" />
+
+                            <LinearLayout
+                                android:id="@+id/ll_rif_block"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:visibility="gone">
+
+                                <TextView
+                                    android:id="@+id/tv_rif_block_label"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginBottom="2dp"
+                                    android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                                    android:textColor="?attr/colorOnPrimary"
+                                    android:textStyle="bold"
+                                    android:text="@string/order_status_rif_block_label" />
+
+                                <TextView
+                                    android:id="@+id/tv_rif_order_status"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginBottom="4dp"
+                                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                    android:textColor="?attr/colorOnPrimary"
+                                    android:textStyle="bold"
+                                    android:visibility="gone"
+                                    tools:text="Order Status: Pending" />
+
+                                <TextView
+                                    android:id="@+id/tv_rif_error_msg"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginBottom="4dp"
+                                    android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                                    android:textColor="@color/md_theme_light_error"
+                                    android:maxLines="2"
+                                    android:ellipsize="end"
+                                    android:visibility="gone"
+                                    tools:text="Error msg : Something went wrong… See more" />
+
+                                <LinearLayout
+                                    android:id="@+id/ll_rif_order_status_pill"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginBottom="6dp"
+                                    android:background="@drawable/bg_status_bar_outline"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
+                                    android:paddingHorizontal="10dp"
+                                    android:paddingVertical="6dp"
+                                    android:visibility="gone">
+
+                                    <ImageView
+                                        android:id="@+id/iv_rif_order_status_pill_icon"
+                                        android:layout_width="14dp"
+                                        android:layout_height="14dp"
+                                        android:layout_marginEnd="4dp"
+                                        android:src="@drawable/ic_refresh" />
+
+                                    <TextView
+                                        android:id="@+id/tv_rif_order_status_pill_text"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:textSize="11sp"
+                                        android:textStyle="bold"
+                                        tools:text="Fetching result from device…" />
+
+                                    <View
+                                        android:id="@+id/view_rif_order_status_divider"
+                                        android:layout_width="1dp"
+                                        android:layout_height="12dp"
+                                        android:layout_marginHorizontal="8dp"
+                                        android:background="?attr/colorOnPrimary"
+                                        android:alpha="0.3"
+                                        android:visibility="gone" />
+
+                                    <TextView
+                                        android:id="@+id/tv_rif_last_checked_caption"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:textSize="11sp"
+                                        android:textColor="?attr/colorOnPrimary"
+                                        android:alpha="0.85"
+                                        android:visibility="gone"
+                                        tools:text="Last checked 12s ago · Auto-refresh every 60 seconds" />
+                                </LinearLayout>
+
+                                <LinearLayout
+                                    android:id="@+id/ll_rif_polling_stopped_caption"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginBottom="6dp"
+                                    android:background="@drawable/bg_status_bar_outline"
+                                    android:orientation="horizontal"
+                                    android:paddingHorizontal="10dp"
+                                    android:paddingVertical="8dp"
+                                    android:visibility="gone">
+
+                                    <ImageView
+                                        android:layout_width="16dp"
+                                        android:layout_height="16dp"
+                                        android:layout_marginEnd="8dp"
+                                        android:layout_marginTop="1dp"
+                                        android:src="@drawable/ic_info_small"
+                                        app:tint="?attr/colorOnPrimary" />
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:orientation="vertical">
+
+                                        <TextView
+                                            android:id="@+id/tv_rif_polling_stopped_caption_title"
+                                            android:layout_width="match_parent"
+                                            android:layout_height="wrap_content"
+                                            android:textSize="12sp"
+                                            android:textStyle="bold"
+                                            android:textColor="?attr/colorOnPrimary"
+                                            tools:text="Automatic device result is unavailable." />
+
+                                        <TextView
+                                            android:id="@+id/tv_rif_polling_stopped_caption_text"
+                                            android:layout_width="match_parent"
+                                            android:layout_height="wrap_content"
+                                            android:textSize="11.5sp"
+                                            android:textColor="?attr/colorOnPrimary"
+                                            android:alpha="0.85"
+                                            tools:text="Please record the test result manually." />
+                                    </LinearLayout>
+                                </LinearLayout>
+
+                                <LinearLayout
+                                    android:id="@+id/ll_rif_summary_strip"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginBottom="4dp"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
+                                    android:visibility="gone">
+
+                                    <ImageView
+                                        android:layout_width="16dp"
+                                        android:layout_height="16dp"
+                                        android:layout_marginEnd="4dp"
+                                        android:src="@drawable/circle_check" />
+
+                                    <TextView
+                                        android:id="@+id/tv_rif_summary_text"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                                        android:textColor="?attr/colorOnPrimary"
+                                        android:textStyle="bold"
+                                        tools:text="RIF Result: DR TB" />
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/btn_view_rif_result"
+                                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:minWidth="0dp"
+                                        android:minHeight="0dp"
+                                        android:paddingHorizontal="10dp"
+                                        android:paddingVertical="2dp"
+                                        android:text="@string/order_status_view_rif_result"
+                                        android:textAllCaps="false"
+                                        android:textColor="?attr/colorOnPrimary"
+                                        android:textSize="11sp"
+                                        app:cornerRadius="14dp"
+                                        app:strokeColor="?attr/colorOnPrimary" />
+                                </LinearLayout>
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal">
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/btn_rif_primary"
+                                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:layout_marginEnd="4dp"
+                                        android:backgroundTint="@android:color/holo_green_dark"
+                                        android:gravity="center"
+                                        android:paddingHorizontal="@dimen/padding_small"
+                                        android:maxLines="1"
+                                        android:singleLine="true"
+                                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                        android:textSize="14sp"
+                                        android:textColor="?attr/colorOnPrimary"
+                                        android:visibility="gone"
+                                        app:cornerRadius="@dimen/padding_normal"
+                                        app:strokeColor="?attr/colorPrimary"
+                                        app:strokeWidth="1dp" />
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/btn_rif_secondary"
+                                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:layout_marginStart="4dp"
+                                        android:backgroundTint="@android:color/holo_green_dark"
+                                        android:gravity="center"
+                                        android:paddingHorizontal="@dimen/padding_small"
+                                        android:maxLines="1"
+                                        android:singleLine="true"
+                                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                        android:textSize="14sp"
+                                        android:textColor="?attr/colorOnPrimary"
+                                        android:visibility="gone"
+                                        app:cornerRadius="@dimen/padding_normal"
+                                        app:strokeColor="?attr/colorPrimary"
+                                        app:strokeWidth="1dp" />
+                                </LinearLayout>
                             </LinearLayout>
                         </LinearLayout>
 

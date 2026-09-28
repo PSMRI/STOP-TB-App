@@ -458,27 +458,33 @@ data class DiagnosticOrderPushRequest(
     @com.squareup.moshi.Json(name = "beneficiaryId")
     @com.google.gson.annotations.SerializedName("beneficiaryId")
     val benRegID: Long,
-    val visitCode: Int,
     val providerServiceMapID: Int,
     val orderType: String,
     val orderEvent: String = "STOP_TB_REFERRAL",
-    val reasonForRefusal: String? = null,
+    // Real backend field name (confirmed against the API doc's own order/push close/refuse
+    // example) — presence of this field is what makes order/push close/refuse the order instead
+    // of pushing it, per the documented contract.
+    val reasonToClose: String? = null,
     val patient: PatientRequest
 )
 
 data class DiagnosticManualResultRequest(
     val beneficiaryId: Long,
     val orderType: String,
-    val resultSummary: String
+    // Null when this call represents a "Not Conducted" closure rather than an actual result
+    // (see reasonToClose below) — Chest X-Ray order lifecycle redesign.
+    val resultSummary: String? = null,
+    // Real backend field name (confirmed directly against the backend, not just the written API
+    // doc) — sent for the "Not Conducted" closure path only.
+    val reasonToClose: String? = null
 )
 
+// Real, confirmed `getBeneficiariesByStatus` response shape — exactly these 5 buckets.
 data class DiagnosticBeneficiaryStatusData(
-    val awaitingTestCompletion: List<Long>? = emptyList(),
     val awaitingProviderResult: List<Long>? = emptyList(),
     val completed: List<Long>? = emptyList(),
-    val pollingTimedOut: List<Long>? = emptyList(),
     val failed: List<Long>? = emptyList(),
-    val refused: List<Long>? = emptyList(),
+    val closed: List<Long>? = emptyList(),
     val awaitingManualEntry: List<Long>? = emptyList()
 )
 

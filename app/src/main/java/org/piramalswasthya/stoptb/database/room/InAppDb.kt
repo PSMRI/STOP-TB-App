@@ -111,7 +111,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 46, exportSchema = false
+    version = 49, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -1517,6 +1517,53 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        // TrueNat (MTB) & RIF order lifecycle redesign: "Confirmed DR-TB Case" must be
+        // distinguishable from the generic isConfirmed/isTBConfirmed flags (isDrTbConfirmed, set
+        // only for RIF DR-TB results), and RIF's own "Not Conducted" flow needs its own reason
+        // columns distinct from NAAT's reasonNotConductedNaat/Other (which stay MTB-only).
+        private val MIGRATION_46_47 = object : Migration(46, 47) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val columns = listOf(
+                    "isDrTbConfirmed INTEGER",
+                    "reasonNotConductedRif TEXT",
+                    "reasonNotConductedRifOther TEXT"
+                )
+                columns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "TB_DIAGNOSTICS", columnName)) {
+                        database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN $columnDefinition")
+                    }
+                }
+            }
+        }
+
+        // Data-only cleanup, no schema change: OrderStatus.REFUSED was retired in favor of
+        // CLOSED (a declined-before-order referral is now just another CLOSED reason, alongside
+        // Not-Conducted/Expired) — normalize any already-persisted 'REFUSED' status strings so
+        // they don't fall through unrecognized in every status check going forward.
+        private val MIGRATION_47_48 = object : Migration(47, 48) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("UPDATE TB_DIAGNOSTICS SET xrayOrderStatus = 'CLOSED' WHERE xrayOrderStatus = 'REFUSED'")
+                database.execSQL("UPDATE TB_DIAGNOSTICS SET trueNatOrderStatus = 'CLOSED' WHERE trueNatOrderStatus = 'REFUSED'")
+            }
+        }
+
+        private val MIGRATION_48_49 = object : Migration(48, 49) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val columns = listOf(
+                    "xrayManualResultPendingSync INTEGER",
+                    "trueNatManualResultPendingSync INTEGER",
+                    "rifManualResultPendingSync INTEGER"
+                )
+                columns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "TB_DIAGNOSTICS", columnName)) {
+                        database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN $columnDefinition")
+                    }
+                }
+            }
+        }
+
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(
@@ -1811,6 +1858,9 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_43_44)
                         .addMigrations(MIGRATION_44_45)
                         .addMigrations(MIGRATION_45_46)
+                        .addMigrations(MIGRATION_46_47)
+                        .addMigrations(MIGRATION_47_48)
+                        .addMigrations(MIGRATION_48_49)
                         .fallbackToDestructiveMigration()
                         .build()
 

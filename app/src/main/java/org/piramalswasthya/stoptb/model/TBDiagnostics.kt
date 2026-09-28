@@ -43,6 +43,9 @@ data class TBDiagnosticsCache(
     var reasonNotConductedNaat: String? = null,
     var reasonNotConductedNaatOther: String? = null,
     var naatResult: String? = null,
+    // ── RIF "Not Conducted" — RIF's own reason fields, distinct from NAAT's above ─────────────
+    var reasonNotConductedRif: String? = null,
+    var reasonNotConductedRifOther: String? = null,
     // ── Liquid Culture ───────────────────────────────────────────────────────
     var recommendedForLiquidCultureTest: Boolean? = null,
     var isLiquidCultureConducted: Boolean? = null,
@@ -50,6 +53,9 @@ data class TBDiagnosticsCache(
     // ── Outcome ─────────────────────────────────────────────────────────────
     var isTBConfirmed: Boolean? = null,
     var isConfirmed: Boolean = false,
+    // TrueNat (MTB) & RIF order lifecycle redesign: "Confirmed DR-TB Case" must be
+    // distinguishable from the generic isConfirmed/isTBConfirmed above (set for RIF DR TB only).
+    var isDrTbConfirmed: Boolean? = null,
     // ── Device Orders / Integration ─────────────────────────────────────────
     var xrayOrderId: String? = null,
     var xrayOrderStatus: String? = null,
@@ -68,7 +74,18 @@ data class TBDiagnosticsCache(
     // ── Error Msg ─────────────────────────────────────────────────────────────────
     var errorMsgXray: String? = null,
     var errorMsgTrueNat : String? = null,
-    var errorMsgRif : String? = null
+    var errorMsgRif : String? = null,
+
+    // ── Manual result offline-first sync ────────────────────────────────────────
+    // True when a manually-entered result/not-conducted-reason for this test type was
+    // written locally (chestXRayResult/naatResult/trueNatRifResult or the matching
+    // reasonNotConductedX field already holds it) but the order/manualResult call that
+    // confirms it with the backend hasn't succeeded yet — set by TBRepo.submitManualResult()
+    // when it falls back to its offline-first path, cleared once that call is replayed
+    // successfully (DiagnosticResultPollWorker's retry sweep).
+    var xrayManualResultPendingSync: Boolean? = null,
+    var trueNatManualResultPendingSync: Boolean? = null,
+    var rifManualResultPendingSync: Boolean? = null
 
 ) : FormDataModel {
     fun toDTO(): TBDiagnosticsDTO = TBDiagnosticsDTO(
