@@ -1940,7 +1940,7 @@ class TBRepo @Inject constructor(
                                 if (testType.equals("XRAY_CHEST", ignoreCase = true)) {
                                     it.copy(
                                         xrayOrderId = orderId ?: it.xrayOrderId,
-                                        xrayOrderStatus = status,
+                                        xrayOrderStatus = reducedOrderStatus(status),
                                         isChestXRayDone = true,
                                         isReferredForDigitalChestXray = true,
                                         syncState = SyncState.UNSYNCED
@@ -2246,35 +2246,41 @@ class TBRepo @Inject constructor(
                         if (resStatusCode == 200) {
                             val dataObj = jsonObj.optJSONObject("data")
                             val rawStatus = dataObj?.optString("status")
-                            val status = if (rawStatus.isNullOrBlank()) "IN_PROGRESS" else rawStatus
-                            
-                            val existing = tbDao.getTbDiagnosticsByBenId(benId)
-                            existing?.let {
-                                val cache = when {
-                                    orderType.equals("XRAY_CHEST", ignoreCase = true) -> {
-                                        it.copy(
-                                            xrayOrderStatus = status,
-                                            isReferredForDigitalChestXray = true,
-                                            syncState = SyncState.UNSYNCED
-                                        )
+                            // reducedOrderStatus() already defaults a blank/unrecognized status to
+                            // PENDING — never write the raw server string (or a hardcoded
+                            // "IN_PROGRESS") directly, or the poll worker's exact-PENDING filter
+                            // silently stops tracking this order.
+                            val status = reducedOrderStatus(rawStatus)
+
+                            withBenIdLock(benId) {
+                                val existing = tbDao.getTbDiagnosticsByBenId(benId)
+                                existing?.let {
+                                    val cache = when {
+                                        orderType.equals("XRAY_CHEST", ignoreCase = true) -> {
+                                            it.copy(
+                                                xrayOrderStatus = status,
+                                                isReferredForDigitalChestXray = true,
+                                                syncState = SyncState.UNSYNCED
+                                            )
+                                        }
+                                        orderType.equals("MDR_RIF", ignoreCase = true) -> {
+                                            it.copy(
+                                                rifOrderStatus = status,
+                                                syncState = SyncState.UNSYNCED
+                                            )
+                                        }
+                                        else -> {
+                                            it.copy(
+                                                trueNatOrderStatus = status,
+                                                isSputumCollected = true,
+                                                syncState = SyncState.UNSYNCED
+                                            )
+                                        }
                                     }
-                                    orderType.equals("MDR_RIF", ignoreCase = true) -> {
-                                        it.copy(
-                                            rifOrderStatus = status,
-                                            syncState = SyncState.UNSYNCED
-                                        )
-                                    }
-                                    else -> {
-                                        it.copy(
-                                            trueNatOrderStatus = status,
-                                            isSputumCollected = true,
-                                            syncState = SyncState.UNSYNCED
-                                        )
-                                    }
+                                    tbDao.saveTbDiagnostics(cache)
                                 }
-                                tbDao.saveTbDiagnostics(cache)
-                                preferenceDao.setDiagPollStartTime(benId, orderType, System.currentTimeMillis())
                             }
+                            preferenceDao.setDiagPollStartTime(benId, orderType, System.currentTimeMillis())
                             
                             if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
                                 // Immediately fetch order result from server for X-Ray

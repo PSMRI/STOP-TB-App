@@ -512,7 +512,13 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 id = freshDiag.id,
                                 xrayOrderId = freshDiag.xrayOrderId ?: tbDiagnostics.xrayOrderId,
                                 trueNatOrderId = freshDiag.trueNatOrderId ?: tbDiagnostics.trueNatOrderId,
-                                rifOrderId = freshDiag.rifOrderId ?: tbDiagnostics.rifOrderId
+                                rifOrderId = freshDiag.rifOrderId ?: tbDiagnostics.rifOrderId,
+                                // Owned exclusively by TBRepo.submitManualResult's offline-first
+                                // path — never take these from the stale snapshot, or a result
+                                // saved while the hub was disconnected never gets replayed.
+                                xrayManualResultPendingSync = freshDiag.xrayManualResultPendingSync,
+                                trueNatManualResultPendingSync = freshDiag.trueNatManualResultPendingSync,
+                                rifManualResultPendingSync = freshDiag.rifManualResultPendingSync
                             )
                         }
                         tbDiagnostics.syncState = SyncState.UNSYNCED

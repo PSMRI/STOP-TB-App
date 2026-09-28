@@ -1537,14 +1537,17 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
-        // Data-only cleanup, no schema change: OrderStatus.REFUSED was retired in favor of
-        // CLOSED (a declined-before-order referral is now just another CLOSED reason, alongside
-        // Not-Conducted/Expired) — normalize any already-persisted 'REFUSED' status strings so
-        // they don't fall through unrecognized in every status check going forward.
+
         private val MIGRATION_47_48 = object : Migration(47, 48) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("UPDATE TB_DIAGNOSTICS SET xrayOrderStatus = 'CLOSED' WHERE xrayOrderStatus = 'REFUSED'")
-                database.execSQL("UPDATE TB_DIAGNOSTICS SET trueNatOrderStatus = 'CLOSED' WHERE trueNatOrderStatus = 'REFUSED'")
+                listOf("xrayOrderStatus", "trueNatOrderStatus", "rifOrderStatus").forEach { column ->
+                    database.execSQL(
+                        "UPDATE TB_DIAGNOSTICS SET $column = 'PENDING' WHERE UPPER($column) = 'AWAITING_TEST_COMPLETION'"
+                    )
+                    database.execSQL(
+                        "UPDATE TB_DIAGNOSTICS SET $column = 'CLOSED' WHERE UPPER($column) IN ('POLLING_TIMEOUT', 'REFUSED')"
+                    )
+                }
             }
         }
 

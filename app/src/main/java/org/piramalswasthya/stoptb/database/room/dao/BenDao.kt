@@ -329,6 +329,15 @@ interface BenDao {
                   )
             ))
             OR (:source = 10 AND isDeath = 0 AND benId IN (
+                -- TB_SUSPECTED has no RIF field of its own (mdrRifResult is only ever mirrored
+                -- here from TB_DIAGNOSTICS.trueNatRifResult by syncTBSuspectedFromDiagnostics, so
+                -- checking it would be redundant with the td.trueNatRifResult check below) — the
+                -- older SuspectedTBDataset form only ever writes chestXRayResult/naatResult here
+                -- directly, with no TB_DIAGNOSTICS row at all, so that's the gap this union closes.
+                SELECT ts.benId FROM TB_SUSPECTED ts
+                WHERE UPPER(TRIM(IFNULL(ts.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
+                  AND UPPER(TRIM(IFNULL(ts.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED')
+                UNION
                 SELECT td.benId FROM TB_DIAGNOSTICS td
                 WHERE (UPPER(TRIM(IFNULL(td.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
                        AND UPPER(TRIM(IFNULL(td.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED'))
@@ -492,6 +501,15 @@ interface BenDao {
                   )
             ))
             OR (:source = 10 AND isDeath = 0 AND benId IN (
+                -- TB_SUSPECTED has no RIF field of its own (mdrRifResult is only ever mirrored
+                -- here from TB_DIAGNOSTICS.trueNatRifResult by syncTBSuspectedFromDiagnostics, so
+                -- checking it would be redundant with the td.trueNatRifResult check below) — the
+                -- older SuspectedTBDataset form only ever writes chestXRayResult/naatResult here
+                -- directly, with no TB_DIAGNOSTICS row at all, so that's the gap this union closes.
+                SELECT ts.benId FROM TB_SUSPECTED ts
+                WHERE UPPER(TRIM(IFNULL(ts.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
+                  AND UPPER(TRIM(IFNULL(ts.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED')
+                UNION
                 SELECT td.benId FROM TB_DIAGNOSTICS td
                 WHERE (UPPER(TRIM(IFNULL(td.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
                        AND UPPER(TRIM(IFNULL(td.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED'))
@@ -655,6 +673,15 @@ interface BenDao {
                   )
             ))
             OR (:source = 10 AND isDeath = 0 AND benId IN (
+                -- TB_SUSPECTED has no RIF field of its own (mdrRifResult is only ever mirrored
+                -- here from TB_DIAGNOSTICS.trueNatRifResult by syncTBSuspectedFromDiagnostics, so
+                -- checking it would be redundant with the td.trueNatRifResult check below) — the
+                -- older SuspectedTBDataset form only ever writes chestXRayResult/naatResult here
+                -- directly, with no TB_DIAGNOSTICS row at all, so that's the gap this union closes.
+                SELECT ts.benId FROM TB_SUSPECTED ts
+                WHERE UPPER(TRIM(IFNULL(ts.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
+                  AND UPPER(TRIM(IFNULL(ts.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED')
+                UNION
                 SELECT td.benId FROM TB_DIAGNOSTICS td
                 WHERE (UPPER(TRIM(IFNULL(td.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
                        AND UPPER(TRIM(IFNULL(td.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED'))
@@ -1150,6 +1177,10 @@ interface BenDao {
         SELECT COUNT(*) FROM BEN_BASIC_CACHE
         WHERE villageId = :selectedVillage AND isDeactivate = 0 AND isDeath = 0
           AND benId IN (
+            SELECT ts.benId FROM TB_SUSPECTED ts
+            WHERE UPPER(TRIM(IFNULL(ts.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
+              AND UPPER(TRIM(IFNULL(ts.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED')
+            UNION
             SELECT td.benId FROM TB_DIAGNOSTICS td
             WHERE (UPPER(TRIM(IFNULL(td.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
                    AND UPPER(TRIM(IFNULL(td.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED'))
