@@ -115,9 +115,7 @@ class DashboardFragment : Fragment() {
     private fun bindFilterScope(state: DashboardFilterState) {
         val scopeName = when {
             state.villageId != 0 -> viewModel.villageList.firstOrNull { it.id == state.villageId }?.name
-            state.blockId != 0 -> viewModel.blockList.firstOrNull { it.id == state.blockId }?.name
-            state.districtId != 0 -> viewModel.districtList.firstOrNull { it.id == state.districtId }?.name
-            else -> null
+            else -> viewModel.selectedVillageName()
         } ?: getString(R.string.filter_all_villages)
         adapter.updateScope(scopeName, periodLabel(state.periodKey))
     }

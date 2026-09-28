@@ -24,7 +24,9 @@ import org.piramalswasthya.stoptb.network.TmcRefreshTokenRequest
 import org.piramalswasthya.stoptb.network.interceptors.TokenInsertTmcInterceptor
 import retrofit2.HttpException
 import timber.log.Timber
+import java.io.IOException
 import java.net.ConnectException
+import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.inject.Inject
@@ -52,13 +54,15 @@ class UserRepo @Inject constructor(
     suspend fun authenticateUser(userName: String, password: String): NetworkResponse<User?> {
         return withContext(Dispatchers.IO) {
             try {
-                val authData = getTokenAmrit(userName, password)
-                val user = setUserRole(
-                    authData.userId,
-                    password,
-                    authData.subCentre,
-                    authData.assignedRoleScreenNames
-                )
+                val user = withRetry {
+                    val authData = getTokenAmrit(userName, password)
+                    setUserRole(
+                        authData.userId,
+                        password,
+                        authData.subCentre,
+                        authData.assignedRoleScreenNames
+                    )
+                }
                 return@withContext NetworkResponse.Success(user)
             } catch (se: SocketTimeoutException) {
                 return@withContext NetworkResponse.Error(
@@ -69,8 +73,11 @@ class UserRepo @Inject constructor(
                     401 -> NetworkResponse.Error(
                         message = userMessageContext().getString(R.string.error_sign_in_invalid_u_p)
                     )
+                    in 500..599 -> NetworkResponse.Error(
+                        message = userMessageContext().getString(R.string.error_login_server_error)
+                    )
                     else -> NetworkResponse.Error(
-                        message = userMessageContext().getString(R.string.error_login_unable_to_reach_server)
+                        message = userMessageContext().getString(R.string.error_login_generic)
                     )
                 }
             } catch (ce: ConnectException) {
@@ -81,7 +88,16 @@ class UserRepo @Inject constructor(
                 return@withContext NetworkResponse.Error(
                     message = userMessageContext().getString(R.string.error_login_unable_to_reach_server)
                 )
-            } catch (ie: Exception) {
+            }
+
+            catch (io: IOException) {   // SocketException, SSLException, EOFException
+                Timber.e(io, "Login network error")
+                return@withContext NetworkResponse.Error(
+                    message = userMessageContext().getString(R.string.error_login_unable_to_reach_server)
+                )
+            }
+
+            catch (ie: Exception) {
                 return@withContext NetworkResponse.Error(message = localizedAuthExceptionMessage(ie))
             }
         }
@@ -261,6 +277,7 @@ class UserRepo @Inject constructor(
                         encryptedPassword
                     )
                 )
+            if (!response.isSuccessful) throw HttpException(response)
             Timber.d("JWT : $response")
             val responseBody = JSONObject(
                 response.body()?.string()
@@ -325,6 +342,37 @@ class UserRepo @Inject constructor(
                 Timber.e(e, "Exception while saving Firebase token")
             }
         }
+    }
+
+    private fun isTransient(e: Throwable): Boolean = when (e) {
+        is SocketTimeoutException,
+        is ConnectException,
+        is UnknownHostException,
+        is SocketException,
+        is javax.net.ssl.SSLException -> true
+        is HttpException -> e.code() in setOf(408, 429, 502, 503, 504)
+        else -> false
+    }
+
+    private suspend fun <T> withRetry(
+        attempts: Int = 3,
+        initialDelayMs: Long = 500,
+        block: suspend () -> T
+    ): T {
+        var delayMs = initialDelayMs
+        repeat(attempts - 1) { attempt ->
+            try {
+                return block()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (!isTransient(e)) throw e
+                Timber.w(e, "Login attempt ${attempt + 1} failed, retrying in ${delayMs}ms")
+            }
+            kotlinx.coroutines.delay(delayMs)
+            delayMs *= 2
+        }
+        return block() // last attempt: let the exception propagate
     }
 
 }

@@ -14,7 +14,6 @@ import org.piramalswasthya.stoptb.databinding.ItemCtNumberPickerBinding
 import org.piramalswasthya.stoptb.databinding.ItemCtReadonlyBinding
 import org.piramalswasthya.stoptb.helpers.QuestionRenderer
 import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingQuestionDto
-import org.piramalswasthya.stoptb.ui.counselling_activity.ActionType
 import org.piramalswasthya.stoptb.ui.counselling_activity.QuestionType
 
 /**
@@ -61,13 +60,10 @@ class CounsellingDynamicAdapter(
         list.associate { it.questionId to Triple(it.value, it.visible, it.errorMessage) }
 
     private fun computeVisibleQuestions(all: List<CounsellingQuestionDto>): List<CounsellingQuestionDto> {
-        relationshipCountFieldIds = all
-            .firstOrNull { it.questionUuid == CT_RELATIONSHIP_UUID }
-            ?.options
-            .orEmpty()
-            .flatMap { it.conditions.orEmpty() }
-            .filter { it.actionType == ActionType.SHOW_QUESTION.value }
-            .mapNotNull { it.targetQuestionId }
+        // Includes nested dependants (e.g. Area of Shared Space) so they render inline, not in the main list.
+        relationshipCountFieldIds = QuestionRenderer
+            .inlineDependants(all.firstOrNull { it.questionUuid == CT_RELATIONSHIP_UUID }?.options, all)
+            .map { it.questionId }
             .toSet()
 
         return all
@@ -218,7 +214,10 @@ class CounsellingDynamicAdapter(
     inner class DropdownViewHolder(private val binding: ItemCounsellingDropdownBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(q: CounsellingQuestionDto, prefix: String) =
-            QuestionRenderer.showDropdown(binding, q, prefix, isEditable, onValueChanged)
+            QuestionRenderer.showDropdown(binding, q, prefix, isEditable, { updated ->
+                onValueChanged(updated)
+                refreshNoOfContactsIfNeeded(updated)
+            }, questions)
     }
 
     inner class NumberViewHolder(private val binding: ItemCtNumberBinding) :

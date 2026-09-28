@@ -51,6 +51,16 @@ interface DynamicFormMetadataDao {
     @Query("DELETE FROM t_form_version WHERE formId = :formId")
     suspend fun deleteVersionsByFormId(formId: Int)
 
+    // Keeps older versions (their responses still reference them) but stops them being picked as the active one.
+    @Query("UPDATE t_form_version SET isActive = 0 WHERE formId = :formId AND versionId != :activeVersionId")
+    suspend fun deactivateOtherVersions(formId: Int, activeVersionId: Int)
+
+    @Query("DELETE FROM t_option_condition WHERE optionId IN (:optionIds)")
+    suspend fun deleteConditionsForOptions(optionIds: List<Int>)
+
+    @Query("DELETE FROM t_question_validation WHERE questionId IN (:questionIds)")
+    suspend fun deleteValidationsForQuestions(questionIds: List<Int>)
+
     @Query("SELECT COUNT(*) FROM t_section_question WHERE serverQuestionId IS NULL")
     suspend fun getQuestionsWithNullServerIdCount(): Int
 

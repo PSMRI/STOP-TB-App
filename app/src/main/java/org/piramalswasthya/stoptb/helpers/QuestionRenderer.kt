@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.helpers
 
 import android.app.AlertDialog
 import android.app.DatePickerDialog
+import android.content.Context
 import android.graphics.Color
 import android.text.Editable
 import android.text.InputFilter
@@ -11,6 +12,9 @@ import android.text.TextWatcher
 import android.text.style.ForegroundColorSpan
 import android.view.LayoutInflater
 import android.view.View
+import com.google.android.material.R
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.CheckBox
 import android.widget.LinearLayout
@@ -18,7 +22,6 @@ import android.widget.RadioButton
 import android.widget.TextView
 import com.google.android.flexbox.FlexboxLayout
 import com.google.android.material.textfield.TextInputLayout
-import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.databinding.ItemCounsellingDateBinding
 import org.piramalswasthya.stoptb.databinding.ItemCounsellingDropdownBinding
 import org.piramalswasthya.stoptb.databinding.ItemCounsellingMcqBinding
@@ -31,13 +34,19 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingOptionDto
 import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingQuestionDto
 import org.piramalswasthya.stoptb.ui.counselling_activity.ActionType
 import org.piramalswasthya.stoptb.ui.counselling_activity.QuestionType
-import org.piramalswasthya.stoptb.utils.Log
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
 
 object QuestionRenderer {
+
+
+    const val CT_RELATIONSHIP_COUNT_PREFIX = "CCT_RELATIONSHIP_COUNT_"
+    // Upper bound when probing a picker's REGEX for its range; must cover Area of Shared Space's 5000.
+    private const val NUMBER_PICKER_PROBE_MAX = 5000
+    // Matches both OCT_AREA_OF_SHARED_SPACE (Occupational) and CCT_AREA_OF_SHARED_SPACE_* (per relationship).
+    private const val AREA_OF_SHARED_SPACE_UUID_PART = "AREA_OF_SHARED_SPACE"
 
     fun showLabel(tvQuestion: TextView, question: CounsellingQuestionDto, prefix: String = "") {
         tvQuestion.text = buildLabel(question, prefix)
@@ -152,8 +161,9 @@ object QuestionRenderer {
             .mapNotNull { it.targetQuestionId }
             .toSet()
 
+        // Only the count fields contribute; hours / Type of Space are also SHOW_QUESTION targets of the same options.
         val computedValue = allQuestions
-            .filter { it.questionId in countFieldIds }
+            .filter { it.questionId in countFieldIds && it.questionUuid.startsWith(CT_RELATIONSHIP_COUNT_PREFIX) }
             .sumOf { it.value?.toString()?.toIntOrNull() ?: 0 }
             .toString()
 
@@ -285,12 +295,7 @@ object QuestionRenderer {
                     question.value = currentValues.toList()
 
                     if (showInline && !checked) {
-                        opt.conditions.orEmpty()
-                            .filter { it.actionType == ActionType.SHOW_QUESTION.value }
-                            .mapNotNull { it.targetQuestionId }
-                            .forEach { targetId ->
-                                allQuestions.firstOrNull { it.questionId == targetId }?.value = null
-                            }
+                        inlineDependants(listOf(opt), allQuestions).forEach { it.value = null }
                     }
 
                     onValueChanged(question)
@@ -333,21 +338,73 @@ object QuestionRenderer {
             LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
         ))
 
-        if (isChecked) {
-            opt.conditions.orEmpty()
-                .filter { it.actionType == ActionType.SHOW_QUESTION.value }
-                .mapNotNull { it.targetQuestionId }
-                .mapNotNull { targetId -> allQuestions.firstOrNull { it.questionId == targetId } }
-                .forEach { target ->
-                    val fieldBinding = ItemCounsellingTextBinding.inflate(LayoutInflater.from(context), container, false)
-                    showTextView(fieldBinding, target, "", isEditable, applyLatinFilter = false, onValueChanged = onValueChanged)
-                    container.addView(fieldBinding.root, LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-                    ))
-                }
-        }
+        if (isChecked) addInlineTargets(context, container, opt, allQuestions, isEditable, onValueChanged)
         return container
     }
+
+    // Adds opt's SHOW_QUESTION targets to container, then recurses into each target's selected options,
+    // so nested dependants (Type of Space -> Approximate Area of Shared Space) stay under their relationship.
+    private fun addInlineTargets(
+        context: android.content.Context,
+        container: LinearLayout,
+        opt: CounsellingOptionDto,
+        allQuestions: List<CounsellingQuestionDto>,
+        isEditable: Boolean,
+        onValueChanged: (CounsellingQuestionDto) -> Unit
+    ) {
+        val inflater = LayoutInflater.from(context)
+        showQuestionTargets(opt, allQuestions).forEach { target ->
+            // Render each target by its own questionType (e.g. Type of Space is RADIO, hours is NUMBER_PICKER).
+            val fieldView = when (QuestionType.from(target.questionType)) {
+                QuestionType.RADIO -> ItemCounsellingRadioBinding.inflate(inflater, container, false).also {
+                    showRadio(it, target, "", isEditable, onValueChanged)
+                }.root
+                QuestionType.NUMBER_PICKER -> ItemCtNumberPickerBinding.inflate(inflater, container, false).also {
+                    showNumberPicker(it, target, "", isEditable, onValueChanged)
+                }.root
+                QuestionType.NUMBER -> ItemCtNumberBinding.inflate(inflater, container, false).also {
+                    showNumber(it, target, "", isEditable, onValueChanged)
+                }.root
+                else -> ItemCounsellingTextBinding.inflate(inflater, container, false).also {
+                    showTextView(it, target, "", isEditable, applyLatinFilter = false, onValueChanged = onValueChanged)
+                }.root
+            }
+            container.addView(fieldView, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
+
+            val selectedValues = when (val v = target.value) {
+                is List<*> -> v.mapNotNull { it?.toString() }
+                null -> emptyList()
+                else -> listOf(v.toString())
+            }
+            target.options.orEmpty()
+                .filter { it.optionValue in selectedValues }
+                .forEach { addInlineTargets(context, container, it, allQuestions, isEditable, onValueChanged) }
+        }
+    }
+
+    private fun showQuestionTargets(
+        opt: CounsellingOptionDto,
+        allQuestions: List<CounsellingQuestionDto>
+    ): List<CounsellingQuestionDto> =
+        opt.conditions.orEmpty()
+            .filter { it.actionType == ActionType.SHOW_QUESTION.value }
+            .mapNotNull { it.targetQuestionId }
+            .mapNotNull { targetId -> allQuestions.firstOrNull { it.questionId == targetId } }
+            // Two conditions can target the same question (e.g. left over from an older schema version); draw it once.
+            .distinctBy { it.questionId }
+            // Conditions come back from Room in no guaranteed order; the schema's displayOrder decides the layout.
+            .sortedBy { it.displayOrder }
+
+    // Every question rendered inline under the given options, at any depth (count, hours, Type of Space, Area of Shared Space...).
+    fun inlineDependants(
+        options: List<CounsellingOptionDto>?,
+        allQuestions: List<CounsellingQuestionDto>
+    ): List<CounsellingQuestionDto> =
+        options.orEmpty()
+            .flatMap { showQuestionTargets(it, allQuestions) }
+            .flatMap { listOf(it) + inlineDependants(it.options, allQuestions) }
 
 
     fun showDate(
@@ -435,7 +492,8 @@ object QuestionRenderer {
         question: CounsellingQuestionDto,
         prefix: String,
         isEditable: Boolean,
-        onValueChanged: (CounsellingQuestionDto) -> Unit
+        onValueChanged: (CounsellingQuestionDto) -> Unit,
+        allQuestions: List<CounsellingQuestionDto> = emptyList()
     ) {
         showLabel(binding.tilDropdown, question, prefix)
         binding.tilDropdown.error = question.errorMessage
@@ -469,6 +527,10 @@ object QuestionRenderer {
                     }
                     .setPositiveButton(android.R.string.ok) { _, _ ->
                         val selected = options.filterIndexed { i, _ -> checkedItems[i] }
+                        // Same as unchecking in showMCQ: a deselected relationship drops its dependent answers.
+                        if (question.questionUuid == "CCT_RELATIONSHIP") {
+                            inlineDependants(options.filter { it !in selected }, allQuestions).forEach { it.value = null }
+                        }
                         question.value = selected.map { it.optionValue }
                         binding.actDropdown.setText(selected.joinToString(", ") { it.optionLabel }, false)
                         onValueChanged(question)
@@ -497,6 +559,44 @@ object QuestionRenderer {
 
         // Hide tvError to avoid duplicating the TextInputLayout's error message.
         binding.tvError.visibility = View.GONE
+
+        showDropdownInlineTargets(binding, question, options, allQuestions, isEditable, onValueChanged)
+    }
+
+    // DROPDOWN_MULTI counterpart of showMCQ's inline rows: the adapter keeps CCT_RELATIONSHIP's dependants out of the
+    // main list, so they must be drawn here — one block per selected option, headed by its label.
+    private fun showDropdownInlineTargets(
+        binding: ItemCounsellingDropdownBinding,
+        question: CounsellingQuestionDto,
+        options: List<CounsellingOptionDto>,
+        allQuestions: List<CounsellingQuestionDto>,
+        isEditable: Boolean,
+        onValueChanged: (CounsellingQuestionDto) -> Unit
+    ) {
+        val container = binding.llInline
+        container.removeAllViews()
+
+        val selectedValues = (question.value as? List<*>)?.filterIsInstance<String>().orEmpty()
+        val selectedOptions = if (question.questionUuid == "CCT_RELATIONSHIP") {
+            options.filter { it.optionValue in selectedValues }
+        } else {
+            emptyList()
+        }
+        container.visibility = if (selectedOptions.isEmpty()) View.GONE else View.VISIBLE
+
+        val context = binding.root.context
+        val density = context.resources.displayMetrics.density
+        selectedOptions.forEach { opt ->
+            val header = TextView(context).apply {
+                text = opt.optionLabel
+                setTextAppearance(R.style.TextAppearance_Material3_TitleSmall)
+                setPadding(0, (12 * density).toInt(), 0, 0)
+            }
+            container.addView(header, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
+            addInlineTargets(context, container, opt, allQuestions, isEditable, onValueChanged)
+        }
     }
 
     // Numeric-only input (age, hours, counts). New — no existing function covers this type.
@@ -571,13 +671,19 @@ object QuestionRenderer {
         binding.tvError.visibility = if (question.errorMessage.isNullOrBlank()) View.GONE else View.VISIBLE
 
         val (min, max) = numberPickerRange(question)
+        // Area of Shared Space spans 50–5000, so it also gets a typed field; every other picker stays stepper-only.
+        val allowTyping = question.questionUuid.contains(AREA_OF_SHARED_SPACE_UUID_PART)
 
         var current = question.value?.toString()?.toIntOrNull()
-        if (current == null || current !in min..max) {
+        // A typed out-of-range value is kept so its validation error shows, instead of being silently reset.
+        if (current == null || (current !in min..max && !allowTyping)) {
             current = 1.coerceIn(min, max)
             question.value = current.toString()
         }
         binding.tvValue.text = current.toString()
+        binding.tvValue.visibility = if (allowTyping) View.GONE else View.VISIBLE
+        binding.etValue.visibility = if (allowTyping) View.VISIBLE else View.GONE
+        applyNumberPickerUnit(binding, question)
 
         binding.btnDecrement.isEnabled = isEditable && current > min
         binding.btnIncrement.isEnabled = isEditable && current < max
@@ -585,28 +691,128 @@ object QuestionRenderer {
         binding.btnDecrement.setOnClickListener {
             val value = question.value?.toString()?.toIntOrNull() ?: min
             if (value > min) {
-                question.value = (value - 1).toString()
+                question.value = (value - 1).coerceAtMost(max).toString()
                 onValueChanged(question)
             }
         }
         binding.btnIncrement.setOnClickListener {
             val value = question.value?.toString()?.toIntOrNull() ?: min
             if (value < max) {
-                question.value = (value + 1).toString()
+                question.value = (value + 1).coerceAtLeast(min).toString()
                 onValueChanged(question)
+            }
+        }
+
+        if (allowTyping) bindNumberPickerInput(binding, question, min, max, isEditable, onValueChanged)
+    }
+
+    // Typed entry for the picker. Keystrokes only update question.value and the range error; onValueChanged (which
+    // re-evaluates the form and rebinds this row, dropping the keyboard) fires once on Done or focus loss.
+    private fun bindNumberPickerInput(
+        binding: ItemCtNumberPickerBinding,
+        question: CounsellingQuestionDto,
+        min: Int,
+        max: Int,
+        isEditable: Boolean,
+        onValueChanged: (CounsellingQuestionDto) -> Unit
+    ) {
+        val et = binding.etValue
+        et.isEnabled = isEditable
+        et.filters = arrayOf(InputFilter.LengthFilter(max.toString().length))
+
+        (et.tag as? TextWatcher)?.let { et.removeTextChangedListener(it) }
+        val newValue = question.value?.toString() ?: ""
+        if (et.text?.toString() != newValue) {
+            et.setText(newValue)
+            et.setSelection(newValue.length)
+        }
+
+        var committedValue = question.value
+        fun commit() {
+            if (question.value == committedValue) return
+            committedValue = question.value
+            onValueChanged(question)
+        }
+
+        val watcher = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                question.value = s?.toString()?.takeIf { it.isNotEmpty() }
+                applyNumberPickerRangeError(binding, question, min, max, isEditable)
+                applyNumberPickerUnit(binding, question)
+            }
+        }
+        et.addTextChangedListener(watcher)
+        et.tag = watcher
+
+        et.setOnEditorActionListener { v, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                v.clearFocus()
+                (v.context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                    .hideSoftInputFromWindow(v.windowToken, 0)
+                commit()
+            }
+            false
+        }
+        et.setOnFocusChangeListener { v, hasFocus ->
+            if (hasFocus) {
+                scrollToView(v)
+            } else {
+                // Focus is also lost when a rebind removes this row mid-layout (e.g. on Submit); committing then
+                // would notify the RecyclerView during layout and crash. Defer, and skip if the view was removed —
+                // question.value is already up to date, so nothing is lost.
+                v.post { if (v.isAttachedToWindow) commit() }
             }
         }
     }
 
+    // Shows the question's UNIT validation param (e.g. "sq. m.") after the value, once a value is present.
+    private fun applyNumberPickerUnit(binding: ItemCtNumberPickerBinding, question: CounsellingQuestionDto) {
+        val unit = question.validations
+            ?.firstOrNull { it.validationType == "UNIT" }
+            ?.validationParam
+            ?.takeIf { it.isNotBlank() }
+        binding.tvUnit.text = unit
+        binding.tvUnit.visibility =
+            if (unit != null && !question.value?.toString().isNullOrBlank()) View.VISIBLE else View.GONE
+    }
+
+    // Checks a typed value against the same min..max the stepper enforces, live, since the ViewModel only
+    // surfaces a new error on Next. Also keeps the steppers' enabled state in sync with the typed value.
+    private fun applyNumberPickerRangeError(
+        binding: ItemCtNumberPickerBinding,
+        question: CounsellingQuestionDto,
+        min: Int,
+        max: Int,
+        isEditable: Boolean
+    ) {
+        val typed = question.value?.toString()?.toIntOrNull()
+        val rangeError = question.validations
+            ?.firstOrNull { it.validationType == "REGEX" }?.errorMessage
+            ?: "Enter a value between $min and $max."
+        question.errorMessage = if (typed != null && typed !in min..max) rangeError else null
+
+        binding.tvError.text = question.errorMessage
+        binding.tvError.visibility = if (question.errorMessage.isNullOrBlank()) View.GONE else View.VISIBLE
+        binding.btnDecrement.isEnabled = isEditable && typed != null && typed > min
+        binding.btnIncrement.isEnabled = isEditable && (typed == null || typed < max)
+    }
+
+    // Probing is repeated on every rebind, so ranges are cached per pattern.
+    private val numberPickerRangeCache = mutableMapOf<String, Pair<Int, Int>>()
+
     // Determines a numeric field's valid range by testing sequential integers against its regex, rather than parsing the pattern directly.
     private fun numberPickerRange(question: CounsellingQuestionDto): Pair<Int, Int> {
-        val regex = question.validations
+        val pattern = question.validations
             ?.firstOrNull { it.validationType == "REGEX" }
             ?.validationParam
-            ?.let { runCatching { it.toRegex() }.getOrNull() }
             ?: return 0 to 100
 
-        val matches = (0..1000).filter { regex.matches(it.toString()) }
-        return if (matches.isEmpty()) 0 to 100 else matches.first() to matches.last()
+        return numberPickerRangeCache.getOrPut(pattern) {
+            val regex = runCatching { pattern.toRegex() }.getOrNull() ?: return@getOrPut 0 to 100
+            val matches = (0..NUMBER_PICKER_PROBE_MAX).filter { regex.matches(it.toString()) }
+            if (matches.isEmpty()) 0 to 100 else matches.first() to matches.last()
+        }
     }
 }

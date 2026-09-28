@@ -50,7 +50,7 @@ class IconDataset @Inject constructor(
         if (AppModule.HOUSEHOLD in homeModules) {
             iconList.add(
                 Icon(
-                    R.drawable.ic_health_home,
+                    R.drawable.ic_household,
                     resources.getString(R.string.icon_title_household),
                     resources.getString(R.string.home_card_household_subtitle),
                     recordsRepo.hhListCount,
@@ -61,7 +61,7 @@ class IconDataset @Inject constructor(
         if (AppModule.BENEFICIARIES in homeModules) {
             iconList.add(
                 Icon(
-                    R.drawable.ic_health_person,
+                    R.drawable.ic_all_ben,
                     resources.getString(R.string.icon_title_ben),
                     resources.getString(R.string.home_card_all_ben_subtitle),
                     recordsRepo.allBenListCount,
@@ -74,7 +74,7 @@ class IconDataset @Inject constructor(
         if (AppModule.NON_HOUSEHOLD in homeModules) {
             iconList.add(
                 Icon(
-                    R.drawable.ic_health_person,
+                    R.drawable.icon_non_household,
                     resources.getString(R.string.icon_title_non_hh),
                     resources.getString(R.string.home_card_non_hh_subtitle),
                     recordsRepo.nonHHListCount,
@@ -104,7 +104,7 @@ class IconDataset @Inject constructor(
             if (AppModule.REFERRAL in homeModules) {
                 iconList.add(
                     Icon(
-                        R.drawable.ic_health_rural_post,
+                        R.drawable.ic_referral_outline,
                         resources.getString(R.string.ncd_refer_list),
                         resources.getString(R.string.home_card_referral_subtitle),
                         null,
@@ -195,7 +195,7 @@ class IconDataset @Inject constructor(
         if (AppModule.HOUSEHOLD in modules) {
             iconList.add(
                 Icon(
-                    R.drawable.ic_health_home,
+                    R.drawable.ic_household,
                     resources.getString(R.string.icon_title_household),
                     resources.getString(R.string.home_card_household_subtitle),
                     recordsRepo.hhListCount,
@@ -206,7 +206,7 @@ class IconDataset @Inject constructor(
         if (AppModule.BENEFICIARIES in modules) {
             iconList.add(
                 Icon(
-                    R.drawable.ic_health_person,
+                    R.drawable.ic_all_ben,
                     resources.getString(R.string.icon_title_ben),
                     resources.getString(R.string.home_card_all_ben_subtitle),
                     recordsRepo.allBenListCount,
@@ -217,7 +217,7 @@ class IconDataset @Inject constructor(
         if (AppModule.NON_HOUSEHOLD in modules) {
             iconList.add(
                 Icon(
-                    R.drawable.ic_health_person,
+                    R.drawable.icon_non_household,
                     resources.getString(R.string.icon_title_non_hh),
                     resources.getString(R.string.home_card_non_hh_subtitle),
                     recordsRepo.nonHHListCount,
@@ -239,7 +239,7 @@ class IconDataset @Inject constructor(
         if (AppModule.REFERRAL in modules) {
             iconList.add(
                 Icon(
-                    R.drawable.ic_health_rural_post,
+                    R.drawable.ic_referral_outline,
                     resources.getString(R.string.ncd_refer_list),
                     resources.getString(R.string.home_card_referral_subtitle),
                     null,
