@@ -288,7 +288,7 @@
     </string-array>
     <string-array name="tb_digital_xray_result">
         <item>सामान्य (Normal)</item>
-        <item>असामान्य लेकिन टीबी प्रकल्पित नहीं (Abnormal (Non-TB Presumptive))</item>
+        <item>असामान्य लेकिन टीबी प्रकल्पित नहीं (Abnormal but not TB Presumptive)</item>
         <item>टीबी प्रकल्पित (TB Presumptive)</item>
         <item>एआई अमान्य परिणाम (AI Invalid Result)</item>
     </string-array>

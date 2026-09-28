@@ -1561,6 +1561,19 @@ abstract class InAppDb : RoomDatabase() {
                         database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN $columnDefinition")
                     }
                 }
+
+                // Data-only cleanup, no schema change: the order lifecycle redesign collapsed
+                // IN_PROGRESS/AWAITING_PROVIDER_RESULT into PENDING (see
+                // TBRepo.reducedOrderStatus) so new writes never produce them, but a row already
+                // holding one of those legacy values from before this upgrade would silently fail
+                // DiagnosticResultPollWorker's exact-PENDING pending-order filter and never get
+                // polled again.
+                val legacyInProgressStatuses = "('IN_PROGRESS', 'AWAITING_PROVIDER_RESULT')"
+                listOf("xrayOrderStatus", "trueNatOrderStatus", "rifOrderStatus").forEach { column ->
+                    database.execSQL(
+                        "UPDATE TB_DIAGNOSTICS SET $column = 'PENDING' WHERE UPPER($column) IN $legacyInProgressStatuses"
+                    )
+                }
             }
         }
 

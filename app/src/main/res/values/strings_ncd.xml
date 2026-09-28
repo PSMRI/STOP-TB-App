@@ -298,7 +298,7 @@
     </string-array>
     <string-array name="tb_digital_xray_result">
         <item>Normal</item>
-        <item>Abnormal (Non-TB Presumptive)</item>
+        <item>Abnormal but not TB Presumptive</item>
         <item>TB Presumptive</item>
         <item>AI Invalid Result</item>
     </string-array>

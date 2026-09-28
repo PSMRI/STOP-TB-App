@@ -16,6 +16,7 @@ import org.piramalswasthya.stoptb.configuration.TBScreeningDataset
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.OrderStatus
+import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.getAgeGenderDisplayString
 import org.piramalswasthya.stoptb.repositories.BenRepo
@@ -200,7 +201,10 @@ class TBScreeningFormViewModel @Inject constructor(
             tbRepo.saveTBScreening(tbScreeningCache)
 
             val existingDiag = tbRepo.getTBDiagnosticsById(benId)
-            var currentDiag = existingDiag ?: org.piramalswasthya.stoptb.model.TBDiagnosticsCache(benId = benId, syncState = SyncState.UNSYNCED)
+            var currentDiag = existingDiag ?: TBDiagnosticsCache(
+                benId = benId,
+                syncState = SyncState.UNSYNCED
+            )
 
             // Whether an order already exists must be decided from the state BEFORE the
             // preemptive PENDING placeholder below is written — otherwise that placeholder
@@ -229,14 +233,6 @@ class TBScreeningFormViewModel @Inject constructor(
                 }
             }
             tbRepo.saveTBDiagnostics(currentDiag)
-
-            // Chain X-ray then TrueNat (same order the automated referral cascade has always
-            // used) as a single background work chain instead of two awaited inline calls —
-            // createOrder() is a network call that can block for up to the configured 60s
-            // OkHttp timeout when the device/camp hub is unreachable, which used to stall form
-            // submission for that long (QA-reported bug). createOrder() already writes the
-            // correct PENDING/FAILED status (and isChestXRayDone/isReferredForDigitalChestXray)
-            // internally, same as before — the worker chain just stops it from blocking here.
             val ordersToPush = mutableListOf<String>()
             if (refersXray && !hasXrayOrder) ordersToPush.add("XRAY_CHEST")
             if (refersTruenat && !hasTruenatOrder) ordersToPush.add("SPUTUM_TRUENAT")

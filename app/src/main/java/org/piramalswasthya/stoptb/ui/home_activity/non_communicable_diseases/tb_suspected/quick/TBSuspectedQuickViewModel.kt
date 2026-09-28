@@ -299,11 +299,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 // Enter Result manually — a standing action whenever the order is
                                 // Pending/Awaiting Manual Entry, not just a device-integration
                                 // fallback.
-                                // Reuse the array-matching value mapValues() already wrote —
-                                // enteredXrayResult.displayValue won't match on reload and breaks
-                                // Hindi localization + isXrayResultReferable().
-                                val xrayResultToSend = tbDiagnostics.chestXRayResult
-                                val res = tbRepo.submitManualResult(benId, "XRAY_CHEST", resultSummary = xrayResultToSend)
+                                val res = tbRepo.submitManualResult(benId, "XRAY_CHEST", resultSummary = enteredXrayResult.displayValue)
                                 if (res is NetworkResponse.Success) {
                                     if (res.data == "PENDING_SYNC") anyPendingManualResultSync = true
                                     tbDiagnostics.xrayOrderStatus = "COMPLETED"

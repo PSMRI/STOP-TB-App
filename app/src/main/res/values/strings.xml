@@ -415,7 +415,7 @@
     <string name="dashboard_demo_transgender">Transgender</string>
     <string name="dashboard_demo_total">Total</string>
     <string name="dashboard_class_xray_normal">Normal</string>
-    <string name="dashboard_class_xray_abnormal">Abnormal (Non-TB Presumptive)</string>
+    <string name="dashboard_class_xray_abnormal">Abnormal but not TB Presumptive</string>
     <string name="dashboard_class_xray_tb_presumptive">TB Presumptive</string>
     <string name="dashboard_class_xray_invalid">AI Invalid Result</string>
     <string name="dashboard_class_sputum_collected">Sample Collected</string>
@@ -425,7 +425,7 @@
     <string name="dashboard_class_mtb_negative">TB Negative</string>
     <string name="dashboard_class_mtb_invalid">Invalid</string>
     <string name="dashboard_class_mtb_neg_xray_normal">TB Negative + X-Ray Normal</string>
-    <string name="dashboard_class_mtb_neg_xray_abnormal">TB Negative + X-Ray Abnormal (Non-TB Presumptive)</string>
+    <string name="dashboard_class_mtb_neg_xray_abnormal">TB Negative + X-Ray Abnormal but not TB Presumptive</string>
     <string name="dashboard_class_mtb_neg_xray_presumptive">TB Negative + X-Ray TB Presumptive</string>
     <string name="dashboard_class_rif_dr">DR TB</string>
     <string name="dashboard_class_rif_non_dr">Non-DR TB</string>

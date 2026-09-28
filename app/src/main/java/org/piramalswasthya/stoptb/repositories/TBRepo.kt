@@ -2433,7 +2433,7 @@ class TBRepo @Inject constructor(
                                                 xrayOrderStatus = OrderStatus.COMPLETED.name,
                                                 isReferredForDigitalChestXray = true,
                                                 isChestXRayDone = true,
-                                                chestXRayResult = chestResult,
+                                                chestXRayResult = standardizedResult?.displayValue ?: chestResult,
                                                 syncState = SyncState.UNSYNCED
                                             )
                                         }
@@ -2449,13 +2449,14 @@ class TBRepo @Inject constructor(
                                         }
                                         isCompleted -> {
                                             // Normal (or an unrecognized-but-completed summary) —
-                                            // terminal, no cascade.
+                                            // terminal, no cascade. Canonicalize for the same reason
+                                            // as the referral branch above.
                                             it.copy(
                                                 xrayOrderId = fetchedOrderId ?: it.xrayOrderId,
                                                 xrayOrderStatus = OrderStatus.COMPLETED.name,
                                                 isReferredForDigitalChestXray = true,
                                                 isChestXRayDone = true,
-                                                chestXRayResult = chestResult,
+                                                chestXRayResult = standardizedResult?.displayValue ?: chestResult,
                                                 syncState = SyncState.UNSYNCED
                                             )
                                         }
