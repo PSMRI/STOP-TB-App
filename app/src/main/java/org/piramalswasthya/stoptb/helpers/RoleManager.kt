@@ -44,6 +44,11 @@ class RoleManager @Inject constructor(
         Timber.d("RoleManager: assignedRoles=$_assignedRoles, activeRole=${_activeRole.value}")
     }
 
+    fun getVillage(): String {
+        val location = preferenceDao.getLocationRecord()
+        return location?.village?.name ?: ""
+    }
+
     fun setActiveRole(role: AppRole) {
         require(role in _assignedRoles) { "Role $role is not assigned to this user" }
         _activeRole.value = role

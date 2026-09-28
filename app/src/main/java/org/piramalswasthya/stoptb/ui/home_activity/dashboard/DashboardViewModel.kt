@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.TBDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.model.LocationEntity
 import java.util.Calendar
 import javax.inject.Inject
@@ -93,6 +94,16 @@ class DashboardViewModel @Inject constructor(
 
     val villageList: List<LocationEntity>
         get() = preferenceDao.getLoggedInUser()?.villages.orEmpty()
+
+    fun selectedVillageName(): String? {
+        val village = preferenceDao.getLocationRecord()?.village ?: return null
+        val villageName = village.name.substringBefore("(").trim()
+        return when (preferenceDao.getCurrentLanguage()) {
+            Languages.HINDI -> village.nameHindi ?: villageName
+            Languages.ASSAMESE -> village.nameAssamese ?: villageName
+            else -> villageName
+        }
+    }
 
     val districtList: List<LocationEntity>
         get() = preferenceDao.getLoggedInUser()?.district?.let { listOf(it) }.orEmpty()

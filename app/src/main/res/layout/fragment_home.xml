@@ -4,10 +4,6 @@
     xmlns:tools="http://schemas.android.com/tools"
     tools:context=".ui.home_activity.home.HomeFragment">
 
-    <data>
-
-    </data>
-
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -55,8 +51,7 @@
                 android:paddingTop="@dimen/padding_small"
                 android:paddingEnd="@dimen/padding_small"
                 android:paddingBottom="@dimen/padding_small"
-                android:visibility="gone"
-                tools:visibility="visible">
+                android:visibility="gone">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -100,27 +95,20 @@
             <com.google.android.material.tabs.TabLayout
                 android:id="@+id/tl_home_viewpager"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:layout_marginTop="16dp"
-                android:layout_marginEnd="16dp"
+                android:layout_height="48dp"
                 android:background="@drawable/bg_tab_strip"
-                android:padding="6dp"
                 app:tabIndicator="@drawable/bg_tab_indicator"
-                app:tabIndicatorFullWidth="false"
-                app:tabIndicatorHeight="0dp"
+                app:tabIndicatorColor="@android:color/white"
+                app:tabIndicatorFullWidth="true"
+                app:tabIndicatorGravity="stretch"
+                app:tabIndicatorHeight="48dp"
+                app:tabMode="fixed"
                 app:tabGravity="fill"
-                app:tabMaxWidth="0dp"
-                app:tabRippleColor="@color/md_theme_light_primaryContainer"
+                app:tabRippleColor="@android:color/transparent"
                 app:tabSelectedTextColor="@color/md_theme_light_primary"
                 app:tabTextAppearance="@style/TextAppearance.Sakhi.HomeTab"
                 app:tabTextColor="@color/md_theme_light_onSurfaceVariant"
-                app:tabInlineLabel="true"
-                app:tabMode="fixed"
-                app:tabPaddingStart="20dp"
-                app:tabPaddingEnd="20dp"
-                app:tabPaddingTop="14dp"
-                app:tabPaddingBottom="14dp" />
+                android:layout_margin="22dp"/>
 
             <androidx.viewpager2.widget.ViewPager2
                 android:id="@+id/vp2_home"
