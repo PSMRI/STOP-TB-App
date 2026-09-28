@@ -329,11 +329,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                             )
                         }
                         "REORDER" -> {
-                            when (orderType) {
-                                "XRAY_CHEST" -> viewModel.createNewXrayOrder(item.benId, requireContext())
-                                "MDR_RIF" -> viewModel.createNewRifOrder(item.benId, requireContext())
-                                else -> viewModel.createNewTrueNatOrder(item.benId, requireContext())
-                            }
+                            viewModel.createNewOrder(item.benId, orderType, requireContext())
                         }
                         "COMPLETE_RIF" -> {
                             findNavController().navigate(

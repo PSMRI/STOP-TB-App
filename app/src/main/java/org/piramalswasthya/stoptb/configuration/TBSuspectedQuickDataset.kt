@@ -1241,11 +1241,11 @@ class TBSuspectedQuickDataset(
             }
         }
 
-        // RIF Conducted & Result
+        // Only force RIF fields once an order actually exists — not the save that queues it.
         val showRif = if (referralMode) {
             diagnosticsCache?.rifOrderStatus.equals("COMPLETED", ignoreCase = true) && isMtbDetected()
         } else {
-            isMtbDetected()
+            !diagnosticsCache?.rifOrderStatus.isNullOrBlank() && isMtbDetected()
         }
         val rifStatus = diagnosticsCache?.rifOrderStatus
         val isRifFailed = rifStatus.equals("FAILED", ignoreCase = true)

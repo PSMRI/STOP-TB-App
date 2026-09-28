@@ -521,88 +521,10 @@ class AllBenViewModel @Inject constructor(
         }
     }
 
-    /** "Create New X-Ray Order" — role-gated reorder from a Closed (Not Conducted / Expired)
-     *  Chest X-Ray order, per the order lifecycle redesign. Always fresh; no local history of
-     *  the previous Closed order is kept. */
-    fun createNewXrayOrder(benId: Long, context: Context) {
-        viewModelScope.launch {
-            // Same guard as retryTest() — a queued DiagnosticOrderPushWorker chain for this
-            // beneficiary (e.g. from a result-driven cascade) must finish before a direct
-            // createOrder() call here, or the two can race and create a duplicate order.
-            val pushActive = withContext(Dispatchers.IO) {
-                WorkerUtils.isDiagnosticOrderPushActive(context, benId)
-            }
-            if (pushActive) {
-                _orderActionState.value = OrderActionResult.Error(
-                    "An order push is already in progress for this beneficiary. Please wait a moment and try again."
-                )
-                return@launch
-            }
-            _orderActionState.value = OrderActionResult.Loading
-            val response = tbRepo.createOrder(benId, "XRAY_CHEST")
-            if (response is NetworkResponse.Success) {
-                WorkerUtils.triggerDiagnosticResultPollWorker(context)
-                _orderActionState.value = OrderActionResult.Success("New X-Ray order created.", "XRAY_CHEST")
-            } else {
-                val errorMsg = (response as? NetworkResponse.Error)?.message ?: "Failed to create new X-Ray order"
-                _orderActionState.value = OrderActionResult.Error(errorMsg)
-            }
-        }
-    }
-
-    /** "Create New Order" — role-gated reorder from a Closed (Not Conducted / Invalid-Error
-     *  repeat) MTB/TrueNat order, per the TrueNat & RIF order lifecycle redesign. Mirrors
-     *  [createNewXrayOrder] exactly. Always fresh; no local history of the previous Closed order
-     *  is kept. */
-    fun createNewTrueNatOrder(benId: Long, context: Context) {
-        viewModelScope.launch {
-            // Same guard as retryTest() — see createNewXrayOrder().
-            val pushActive = withContext(Dispatchers.IO) {
-                WorkerUtils.isDiagnosticOrderPushActive(context, benId)
-            }
-            if (pushActive) {
-                _orderActionState.value = OrderActionResult.Error(
-                    "An order push is already in progress for this beneficiary. Please wait a moment and try again."
-                )
-                return@launch
-            }
-            _orderActionState.value = OrderActionResult.Loading
-            val response = tbRepo.createOrder(benId, "SPUTUM_TRUENAT")
-            if (response is NetworkResponse.Success) {
-                WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context)
-                _orderActionState.value = OrderActionResult.Success("New MTB order created.", "SPUTUM_TRUENAT")
-            } else {
-                val errorMsg = (response as? NetworkResponse.Error)?.message ?: "Failed to create new MTB order"
-                _orderActionState.value = OrderActionResult.Error(errorMsg)
-            }
-        }
-    }
-
-    /** "Create New Order" — role-gated reorder from a Closed (Not Conducted / Invalid-Error
-     *  repeat) RIF order, per the TrueNat & RIF order lifecycle redesign. Mirrors
-     *  [createNewXrayOrder] exactly. Always fresh; no local history of the previous Closed order
-     *  is kept. */
-    fun createNewRifOrder(benId: Long, context: Context) {
-        viewModelScope.launch {
-            // Same guard as retryTest() — see createNewXrayOrder().
-            val pushActive = withContext(Dispatchers.IO) {
-                WorkerUtils.isDiagnosticOrderPushActive(context, benId)
-            }
-            if (pushActive) {
-                _orderActionState.value = OrderActionResult.Error(
-                    "An order push is already in progress for this beneficiary. Please wait a moment and try again."
-                )
-                return@launch
-            }
-            _orderActionState.value = OrderActionResult.Loading
-            val response = tbRepo.createOrder(benId, "MDR_RIF")
-            if (response is NetworkResponse.Success) {
-                WorkerUtils.triggerRifDiagnosticResultPollWorker(context)
-                _orderActionState.value = OrderActionResult.Success("New RIF order created.", "MDR_RIF")
-            } else {
-                val errorMsg = (response as? NetworkResponse.Error)?.message ?: "Failed to create new RIF order"
-                _orderActionState.value = OrderActionResult.Error(errorMsg)
-            }
-        }
+    // Routed through the DiagnosticOrderPushWorker chain (serialized per benId) instead of a
+    // direct createOrder() call, so two quick taps can't create a duplicate order.
+    fun createNewOrder(benId: Long, orderType: String, context: Context) {
+        WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, listOf(orderType))
+        _orderActionState.value = OrderActionResult.Success("New order queued.", orderType)
     }
 }

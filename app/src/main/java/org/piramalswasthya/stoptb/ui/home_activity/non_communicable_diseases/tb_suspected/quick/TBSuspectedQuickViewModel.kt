@@ -235,6 +235,9 @@ class TBSuspectedQuickViewModel @Inject constructor(
                     // still saved and this save still succeeds, but the user should be told it's
                     // pending sync rather than confirmed.
                     var anyPendingManualResultSync = false
+                    // Deferred — enqueued only after the final save below, so the worker's own
+                    // status write can't be clobbered by this save's stale snapshot.
+                    val ordersToPushAfterSave = mutableListOf<String>()
 
                     if (referralType == 6) {
                         // Chest X-Ray order lifecycle redesign — 3 mutually exclusive cases,
@@ -296,11 +299,14 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 // Enter Result manually — a standing action whenever the order is
                                 // Pending/Awaiting Manual Entry, not just a device-integration
                                 // fallback.
-                                val res = tbRepo.submitManualResult(benId, "XRAY_CHEST", resultSummary = enteredXrayResult.displayValue)
+                                // Reuse the array-matching value mapValues() already wrote —
+                                // enteredXrayResult.displayValue won't match on reload and breaks
+                                // Hindi localization + isXrayResultReferable().
+                                val xrayResultToSend = tbDiagnostics.chestXRayResult
+                                val res = tbRepo.submitManualResult(benId, "XRAY_CHEST", resultSummary = xrayResultToSend)
                                 if (res is NetworkResponse.Success) {
                                     if (res.data == "PENDING_SYNC") anyPendingManualResultSync = true
                                     tbDiagnostics.xrayOrderStatus = "COMPLETED"
-                                    tbDiagnostics.chestXRayResult = enteredXrayResult.displayValue
                                     tbDiagnostics.isChestXRayDone = true
                                     tbRepo.getTBDiagnosticsById(benId)?.xrayOrderId?.let { tbDiagnostics.xrayOrderId = it }
 
@@ -315,23 +321,13 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                                     currentDiag?.trueNatOrderStatus.equals("PENDING", ignoreCase = true) ||
                                                     currentDiag?.trueNatOrderStatus.equals("CLOSED", ignoreCase = true)
                                             if (!hasTruenat) {
-                                                // Routed through the background push worker instead of an awaited
-                                                // inline createOrder() call — a connected-but-unreachable hub could
-                                                // otherwise block this save for up to the configured 60s OkHttp
-                                                // timeout. trueNatOrderStatus/trueNatOrderId are intentionally left
-                                                // untouched here — the queued worker's own createOrder() call writes
-                                                // them once the push actually happens, not before.
-                                                WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, listOf("SPUTUM_TRUENAT"))
+                                                ordersToPushAfterSave += "SPUTUM_TRUENAT"
                                             }
                                         }
                                         enteredXrayResult == ChestXrayResult.AI_INVALID -> {
-                                            // Manual AI-Invalid entry: the client re-orders
-                                            // immediately (mirrors the existing RIF
-                                            // re-order-on-Indeterminate / MTB-detected auto-RIF
-                                            // pattern), resetting this row to a fresh Pending
-                                            // order in the same save. No local history of the
-                                            // superseded AI-Invalid attempt is kept.
-                                            WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, listOf("XRAY_CHEST"))
+                                            // Manual AI-Invalid: re-order immediately, mirrors RIF
+                                            // Indeterminate / MTB TB-Positive.
+                                            ordersToPushAfterSave += "XRAY_CHEST"
                                         }
                                         else -> Unit // Normal — no cascade
                                     }
@@ -424,17 +420,12 @@ class TBSuspectedQuickViewModel @Inject constructor(
 
                                     when (enteredMtbResult) {
                                         MtbResult.TB_POSITIVE -> {
-                                            // TB Positive always creates a RIF order — unconditional
-                                            // cascade, regardless of X-ray result.
-                                            WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, listOf("MDR_RIF"))
+                                            // TB Positive always creates a RIF order, regardless of X-ray.
+                                            ordersToPushAfterSave += "MDR_RIF"
                                         }
                                         MtbResult.INVALID_ERROR -> {
-                                            // Manual Invalid/Error entry: the client re-orders
-                                            // immediately (mirrors Chest X-Ray's manual AI-Invalid
-                                            // pattern), resetting this row to a fresh Pending order
-                                            // in the same save. No local history of the superseded
-                                            // Invalid/Error attempt is kept.
-                                            WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, listOf("SPUTUM_TRUENAT"))
+                                            // Manual Invalid/Error: re-order immediately, mirrors X-Ray's AI-Invalid.
+                                            ordersToPushAfterSave += "SPUTUM_TRUENAT"
                                         }
                                         else -> Unit // TB Negative — no cascade
                                     }
@@ -454,8 +445,11 @@ class TBSuspectedQuickViewModel @Inject constructor(
                         // itself is always auto-created by the MTB-Positive cascade above (no
                         // "not referred" state of its own), so this is a 2-way
                         // Enter-Result/Not-Conducted restructure, same standing-actions principle.
+                        // rifOrderExisted must be true, or this is the save that's still queuing
+                        // the RIF order — submitting a result now would race it.
                         val isMtbAlreadyCompleted = tbDiagnostics.trueNatOrderStatus.equals("COMPLETED", ignoreCase = true)
-                        if (apiSuccess && isMtbAlreadyCompleted && dataset.isMtbDetected()) {
+                        val rifOrderExisted = !tbRepo.getTBDiagnosticsById(benId)?.rifOrderStatus.isNullOrBlank()
+                        if (apiSuccess && isMtbAlreadyCompleted && rifOrderExisted && dataset.isMtbDetected()) {
                             val rifConductedVal = dataset.rifConducted.value
                             val enteredRifResult = org.piramalswasthya.stoptb.model.RifResult
                                 .fromResultText(tbDiagnostics.trueNatRifResult)
@@ -497,12 +491,9 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                         }
                                         tbRepo.getTBDiagnosticsById(benId)?.rifOrderId?.let { tbDiagnostics.rifOrderId = it }
 
-                                        // RIF order lifecycle redesign — INVERTED from before:
-                                        // Indeterminate is now terminal (no repeat); Invalid/Error
-                                        // is the new manual repeat-trigger (mirrors MTB's own
-                                        // manual Invalid/Error re-order above).
+                                        // Indeterminate is terminal; Invalid/Error re-orders, mirroring MTB.
                                         if (enteredRifResult == RifResult.INVALID_ERROR) {
-                                            WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, listOf("MDR_RIF"))
+                                            ordersToPushAfterSave += "MDR_RIF"
                                         }
                                     } else {
                                         apiSuccess = false
@@ -531,6 +522,11 @@ class TBSuspectedQuickViewModel @Inject constructor(
                         tbDiagnostics.syncState = SyncState.UNSYNCED
                         tbRepo.saveTBDiagnostics(tbDiagnostics)
                         tbRepo.syncTBSuspectedFromDiagnostics(benId, tbDiagnostics)
+
+                        // Enqueued only now that the save has landed — see ordersToPushAfterSave above.
+                        if (ordersToPushAfterSave.isNotEmpty()) {
+                            WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, ordersToPushAfterSave)
+                        }
 
                         val updatedDiag = tbRepo.getTBDiagnosticsById(benId)
                         // Real order/result contract: all three order types represent "awaiting

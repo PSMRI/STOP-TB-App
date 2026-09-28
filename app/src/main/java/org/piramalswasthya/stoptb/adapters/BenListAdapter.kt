@@ -644,7 +644,10 @@ class BenListAdapter(
                 val xrayStd = ChestXrayResult.fromResultText(tbDiagForStatus?.chestXRayResult)
                 val mtbStd = MtbResult.fromResultText(tbDiagForStatus?.naatResult)
                 val rifStd = RifResult.fromResultText(tbDiagForStatus?.trueNatRifResult)
-                val isMtbNegativeAbnormalXray = xrayStd != null && xrayStd != ChestXrayResult.NORMAL &&
+                // Matches BenDao's referral-list criteria exactly (not AI_INVALID).
+                val isMtbNegativeAbnormalXray =
+                        (xrayStd == ChestXrayResult.TB_PRESUMPTIVE ||
+                                xrayStd == ChestXrayResult.ABNORMAL_NOT_PRESUMPTIVE) &&
                         mtbStd == MtbResult.TB_NEGATIVE
                 val isRifIndeterminateForTile = rifStd == RifResult.INDETERMINATE
                 val showClinicalAssessmentTile = isMtbNegativeAbnormalXray || isRifIndeterminateForTile
