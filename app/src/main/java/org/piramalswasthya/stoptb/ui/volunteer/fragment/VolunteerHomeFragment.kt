@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.work.WorkInfo
@@ -86,6 +87,53 @@ class VolunteerHomeFragment : Fragment() {
         setupNurseQuickRefresh()
     }
 
+    fun requestQuickRefresh() {
+        if (_binding == null || manualHomeRefreshRequested) return
+        if (!pref.isCampModeEnabled() || !pref.isCampHubConnected()) {
+            val unreachableStatus = getString(
+                R.string.quick_refresh_ip_not_reachable,
+                pref.getCampHubUrl()
+            )
+            if (binding.tvQuickRefreshStatus.text.toString() != unreachableStatus) {
+                showRefreshStatus(getString(R.string.quick_refresh_camp_disconnected))
+            }
+            setQuickRefreshButtonEnabled(true)
+            return
+        }
+        setQuickRefreshButtonEnabled(false)
+        showRefreshStatus(getString(R.string.quick_refresh_refreshing))
+        manualRefreshStartedAtMs = SystemClock.elapsedRealtime()
+        startManualRefreshProgress()
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            val isReachable = pingCampHub()
+            launch(Dispatchers.Main) {
+                if (_binding == null) return@launch
+                if (!isReachable) {
+                    pref.setCampHubConnected(false)
+                    showRefreshStatus(
+                        getString(
+                            R.string.quick_refresh_ip_not_reachable,
+                            pref.getCampHubUrl()
+                        )
+                    )
+                    setQuickRefreshButtonEnabled(true)
+                    manualRefreshProgressJob?.cancel()
+                    manualRefreshProgressJob = null
+                    return@launch
+                }
+                manualHomeRefreshRequested = true
+                manualRefreshWorkIds.clear()
+                manualRefreshWorkIds.addAll(
+                    WorkerUtils.startManualCampRefresh(
+                        requireContext().applicationContext,
+                        pref
+                    )
+                )
+                startManualRefreshTimeout()
+            }
+        }
+    }
+
     private fun setupNurseQuickRefresh() {
         // Legacy, kept for reference:
 //        val role = pref.getLoggedInUser()?.role
@@ -94,59 +142,16 @@ class VolunteerHomeFragment : Fragment() {
 //                role.isCounsellingOfficerRole()
         val canUseQuickRefresh = roleManager.privilegesUnion().allowQuickRefresh
         Timber.d("RoleManager: allowQuickRefresh=$canUseQuickRefresh")
+        binding.llQuickRefresh.visibility = View.GONE
+        val activity = activity as? VolunteerActivity
         if (!canUseQuickRefresh) {
-            binding.llQuickRefresh.visibility = View.GONE
+            activity?.setQuickRefreshActionVisible(false)
             return
         }
 
-        binding.llQuickRefresh.visibility = View.VISIBLE
+        activity?.setQuickRefreshActionVisible(true)
         updateQuickRefreshStatus()
         setQuickRefreshButtonEnabled(true)
-
-        binding.btnQuickRefresh.setOnClickListener {
-            if (manualHomeRefreshRequested || !binding.btnQuickRefresh.isEnabled) return@setOnClickListener
-            if (!pref.isCampModeEnabled() || !pref.isCampHubConnected()) {
-                val unreachableStatus = getString(
-                    R.string.quick_refresh_ip_not_reachable,
-                    pref.getCampHubUrl()
-                )
-                if (binding.tvQuickRefreshStatus.text.toString() != unreachableStatus) {
-                    binding.tvQuickRefreshStatus.text =
-                        getString(R.string.quick_refresh_camp_disconnected)
-                }
-                setQuickRefreshButtonEnabled(true)
-                return@setOnClickListener
-            }
-            setQuickRefreshButtonEnabled(false)
-            binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_refreshing)
-            manualRefreshStartedAtMs = SystemClock.elapsedRealtime()
-            startManualRefreshProgress()
-            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-                val isReachable = pingCampHub()
-                launch(Dispatchers.Main) {
-                    if (!isReachable) {
-                        pref.setCampHubConnected(false)
-                        binding.tvQuickRefreshStatus.text = getString(
-                            R.string.quick_refresh_ip_not_reachable,
-                            pref.getCampHubUrl()
-                        )
-                        setQuickRefreshButtonEnabled(true)
-                        manualRefreshProgressJob?.cancel()
-                        manualRefreshProgressJob = null
-                        return@launch
-                    }
-                    manualHomeRefreshRequested = true
-                    manualRefreshWorkIds.clear()
-                    manualRefreshWorkIds.addAll(
-                        WorkerUtils.startManualCampRefresh(
-                            requireContext().applicationContext,
-                            pref
-                        )
-                    )
-                    startManualRefreshTimeout()
-                }
-            }
-        }
 
         WorkManager.getInstance(requireContext().applicationContext)
             .getWorkInfosLiveData(
@@ -205,6 +210,14 @@ class VolunteerHomeFragment : Fragment() {
             }
     }
 
+    private fun showRefreshStatus(status: String) {
+        if (_binding == null) return
+        binding.tvQuickRefreshStatus.text = status
+        if (status.isNotBlank()) {
+            Toast.makeText(requireContext(), status, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun updateQuickRefreshStatus() {
         val lastUpdated = pref.lastQuickRefreshTimestamp
         binding.tvQuickRefreshStatus.text = if (lastUpdated > 0L) {
@@ -218,9 +231,12 @@ class VolunteerHomeFragment : Fragment() {
     }
 
     private fun setQuickRefreshButtonEnabled(enabled: Boolean) {
-        binding.btnQuickRefresh.isEnabled = enabled
-        binding.btnQuickRefresh.isClickable = enabled
-        binding.btnQuickRefresh.alpha = if (enabled) 1f else 0.55f
+        if (_binding != null) {
+            binding.btnQuickRefresh.isEnabled = enabled
+            binding.btnQuickRefresh.isClickable = enabled
+            binding.btnQuickRefresh.alpha = if (enabled) 1f else 0.55f
+        }
+        (activity as? VolunteerActivity)?.setQuickRefreshActionEnabled(enabled)
         (activity as? VolunteerActivity)?.setQuickRefreshProgressVisible(!enabled)
     }
 
@@ -234,7 +250,7 @@ class VolunteerHomeFragment : Fragment() {
         manualRefreshWorkIds.clear()
         WorkerUtils.finishManualCampRefresh()
         setQuickRefreshButtonEnabled(true)
-        statusText?.let { binding.tvQuickRefreshStatus.text = it }
+        statusText?.let { showRefreshStatus(it) }
     }
 
     private fun startManualRefreshTimeout() {
@@ -309,6 +325,9 @@ class VolunteerHomeFragment : Fragment() {
                 getHomeToolbarTitle()
             )
             it.addClickListenerToHomepageActionBarTitle()
+            if (roleManager.privilegesUnion().allowQuickRefresh) {
+                it.setQuickRefreshActionVisible(true)
+            }
         }
         binding.vp2Home.setCurrentItem(0, false)
     }
@@ -327,6 +346,7 @@ class VolunteerHomeFragment : Fragment() {
         activity?.let {
             (it as VolunteerActivity).removeClickListenerToHomepageActionBarTitle()
             it.setQuickRefreshProgressVisible(false)
+            it.setQuickRefreshActionVisible(false)
         }
         super.onStop()
     }
