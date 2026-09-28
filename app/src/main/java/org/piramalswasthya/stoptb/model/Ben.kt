@@ -68,7 +68,7 @@ enum class ScreeningStatus {
 // In your BenBasicCache.kt file, REPLACE the old @DatabaseView with this one.
 @DatabaseView(
     viewName = "BEN_BASIC_CACHE",
-    value = "SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId" +
+    value = "SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId" +
             ", b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod" +
             ", b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus" +
             ", b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId" +
@@ -114,6 +114,7 @@ data class BenBasicCache(
     val benId: Long,
     val hhId: Long? = null,
     val regDate: Long,
+    val createdDate: Long? = null,
     var isDeath: Boolean = false,
     var isDeathValue: String? = null,
     var dateOfDeath: String? = null,
@@ -1252,7 +1253,8 @@ data class BenRegGen(
         Index(name = "ind_ben_village", value = ["loc_village_id"]),
         Index(name = "ind_ben_sync", value = ["syncState"]),
         Index(name = "ind_ben_draft_deactivate", value = ["isDraft", "isDeactivate"]),
-        Index(name = "ind_ben_village_deactivate", value = ["loc_village_id", "isDeactivate", "isDraft"])
+        Index(name = "ind_ben_village_deactivate", value = ["loc_village_id", "isDeactivate", "isDraft"]),
+        Index(name = "ind_ben_draft_created", value = ["isDraft", "createdDate"])
     ]
 
 )
