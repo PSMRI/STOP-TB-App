@@ -1133,94 +1133,15 @@ def upload_apk(args: argparse.Namespace) -> None:
         "Uploading APK with "
         f"versionName={args.version_name} versionCode={args.version_code}. "
         "Android and Intune only replace an installed package when versionCode is higher; "
-        "versionName is display-only."
+        "versionName is display-only. Other Intune apps and assignments will not be changed."
     )
-
-    def free_canonical_display_name(keep_app_id: str | None = None) -> None:
-        want = _normalized_app_name({"displayName": app_display_name})
-        for app in matching:
-            other_id = str(app.get("id") or "")
-            if not other_id or other_id == keep_app_id:
-                continue
-            current = str(app.get("displayName") or "")
-            if _normalized_app_name(app) != want:
-                continue
-            previous_name = f"{app_display_name} (previous)"
-            if current == previous_name:
-                continue
-            try:
-                rename_app_display_name(token, app, previous_name)
-                log(
-                    f"Renamed {current} ({other_id}) to {previous_name} "
-                    f"so the Required app can keep the name {app_display_name}"
-                )
-            except Exception as exc:  # noqa: BLE001
-                log(f"Could not rename {current} ({other_id}) off {app_display_name}: {exc}")
-
-    def ensure_canonical_display_name(target_app_id: str) -> None:
-        free_canonical_display_name(keep_app_id=target_app_id)
-        try:
-            current = refresh_app(token, target_app_id)
-        except Exception as exc:  # noqa: BLE001
-            log(f"Could not read Intune app {target_app_id} to confirm displayName: {exc}")
-            return
-        current_name = str(current.get("displayName") or "")
-        if current_name == app_display_name:
-            return
-        try:
-            rename_app_display_name(token, current, app_display_name)
-            log(f"Renamed Intune app {target_app_id} from {current_name} to {app_display_name}")
-        except Exception as exc:  # noqa: BLE001
-            log(f"Could not set Intune displayName to {app_display_name}: {exc}")
-
-    def create_app() -> str:
-        free_canonical_display_name()
-        body = android_app_body(
-            app_display_name,
-            args.publisher,
-            app_description,
-            filename,
-            args.package_id,
-            args.version_code,
-            args.version_name,
-        )
-        try:
-            created = graph_request(
-                token,
-                "POST",
-                "deviceAppManagement/mobileApps",
-                body,
-                api="beta",
-            )
-        except RuntimeError as exc:
-            raise RuntimeError(
-                "Could not create an Android Enterprise Intune LOB app "
-                "(targetedPlatforms=androidOpenSourceProject). "
-                "If Graph returned 503 ServerBusy, re-run the job; Intune was temporarily unavailable. "
-                f"Graph error: {exc}"
-            ) from exc
-        created_id = str(created["id"])
-        platforms = created.get("targetedPlatforms")
-        if not platforms:
-            try:
-                platforms = refresh_app(token, created_id, api="beta").get("targetedPlatforms")
-            except Exception as exc:  # noqa: BLE001
-                log(f"Could not read targetedPlatforms for new app {created_id}: {exc}")
-        log(
-            f"Created Intune app {created_id} displayName={app_display_name} "
-            f"targetedPlatforms={platforms or 'androidDeviceAdministrator'}"
-        )
-        if not targets_android_enterprise({"targetedPlatforms": platforms}):
-            raise RuntimeError(
-                "Intune created the LOB app as Android device administrator. "
-                "Android Enterprise devices will not install it. "
-                "Delete this app in Intune and create an Android Enterprise LOB app, "
-                "or ensure Graph beta accepts targetedPlatforms=androidOpenSourceProject."
-            )
-        return created_id
 
     def create_content_version() -> dict[str, Any]:
         return graph_request(token, "POST", content_versions_path(app_id), {})
+
+    if args.app_id and ".uat" in args.package_id:
+        log("Ignoring --app-id for UAT; the APK will replace the existing STOPTB_UAT app by name")
+        args.app_id = None
 
     apps = find_apps_for_package(token, args.package_id, args.app_id)
     if args.app_id:
@@ -1252,63 +1173,43 @@ def upload_apk(args: argparse.Namespace) -> None:
         if target is None:
             raise RuntimeError(
                 f"Pinned Intune app {args.app_id} was not found as an Android Enterprise LOB app. "
-                "Set INTUNE_APP_ID_UAT / INTUNE_APP_ID_PROD to the Intune app that should receive this APK."
+                "Set INTUNE_APP_ID_PROD to the Intune app that should receive this APK."
             )
         log(f"Using pinned Intune app {args.app_id} ({target.get('displayName')}) for in-place APK replace")
     else:
-        target = (
-            pick_in_place_target(token, enterprise_apps, args.group_id, args.app_id)
-            if enterprise_apps
-            else None
+        want = _normalized_app_name({"displayName": app_display_name})
+        named = [app for app in enterprise_apps if _normalized_app_name(app) == want]
+        target = named[0] if named else None
+        if target is None:
+            raise RuntimeError(
+                f"No existing Intune app named {app_display_name} was found. "
+                "The pipeline only replaces the APK on that app; it will not create, delete, "
+                f"or change other MDM apps. Create {app_display_name} in Intune first."
+            )
+        log(
+            f"Using existing Intune app {target.get('id')} ({target.get('displayName')}) "
+            "for in-place APK replace. Other MDM apps will be left unchanged."
         )
-    replace_mode = "new"
+    app_id = str(target["id"])
+    replace_mode = "in-place"
     skip_upload = False
-    if target is not None:
-        app_id = str(target["id"])
-        current_code = existing_app_version_code(target)
-        if already_has_version(target, args.version_code):
-            replace_mode = "already"
-            skip_upload = True
-            log(
-                f"Reusing Intune app {app_id} ({target.get('displayName')}) "
-                f"which already has versionCode {args.version_code}. "
-                "No new Intune app will be created; the group assignment will be refreshed."
-            )
-        else:
-            replace_mode = "in-place"
-            log(
-                f"Updating existing Intune app {app_id} ({target.get('displayName')}) "
-                f"in place, same as portal 'Select file to update'. "
-                f"versionCode {current_code} -> {args.version_code}. "
-                "A new Intune app will not be created."
-            )
-            delete_pending_content_versions(token, refresh_app(token, app_id))
-        for app in enterprise_apps:
-            other_id = str(app.get("id") or "")
-            if not other_id or other_id == app_id:
-                continue
-            state = str(app.get("publishingState") or "").lower()
-            log(f"Retiring extra Intune app {other_id} ({app.get('displayName')}) so only {app_id} is Required")
-            if state == "published":
-                try:
-                    mark_app_for_uninstall(token, app, args.group_id)
-                except Exception as exc:  # noqa: BLE001
-                    log(f"Could not uninstall extra Intune app {other_id}: {exc}")
-            else:
-                try:
-                    delete_mobile_app(token, other_id)
-                except Exception as exc:  # noqa: BLE001
-                    log(f"Could not delete extra unpublished Intune app {other_id}: {exc}")
+    current_code = existing_app_version_code(target)
+    if already_has_version(target, args.version_code):
+        replace_mode = "already"
+        skip_upload = True
+        log(
+            f"Intune app {app_id} ({target.get('displayName')}) "
+            f"already has versionCode {args.version_code}. Skipping APK upload. "
+            "No other Intune apps or assignments will be changed."
+        )
     else:
-        if matching:
-            log(
-                "Existing Intune LOB app is Android device administrator only. "
-                "TargetedPlatforms is read-only after create, so one Android Enterprise "
-                "LOB app will be created and reused for later uploads."
-            )
-        else:
-            log("No existing Intune app for this package. Creating one Android Enterprise app to reuse.")
-        app_id = create_app()
+        log(
+            f"Updating existing Intune app {app_id} ({target.get('displayName')}) "
+            f"in place, same as portal 'Select file to update'. "
+            f"versionCode {current_code} -> {args.version_code}. "
+            "No other Intune app will be created, deleted, or reassigned."
+        )
+        delete_pending_content_versions(token, refresh_app(token, app_id))
 
     if not skip_upload:
         try:
@@ -1317,10 +1218,11 @@ def upload_apk(args: argparse.Namespace) -> None:
             message = str(exc).lower()
             if "first content version is committed" not in message and "cannot be updated" not in message:
                 raise
-            log("Intune still has a blocked first content version; recreating the app")
-            delete_mobile_app(token, app_id)
-            app_id = create_app()
-            content_version = create_content_version()
+            raise RuntimeError(
+                "Intune blocked a new content version on this app. The pipeline will not "
+                "delete or recreate MDM apps. Retry later, or upload the APK in the Intune "
+                "portal with 'Select file to update'."
+            ) from exc
         content_version_id = content_version["id"]
         log(f"Uploading current APK as Intune content version {content_version_id}")
 
@@ -1378,7 +1280,6 @@ def upload_apk(args: argparse.Namespace) -> None:
                 f"deviceAppManagement/mobileApps/{app_id}",
                 {
                     "@odata.type": f"#{LOB_TYPE}",
-                    "displayName": app_display_name,
                     "description": app_description,
                 },
                 extra_headers={"Prefer": "return=minimal"},
@@ -1398,7 +1299,6 @@ def upload_apk(args: argparse.Namespace) -> None:
     )
     if not skip_upload:
         log_published_app(token, app_id, args.version_code, args.version_name)
-    ensure_canonical_display_name(app_id)
     try:
         graph_request(
             token,
@@ -1406,7 +1306,6 @@ def upload_apk(args: argparse.Namespace) -> None:
             f"deviceAppManagement/mobileApps/{app_id}",
             {
                 "@odata.type": f"#{LOB_TYPE}",
-                "displayName": app_display_name,
                 "description": app_description,
             },
             extra_headers={"Prefer": "return=minimal"},
@@ -1415,33 +1314,16 @@ def upload_apk(args: argparse.Namespace) -> None:
         log(f"Updated Intune description to {app_description}")
     except Exception as exc:  # noqa: BLE001
         log(f"Could not update Intune description to {app_description}: {exc}")
-    ensure_group_assignment(token, app_id, args.group_id, intent="required")
-    try:
-        uninstall_competing_apps(token, args.package_id, app_id, args.group_id, matching)
-    except Exception as exc:  # noqa: BLE001
-        log(f"Could not finish competing-app uninstall: {exc}")
-    if replace_mode == "in-place":
+    if replace_mode == "already":
         log(
-            f"Intune in-place upgrade complete for {args.package_id} "
-            f"{args.version_name} ({args.version_code})"
-        )
-    elif replace_mode == "reinstall":
-        log(
-            f"Intune uninstall+reinstall complete for {args.package_id} "
-            f"{args.version_name} ({args.version_code}). "
-            "Devices must check in so Uninstall removes the old package before the new "
-            "Required APK can install. Android will not silently downgrade over a higher "
-            "installed versionCode."
-        )
-    elif replace_mode == "already":
-        log(
-            f"Intune already had {args.package_id} {args.version_name} ({args.version_code}); "
-            "Required assignment and competing-app uninstall were refreshed."
+            f"Intune already had {args.package_id} {args.version_name} ({args.version_code}) "
+            f"on {app_display_name}. Other MDM apps and assignments were not changed."
         )
     else:
         log(
-            f"Intune upload complete for {args.package_id} {args.version_name} ({args.version_code}). "
-            "Competing apps such as STOPTB_UAT were set to Uninstall so this APK can install."
+            f"Intune in-place upgrade complete for {app_display_name} "
+            f"{args.version_name} ({args.version_code}). "
+            "Other MDM apps, groups, and assignments were not changed."
         )
 
 

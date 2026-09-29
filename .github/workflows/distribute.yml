@@ -118,7 +118,6 @@ jobs:
           INTUNE_GROUP_ID_UAT: ${{ secrets.INTUNE_GROUP_ID_UAT }}
           INTUNE_GROUP_ID_PROD: ${{ secrets.INTUNE_GROUP_ID_PROD }}
           INTUNE_APP_ID: ${{ secrets.INTUNE_APP_ID }}
-          INTUNE_APP_ID_UAT: ${{ secrets.INTUNE_APP_ID_UAT }}
           INTUNE_APP_ID_PROD: ${{ secrets.INTUNE_APP_ID_PROD }}
         run: |
           set -euo pipefail
@@ -218,8 +217,12 @@ jobs:
             echo "AZURE_TENANT_ID=$(pick_env AZURE_TENANT_ID)"
             echo "AZURE_CLIENT_SECRET=$(pick_env AZURE_CLIENT_SECRET)"
             echo "INTUNE_GROUP_ID=$(pick_env INTUNE_GROUP_ID)"
-            echo "INTUNE_APP_ID=$(pick_env INTUNE_APP_ID)"
           } >> "$GITHUB_ENV"
+          if [ "$TARGET_ENV" = prod ]; then
+            echo "INTUNE_APP_ID=$(pick_env INTUNE_APP_ID)" >> "$GITHUB_ENV"
+          else
+            echo "INTUNE_APP_ID=" >> "$GITHUB_ENV"
+          fi
 
           echo "Plan: env=$TARGET_ENV signing=$SIGNING apk=$DO_APK firebase=$DO_FIREBASE intune=$DO_INTUNE play=$DO_PLAY"
 
