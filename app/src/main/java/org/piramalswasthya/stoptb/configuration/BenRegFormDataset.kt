@@ -814,6 +814,13 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             economicStatus.required = false
         }
 
+        // SES not captured for Head of Family only
+        if (!isNonHH && relToHeadId == 18) {
+            list.remove(economicStatus)
+            economicStatus.required = false
+        }
+
+
         setUpPage(list)
 
 
