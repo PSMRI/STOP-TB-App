@@ -295,10 +295,12 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                     apiError = (res as? NetworkResponse.Error)?.message ?: "Not Conducted Submission Failed"
                                 }
                             }
-                            enteredXrayResult != null -> {
+                            enteredXrayResult != null && !tbDiagnostics.xrayOrderStatus.equals("COMPLETED", ignoreCase = true) -> {
                                 // Enter Result manually — a standing action whenever the order is
                                 // Pending/Awaiting Manual Entry, not just a device-integration
-                                // fallback.
+                                // fallback. Excludes an already-COMPLETED order so re-saving this
+                                // screen (e.g. only to touch an unrelated field) doesn't resubmit
+                                // an identical result the backend already accepted.
                                 val res = tbRepo.submitManualResult(benId, "XRAY_CHEST", resultSummary = enteredXrayResult.displayValue)
                                 if (res is NetworkResponse.Success) {
                                     if (res.data == "PENDING_SYNC") anyPendingManualResultSync = true
@@ -333,11 +335,14 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 }
                             }
                             else -> {
-                                // Conducted = Yes but no manual value chosen yet — device/AI
-                                // result is still pending automatically.
-                                tbDiagnostics.xrayOrderStatus = "PENDING"
-                                tbRepo.preferenceDao.setTrackSubmitTime(benId, "XRAY_CHEST", System.currentTimeMillis())
-                                tbRepo.preferenceDao.setDiagPollActualStartTime(benId, "XRAY_CHEST", 0L)
+                                if (enteredXrayResult == null) {
+                                    // Conducted = Yes but no manual value chosen yet — device/AI
+                                    // result is still pending automatically.
+                                    tbDiagnostics.xrayOrderStatus = "PENDING"
+                                    tbRepo.preferenceDao.setTrackSubmitTime(benId, "XRAY_CHEST", System.currentTimeMillis())
+                                    tbRepo.preferenceDao.setDiagPollActualStartTime(benId, "XRAY_CHEST", 0L)
+                                }
+                                // else: already COMPLETED and nothing new entered — leave as-is.
                             }
                         }
                     } else if (referralType == 7) {
@@ -396,10 +401,14 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                     apiError = (res as? NetworkResponse.Error)?.message ?: "Not Conducted Submission Failed"
                                 }
                             }
-                            enteredMtbResult != null -> {
+                            enteredMtbResult != null && !tbDiagnostics.trueNatOrderStatus.equals("COMPLETED", ignoreCase = true) -> {
                                 // Enter Result manually — a standing action whenever the order is
                                 // Pending/Awaiting Manual Entry, not just a device-integration
-                                // fallback.
+                                // fallback. Excludes an already-COMPLETED order — otherwise a save
+                                // whose only intent is to fill in the (now-unlocked) RIF section
+                                // below would resubmit this already-accepted MTB result too, and a
+                                // backend rejection of that redundant resubmit would fail the whole
+                                // save before the RIF section ever runs.
                                 val res = tbRepo.submitManualResult(benId, "SPUTUM_TRUENAT", resultSummary = enteredMtbResult.displayValue)
                                 if (res is NetworkResponse.Success) {
                                     if (res.data == "PENDING_SYNC") anyPendingManualResultSync = true
@@ -431,9 +440,12 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 }
                             }
                             else -> {
-                                // Conducted = Yes but no manual value chosen yet — device/AI
-                                // result is still pending automatically.
-                                tbDiagnostics.trueNatOrderStatus = "PENDING"
+                                if (enteredMtbResult == null) {
+                                    // Conducted = Yes but no manual value chosen yet — device/AI
+                                    // result is still pending automatically.
+                                    tbDiagnostics.trueNatOrderStatus = "PENDING"
+                                }
+                                // else: already COMPLETED and nothing new entered — leave as-is.
                             }
                         }
 
@@ -468,7 +480,9 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                         apiError = (rifRes as? NetworkResponse.Error)?.message ?: "RIF Not Conducted Submission Failed"
                                     }
                                 }
-                                enteredRifResult != null -> {
+                                enteredRifResult != null && !tbDiagnostics.rifOrderStatus.equals("COMPLETED", ignoreCase = true) -> {
+                                    // Excludes an already-COMPLETED RIF order — same reasoning as
+                                    // the X-ray/MTB guards above.
                                     val rifRes = tbRepo.submitManualResult(benId, "MDR_RIF", resultSummary = enteredRifResult.displayValue)
                                     if (rifRes is NetworkResponse.Success) {
                                         if (rifRes.data == "PENDING_SYNC") anyPendingManualResultSync = true

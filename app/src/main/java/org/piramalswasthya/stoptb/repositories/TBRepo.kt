@@ -604,32 +604,41 @@ class TBRepo @Inject constructor(
             val benRegId = item.optLong("benRegID", 0L).takeIf { it > 0 } ?: continue
             val ben = benDao.getBenByRegId(benRegId) ?: continue
             val visitDate = getLongFromDateMultipleSupport(item.optString("visitDate"))
-            val existing = tbDao.getTbDiagnostics(ben.beneficiaryId)
             val serverUpdatedDate = getServerUpdatedDate(item)
-            if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
-                continue
+            // Unlike every other TB_DIAGNOSTICS write path in this file, this pull used to read
+            // `existing` once and write much later (after the full network round-trip for every
+            // beneficiary in the response) with no lock at all — a wide TOCTOU window where a
+            // concurrent createOrder()/submitManualResult() write (e.g. re-ordering a Closed order,
+            // which correctly clears naatResult/trueNatRifResult/reasonNotConducted*) could land in
+            // between and then get silently overwritten by this pull's stale snapshot. Re-read fresh
+            // inside the lock, right before deciding/writing, same pattern as fetchOrderResult.
+            withBenIdLock(ben.beneficiaryId) {
+                val existing = tbDao.getTbDiagnostics(ben.beneficiaryId)
+                if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
+                    return@withBenIdLock
+                }
+                val cache = (existing ?: TBDiagnosticsCache(benId = ben.beneficiaryId)).copy(
+                    visitDate = visitDate,
+                    nikshayId = item.optStringOrNull("nikshayId") ?: existing?.nikshayId,
+                    isChestXRayDone = item.optNullableBoolean("isDigitalChestXrayConducted") ?: existing?.isChestXRayDone,
+                    chestXRayResult = item.optStringOrNull("digitalChestXrayResult") ?: existing?.chestXRayResult,
+                    isNaatConducted = item.optNullableBoolean("isTruenatConducted") ?: existing?.isNaatConducted,
+                    naatResult = item.optStringOrNull("truenatResult") ?: existing?.naatResult,
+                    recommendedForLiquidCultureTest = item.optNullableBoolean("recommendedForLiquidCulture") ?: existing?.recommendedForLiquidCultureTest,
+                    liquidCultureResult = item.optStringOrNull("liquidCultureResult") ?: existing?.liquidCultureResult,
+                    xrayOrderId = item.optStringOrNull("xrayOrderId") ?: existing?.xrayOrderId,
+                    xrayOrderStatus = item.optStringOrNull("xrayOrderStatus") ?: existing?.xrayOrderStatus,
+                    trueNatOrderId = item.optStringOrNull("trueNatOrderId") ?: existing?.trueNatOrderId,
+                    trueNatOrderStatus = item.optStringOrNull("trueNatOrderStatus") ?: existing?.trueNatOrderStatus,
+                    trueNatRifResult = item.optStringOrNull("trueNatRifResult") ?: existing?.trueNatRifResult,
+                    rifOrderId = item.optStringOrNull("rifOrderId") ?: existing?.rifOrderId,
+                    rifOrderStatus = item.optStringOrNull("rifOrderStatus") ?: existing?.rifOrderStatus,
+                    serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
+                    syncState = SyncState.SYNCED
+                )
+                tbDao.saveTbDiagnostics(cache)
+                tbDiagnosticsList.add(cache)
             }
-            val cache = (existing ?: TBDiagnosticsCache(benId = ben.beneficiaryId)).copy(
-                visitDate = visitDate,
-                nikshayId = item.optStringOrNull("nikshayId") ?: existing?.nikshayId,
-                isChestXRayDone = item.optNullableBoolean("isDigitalChestXrayConducted") ?: existing?.isChestXRayDone,
-                chestXRayResult = item.optStringOrNull("digitalChestXrayResult") ?: existing?.chestXRayResult,
-                isNaatConducted = item.optNullableBoolean("isTruenatConducted") ?: existing?.isNaatConducted,
-                naatResult = item.optStringOrNull("truenatResult") ?: existing?.naatResult,
-                recommendedForLiquidCultureTest = item.optNullableBoolean("recommendedForLiquidCulture") ?: existing?.recommendedForLiquidCultureTest,
-                liquidCultureResult = item.optStringOrNull("liquidCultureResult") ?: existing?.liquidCultureResult,
-                xrayOrderId = item.optStringOrNull("xrayOrderId") ?: existing?.xrayOrderId,
-                xrayOrderStatus = item.optStringOrNull("xrayOrderStatus") ?: existing?.xrayOrderStatus,
-                trueNatOrderId = item.optStringOrNull("trueNatOrderId") ?: existing?.trueNatOrderId,
-                trueNatOrderStatus = item.optStringOrNull("trueNatOrderStatus") ?: existing?.trueNatOrderStatus,
-                trueNatRifResult = item.optStringOrNull("trueNatRifResult") ?: existing?.trueNatRifResult,
-                rifOrderId = item.optStringOrNull("rifOrderId") ?: existing?.rifOrderId,
-                rifOrderStatus = item.optStringOrNull("rifOrderStatus") ?: existing?.rifOrderStatus,
-                serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
-                syncState = SyncState.SYNCED
-            )
-            tbDao.saveTbDiagnostics(cache)
-            tbDiagnosticsList.add(cache)
         }
         return tbDiagnosticsList
     }
@@ -2680,10 +2689,16 @@ class TBRepo @Inject constructor(
                                         // silently re-marked SYNCED by this sweep even though it
                                         // still needed to be pushed to Amrit.
                                         val fresh = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
-                                        if (fresh?.syncState != null && fresh.syncState != SyncState.SYNCED) {
+                                        val currentStatus = if (isXray) fresh?.xrayOrderStatus else if (isRif) fresh?.rifOrderStatus else fresh?.trueNatOrderStatus
+                                        // A row stuck at FAILED for this order type has nothing worth
+                                        // protecting — saveFailedOrderStatus() set syncState UNSYNCED
+                                        // itself, which would otherwise block this exact correction
+                                        // forever even though the backend just confirmed the order is
+                                        // genuinely still in progress.
+                                        val isStaleFailed = currentStatus.equals(OrderStatus.FAILED.name, ignoreCase = true)
+                                        if (fresh?.syncState != null && fresh.syncState != SyncState.SYNCED && !isStaleFailed) {
                                             return@withBenIdLock
                                         }
-                                        val currentStatus = if (isXray) fresh?.xrayOrderStatus else if (isRif) fresh?.rifOrderStatus else fresh?.trueNatOrderStatus
                                         val isDone = currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
                                         Timber.d("STOP-TB polling debug: awaitingProviderResult regId=$regId benId=${b.beneficiaryId} currentStatus=$currentStatus isDone=$isDone")
                                         if (!isDone) {
@@ -2729,10 +2744,12 @@ class TBRepo @Inject constructor(
                                     // sweep — the actual write below re-verifies against a fresh
                                     // read before committing anything.
                                     val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
-                                    if (existing?.syncState != null && existing.syncState != SyncState.SYNCED) {
+                                    val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
+                                    // See bucket 1's isStaleFailed comment — same reasoning here.
+                                    val isStaleFailed = currentStatus.equals(OrderStatus.FAILED.name, ignoreCase = true)
+                                    if (existing?.syncState != null && existing.syncState != SyncState.SYNCED && !isStaleFailed) {
                                         return@let
                                     }
-                                    val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
                                     val needsResultFetch = when {
                                         isXray -> !currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) || existing?.chestXRayResult.isNullOrBlank()
                                         isRif -> !currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) || existing?.trueNatRifResult.isNullOrBlank()
@@ -2750,10 +2767,11 @@ class TBRepo @Inject constructor(
                                         // landed), so both the sync-guard and the "already done"
                                         // check are redone here against current state.
                                         val fresh = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
-                                        if (fresh?.syncState != null && fresh.syncState != SyncState.SYNCED) {
+                                        val freshStatus = if (isXray) fresh?.xrayOrderStatus else if (isRif) fresh?.rifOrderStatus else fresh?.trueNatOrderStatus
+                                        val isStaleFailed = freshStatus.equals(OrderStatus.FAILED.name, ignoreCase = true)
+                                        if (fresh?.syncState != null && fresh.syncState != SyncState.SYNCED && !isStaleFailed) {
                                             return@withBenIdLock
                                         }
-                                        val freshStatus = if (isXray) fresh?.xrayOrderStatus else if (isRif) fresh?.rifOrderStatus else fresh?.trueNatOrderStatus
                                         if (freshStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true)) {
                                             return@withBenIdLock
                                         }
@@ -2793,10 +2811,11 @@ class TBRepo @Inject constructor(
                                 ben?.let { b ->
                                     withBenIdLock(b.beneficiaryId) {
                                         val fresh = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
-                                        if (fresh?.syncState != null && fresh.syncState != SyncState.SYNCED) {
+                                        val currentStatus = if (isXray) fresh?.xrayOrderStatus else if (isRif) fresh?.rifOrderStatus else fresh?.trueNatOrderStatus
+                                        val isStaleFailed = currentStatus.equals(OrderStatus.FAILED.name, ignoreCase = true)
+                                        if (fresh?.syncState != null && fresh.syncState != SyncState.SYNCED && !isStaleFailed) {
                                             return@withBenIdLock
                                         }
-                                        val currentStatus = if (isXray) fresh?.xrayOrderStatus else if (isRif) fresh?.rifOrderStatus else fresh?.trueNatOrderStatus
                                         val isAlreadyClosed = currentStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
                                         if (!isAlreadyClosed) {
                                             val cache = (fresh ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
@@ -2878,10 +2897,11 @@ class TBRepo @Inject constructor(
                                 ben?.let { b ->
                                     withBenIdLock(b.beneficiaryId) {
                                         val fresh = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
-                                        if (fresh?.syncState != null && fresh.syncState != SyncState.SYNCED) {
+                                        val currentStatus = if (isXray) fresh?.xrayOrderStatus else if (isRif) fresh?.rifOrderStatus else fresh?.trueNatOrderStatus
+                                        val isStaleFailed = currentStatus.equals(OrderStatus.FAILED.name, ignoreCase = true)
+                                        if (fresh?.syncState != null && fresh.syncState != SyncState.SYNCED && !isStaleFailed) {
                                             return@withBenIdLock
                                         }
-                                        val currentStatus = if (isXray) fresh?.xrayOrderStatus else if (isRif) fresh?.rifOrderStatus else fresh?.trueNatOrderStatus
                                         val isDone = currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
                                         if (!isDone) {
                                             val cache = (fresh ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
