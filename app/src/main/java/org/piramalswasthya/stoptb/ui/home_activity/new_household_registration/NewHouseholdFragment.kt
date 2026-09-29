@@ -45,6 +45,7 @@ import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.LocationState
 import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.home_activity.new_household_registration.NewHouseholdViewModel.State
+import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import timber.log.Timber
 import javax.inject.Inject
@@ -106,10 +107,14 @@ class NewHouseholdFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
-        (activity as? VolunteerActivity)?.updateActionBar(
-            R.drawable.ic__hh,
-            getString(R.string.frag_nhhr_title)
-        )
+        updateActionBarTitle(getString(R.string.frag_nhhr_title))
+    }
+
+    private fun updateActionBarTitle(title: String) {
+        when (val host = activity) {
+            is HomeActivity -> host.updateActionBar(R.drawable.ic__hh, title)
+            is VolunteerActivity -> host.updateActionBar(R.drawable.ic__hh, title)
+        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -211,8 +216,7 @@ class NewHouseholdFragment : Fragment() {
     private fun observeViewModel() {
         // Record exists → drives view/edit mode
         viewModel.readRecord.observe(viewLifecycleOwner) { recordExists ->
-            (activity as? VolunteerActivity)?.updateActionBar(
-                R.drawable.ic__hh,
+            updateActionBarTitle(
                 if (recordExists) getString(R.string.view_household_information)
                 else getString(R.string.frag_nhhr_title)
             )
