@@ -1247,11 +1247,20 @@ def upload_apk(args: argparse.Namespace) -> None:
         for app in matching
         if is_android_lob_type(app) and targets_android_enterprise(app)
     ]
-    target = (
-        pick_in_place_target(token, enterprise_apps, args.group_id, args.app_id)
-        if enterprise_apps
-        else None
-    )
+    if args.app_id:
+        target = next((app for app in enterprise_apps if str(app.get("id")) == args.app_id), None)
+        if target is None:
+            raise RuntimeError(
+                f"Pinned Intune app {args.app_id} was not found as an Android Enterprise LOB app. "
+                "Set INTUNE_APP_ID_UAT / INTUNE_APP_ID_PROD to the Intune app that should receive this APK."
+            )
+        log(f"Using pinned Intune app {args.app_id} ({target.get('displayName')}) for in-place APK replace")
+    else:
+        target = (
+            pick_in_place_target(token, enterprise_apps, args.group_id, args.app_id)
+            if enterprise_apps
+            else None
+        )
     replace_mode = "new"
     skip_upload = False
     if target is not None:
