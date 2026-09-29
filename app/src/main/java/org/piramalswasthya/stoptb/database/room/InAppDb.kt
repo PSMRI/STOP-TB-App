@@ -111,7 +111,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 46, exportSchema = false
+    version = 47, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -1517,10 +1517,19 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_46_47 = object : Migration(46, 47) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `ind_ben_draft_created` ON `BENEFICIARY` (`isDraft`, `createdDate`)"
+                )
+                recreateBenBasicCacheView(database)
+            }
+        }
+
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(
-                "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId" +
+                "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId" +
                     ", b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod" +
                     ", b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus" +
                     ", b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId" +
@@ -1811,6 +1820,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_43_44)
                         .addMigrations(MIGRATION_44_45)
                         .addMigrations(MIGRATION_45_46)
+                        .addMigrations(MIGRATION_46_47)
                         .fallbackToDestructiveMigration()
                         .build()
 
