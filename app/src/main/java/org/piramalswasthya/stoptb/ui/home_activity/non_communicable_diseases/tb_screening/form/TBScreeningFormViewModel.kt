@@ -175,7 +175,7 @@ class TBScreeningFormViewModel @Inject constructor(
         )
     }
 
-    private suspend fun initializeDiagnosticsAndPush(tbScreeningCache: org.piramalswasthya.stoptb.model.TBScreeningCache) {
+    private suspend fun initializeDiagnosticsAndPush(tbScreeningCache: TBScreeningCache) {
         try {
             val isPresumptive = tbScreeningCache.coughMoreThan2Weeks == true ||
                     tbScreeningCache.bloodInSputum == true ||
@@ -195,7 +195,6 @@ class TBScreeningFormViewModel @Inject constructor(
             val refersXray = !isPregnant
             val refersTruenat = isPresumptive || isPregnant
 
-            // Persist the computed referral eligibility back to local screening record
             tbScreeningCache.referredForDigitalChestXray = refersXray
             tbScreeningCache.referredForSputumCollection = refersTruenat
             tbRepo.saveTBScreening(tbScreeningCache)
@@ -205,12 +204,6 @@ class TBScreeningFormViewModel @Inject constructor(
                 benId = benId,
                 syncState = SyncState.UNSYNCED
             )
-
-            // Whether an order already exists must be decided from the state BEFORE the
-            // preemptive PENDING placeholder below is written — otherwise that placeholder
-            // (written purely so the UI has something to show while the push is in flight)
-            // would itself satisfy this check, and a genuinely new referral would never
-            // actually get pushed.
             val hasXrayOrder = !existingDiag?.xrayOrderId.isNullOrBlank() ||
                     existingDiag?.xrayOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
                     existingDiag?.xrayOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
@@ -221,8 +214,6 @@ class TBScreeningFormViewModel @Inject constructor(
                     existingDiag?.trueNatOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
 
             if (refersXray) {
-                // "NONE" was never actually written as a status value anywhere — a blank status
-                // is what "no order yet" looks like.
                 if (currentDiag.xrayOrderStatus.isNullOrBlank()) {
                     currentDiag = currentDiag.copy(xrayOrderStatus = OrderStatus.PENDING.name, isReferredForDigitalChestXray = true)
                 }

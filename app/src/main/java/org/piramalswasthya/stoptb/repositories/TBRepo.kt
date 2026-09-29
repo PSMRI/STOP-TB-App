@@ -1773,13 +1773,6 @@ class TBRepo @Inject constructor(
             if (targetBenId <= 0) {
                 return@withContext NetworkResponse.Error("Beneficiary ID not valid")
             }
-            // Skip the network call entirely when the hub is known disconnected — otherwise a
-            // request via CampModeUrlInterceptor can eat the full connect timeout for a request
-            // that's certain to fail. This only catches KNOWN-disconnected state (explicit
-            // disconnect, WiFi loss, a prior request that already failed and flipped the flag);
-            // isCampHubConnected() is a cached flag, not continuously re-verified, so a hub that
-            // died moments ago while still marked connected will still attempt the call below and
-            // fall through to the same timeout-driven FAILED path as before.
             if (preferenceDao.isCampModeEnabled() && !preferenceDao.isCampHubConnected()) {
                 saveFailedOrderStatus(benId, testType, "Camp Hub not connected")
                 return@withContext NetworkResponse.Error("Camp Hub not connected")
@@ -1821,11 +1814,6 @@ class TBRepo @Inject constructor(
                             val existing = tbDao.getTbDiagnosticsByBenId(benId)
                             val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
                                 if (testType.equals("XRAY_CHEST", ignoreCase = true)) {
-                                    // Chest X-Ray order lifecycle redesign: a fresh order/push
-                                    // always lands the row in PENDING (or FAILED if the push
-                                    // response itself reports it), resetting any stale result/
-                                    // not-conducted data from a previously Closed order so a new
-                                    // order never shows leftover data.
                                     it.copy(
                                         xrayOrderId = orderId,
                                         xrayOrderStatus = if (status.equals(OrderStatus.FAILED.name, ignoreCase = true))
@@ -1839,11 +1827,6 @@ class TBRepo @Inject constructor(
                                         errorMsgXray = responseBody.data.errorMessage
                                     )
                                 } else if (testType.equals("MDR_RIF", ignoreCase = true)) {
-                                    // TrueNat/RIF order lifecycle redesign: same reduced 5-value
-                                    // vocabulary/reset-on-fresh-order pattern as Chest X-Ray above
-                                    // — a fresh order/push lands in PENDING (or FAILED if the push
-                                    // response itself reports it), clearing any stale result/
-                                    // DR-TB flag from a previously Closed order.
                                     it.copy(
                                         rifOrderId = orderId,
                                         rifOrderStatus = if (status.equals(OrderStatus.FAILED.name, ignoreCase = true))
@@ -1903,7 +1886,6 @@ class TBRepo @Inject constructor(
                 NetworkResponse.Error("HTTP Error $statusCode")
             } catch (e: Exception) {
                 Timber.e(e, "createOrder failed")
-                // Keep errorMessage null on timeout/connect failure to flag the request for reconciliation.
                 saveFailedOrderStatus(benId, testType)
                 NetworkResponse.Error(e.message ?: "Unknown error")
             }
@@ -2008,11 +1990,6 @@ class TBRepo @Inject constructor(
             val existing = tbDao.getTbSuspected(benId)
 
             val mappedIsSputumCollected = when {
-                // reasonForDenialSputum alone identifies "declined before order exists" — it's
-                // only ever set on that path. Checking trueNatOrderStatus == CLOSED here as well
-                // would misfire: CLOSED is now shared with the unrelated "Not Conducted" closure
-                // (reasonNotConductedNaat, handled in the branch below), which must still map to
-                // isSputumCollected == true, not false.
                 diag.isSputumCollected == false ||
                 diag.reasonForDenialSputum != null -> false
 
