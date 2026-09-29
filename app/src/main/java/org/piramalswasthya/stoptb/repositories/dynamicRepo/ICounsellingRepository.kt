@@ -17,6 +17,14 @@ interface ICounsellingRepository {
         nextSectionId: Int?,
         answers: List<QuestionResponseEntity>
     )
+
+    // Replaces answers for the given questions only. Leaves section completion untouched.
+    suspend fun replaceQuestionAnswers(
+        responseId: Long,
+        sectionId: Int,
+        questionIds: List<Int>,
+        answers: List<QuestionResponseEntity>
+    )
     suspend fun submitSectionE(responseId: Long, answers: List<QuestionResponseEntity>)
     suspend fun submitSectionF(responseId: Long, answers: List<QuestionResponseEntity>)
     suspend fun submitSectionGeneralInfo(responseId: Long, answers: List<QuestionResponseEntity>)
