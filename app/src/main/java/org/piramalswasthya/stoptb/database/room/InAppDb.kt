@@ -105,7 +105,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 44, exportSchema = false
+    version = 45, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -1523,13 +1523,6 @@ abstract class InAppDb : RoomDatabase() {
                     ", 0 as isDelivered, 0 as pwHrp" +
                     ", 0 as irFilled, 0 as crFilled, 0 as doFilled" +
                     ", b.isNonHH" +
-                    ", b.isAvailableForCamp" +
-                    ", b.reasonForNotAttendingCamp" +
-                    ", b.otherReasonForNotAttendingCamp" +
-                    ", b.screeningStatus" +
-                    ", b.symptomsScreenedDate" +
-                    ", b.chestXrayDoneDate" +
-                    ", b.trunatTestDoneDate" +
                     ", b.placeOfCurrentLiving" +
                     ", b.otherPlaceOfCurrentLiving" +
                     ", b.institutionName" +
@@ -1591,7 +1584,7 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_44_45 = object : Migration(45, 46) {
+        private val MIGRATION_44_45 = object : Migration(44, 45) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 val columns = listOf(
                     "chestPain INTEGER DEFAULT NULL",
@@ -1607,6 +1600,7 @@ abstract class InAppDb : RoomDatabase() {
                         database.execSQL("ALTER TABLE TB_SCREENING ADD COLUMN $columnDefinition")
                     }
                 }
+                recreateBenBasicCacheView(database)
             }
         }
 
