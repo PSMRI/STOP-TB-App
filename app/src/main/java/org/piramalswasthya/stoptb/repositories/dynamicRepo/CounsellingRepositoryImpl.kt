@@ -166,6 +166,37 @@ class CounsellingRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun replaceQuestionAnswers(
+        responseId: Long,
+        sectionId: Int,
+        questionIds: List<Int>,
+        answers: List<QuestionResponseEntity>
+    ) {
+        if (questionIds.isEmpty()) return
+        db.withTransaction {
+            val formResponseWithDetails = responseDao.getFormResponseById(responseId)
+                ?: return@withTransaction
+            val sectionResponse = formResponseWithDetails.sectionResponses
+                .find { it.sectionResponse.sectionId == sectionId }
+                ?: return@withTransaction
+            val sectionResponseId = sectionResponse.sectionResponse.sectionResponseId
+            responseDao.deleteQuestionResponsesForQuestions(sectionResponseId, questionIds)
+            if (answers.isNotEmpty()) {
+                responseDao.insertQuestionResponses(
+                    answers.map {
+                        it.copy(questionResponseId = 0, sectionResponseId = sectionResponseId)
+                    }
+                )
+            }
+            responseDao.updateFormResponse(
+                formResponseWithDetails.formResponse.copy(
+                    syncStatus = "UNSYNCED",
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
     private suspend fun submitSectionWithPhase(
         responseId: Long,
         answers: List<QuestionResponseEntity>,

@@ -62,7 +62,31 @@ data class CounsellingQuestionDto(
     @Transient var visible: Boolean = true,
     @Transient var errorMessage: String? = null,
     @Transient var originalIsMandatory: Boolean? = null
-)
+) {
+    companion object {
+        // Remarks stay editable after the rest of the section is locked.
+        val ALWAYS_EDITABLE_UUIDS = setOf(
+            "TB_A_REMARKS",
+            "TB_B_REMARKS",
+            "TB_C_REMARKS",
+            "TB_D_REMARKS",
+            "TB_E_REMARKS"
+        )
+    }
+
+    // True for the section remarks box, including after the section has been submitted and reopened.
+    fun isRemarksField(matchLabel: Boolean = true): Boolean {
+        val uuid = questionUuid.trim()
+        if (ALWAYS_EDITABLE_UUIDS.any { it.equals(uuid, ignoreCase = true) }) return true
+        if (uuid.contains("REMARK", ignoreCase = true)) return true
+        if (!matchLabel || !questionType.equals("TEXT", ignoreCase = true)) return false
+        return questionText.contains("remark", ignoreCase = true)
+            || questionText.contains("note", ignoreCase = true)
+            || questionText.contains("टिप्प")
+            || questionText.contains("नोट")
+            || questionText.contains("মন্তব্য")
+    }
+}
 
 data class CounsellingValidationDto(
     @SerializedName("validationId") val validationId: Int? = null,

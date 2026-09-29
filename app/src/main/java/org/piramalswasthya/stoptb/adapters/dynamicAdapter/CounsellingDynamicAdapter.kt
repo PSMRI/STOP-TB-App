@@ -172,6 +172,9 @@ class CounsellingDynamicAdapter(
         }
     }
 
+    private fun fieldEditable(q: CounsellingQuestionDto): Boolean =
+        isEditable || q.isRemarksField(matchLabel = !isContactTracing)
+
     override fun getItemCount(): Int = visibleQuestions.size
 
     inner class TextViewHolder(private val binding: ItemCounsellingTextBinding) :
@@ -182,7 +185,7 @@ class CounsellingDynamicAdapter(
             } else if (q.questionUuid == TFU_REGISTRATION_DATE_UUID) {
                 QuestionRenderer.showTextView(binding, q, prefix, false, applyLatinFilter = !isContactTracing, onValueChanged = onValueChanged)
             } else {
-                QuestionRenderer.showTextView(binding, q, prefix, isEditable, applyLatinFilter = !isContactTracing) { updated ->
+                QuestionRenderer.showTextView(binding, q, prefix, fieldEditable(q), applyLatinFilter = !isContactTracing) { updated ->
                     onValueChanged(updated)
                     refreshNoOfContactsIfNeeded(updated)
                 }
@@ -194,13 +197,13 @@ class CounsellingDynamicAdapter(
         RecyclerView.ViewHolder(binding.root) {
             val errorMsg = binding.tvError
         fun bind(q: CounsellingQuestionDto, prefix: String) =
-            QuestionRenderer.showRadio(binding, q, prefix, isEditable, onValueChanged)
+            QuestionRenderer.showRadio(binding, q, prefix, fieldEditable(q), onValueChanged)
     }
 
     inner class McqViewHolder(private val binding: ItemCounsellingMcqBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(q: CounsellingQuestionDto, prefix: String) =
-            QuestionRenderer.showMCQ(binding, q, prefix, isEditable, { updated ->
+            QuestionRenderer.showMCQ(binding, q, prefix, fieldEditable(q), { updated ->
                 onValueChanged(updated)
                 refreshNoOfContactsIfNeeded(updated)
             }, questions)
@@ -209,12 +212,12 @@ class CounsellingDynamicAdapter(
     inner class DateViewHolder(private val binding: ItemCounsellingDateBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(q: CounsellingQuestionDto, prefix: String) =
-            QuestionRenderer.showDate(binding, q, prefix, isEditable, onValueChanged)
+            QuestionRenderer.showDate(binding, q, prefix, fieldEditable(q), onValueChanged)
     }
     inner class DropdownViewHolder(private val binding: ItemCounsellingDropdownBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(q: CounsellingQuestionDto, prefix: String) =
-            QuestionRenderer.showDropdown(binding, q, prefix, isEditable, { updated ->
+            QuestionRenderer.showDropdown(binding, q, prefix, fieldEditable(q), { updated ->
                 onValueChanged(updated)
                 refreshNoOfContactsIfNeeded(updated)
             }, questions)
@@ -223,7 +226,7 @@ class CounsellingDynamicAdapter(
     inner class NumberViewHolder(private val binding: ItemCtNumberBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(q: CounsellingQuestionDto, prefix: String) =
-            QuestionRenderer.showNumber(binding, q, prefix, isEditable, onValueChanged)
+            QuestionRenderer.showNumber(binding, q, prefix, fieldEditable(q), onValueChanged)
     }
 
     inner class ReadOnlyViewHolder(private val binding: ItemCtReadonlyBinding) :
@@ -235,6 +238,6 @@ class CounsellingDynamicAdapter(
     inner class NumberPickerViewHolder(private val binding: ItemCtNumberPickerBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(q: CounsellingQuestionDto, prefix: String) =
-            QuestionRenderer.showNumberPicker(binding, q, prefix, isEditable, onValueChanged)
+            QuestionRenderer.showNumberPicker(binding, q, prefix, fieldEditable(q), onValueChanged)
     }
 }

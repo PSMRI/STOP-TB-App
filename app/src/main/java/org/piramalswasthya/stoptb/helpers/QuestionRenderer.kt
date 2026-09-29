@@ -92,7 +92,22 @@ object QuestionRenderer {
     ) {
         showLabel(binding.tilInput, question, prefix)
         binding.tilInput.error = question.errorMessage
+        // Remember the listener before a disable pass clears it. setEnabled(true) does not put it back,
+        // so a remarks box reopened after Next stays visible but will not accept typing.
+        if (binding.etInput.keyListener != null) {
+            binding.tilInput.setTag(org.piramalswasthya.stoptb.R.id.til_input, binding.etInput.keyListener)
+        }
+        binding.tilInput.isEnabled = isEditable
         binding.etInput.isEnabled = isEditable
+        binding.etInput.isFocusable = isEditable
+        binding.etInput.isFocusableInTouchMode = isEditable
+        binding.etInput.isClickable = isEditable
+        binding.etInput.isCursorVisible = isEditable
+        if (isEditable) {
+            binding.etInput.keyListener = binding.etInput.keyListener
+                ?: (binding.tilInput.getTag(org.piramalswasthya.stoptb.R.id.til_input) as? android.text.method.KeyListener)
+                ?: android.text.method.TextKeyListener.getInstance()
+        }
 
         val maxLength = question.maxLength
         val filters = mutableListOf<InputFilter>()

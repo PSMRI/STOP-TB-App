@@ -83,6 +83,9 @@ interface CounsellingFormResponseDao {
     @Query("DELETE FROM t_question_response WHERE sectionResponseId = :sectionResponseId")
     suspend fun deleteQuestionResponsesForSection(sectionResponseId: Long)
 
+    @Query("DELETE FROM t_question_response WHERE sectionResponseId = :sectionResponseId AND questionId IN (:questionIds)")
+    suspend fun deleteQuestionResponsesForQuestions(sectionResponseId: Long, questionIds: List<Int>)
+
 
     @Query("SELECT backendSectionResponseId FROM t_section_response WHERE backendSectionResponseId IN (:backendSectionResponseIds)")
     suspend fun getExistingBackendSectionResponseIds(backendSectionResponseIds: List<Long>): List<Long>
