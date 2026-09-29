@@ -1600,6 +1600,7 @@ abstract class InAppDb : RoomDatabase() {
                         database.execSQL("ALTER TABLE TB_SCREENING ADD COLUMN $columnDefinition")
                     }
                 }
+                recreateBenBasicCacheView(database)
             }
         }
 
