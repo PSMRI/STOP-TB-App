@@ -367,8 +367,14 @@ class CounsellingViewModel @Inject constructor(
         val section = currentSection() ?: return
         if (!isSectionEditable(section)) return
         if (selectAll) {
-            repeat(5) {
-                checkboxQuestions(section).forEach { q ->
+            var previousIds: Set<Int>? = null
+            var guard = section.questions.size.coerceAtLeast(1)
+            while (guard-- > 0) {
+                val visible = checkboxQuestions(section)
+                val ids = visible.map { it.questionId }.toSet()
+                if (ids == previousIds) break
+                previousIds = ids
+                visible.forEach { q ->
                     q.value = q.options.orEmpty().map { it.optionValue }
                     q.errorMessage = null
                 }

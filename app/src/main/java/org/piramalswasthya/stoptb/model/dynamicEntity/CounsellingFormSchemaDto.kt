@@ -74,6 +74,12 @@ data class CounsellingQuestionDto(
             "TB_D_REMARKS",
             "TB_E_REMARKS"
         )
+
+        // Whole words only, so labels like "denote" or "annotate" are not treated as notes.
+        private val REMARKS_LABEL = Regex(
+            "(?<![\\p{L}\\p{N}])(?:remarks?|notes?|टिप्पणियाँ|टिप्पणियां|टिप्पणी|टिप्प|नोट्स|नोट|মন্তব্য)(?![\\p{L}\\p{N}])",
+            RegexOption.IGNORE_CASE
+        )
     }
 
     // True for the section remarks box, including after the section has been submitted and reopened.
@@ -82,11 +88,7 @@ data class CounsellingQuestionDto(
         if (ALWAYS_EDITABLE_UUIDS.any { it.equals(uuid, ignoreCase = true) }) return true
         if (uuid.contains("REMARK", ignoreCase = true)) return true
         if (!matchLabel || !questionType.equals("TEXT", ignoreCase = true)) return false
-        return questionText.contains("remark", ignoreCase = true)
-            || questionText.contains("note", ignoreCase = true)
-            || questionText.contains("टिप्प")
-            || questionText.contains("नोट")
-            || questionText.contains("মন্তব্য")
+        return REMARKS_LABEL.containsMatchIn(questionText)
     }
 }
 
