@@ -88,12 +88,12 @@ jobs:
             SUFFIX=PROD
             PACKAGE_ID=org.piramalswasthya.stoptb
             LABEL=PROD
-            INTUNE_DISPLAY_NAME=STOPTB
+            INTUNE_DISPLAY_NAME=TBMJA_Internal_Testing_Prod
           else
             SUFFIX=UAT
             PACKAGE_ID=org.piramalswasthya.stoptb.uat
             LABEL=UAT
-            INTUNE_DISPLAY_NAME=STOPTB_UAT
+            INTUNE_DISPLAY_NAME=StopTB_Internal_Testing_UAT
           fi
 
           {

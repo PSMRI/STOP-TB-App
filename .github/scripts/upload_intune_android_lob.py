@@ -569,12 +569,10 @@ def _app_package_ids(app: dict[str, Any]) -> set[str]:
 
 
 def canonical_display_name(package_id: str, requested: str | None = None) -> str:
+    del requested
     if ".uat" in package_id:
-        return "STOPTB_UAT"
-    requested_name = str(requested or "").strip()
-    if requested_name.upper() in {"STOPTB", "STOPTB_PROD"}:
-        return "STOPTB"
-    return "STOPTB"
+        return "StopTB_Internal_Testing_UAT"
+    return "TBMJA_Internal_Testing_Prod"
 
 
 def canonical_description(package_id: str, version_name: str, version_code: str) -> str:
@@ -1139,8 +1137,10 @@ def upload_apk(args: argparse.Namespace) -> None:
     def create_content_version() -> dict[str, Any]:
         return graph_request(token, "POST", content_versions_path(app_id), {})
 
-    if args.app_id and ".uat" in args.package_id:
-        log("Ignoring --app-id for UAT; the APK will replace the existing STOPTB_UAT app by name")
+    if args.app_id:
+        log(
+            f"Ignoring --app-id; the APK will replace the existing {app_display_name} app by name"
+        )
         args.app_id = None
 
     apps = find_apps_for_package(token, args.package_id, args.app_id)
@@ -1172,8 +1172,9 @@ def upload_apk(args: argparse.Namespace) -> None:
         target = next((app for app in enterprise_apps if str(app.get("id")) == args.app_id), None)
         if target is None:
             raise RuntimeError(
-                f"Pinned Intune app {args.app_id} was not found as an Android Enterprise LOB app. "
-                "Set INTUNE_APP_ID_PROD to the Intune app that should receive this APK."
+                f"No existing Intune app named {app_display_name} was found. "
+                "The pipeline only replaces the APK on that app; it will not create, delete, "
+                f"or change other MDM apps. Create {app_display_name} in Intune first."
             )
         log(f"Using pinned Intune app {args.app_id} ({target.get('displayName')}) for in-place APK replace")
     else:
@@ -1339,7 +1340,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--version-name")
     parser.add_argument("--version-code")
     parser.add_argument("--group-id")
-    parser.add_argument("--display-name", default="STOPTB_UAT")
+    parser.add_argument("--display-name", default="StopTB_Internal_Testing_UAT")
     parser.add_argument("--publisher", default="Piramal Swasthya")
     parser.add_argument("--description", default="StopTB UAT signed build")
     parser.add_argument("--app-id", default="")

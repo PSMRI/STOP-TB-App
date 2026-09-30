@@ -150,7 +150,7 @@ jobs:
             APK_NAME=app-stoptb
             GRADLE_AAB_TASK=bundleStoptbRelease
             FIREBASE_LABEL=PROD
-            INTUNE_DISPLAY_NAME=STOPTB
+            INTUNE_DISPLAY_NAME=TBMJA_Internal_Testing_Prod
           else
             SUFFIX=UAT
             PACKAGE_ID=org.piramalswasthya.stoptb.uat
@@ -158,7 +158,7 @@ jobs:
             APK_NAME=app-stoptbUat
             GRADLE_AAB_TASK=
             FIREBASE_LABEL=UAT
-            INTUNE_DISPLAY_NAME=STOPTB_UAT
+            INTUNE_DISPLAY_NAME=StopTB_Internal_Testing_UAT
           fi
 
           if [ "$SIGNING" = signed ]; then
