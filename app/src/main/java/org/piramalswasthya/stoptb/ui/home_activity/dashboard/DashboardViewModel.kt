@@ -44,7 +44,7 @@ data class DashboardFilterState(
     val districtId: Int = 0,
     val blockId: Int = 0,
     val villageId: Int = 0,
-    val periodKey: String = DashboardViewModel.PERIOD_MONTH,
+    val periodKey: String = DashboardViewModel.PERIOD_ALL,
 )
 
 // data class PositiveNegativeCount(
@@ -82,8 +82,10 @@ class DashboardViewModel @Inject constructor(
         const val PERIOD_YESTERDAY = "yesterday"
         const val PERIOD_WEEK = "week"
         const val PERIOD_MONTH = "month"
-        const val PERIOD_YEAR = "year"
         const val PERIOD_ALL = "all"
+        const val PERIOD_MONTH_PREFIX = "month_"
+
+        fun monthPeriodKey(month: Int): String = "$PERIOD_MONTH_PREFIX$month"
     }
 
     private val _unscreened = MutableLiveData(TbGenderBreakdown())
@@ -95,14 +97,19 @@ class DashboardViewModel @Inject constructor(
     val villageList: List<LocationEntity>
         get() = preferenceDao.getLoggedInUser()?.villages.orEmpty()
 
-    fun selectedVillageName(): String? {
-        val village = preferenceDao.getLocationRecord()?.village ?: return null
+    fun villageDisplayName(village: LocationEntity): String {
         val villageName = village.name.substringBefore("(").trim()
-        return when (preferenceDao.getCurrentLanguage()) {
-            Languages.HINDI -> village.nameHindi ?: villageName
-            Languages.ASSAMESE -> village.nameAssamese ?: villageName
+        val localized = when (preferenceDao.getCurrentLanguage()) {
+            Languages.HINDI -> village.nameHindi
+            Languages.ASSAMESE -> village.nameAssamese
             else -> villageName
         }
+        return localized?.takeIf { it.isNotBlank() } ?: villageName
+    }
+
+    fun selectedVillageName(): String? {
+        val village = preferenceDao.getLocationRecord()?.village ?: return null
+        return villageDisplayName(village)
     }
 
     val districtList: List<LocationEntity>
@@ -111,14 +118,13 @@ class DashboardViewModel @Inject constructor(
     val blockList: List<LocationEntity>
         get() = preferenceDao.getLoggedInUser()?.block?.let { listOf(it) }.orEmpty()
 
-    val periodKeys = listOf(
+    val periodKeys: List<String> = listOf(
+        PERIOD_ALL,
         PERIOD_TODAY,
         PERIOD_YESTERDAY,
         PERIOD_WEEK,
         PERIOD_MONTH,
-        PERIOD_YEAR,
-        PERIOD_ALL
-    )
+    ) + (Calendar.JANUARY..Calendar.DECEMBER).map { monthPeriodKey(it) }
 
     // Dashboard data
     private val _tbScreening = MutableLiveData(TbGenderBreakdown())
@@ -178,7 +184,7 @@ class DashboardViewModel @Inject constructor(
         villageList.map { it.id }.ifEmpty { listOf(-1) }
 
     private fun getTimeRange(): Pair<Long, Long> {
-        val period = _filters.value?.periodKey ?: PERIOD_MONTH
+        val period = _filters.value?.periodKey ?: PERIOD_ALL
         val cal = Calendar.getInstance()
 
         fun startOfDay(calendar: Calendar): Long {
@@ -197,7 +203,7 @@ class DashboardViewModel @Inject constructor(
             return calendar.timeInMillis
         }
 
-        return when (period) {
+        val range = when (period) {
             PERIOD_TODAY -> {
                 val start = startOfDay(cal)
                 val end = endOfDay(cal)
@@ -212,6 +218,9 @@ class DashboardViewModel @Inject constructor(
             PERIOD_WEEK -> {
                 cal.firstDayOfWeek = Calendar.MONDAY
                 cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+                if (cal.timeInMillis > System.currentTimeMillis()) {
+                    cal.add(Calendar.WEEK_OF_YEAR, -1)
+                }
                 val start = startOfDay(cal)
                 val endCal = Calendar.getInstance()
                 Pair(start, endOfDay(endCal))
@@ -222,15 +231,26 @@ class DashboardViewModel @Inject constructor(
                 cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH))
                 Pair(start, endOfDay(cal))
             }
-            PERIOD_YEAR -> {
-                cal.set(Calendar.MONTH, Calendar.JANUARY)
-                cal.set(Calendar.DAY_OF_MONTH, 1)
-                val start = startOfDay(cal)
-                cal.set(Calendar.MONTH, Calendar.DECEMBER)
-                cal.set(Calendar.DAY_OF_MONTH, 31)
-                Pair(start, endOfDay(cal))
+            else -> {
+                if (!period.startsWith(PERIOD_MONTH_PREFIX)) return Pair(0L, 0L)
+                val month = period.removePrefix(PERIOD_MONTH_PREFIX).toIntOrNull()
+                if (month == null || month !in Calendar.JANUARY..Calendar.DECEMBER) {
+                    Pair(0L, 0L)
+                } else {
+                    cal.set(Calendar.DAY_OF_MONTH, 1)
+                    cal.set(Calendar.MONTH, month)
+                    val start = startOfDay(cal)
+                    cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH))
+                    Pair(start, endOfDay(cal))
+                }
             }
-            else -> Pair(0L, 0L)
+        }
+        return if (range.first == 0L && range.second == 0L) {
+            range
+        } else {
+            // Visit timestamps are sometimes shifted by the IST offset (5h 30m).
+            val offset = 19_800_000L
+            Pair(range.first - offset, range.second + offset)
         }
     }
 
@@ -242,8 +262,15 @@ class DashboardViewModel @Inject constructor(
         collectJobs.clear()
 
         val (startTime, endTime) = getTimeRange()
-        val village = _filters.value?.villageId ?: 0
-        val assignedVillageIds = getAssignedVillageIds()
+        val selectedVillageId = _filters.value?.villageId ?: 0
+        // Keep villageId at 0 and narrow with the IN-list. That is the path that
+        // already returns data for All Villages; equality on :villageId was coming back empty.
+        val village = 0
+        val assignedVillageIds = if (selectedVillageId == 0) {
+            getAssignedVillageIds()
+        } else {
+            listOf(selectedVillageId)
+        }
 
         // Keep previous values on screen until new filtered results arrive (avoid flashing/sticking at 0).
 
