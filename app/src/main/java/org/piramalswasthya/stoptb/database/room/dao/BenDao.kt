@@ -883,6 +883,18 @@ interface BenDao {
     fun getHouseholdMemberCounts(selectedVillage: Int): Flow<List<HouseholdMemberCount>>
 
     @Query("""
+        SELECT householdId AS hhId,
+               TRIM(COALESCE(firstName, '') || ' ' || COALESCE(lastName, '')) AS fullName
+        FROM BENEFICIARY
+        WHERE isDraft = 0
+          AND isDeactivate = 0
+          AND loc_village_id = :selectedVillage
+          AND householdId IS NOT NULL
+          AND familyHeadRelationPosition = 19
+    """)
+    fun getHouseholdHeadNames(selectedVillage: Int): Flow<List<HouseholdHeadName>>
+
+    @Query("""
         SELECT COUNT(child.beneficiaryId)
         FROM BENEFICIARY parent
         LEFT JOIN BENEFICIARY child

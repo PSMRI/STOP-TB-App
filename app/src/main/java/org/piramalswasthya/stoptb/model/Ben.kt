@@ -992,6 +992,11 @@ data class HouseholdMemberCount(
     val memberCount: Int
 )
 
+data class HouseholdHeadName(
+    val hhId: Long,
+    val fullName: String
+)
+
 data class BenBasicDomainForForm(
     val benId: Long,
     val hhId: Long,

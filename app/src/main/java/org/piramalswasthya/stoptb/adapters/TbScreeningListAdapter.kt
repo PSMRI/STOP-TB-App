@@ -131,12 +131,12 @@ class TbScreeningListAdapter(
             val isHeadOfFamily = !isNonHH && item.ben.relToHeadId == 19
             if (isNonHH) {
                 binding.ivIsHead.visibility = View.VISIBLE
-                binding.ivIsHead.setImageResource(R.drawable.ic_non_household_vector)
+                binding.ivIsHead.setImageResource(R.drawable.icon_non_household)
                 binding.ivIsHead.imageTintList = null
             } else {
-                binding.ivIsHead.setImageResource(R.drawable.ic__hh)
+                binding.ivIsHead.setImageResource(R.drawable.ic_icon_head_of_family)
                 binding.ivIsHead.imageTintList = android.content.res.ColorStateList.valueOf(
-                    ContextCompat.getColor(binding.root.context, R.color.md_theme_light_primary)
+                    ContextCompat.getColor(binding.root.context, android.R.color.white)
                 )
                 binding.ivIsHead.visibility = if (isHeadOfFamily) View.VISIBLE else View.GONE
             }
