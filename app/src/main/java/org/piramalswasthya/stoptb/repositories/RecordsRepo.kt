@@ -55,6 +55,10 @@ class RecordsRepo @Inject constructor(
         benDao.getHouseholdMemberCounts(selectedVillage)
             .map { list -> list.associate { it.hhId to it.memberCount } }
 
+    val householdHeadNames: Flow<Map<Long, String>> get() =
+        benDao.getHouseholdHeadNames(selectedVillage)
+            .map { list -> list.associate { it.hhId to it.fullName } }
+
     val anthropometryFilledBenIds: Flow<List<Long>> get() =
         benDao.getAnthropometryFilledBenIds(selectedVillage)
 

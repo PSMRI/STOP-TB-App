@@ -50,6 +50,7 @@ class BenPagingAdapter(
     private val tptEligibleIds = mutableListOf<Long>()
     private val childCountMap = mutableMapOf<Long, Int>()
     private val householdMemberCountMap = mutableMapOf<Long, Int>()
+    private val householdHeadNameMap = mutableMapOf<Long, String>()
     private val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
     private val tbScreeningMap = mutableMapOf<Long, TBScreeningCache>()
     private val retryingBenIds = mutableListOf<Long>()
@@ -96,6 +97,7 @@ class BenPagingAdapter(
             showScreeningStatus = showScreeningStatus,   // ADD THIS
             showRedesignedCard = showRedesignedCard,
             householdMemberCountMap = householdMemberCountMap,
+            householdHeadNameMap = householdHeadNameMap,
             source = source,
             retryingBenIds = retryingBenIds,
             showContactTracingForms = showContactTracingForms,
@@ -243,6 +245,18 @@ class BenPagingAdapter(
         val old = householdMemberCountMap.toMap()
         householdMemberCountMap.clear()
         householdMemberCountMap.putAll(map)
+        val changedHouseholds = (old.keys + map.keys).filterTo(mutableSetOf()) { old[it] != map[it] }
+        if (changedHouseholds.isNotEmpty()) {
+            snapshot().forEachIndexed { index, item ->
+                if (item != null && item.hhId in changedHouseholds) notifyItemChanged(index)
+            }
+        }
+    }
+
+    fun submitHouseholdHeadNames(map: Map<Long, String>) {
+        val old = householdHeadNameMap.toMap()
+        householdHeadNameMap.clear()
+        householdHeadNameMap.putAll(map)
         val changedHouseholds = (old.keys + map.keys).filterTo(mutableSetOf()) { old[it] != map[it] }
         if (changedHouseholds.isNotEmpty()) {
             snapshot().forEachIndexed { index, item ->

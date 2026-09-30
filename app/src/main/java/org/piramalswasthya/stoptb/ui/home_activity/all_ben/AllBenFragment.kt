@@ -574,6 +574,12 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         }
 
         lifecycleScope.launch {
+            viewModel.householdHeadNames.collectLatest { nameMap ->
+                benAdapter.submitHouseholdHeadNames(nameMap)
+            }
+        }
+
+        lifecycleScope.launch {
             viewModel.vitalBenIds.collectLatest { benIds ->
                 benAdapter.submitBenIds(benIds)
             }
