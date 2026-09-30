@@ -59,6 +59,8 @@
                     android:maxLines="1"
                     android:paddingTop="10dp"
                     android:paddingBottom="10dp"
+                    android:paddingStart="@dimen/_10sdp"
+                    android:paddingEnd="@dimen/_1sdp"
                     android:textColor="@color/dashboard_ink"
                     android:textSize="13sp"
                     tools:text="All Time" />
@@ -109,6 +111,8 @@
                     android:paddingBottom="10dp"
                     android:textColor="@color/dashboard_ink"
                     android:textSize="13sp"
+                    android:paddingStart="@dimen/_10sdp"
+                    android:paddingEnd="@dimen/_1sdp"
                     tools:text="All Villages" />
             </com.google.android.material.textfield.TextInputLayout>
         </LinearLayout>
