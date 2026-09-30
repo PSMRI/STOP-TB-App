@@ -20,6 +20,7 @@ import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import com.google.android.flexbox.FlexboxLayout
 import com.google.android.material.textfield.TextInputLayout
 import org.piramalswasthya.stoptb.databinding.ItemCounsellingDateBinding
@@ -88,6 +89,8 @@ object QuestionRenderer {
         prefix: String,
         isEditable: Boolean,
         applyLatinFilter: Boolean = true,
+        showPencil: Boolean = false,
+        onPencilClick: (() -> Unit)? = null,
         onValueChanged: (CounsellingQuestionDto) -> Unit
     ) {
         showLabel(binding.tilInput, question, prefix)
@@ -97,7 +100,8 @@ object QuestionRenderer {
         if (binding.etInput.keyListener != null) {
             binding.tilInput.setTag(org.piramalswasthya.stoptb.R.id.til_input, binding.etInput.keyListener)
         }
-        binding.tilInput.isEnabled = isEditable
+        // Keep the layout enabled when the pencil is shown, otherwise Material disables the end icon.
+        binding.tilInput.isEnabled = isEditable || showPencil
         binding.etInput.isEnabled = isEditable
         binding.etInput.isFocusable = isEditable
         binding.etInput.isFocusableInTouchMode = isEditable
@@ -107,6 +111,22 @@ object QuestionRenderer {
             binding.etInput.keyListener = binding.etInput.keyListener
                 ?: (binding.tilInput.getTag(org.piramalswasthya.stoptb.R.id.til_input) as? android.text.method.KeyListener)
                 ?: android.text.method.TextKeyListener.getInstance()
+        }
+        if (showPencil) {
+            binding.tilInput.endIconMode = TextInputLayout.END_ICON_CUSTOM
+            binding.tilInput.isEndIconVisible = true
+            binding.tilInput.setEndIconTintList(
+                android.content.res.ColorStateList.valueOf(
+                    ContextCompat.getColor(binding.root.context, org.piramalswasthya.stoptb.R.color.md_theme_light_primary)
+                )
+            )
+            binding.tilInput.endIconDrawable =
+                ContextCompat.getDrawable(binding.root.context, android.R.drawable.ic_menu_edit)
+            binding.tilInput.setEndIconOnClickListener { onPencilClick?.invoke() }
+        } else {
+            binding.tilInput.endIconMode = TextInputLayout.END_ICON_NONE
+            binding.tilInput.endIconDrawable = null
+            binding.tilInput.setEndIconOnClickListener(null)
         }
 
         val maxLength = question.maxLength

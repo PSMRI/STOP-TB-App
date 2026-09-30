@@ -61,10 +61,12 @@ data class CounsellingQuestionDto(
     @Transient var value: Any? = null,
     @Transient var visible: Boolean = true,
     @Transient var errorMessage: String? = null,
-    @Transient var originalIsMandatory: Boolean? = null
+    @Transient var originalIsMandatory: Boolean? = null,
+    // Set when the user taps the pencil on a submitted section's notes field.
+    @Transient var remarksUnlocked: Boolean = false,
+    @Transient var remarksRequestFocus: Boolean = false
 ) {
     companion object {
-        // Remarks stay editable after the rest of the section is locked.
         val ALWAYS_EDITABLE_UUIDS = setOf(
             "TB_A_REMARKS",
             "TB_B_REMARKS",

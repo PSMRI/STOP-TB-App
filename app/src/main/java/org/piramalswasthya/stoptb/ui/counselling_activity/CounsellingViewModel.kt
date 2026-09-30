@@ -54,10 +54,10 @@ class CounsellingViewModel @Inject constructor(
     val isFormEditable: LiveData<Boolean> get() = _isFormEditable
 
     fun isSectionEditable(section: CounsellingSectionDto?): Boolean {
-        // Backend's isEditable=true (only the last section) is an unconditional override — that
-        // section stays editable forever regardless of submitted/completed/refused state.
-        if (section?.isEditable == true) return true
+        // Once submitted, option checkboxes and Select All stay locked. Notes can still
+        // be opened with the pencil icon. isEditable only applies before submit.
         if (section?.isSubmitted == true) return false
+        if (section?.isEditable == true) return true
         return _isFormEditable.value != false
     }
 
@@ -343,6 +343,10 @@ class CounsellingViewModel @Inject constructor(
         _currentStep.value = index
 
         evaluateAllConditions(section)
+        section.questions.forEach {
+            it.remarksUnlocked = false
+            it.remarksRequestFocus = false
+        }
         captureRemarksSnapshot(section)
 
         _activeQuestions.value = section.questions.toList()
@@ -361,6 +365,7 @@ class CounsellingViewModel @Inject constructor(
 
     fun selectAllCheckboxes(selectAll: Boolean) {
         val section = currentSection() ?: return
+        if (!isSectionEditable(section)) return
         if (selectAll) {
             repeat(5) {
                 checkboxQuestions(section).forEach { q ->
