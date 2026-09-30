@@ -1112,10 +1112,8 @@ class BenRepo @Inject constructor(
         if (date.isNullOrBlank()) return null
 
         val patterns = listOf(
-            "MMM dd, yyyy HH:mm:ss a",
-            "MMM dd, yyyy h:mm:ss a",
-            "MMM d, yyyy HH:mm:ss a",
             "MMM d, yyyy h:mm:ss a",
+            "MMM d, yyyy HH:mm:ss",
             "yyyy-MM-dd",
             "yyyy-MM-dd HH:mm:ss",
             "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
