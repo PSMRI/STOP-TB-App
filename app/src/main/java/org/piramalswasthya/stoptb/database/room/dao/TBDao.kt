@@ -139,14 +139,14 @@ interface TBDao {
     @Query("""
         SELECT COUNT(*) FROM TB_SCREENING ts
         INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-        WHERE ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+        WHERE (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
         AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
         AND (:endTime = :endTime)
         AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
         AND (:isSeniorCitizen  = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
     """)
-    fun getDashboardTbScreeningCount(villageId: Int, assignedVillageIds: List<Int>, startTime: Long, endTime: Long, gender: String, isChild: Int,    isSeniorCitizen: Int
+    fun getDashboardTbScreeningCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int,    isSeniorCitizen: Int
     ): Flow<Int>
 
 
@@ -178,15 +178,15 @@ interface TBDao {
     AND UPPER(IFNULL(td.naatResult, '')) NOT IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
     AND UPPER(IFNULL(td.liquidCultureResult, '')) != 'POSITIVE'
     AND NOT EXISTS (SELECT 1 FROM TB_CONFIRMED_TREATMENT tc WHERE tc.benId = b.beneficiaryId)
-    AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+    AND (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
     AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
     AND (:endTime = :endTime)
     AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
     AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
 """)
     fun getDashboardPresumptiveTbCount(
-        villageId: Int,
         assignedVillageIds: List<Int>,
+        villageName: String,
         startTime: Long,
         endTime: Long,
         gender: String,
@@ -196,7 +196,7 @@ interface TBDao {
     @Query("""
         SELECT COUNT(*) FROM TB_SCREENING ts
         INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-        WHERE ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+        WHERE (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
         AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
         AND (:endTime = :endTime)
         AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
@@ -205,8 +205,8 @@ interface TBDao {
         AND ts.historyOfTb = 1
     """)
     fun getDashboardPastHistoryTbCount(
-        villageId: Int,
         assignedVillageIds: List<Int>,
+        villageName: String,
         startTime: Long,
         endTime: Long,
         gender: String,
@@ -217,7 +217,7 @@ interface TBDao {
     @Query("""
         SELECT COUNT(*) FROM TB_SCREENING ts
         INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-        WHERE ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+        WHERE (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
         AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
         AND (:endTime = :endTime)
         AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
@@ -226,8 +226,8 @@ interface TBDao {
         AND ts.takingAntiTBDrugs = 1
     """)
     fun getDashboardAntiTbDrugsCount(
-        villageId: Int,
         assignedVillageIds: List<Int>,
+        villageName: String,
         startTime: Long,
         endTime: Long,
         gender: String,
@@ -240,7 +240,7 @@ interface TBDao {
         SELECT COUNT(*) FROM (
             SELECT b.beneficiaryId FROM TB_SUSPECTED ts
             INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-            WHERE ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+            WHERE (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
             AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
             AND (:endTime = :endTime)
             AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
@@ -249,7 +249,7 @@ interface TBDao {
             UNION
             SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
             INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
-            WHERE ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+            WHERE (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
             AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN td.visitDate >= 100000000000 THEN td.visitDate WHEN td.visitDate > 0 THEN td.visitDate * 1000 WHEN IFNULL(td.serverUpdatedDate, 0) >= 100000000000 THEN td.serverUpdatedDate WHEN IFNULL(td.serverUpdatedDate, 0) > 0 THEN td.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
             AND (:endTime = :endTime)
             AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
@@ -257,7 +257,7 @@ interface TBDao {
             AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
         )
     """)
-    fun getDashboardTbSuspectedCount(villageId: Int, assignedVillageIds: List<Int>, startTime: Long, endTime: Long, gender: String, isChild: Int,isSeniorCitizen: Int): Flow<Int>
+    fun getDashboardTbSuspectedCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int,isSeniorCitizen: Int): Flow<Int>
 
     // Dashboard queries - TB Confirmed count by gender with time + village filter
     @Query("""
@@ -265,7 +265,7 @@ interface TBDao {
             SELECT b.beneficiaryId FROM TB_SUSPECTED ts
             INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
             WHERE ts.isConfirmed = 1
-            AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+            AND (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
             AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
             AND (:endTime = :endTime)
             AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
@@ -275,7 +275,7 @@ interface TBDao {
             SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
             INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
             WHERE td.isConfirmed = 1
-            AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+            AND (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
             AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN td.visitDate >= 100000000000 THEN td.visitDate WHEN td.visitDate > 0 THEN td.visitDate * 1000 WHEN IFNULL(td.serverUpdatedDate, 0) >= 100000000000 THEN td.serverUpdatedDate WHEN IFNULL(td.serverUpdatedDate, 0) > 0 THEN td.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
             AND (:endTime = :endTime)
             AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
@@ -283,14 +283,14 @@ interface TBDao {
             AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
         )
     """)
-    fun getDashboardTbConfirmedCount(villageId: Int, assignedVillageIds: List<Int>, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int): Flow<Int>
+    fun getDashboardTbConfirmedCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int): Flow<Int>
 
     // NIKSHAY IDs count with time + village filter
     @Query("""
         SELECT COUNT(*) FROM TB_SUSPECTED ts
         INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
         WHERE ts.nikshayId IS NOT NULL AND ts.nikshayId != ''
-        AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+        AND (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
         AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
         AND (:endTime = :endTime)
         AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
@@ -298,8 +298,8 @@ interface TBDao {
         AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
     """)
     fun getDashboardNikshayCount(
-        villageId: Int,
         assignedVillageIds: List<Int>,
+        villageName: String,
         startTime: Long,
         endTime: Long,
         gender: String,
@@ -313,7 +313,7 @@ interface TBDao {
             INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
             LEFT JOIN TB_DIAGNOSTICS td ON td.benId = ts.benId
             WHERE ts.isChestXRayDone = 1 AND (td.benId IS NULL OR td.xrayOrderStatus = 'COMPLETED')
-            AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+            AND (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
             AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
             AND (:endTime = :endTime)
             AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
@@ -323,7 +323,7 @@ interface TBDao {
             SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
             INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
             WHERE td.isChestXRayDone = 1 AND td.xrayOrderStatus = 'COMPLETED'
-            AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+            AND (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
             AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN td.visitDate >= 100000000000 THEN td.visitDate WHEN td.visitDate > 0 THEN td.visitDate * 1000 WHEN IFNULL(td.serverUpdatedDate, 0) >= 100000000000 THEN td.serverUpdatedDate WHEN IFNULL(td.serverUpdatedDate, 0) > 0 THEN td.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
             AND (:endTime = :endTime)
             AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
@@ -331,7 +331,7 @@ interface TBDao {
             AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
         )
     """)
-    fun getDashboardDigitalChestXRayCount(villageId: Int, assignedVillageIds: List<Int>, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int): Flow<Int>
+    fun getDashboardDigitalChestXRayCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int): Flow<Int>
 
     @Query("""
         SELECT COUNT(*) FROM (
@@ -339,7 +339,7 @@ interface TBDao {
             INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
             LEFT JOIN TB_DIAGNOSTICS td ON td.benId = ts.benId
             WHERE ts.isSputumCollected = 1 AND (td.benId IS NULL OR td.trueNatOrderStatus IN ('COMPLETED', 'REFUSED'))
-            AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+            AND (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
             AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
             AND (:endTime = :endTime)
             AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
@@ -349,7 +349,7 @@ interface TBDao {
             SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
             INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
             WHERE td.isSputumCollected = 1 AND td.trueNatOrderStatus IN ('COMPLETED', 'REFUSED')
-            AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+            AND (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
             AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN td.visitDate >= 100000000000 THEN td.visitDate WHEN td.visitDate > 0 THEN td.visitDate * 1000 WHEN IFNULL(td.serverUpdatedDate, 0) >= 100000000000 THEN td.serverUpdatedDate WHEN IFNULL(td.serverUpdatedDate, 0) > 0 THEN td.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
             AND (:endTime = :endTime)
             AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
@@ -357,7 +357,7 @@ interface TBDao {
             AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
         )
     """)
-    fun getDashboardSputumCollectionCount(villageId: Int, assignedVillageIds: List<Int>, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int): Flow<Int>
+    fun getDashboardSputumCollectionCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int): Flow<Int>
 
     @Query("""
         SELECT COUNT(*) FROM (
@@ -365,7 +365,7 @@ interface TBDao {
             INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
             LEFT JOIN TB_DIAGNOSTICS td ON td.benId = ts.benId
             WHERE ts.isNaatConducted = 1 AND (td.benId IS NULL OR td.trueNatOrderStatus = 'COMPLETED')
-            AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+            AND (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
             AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
             AND (:endTime = :endTime)
             AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
@@ -375,7 +375,7 @@ interface TBDao {
             SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
             INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
             WHERE td.isNaatConducted = 1 AND td.trueNatOrderStatus = 'COMPLETED'
-            AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+            AND (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
             AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN td.visitDate >= 100000000000 THEN td.visitDate WHEN td.visitDate > 0 THEN td.visitDate * 1000 WHEN IFNULL(td.serverUpdatedDate, 0) >= 100000000000 THEN td.serverUpdatedDate WHEN IFNULL(td.serverUpdatedDate, 0) > 0 THEN td.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
             AND (:endTime = :endTime)
             AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
@@ -383,14 +383,14 @@ interface TBDao {
             AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
         )
     """)
-    fun getDashboardTrueNatCount(villageId: Int, assignedVillageIds: List<Int>, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int): Flow<Int>
+    fun getDashboardTrueNatCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int): Flow<Int>
 
     @Query("""
         SELECT COUNT(*) FROM (
             SELECT b.beneficiaryId FROM TB_SUSPECTED ts
             INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
             WHERE ts.isLiquidCultureConducted = 1
-            AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+            AND (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
             AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
             AND (:endTime = :endTime)
             AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
@@ -400,7 +400,7 @@ interface TBDao {
             SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
             INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
             WHERE td.isLiquidCultureConducted = 1
-            AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+            AND (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
             AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN td.visitDate >= 100000000000 THEN td.visitDate WHEN td.visitDate > 0 THEN td.visitDate * 1000 WHEN IFNULL(td.serverUpdatedDate, 0) >= 100000000000 THEN td.serverUpdatedDate WHEN IFNULL(td.serverUpdatedDate, 0) > 0 THEN td.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
             AND (:endTime = :endTime)
             AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
@@ -408,13 +408,13 @@ interface TBDao {
             AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
         )
     """)
-    fun getDashboardLiquidCultureCount(villageId: Int, assignedVillageIds: List<Int>, startTime: Long, endTime: Long, gender: String, isChild: Int,isSeniorCitizen: Int): Flow<Int>
+    fun getDashboardLiquidCultureCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int,isSeniorCitizen: Int): Flow<Int>
 
     @Query("""
         SELECT COUNT(*) FROM (
             SELECT b.beneficiaryId FROM beneficiary b
             WHERE b.temperature IS NOT NULL AND b.temperature >= 100.0
-            AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+            AND (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
             AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN IFNULL(b.updatedDate, 0) >= 100000000000 THEN b.updatedDate WHEN IFNULL(b.updatedDate, 0) > 0 THEN b.updatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
             AND (:endTime = :endTime)
             AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
@@ -430,7 +430,7 @@ interface TBDao {
                OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
                OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
                OR (v.rbs IS NOT NULL AND v.rbs >= 100))
-            AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+            AND (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
             AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN IFNULL(v.capturedAt, 0) >= 100000000000 THEN v.capturedAt WHEN IFNULL(v.capturedAt, 0) > 0 THEN v.capturedAt * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
             AND (:endTime = :endTime)
             AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
@@ -438,7 +438,7 @@ interface TBDao {
             AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
         )
     """)
-    fun getDashboardHwcReferralCount(villageId: Int, assignedVillageIds: List<Int>, startTime: Long, endTime: Long, gender: String, isChild: Int,isSeniorCitizen: Int): Flow<Int>
+    fun getDashboardHwcReferralCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int,isSeniorCitizen: Int): Flow<Int>
 
 
 
@@ -446,15 +446,15 @@ interface TBDao {
     @Query("""
         SELECT COUNT(*) FROM beneficiary b
         WHERE b.beneficiaryId NOT IN (SELECT benId FROM TB_SCREENING)
-        AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
+        AND (b.loc_village_id IN (:assignedVillageIds) OR (:villageName != '' AND (b.loc_village_name = :villageName OR b.loc_village_name LIKE :villageName || ' (%' OR b.loc_village_name LIKE :villageName || '(%')))
         AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN IFNULL(b.updatedDate, 0) >= 100000000000 THEN b.updatedDate WHEN IFNULL(b.updatedDate, 0) > 0 THEN b.updatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
         AND (:endTime = :endTime)
         AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
     """)
     fun getDashboardUnscreenedCount(
-        villageId: Int,
         assignedVillageIds: List<Int>,
+        villageName: String,
         startTime: Long,
         endTime: Long,
         gender: String,
