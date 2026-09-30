@@ -1,10 +1,12 @@
 package org.piramalswasthya.stoptb.ui.counselling_activity
 
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.CheckBox
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -37,8 +39,24 @@ class   CounsellingFormFragment : Fragment() {
         fun updateSelectAll() {
             val section = viewModel.schemaData?.sections?.getOrNull(viewModel.currentStep.value ?: 0)
             val show = viewModel.currentSectionHasCheckboxes()
+            val sectionEditable = viewModel.isSectionEditable(section)
             cbSelectAll.visibility = if (show) View.VISIBLE else View.GONE
-            cbSelectAll.isEnabled = viewModel.isSectionEditable(section)
+            cbSelectAll.isEnabled = sectionEditable
+            cbSelectAll.isClickable = sectionEditable
+            val boxColor = ContextCompat.getColor(
+                cbSelectAll.context,
+                if (sectionEditable) R.color.md_theme_light_primary else R.color.grey
+            )
+            val labelColor = ContextCompat.getColor(
+                cbSelectAll.context,
+                if (sectionEditable) R.color.md_theme_light_onSurfaceVariant else R.color.grey
+            )
+            cbSelectAll.buttonTintList = ColorStateList.valueOf(boxColor)
+            (cbSelectAll as? com.google.android.material.checkbox.MaterialCheckBox)?.buttonIconTintList =
+                ColorStateList.valueOf(
+                    ContextCompat.getColor(cbSelectAll.context, R.color.md_theme_light_onPrimary)
+                )
+            cbSelectAll.setTextColor(labelColor)
             suppressSelectAllCallback = true
             cbSelectAll.isChecked = viewModel.areAllCheckboxesSelected()
             suppressSelectAllCallback = false
@@ -51,12 +69,18 @@ class   CounsellingFormFragment : Fragment() {
                     viewModel.evaluateConditions(updatedQ)
                 }
                 updateSelectAll()
-            }
+            },
+            unlockRemarksWithPencil = true
         )
         rv.adapter = adapter
 
         cbSelectAll.setOnCheckedChangeListener { _, isChecked ->
             if (suppressSelectAllCallback) return@setOnCheckedChangeListener
+            val section = viewModel.schemaData?.sections?.getOrNull(viewModel.currentStep.value ?: 0)
+            if (!viewModel.isSectionEditable(section)) {
+                updateSelectAll()
+                return@setOnCheckedChangeListener
+            }
             viewModel.selectAllCheckboxes(isChecked)
         }
 
