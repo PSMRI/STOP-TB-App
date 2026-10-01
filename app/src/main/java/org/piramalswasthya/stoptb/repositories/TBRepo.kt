@@ -340,6 +340,13 @@ class TBRepo @Inject constructor(
                 familySufferingFromTB = item.optNullableBoolean("familySufferingFromTB"),
                 riseOfFever = item.optNullableBoolean("riseOfFever"),
                 lossOfAppetite = item.optNullableBoolean("lossOfAppetite"),
+
+                chestPain = item.optNullableBoolean("chestPain") ?: existing?.chestPain,
+                shortnessOfBreath = item.optNullableBoolean("shortnessOfBreath") ?: existing?.shortnessOfBreath,
+                fatigue = item.optNullableBoolean("fatigue") ?: existing?.fatigue,
+                failureToGainWeightInChildren = item.optNullableBoolean("failureToGainWeightInChildren") ?: existing?.failureToGainWeightInChildren,
+                decreasedActivityOrPlayfulnessInChildren = item.optNullableBoolean("decreasedActivityOrPlayfulnessInChildren") ?: existing?.decreasedActivityOrPlayfulnessInChildren,
+                otherSymptoms = item.optNullableBoolean("otherSymptoms") ?: existing?.otherSymptoms,
                 referredForDigitalChestXray = item.optNullableBoolean("referredForDigitalChestXray"),
                 referredForSputumCollection = item.optNullableBoolean("referredForSputumCollection"),
                 sputumSampleSubmittedAt = item.optStringOrNull("sputumSampleSubmittedAt"),
@@ -1966,9 +1973,10 @@ class TBRepo @Inject constructor(
                                     val chestResult = serverResultSummary ?: ""
 
                                     val isCompleted = status.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
-                                    val xrayPos = isCompleted && isChestXrayPositive(chestResult)
+                                    val xrayPos = isCompleted &&
+                                        (isChestXrayPositive(chestResult) || isChestXrayAbnormalNonTB(chestResult))
 
-                                     if (xrayPos && isTruenatIntegrated()) {
+                                     if (xrayPos) {
                                         val hasTruenat = !it.trueNatOrderId.isNullOrBlank() ||
                                                 it.trueNatOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
                                                 it.trueNatOrderStatus.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) ||
@@ -1978,8 +1986,9 @@ class TBRepo @Inject constructor(
                                                 val response = createOrder(benId, "SPUTUM_TRUENAT")
                                                 if (response is NetworkResponse.Success) {
                                                     triggerTrueNatDiagnosticResultPollWorker(context)
-                                                    it.copy(
-                                                        xrayOrderId = fetchedOrderId ?: it.xrayOrderId,
+                                                    val postOrder = tbDao.getTbDiagnosticsByBenId(benId) ?: it
+                                                    postOrder.copy(
+                                                        xrayOrderId = fetchedOrderId ?: postOrder.xrayOrderId,
                                                         xrayOrderStatus = OrderStatus.COMPLETED.name,
                                                         isReferredForDigitalChestXray = true,
                                                         isChestXRayDone = true,
@@ -2169,7 +2178,13 @@ class TBRepo @Inject constructor(
                                         trueNatOrderStatus = computedTrueNatStatus,
                                         trueNatOrderId = computedTrueNatOrderId ?: it.trueNatOrderId,
                                         isSputumCollected = true,
-                                        isNaatConducted = if (isCompleted) true else it.isNaatConducted,
+                                        isNaatConducted = when {
+                                            isCompleted -> true
+                                            it.isNaatConducted == true -> true
+                                            !it.trueNatOrderId.isNullOrBlank() ||
+                                                !it.trueNatOrderStatus.isNullOrBlank() -> true
+                                            else -> it.isNaatConducted
+                                        },
                                         naatResult = if (isCompleted) (serverMtbResultSummary ?: mtbResult) else it.naatResult,
                                         isTBConfirmed = if (isCompleted) isMtbDetected else it.isTBConfirmed,
                                         isConfirmed = if (isCompleted) isMtbDetected else it.isConfirmed,
@@ -2668,5 +2683,10 @@ class TBRepo @Inject constructor(
     private fun isChestXrayPositive(value: String?): Boolean {
         if (value.isNullOrBlank()) return false
         return value.trim().lowercase() == "tb presumptive"
+    }
+
+    private fun isChestXrayAbnormalNonTB(value: String?): Boolean {
+        if (value.isNullOrBlank()) return false
+        return value.trim().lowercase() == "abnormal but not tb presumptive"
     }
 }

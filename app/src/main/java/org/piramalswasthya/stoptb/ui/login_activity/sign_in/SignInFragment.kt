@@ -2,10 +2,7 @@ package org.piramalswasthya.stoptb.ui.login_activity.sign_in
 
 import android.app.AlertDialog
 import android.content.Context
-import android.content.Context.CONNECTIVITY_SERVICE
 import android.content.Intent
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -65,6 +62,13 @@ class SignInFragment : Fragment() {
     private val viewModel: SignInViewModel by viewModels()
     private var suppressCampModeListener = false
     private var pendingLoginAfterCampCheck = false
+
+    /**
+     * True between handing a login to the camp hub and its result arriving. Lets the error branch
+     * tell "the hub went away mid-request" (fall back to a local login) from "the hub answered and
+     * rejected these credentials" (show the error).
+     */
+    private var campAuthInFlight = false
 
     private val stateUnselectedAlert by lazy {
         AlertDialog.Builder(context).setTitle("State Missing")
@@ -162,26 +166,7 @@ class SignInFragment : Fragment() {
             binding.tilPassword.error = null
         }
 
-        binding.btnLogin.setOnClickListener {
-            view.findFocus()?.let { view ->
-                val imm =
-                    activity?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-                imm?.hideSoftInputFromWindow(view.windowToken, 0)
-            }
-            if (!viewModel.isCampHubConnected()) {
-                binding.tvError.text = getString(R.string.camp_hub_login_blocked)
-                binding.tvError.visibility = View.VISIBLE
-                viewModel.checkCampHubConnection()
-                return@setOnClickListener
-            }
-            val username = binding.etUsername.text.toString()
-            val password = binding.etPassword.text.toString()
-            if (!applyLoginEmptyFieldErrors(username, password)) {
-                binding.tvError.visibility = View.GONE
-                return@setOnClickListener
-            }
-            viewModel.loginInClicked()
-        }
+        binding.btnLogin.setOnClickListener { startLoginAttempt() }
 
         refreshCampModeUi()
 
@@ -212,21 +197,14 @@ class SignInFragment : Fragment() {
         viewModel.campHubStatus.observe(viewLifecycleOwner) { status ->
             updateCampHubStatus(status)
             when (status) {
-                CampHubStatus.CONNECTED -> {
-                    if (pendingLoginAfterCampCheck) {
-                        pendingLoginAfterCampCheck = false
-                        viewModel.loginInClicked()
-                    }
-                }
-                CampHubStatus.NOT_CONNECTED -> {
-                    if (pendingLoginAfterCampCheck) {
-                        pendingLoginAfterCampCheck = false
-                        binding.tvError.text = getString(R.string.camp_hub_login_blocked)
-                        binding.tvError.visibility = View.VISIBLE
-                    }
+                // CHECKING is the only non-terminal status. Every other one has to release a
+                // pending login, or a login attempt would sit on the spinner forever.
+                CampHubStatus.CHECKING -> Unit
+                CampHubStatus.NOT_CONNECTED, CampHubStatus.IDLE -> {
+                    releasePendingLogin()
                     refreshCampModeUi()
                 }
-                else -> Unit
+                CampHubStatus.CONNECTED -> releasePendingLogin()
             }
         }
 
@@ -292,13 +270,30 @@ class SignInFragment : Fragment() {
                         hasRememberMePassword = true
                     } ?: binding.etPassword.text?.clear()
                     binding.cbRemember.isChecked = hasRememberMeUsername
-                    if (hasRememberMeUsername && hasRememberMePassword && viewModel.isCampHubConnected()) {
-                        validateInput()
+                    campAuthInFlight = false
+                    if (hasRememberMeUsername && hasRememberMePassword) {
+                        // No isCampHubConnected() guard: the attempt probes the hub itself and
+                        // falls back to a local login when it is unreachable.
+                        startLoginAttempt()
                     }
                 }
 
                 is NetworkResponse.Loading -> validateInput()
                 is NetworkResponse.Error -> {
+                    if (campAuthInFlight) {
+                        campAuthInFlight = false
+                        // CampModeUrlInterceptor clears this flag once it confirms the hub became
+                        // unreachable during the call, which is the only failure that should fall
+                        // back to a local login. A 401 or a server error leaves it set, so bad
+                        // credentials still surface instead of silently signing the user in.
+                        if (!viewModel.isCampHubConnected()) {
+                            loginLocally(
+                                binding.etUsername.text.toString(),
+                                binding.etPassword.text.toString()
+                            )
+                            return@observe
+                        }
+                    }
                     binding.pbSignIn.visibility = View.GONE
                     binding.clContent.visibility = View.VISIBLE
                     clearLoginFieldErrors()
@@ -337,6 +332,7 @@ class SignInFragment : Fragment() {
 //                }
 
                 is NetworkResponse.Success -> {
+                    campAuthInFlight = false
 
                     val user = state.data  // ya loggedInUser use karo
 
@@ -493,8 +489,9 @@ class SignInFragment : Fragment() {
     }
 
     /**
-     * Visually enable/disable the login button while keeping it always clickable
-     * so the click listener can show an error message when hub is not connected.
+     * Visually flags camp hub reachability on the login button without disabling it. The button
+     * stays clickable because a login is still possible while the hub is down: the attempt probes
+     * the hub and falls back to a local sign-in for a user already stored on this device.
      */
     private fun setLoginButtonReady(ready: Boolean) {
         binding.btnLogin.alpha = if (ready) 1f else 0.45f
@@ -523,6 +520,41 @@ class SignInFragment : Fragment() {
     }
 
     /**
+     * The single entry point for a login attempt, from the Login button and from the
+     * remembered-credentials auto-login.
+     *
+     * Always probes the camp hub first rather than trusting the cached connected flag, then lets
+     * [releasePendingLogin] continue once the probe reaches a terminal status.
+     */
+    private fun startLoginAttempt() {
+        binding.root.findFocus()?.let { focused ->
+            val imm =
+                activity?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.hideSoftInputFromWindow(focused.windowToken, 0)
+        }
+
+        val username = binding.etUsername.text.toString()
+        val password = binding.etPassword.text.toString()
+        if (!applyLoginEmptyFieldErrors(username, password)) {
+            binding.tvError.visibility = View.GONE
+            return
+        }
+
+        binding.tvError.visibility = View.GONE
+        pendingLoginAfterCampCheck = true
+        binding.clContent.visibility = View.INVISIBLE
+        binding.pbSignIn.visibility = View.VISIBLE
+        viewModel.checkCampHubConnection()
+    }
+
+    /** Continues an attempt that was waiting on the camp hub probe, whatever the probe decided. */
+    private fun releasePendingLogin() {
+        if (!pendingLoginAfterCampCheck) return
+        pendingLoginAfterCampCheck = false
+        viewModel.loginInClicked()
+    }
+
+    /**
      * get username and password
      * validate with existing logged in user if exists else call login api
      */
@@ -540,40 +572,52 @@ class SignInFragment : Fragment() {
             return
         }
 
-        if (!viewModel.isCampHubConnected()) {
-            viewModel.updateState(NetworkResponse.Error(getString(R.string.camp_hub_login_blocked)))
-            return
-        }
-
         continueNormalLogin(username, password)
     }
 
+    /**
+     * Camp-first: whenever the hub answered the probe, authenticate against it, even for a user who
+     * is already stored locally. Resolving a returning user from SharedPreferences instead is what
+     * used to make a rejected login unrecoverable, and it also hid server-side role and password
+     * changes from the app. The local comparison is now only the offline fallback.
+     */
     private fun continueNormalLogin(username: String, password: String) {
         val loggedInUser = viewModel.getLoggedInUser()
 
-        if (loggedInUser == null) {
-            viewModel.authUser(username, password)
-        } else {
-            if (loggedInUser.userName.equals(username.trim(), true)) {
-                if (loggedInUser.password == password) {
-                    if(isInternetAvailable(requireActivity())){
-                        lifecycleScope.launch {
-                            migrateLegacySessionIfNeeded()
-                            viewModel.updateState(NetworkResponse.Success(loggedInUser))
-                        }
-                    }else{
-                        viewModel.updateState(NetworkResponse.Success(loggedInUser))
-                    }
-                } else {
-                    viewModel.updateState(
-                        NetworkResponse.Error(getString(R.string.error_login_invalid_password))
-                    )
-                }
-            } else {
-                userChangeAlert.setCanceledOnTouchOutside(false)
-                userChangeAlert.show()
-            }
+        // A different user has to clear the logout confirmation first. Authenticating straight
+        // away would overwrite the stored user while the previous user's unsynced rows are still
+        // in the database.
+        if (loggedInUser != null && !loggedInUser.userName.equals(username.trim(), true)) {
+            userChangeAlert.setCanceledOnTouchOutside(false)
+            userChangeAlert.show()
+            return
         }
+
+        if (viewModel.isCampHubConnected()) {
+            campAuthInFlight = true
+            viewModel.authUser(username, password)
+            return
+        }
+
+        loginLocally(username, password)
+    }
+
+    /** Offline path: only reachable when the camp hub could not be reached. */
+    private fun loginLocally(username: String, password: String) {
+        val loggedInUser = viewModel.getLoggedInUser()
+        viewModel.updateState(
+            when {
+                // Nothing to authenticate against - a first login has to go through the hub.
+                loggedInUser == null ->
+                    NetworkResponse.Error(getString(R.string.camp_hub_login_blocked))
+
+                loggedInUser.password == password ->
+                    NetworkResponse.Success(loggedInUser)
+
+                else ->
+                    NetworkResponse.Error(getString(R.string.error_login_invalid_password))
+            }
+        )
     }
 
 
@@ -582,40 +626,5 @@ class SignInFragment : Fragment() {
         _binding = null
     }
 
-
-    private suspend fun migrateLegacySessionIfNeeded() {
-        if (!prefDao.getJWTAmritToken().isNullOrBlank()) return
-
-        val user = prefDao.getLoggedInUser() ?: return
-
-        when (
-            val result = viewModel.authenticateForMigration(
-                user.userName,
-                user.password
-            )
-        ) {
-            is NetworkResponse.Success -> {
-                //Currenltly Implementation not required
-            }
-
-            is NetworkResponse.Error -> {
-               //Currenltly Implementation not required
-            }
-
-            else -> Unit
-        }
-    }
-
-    @Suppress("deprecation")
-    private fun isInternetAvailable(context: Context): Boolean {
-        val connectivityManager = context.getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val network = connectivityManager.activeNetwork
-            val capabilities = connectivityManager.getNetworkCapabilities(network)
-            capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ?: false
-        } else {
-            connectivityManager.activeNetworkInfo?.let { it.isAvailable && it.isConnected } == true
-        }
-    }
 
 }

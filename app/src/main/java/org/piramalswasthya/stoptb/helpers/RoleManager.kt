@@ -8,6 +8,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.AppModule
 import org.piramalswasthya.stoptb.model.AppRole
 import org.piramalswasthya.stoptb.model.ModulePrivilege
+import org.piramalswasthya.stoptb.model.User
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -37,11 +38,12 @@ class RoleManager @Inject constructor(
      *  active role to the first assigned role — no persistence across app restarts. */
     fun initializeFromLoggedInUser() {
         val user = preferenceDao.getLoggedInUser()
-        _assignedRoles = AppRole.resolveAssignedRoles(
-            screenNames = user?.assignedRoleScreenNames.orEmpty()
-        )
+        _assignedRoles = resolveRoles(user)
         _activeRole.value = _assignedRoles.firstOrNull() ?: AppRole.VOLUNTEER
-        Timber.d("RoleManager: assignedRoles=$_assignedRoles, activeRole=${_activeRole.value}")
+        Timber.d(
+            "RoleManager: screenNames=${user?.assignedRoleScreenNames}, legacyRole=${user?.role}, " +
+                    "assignedRoles=$_assignedRoles, activeRole=${_activeRole.value}"
+        )
     }
 
     fun setActiveRole(role: AppRole) {
@@ -52,11 +54,31 @@ class RoleManager @Inject constructor(
     /** The login-gate check: does this user have at least one resolvable role? */
     fun hasAnyValidRole(): Boolean {
         val user = preferenceDao.getLoggedInUser()
-        val resolved = AppRole.resolveAssignedRoles(
+        val resolved = resolveRoles(user)
+        Timber.d(
+            "RoleManager: hasAnyValidRole screenNames=${user?.assignedRoleScreenNames}, " +
+                    "legacyRole=${user?.role}, resolved=$resolved"
+        )
+        return resolved.isNotEmpty()
+    }
+
+    /**
+     * screenNames from the login response are the source of truth. The flat `role` string is
+     * consulted only when they resolve to nothing, which happens for accounts whose stored session
+     * predates release-2.2 and therefore has no screenNames at all - see [toLegacyAppRole]. The
+     * next successful online login rewrites the stored user with real screenNames, after which the
+     * legacy branch is never taken again for that account.
+     *
+     * `User.role` and `User.assignedRoleScreenNames` are declared non-null, but the stored user is
+     * deserialized by Gson from a blob that may predate either field, so both are treated as
+     * nullable here.
+     */
+    private fun resolveRoles(user: User?): List<AppRole> {
+        val fromScreenNames = AppRole.resolveAssignedRoles(
             screenNames = user?.assignedRoleScreenNames.orEmpty()
         )
-        Timber.d("RoleManager: hasAnyValidRole screenNames=${user?.assignedRoleScreenNames}, resolved=$resolved")
-        return resolved.isNotEmpty()
+        if (fromScreenNames.isNotEmpty()) return fromScreenNames
+        return listOfNotNull(user?.role.toLegacyAppRole())
     }
 
     fun privilegesForActiveRole(): ModulePrivilege =

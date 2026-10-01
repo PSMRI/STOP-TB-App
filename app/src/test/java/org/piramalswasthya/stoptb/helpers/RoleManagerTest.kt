@@ -23,8 +23,14 @@ class RoleManagerTest {
     }
 
     private fun mockUserWithScreenNames(screenNames: List<String>) {
+        mockUser(screenNames = screenNames)
+    }
+
+    /** [legacyRole] is the flat pre-2.2 `role` string; null means the field was never stored. */
+    private fun mockUser(screenNames: List<String> = emptyList(), legacyRole: String? = null) {
         val user = mock(User::class.java)
         `when`(user.assignedRoleScreenNames).thenReturn(screenNames)
+        `when`(user.role).thenReturn(legacyRole)
         `when`(preferenceDao.getLoggedInUser()).thenReturn(user)
     }
 
@@ -108,5 +114,54 @@ class RoleManagerTest {
         // Switch to COUNSELING tab
         roleManager.setActiveRole(AppRole.COUNSELING)
         assertThat(roleManager.privilegesForActiveRole().showRegisterSpouseButtons).isFalse()
+    }
+
+    @Test
+    fun `upgraded pre-2_2 session with only a legacy role is admitted`() {
+        mockUser(legacyRole = "Registration Officer")
+        assertThat(roleManager.hasAnyValidRole()).isTrue()
+        roleManager.initializeFromLoggedInUser()
+        assertThat(roleManager.assignedRoles).containsExactly(AppRole.REGISTRAR)
+        assertThat(roleManager.activeRole.value).isEqualTo(AppRole.REGISTRAR)
+
+        mockUser(legacyRole = "Nurse")
+        roleManager.initializeFromLoggedInUser()
+        assertThat(roleManager.assignedRoles).containsExactly(AppRole.NURSE)
+
+        mockUser(legacyRole = "Counselling Officer")
+        roleManager.initializeFromLoggedInUser()
+        assertThat(roleManager.assignedRoles).containsExactly(AppRole.COUNSELING)
+    }
+
+    @Test
+    fun `legacy volunteer and unknown roles stay denied`() {
+        mockUser(legacyRole = "Volunteer")
+        assertThat(roleManager.hasAnyValidRole()).isFalse()
+        roleManager.initializeFromLoggedInUser()
+        assertThat(roleManager.assignedRoles).isEmpty()
+        // Defensive default when nothing resolves - the login gate still blocks this user.
+        assertThat(roleManager.activeRole.value).isEqualTo(AppRole.VOLUNTEER)
+
+        mockUser(legacyRole = "ASHA Supervisor")
+        assertThat(roleManager.hasAnyValidRole()).isFalse()
+    }
+
+    @Test
+    fun `screenNames win over a conflicting legacy role`() {
+        mockUser(screenNames = listOf("Counseling"), legacyRole = "Registration Officer")
+        roleManager.initializeFromLoggedInUser()
+        assertThat(roleManager.assignedRoles).containsExactly(AppRole.COUNSELING)
+    }
+
+    @Test
+    fun `no stored user is denied`() {
+        `when`(preferenceDao.getLoggedInUser()).thenReturn(null)
+        assertThat(roleManager.hasAnyValidRole()).isFalse()
+    }
+
+    @Test
+    fun `stored user with neither screenNames nor a legacy role is denied`() {
+        mockUser()
+        assertThat(roleManager.hasAnyValidRole()).isFalse()
     }
 }
