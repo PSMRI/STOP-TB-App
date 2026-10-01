@@ -13,6 +13,9 @@
     <string name="error_login_username_required">ব্যৱহাৰকাৰীৰ নাম প্ৰয়োজন</string>
     <string name="error_login_password_required">পাছৱৰ্ড প্ৰয়োজন</string>
     <string name="error_login_failed">লগইন বিফল। অনুগ্ৰহ কৰি পুনৰ চেষ্টা কৰক।</string>
+    <string name="error_login_remaining_attempts">অবৈধ ব্যৱহাৰকাৰীনাম বা পাছৱৰ্ড। বাকী থকা প্ৰচেষ্টা: %1$d</string>
+    <string name="error_login_last_attempt">অবৈধ ব্যৱহাৰকাৰীনাম বা পাছৱৰ্ড। মাত্ৰ ১ টা প্ৰচেষ্টা বাকী আছে। পুনৰ ভুল পাছৱৰ্ড দিলে আপোনাৰ একাউণ্ট লক হৈ যাব।</string>
+    <string name="error_login_account_locked">একাধিকবাৰ ভুল লগইন প্ৰচেষ্টাৰ বাবে আপোনাৰ একাউণ্ট লক কৰা হৈছে। অনুগ্ৰহ কৰি কাইলৈ পুনৰ চেষ্টা কৰক বা প্ৰশাসকৰ সৈতে যোগাযোগ কৰক।</string>
     <string name="error_login_unable_to_reach_server">চাৰ্ভাৰৰ সৈতে সংযোগ কৰিব পৰা নাই।</string>
     <string name="error_login_server_refused">চাৰ্ভাৰে সংযোগ অগ্ৰাহ্য কৰিলে।</string>
     <string name="error_login_generic">কিবা ভুল হ\'ল। অনুগ্ৰহ কৰি পিছত পুনৰ চেষ্টা কৰক।</string>
