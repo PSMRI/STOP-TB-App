@@ -433,6 +433,13 @@ class IconDataset @Inject constructor(
             resources.getString(R.string.home_card_referral_subtitle),
             recordsRepo.liquidCultureReferralCount,
             ReferralIconsFragmentDirections.actionReferralIconsFragmentToAllBenFragment(8)
+        ),
+        Icon(
+            R.drawable.ic_check_circle,
+            resources.getString(R.string.referral_clinical_assessment),
+            resources.getString(R.string.home_card_referral_subtitle),
+            recordsRepo.clinicalAssessmentReferralCount,
+            ReferralIconsFragmentDirections.actionReferralIconsFragmentToAllBenFragment(10)
         )
     ).apply {
         forEachIndexed { index, icon ->

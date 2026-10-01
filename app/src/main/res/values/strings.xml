@@ -355,6 +355,7 @@
     <string name="referral_true_nat">True NAT</string>
     <string name="referral_hwc">Health and Wellness Centre</string>
     <string name="referral_liquid_culture">Liquid Culture</string>
+    <string name="referral_clinical_assessment">Clinical Assessment &amp; Diagnosis</string>
     <string name="dashboard_tb_screening_subtitle">Track outreach and screening volume</string>
     <string name="dashboard_tb_suspected_subtitle">Follow up high-risk suspected cases</string>
     <string name="dashboard_tb_confirmed_subtitle">Monitor confirmed patients and support</string>
@@ -415,7 +416,7 @@
     <string name="dashboard_demo_transgender">Transgender</string>
     <string name="dashboard_demo_total">Total</string>
     <string name="dashboard_class_xray_normal">Normal</string>
-    <string name="dashboard_class_xray_abnormal">Abnormal (Non-TB Presumptive)</string>
+    <string name="dashboard_class_xray_abnormal">Abnormal but not TB Presumptive</string>
     <string name="dashboard_class_xray_tb_presumptive">TB Presumptive</string>
     <string name="dashboard_class_xray_invalid">AI Invalid Result</string>
     <string name="dashboard_class_sputum_collected">Sample Collected</string>
@@ -425,7 +426,7 @@
     <string name="dashboard_class_mtb_negative">TB Negative</string>
     <string name="dashboard_class_mtb_invalid">Invalid</string>
     <string name="dashboard_class_mtb_neg_xray_normal">TB Negative + X-Ray Normal</string>
-    <string name="dashboard_class_mtb_neg_xray_abnormal">TB Negative + X-Ray Abnormal (Non-TB Presumptive)</string>
+    <string name="dashboard_class_mtb_neg_xray_abnormal">TB Negative + X-Ray Abnormal but not TB Presumptive</string>
     <string name="dashboard_class_mtb_neg_xray_presumptive">TB Negative + X-Ray TB Presumptive</string>
     <string name="dashboard_class_rif_dr">DR TB</string>
     <string name="dashboard_class_rif_non_dr">Non-DR TB</string>
@@ -1195,6 +1196,7 @@
     <string name="pulse_option_70_80">70-80</string>
     <string name="pulse_option_above_90">More than 90</string>
     <string name="diagnostics_submitted">Diagnostics submitted</string>
+    <string name="diagnostics_saved_offline_pending_sync">Result saved locally — will sync when Camp Hub reconnects</string>
     <string-array name="vital_temperature_options">
         <item>@string/temperature_option_97_5</item>
         <item>@string/temperature_option_98_5</item>
@@ -1339,8 +1341,39 @@
     <string name="ben_card_tb_symptoms">TB Symptoms</string>
     <string name="ben_card_chest_xray">Chest X-Ray</string>
     <string name="ben_card_truenat">TrueNat</string>
+    <string name="ben_card_clinical_assessment">Clinical Assessment</string>
     <string name="ben_card_result">Result:\n%1$s</string>
     <string name="ben_card_result_title">Result:</string>
+
+    <!-- TrueNat & RIF order lifecycle redesign — Order Status area pill/caption/button copy,
+         reused identically by Chest X-Ray's own retrofit of the same design language. -->
+    <string name="order_status_fetching_from_device">Fetching result from device…</string>
+    <string name="order_status_manual_action_required">Manual Action Required</string>
+    <string name="order_status_polling_stopped">Device polling has stopped — results won\'t be fetched automatically.</string>
+    <string name="order_status_manual_unavailable">Automatic device result is unavailable. Please record the test result manually.</string>
+    <string name="order_status_polling_stopped_title">Device polling has stopped.</string>
+    <string name="order_status_polling_stopped_desc">Results won\'t be fetched automatically.</string>
+    <string name="order_status_manual_unavailable_title">Automatic device result is unavailable.</string>
+    <string name="order_status_manual_unavailable_desc">Please record the test result manually.</string>
+    <string name="order_status_hub_disconnected">Hub Disconnected</string>
+    <string name="order_status_saved_locally_syncing">Saved Locally — Syncing…</string>
+    <string name="order_status_hub_disconnected_title">Camp Hub is disconnected.</string>
+    <string name="order_status_hub_disconnected_desc">Not polling for result — please connect to Camp Hub.</string>
+    <string name="order_status_last_checked_caption">Last checked %1$s ago · Auto-refresh every %2$d seconds</string>
+    <!-- Deliberately vague rather than an exact elapsed-seconds count — when a poll cycle runs
+         long, showing e.g. "84s ago" next to "every 60 seconds" looks broken even though it
+         isn't. -->
+    <string name="order_status_few_seconds">a few seconds</string>
+    <!-- Kept short deliberately: these sit side-by-side in two half-width buttons with an
+         icon, and "Enter Result Manually"/"Mark Test Not Conducted" truncate on narrower
+         phone widths. -->
+    <string name="order_status_enter_result">Enter Result</string>
+    <string name="order_status_not_conducted">Not Conducted</string>
+    <string name="order_status_view_mtb_result">View MTB Result</string>
+    <string name="order_status_view_rif_result">View RIF Result</string>
+    <string name="order_status_rif_block_label">RIF Test · triggered by MTB Positive</string>
+    <string name="order_status_create_new_order">Create New Order</string>
+    <string name="order_status_clinical_assessment_referred">Referred for Clinical Assessment &amp; Diagnosis</string>
     <string name="btn_examine">Examine</string>
     <string name="btn_examine_count">Examine %1$d/4</string>
     <string name="btn_examine_count_of">Examine %1$d/%2$d</string>
@@ -1363,10 +1396,11 @@
     <string name="tb_reason_for_denial_chest_xray_other">Specify other reason for denial (X-Ray)</string>
     <string name="tb_reason_not_conducted_xray">Reason Digital Chest X-Ray not conducted</string>
     <string name="tb_reason_not_conducted_xray_other">Specify other reason (X-Ray not conducted)</string>
-    <string name="tb_referred_for_sputum_collection">Referred for Sputum Collection?</string>
+    <string name="tb_referred_for_sputum_collection">Referred for sputum collection/TrueNat Test?</string>
+    <string name="tb_is_sputum_collected">Is sputum collected?</string>
     <string name="tb_reason_for_denial_sputum">Reason for Denial of Sputum Collection</string>
     <string name="tb_reason_for_denial_sputum_other">Specify other reason for denial (Sputum)</string>
-    <string name="tb_sputum_submitted_at">Sputum sample submitted at</string>
+    <string name="tb_sputum_submitted_at">Sputum Sample Submission Center</string>
     <string name="sputum_sample_submitted_at_screening_camp">Sputum Sample Submitted at TB Screening Camp</string>
     <string name="tb_reason_not_conducted_naat">Reason True NAT not conducted</string>
     <string name="tb_reason_not_conducted_naat_other">Specify other reason (True NAT not conducted)</string>

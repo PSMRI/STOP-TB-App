@@ -243,11 +243,11 @@ interface BenDao {
                    OR (v.rbs IS NOT NULL AND v.rbs >= 100)
                 UNION
                 SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                   AND UPPER(IFNULL(ts.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
                 UNION
                 SELECT td.benId FROM TB_DIAGNOSTICS td
-                WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                   AND UPPER(IFNULL(td.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
             ))
             OR (:source = 6 AND isDeath = 0 AND reproductiveStatusId != 1 AND benId NOT IN (SELECT v.benId FROM BEN_VITALS v WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%') AND (
@@ -273,12 +273,12 @@ interface BenDao {
                 OR benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isNaatConducted IS NOT NULL
-                       OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                       OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                 )
                 OR benId IN (
                     SELECT td.benId FROM TB_DIAGNOSTICS td
                     WHERE td.isNaatConducted IS NOT NULL
-                       OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                       OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                 )
                 OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
@@ -327,6 +327,21 @@ interface BenDao {
                         OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
                         OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
                   )
+            ))
+            OR (:source = 10 AND isDeath = 0 AND benId IN (
+                -- TB_SUSPECTED has no RIF field of its own (mdrRifResult is only ever mirrored
+                -- here from TB_DIAGNOSTICS.trueNatRifResult by syncTBSuspectedFromDiagnostics, so
+                -- checking it would be redundant with the td.trueNatRifResult check below) — the
+                -- older SuspectedTBDataset form only ever writes chestXRayResult/naatResult here
+                -- directly, with no TB_DIAGNOSTICS row at all, so that's the gap this union closes.
+                SELECT ts.benId FROM TB_SUSPECTED ts
+                WHERE UPPER(TRIM(IFNULL(ts.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
+                  AND UPPER(TRIM(IFNULL(ts.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED')
+                UNION
+                SELECT td.benId FROM TB_DIAGNOSTICS td
+                WHERE (UPPER(TRIM(IFNULL(td.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
+                       AND UPPER(TRIM(IFNULL(td.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED'))
+                   OR UPPER(TRIM(IFNULL(td.trueNatRifResult,''))) = 'INDETERMINATE'
             ))
         )
         AND (:filterType = 0
@@ -400,11 +415,11 @@ interface BenDao {
                    OR (v.rbs IS NOT NULL AND v.rbs >= 100)
                 UNION
                 SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                   AND UPPER(IFNULL(ts.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
                 UNION
                 SELECT td.benId FROM TB_DIAGNOSTICS td
-                WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                   AND UPPER(IFNULL(td.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
             ))
             OR (:source = 6 AND isDeath = 0 AND reproductiveStatusId != 1 AND benId NOT IN (SELECT v.benId FROM BEN_VITALS v WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%') AND (
@@ -430,12 +445,12 @@ interface BenDao {
                 OR benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isNaatConducted IS NOT NULL
-                       OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                       OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                 )
                 OR benId IN (
                     SELECT td.benId FROM TB_DIAGNOSTICS td
                     WHERE td.isNaatConducted IS NOT NULL
-                       OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                       OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                 )
                 OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
@@ -485,6 +500,21 @@ interface BenDao {
                         OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
                   )
             ))
+            OR (:source = 10 AND isDeath = 0 AND benId IN (
+                -- TB_SUSPECTED has no RIF field of its own (mdrRifResult is only ever mirrored
+                -- here from TB_DIAGNOSTICS.trueNatRifResult by syncTBSuspectedFromDiagnostics, so
+                -- checking it would be redundant with the td.trueNatRifResult check below) — the
+                -- older SuspectedTBDataset form only ever writes chestXRayResult/naatResult here
+                -- directly, with no TB_DIAGNOSTICS row at all, so that's the gap this union closes.
+                SELECT ts.benId FROM TB_SUSPECTED ts
+                WHERE UPPER(TRIM(IFNULL(ts.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
+                  AND UPPER(TRIM(IFNULL(ts.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED')
+                UNION
+                SELECT td.benId FROM TB_DIAGNOSTICS td
+                WHERE (UPPER(TRIM(IFNULL(td.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
+                       AND UPPER(TRIM(IFNULL(td.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED'))
+                   OR UPPER(TRIM(IFNULL(td.trueNatRifResult,''))) = 'INDETERMINATE'
+            ))
         )
         AND (:filterType = 0
             OR (:filterType = 1 AND abhaId IS NOT NULL)
@@ -513,19 +543,62 @@ interface BenDao {
             WHEN isDeactivate = 1 THEN 2
             ELSE 3
         END ASC,
+        -- X-ray/TrueNat lists only (source 6/7): surface rows needing action (Failed/Manual
+        -- Entry) above merely-pending ones, which rank above resolved (Completed), which rank
+        -- above terminal (Closed) — instead of ordering purely by recency, which could bury a
+        -- beneficiary whose order genuinely needs a retry under one that's already resolved.
+        -- Every other source falls into the ELSE branch, unaffected, same as before.
         CASE
-            WHEN :source = 6 OR :source = 7 THEN COALESCE(
-                (
-                    SELECT MAX(visitDate) FROM (
-                        SELECT visitDate FROM TB_SCREENING WHERE benId = BEN_BASIC_CACHE.benId
-                        UNION ALL
-                        SELECT visitDate FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId
-                        UNION ALL
-                        SELECT visitDate FROM TB_SUSPECTED WHERE benId = BEN_BASIC_CACHE.benId
-                    )
-                ),
-                0
-            )
+            WHEN :source = 6 THEN CASE
+                (SELECT xrayOrderStatus FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId ORDER BY id DESC LIMIT 1)
+                WHEN 'FAILED' THEN 0
+                WHEN 'MANUAL_ENTRY' THEN 0
+                WHEN 'COMPLETED' THEN 2
+                WHEN 'CLOSED' THEN 3
+                ELSE 1
+            END
+            WHEN :source = 7 THEN CASE
+                (SELECT trueNatOrderStatus FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId ORDER BY id DESC LIMIT 1)
+                WHEN 'FAILED' THEN 0
+                WHEN 'MANUAL_ENTRY' THEN 0
+                WHEN 'COMPLETED' THEN 2
+                WHEN 'CLOSED' THEN 3
+                ELSE 1
+            END
+            ELSE 1
+        END ASC,
+        CASE
+            WHEN :source = 6 OR :source = 7 THEN
+                -- Within the "needs action" tier (Failed/Manual Entry), oldest first so a
+                -- beneficiary doesn't silently age out of view; every other tier keeps the
+                -- existing most-recent-visit-first order.
+                (CASE WHEN (
+                    CASE
+                        WHEN :source = 6 THEN CASE
+                            (SELECT xrayOrderStatus FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId ORDER BY id DESC LIMIT 1)
+                            WHEN 'FAILED' THEN 0
+                            WHEN 'MANUAL_ENTRY' THEN 0
+                            ELSE 1
+                        END
+                        WHEN :source = 7 THEN CASE
+                            (SELECT trueNatOrderStatus FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId ORDER BY id DESC LIMIT 1)
+                            WHEN 'FAILED' THEN 0
+                            WHEN 'MANUAL_ENTRY' THEN 0
+                            ELSE 1
+                        END
+                    END = 0
+                ) THEN -1 ELSE 1 END) * COALESCE(
+                    (
+                        SELECT MAX(visitDate) FROM (
+                            SELECT visitDate FROM TB_SCREENING WHERE benId = BEN_BASIC_CACHE.benId
+                            UNION ALL
+                            SELECT visitDate FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId
+                            UNION ALL
+                            SELECT visitDate FROM TB_SUSPECTED WHERE benId = BEN_BASIC_CACHE.benId
+                        )
+                    ),
+                    0
+                )
             ELSE COALESCE(createdDate, regDate, 0)
         END DESC,
         benId DESC
@@ -557,11 +630,11 @@ interface BenDao {
                    OR (v.rbs IS NOT NULL AND v.rbs >= 100)
                 UNION
                 SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                   AND UPPER(IFNULL(ts.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
                 UNION
                 SELECT td.benId FROM TB_DIAGNOSTICS td
-                WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                   AND UPPER(IFNULL(td.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
             ))
             OR (:source = 6 AND isDeath = 0 AND reproductiveStatusId != 1 AND benId NOT IN (SELECT v.benId FROM BEN_VITALS v WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%') AND (
@@ -587,12 +660,12 @@ interface BenDao {
                 OR benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isNaatConducted IS NOT NULL
-                       OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                       OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                 )
                 OR benId IN (
                     SELECT td.benId FROM TB_DIAGNOSTICS td
                     WHERE td.isNaatConducted IS NOT NULL
-                       OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                       OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                 )
                 OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
@@ -641,6 +714,21 @@ interface BenDao {
                         OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
                         OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
                   )
+            ))
+            OR (:source = 10 AND isDeath = 0 AND benId IN (
+                -- TB_SUSPECTED has no RIF field of its own (mdrRifResult is only ever mirrored
+                -- here from TB_DIAGNOSTICS.trueNatRifResult by syncTBSuspectedFromDiagnostics, so
+                -- checking it would be redundant with the td.trueNatRifResult check below) — the
+                -- older SuspectedTBDataset form only ever writes chestXRayResult/naatResult here
+                -- directly, with no TB_DIAGNOSTICS row at all, so that's the gap this union closes.
+                SELECT ts.benId FROM TB_SUSPECTED ts
+                WHERE UPPER(TRIM(IFNULL(ts.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
+                  AND UPPER(TRIM(IFNULL(ts.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED')
+                UNION
+                SELECT td.benId FROM TB_DIAGNOSTICS td
+                WHERE (UPPER(TRIM(IFNULL(td.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
+                       AND UPPER(TRIM(IFNULL(td.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED'))
+                   OR UPPER(TRIM(IFNULL(td.trueNatRifResult,''))) = 'INDETERMINATE'
             ))
         )
         AND (:filterType = 0
@@ -1047,11 +1135,11 @@ interface BenDao {
                OR (v.rbs IS NOT NULL AND v.rbs >= 100)
             UNION
             SELECT ts.benId FROM TB_SUSPECTED ts
-            WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+            WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
               AND UPPER(IFNULL(ts.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
             UNION
             SELECT td.benId FROM TB_DIAGNOSTICS td
-            WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+            WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
               AND UPPER(IFNULL(td.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
           )
     """)
@@ -1087,12 +1175,12 @@ interface BenDao {
             benId IN (
               SELECT ts.benId FROM TB_SUSPECTED ts
               WHERE ts.isNaatConducted IS NOT NULL
-                 OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                 OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
             )
             OR benId IN (
               SELECT td.benId FROM TB_DIAGNOSTICS td
               WHERE td.isNaatConducted IS NOT NULL
-                 OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                 OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
             )
             OR benId IN (
               SELECT tbs.benId FROM TB_SCREENING tbs
@@ -1138,6 +1226,22 @@ interface BenDao {
           )
     """)
     fun getLiquidCultureBenCount(selectedVillage: Int): Flow<Int>
+
+    @Query("""
+        SELECT COUNT(*) FROM BEN_BASIC_CACHE
+        WHERE villageId = :selectedVillage AND isDeactivate = 0 AND isDeath = 0
+          AND benId IN (
+            SELECT ts.benId FROM TB_SUSPECTED ts
+            WHERE UPPER(TRIM(IFNULL(ts.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
+              AND UPPER(TRIM(IFNULL(ts.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED')
+            UNION
+            SELECT td.benId FROM TB_DIAGNOSTICS td
+            WHERE (UPPER(TRIM(IFNULL(td.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
+                   AND UPPER(TRIM(IFNULL(td.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED'))
+               OR UPPER(TRIM(IFNULL(td.trueNatRifResult,''))) = 'INDETERMINATE'
+          )
+    """)
+    fun getClinicalAssessmentBenCount(selectedVillage: Int): Flow<Int>
 
 
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE WHERE reproductiveStatusId = 1 and gender = 'FEMALE' and isDeactivate=0 and villageId=:selectedVillage")
@@ -1275,8 +1379,8 @@ interface BenDao {
             "            OR t.takingAntiTBDrugs = 1\n" +
             "            OR t.familySufferingFromTB = 1\n" +
 //            "            OR CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) <= 5\n" +
-            "            OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')\n" +
-            "            OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')\n" +
+            "            OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')\n" +
+            "            OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')\n" +
             "        ) AND IFNULL(ts.isConfirmed, 0) = 0\n" +
             "        AND NOT EXISTS (\n" +
             "            SELECT 1 FROM TB_CONFIRMED_TREATMENT tc WHERE tc.benId = b.benId\n" +
