@@ -94,7 +94,7 @@ class TBDaoTest {
         tbDao.saveTbScreening(screening)
         println("  -> [DB INSERT] Saved asymptomatic verbal screening form (all symptoms = false).")
 
-        val count = tbDao.getDashboardPresumptiveTbCount(villageId, assignedVillages, 0, 0, "", 0).first()
+        val count = tbDao.getDashboardPresumptiveTbCount(assignedVillages, "", 0, 0, "", 0).first()
         println("  -> [DB QUERY] Dashboard presumptive count: $count")
         
         println("  -> [ASSERT] Verifying count is 0...")
@@ -127,7 +127,7 @@ class TBDaoTest {
         tbDao.saveTbDiagnostics(diag)
         println("  -> [DB INSERT] X-ray order created (Status: PENDING, Result: NULL).")
 
-        val count = tbDao.getDashboardPresumptiveTbCount(villageId, assignedVillages, 0, 0, "", 0).first()
+        val count = tbDao.getDashboardPresumptiveTbCount(assignedVillages, "", 0, 0, "", 0).first()
         println("  -> [DB QUERY] Dashboard presumptive count: $count")
         
         println("  -> [ASSERT] Verifying count is 0...")
@@ -162,7 +162,7 @@ class TBDaoTest {
         tbDao.saveTbSuspected(TBSuspectedCache(benId = benId, chestXRayResult = "TB Presumptive"))
         println("  -> [DB INSERT] Chest X-Ray completed. Result: 'TB Presumptive'.")
 
-        val count = tbDao.getDashboardPresumptiveTbCount(villageId, assignedVillages, 0, 0, "", 0).first()
+        val count = tbDao.getDashboardPresumptiveTbCount(assignedVillages, "", 0, 0, "", 0).first()
         println("  -> [DB QUERY] Dashboard presumptive count: $count")
         
         println("  -> [ASSERT] Verifying count is 1...")
@@ -195,7 +195,7 @@ class TBDaoTest {
         tbDao.saveTbDiagnostics(diag)
         println("  -> [DB INSERT] Lab results received. TrueNat/NAAT: 'Positive' (Confirmed).")
 
-        val count = tbDao.getDashboardPresumptiveTbCount(villageId, assignedVillages, 0, 0, "", 0).first()
+        val count = tbDao.getDashboardPresumptiveTbCount(assignedVillages, "", 0, 0, "", 0).first()
         println("  -> [DB QUERY] Dashboard presumptive count (expected to exclude confirmed): $count")
         
         println("  -> [ASSERT] Verifying count is 0...")
@@ -228,7 +228,7 @@ class TBDaoTest {
         tbDao.saveTbDiagnostics(diag)
         println("  -> [DB INSERT] Lab results received. TrueNat/NAAT: 'Negative'.")
 
-        val count = tbDao.getDashboardPresumptiveTbCount(villageId, assignedVillages, 0, 0, "", 0).first()
+        val count = tbDao.getDashboardPresumptiveTbCount(assignedVillages, "", 0, 0, "", 0).first()
         println("  -> [DB QUERY] Dashboard presumptive count: $count")
         
         println("  -> [ASSERT] Verifying count is 1...")
@@ -250,7 +250,7 @@ class TBDaoTest {
         tbDao.saveTbDiagnostics(diag)
         println("  -> [DB INSERT] Sputum collected. TrueNat order status: 'PENDING'.")
 
-        val count = tbDao.getDashboardSputumCollectionCount(villageId, assignedVillages, 0, 0, "", 0, 0).first()
+        val count = tbDao.getDashboardSputumCollectionCount(assignedVillages, "", 0, 0, "", 0, 0).first()
         println("  -> [DB QUERY] Sputum collection conducted count: $count")
         
         println("  -> [ASSERT] Verifying count is 0...")
@@ -272,7 +272,7 @@ class TBDaoTest {
         tbDao.saveTbDiagnostics(diag)
         println("  -> [DB INSERT] Sputum collected. TrueNat order status: 'COMPLETED'.")
 
-        val count = tbDao.getDashboardSputumCollectionCount(villageId, assignedVillages, 0, 0, "", 0, 0).first()
+        val count = tbDao.getDashboardSputumCollectionCount(assignedVillages, "", 0, 0, "", 0, 0).first()
         println("  -> [DB QUERY] Sputum collection conducted count: $count")
         
         println("  -> [ASSERT] Verifying count is 1...")
@@ -294,7 +294,7 @@ class TBDaoTest {
         tbDao.saveTbDiagnostics(diag)
         println("  -> [DB INSERT] Sputum collected. TrueNat order status: 'REFUSED'.")
 
-        val count = tbDao.getDashboardSputumCollectionCount(villageId, assignedVillages, 0, 0, "", 0, 0).first()
+        val count = tbDao.getDashboardSputumCollectionCount(assignedVillages, "", 0, 0, "", 0, 0).first()
         println("  -> [DB QUERY] Sputum collection conducted count: $count")
         
         println("  -> [ASSERT] Verifying count is 1...")
@@ -316,7 +316,7 @@ class TBDaoTest {
         tbDao.saveTbDiagnostics(diag)
         println("  -> [DB INSERT] Sputum collection refused (isSputumCollected = false, TrueNat = REFUSED).")
 
-        val count = tbDao.getDashboardSputumCollectionCount(villageId, assignedVillages, 0, 0, "", 0, 0).first()
+        val count = tbDao.getDashboardSputumCollectionCount(assignedVillages, "", 0, 0, "", 0, 0).first()
         println("  -> [DB QUERY] Sputum collection conducted count: $count")
         
         println("  -> [ASSERT] Verifying count is 0...")
@@ -338,7 +338,7 @@ class TBDaoTest {
         tbDao.saveTbDiagnostics(diag)
         println("  -> [DB INSERT] Sputum collected. TrueNat order status: 'FAILED'.")
 
-        val count = tbDao.getDashboardSputumCollectionCount(villageId, assignedVillages, 0, 0, "", 0, 0).first()
+        val count = tbDao.getDashboardSputumCollectionCount(assignedVillages, "", 0, 0, "", 0, 0).first()
         println("  -> [DB QUERY] Sputum collection conducted count: $count")
         
         println("  -> [ASSERT] Verifying count is 0...")

@@ -260,13 +260,7 @@ class DashboardViewModel @Inject constructor(
                 }
             }
         }
-        return if (range.first == 0L && range.second == 0L) {
-            range
-        } else {
-            // Visit timestamps are sometimes shifted by the IST offset (5h 30m).
-            val offset = 19_800_000L
-            Pair(range.first - offset, range.second + offset)
-        }
+        return range
     }
 
 
