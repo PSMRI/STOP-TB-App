@@ -4,6 +4,9 @@ import android.content.Context
 import com.google.gson.Gson
 import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -2810,8 +2813,19 @@ class TBRepo @Inject constructor(
                                 }
                             }
 
-                            // 3. Completed
-                            for (regId in completedList) {
+                            // 3. Completed — each beneficiary here is independent (its own
+                            // benId lock, no shared mutable state beyond the ConcurrentHashMaps
+                            // already used elsewhere in this file), so fan these out concurrently
+                            // instead of one-by-one. This bucket previously issued a real network
+                            // round trip per beneficiary needing a fresh result (fetchOrderResult)
+                            // strictly sequentially — on a village with several outstanding
+                            // results, that serialized wait is what made opening the X-ray/TrueNat
+                            // list slow. OkHttp's own per-host connection limit (default 5) still
+                            // throttles how many of these are actually in flight at once, so this
+                            // only removes the artificial serialization, not any real safeguard.
+                            coroutineScope {
+                                completedList.map { regId ->
+                                async {
                                 val ben = benDao.getBenByRegId(regId) ?: benDao.getBen(regId)
                                 ben?.let { b ->
                                     // This pre-check is intentionally unlocked — it only decides
@@ -2880,6 +2894,8 @@ class TBRepo @Inject constructor(
                                         }
                                     }
                                 }
+                                }
+                                }.awaitAll()
                             }
 
                             // 4. Closed — backend's own confirmed closure (EoD expiry, not
