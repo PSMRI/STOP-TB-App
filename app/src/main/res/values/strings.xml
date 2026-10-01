@@ -921,7 +921,7 @@
     <string name="symptomatic_tb_screening">Symptomatic TB Screening</string>
     <string name="check_if_the_person_has_any_of_these_symptoms">Check if the person has any of these Symptoms:</string>
     <string name="tb_asymptomatic_screening">Asymptomatic Screening</string>
-    <string name="tb_is_beneficiary_asymptomatic">Is beneficiary asymptomatic</string>
+    <string name="tb_is_beneficiary_asymptomatic">Beneficiary is Asymptomatic</string>
     <string name="risk_factors">Risk Factors</string>
     <string name="other_details">Other Details</string>
     <string name="tb_rise_of_fever">Rise of fever in evening</string>
