@@ -1,11 +1,13 @@
 package org.piramalswasthya.stoptb.ui.login_activity.sign_in
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -16,6 +18,7 @@ import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.User
 import org.piramalswasthya.stoptb.repositories.UserRepo
+import org.piramalswasthya.stoptb.work.WorkerUtils
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
@@ -24,7 +27,8 @@ import javax.inject.Inject
 class SignInViewModel @Inject constructor(
     private val userRepo: UserRepo,
     private val database: InAppDb,
-    private val pref: PreferenceDao
+    private val pref: PreferenceDao,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     companion object {
@@ -131,6 +135,12 @@ class SignInViewModel @Inject constructor(
             // disable VolunteerActivity's Wi-Fi reconnect poll, which is the only thing that can
             // bring campHubConnected back up unattended.
             pref.setCampHubConnected(connected)
+            if (connected) {
+                // Promptly retry any diagnostic order pushes / manually-entered results that
+                // were saved locally while the hub was disconnected, instead of waiting for an
+                // unrelated poll cycle to pick them up.
+                WorkerUtils.triggerDiagnosticResultPollWorker(context)
+            }
             _campHubStatus.value =
                 if (connected) CampHubStatus.CONNECTED else CampHubStatus.NOT_CONNECTED
         }

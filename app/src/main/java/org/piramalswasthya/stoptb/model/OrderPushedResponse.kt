@@ -32,6 +32,6 @@ data class OrderPushedData(
     val pushResponseJson: String? = null,
     val retryCount: Int? = null,
     val status: String? = null,
-    val visitCode: Int? = null,
+    val visitCode: Long? = null,
     val errorMessage: String? = null
 )

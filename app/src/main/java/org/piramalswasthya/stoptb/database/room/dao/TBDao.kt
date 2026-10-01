@@ -338,7 +338,7 @@ interface TBDao {
             SELECT b.beneficiaryId FROM TB_SUSPECTED ts
             INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
             LEFT JOIN TB_DIAGNOSTICS td ON td.benId = ts.benId
-            WHERE ts.isSputumCollected = 1 AND (td.benId IS NULL OR td.trueNatOrderStatus IN ('COMPLETED', 'REFUSED'))
+            WHERE ts.isSputumCollected = 1 AND (td.benId IS NULL OR td.trueNatOrderStatus = 'COMPLETED' OR (td.trueNatOrderStatus = 'CLOSED' AND td.reasonForDenialSputum IS NOT NULL))
             AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
             AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
             AND (:endTime = :endTime)
@@ -348,7 +348,7 @@ interface TBDao {
             UNION
             SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
             INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
-            WHERE td.isSputumCollected = 1 AND td.trueNatOrderStatus IN ('COMPLETED', 'REFUSED')
+            WHERE td.isReferredForSputum = 1 AND (td.trueNatOrderStatus = 'COMPLETED' OR (td.trueNatOrderStatus = 'CLOSED' AND td.reasonForDenialSputum IS NOT NULL))
             AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
             AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN td.visitDate >= 100000000000 THEN td.visitDate WHEN td.visitDate > 0 THEN td.visitDate * 1000 WHEN IFNULL(td.serverUpdatedDate, 0) >= 100000000000 THEN td.serverUpdatedDate WHEN IFNULL(td.serverUpdatedDate, 0) > 0 THEN td.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
             AND (:endTime = :endTime)

@@ -282,18 +282,21 @@
     <string name="cat_hrp">एचआरपी</string>
     <string name="cat_maternal">मातृ</string>
     <string-array name="tb_truenat_mtb_result">
-        <item>एमटीबी नहीं पाया गया (MTB not detected)</item>
-        <item>एमटीबी पाया गया (MTB detected)</item>
-        <item>अमान्य (Invalid)</item>
+        <item>एमटीबी पाया गया (MTB Positive)</item>
+        <item>एमटीबी नहीं पाया गया (MTB Negative)</item>
+        <item>अमान्य/त्रुटि (Invalid/Error)</item>
     </string-array>
     <string-array name="tb_truenat_rif_result">
         <item>रिफ प्रतिरोध पाया गया (Rif Resistance Detected)</item>
         <item>रिफ प्रतिरोध नहीं पाया गया (Rif Resistance Not Detected)</item>
         <item>अनिर्णायक (Indeterminate)</item>
+        <item>अमान्य/त्रुटि (Invalid/Error)</item>
     </string-array>
     <string-array name="tb_digital_xray_result">
         <item>सामान्य (Normal)</item>
+        <item>असामान्य लेकिन टीबी प्रकल्पित नहीं (Abnormal but not TB Presumptive)</item>
         <item>टीबी प्रकल्पित (TB Presumptive)</item>
+        <item>एआई अमान्य परिणाम (AI Invalid Result)</item>
     </string-array>
 </resources>
 

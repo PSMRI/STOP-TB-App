@@ -111,7 +111,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 47, exportSchema = false
+    version = 51, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -1517,12 +1517,95 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        // TrueNat (MTB) & RIF order lifecycle redesign: "Confirmed DR-TB Case" must be
+        // distinguishable from the generic isConfirmed/isTBConfirmed flags (isDrTbConfirmed, set
+        // only for RIF DR-TB results), and RIF's own "Not Conducted" flow needs its own reason
+        // columns distinct from NAAT's reasonNotConductedNaat/Other (which stay MTB-only).
         private val MIGRATION_46_47 = object : Migration(46, 47) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val columns = listOf(
+                    "isDrTbConfirmed INTEGER",
+                    "reasonNotConductedRif TEXT",
+                    "reasonNotConductedRifOther TEXT"
+                )
+                columns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "TB_DIAGNOSTICS", columnName)) {
+                        database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN $columnDefinition")
+                    }
+                }
+            }
+        }
+
+
+        private val MIGRATION_47_48 = object : Migration(47, 48) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Some feature-branch builds shipped version 47 without the 44->47 schema
+                // changes (e.g. missing TB_SCREENING symptom columns) — re-apply them first.
+                // Each of 44_45/45_46/46_47 is itself guarded (columnExists()/CREATE TABLE IF
+                // NOT EXISTS), so this is a safe no-op on a device that already has them.
+                MIGRATION_44_45.migrate(database)
+                MIGRATION_45_46.migrate(database)
+                MIGRATION_46_47.migrate(database)
+
+                listOf("xrayOrderStatus", "trueNatOrderStatus", "rifOrderStatus").forEach { column ->
+                    database.execSQL(
+                        "UPDATE TB_DIAGNOSTICS SET $column = 'PENDING' WHERE UPPER($column) = 'AWAITING_TEST_COMPLETION'"
+                    )
+                    database.execSQL(
+                        "UPDATE TB_DIAGNOSTICS SET $column = 'CLOSED' WHERE UPPER($column) IN ('POLLING_TIMEOUT', 'REFUSED')"
+                    )
+                }
+            }
+        }
+
+        private val MIGRATION_48_49 = object : Migration(48, 49) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val columns = listOf(
+                    "xrayManualResultPendingSync INTEGER",
+                    "trueNatManualResultPendingSync INTEGER",
+                    "rifManualResultPendingSync INTEGER"
+                )
+                columns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "TB_DIAGNOSTICS", columnName)) {
+                        database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN $columnDefinition")
+                    }
+                }
+
+                // Data-only cleanup, no schema change: the order lifecycle redesign collapsed
+                // IN_PROGRESS/AWAITING_PROVIDER_RESULT into PENDING (see
+                // TBRepo.reducedOrderStatus) so new writes never produce them, but a row already
+                // holding one of those legacy values from before this upgrade would silently fail
+                // DiagnosticResultPollWorker's exact-PENDING pending-order filter and never get
+                // polled again.
+                val legacyInProgressStatuses = "('IN_PROGRESS', 'AWAITING_PROVIDER_RESULT')"
+                listOf("xrayOrderStatus", "trueNatOrderStatus", "rifOrderStatus").forEach { column ->
+                    database.execSQL(
+                        "UPDATE TB_DIAGNOSTICS SET $column = 'PENDING' WHERE UPPER($column) IN $legacyInProgressStatuses"
+                    )
+                }
+            }
+        }
+        private val MIGRATION_49_50 = object : Migration(49, 50) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
                     "CREATE INDEX IF NOT EXISTS `ind_ben_draft_created` ON `BENEFICIARY` (`isDraft`, `createdDate`)"
                 )
                 recreateBenBasicCacheView(database)
+            }
+        }
+
+        // TrueNat flow redesign: isSputumCollected used to store the referral answer (misnamed —
+        // it never tracked whether a sample was actually collected). Split it: isReferredForSputum
+        // is the new home for the referral answer, backfilled from the old isSputumCollected
+        // values; isSputumCollected now holds the answer to the new "Is sputum collected?" question.
+        private val MIGRATION_50_51 = object : Migration(50, 51) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "TB_DIAGNOSTICS", "isReferredForSputum")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN isReferredForSputum INTEGER")
+                }
+                database.execSQL("UPDATE TB_DIAGNOSTICS SET isReferredForSputum = isSputumCollected")
             }
         }
 
@@ -1836,6 +1919,10 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_44_45)
                         .addMigrations(MIGRATION_45_46)
                         .addMigrations(MIGRATION_46_47)
+                        .addMigrations(MIGRATION_47_48)
+                        .addMigrations(MIGRATION_48_49)
+                        .addMigrations(MIGRATION_49_50)
+                        .addMigrations(MIGRATION_50_51)
                         .fallbackToDestructiveMigration()
                         .build()
 

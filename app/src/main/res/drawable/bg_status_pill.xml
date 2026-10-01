@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    TrueNat & RIF (and Chest X-Ray retrofit) order lifecycle redesign — generic tintable
+    pill/badge background for the "Order Status" area's device-integration state chip
+    (orange "Fetching result from device…" / blue "Manual Action Required").
+    Deliberately generic + tinted at runtime via setBackgroundTintList (same pattern this
+    app already uses everywhere else for coloring buttons), rather than one color-specific
+    drawable per state. Not the same as bg_status_chip.xml, which is hardcoded to one color
+    scheme for an unrelated screen.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/white" />
+    <corners android:radius="100dp" />
+</shape>

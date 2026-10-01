@@ -817,6 +817,7 @@
     <string name="unknown">अज्ञात</string>
     <string name="not_applicable">लागू नहीं</string>
     <string name="diagnostics_submitted">जांच जमा की गई</string>
+    <string name="diagnostics_saved_offline_pending_sync">परिणाम स्थानीय रूप से सहेजा गया — कैंप हब पुनः जुड़ने पर सिंक होगा</string>
     <string name="general_opd">जनरल ओपीडी</string>
     <string name="enter_value_between">%1$s %2$s और %3$s के बीच दर्ज करें</string>
     <string name="chief_complaint">मुख्य शिकायत</string>
@@ -947,8 +948,32 @@
     <string name="ben_card_tb_symptoms">टीबी के लक्षण</string>
     <string name="ben_card_chest_xray">छाती एक्स-रे</string>
     <string name="ben_card_truenat">ट्रूनैट</string>
+    <string name="ben_card_clinical_assessment">क्लिनिकल आकलन</string>
     <string name="ben_card_result">परिणाम:\n%1$s</string>
     <string name="ben_card_result_title">परिणाम:</string>
+
+    <!-- TrueNat & RIF order lifecycle redesign -->
+    <string name="order_status_fetching_from_device">डिवाइस से परिणाम प्राप्त हो रहा है…</string>
+    <string name="order_status_manual_action_required">मैन्युअल कार्रवाई आवश्यक</string>
+    <string name="order_status_polling_stopped">डिवाइस पोलिंग बंद हो गई है — परिणाम स्वतः प्राप्त नहीं होंगे।</string>
+    <string name="order_status_manual_unavailable">स्वचालित डिवाइस परिणाम उपलब्ध नहीं है। कृपया परीक्षण परिणाम मैन्युअल रूप से दर्ज करें।</string>
+    <string name="order_status_polling_stopped_title">डिवाइस पोलिंग बंद हो गई है।</string>
+    <string name="order_status_polling_stopped_desc">परिणाम स्वतः प्राप्त नहीं होंगे।</string>
+    <string name="order_status_manual_unavailable_title">स्वचालित डिवाइस परिणाम उपलब्ध नहीं है।</string>
+    <string name="order_status_manual_unavailable_desc">कृपया परीक्षण परिणाम मैन्युअल रूप से दर्ज करें।</string>
+    <string name="order_status_hub_disconnected">हब जुड़ा नहीं है</string>
+    <string name="order_status_saved_locally_syncing">स्थानीय रूप से सहेजा गया — सिंक हो रहा है…</string>
+    <string name="order_status_hub_disconnected_title">कैंप हब जुड़ा नहीं है।</string>
+    <string name="order_status_hub_disconnected_desc">परिणाम के लिए पोलिंग नहीं हो रही — कृपया कैंप हब से कनेक्ट करें।</string>
+    <string name="order_status_last_checked_caption">%1$s पहले जांचा गया · हर %2$d सेकंड में स्वतः रिफ्रेश</string>
+    <string name="order_status_few_seconds">कुछ सेकंड</string>
+    <string name="order_status_enter_result">परिणाम दर्ज करें</string>
+    <string name="order_status_not_conducted">नहीं किया गया</string>
+    <string name="order_status_view_mtb_result">एमटीबी परिणाम देखें</string>
+    <string name="order_status_view_rif_result">आरआईएफ परिणाम देखें</string>
+    <string name="order_status_rif_block_label">आरआईएफ परीक्षण · एमटीबी पॉजिटिव द्वारा ट्रिगर</string>
+    <string name="order_status_create_new_order">नया ऑर्डर बनाएं</string>
+    <string name="order_status_clinical_assessment_referred">क्लिनिकल आकलन एवं निदान हेतु संदर्भित</string>
     <string name="btn_examine">जांचें</string>
     <string name="btn_examine_count">जांचें %1$d/4</string>
     <string name="examine_bottomsheet_title">परीक्षण फॉर्म</string>
@@ -968,10 +993,11 @@
     <string name="tb_reason_for_denial_chest_xray_other">इनकार का अन्य कारण बताएं (एक्स-रे)</string>
     <string name="tb_reason_not_conducted_xray">एक्स-रे न होने का कारण</string>
     <string name="tb_reason_not_conducted_xray_other">अन्य कारण बताएं (एक्स-रे नहीं हुआ)</string>
-    <string name="tb_referred_for_sputum_collection">थूक संग्रह के लिए रेफर किया गया?</string>
+    <string name="tb_referred_for_sputum_collection">थूक संग्रह/ट्रूनैट जांच के लिए रेफर किया गया?</string>
+    <string name="tb_is_sputum_collected">क्या थूक एकत्र किया गया?</string>
     <string name="tb_reason_for_denial_sputum">थूक संग्रह से इनकार का कारण</string>
     <string name="tb_reason_for_denial_sputum_other">इनकार का अन्य कारण बताएं (थूक)</string>
-    <string name="tb_sputum_submitted_at">थूक सैंपल कहाँ जमा किया</string>
+    <string name="tb_sputum_submitted_at">थूक सैंपल जमा करने का केंद्र</string>
     <string name="tb_reason_not_conducted_naat">True NAT न होने का कारण</string>
     <string name="tb_reason_not_conducted_naat_other">अन्य कारण बताएं (True NAT नहीं हुआ)</string>
 

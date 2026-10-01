@@ -16,10 +16,12 @@ import org.piramalswasthya.stoptb.configuration.TBScreeningDataset
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.OrderStatus
+import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.getAgeGenderDisplayString
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
+import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -173,7 +175,7 @@ class TBScreeningFormViewModel @Inject constructor(
         )
     }
 
-    private suspend fun initializeDiagnosticsAndPush(tbScreeningCache: org.piramalswasthya.stoptb.model.TBScreeningCache) {
+    private suspend fun initializeDiagnosticsAndPush(tbScreeningCache: TBScreeningCache) {
         try {
             val isPresumptive = tbScreeningCache.coughMoreThan2Weeks == true ||
                     tbScreeningCache.bloodInSputum == true ||
@@ -199,110 +201,40 @@ class TBScreeningFormViewModel @Inject constructor(
             val refersXray = !isPregnant
             val refersTruenat = isPresumptive || isPregnant
 
-            // Persist the computed referral eligibility back to local screening record
             tbScreeningCache.referredForDigitalChestXray = refersXray
             tbScreeningCache.referredForSputumCollection = refersTruenat
             tbRepo.saveTBScreening(tbScreeningCache)
 
             val existingDiag = tbRepo.getTBDiagnosticsById(benId)
-            var currentDiag = existingDiag ?: org.piramalswasthya.stoptb.model.TBDiagnosticsCache(benId = benId, syncState = SyncState.UNSYNCED)
-            
+            var currentDiag = existingDiag ?: TBDiagnosticsCache(
+                benId = benId,
+                syncState = SyncState.UNSYNCED
+            )
+            val hasXrayOrder = !existingDiag?.xrayOrderId.isNullOrBlank() ||
+                    existingDiag?.xrayOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
+                    existingDiag?.xrayOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
+                    existingDiag?.xrayOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
+            val hasTruenatOrder = !existingDiag?.trueNatOrderId.isNullOrBlank() ||
+                    existingDiag?.trueNatOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
+                    existingDiag?.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
+                    existingDiag?.trueNatOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
+
             if (refersXray) {
-                if (currentDiag.xrayOrderStatus.isNullOrBlank() || currentDiag.xrayOrderStatus == OrderStatus.NONE.name) {
+                if (currentDiag.xrayOrderStatus.isNullOrBlank()) {
                     currentDiag = currentDiag.copy(xrayOrderStatus = OrderStatus.PENDING.name, isReferredForDigitalChestXray = true)
                 }
             }
             if (refersTruenat) {
-                if (currentDiag.trueNatOrderStatus.isNullOrBlank() || currentDiag.trueNatOrderStatus == OrderStatus.NONE.name) {
+                if (currentDiag.trueNatOrderStatus.isNullOrBlank()) {
                     currentDiag = currentDiag.copy(trueNatOrderStatus = OrderStatus.PENDING.name)
                 }
             }
             tbRepo.saveTBDiagnostics(currentDiag)
-
-            if (refersXray) {
-                try {
-                    val current = tbRepo.getTBDiagnosticsById(benId)
-                    val hasOrder = !current?.xrayOrderId.isNullOrBlank() ||
-                            current?.xrayOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
-                            current?.xrayOrderStatus.equals(OrderStatus.AWAITING_PROVIDER_RESULT.name, ignoreCase = true) ||
-                            current?.xrayOrderStatus.equals(OrderStatus.REFUSED.name, ignoreCase = true)
-                    if (!hasOrder) {
-                        val response = tbRepo.createOrder(benId, "XRAY_CHEST")
-                        if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
-                            val isIntegrated = tbRepo.isXrayIntegrated()
-                            val fresh = tbRepo.getTBDiagnosticsById(benId)
-                            fresh?.let {
-                                val updated = it.copy(
-                                    xrayOrderStatus = if (isIntegrated) OrderStatus.AWAITING_PROVIDER_RESULT.name else OrderStatus.PENDING.name,
-                                    isChestXRayDone = isIntegrated,
-                                    isReferredForDigitalChestXray = true,
-                                    syncState = SyncState.UNSYNCED
-                                )
-                                tbRepo.saveTBDiagnostics(updated)
-                            }
-                            if (isIntegrated) {
-                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(context)
-                            }
-                        } else {
-                            val isIntegrated = tbRepo.isXrayIntegrated()
-                            if (isIntegrated) {
-                                val fresh = tbRepo.getTBDiagnosticsById(benId)
-                                fresh?.let {
-                                    val updated = it.copy(
-                                        xrayOrderStatus = OrderStatus.FAILED.name,
-                                        syncState = SyncState.UNSYNCED
-                                    )
-                                    tbRepo.saveTBDiagnostics(updated)
-                                }
-                            }
-                        }
-                    }
-                } catch (e: java.lang.Exception) {
-                    Timber.e(e, "Automatic X-Ray order push failed")
-                }
-            }
-
-            if (refersTruenat) {
-                try {
-                    val current = tbRepo.getTBDiagnosticsById(benId)
-                    val hasOrder = !current?.trueNatOrderId.isNullOrBlank() ||
-                            current?.trueNatOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
-                            current?.trueNatOrderStatus.equals(OrderStatus.AWAITING_PROVIDER_RESULT.name, ignoreCase = true) ||
-                            current?.trueNatOrderStatus.equals(OrderStatus.REFUSED.name, ignoreCase = true)
-                    if (!hasOrder) {
-                        val response = tbRepo.createOrder(benId, "SPUTUM_TRUENAT")
-                        if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
-                            val isIntegrated = tbRepo.isTruenatIntegrated()
-                            val fresh = tbRepo.getTBDiagnosticsById(benId)
-                            fresh?.let {
-                                val updated = it.copy(
-                                    trueNatOrderStatus = if (isIntegrated) OrderStatus.AWAITING_PROVIDER_RESULT.name else OrderStatus.PENDING.name,
-                                    isSputumCollected = true,
-                                    isNaatConducted = isIntegrated,
-                                    syncState = SyncState.UNSYNCED
-                                )
-                                tbRepo.saveTBDiagnostics(updated)
-                            }
-                            if (isIntegrated) {
-                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context)
-                            }
-                        } else {
-                            val isIntegrated = tbRepo.isTruenatIntegrated()
-                            if (isIntegrated) {
-                                val fresh = tbRepo.getTBDiagnosticsById(benId)
-                                fresh?.let {
-                                    val updated = it.copy(
-                                        trueNatOrderStatus = OrderStatus.FAILED.name,
-                                        syncState = SyncState.UNSYNCED
-                                    )
-                                    tbRepo.saveTBDiagnostics(updated)
-                                }
-                            }
-                        }
-                    }
-                } catch (e: java.lang.Exception) {
-                    Timber.e(e, "Automatic TrueNat order push failed")
-                }
+            val ordersToPush = mutableListOf<String>()
+            if (refersXray && !hasXrayOrder) ordersToPush.add("XRAY_CHEST")
+            if (refersTruenat && !hasTruenatOrder) ordersToPush.add("SPUTUM_TRUENAT")
+            if (ordersToPush.isNotEmpty()) {
+                WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, ordersToPush)
             }
         } catch (e: java.lang.Exception) {
             Timber.e(e, "Error initializing diagnostic record and pushing orders")

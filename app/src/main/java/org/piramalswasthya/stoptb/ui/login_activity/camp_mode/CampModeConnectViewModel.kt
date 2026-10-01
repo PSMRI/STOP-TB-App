@@ -1,22 +1,26 @@
 package org.piramalswasthya.stoptb.ui.login_activity.camp_mode
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.work.WorkerUtils
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
 
 @HiltViewModel
 class CampModeConnectViewModel @Inject constructor(
-    private val pref: PreferenceDao
+    private val pref: PreferenceDao,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     companion object {
@@ -49,6 +53,9 @@ class CampModeConnectViewModel @Inject constructor(
             Log.d(TAG, "Connect result. connected=$connected, normalizedUrl=$normalizedUrl")
             pref.setCampModeEnabled(connected)
             pref.setCampHubConnected(connected)
+            if (connected) {
+                WorkerUtils.triggerDiagnosticResultPollWorker(context)
+            }
             _campHubStatus.value =
                 if (connected) CampHubStatus.CONNECTED else CampHubStatus.NOT_CONNECTED
         }
