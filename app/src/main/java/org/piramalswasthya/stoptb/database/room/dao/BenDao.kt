@@ -543,19 +543,62 @@ interface BenDao {
             WHEN isDeactivate = 1 THEN 2
             ELSE 3
         END ASC,
+        -- X-ray/TrueNat lists only (source 6/7): surface rows needing action (Failed/Manual
+        -- Entry) above merely-pending ones, which rank above resolved (Completed), which rank
+        -- above terminal (Closed) — instead of ordering purely by recency, which could bury a
+        -- beneficiary whose order genuinely needs a retry under one that's already resolved.
+        -- Every other source falls into the ELSE branch, unaffected, same as before.
         CASE
-            WHEN :source = 6 OR :source = 7 THEN COALESCE(
-                (
-                    SELECT MAX(visitDate) FROM (
-                        SELECT visitDate FROM TB_SCREENING WHERE benId = BEN_BASIC_CACHE.benId
-                        UNION ALL
-                        SELECT visitDate FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId
-                        UNION ALL
-                        SELECT visitDate FROM TB_SUSPECTED WHERE benId = BEN_BASIC_CACHE.benId
-                    )
-                ),
-                0
-            )
+            WHEN :source = 6 THEN CASE
+                (SELECT xrayOrderStatus FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId ORDER BY id DESC LIMIT 1)
+                WHEN 'FAILED' THEN 0
+                WHEN 'MANUAL_ENTRY' THEN 0
+                WHEN 'COMPLETED' THEN 2
+                WHEN 'CLOSED' THEN 3
+                ELSE 1
+            END
+            WHEN :source = 7 THEN CASE
+                (SELECT trueNatOrderStatus FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId ORDER BY id DESC LIMIT 1)
+                WHEN 'FAILED' THEN 0
+                WHEN 'MANUAL_ENTRY' THEN 0
+                WHEN 'COMPLETED' THEN 2
+                WHEN 'CLOSED' THEN 3
+                ELSE 1
+            END
+            ELSE 1
+        END ASC,
+        CASE
+            WHEN :source = 6 OR :source = 7 THEN
+                -- Within the "needs action" tier (Failed/Manual Entry), oldest first so a
+                -- beneficiary doesn't silently age out of view; every other tier keeps the
+                -- existing most-recent-visit-first order.
+                (CASE WHEN (
+                    CASE
+                        WHEN :source = 6 THEN CASE
+                            (SELECT xrayOrderStatus FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId ORDER BY id DESC LIMIT 1)
+                            WHEN 'FAILED' THEN 0
+                            WHEN 'MANUAL_ENTRY' THEN 0
+                            ELSE 1
+                        END
+                        WHEN :source = 7 THEN CASE
+                            (SELECT trueNatOrderStatus FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId ORDER BY id DESC LIMIT 1)
+                            WHEN 'FAILED' THEN 0
+                            WHEN 'MANUAL_ENTRY' THEN 0
+                            ELSE 1
+                        END
+                    END = 0
+                ) THEN -1 ELSE 1 END) * COALESCE(
+                    (
+                        SELECT MAX(visitDate) FROM (
+                            SELECT visitDate FROM TB_SCREENING WHERE benId = BEN_BASIC_CACHE.benId
+                            UNION ALL
+                            SELECT visitDate FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId
+                            UNION ALL
+                            SELECT visitDate FROM TB_SUSPECTED WHERE benId = BEN_BASIC_CACHE.benId
+                        )
+                    ),
+                    0
+                )
             ELSE COALESCE(createdDate, regDate, 0)
         END DESC,
         benId DESC
