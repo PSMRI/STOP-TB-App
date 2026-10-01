@@ -1633,10 +1633,13 @@ abstract class InAppDb : RoomDatabase() {
         // values; isSputumCollected now holds the answer to the new "Is sputum collected?" question.
         private val MIGRATION_51_52 = object : Migration(51, 52) {
             override fun migrate(database: SupportSQLiteDatabase) {
+                // Backfill only when the column is added here. A DB that already ran the former
+                // 50->51 (same change, before renumbering) holds real, distinct referral answers;
+                // re-copying isSputumCollected would overwrite them.
                 if (!columnExists(database, "TB_DIAGNOSTICS", "isReferredForSputum")) {
                     database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN isReferredForSputum INTEGER")
+                    database.execSQL("UPDATE TB_DIAGNOSTICS SET isReferredForSputum = isSputumCollected")
                 }
-                database.execSQL("UPDATE TB_DIAGNOSTICS SET isReferredForSputum = isSputumCollected")
             }
         }
 
