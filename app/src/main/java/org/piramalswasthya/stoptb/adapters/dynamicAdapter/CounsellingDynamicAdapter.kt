@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.adapters.dynamicAdapter
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import org.piramalswasthya.stoptb.databinding.ItemCounsellingDateBinding
@@ -31,7 +32,8 @@ class CounsellingDynamicAdapter(
     private var questions: List<CounsellingQuestionDto>,
     private val onValueChanged: (CounsellingQuestionDto) -> Unit,
     private var isEditable: Boolean = true,
-    private val isContactTracing: Boolean = false
+    private val isContactTracing: Boolean = false,
+    private val unlockRemarksWithPencil: Boolean = false
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
 
@@ -54,10 +56,19 @@ class CounsellingDynamicAdapter(
     private var relationshipCountFieldIds: Set<Int> = emptySet()
 
     private var visibleQuestions: List<CounsellingQuestionDto> = computeVisibleQuestions(questions)
-    private var lastSnapshot: Map<Int, Triple<Any?, Boolean, String?>> = snapshotOf(questions)
+    private data class FieldSnapshot(
+        val value: Any?,
+        val visible: Boolean,
+        val errorMessage: String?,
+        val remarksUnlocked: Boolean
+    )
 
-    private fun snapshotOf(list: List<CounsellingQuestionDto>): Map<Int, Triple<Any?, Boolean, String?>> =
-        list.associate { it.questionId to Triple(it.value, it.visible, it.errorMessage) }
+    private var lastSnapshot: Map<Int, FieldSnapshot> = snapshotOf(questions)
+
+    private fun snapshotOf(list: List<CounsellingQuestionDto>): Map<Int, FieldSnapshot> =
+        list.associate {
+            it.questionId to FieldSnapshot(it.value, it.visible, it.errorMessage, it.remarksUnlocked)
+        }
 
     private fun computeVisibleQuestions(all: List<CounsellingQuestionDto>): List<CounsellingQuestionDto> {
         // Includes nested dependants (e.g. Area of Shared Space) so they render inline, not in the main list.
@@ -93,12 +104,14 @@ class CounsellingDynamicAdapter(
             override fun areContentsTheSame(oldPos: Int, newPos: Int): Boolean {
                 val newQ = newVisible[newPos]
                 val prior = oldSnapshot[newQ.questionId] ?: return false
-                if (prior != Triple(newQ.value, newQ.visible, newQ.errorMessage)) return false
+                if (prior != FieldSnapshot(newQ.value, newQ.visible, newQ.errorMessage, newQ.remarksUnlocked)) return false
 
                 if (newQ.questionUuid == CT_RELATIONSHIP_UUID ) {
                     val contributorChanged = relationshipCountFieldIds.any { id ->
                         val contributor = questions.firstOrNull { it.questionId == id }
-                        contributor != null && oldSnapshot[id] != Triple(contributor.value, contributor.visible, contributor.errorMessage)
+                        contributor != null && oldSnapshot[id] != FieldSnapshot(
+                            contributor.value, contributor.visible, contributor.errorMessage, contributor.remarksUnlocked
+                        )
                     }
                     if (contributorChanged) return false
                 }
@@ -172,6 +185,25 @@ class CounsellingDynamicAdapter(
         }
     }
 
+    private fun fieldEditable(q: CounsellingQuestionDto): Boolean {
+        if (isEditable) return true
+        val remarks = q.isRemarksField(matchLabel = !isContactTracing)
+        if (!remarks) return false
+        // Submitted counselling notes stay locked until the pencil is tapped.
+        return if (unlockRemarksWithPencil) q.remarksUnlocked else true
+    }
+
+    private fun showRemarksPencil(q: CounsellingQuestionDto): Boolean =
+        unlockRemarksWithPencil && !isEditable && q.isRemarksField() && !q.remarksUnlocked
+
+    private fun unlockRemarks(q: CounsellingQuestionDto) {
+        if (q.remarksUnlocked) return
+        q.remarksUnlocked = true
+        q.remarksRequestFocus = true
+        val index = visibleQuestions.indexOfFirst { it.questionId == q.questionId }
+        if (index >= 0) notifyItemChanged(index)
+    }
+
     override fun getItemCount(): Int = visibleQuestions.size
 
     inner class TextViewHolder(private val binding: ItemCounsellingTextBinding) :
@@ -182,9 +214,26 @@ class CounsellingDynamicAdapter(
             } else if (q.questionUuid == TFU_REGISTRATION_DATE_UUID) {
                 QuestionRenderer.showTextView(binding, q, prefix, false, applyLatinFilter = !isContactTracing, onValueChanged = onValueChanged)
             } else {
-                QuestionRenderer.showTextView(binding, q, prefix, isEditable, applyLatinFilter = !isContactTracing) { updated ->
-                    onValueChanged(updated)
-                    refreshNoOfContactsIfNeeded(updated)
+                QuestionRenderer.showTextView(
+                    binding,
+                    q,
+                    prefix,
+                    fieldEditable(q),
+                    applyLatinFilter = !isContactTracing,
+                    onValueChanged = { updated ->
+                        onValueChanged(updated)
+                        refreshNoOfContactsIfNeeded(updated)
+                    },
+                    showPencil = showRemarksPencil(q),
+                    onPencilClick = { unlockRemarks(q) }
+                )
+                if (q.remarksRequestFocus) {
+                    q.remarksRequestFocus = false
+                    binding.etInput.post {
+                        binding.etInput.requestFocus()
+                        val imm = binding.etInput.context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                        imm?.showSoftInput(binding.etInput, InputMethodManager.SHOW_IMPLICIT)
+                    }
                 }
             }
         }
@@ -194,13 +243,13 @@ class CounsellingDynamicAdapter(
         RecyclerView.ViewHolder(binding.root) {
             val errorMsg = binding.tvError
         fun bind(q: CounsellingQuestionDto, prefix: String) =
-            QuestionRenderer.showRadio(binding, q, prefix, isEditable, onValueChanged)
+            QuestionRenderer.showRadio(binding, q, prefix, fieldEditable(q), onValueChanged)
     }
 
     inner class McqViewHolder(private val binding: ItemCounsellingMcqBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(q: CounsellingQuestionDto, prefix: String) =
-            QuestionRenderer.showMCQ(binding, q, prefix, isEditable, { updated ->
+            QuestionRenderer.showMCQ(binding, q, prefix, fieldEditable(q), { updated ->
                 onValueChanged(updated)
                 refreshNoOfContactsIfNeeded(updated)
             }, questions)
@@ -209,12 +258,12 @@ class CounsellingDynamicAdapter(
     inner class DateViewHolder(private val binding: ItemCounsellingDateBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(q: CounsellingQuestionDto, prefix: String) =
-            QuestionRenderer.showDate(binding, q, prefix, isEditable, onValueChanged)
+            QuestionRenderer.showDate(binding, q, prefix, fieldEditable(q), onValueChanged)
     }
     inner class DropdownViewHolder(private val binding: ItemCounsellingDropdownBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(q: CounsellingQuestionDto, prefix: String) =
-            QuestionRenderer.showDropdown(binding, q, prefix, isEditable, { updated ->
+            QuestionRenderer.showDropdown(binding, q, prefix, fieldEditable(q), { updated ->
                 onValueChanged(updated)
                 refreshNoOfContactsIfNeeded(updated)
             }, questions)
@@ -223,7 +272,7 @@ class CounsellingDynamicAdapter(
     inner class NumberViewHolder(private val binding: ItemCtNumberBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(q: CounsellingQuestionDto, prefix: String) =
-            QuestionRenderer.showNumber(binding, q, prefix, isEditable, onValueChanged)
+            QuestionRenderer.showNumber(binding, q, prefix, fieldEditable(q), onValueChanged)
     }
 
     inner class ReadOnlyViewHolder(private val binding: ItemCtReadonlyBinding) :
@@ -235,6 +284,6 @@ class CounsellingDynamicAdapter(
     inner class NumberPickerViewHolder(private val binding: ItemCtNumberPickerBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(q: CounsellingQuestionDto, prefix: String) =
-            QuestionRenderer.showNumberPicker(binding, q, prefix, isEditable, onValueChanged)
+            QuestionRenderer.showNumberPicker(binding, q, prefix, fieldEditable(q), onValueChanged)
     }
 }

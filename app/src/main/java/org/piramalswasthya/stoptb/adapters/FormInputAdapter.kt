@@ -8,6 +8,7 @@ import android.content.DialogInterface
 import android.content.res.ColorStateList
 import android.content.res.Resources
 import android.graphics.Color
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.util.TypedValue
@@ -666,6 +667,10 @@ class FormInputAdapter(
                 binding.tvNullable.text = spannableString
             }
 
+            val boldTitle = item.boldTitleOnYes && item.value == item.entries?.getOrNull(0)
+            val titleStyle = if (boldTitle) Typeface.BOLD else Typeface.NORMAL
+            binding.tvTitle.setTypeface(binding.tvTitle.typeface, titleStyle)
+            binding.tvTitleHr.setTypeface(binding.tvTitleHr.typeface, titleStyle)
         }
     }
 
@@ -785,18 +790,37 @@ class FormInputAdapter(
                         formValueListener
                     )
                 } else {
-                    AlertDialog.Builder(binding.root.context)
+                    val dialog = AlertDialog.Builder(binding.root.context)
                         .setTitle(item.title)
-                        .setMultiChoiceItems(labels, checkedItems) { dialog, which, isChecked ->
+                        .setMultiChoiceItems(labels, checkedItems) { dialogInterface, which, isChecked ->
                             applyExclusiveSelection(item, checkedItems, which, isChecked)
-                            val listView = (dialog as? AlertDialog)?.listView
-                            checkedItems.indices.forEach { idx -> listView?.setItemChecked(idx, checkedItems[idx]) }
+
+                            val listView = (dialogInterface as? AlertDialog)?.listView
+                            checkedItems.indices.forEach { idx ->
+                                listView?.setItemChecked(idx, checkedItems[idx])
+                            }
                         }
                         .setPositiveButton(android.R.string.ok) { _, _ ->
                             applyMultiSelectResult(item, checkedItems, selectedIndexes, formValueListener)
                         }
                         .setNegativeButton(android.R.string.cancel, null)
-                        .show()
+                        .create()
+
+                    dialog.show()
+
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.apply {
+                        background = null
+                        setBackgroundColor(Color.TRANSPARENT)
+                        setTextColor(
+                            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.currentTextColor
+                                ?: Color.BLACK
+                        )
+                    }
+
+                    dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.apply {
+                        background = null
+                        setBackgroundColor(Color.TRANSPARENT)
+                    }
                 }
             }
             binding.etMultiSelect.setOnClickListener(showDialog)

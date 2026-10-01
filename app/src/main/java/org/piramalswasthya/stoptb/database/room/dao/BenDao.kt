@@ -908,9 +908,9 @@ interface BenDao {
     @Query("""
         SELECT COUNT(*) FROM BEN_BASIC_CACHE
         WHERE isDeactivate = 0
-        AND ((:villageId != 0 AND villageId = :villageId) OR (:villageId = 0 AND villageId IN (:assignedVillageIds)))
+        AND villageId IN (:assignedVillageIds)
     """)
-    fun getGlancePopulationCount(villageId: Int, assignedVillageIds: List<Int>): Flow<Int>
+    fun getGlancePopulationCount(assignedVillageIds: List<Int>): Flow<Int>
 
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage AND isDeactivate=0 AND abhaId IS NOT NULL")
     fun getAllBenWithAbhaCount(selectedVillage: Int): Flow<Int>
@@ -925,15 +925,14 @@ interface BenDao {
     @Query("""
         SELECT COUNT(*) FROM BEN_BASIC_CACHE
         WHERE isDeactivate = 0 AND abhaId IS NOT NULL
-        AND ((:villageId != 0 AND villageId = :villageId) OR (:villageId = 0 AND villageId IN (:assignedVillageIds)))
-        AND (:startTime = 0 OR regDate >= :startTime)
-        AND (:endTime = 0 OR regDate <= :endTime)
+        AND villageId IN (:assignedVillageIds)
+        AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN IFNULL(regDate, 0) >= 100000000000 THEN regDate WHEN IFNULL(regDate, 0) > 0 THEN regDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
+        AND (:endTime = :endTime)
         AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(gender, '')) NOT IN ('MALE', 'FEMALE')))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) < 15))
         AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) >= 60))
     """)
     fun getDashboardAbhaCount(
-        villageId: Int,
         assignedVillageIds: List<Int>,
         startTime: Long,
         endTime: Long,
@@ -969,6 +968,18 @@ interface BenDao {
         GROUP BY householdId
     """)
     fun getHouseholdMemberCounts(selectedVillage: Int): Flow<List<HouseholdMemberCount>>
+
+    @Query("""
+        SELECT householdId AS hhId,
+               TRIM(COALESCE(firstName, '') || ' ' || COALESCE(lastName, '')) AS fullName
+        FROM BENEFICIARY
+        WHERE isDraft = 0
+          AND isDeactivate = 0
+          AND loc_village_id = :selectedVillage
+          AND householdId IS NOT NULL
+          AND familyHeadRelationPosition = 19
+    """)
+    fun getHouseholdHeadNames(selectedVillage: Int): Flow<List<HouseholdHeadName>>
 
     @Query("""
         SELECT COUNT(child.beneficiaryId)
@@ -1408,15 +1419,15 @@ interface BenDao {
         LEFT JOIN TB_DIAGNOSTICS td ON b.benId = td.benId
         WHERE b.isDeactivate = 0
           AND b.isDeath = 0
-          AND ((:villageId != 0 AND b.villageId = :villageId) OR (:villageId = 0 AND b.villageId IN (:assignedVillageIds)))
+          AND b.villageId IN (:assignedVillageIds)
           AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
           AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
           AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
           AND (
                 (
                     ts.isConfirmed = 1
-                    AND (:startTime = 0 OR ts.visitDate >= :startTime)
-                    AND (:endTime = 0 OR ts.visitDate <= :endTime)
+                    AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
+                    AND (:endTime = :endTime)
                 )
                 OR
                 (
@@ -1425,13 +1436,12 @@ interface BenDao {
                         OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
                         OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
                     )
-                    AND (:startTime = 0 OR td.visitDate >= :startTime)
-                    AND (:endTime = 0 OR td.visitDate <= :endTime)
+                    AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN td.visitDate >= 100000000000 THEN td.visitDate WHEN td.visitDate > 0 THEN td.visitDate * 1000 WHEN IFNULL(td.serverUpdatedDate, 0) >= 100000000000 THEN td.serverUpdatedDate WHEN IFNULL(td.serverUpdatedDate, 0) > 0 THEN td.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
+                    AND (:endTime = :endTime)
                 )
               )
     """)
     fun getDashboardFilteredTbConfirmedCount(
-        villageId: Int,
         assignedVillageIds: List<Int>,
         startTime: Long,
         endTime: Long,
@@ -1595,12 +1605,12 @@ interface BenDao {
         FROM BEN_BASIC_CACHE b
         WHERE b.isDeactivate = 0
           AND b.screeningStatus = 'UNSCREENED'
-          AND ((:villageId != 0 AND b.villageId = :villageId) OR (:villageId = 0 AND b.villageId IN (:assignedVillageIds)))
+          AND b.villageId IN (:assignedVillageIds)
           AND NOT EXISTS (
               SELECT 1 FROM TB_SCREENING ts WHERE ts.benId = b.benId
           )
     """)
-    fun getGlanceUnscreenedCount(villageId: Int, assignedVillageIds: List<Int>): Flow<Int>
+    fun getGlanceUnscreenedCount(assignedVillageIds: List<Int>): Flow<Int>
 
     @Query("""
         SELECT * FROM BEN_BASIC_CACHE

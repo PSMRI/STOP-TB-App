@@ -111,6 +111,9 @@ class BenListAdapter(
             }
         }
 
+        private fun normalizedName(name: String): String =
+            name.trim().replace(Regex("\\s+"), " ").lowercase(java.util.Locale.ROOT)
+
         private fun bindErrorMsg(text: String?) {
             if (text.isNullOrBlank()) {
                 binding.tvErrorMsg.visibility = View.GONE
@@ -472,6 +475,7 @@ class BenListAdapter(
             roleManager: RoleManager? = null,
             showRedesignedCard: Boolean = false,
             householdMemberCountMap: Map<Long, Int> = emptyMap(),
+            householdHeadNameMap: Map<Long, String> = emptyMap(),
             showAddMemberButton: Boolean = false
         ) {
             binding.btnAbha.visibility = View.VISIBLE
@@ -487,10 +491,26 @@ class BenListAdapter(
             binding.hasAbha = !item.abhaId.isNullOrEmpty()
             binding.role = role
 
-            binding.ivCall.visibility = if (showCall && item.hasCallableMobileNo) {
-                View.VISIBLE
-            } else {
-                View.GONE
+            val canCallBeneficiary = showCall && item.hasCallableMobileNo &&
+                    !item.isDeath && !item.isDeactivate
+            binding.tvRedesignMobileLabel.apply {
+                val callIcon = if (canCallBeneficiary) {
+                    ContextCompat.getDrawable(context, R.drawable.ic_call_icon)?.mutate()?.apply {
+                        setTint(ContextCompat.getColor(context, android.R.color.white))
+                        val iconSize = (16 * context.resources.displayMetrics.density).toInt()
+                        setBounds(0, 0, iconSize, iconSize)
+                    }
+                } else {
+                    null
+                }
+                setCompoundDrawablesRelative(null, null, callIcon, null)
+                setOnClickListener(
+                    if (canCallBeneficiary) View.OnClickListener {
+                        clickListener?.onClickedForCall(item)
+                    } else {
+                        null
+                    }
+                )
             }
 
             val isMatched = benIdList.contains(item.benId)
@@ -518,7 +538,11 @@ class BenListAdapter(
             }
             val isNonHH = item.isNonHH
             val isHeadOfFamily = if (isNonHH) false else item.relToHeadId == 19
-            val hasFamilyHeadName = !isNonHH && item.familyHeadName.isNotBlank() && item.familyHeadName != "Not Available"
+            val householdHeadName = householdHeadNameMap[item.hhId]
+                ?.trim()
+                ?.takeUnless { it.isBlank() }
+                ?: item.familyHeadName
+            val hasFamilyHeadName = !isNonHH && householdHeadName.isNotBlank() && householdHeadName != "Not Available"
             binding.tvAgeGender.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
             binding.tvAgeGender.text = "${item.gender.replaceFirstChar { it.titlecase() }} | ${compactAge(item.age)}"
             binding.llRedesignedDetails.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
@@ -533,10 +557,10 @@ class BenListAdapter(
                 val showSeparateFatherName = hasFamilyHeadName &&
                         !isHeadOfFamily &&
                         fatherName != null &&
-                        !item.familyHeadName.trim().equals(fatherName, ignoreCase = true)
+                        normalizedName(householdHeadName) != normalizedName(fatherName)
                 val relation = when {
                     isHeadOfFamily -> null
-                    hasFamilyHeadName -> binding.root.context.getString(R.string.hof) to item.familyHeadName
+                    hasFamilyHeadName -> binding.root.context.getString(R.string.hof) to householdHeadName
                     !item.spouseName.isNullOrBlank() && item.spouseName != "Not Available" ->
                         binding.root.context.getString(R.string.tv_spouse_name_ph) to item.spouseName
                     else -> binding.root.context.getString(R.string.tv_father_name_ph) to
@@ -559,12 +583,12 @@ class BenListAdapter(
             binding.HOF.visibility = View.GONE
             if (isNonHH) {
                 binding.ivIsHead.visibility = View.VISIBLE
-                binding.ivIsHead.setImageResource(R.drawable.ic_non_household_vector)
+                binding.ivIsHead.setImageResource(R.drawable.icon_non_household)
                 binding.ivIsHead.imageTintList = null
             } else {
                 binding.ivIsHead.setImageResource(R.drawable.ic_icon_head_of_family)
                 binding.ivIsHead.imageTintList = android.content.res.ColorStateList.valueOf(
-                    ContextCompat.getColor(binding.root.context, R.color.md_theme_light_primary)
+                    ContextCompat.getColor(binding.root.context, android.R.color.white)
                 )
                 binding.ivIsHead.visibility = if (isHeadOfFamily) View.VISIBLE else View.GONE
             }
@@ -620,12 +644,23 @@ class BenListAdapter(
                 binding.tvSymptomsStatus.text = if (hasTbScreening) "Screened" else "Unscreened"
                 binding.tvSymptomsStatus.visibility = View.GONE
 
+                fun formatScreeningResult(value: String?): String {
+                    val displayValue = value?.trim()?.takeUnless {
+                        it.isEmpty() || it.equals("N/A", ignoreCase = true)
+                    }
+                    return if (displayValue == null) {
+                        context.getString(R.string.ben_card_result_title)
+                    } else {
+                        context.getString(R.string.ben_card_result, displayValue)
+                    }
+                }
+
                 val symptomsResultText = when (isPresumptive) {
                     true -> "Presumptive"
                     false -> "Asymptomatic"
-                    null -> "N/A"
+                    null -> ""
                 }
-                binding.tvSymptomsResult.text = context.getString(R.string.ben_card_result, symptomsResultText)
+                binding.tvSymptomsResult.text = formatScreeningResult(symptomsResultText)
                 binding.tvSymptomsResult.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
 
                 // ---------------------------------------------------------
@@ -655,11 +690,7 @@ class BenListAdapter(
                 )
                 binding.tvXrayStatus.text = if (xrayResult.isNullOrBlank()) "Unscreened" else "Screened"
                 binding.tvXrayStatus.visibility = View.GONE
-                if (!xrayResult.isNullOrBlank()) {
-                    binding.tvXrayResult.text = context.getString(R.string.ben_card_result, xrayResult)
-                } else {
-                    binding.tvXrayResult.text = context.getString(R.string.ben_card_result, "N/A")
-                }
+                binding.tvXrayResult.text = formatScreeningResult(xrayResult)
                 binding.tvXrayResult.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
 
                 // ---------------------------------------------------------
@@ -672,11 +703,7 @@ class BenListAdapter(
                 )
                 binding.tvTruenatStatus.text = if (truenatResult.isNullOrBlank()) "Unscreened" else "Screened"
                 binding.tvTruenatStatus.visibility = View.GONE
-                if (!truenatResult.isNullOrBlank()) {
-                    binding.tvTruenatResult.text = context.getString(R.string.ben_card_result, truenatResult)
-                } else {
-                    binding.tvTruenatResult.text = context.getString(R.string.ben_card_result, "N/A")
-                }
+                binding.tvTruenatResult.text = formatScreeningResult(truenatResult)
                 binding.tvTruenatResult.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
             } else {
                 binding.detailsDivider.visibility = View.GONE
@@ -1242,7 +1269,6 @@ class BenListAdapter(
             when {
                 item.isDeath -> {
                     binding.contentLayout.setBackgroundColor(ContextCompat.getColor(binding.contentLayout.context, R.color.md_theme_dark_outline))
-                    binding.ivCall.visibility = View.GONE
                     binding.ivSyncState.visibility = View.GONE
                     binding.btnAbha.visibility = View.GONE
                 }
@@ -1250,7 +1276,6 @@ class BenListAdapter(
                     binding.contentLayout.setBackgroundColor(ContextCompat.getColor(binding.contentLayout.context, R.color.Quartenary))
                     binding.btnAbha.visibility = View.INVISIBLE
                     binding.tvTitleDuplicaterecord.visibility = View.VISIBLE
-                    binding.ivCall.visibility = View.INVISIBLE
                     binding.ivSyncState.visibility = View.INVISIBLE
                 }
                 else -> {
@@ -1284,6 +1309,7 @@ class BenListAdapter(
 
     private val tbScreeningMap = mutableMapOf<Long, TBScreeningCache>()
     private val householdMemberCountMap = mutableMapOf<Long, Int>()
+    private val householdHeadNameMap = mutableMapOf<Long, String>()
     var source: Int = 0
 
     override fun onBindViewHolder(holder: BenViewHolder, position: Int) {
@@ -1322,6 +1348,7 @@ class BenListAdapter(
             tbScreeningMap = tbScreeningMap,
             showRedesignedCard = showRedesignedCard,
             householdMemberCountMap = householdMemberCountMap,
+            householdHeadNameMap = householdHeadNameMap,
             source = source,
             showExamineButton = showExamineButton,
             showContactTracingForms = showContactTracingForms,
@@ -1395,6 +1422,18 @@ class BenListAdapter(
         val old = householdMemberCountMap.toMap()
         householdMemberCountMap.clear()
         householdMemberCountMap.putAll(map)
+        val changedHouseholds = (old.keys + map.keys).filterTo(mutableSetOf()) { old[it] != map[it] }
+        if (changedHouseholds.isNotEmpty()) {
+            currentList.forEachIndexed { index, item ->
+                if (item.hhId in changedHouseholds) notifyItemChanged(index)
+            }
+        }
+    }
+
+    fun submitHouseholdHeadNames(map: Map<Long, String>) {
+        val old = householdHeadNameMap.toMap()
+        householdHeadNameMap.clear()
+        householdHeadNameMap.putAll(map)
         val changedHouseholds = (old.keys + map.keys).filterTo(mutableSetOf()) { old[it] != map[it] }
         if (changedHouseholds.isNotEmpty()) {
             currentList.forEachIndexed { index, item ->

@@ -23,7 +23,6 @@ import org.piramalswasthya.stoptb.databinding.ItemDashboardIndicatorBinding
 internal data class DashboardHeaderState(
     val coverage: CoverageStats = CoverageStats(),
     val screened: TbGenderBreakdown = TbGenderBreakdown(),
-    val scopeName: String = "",
     val periodLabel: String = "",
 )
 
@@ -42,7 +41,6 @@ internal data class DashboardIndicatorItem(
 )
 
 internal class DashboardListAdapter(
-    private val onOpenFilters: () -> Unit,
     private val onUnscreenedClick: () -> Unit,
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
@@ -158,8 +156,9 @@ internal class DashboardListAdapter(
         notifyItemChanged(0)
     }
 
-    fun updateScope(scopeName: String, periodLabel: String) {
-        header = header.copy(scopeName = scopeName, periodLabel = periodLabel)
+    fun updatePeriod(periodLabel: String) {
+        if (header.periodLabel == periodLabel) return
+        header = header.copy(periodLabel = periodLabel)
         notifyItemChanged(0)
     }
 
@@ -216,14 +215,11 @@ internal class DashboardListAdapter(
             }
             bindCoverage(state.coverage)
             bindScreened(state.screened)
-            binding.tvFilterScope.text = itemView.context.getString(R.string.home_village_at_a_glance, state.scopeName.substringBefore("(").trim())
-            binding.tvFilterScopePeriod.text = state.periodLabel
             binding.tvScreenedPeriodLabel.text = binding.root.context.getString(
                 R.string.dashboard_screened_period_label,
                 state.periodLabel
             )
             if (payloads.isEmpty()) {
-                binding.btnOpenFilters.setOnClickListener { onOpenFilters() }
                 binding.rowUnscreened.setOnClickListener { onUnscreenedClick() }
             }
         }

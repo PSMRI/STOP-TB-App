@@ -1695,9 +1695,9 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_44_45 = object : Migration(25, 26) {
+        private val MIGRATION_44_45 = object : Migration(44, 45) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                val newColumns = listOf(
+                val beneficiaryColumns = listOf(
                     "isAvailableForCamp INTEGER NOT NULL DEFAULT 1",
                     "reasonForNotAttendingCamp TEXT DEFAULT NULL",
                     "otherReasonForNotAttendingCamp TEXT DEFAULT NULL",
@@ -1706,10 +1706,25 @@ abstract class InAppDb : RoomDatabase() {
                     "chestXrayDoneDate INTEGER DEFAULT NULL",
                     "trunatTestDoneDate INTEGER DEFAULT NULL"
                 )
-                newColumns.forEach { columnDefinition ->
+                beneficiaryColumns.forEach { columnDefinition ->
                     val columnName = columnDefinition.substringBefore(" ")
                     if (!columnExists(database, "BENEFICIARY", columnName)) {
                         database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN $columnDefinition")
+                    }
+                }
+
+                val tbScreeningColumns = listOf(
+                    "chestPain INTEGER DEFAULT NULL",
+                    "shortnessOfBreath INTEGER DEFAULT NULL",
+                    "fatigue INTEGER DEFAULT NULL",
+                    "failureToGainWeightInChildren INTEGER DEFAULT NULL",
+                    "decreasedActivityOrPlayfulnessInChildren INTEGER DEFAULT NULL",
+                    "otherSymptoms INTEGER DEFAULT NULL"
+                )
+                tbScreeningColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "TB_SCREENING", columnName)) {
+                        database.execSQL("ALTER TABLE TB_SCREENING ADD COLUMN $columnDefinition")
                     }
                 }
                 recreateBenBasicCacheView(database)

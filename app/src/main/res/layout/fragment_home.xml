@@ -108,7 +108,10 @@
                 app:tabSelectedTextColor="@color/md_theme_light_primary"
                 app:tabTextAppearance="@style/TextAppearance.Sakhi.HomeTab"
                 app:tabTextColor="@color/md_theme_light_onSurfaceVariant"
-                android:layout_margin="22dp"/>
+                android:layout_marginTop="22dp"
+                android:layout_marginStart="22dp"
+                android:layout_marginEnd="22dp"
+                />
 
             <androidx.viewpager2.widget.ViewPager2
                 android:id="@+id/vp2_home"

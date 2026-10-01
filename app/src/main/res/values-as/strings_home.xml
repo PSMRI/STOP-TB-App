@@ -143,6 +143,7 @@
     <string name="label_senior_citizen">বয়স (>=৬০): %d</string>
     <string name="filter_time_period">সময়সীমা</string>
     <string name="filter_village">গাওঁ / বস্তি</string>
+    <string name="filter_village_name">গাঁৱৰ নাম</string>
     <string name="filter_all_villages">সকলো গাওঁ</string>
     <string name="filter_today">আজি</string>
     <string name="total_tb_screenings">মুঠ টিবি পৰীক্ষণ</string>

@@ -314,6 +314,7 @@
     <string name="filter_time_period">Time Period</string>
     <string name="filter_village">Village / Hamlet</string>
     <string name="filter_village_label">Village</string>
+    <string name="filter_village_name">Village Name</string>
     <string name="filter_district">District</string>
     <string name="filter_block">Block</string>
     <string name="filter_period">Period</string>
@@ -1014,7 +1015,7 @@
     <string name="symptomatic_tb_screening">Symptomatic TB Screening</string>
     <string name="check_if_the_person_has_any_of_these_symptoms">Check if the person has any of these Symptoms:</string>
     <string name="tb_asymptomatic_screening">Asymptomatic Screening</string>
-    <string name="tb_is_beneficiary_asymptomatic">Is beneficiary asymptomatic</string>
+    <string name="tb_is_beneficiary_asymptomatic">Beneficiary is Asymptomatic</string>
     <string name="risk_factors">Risk Factors</string>
     <string name="other_details">Other Details</string>
     <string name="tb_rise_of_fever">Rise of fever in evening</string>
@@ -1341,7 +1342,8 @@
     <string name="ben_card_chest_xray">Chest X-Ray</string>
     <string name="ben_card_truenat">TrueNat</string>
     <string name="ben_card_clinical_assessment">Clinical Assessment</string>
-    <string name="ben_card_result">Result: %1$s</string>
+    <string name="ben_card_result">Result:\n%1$s</string>
+    <string name="ben_card_result_title">Result:</string>
 
     <!-- TrueNat & RIF order lifecycle redesign — Order Status area pill/caption/button copy,
          reused identically by Chest X-Ray's own retrofit of the same design language. -->

@@ -152,28 +152,6 @@
                             android:visibility="gone"
                             app:cornerRadius="@dimen/padding_small"
                             app:layout_constraintBottom_toBottomOf="@+id/tv_hh_id" />
-                        <TextView
-                            android:id="@+id/head"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/hof"
-                            android:visibility="gone"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                            android:textColor="?attr/colorPrimaryVariant"
-                            app:drawableTint="?attr/colorPrimary"
-                            android:layout_gravity="center_vertical|end"
-                            android:textStyle="bold"/>
-
-                        <ImageView
-                            android:id="@+id/iv_isHead"
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:visibility="gone"
-                            app:tint="?attr/colorPrimary"
-                            android:layout_gravity="center_vertical|end"
-                            android:layout_marginHorizontal="@dimen/padding_small"
-                            android:src="@drawable/ic__hh" />
-
                         <ImageView
                             android:id="@+id/iv_isDeath"
                             android:layout_width="24dp"
@@ -183,18 +161,6 @@
                             android:visibility="@{ben.isDeath == true ? View.VISIBLE : View.GONE}"
                             android:contentDescription="@string/iv_death_indicator"
                             android:src="@drawable/ic_death" />
-
-                        <ImageView
-                            android:id="@+id/iv_call"
-                            android:layout_width="28dp"
-                            android:layout_height="28dp"
-                            android:padding="4dp"
-                            android:visibility="gone"
-                            android:src="@drawable/ic_call_icon"
-                            android:layout_gravity="center"
-                            android:onClick="@{()->clickListener.onClickedForCall(ben)}"
-                            android:background="?selectableItemBackgroundBorderless"
-                            android:layout_marginEnd="4dp" />
 
                         <ImageView
                             android:id="@+id/ivSoftDelete"
@@ -523,18 +489,9 @@
                     android:visibility="gone"
                     app:layout_constraintTop_toBottomOf="@id/ll_ben_details_2">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Demographic Details"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
-                        android:textColor="?attr/colorOnPrimary"
-                        android:textStyle="bold" />
-
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/padding_small"
                         android:baselineAligned="false"
                         android:orientation="horizontal">
 
@@ -646,22 +603,65 @@
                             android:layout_weight="1"
                             android:orientation="vertical">
 
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Beneficiary ID"
-                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                                android:textColor="?attr/colorOnPrimary" />
-
-                            <TextView
-                                android:id="@+id/tv_redesign_beneficiary_id"
+                            <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:ellipsize="end"
-                                android:maxLines="1"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                android:textColor="?attr/colorOnPrimary"
-                                android:textStyle="bold" />
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
+
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:orientation="vertical">
+
+                                    <LinearLayout
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:gravity="center_vertical"
+                                        android:orientation="horizontal">
+
+                                        <TextView
+                                            android:layout_width="0dp"
+                                            android:layout_height="wrap_content"
+                                            android:layout_weight="1"
+                                            android:text="Beneficiary ID"
+                                            android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                                            android:textColor="?attr/colorOnPrimary" />
+
+                                    </LinearLayout>
+
+                                    <TextView
+                                        android:id="@+id/tv_redesign_beneficiary_id"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:ellipsize="end"
+                                        android:maxLines="1"
+                                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                        android:textColor="?attr/colorOnPrimary"
+                                        android:textStyle="bold" />
+                                </LinearLayout>
+
+                                <TextView
+                                    android:id="@+id/head"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="center_vertical"
+                                    android:text="@string/hof"
+                                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                    android:textColor="?attr/colorOnPrimary"
+                                    android:textStyle="bold"
+                                    android:visibility="gone" />
+
+                                <ImageView
+                                    android:id="@+id/iv_isHead"
+                                    android:layout_width="32dp"
+                                    android:layout_height="32dp"
+                                    android:contentDescription="@string/hof"
+                                    android:layout_marginEnd="@dimen/padding_small"
+                                    android:src="@drawable/ic__hh"
+                                    android:visibility="gone" />
+                            </LinearLayout>
 
                             <TextView
                                 android:layout_width="wrap_content"
@@ -685,9 +685,33 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/padding_small"
+                                android:text="@string/abha_number"
+                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                                android:textColor="?attr/colorOnPrimary"
+                                android:visibility="@{hasAbha ? View.VISIBLE : View.GONE}" />
+
+                            <TextView
+                                android:id="@+id/tv_redesign_abha_id"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:text="@{ben.abhaId}"
+                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                android:textColor="?attr/colorOnPrimary"
+                                android:textStyle="bold"
+                                android:visibility="@{hasAbha ? View.VISIBLE : View.GONE}" />
+
+                            <TextView
+                                android:id="@+id/tv_redesign_mobile_label"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/padding_small"
+                                android:drawablePadding="@dimen/padding_small"
                                 android:text="Mobile Number"
                                 android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                                android:textColor="?attr/colorOnPrimary" />
+                                android:textColor="?attr/colorOnPrimary"
+                                app:drawableTint="@android:color/white" />
 
                             <TextView
                                 android:id="@+id/tv_redesign_mobile_number"
@@ -814,7 +838,7 @@
                             android:id="@+id/tvSymptomsResult"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="8dp"
                             android:gravity="center"
                             android:textColor="@android:color/white"
                             android:textSize="13sp"
@@ -905,7 +929,7 @@
                             android:id="@+id/tvXrayResult"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="8dp"
                             android:gravity="center"
                             android:textColor="@android:color/white"
                             android:textSize="13sp"
@@ -996,7 +1020,7 @@
                             android:id="@+id/tvTruenatResult"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="8dp"
                             android:gravity="center"
                             android:textColor="@android:color/white"
                             android:textSize="13sp"
@@ -1763,6 +1787,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:backgroundTint="@android:color/holo_green_dark"
+                        android:contentDescription="@string/abha"
                         android:onClick="@{()-> clickListener.onClickABHA(ben)}"
                         android:singleLine="true"
                         android:text="@string/abha"
@@ -1770,47 +1795,11 @@
                         android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
                         android:textColor="?attr/colorOnPrimary"
                         app:cornerRadius="@dimen/padding_normal"
+                        app:icon="@drawable/ic_abha_id_card"
+                        app:iconGravity="textStart"
+                        app:iconSize="28dp"
+                        app:iconTint="@android:color/white"
                         app:strokeColor="?attr/colorPrimary" />
-                </LinearLayout>
-
-                <!-- ABHA number display (ABHA already linked) — right half -->
-                <LinearLayout
-                    showLayout="@{showAbha? hasAbha: showAbha}"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="8dp"
-                    android:orientation="vertical"
-                    android:padding="@dimen/padding_small">
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/abha_number"
-                            android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                            android:textColor="?attr/colorOnPrimary" />
-
-                        <ImageView
-                            android:id="@+id/tvIsNewAbha"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="@dimen/_5sdp"
-                            android:src='@{ben.isNewAbha ? @drawable/ic_new_abha : @drawable/ic_existing_abha}' />
-
-                    </LinearLayout>
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@{ben.abhaId}"
-                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                        android:textColor="?attr/colorOnPrimary"
-                        tools:text="0123456789" />
                 </LinearLayout>
 
             </LinearLayout>
