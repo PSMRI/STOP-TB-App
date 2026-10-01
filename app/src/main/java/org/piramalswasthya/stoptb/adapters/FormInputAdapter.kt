@@ -790,18 +790,37 @@ class FormInputAdapter(
                         formValueListener
                     )
                 } else {
-                    AlertDialog.Builder(binding.root.context)
+                    val dialog = AlertDialog.Builder(binding.root.context)
                         .setTitle(item.title)
-                        .setMultiChoiceItems(labels, checkedItems) { dialog, which, isChecked ->
+                        .setMultiChoiceItems(labels, checkedItems) { dialogInterface, which, isChecked ->
                             applyExclusiveSelection(item, checkedItems, which, isChecked)
-                            val listView = (dialog as? AlertDialog)?.listView
-                            checkedItems.indices.forEach { idx -> listView?.setItemChecked(idx, checkedItems[idx]) }
+
+                            val listView = (dialogInterface as? AlertDialog)?.listView
+                            checkedItems.indices.forEach { idx ->
+                                listView?.setItemChecked(idx, checkedItems[idx])
+                            }
                         }
                         .setPositiveButton(android.R.string.ok) { _, _ ->
                             applyMultiSelectResult(item, checkedItems, selectedIndexes, formValueListener)
                         }
                         .setNegativeButton(android.R.string.cancel, null)
-                        .show()
+                        .create()
+
+                    dialog.show()
+
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.apply {
+                        background = null
+                        setBackgroundColor(Color.TRANSPARENT)
+                        setTextColor(
+                            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.currentTextColor
+                                ?: Color.BLACK
+                        )
+                    }
+
+                    dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.apply {
+                        background = null
+                        setBackgroundColor(Color.TRANSPARENT)
+                    }
                 }
             }
             binding.etMultiSelect.setOnClickListener(showDialog)
