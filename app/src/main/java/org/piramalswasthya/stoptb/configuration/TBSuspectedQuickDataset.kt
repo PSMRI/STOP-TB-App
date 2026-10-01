@@ -141,6 +141,15 @@ class TBSuspectedQuickDataset(
         hasDependants = true
     )
 
+    private val isSputumCollectedField = FormElement(
+        id = 24,
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.tb_is_sputum_collected),
+        entries = yesNoEntries,
+        required = true,
+        hasDependants = true
+    )
+
     private val reasonForDenialSputum = FormElement(
         id = 14,
         inputType = InputType.CHECKBOXES,
@@ -325,10 +334,14 @@ class TBSuspectedQuickDataset(
         }
 
         // ── Sputum Collection ──────────────────────────────────────────────
-        val isMtbManualState = saved?.trueNatOrderStatus.equals("FAILED", ignoreCase = true) ||
-                saved?.trueNatOrderStatus.equals("MANUAL_ENTRY", ignoreCase = true)
-        val isSputumCollectedVal = saved?.isSputumCollected == true || !saved?.naatResult.isNullOrBlank()
-        referredForSputumCollection.value = boolToYesNo(if (isTruenatDeviceIntegrated && referralType == 7 && !isMtbManualState) true else isSputumCollectedVal)
+        // Always Yes in the device-integrated flow (PENDING, FAILED, or MANUAL_ENTRY alike) — see
+        // syncFieldStates()'s matching unconditional lock for why.
+        val isReferredForSputumVal = saved?.isReferredForSputum == true || !saved?.naatResult.isNullOrBlank()
+        referredForSputumCollection.value = boolToYesNo(if (isTruenatDeviceIntegrated && referralType == 7) true else isReferredForSputumVal)
+        // Defaults Yes unless the user already explicitly saved "No" — unlike trueNatConducted's
+        // "was it already done" pattern, this must default Yes even with no order/result yet (e.g.
+        // a fresh Not-Conducted-eligible order), while staying editable so No is still selectable.
+        isSputumCollectedField.value = boolToYesNo(saved?.isSputumCollected ?: true)
         reasonForDenialSputum.value = englishPipeToIndexPipe(
             saved?.reasonForDenialSputum, R.array.tb_reason_for_denial_sputum
         )
@@ -406,11 +419,17 @@ class TBSuspectedQuickDataset(
             referredForSputumCollection.value = yesValue
         }
         if (sputumVisible && isYes(referredForSputumCollection) &&
+            isSputumCollectedField.value.isNullOrBlank()
+        ) {
+            isSputumCollectedField.value = yesValue
+        }
+        val sputumCollectedNow = isYes(referredForSputumCollection) && isYes(isSputumCollectedField)
+        if (sputumVisible && sputumCollectedNow &&
             sputumSampleSubmittedAt.value.isNullOrBlank()
         ) {
             sputumSampleSubmittedAt.value = sputumSampleSubmittedAt.entries?.firstOrNull()
         }
-        if (sputumVisible && isNo(referredForSputumCollection) &&
+        if (sputumVisible && !sputumCollectedNow &&
             reasonForDenialSputum.value.isNullOrBlank()
         ) {
             reasonForDenialSputum.value = "0"
@@ -530,10 +549,24 @@ class TBSuspectedQuickDataset(
                     }
                     addItems.add(referredForSputumCollection)
                     if (isYes(referredForSputumCollection)) {
-                        if (sputumSampleSubmittedAt.value.isNullOrBlank()) {
-                            sputumSampleSubmittedAt.value = sputumSampleSubmittedAt.entries?.firstOrNull()
+                        if (isSputumCollectedField.value.isNullOrBlank()) {
+                            isSputumCollectedField.value = yesValue
                         }
-                        addItems.add(sputumSampleSubmittedAt)
+                        addItems.add(isSputumCollectedField)
+                        if (isYes(isSputumCollectedField)) {
+                            if (sputumSampleSubmittedAt.value.isNullOrBlank()) {
+                                sputumSampleSubmittedAt.value = sputumSampleSubmittedAt.entries?.firstOrNull()
+                            }
+                            addItems.add(sputumSampleSubmittedAt)
+                        } else {
+                            if (reasonForDenialSputum.value.isNullOrBlank()) {
+                                reasonForDenialSputum.value = "0"
+                            }
+                            addItems.add(reasonForDenialSputum)
+                            if (isLastItemSelected(reasonForDenialSputum, R.array.tb_reason_for_denial_sputum)) {
+                                addItems.add(reasonForDenialSputumOther)
+                            }
+                        }
                     } else if (isNo(referredForSputumCollection)) {
                         if (reasonForDenialSputum.value.isNullOrBlank()) {
                             reasonForDenialSputum.value = "0"
@@ -547,6 +580,7 @@ class TBSuspectedQuickDataset(
                     // Xray result no longer positive and no other static conditions – hide sputum section
                     removeItems.addAll(listOf(
                         referredForSputumCollection,
+                        isSputumCollectedField,
                         reasonForDenialSputum,
                         reasonForDenialSputumOther,
                         sputumSampleSubmittedAt
@@ -583,8 +617,69 @@ class TBSuspectedQuickDataset(
                 referredForSputumCollection.value = if (index == 0) yesValue else noValue
                 syncFieldStates()
                 if (index == 0) {
-                    // Yes: show submitted-at (default to TB Screening Camp if blank), remove denial
-                    sputumSampleSubmittedAt.isEnabled = !referralMode  // explicitly enable when first shown
+                    // Yes: reveal "Is sputum collected?" (default Yes if blank), remove denial
+                    if (isSputumCollectedField.value.isNullOrBlank()) {
+                        isSputumCollectedField.value = yesValue
+                    }
+                    val addItems = mutableListOf<FormElement>(isSputumCollectedField)
+                    if (isYes(isSputumCollectedField)) {
+                        sputumSampleSubmittedAt.isEnabled = !referralMode  // explicitly enable when first shown
+                        if (sputumSampleSubmittedAt.value.isNullOrBlank()) {
+                            sputumSampleSubmittedAt.value = sputumSampleSubmittedAt.entries?.firstOrNull()
+                        }
+                        addItems.add(sputumSampleSubmittedAt)
+                        if (shouldShowTrueNatConducted()) {
+                            addItems.add(trueNatConducted)
+                            if (isYes(trueNatConducted)) {
+                                addItems.add(trueNatResult)
+                            } else if (!trueNatConducted.value.isNullOrBlank() && !isYes(trueNatConducted)) {
+                                addItems.add(reasonNotConductedNaat)
+                                if (isLastItemSelectedDropdown(reasonNotConductedNaat, R.array.tb_reason_not_conducted_naat)) {
+                                    addItems.add(reasonNotConductedNaatOther)
+                                }
+                            }
+                        }
+                    } else {
+                        if (reasonForDenialSputum.value.isNullOrBlank()) {
+                            reasonForDenialSputum.value = "0"
+                        }
+                        addItems.add(reasonForDenialSputum)
+                        if (isLastItemSelected(reasonForDenialSputum, R.array.tb_reason_for_denial_sputum)) {
+                            addItems.add(reasonForDenialSputumOther)
+                        }
+                    }
+                    triggerDependants(
+                        source = referredForSputumCollection,
+                        removeItems = listOf(reasonForDenialSputum, reasonForDenialSputumOther),
+                        addItems = addItems
+                    )
+                } else {
+                    // No: show denial (default to Patient refused if blank), remove everything below
+                    // "Is sputum collected?" including that field itself (referral declined outright).
+                    if (reasonForDenialSputum.value.isNullOrBlank()) {
+                        reasonForDenialSputum.value = "0"
+                    }
+                    triggerDependants(
+                        source = referredForSputumCollection,
+                        removeItems = listOf(
+                            isSputumCollectedField,
+                            sputumSampleSubmittedAt,
+                            trueNatConducted,
+                            reasonNotConductedNaat,
+                            reasonNotConductedNaatOther,
+                            trueNatResult
+                        ),
+                        addItems = listOf(reasonForDenialSputum)
+                    )
+                }
+            }
+
+            isSputumCollectedField.id -> {
+                isSputumCollectedField.value = if (index == 0) yesValue else noValue
+                syncFieldStates()
+                if (index == 0) {
+                    // Yes: reveal submitted-at (default to TB Screening Camp if blank) + NAAT chain
+                    sputumSampleSubmittedAt.isEnabled = !referralMode
                     if (sputumSampleSubmittedAt.value.isNullOrBlank()) {
                         sputumSampleSubmittedAt.value = sputumSampleSubmittedAt.entries?.firstOrNull()
                     }
@@ -601,28 +696,25 @@ class TBSuspectedQuickDataset(
                         }
                     }
                     triggerDependants(
-                        source = referredForSputumCollection,
+                        source = isSputumCollectedField,
                         removeItems = listOf(reasonForDenialSputum, reasonForDenialSputumOther),
                         addItems = addItems
                     )
                 } else {
-                    // No: show denial (default to Patient refused if blank), conditionally remove NAAT
+                    // No: sample never obtained — show the reason, remove everything downstream
+                    // (nothing about the TrueNat test itself is answerable without a sample).
                     if (reasonForDenialSputum.value.isNullOrBlank()) {
                         reasonForDenialSputum.value = "0"
                     }
-                    // Keep NAAT visible if xray positive, historyTB, antiTBDrugs, or pregnant still apply
-                    val keepNaat = shouldShowTrueNatConducted()
                     triggerDependants(
-                        source = referredForSputumCollection,
-                        removeItems = buildList {
-                            add(sputumSampleSubmittedAt)
-                            if (!keepNaat) addAll(listOf(
-                                trueNatConducted,
-                                reasonNotConductedNaat,
-                                reasonNotConductedNaatOther,
-                                trueNatResult
-                            ))
-                        },
+                        source = isSputumCollectedField,
+                        removeItems = listOf(
+                            sputumSampleSubmittedAt,
+                            trueNatConducted,
+                            reasonNotConductedNaat,
+                            reasonNotConductedNaatOther,
+                            trueNatResult
+                        ),
                         addItems = listOf(reasonForDenialSputum)
                     )
                 }
@@ -824,18 +916,22 @@ class TBSuspectedQuickDataset(
             // Sputum Collection & TrueNAT (referralType == 0 or 7)
             if (referralType == 0 || referralType == 7) {
                 val sputumVisible = referralType == 7 || shouldShowSputumCollected()
+                val isReferred = isYes(referredForSputumCollection)
+                val isSputumCollectedNow = isReferred && isYes(isSputumCollectedField)
+                form.isReferredForSputum =
+                    if (sputumVisible) isReferred else null
                 form.isSputumCollected =
-                    if (sputumVisible) isYes(referredForSputumCollection) else null
+                    if (sputumVisible && isReferred) isYes(isSputumCollectedField) else null
                 form.reasonForDenialSputum =
-                    if (sputumVisible && !isYes(referredForSputumCollection))
+                    if (sputumVisible && (!isReferred || (isReferred && !isSputumCollectedNow)))
                         indexPipeToEnglishPipe(reasonForDenialSputum, R.array.tb_reason_for_denial_sputum)
                     else null
                 form.reasonForDenialSputumOther =
-                    if (sputumVisible && !isYes(referredForSputumCollection))
+                    if (sputumVisible && (!isReferred || (isReferred && !isSputumCollectedNow)))
                         reasonForDenialSputumOther.value?.takeIf { it.isNotBlank() }
                     else null
                 form.sputumSubmittedAt =
-                    if (sputumVisible && isYes(referredForSputumCollection))
+                    if (sputumVisible && isSputumCollectedNow)
                         getEnglishValueInArray(R.array.tb_diagnostics_sputum_submitted_at, sputumSampleSubmittedAt.value)
                     else null
 
@@ -945,34 +1041,42 @@ class TBSuspectedQuickDataset(
             if (referralType == 7 || referralType == 0 || shouldShowSputumCollected()) {
                 add(referredForSputumCollection)
                 if (isYes(referredForSputumCollection)) {
-                    add(sputumSampleSubmittedAt)
-                    if (referralMode || referralType == 0 || referralType == 7) {
-                        add(trueNatConducted)
-                        if (isYes(trueNatConducted)) {
-                            add(trueNatResult)
-                            
-                            val isRifCompleted = diagnosticsCache?.rifOrderStatus.equals("COMPLETED", ignoreCase = true)
-                            val showRif = if (referralMode) {
-                                isRifCompleted && isMtbDetected()
-                            } else {
-                                isMtbDetected()
-                            }
-                            if (showRif) {
-                                add(rifConducted)
-                                if (isYes(rifConducted)) {
-                                    add(trueNatRifResult)
-                                } else if (isNo(rifConducted)) {
-                                    add(reasonNotConductedRif)
-                                    if (isLastItemSelectedDropdown(reasonNotConductedRif, R.array.tb_reason_not_conducted_naat)) {
-                                        add(reasonNotConductedRifOther)
+                    add(isSputumCollectedField)
+                    if (isYes(isSputumCollectedField)) {
+                        add(sputumSampleSubmittedAt)
+                        if (referralMode || referralType == 0 || referralType == 7) {
+                            add(trueNatConducted)
+                            if (isYes(trueNatConducted)) {
+                                add(trueNatResult)
+
+                                val isRifCompleted = diagnosticsCache?.rifOrderStatus.equals("COMPLETED", ignoreCase = true)
+                                val showRif = if (referralMode) {
+                                    isRifCompleted && isMtbDetected()
+                                } else {
+                                    isMtbDetected()
+                                }
+                                if (showRif) {
+                                    add(rifConducted)
+                                    if (isYes(rifConducted)) {
+                                        add(trueNatRifResult)
+                                    } else if (isNo(rifConducted)) {
+                                        add(reasonNotConductedRif)
+                                        if (isLastItemSelectedDropdown(reasonNotConductedRif, R.array.tb_reason_not_conducted_naat)) {
+                                            add(reasonNotConductedRifOther)
+                                        }
                                     }
                                 }
+                            } else if (!trueNatConducted.value.isNullOrBlank()) {
+                                add(reasonNotConductedNaat)
+                                if (isLastItemSelectedDropdown(reasonNotConductedNaat, R.array.tb_reason_not_conducted_naat)) {
+                                    add(reasonNotConductedNaatOther)
+                                }
                             }
-                        } else if (!trueNatConducted.value.isNullOrBlank()) {
-                            add(reasonNotConductedNaat)
-                            if (isLastItemSelectedDropdown(reasonNotConductedNaat, R.array.tb_reason_not_conducted_naat)) {
-                                add(reasonNotConductedNaatOther)
-                            }
+                        }
+                    } else {
+                        add(reasonForDenialSputum)
+                        if (isLastItemSelected(reasonForDenialSputum, R.array.tb_reason_for_denial_sputum)) {
+                            add(reasonForDenialSputumOther)
                         }
                     }
                 } else if (isNo(referredForSputumCollection)) {
@@ -1127,11 +1231,13 @@ class TBSuspectedQuickDataset(
 
         // Sputum section
         val sputumVisible = referralType == 7 || shouldShowSputumCollected()
-        val currentMtbStatus = diagnosticsCache?.trueNatOrderStatus
-        val isMtbManualState = currentMtbStatus.equals("FAILED", ignoreCase = true) ||
-                currentMtbStatus.equals("MANUAL_ENTRY", ignoreCase = true)
 
-        if (isTruenatDevIntegrated && referralType == 7 && !isMtbManualState) {
+        // "Referred for sputum collection/TrueNat Test?" always stays locked at Yes in the
+        // device-integrated flow — PENDING, FAILED, or MANUAL_ENTRY alike. Only "Is sputum
+        // collected?" is meant to be user-editable in those states (see below), so the user can
+        // refuse sputum collection at any point before a real result exists, without also being
+        // able to re-open the referral decision itself.
+        if (isTruenatDevIntegrated && referralType == 7) {
             referredForSputumCollection.value = yesValue
             referredForSputumCollection.isEnabled = false
             referredForSputumCollection.required = false
@@ -1141,8 +1247,18 @@ class TBSuspectedQuickDataset(
         }
         if (!sputumVisible) resetField(referredForSputumCollection)
 
+        // "Is sputum collected?" locks the same way trueNatConducted/trueNatResult already do
+        // (lockTrueNat: referralMode or a real result already exists) — editable for as long as
+        // the order is still unresolved (PENDING, FAILED, or MANUAL_ENTRY), letting the user
+        // refuse sputum collection at any of those points, not just once it's failed outright.
+        val sputumCollectedVisible = shouldShowIsSputumCollected()
+        isSputumCollectedField.isEnabled = sputumCollectedVisible && !lockTrueNat
+        isSputumCollectedField.required = sputumCollectedVisible && !lockTrueNat
+        if (!sputumCollectedVisible) resetField(isSputumCollectedField)
+
         val sputumReferred = isYes(referredForSputumCollection)
-        val sputumDenied = isNo(referredForSputumCollection)
+        val sputumDenied = isNo(referredForSputumCollection) ||
+                (isYes(referredForSputumCollection) && isNo(isSputumCollectedField))
         sputumSampleSubmittedAt.isEnabled = !referralMode  // not editable when Submit is hidden (view mode)
         reasonForDenialSputum.isEnabled = true
         reasonForDenialSputum.required = true
@@ -1353,10 +1469,17 @@ class TBSuspectedQuickDataset(
             screeningCache?.asymptomatic?.equals("NO", ignoreCase = true) == true ||
             screeningCache?.recommendedForTruenatTest == true
 
-    /** TrueNAT shown when xray positive, sputum referred, history of TB, anti-TB drugs, or pregnant */
-    private fun shouldShowTrueNatConducted(): Boolean =
+    /** "Is sputum collected?" shown whenever the referral itself is Yes — same condition
+     *  shouldShowTrueNatConducted() used before the new sputum-collected gate was inserted. */
+    private fun shouldShowIsSputumCollected(): Boolean =
         (referralMode || referralType == 0 || referralType == 7) &&
         isYes(referredForSputumCollection)
+
+    /** TrueNAT shown when xray positive, sputum referred, history of TB, anti-TB drugs, or
+     *  pregnant — AND a sample was actually collected (new gate; a sample never obtained can't
+     *  have its TrueNat test conducted). */
+    private fun shouldShowTrueNatConducted(): Boolean =
+        shouldShowIsSputumCollected() && isYes(isSputumCollectedField)
 
     /** Liquid Culture shown when both history of TB AND taking anti-TB drugs */
     private fun shouldShowLiquidCultureConducted(): Boolean =

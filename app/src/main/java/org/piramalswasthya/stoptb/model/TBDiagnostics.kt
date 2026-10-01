@@ -34,7 +34,8 @@ data class TBDiagnosticsCache(
     var reasonNotConductedChestXrayOther: String? = null,
     var chestXRayResult: String? = null,
     // ── Sputum Collection ────────────────────────────────────────────────────
-    var isSputumCollected: Boolean? = null,             // used as "referred for sputum"
+    var isReferredForSputum: Boolean? = null,           // referral decision (see MIGRATION_50_51)
+    var isSputumCollected: Boolean? = null,             // was a sample physically collected
     var reasonForDenialSputum: String? = null,          // pipe-sep English values
     var reasonForDenialSputumOther: String? = null,
     var sputumSubmittedAt: String? = null,

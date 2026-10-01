@@ -1358,6 +1358,10 @@
     <string name="order_status_hub_disconnected_title">Camp Hub is disconnected.</string>
     <string name="order_status_hub_disconnected_desc">Not polling for result — please connect to Camp Hub.</string>
     <string name="order_status_last_checked_caption">Last checked %1$s ago · Auto-refresh every %2$d seconds</string>
+    <!-- Deliberately vague rather than an exact elapsed-seconds count — when a poll cycle runs
+         long, showing e.g. "84s ago" next to "every 60 seconds" looks broken even though it
+         isn't. -->
+    <string name="order_status_few_seconds">a few seconds</string>
     <!-- Kept short deliberately: these sit side-by-side in two half-width buttons with an
          icon, and "Enter Result Manually"/"Mark Test Not Conducted" truncate on narrower
          phone widths. -->
@@ -1390,10 +1394,11 @@
     <string name="tb_reason_for_denial_chest_xray_other">Specify other reason for denial (X-Ray)</string>
     <string name="tb_reason_not_conducted_xray">Reason Digital Chest X-Ray not conducted</string>
     <string name="tb_reason_not_conducted_xray_other">Specify other reason (X-Ray not conducted)</string>
-    <string name="tb_referred_for_sputum_collection">Referred for Sputum Collection?</string>
+    <string name="tb_referred_for_sputum_collection">Referred for sputum collection/TrueNat Test?</string>
+    <string name="tb_is_sputum_collected">Is sputum collected?</string>
     <string name="tb_reason_for_denial_sputum">Reason for Denial of Sputum Collection</string>
     <string name="tb_reason_for_denial_sputum_other">Specify other reason for denial (Sputum)</string>
-    <string name="tb_sputum_submitted_at">Sputum sample submitted at</string>
+    <string name="tb_sputum_submitted_at">Sputum Sample Submission Center</string>
     <string name="sputum_sample_submitted_at_screening_camp">Sputum Sample Submitted at TB Screening Camp</string>
     <string name="tb_reason_not_conducted_naat">Reason True NAT not conducted</string>
     <string name="tb_reason_not_conducted_naat_other">Specify other reason (True NAT not conducted)</string>

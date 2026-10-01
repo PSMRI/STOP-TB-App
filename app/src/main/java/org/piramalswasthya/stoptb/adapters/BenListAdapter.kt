@@ -33,7 +33,6 @@ import org.piramalswasthya.stoptb.model.AppRole
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.ExamineDenominatorRule
 import org.piramalswasthya.stoptb.model.Gender
-import org.piramalswasthya.stoptb.model.ChestXrayResult
 import org.piramalswasthya.stoptb.model.MtbResult
 import org.piramalswasthya.stoptb.model.OrderStatus
 import org.piramalswasthya.stoptb.model.RifResult
@@ -236,11 +235,11 @@ class BenListAdapter(
 
                         val lastChecked = pref?.getLastCheckedTime(benId, testType) ?: 0L
                         if (lastChecked > 0L) {
-                            val secondsAgo = ((System.currentTimeMillis() - lastChecked) / 1000L).coerceAtLeast(0L)
                             statusDivider.visibility = View.VISIBLE
                             lastCheckedCaption.visibility = View.VISIBLE
                             lastCheckedCaption.text = ctx.getString(
-                                R.string.order_status_last_checked_caption, "${secondsAgo}s", 60
+                                R.string.order_status_last_checked_caption,
+                                ctx.getString(R.string.order_status_few_seconds), 60
                             )
                         } else {
                             statusDivider.visibility = View.GONE
@@ -331,15 +330,16 @@ class BenListAdapter(
                     binding.tvRifOrderStatus.visibility = View.VISIBLE
                     val reasonStr = formatDenialReason(tbDiag?.reasonNotConductedRif, tbDiag?.reasonNotConductedRifOther)
                     binding.tvRifOrderStatus.text = if (reasonStr.isNotBlank()) {
-                        "Order Status: Closed — Not Conducted\nReason:\n$reasonStr"
+                        "Order Status: Closed — Not Conducted\nReason: $reasonStr"
                     } else {
                         "Order Status: Closed — Expired (Result not entered)"
                     }
                     binding.btnRifPrimary.visibility = View.VISIBLE
                     binding.btnRifPrimary.text = ctx.getString(R.string.order_status_create_new_order)
                     binding.btnRifPrimary.setBackgroundTintList(ContextCompat.getColorStateList(ctx, android.R.color.holo_blue_dark))
-                    binding.btnRifPrimary.isEnabled = canActOnReferral
-                    binding.btnRifPrimary.alpha = if (canActOnReferral) 1.0f else 0.5f
+                    val reorderEnabled = canActOnReferral && !retryingBenIds.contains(item.benId)
+                    binding.btnRifPrimary.isEnabled = reorderEnabled
+                    binding.btnRifPrimary.alpha = if (reorderEnabled) 1.0f else 0.5f
                     binding.btnRifPrimary.setOnClickListener {
                         clickListener?.onClickOrderAction(item, "REORDER", "MDR_RIF")
                     }
@@ -641,32 +641,14 @@ class BenListAdapter(
                 binding.llXrayTile.visibility = if (isPregnantFemale) View.GONE else View.VISIBLE
                 binding.llTruenatTile.visibility = if (isNegativeXray) View.GONE else View.VISIBLE
 
-                val xrayStd = ChestXrayResult.fromResultText(tbDiagForStatus?.chestXRayResult)
-                val mtbStd = MtbResult.fromResultText(tbDiagForStatus?.naatResult)
-                val rifStd = RifResult.fromResultText(tbDiagForStatus?.trueNatRifResult)
-                // Matches BenDao's referral-list criteria exactly (not AI_INVALID).
-                val isMtbNegativeAbnormalXray =
-                        (xrayStd == ChestXrayResult.TB_PRESUMPTIVE ||
-                                xrayStd == ChestXrayResult.ABNORMAL_NOT_PRESUMPTIVE) &&
-                        mtbStd == MtbResult.TB_NEGATIVE
-                val isRifIndeterminateForTile = rifStd == RifResult.INDETERMINATE
-                val showClinicalAssessmentTile = isMtbNegativeAbnormalXray || isRifIndeterminateForTile
-                binding.llClinicalAssessmentTile.visibility = if (showClinicalAssessmentTile) View.VISIBLE else View.GONE
-                if (showClinicalAssessmentTile) {
-                    binding.ivClinicalAssessment.setImageResource(R.drawable.circle_check)
-                    val reasonDetail = if (isRifIndeterminateForTile) {
-                        "RIF Indeterminate"
-                    } else {
-                        "${xrayStd?.displayValue}, ${mtbStd?.displayValue}"
-                    }
-                    binding.tvClinicalAssessmentReason.text = reasonDetail
-                }
+                // Clinical Assessment tile removed from the card — the same referral criteria is
+                // already surfaced via the dedicated Clinical Assessment line listing.
+                binding.llClinicalAssessmentTile.visibility = View.GONE
 
                 binding.llScreeningStatus.weightSum = listOf(
                     true, // TB Symptoms tile is always visible
                     !isPregnantFemale,
-                    !isNegativeXray,
-                    showClinicalAssessmentTile
+                    !isNegativeXray
                 ).count { it }.toFloat()
                 binding.ivXray.setImageResource(
                     if (!xrayResult.isNullOrBlank()) R.drawable.circle_check else R.drawable.circle_uncheck
@@ -751,13 +733,13 @@ class BenListAdapter(
                         }
                         7 -> {
                             val status = tbDiag?.trueNatOrderStatus
-                            val sputumCollected = tbDiag?.isSputumCollected
+                            val referredForSputum = tbDiag?.isReferredForSputum
                             binding.btnVitalScreenSecondary.visibility = View.GONE
                             binding.btnVitalScreen.visibility = View.VISIBLE
                             binding.llMtbSummaryStrip.visibility = View.GONE
 
                             when {
-                                sputumCollected == false -> {
+                                referredForSputum == false -> {
                                     ButtonConfig("TEST REFUSED", android.R.color.darker_gray, "NONE", "SPUTUM_TRUENAT")
                                 }
                                 status.equals(OrderStatus.FAILED.name, ignoreCase = true) -> {
@@ -823,7 +805,8 @@ class BenListAdapter(
                         binding.btnVitalScreen.alpha = 1.0f
                     }
 
-                    val isRetryPushInFlight = config.action == "RETRY_PUSH" && retryingBenIds.contains(item.benId)
+                    val isRetryPushInFlight = (config.action == "RETRY_PUSH" || config.action == "REORDER") &&
+                            retryingBenIds.contains(item.benId)
                     if (isRetryPushInFlight) {
                         binding.btnVitalScreen.isEnabled = false
                         binding.btnVitalScreen.alpha = 1.0f
@@ -869,7 +852,7 @@ class BenListAdapter(
                                 referred == false -> {
                                     val reasonStr = formatDenialReason(tbDiag?.reasonForDenialChestXray, tbDiag?.reasonForDenialChestXrayOther)
                                     if (reasonStr.isNotBlank()) {
-                                        "Referral Status: Declined / Not Conducted\nReason for Refusal:\n$reasonStr"
+                                        "Referral Status: Declined / Not Conducted\nReason for Refusal: $reasonStr"
                                     } else {
                                         "Referral Status: Declined / Not Conducted"
                                     }
@@ -885,9 +868,9 @@ class BenListAdapter(
                                     val notConductedReasonStr = formatDenialReason(tbDiag?.reasonNotConductedChestXray, tbDiag?.reasonNotConductedChestXrayOther)
                                     when {
                                         declineReasonStr.isNotBlank() ->
-                                            "Order Status: Closed — Declined\nReason:\n$declineReasonStr"
+                                            "Order Status: Closed — Declined\nReason: $declineReasonStr"
                                         notConductedReasonStr.isNotBlank() ->
-                                            "Order Status: Closed — Not Conducted\nReason:\n$notConductedReasonStr"
+                                            "Order Status: Closed — Not Conducted\nReason: $notConductedReasonStr"
                                         else ->
                                             "Order Status: Closed — Expired (Result not entered)"
                                     }
@@ -903,12 +886,12 @@ class BenListAdapter(
                         }
                         7 -> {
                             val status = tbDiag?.trueNatOrderStatus
-                            val sputumCollected = tbDiag?.isSputumCollected
+                            val referredForSputum = tbDiag?.isReferredForSputum
                             when {
-                                sputumCollected == false -> {
+                                referredForSputum == false -> {
                                     val reasonStr = formatDenialReason(tbDiag?.reasonForDenialSputum, tbDiag?.reasonForDenialSputumOther)
                                     if (reasonStr.isNotBlank()) {
-                                        "Referral Status: Declined / Not Conducted\nReason for Refusal:\n$reasonStr"
+                                        "Referral Status: Declined / Not Conducted\nReason for Refusal:$reasonStr"
                                     } else {
                                         "Referral Status: Declined / Not Conducted"
                                     }
@@ -926,9 +909,9 @@ class BenListAdapter(
                                     val notConductedReasonStr = formatDenialReason(tbDiag?.reasonNotConductedNaat, tbDiag?.reasonNotConductedNaatOther)
                                     when {
                                         declineReasonStr.isNotBlank() ->
-                                            "Order Status: Closed — Declined\nReason:\n$declineReasonStr"
+                                            "Order Status: Closed — Declined\nReason: $declineReasonStr"
                                         notConductedReasonStr.isNotBlank() ->
-                                            "Order Status: Closed — Not Conducted\nReason:\n$notConductedReasonStr"
+                                            "Order Status: Closed — Not Conducted\nReason: $notConductedReasonStr"
                                         else ->
                                             "Order Status: Closed — Expired (Result not entered)"
                                     }
@@ -960,7 +943,7 @@ class BenListAdapter(
                     }
                     val hasOrderBeenPlaced = when (source) {
                         6 -> tbDiag?.isReferredForDigitalChestXray == true || !tbDiag?.xrayOrderStatus.isNullOrBlank()
-                        7 -> tbDiag?.isSputumCollected == true || !tbDiag?.trueNatOrderStatus.isNullOrBlank()
+                        7 -> tbDiag?.isReferredForSputum == true || !tbDiag?.trueNatOrderStatus.isNullOrBlank()
                         else -> false
                     }
 

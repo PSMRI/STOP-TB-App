@@ -201,13 +201,41 @@ class TBRepo @Inject constructor(
         }
     }
 
+    // Called directly from ViewModels (form save flows) with a snapshot that can be stale by the
+    // time it's written — most notably, a screen's own in-memory diagnostics object doesn't know
+    // about an in-flight auto-reorder Worker (see createOrder()) that may have already cleared
+    // naatResult/chestXRayResult/trueNatRifResult and moved to a new order underneath it. Re-read
+    // fresh under the row's lock and, for each test type whose order id has moved on since this
+    // caller's snapshot was taken, defer to the fresh order-lifecycle fields instead of the stale
+    // ones — every other field in the caller's snapshot (its actual form edits) still applies.
     suspend fun saveTBDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache) {
         withContext(Dispatchers.IO) {
             benDao.getBen(tbDiagnosticsCache.benId)?.let { ben ->
                 ben.gpsLatitude?.let { tbDiagnosticsCache.latitude = it }
                 ben.gpsLongitude?.let { tbDiagnosticsCache.longitude = it }
             }
-            tbDao.saveTbDiagnostics(tbDiagnosticsCache)
+            withBenIdLock(tbDiagnosticsCache.benId) {
+                val fresh = tbDao.getTbDiagnosticsByBenId(tbDiagnosticsCache.benId)
+                // id is a val (Room primary key) — .copy() to retarget the existing row instead
+                // of reassigning, then apply the deferred-field overrides below onto that copy.
+                val cache = if (fresh != null) tbDiagnosticsCache.copy(id = fresh.id) else tbDiagnosticsCache
+                if (fresh != null) {
+                    if (fresh.trueNatOrderId != cache.trueNatOrderId) {
+                        cache.naatResult = fresh.naatResult
+                        cache.trueNatOrderId = fresh.trueNatOrderId
+                        cache.trueNatOrderStatus = fresh.trueNatOrderStatus
+                    }
+                    if (fresh.xrayOrderId != cache.xrayOrderId) {
+                        cache.chestXRayResult = fresh.chestXRayResult
+                        cache.xrayOrderStatus = fresh.xrayOrderStatus
+                    }
+                    if (fresh.rifOrderId != cache.rifOrderId) {
+                        cache.trueNatRifResult = fresh.trueNatRifResult
+                        cache.rifOrderStatus = fresh.rifOrderStatus
+                    }
+                }
+                tbDao.saveTbDiagnostics(cache)
+            }
             if (tbDiagnosticsCache.isChestXRayDone == true) benDao.updateScreeningStatus(tbDiagnosticsCache.benId,"SCREENED")   // NEW
 
             if (tbDiagnosticsCache.isNaatConducted == true) benDao.updateScreeningStatus(tbDiagnosticsCache.benId,"SCREENED")   // NEW
@@ -1327,17 +1355,35 @@ class TBRepo @Inject constructor(
         }
     }
 
+    // pushUnSyncedRecordsTBDiagnostics() snapshots UNSYNCED rows once, then pushes them over the
+    // network — during that round trip something else (most notably createOrder()'s reorder-
+    // clearing write) can land on the same row. Blindly writing the stale snapshot back here (as
+    // this used to do) would silently discard that newer write while marking the row SYNCED,
+    // hiding it from future push cycles. Re-read fresh under the row's lock and only flip
+    // syncState if nothing else changed since the snapshot was pushed; otherwise leave it
+    // UNSYNCED so the next sync cycle picks up and pushes the newer state instead.
     private suspend fun updateSyncStatusDiagnostics(diagnosticsList: List<TBDiagnosticsCache>) {
-        diagnosticsList.forEach {
-            it.syncState = SyncState.SYNCED
-            tbDao.saveTbDiagnostics(it)
+        diagnosticsList.forEach { pushed ->
+            withBenIdLock(pushed.benId) {
+                val fresh = tbDao.getTbDiagnosticsByBenId(pushed.benId) ?: return@withBenIdLock
+                val unchanged = fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)
+                if (unchanged) {
+                    tbDao.saveTbDiagnostics(fresh.copy(syncState = SyncState.SYNCED))
+                }
+            }
         }
     }
 
+    // Same stale-snapshot race as updateSyncStatusDiagnostics() above, for TB_SUSPECTED.
     private suspend fun updateSyncStatusSuspected(tbspList: List<TBSuspectedCache>) {
-        tbspList.forEach {
-            it.syncState = SyncState.SYNCED
-            tbDao.saveTbSuspected(it)
+        tbspList.forEach { pushed ->
+            withBenIdLock(pushed.benId) {
+                val fresh = tbDao.getTbSuspected(pushed.benId) ?: return@withBenIdLock
+                val unchanged = fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)
+                if (unchanged) {
+                    tbDao.saveTbSuspected(fresh.copy(syncState = SyncState.SYNCED))
+                }
+            }
         }
     }
 
@@ -1620,7 +1666,11 @@ class TBRepo @Inject constructor(
                     it.copy(
                         rifOrderId = fetchedOrderId ?: it.rifOrderId,
                         rifOrderStatus = OrderStatus.COMPLETED.name,
-                        trueNatRifResult = localResult,
+                        // Invalid/Error immediately triggers a reorder (see
+                        // TBSuspectedQuickViewModel's ordersToPushAfterSave) — never persist this
+                        // result text locally, or a race with the reorder's own clearing write can
+                        // leave it stuck showing the old value. Indeterminate is terminal, keep it.
+                        trueNatRifResult = if (standardizedRif == RifResult.INVALID_ERROR) null else localResult,
                         // RIF DR TB / Non DR TB manual entry — extend the same
                         // isConfirmed/isTBConfirmed flags the automated path sets;
                         // isDrTbConfirmed distinguishes the DR-TB-specific outcome.
@@ -1649,9 +1699,13 @@ class TBRepo @Inject constructor(
                     it.copy(
                         trueNatOrderId = fetchedOrderId ?: it.trueNatOrderId,
                         trueNatOrderStatus = OrderStatus.COMPLETED.name,
-                        isSputumCollected = true,
+                        isReferredForSputum = true,
                         isNaatConducted = true,
-                        naatResult = localResult,
+                        // Invalid/Error immediately triggers a reorder (see
+                        // TBSuspectedQuickViewModel's ordersToPushAfterSave) — never persist this
+                        // result text locally, or a race with the reorder's own clearing write can
+                        // leave it stuck showing the old value.
+                        naatResult = if (standardizedMtb == MtbResult.INVALID_ERROR) null else localResult,
                         isTBConfirmed = when (standardizedMtb) {
                             MtbResult.TB_POSITIVE -> true
                             MtbResult.TB_NEGATIVE -> false
@@ -1857,7 +1911,7 @@ class TBRepo @Inject constructor(
                                             OrderStatus.FAILED.name else OrderStatus.PENDING.name,
                                         naatResult = null,
                                         trueNatRifResult = null,
-                                        isSputumCollected = true,
+                                        isReferredForSputum = true,
                                         isNaatConducted = true,
                                         reasonNotConductedNaat = null,
                                         reasonNotConductedNaatOther = null,
@@ -1952,7 +2006,7 @@ class TBRepo @Inject constructor(
                                         trueNatOrderStatus = reducedOrderStatus(status),
                                         naatResult = null,
                                         trueNatRifResult = null,
-                                        isSputumCollected = true,
+                                        isReferredForSputum = true,
                                         isNaatConducted = isIntegrated,
                                         sputumSubmittedAt = "TB Screening Camp",
                                         syncState = SyncState.UNSYNCED
@@ -1998,12 +2052,15 @@ class TBRepo @Inject constructor(
             withBenIdLock(benId) {
             val existing = tbDao.getTbSuspected(benId)
 
+            // TB_SUSPECTED.isSputumCollected still means "referred" (a separate, unrelated table
+            // from TB_DIAGNOSTICS' own isSputumCollected, which was repurposed to mean "sample
+            // physically collected") — so this reads diag.isReferredForSputum, not diag.isSputumCollected.
             val mappedIsSputumCollected = when {
-                diag.isSputumCollected == false ||
+                diag.isReferredForSputum == false ||
                 diag.reasonForDenialSputum != null -> false
 
                 diag.reasonNotConductedNaat != null ||
-                diag.isSputumCollected == true ||
+                diag.isReferredForSputum == true ||
                 !diag.trueNatOrderId.isNullOrBlank() -> true
 
                 else -> existing?.isSputumCollected
@@ -2258,7 +2315,7 @@ class TBRepo @Inject constructor(
                                         else -> {
                                             it.copy(
                                                 trueNatOrderStatus = status,
-                                                isSputumCollected = true,
+                                                isReferredForSputum = true,
                                                 syncState = SyncState.UNSYNCED
                                             )
                                         }
@@ -2295,6 +2352,17 @@ class TBRepo @Inject constructor(
             val targetBenId = ben.beneficiaryId
             if (targetBenId <= 0) {
                 return@withContext NetworkResponse.Error("Beneficiary ID not valid")
+            }
+            val isXrayType = orderType.equals("XRAY_CHEST", ignoreCase = true)
+            val isRifType = orderType.equals("MDR_RIF", ignoreCase = true)
+            // Captured before the network round trip below — this call is triggered by an
+            // independent poll worker, decoupled from any concurrent reorder (e.g. createOrder()
+            // on Invalid/Error). If a newer order gets created for this test type while this
+            // call's own GET is in flight, the fresh order id/status this response carries would
+            // still look plausible on their own, but this response is for a now-superseded order —
+            // see the check before the final commit below.
+            val orderIdAtStart = tbDao.getTbDiagnosticsByBenId(benId)?.let {
+                if (isXrayType) it.xrayOrderId else if (isRifType) it.rifOrderId else it.trueNatOrderId
             }
             try {
                 val apiOrderType = if (orderType.equals("SPUTUM_TRUENAT", ignoreCase = true)) "MTB" else orderType
@@ -2394,6 +2462,17 @@ class TBRepo @Inject constructor(
                             // rather than clobbered by a stale pre-cascade snapshot.
                             val syncedCache = withBenIdLock(benId) {
                             val existing = tbDao.getTbDiagnosticsByBenId(benId)
+                            val currentOrderId = if (isXrayType) existing?.xrayOrderId else if (isRifType) existing?.rifOrderId else existing?.trueNatOrderId
+                            if (orderIdAtStart != null && currentOrderId != orderIdAtStart) {
+                                // A newer order for this test type (e.g. an auto-reorder on
+                                // Invalid/Error) was created while this call's network round trip
+                                // was in flight. This response — including its fresh-looking
+                                // status/order id — describes the now-superseded order; committing
+                                // it here (and force-marking SYNCED below) would clobber whatever
+                                // that newer order's own write already committed. Skip; the next
+                                // poll cycle will fetch against the current order instead.
+                                return@withBenIdLock existing ?: TBDiagnosticsCache(benId = benId)
+                            }
                             val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
                                 if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
                                     // Chest X-Ray order lifecycle redesign: standardized 4-way
@@ -2408,7 +2487,7 @@ class TBRepo @Inject constructor(
                                             // TB Presumptive/Abnormal — trigger SPUTUM_TRUENAT via the
                                             // per-benId push-worker chain, not inline (an inline call
                                             // here used to race the Screening Form's own TrueNat push).
-                                            // Leave trueNatOrderStatus/isSputumCollected/isNaatConducted
+                                            // Leave trueNatOrderStatus/isReferredForSputum/isNaatConducted
                                             // untouched — writing PENDING here would make the worker's
                                             // own "does an order exist" check skip the push.
                                             val hasTruenat = !it.trueNatOrderId.isNullOrBlank() ||
@@ -2538,7 +2617,7 @@ class TBRepo @Inject constructor(
                                     it.copy(
                                         trueNatOrderStatus = computedTrueNatStatus,
                                         trueNatOrderId = computedTrueNatOrderId ?: it.trueNatOrderId,
-                                        isSputumCollected = true,
+                                        isReferredForSputum = true,
                                         isNaatConducted = if (isCompleted) true else it.isNaatConducted,
                                         naatResult = if (isCompleted) (serverMtbResultSummary ?: mtbResult) else it.naatResult,
                                         isTBConfirmed = if (isCompleted) isMtbDetected else it.isTBConfirmed,
@@ -2720,7 +2799,7 @@ class TBRepo @Inject constructor(
                                                 } else {
                                                     it.copy(
                                                         trueNatOrderStatus = OrderStatus.PENDING.name,
-                                                        isSputumCollected = true,
+                                                        isReferredForSputum = true,
                                                         syncState = SyncState.SYNCED
                                                     )
                                                 }
@@ -2791,7 +2870,7 @@ class TBRepo @Inject constructor(
                                             } else {
                                                 it.copy(
                                                     trueNatOrderStatus = OrderStatus.COMPLETED.name,
-                                                    isSputumCollected = true,
+                                                    isReferredForSputum = true,
                                                     isNaatConducted = true,
                                                     syncState = SyncState.SYNCED
                                                 )
@@ -2833,7 +2912,7 @@ class TBRepo @Inject constructor(
                                                 } else {
                                                     it.copy(
                                                         trueNatOrderStatus = OrderStatus.CLOSED.name,
-                                                        isSputumCollected = true,
+                                                        isReferredForSputum = true,
                                                         syncState = SyncState.SYNCED
                                                     )
                                                 }
@@ -2875,7 +2954,7 @@ class TBRepo @Inject constructor(
                                                 } else {
                                                     it.copy(
                                                         trueNatOrderStatus = OrderStatus.FAILED.name,
-                                                        isSputumCollected = true,
+                                                        isReferredForSputum = true,
                                                         syncState = SyncState.SYNCED
                                                     )
                                                 }
@@ -2920,7 +2999,7 @@ class TBRepo @Inject constructor(
                                                 } else {
                                                     it.copy(
                                                         trueNatOrderStatus = OrderStatus.MANUAL_ENTRY.name,
-                                                        isSputumCollected = true,
+                                                        isReferredForSputum = true,
                                                         syncState = SyncState.SYNCED
                                                     )
                                                 }

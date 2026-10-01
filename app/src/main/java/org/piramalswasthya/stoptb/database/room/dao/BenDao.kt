@@ -243,11 +243,11 @@ interface BenDao {
                    OR (v.rbs IS NOT NULL AND v.rbs >= 100)
                 UNION
                 SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                   AND UPPER(IFNULL(ts.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
                 UNION
                 SELECT td.benId FROM TB_DIAGNOSTICS td
-                WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                   AND UPPER(IFNULL(td.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
             ))
             OR (:source = 6 AND isDeath = 0 AND reproductiveStatusId != 1 AND benId NOT IN (SELECT v.benId FROM BEN_VITALS v WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%') AND (
@@ -273,12 +273,12 @@ interface BenDao {
                 OR benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isNaatConducted IS NOT NULL
-                       OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                       OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                 )
                 OR benId IN (
                     SELECT td.benId FROM TB_DIAGNOSTICS td
                     WHERE td.isNaatConducted IS NOT NULL
-                       OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                       OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                 )
                 OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
@@ -415,11 +415,11 @@ interface BenDao {
                    OR (v.rbs IS NOT NULL AND v.rbs >= 100)
                 UNION
                 SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                   AND UPPER(IFNULL(ts.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
                 UNION
                 SELECT td.benId FROM TB_DIAGNOSTICS td
-                WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                   AND UPPER(IFNULL(td.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
             ))
             OR (:source = 6 AND isDeath = 0 AND reproductiveStatusId != 1 AND benId NOT IN (SELECT v.benId FROM BEN_VITALS v WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%') AND (
@@ -445,12 +445,12 @@ interface BenDao {
                 OR benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isNaatConducted IS NOT NULL
-                       OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                       OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                 )
                 OR benId IN (
                     SELECT td.benId FROM TB_DIAGNOSTICS td
                     WHERE td.isNaatConducted IS NOT NULL
-                       OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                       OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                 )
                 OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
@@ -587,11 +587,11 @@ interface BenDao {
                    OR (v.rbs IS NOT NULL AND v.rbs >= 100)
                 UNION
                 SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                   AND UPPER(IFNULL(ts.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
                 UNION
                 SELECT td.benId FROM TB_DIAGNOSTICS td
-                WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                   AND UPPER(IFNULL(td.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
             ))
             OR (:source = 6 AND isDeath = 0 AND reproductiveStatusId != 1 AND benId NOT IN (SELECT v.benId FROM BEN_VITALS v WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%') AND (
@@ -617,12 +617,12 @@ interface BenDao {
                 OR benId IN (
                     SELECT ts.benId FROM TB_SUSPECTED ts
                     WHERE ts.isNaatConducted IS NOT NULL
-                       OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                       OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                 )
                 OR benId IN (
                     SELECT td.benId FROM TB_DIAGNOSTICS td
                     WHERE td.isNaatConducted IS NOT NULL
-                       OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                       OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                 )
                 OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
@@ -1081,11 +1081,11 @@ interface BenDao {
                OR (v.rbs IS NOT NULL AND v.rbs >= 100)
             UNION
             SELECT ts.benId FROM TB_SUSPECTED ts
-            WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+            WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
               AND UPPER(IFNULL(ts.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
             UNION
             SELECT td.benId FROM TB_DIAGNOSTICS td
-            WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+            WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
               AND UPPER(IFNULL(td.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
           )
     """)
@@ -1121,12 +1121,12 @@ interface BenDao {
             benId IN (
               SELECT ts.benId FROM TB_SUSPECTED ts
               WHERE ts.isNaatConducted IS NOT NULL
-                 OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                 OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
             )
             OR benId IN (
               SELECT td.benId FROM TB_DIAGNOSTICS td
               WHERE td.isNaatConducted IS NOT NULL
-                 OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
+                 OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
             )
             OR benId IN (
               SELECT tbs.benId FROM TB_SCREENING tbs
@@ -1325,8 +1325,8 @@ interface BenDao {
             "            OR t.takingAntiTBDrugs = 1\n" +
             "            OR t.familySufferingFromTB = 1\n" +
 //            "            OR CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) <= 5\n" +
-            "            OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')\n" +
-            "            OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')\n" +
+            "            OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')\n" +
+            "            OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')\n" +
             "        ) AND IFNULL(ts.isConfirmed, 0) = 0\n" +
             "        AND NOT EXISTS (\n" +
             "            SELECT 1 FROM TB_CONFIRMED_TREATMENT tc WHERE tc.benId = b.benId\n" +

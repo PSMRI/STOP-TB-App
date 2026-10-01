@@ -524,7 +524,23 @@ class AllBenViewModel @Inject constructor(
     // Routed through the DiagnosticOrderPushWorker chain (serialized per benId) instead of a
     // direct createOrder() call, so two quick taps can't create a duplicate order.
     fun createNewOrder(benId: Long, orderType: String, context: Context) {
+        if (_retryingBenIds.value.contains(benId)) return
+        _retryingBenIds.value += benId
         WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, listOf(orderType))
         _orderActionState.value = OrderActionResult.Success("New order queued.", orderType)
+        // The push itself runs on WorkManager's own schedule, not awaited here — track it via
+        // retryingBenIds (same in-flight flag retryTest() uses) so the beneficiary list shows a
+        // locked/spinner state on this row for the few seconds between enqueue and the worker's
+        // createOrder() call actually landing PENDING, instead of re-rendering whatever a
+        // Paging3/RecyclerView recycle produces during that gap.
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                delay(300L)
+                while (WorkerUtils.isDiagnosticOrderPushActive(context, benId)) {
+                    delay(500L)
+                }
+            }
+            _retryingBenIds.value -= benId
+        }
     }
 }

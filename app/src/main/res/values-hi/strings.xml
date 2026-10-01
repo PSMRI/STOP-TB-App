@@ -964,6 +964,7 @@
     <string name="order_status_hub_disconnected_title">कैंप हब जुड़ा नहीं है।</string>
     <string name="order_status_hub_disconnected_desc">परिणाम के लिए पोलिंग नहीं हो रही — कृपया कैंप हब से कनेक्ट करें।</string>
     <string name="order_status_last_checked_caption">%1$s पहले जांचा गया · हर %2$d सेकंड में स्वतः रिफ्रेश</string>
+    <string name="order_status_few_seconds">कुछ सेकंड</string>
     <string name="order_status_enter_result">परिणाम दर्ज करें</string>
     <string name="order_status_not_conducted">नहीं किया गया</string>
     <string name="order_status_view_mtb_result">एमटीबी परिणाम देखें</string>
@@ -990,10 +991,11 @@
     <string name="tb_reason_for_denial_chest_xray_other">इनकार का अन्य कारण बताएं (एक्स-रे)</string>
     <string name="tb_reason_not_conducted_xray">एक्स-रे न होने का कारण</string>
     <string name="tb_reason_not_conducted_xray_other">अन्य कारण बताएं (एक्स-रे नहीं हुआ)</string>
-    <string name="tb_referred_for_sputum_collection">थूक संग्रह के लिए रेफर किया गया?</string>
+    <string name="tb_referred_for_sputum_collection">थूक संग्रह/ट्रूनैट जांच के लिए रेफर किया गया?</string>
+    <string name="tb_is_sputum_collected">क्या थूक एकत्र किया गया?</string>
     <string name="tb_reason_for_denial_sputum">थूक संग्रह से इनकार का कारण</string>
     <string name="tb_reason_for_denial_sputum_other">इनकार का अन्य कारण बताएं (थूक)</string>
-    <string name="tb_sputum_submitted_at">थूक सैंपल कहाँ जमा किया</string>
+    <string name="tb_sputum_submitted_at">थूक सैंपल जमा करने का केंद्र</string>
     <string name="tb_reason_not_conducted_naat">True NAT न होने का कारण</string>
     <string name="tb_reason_not_conducted_naat_other">अन्य कारण बताएं (True NAT नहीं हुआ)</string>
 

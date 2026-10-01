@@ -94,7 +94,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                         nikshayId = legacySuspected.nikshayId,
                         isChestXRayDone = legacySuspected.isChestXRayDone,
                         chestXRayResult = legacySuspected.chestXRayResult,
-                        isSputumCollected = legacySuspected.isSputumCollected,
+                        isReferredForSputum = legacySuspected.isSputumCollected,
                         sputumSubmittedAt = legacySuspected.sputumSubmittedAt,
                         isNaatConducted = legacySuspected.isNaatConducted,
                         naatResult = legacySuspected.naatResult,
@@ -352,7 +352,8 @@ class TBSuspectedQuickViewModel @Inject constructor(
                         // actually did on this screen (form state, already mapped onto
                         // tbDiagnostics by dataset.mapValues() above), NOT device-integration/
                         // camp-hub status — Enter Result / Not Conducted are standing actions now.
-                        val isReferredForSputum = tbDiagnostics.isSputumCollected == true
+                        val isReferredForSputum = tbDiagnostics.isReferredForSputum == true
+                        val isSputumCollectedNow = tbDiagnostics.isSputumCollected == true
                         val isMtbConducted = tbDiagnostics.isNaatConducted == true
                         // Non-null only when the user actually picked one of the 3 standardized
                         // MTB results (mapValues() above already ran the selection through
@@ -378,6 +379,27 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 } else {
                                     apiSuccess = false
                                     apiError = (res as? NetworkResponse.Error)?.message ?: "Push Order Failed"
+                                }
+                            }
+                            !isSputumCollectedNow -> {
+                                // Sample never obtained — closure via order/manualResult, mirrors
+                                // the !isMtbConducted branch below exactly, just sourced from
+                                // reasonForDenialSputum instead of reasonNotConductedNaat.
+                                val sputumNotCollectedReason = {
+                                    val r = tbDiagnostics.reasonForDenialSputum
+                                    val o = tbDiagnostics.reasonForDenialSputumOther
+                                    if (r.equals("Other", ignoreCase = true) && !o.isNullOrBlank()) "Other: $o" else r
+                                }()
+                                val res = tbRepo.submitManualResult(
+                                    benId, "SPUTUM_TRUENAT", resultSummary = null, reasonForRefusal = sputumNotCollectedReason
+                                )
+                                if (res is NetworkResponse.Success) {
+                                    if (res.data == "PENDING_SYNC") anyPendingManualResultSync = true
+                                    tbDiagnostics.trueNatOrderStatus = "CLOSED"
+                                    tbDiagnostics.naatResult = null
+                                } else {
+                                    apiSuccess = false
+                                    apiError = (res as? NetworkResponse.Error)?.message ?: "Sputum Not Collected Submission Failed"
                                 }
                             }
                             !isMtbConducted -> {
@@ -417,7 +439,9 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                     tbDiagnostics.naatResult = when (enteredMtbResult) {
                                         MtbResult.TB_POSITIVE -> "MTB detected"
                                         MtbResult.TB_NEGATIVE -> "MTB not detected"
-                                        else -> enteredMtbResult.displayValue
+                                        // Invalid/Error re-orders immediately below — don't persist
+                                        // this result text, or it can outlive the reorder locally.
+                                        else -> null
                                     }
                                     tbDiagnostics.isTBConfirmed = enteredMtbResult == MtbResult.TB_POSITIVE
                                     tbDiagnostics.isConfirmed = enteredMtbResult == MtbResult.TB_POSITIVE
@@ -490,6 +514,10 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                         tbDiagnostics.trueNatRifResult = when (enteredRifResult) {
                                             RifResult.DR_TB -> "Rif Resistance Detected"
                                             RifResult.NON_DR_TB -> "Rif Resistance Not Detected"
+                                            // Invalid/Error re-orders immediately below — don't
+                                            // persist this result text, or it can outlive the
+                                            // reorder locally. Indeterminate is terminal, keep it.
+                                            RifResult.INVALID_ERROR -> null
                                             else -> enteredRifResult.displayValue
                                         }
                                         tbDiagnostics.isDrTbConfirmed = enteredRifResult == RifResult.DR_TB

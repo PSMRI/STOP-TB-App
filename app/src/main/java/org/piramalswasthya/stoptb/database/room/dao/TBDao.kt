@@ -348,7 +348,7 @@ interface TBDao {
             UNION
             SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
             INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
-            WHERE td.isSputumCollected = 1 AND (td.trueNatOrderStatus = 'COMPLETED' OR (td.trueNatOrderStatus = 'CLOSED' AND td.reasonForDenialSputum IS NOT NULL))
+            WHERE td.isReferredForSputum = 1 AND (td.trueNatOrderStatus = 'COMPLETED' OR (td.trueNatOrderStatus = 'CLOSED' AND td.reasonForDenialSputum IS NOT NULL))
             AND ((:villageId != 0 AND b.loc_village_id = :villageId) OR (:villageId = 0 AND b.loc_village_id IN (:assignedVillageIds)))
             AND (:startTime = 0 OR td.visitDate >= :startTime)
             AND (:endTime = 0 OR td.visitDate <= :endTime)

@@ -240,7 +240,7 @@ data class Tokens(
     val token: String = "", val expiresIn: Int = 0,
     val refreshToken: String = "", val refreshExpiresIn: Int = 0
 ) : Parcelable
-
+ 
 @Parcelize
 @JsonClass(generateAdapter = true)
 data class ABHAProfile(
@@ -543,7 +543,7 @@ data class TBDiagnosticsSaveRequest(
                 reasonNotConductedChestXray = cache.reasonNotConductedChestXray,
                 reasonNotConductedChestXrayOther = cache.reasonNotConductedChestXrayOther,
                 digitalChestXrayResult = cache.chestXRayResult,
-                isReferredForSputumCollection = cache.isSputumCollected,
+                isReferredForSputumCollection = cache.isReferredForSputum,
                 reasonForDenialSputum = cache.reasonForDenialSputum,
                 reasonForDenialSputumOther = cache.reasonForDenialSputumOther,
                 sputumSubmittedAt = cache.sputumSubmittedAt,

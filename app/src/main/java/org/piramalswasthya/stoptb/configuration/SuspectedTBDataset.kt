@@ -463,7 +463,7 @@ class SuspectedTBDataset(
         isQuickPrefillLockActive && (!savedCache?.chestXRayResult.isNullOrBlank() || !diagnosticsCache?.chestXRayResult.isNullOrBlank())
 
     private fun shouldLockSputumCollected(): Boolean =
-        isQuickPrefillLockActive && (savedCache?.isSputumCollected != null || diagnosticsCache?.isSputumCollected != null)
+        isQuickPrefillLockActive && (savedCache?.isSputumCollected != null || diagnosticsCache?.isReferredForSputum != null)
 
     private fun shouldLockTrueNatConducted(): Boolean =
         isQuickPrefillLockActive && (savedCache?.isNaatConducted != null || diagnosticsCache?.isNaatConducted != null)
@@ -488,7 +488,7 @@ class SuspectedTBDataset(
 
     private fun isSputumReferralEnabled(): Boolean =
         isChestXRayPositive() ||
-            diagnosticsCache?.isSputumCollected == true ||
+            diagnosticsCache?.isReferredForSputum == true ||
             screeningCache?.historyOfTb == true ||
             isPregnant() ||
             screeningCache?.takingAntiTBDrugs == true ||
@@ -533,8 +533,8 @@ class SuspectedTBDataset(
 
     private fun prefillFromDiagnostics(diagnostics: TBDiagnosticsCache?) {
         diagnostics ?: return
-        val isSputumCollectedVal = diagnostics.isSputumCollected == true || !diagnostics.naatResult.isNullOrBlank()
-        sputumCollected.value = boolToYesNo(if (isSputumCollectedVal) true else diagnostics.isSputumCollected)
+        val isSputumCollectedVal = diagnostics.isReferredForSputum == true || !diagnostics.naatResult.isNullOrBlank()
+        sputumCollected.value = boolToYesNo(if (isSputumCollectedVal) true else diagnostics.isReferredForSputum)
         sputumSubmittedAt.value = getLocalValueInArray(
             R.array.tb_diagnostics_sputum_submitted_at,
             diagnostics.sputumSubmittedAt
@@ -557,8 +557,8 @@ class SuspectedTBDataset(
     private fun prefillMissingFromDiagnostics(diagnostics: TBDiagnosticsCache?) {
         diagnostics ?: return
         if (sputumCollected.value.isNullOrBlank()) {
-            val isSputumCollectedVal = diagnostics.isSputumCollected == true || !diagnostics.naatResult.isNullOrBlank()
-            sputumCollected.value = boolToYesNo(if (isSputumCollectedVal) true else diagnostics.isSputumCollected)
+            val isSputumCollectedVal = diagnostics.isReferredForSputum == true || !diagnostics.naatResult.isNullOrBlank()
+            sputumCollected.value = boolToYesNo(if (isSputumCollectedVal) true else diagnostics.isReferredForSputum)
         }
         if (sputumSubmittedAt.value.isNullOrBlank()) {
             sputumSubmittedAt.value = getLocalValueInArray(
