@@ -1540,6 +1540,14 @@ abstract class InAppDb : RoomDatabase() {
 
         private val MIGRATION_47_48 = object : Migration(47, 48) {
             override fun migrate(database: SupportSQLiteDatabase) {
+                // Some feature-branch builds shipped version 47 without the 44->47 schema
+                // changes (e.g. missing TB_SCREENING symptom columns) — re-apply them first.
+                // Each of 44_45/45_46/46_47 is itself guarded (columnExists()/CREATE TABLE IF
+                // NOT EXISTS), so this is a safe no-op on a device that already has them.
+                MIGRATION_44_45.migrate(database)
+                MIGRATION_45_46.migrate(database)
+                MIGRATION_46_47.migrate(database)
+
                 listOf("xrayOrderStatus", "trueNatOrderStatus", "rifOrderStatus").forEach { column ->
                     database.execSQL(
                         "UPDATE TB_DIAGNOSTICS SET $column = 'PENDING' WHERE UPPER($column) = 'AWAITING_TEST_COMPLETION'"
