@@ -68,7 +68,6 @@ jobs:
           INTUNE_GROUP_ID_UAT: ${{ secrets.INTUNE_GROUP_ID_UAT }}
           INTUNE_GROUP_ID_PROD: ${{ secrets.INTUNE_GROUP_ID_PROD }}
           INTUNE_APP_ID: ${{ secrets.INTUNE_APP_ID }}
-          INTUNE_APP_ID_UAT: ${{ secrets.INTUNE_APP_ID_UAT }}
           INTUNE_APP_ID_PROD: ${{ secrets.INTUNE_APP_ID_PROD }}
         run: |
           set -euo pipefail
@@ -89,15 +88,18 @@ jobs:
             SUFFIX=PROD
             PACKAGE_ID=org.piramalswasthya.stoptb
             LABEL=PROD
+            INTUNE_DISPLAY_NAME=TBMJA_Internal_Testing_Prod
           else
             SUFFIX=UAT
             PACKAGE_ID=org.piramalswasthya.stoptb.uat
             LABEL=UAT
+            INTUNE_DISPLAY_NAME=StopTB_Internal_Testing_UAT
           fi
 
           {
             echo "package_id=$PACKAGE_ID"
             echo "label=$LABEL"
+            echo "intune_display_name=$INTUNE_DISPLAY_NAME"
           } >> "$GITHUB_OUTPUT"
           {
             echo "FIREBASE_APP_ID=$(pick_env FIREBASE_APP_ID)"
@@ -105,8 +107,12 @@ jobs:
             echo "AZURE_TENANT_ID=$(pick_env AZURE_TENANT_ID)"
             echo "AZURE_CLIENT_SECRET=$(pick_env AZURE_CLIENT_SECRET)"
             echo "INTUNE_GROUP_ID=$(pick_env INTUNE_GROUP_ID)"
-            echo "INTUNE_APP_ID=$(pick_env INTUNE_APP_ID)"
           } >> "$GITHUB_ENV"
+          if [ "$TARGET_ENV" = prod ]; then
+            echo "INTUNE_APP_ID=$(pick_env INTUNE_APP_ID)" >> "$GITHUB_ENV"
+          else
+            echo "INTUNE_APP_ID=" >> "$GITHUB_ENV"
+          fi
 
           if [ "$ACTION" = push ]; then
             if [ -z "${VERSION_NAME}" ] || [ -z "${VERSION_CODE}" ]; then
@@ -254,7 +260,7 @@ jobs:
             --version-name "${{ inputs.versionName }}" \
             --version-code "${{ inputs.versionCode }}" \
             --group-id "${INTUNE_GROUP_ID}" \
-            --display-name "StopTB ${{ steps.cfg.outputs.label }}" \
+            --display-name "${{ steps.cfg.outputs.intune_display_name }}" \
             --publisher "Piramal Swasthya" \
-            --description "${{ steps.cfg.outputs.label }} signed build ${{ inputs.versionName }} (${{ inputs.versionCode }}) promoted from Firebase" \
+            --description "${{ steps.cfg.outputs.label }} signed build updated to ${{ inputs.versionName }} (${{ inputs.versionCode }}) promoted from Firebase" \
             "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"
