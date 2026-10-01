@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.ui.home_activity.dashboard
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -152,6 +153,7 @@ class DashboardFragment : Fragment() {
         return viewModel.villageDisplayName(village)
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private fun bindDropdown(
         view: AutoCompleteTextView,
         items: List<String>,
@@ -159,9 +161,10 @@ class DashboardFragment : Fragment() {
     ) {
         view.setAdapter(null)
         view.keyListener = null
-        view.setOnTouchListener { _, event ->
+        view.setOnClickListener { showChoicePopup(view, items, onSelected) }
+        view.setOnTouchListener { v, event ->
             if (event.action == MotionEvent.ACTION_UP) {
-                showChoicePopup(view, items, onSelected)
+                v.performClick()
             }
             true
         }
