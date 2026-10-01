@@ -284,8 +284,11 @@ class UserRepo @Inject constructor(
                     ?: throw IllegalStateException("Response success but data missing @ $response")
             )
             val statusCode = responseBody.getInt("statusCode")
+            // Keep the server's message: it carries the remaining-attempts / account-locked info.
             if (statusCode == 5002)
-                throw IllegalStateException("Login failed")
+                throw IllegalStateException(
+                    responseBody.optString("errorMessage").ifBlank { "Login failed" }
+                )
             if (statusCode == 401)
                 throw IllegalStateException("Invalid username / password")
             val data = responseBody.getJSONObject("data")
@@ -312,8 +315,21 @@ class UserRepo @Inject constructor(
     }
 
     private fun localizedAuthExceptionMessage(ie: Exception): String {
+        val message = ie.message.orEmpty()
+        val remainingAttempts = REMAINING_ATTEMPTS_REGEX.find(message)
+            ?.groupValues?.get(1)?.toIntOrNull()
+        if (remainingAttempts != null) {
+            return if (remainingAttempts == 1)
+                userMessageContext().getString(R.string.error_login_last_attempt)
+            else
+                userMessageContext().getString(R.string.error_login_remaining_attempts, remainingAttempts)
+        }
+        if (message.contains("locked", ignoreCase = true)) {
+            return userMessageContext().getString(R.string.error_login_account_locked)
+        }
         return when (ie.message) {
             "Invalid username / password",
+            "Invalid username or password",
             "Invalid Username/password" -> userMessageContext().getString(R.string.error_sign_in_invalid_u_p)
 
             "Login failed" -> userMessageContext().getString(R.string.error_login_failed)
@@ -376,3 +392,5 @@ class UserRepo @Inject constructor(
     }
 
 }
+
+private val REMAINING_ATTEMPTS_REGEX = Regex("""Remaining attempts:\s*(\d+)""", RegexOption.IGNORE_CASE)
