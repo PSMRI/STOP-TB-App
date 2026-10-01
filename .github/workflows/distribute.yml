@@ -118,7 +118,6 @@ jobs:
           INTUNE_GROUP_ID_UAT: ${{ secrets.INTUNE_GROUP_ID_UAT }}
           INTUNE_GROUP_ID_PROD: ${{ secrets.INTUNE_GROUP_ID_PROD }}
           INTUNE_APP_ID: ${{ secrets.INTUNE_APP_ID }}
-          INTUNE_APP_ID_UAT: ${{ secrets.INTUNE_APP_ID_UAT }}
           INTUNE_APP_ID_PROD: ${{ secrets.INTUNE_APP_ID_PROD }}
         run: |
           set -euo pipefail
@@ -151,6 +150,7 @@ jobs:
             APK_NAME=app-stoptb
             GRADLE_AAB_TASK=bundleStoptbRelease
             FIREBASE_LABEL=PROD
+            INTUNE_DISPLAY_NAME=TBMJA_Internal_Testing_Prod
           else
             SUFFIX=UAT
             PACKAGE_ID=org.piramalswasthya.stoptb.uat
@@ -158,6 +158,7 @@ jobs:
             APK_NAME=app-stoptbUat
             GRADLE_AAB_TASK=
             FIREBASE_LABEL=UAT
+            INTUNE_DISPLAY_NAME=StopTB_Internal_Testing_UAT
           fi
 
           if [ "$SIGNING" = signed ]; then
@@ -195,6 +196,7 @@ jobs:
             echo "gradle_apk_task=$GRADLE_APK_TASK"
             echo "gradle_aab_task=$GRADLE_AAB_TASK"
             echo "firebase_label=$FIREBASE_LABEL"
+            echo "intune_display_name=$INTUNE_DISPLAY_NAME"
             echo "do_apk=$DO_APK"
             echo "do_firebase=$DO_FIREBASE"
             echo "do_intune=$DO_INTUNE"
@@ -215,8 +217,12 @@ jobs:
             echo "AZURE_TENANT_ID=$(pick_env AZURE_TENANT_ID)"
             echo "AZURE_CLIENT_SECRET=$(pick_env AZURE_CLIENT_SECRET)"
             echo "INTUNE_GROUP_ID=$(pick_env INTUNE_GROUP_ID)"
-            echo "INTUNE_APP_ID=$(pick_env INTUNE_APP_ID)"
           } >> "$GITHUB_ENV"
+          if [ "$TARGET_ENV" = prod ]; then
+            echo "INTUNE_APP_ID=$(pick_env INTUNE_APP_ID)" >> "$GITHUB_ENV"
+          else
+            echo "INTUNE_APP_ID=" >> "$GITHUB_ENV"
+          fi
 
           echo "Plan: env=$TARGET_ENV signing=$SIGNING apk=$DO_APK firebase=$DO_FIREBASE intune=$DO_INTUNE play=$DO_PLAY"
 
@@ -542,9 +548,9 @@ jobs:
             --version-name "${{ inputs.versionName }}" \
             --version-code "${{ inputs.versionCode }}" \
             --group-id "${INTUNE_GROUP_ID}" \
-            --display-name "StopTB ${{ steps.plan.outputs.firebase_label }}" \
+            --display-name "${{ steps.plan.outputs.intune_display_name }}" \
             --publisher "Piramal Swasthya" \
-            --description "${{ steps.plan.outputs.firebase_label }} signed build ${{ inputs.versionName }} (${{ inputs.versionCode }})" \
+            --description "${{ steps.plan.outputs.firebase_label }} signed build updated to ${{ inputs.versionName }} (${{ inputs.versionCode }})" \
             "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"
 
       - name: Build PROD Release AAB
