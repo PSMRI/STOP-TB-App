@@ -105,7 +105,8 @@ class AllHouseholdFragment : Fragment() {
         val canAddBeneficiary = privilege.beneficiaryPermission == Permission.FULL
         Timber.d("RoleManager: householdPermission=${privilege.householdPermission}, beneficiaryPermission=${privilege.beneficiaryPermission}")
 
-        binding.btnNextPage.text = getString(R.string.btn_text_frag_home_nhhr)
+//        binding.btnNextPage.text = getString(R.string.btn_text_frag_home_nhhr)
+        binding.btnNextPage.contentDescription = getString(R.string.btn_text_frag_home_nhhr)
         binding.btnNextPage.visibility = if (canAddHousehold) View.VISIBLE else View.GONE
 
         val householdAdapter = HouseHoldListAdapter(

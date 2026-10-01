@@ -61,8 +61,36 @@ data class CounsellingQuestionDto(
     @Transient var value: Any? = null,
     @Transient var visible: Boolean = true,
     @Transient var errorMessage: String? = null,
-    @Transient var originalIsMandatory: Boolean? = null
-)
+    @Transient var originalIsMandatory: Boolean? = null,
+    // Set when the user taps the pencil on a submitted section's notes field.
+    @Transient var remarksUnlocked: Boolean = false,
+    @Transient var remarksRequestFocus: Boolean = false
+) {
+    companion object {
+        val ALWAYS_EDITABLE_UUIDS = setOf(
+            "TB_A_REMARKS",
+            "TB_B_REMARKS",
+            "TB_C_REMARKS",
+            "TB_D_REMARKS",
+            "TB_E_REMARKS"
+        )
+
+        // Whole words only, so labels like "denote" or "annotate" are not treated as notes.
+        private val REMARKS_LABEL = Regex(
+            "(?<![\\p{L}\\p{N}])(?:remarks?|notes?|टिप्पणियाँ|टिप्पणियां|टिप्पणी|टिप्प|नोट्स|नोट|মন্তব্য)(?![\\p{L}\\p{N}])",
+            RegexOption.IGNORE_CASE
+        )
+    }
+
+    // True for the section remarks box, including after the section has been submitted and reopened.
+    fun isRemarksField(matchLabel: Boolean = true): Boolean {
+        val uuid = questionUuid.trim()
+        if (ALWAYS_EDITABLE_UUIDS.any { it.equals(uuid, ignoreCase = true) }) return true
+        if (uuid.contains("REMARK", ignoreCase = true)) return true
+        if (!matchLabel || !questionType.equals("TEXT", ignoreCase = true)) return false
+        return REMARKS_LABEL.containsMatchIn(questionText)
+    }
+}
 
 data class CounsellingValidationDto(
     @SerializedName("validationId") val validationId: Int? = null,

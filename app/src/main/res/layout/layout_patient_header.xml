@@ -112,6 +112,7 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
+                android:visibility="gone"
                 android:background="@color/md_theme_light_outlineVariant" />
 
             <!-- Nikshay ID -->
@@ -119,6 +120,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:minHeight="48dp"
+                android:visibility="gone"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingStart="@dimen/padding_wide"
@@ -149,6 +151,7 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
+                android:visibility="gone"
                 android:background="@color/md_theme_light_outlineVariant" />
 
             <!-- Age / Gender -->
@@ -156,6 +159,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:minHeight="48dp"
+                android:visibility="gone"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingStart="@dimen/padding_wide"
