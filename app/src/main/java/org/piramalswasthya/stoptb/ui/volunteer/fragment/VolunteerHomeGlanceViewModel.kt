@@ -28,7 +28,6 @@ class VolunteerHomeGlanceViewModel @Inject constructor(
     preferenceDao: PreferenceDao,
 ) : ViewModel() {
 
-    private val villageId = preferenceDao.getLocationRecord()?.village?.id ?: 0
     private val assignedVillageIds = preferenceDao.getLoggedInUser()
         ?.villages
         .orEmpty()
@@ -36,10 +35,10 @@ class VolunteerHomeGlanceViewModel @Inject constructor(
         .ifEmpty { listOf(-1) }
 
     val glance: StateFlow<HomeGlance> = combine(
-        tbDao.getDashboardPresumptiveTbCount(villageId, assignedVillageIds, 0L, 0L, "", 0),
-        householdDao.getGlanceHouseholdCount(villageId, assignedVillageIds),
-        benDao.getGlancePopulationCount(villageId, assignedVillageIds),
-        benDao.getGlanceUnscreenedCount(villageId, assignedVillageIds),
+        tbDao.getDashboardPresumptiveTbCount(assignedVillageIds, "", 0L, 0L, "", 0),
+        householdDao.getGlanceHouseholdCount(assignedVillageIds),
+        benDao.getGlancePopulationCount(assignedVillageIds),
+        benDao.getGlanceUnscreenedCount(assignedVillageIds),
     ) { presumptive, households, population, unscreened ->
         HomeGlance(
             presumptiveReferral = presumptive,

@@ -314,6 +314,7 @@
     <string name="filter_time_period">Time Period</string>
     <string name="filter_village">Village / Hamlet</string>
     <string name="filter_village_label">Village</string>
+    <string name="filter_village_name">Village Name</string>
     <string name="filter_district">District</string>
     <string name="filter_block">Block</string>
     <string name="filter_period">Period</string>

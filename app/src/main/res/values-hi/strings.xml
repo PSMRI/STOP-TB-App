@@ -231,6 +231,7 @@
     <string name="dashboard_class_tpt_discontinued">टीपीटी बंद/डिफॉल्ट</string>
     <string name="dashboard_class_tpt_not_eligible">टीपीटी के लिए अपात्र</string>
     <string name="filter_village_label">गाँव</string>
+    <string name="filter_village_name">गाँव का नाम</string>
     <string name="filter_district">जिला</string>
     <string name="filter_block">ब्लॉक</string>
     <string name="filter_period">अवधि</string>
