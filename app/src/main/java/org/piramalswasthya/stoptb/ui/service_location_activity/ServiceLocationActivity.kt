@@ -3,11 +3,20 @@ package org.piramalswasthya.stoptb.ui.service_location_activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
+import android.widget.ArrayAdapter
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ListView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import org.piramalswasthya.stoptb.R
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.EntryPoint
@@ -169,13 +178,95 @@ class ServiceLocationActivity : AppCompatActivity() {
                             } else {
                                 setText(viewModel.selectedVillageName.orEmpty())
                             }
-                            setOnItemClickListener { _, _, position, _ ->
-                                viewModel.setVillage(position)
-                            }
                         }
+                        val showVillageDialog = View.OnClickListener {
+                            showSearchableVillageDialog()
+                        }
+                        binding.actvVillageDropdown.setOnClickListener(showVillageDialog)
+                        binding.tilVillageDropdown.setEndIconOnClickListener(showVillageDialog)
                     }
                 }
             }
+        }
+    }
+
+    private fun showSearchableVillageDialog() {
+        val labels = viewModel.villageList
+        if (labels.isEmpty()) return
+
+        val density = resources.displayMetrics.density
+        val maxListHeightPx = (resources.displayMetrics.heightPixels * 0.58f).toInt()
+        val rowHeightPx = (48 * density).toInt()
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((20 * density).toInt(), (8 * density).toInt(), (20 * density).toInt(), 0)
+        }
+        val searchInput = EditText(this).apply {
+            hint = getString(R.string.household_search)
+            setSingleLine(true)
+        }
+        val listView = ListView(this)
+        container.addView(
+            searchInput,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        )
+        container.addView(
+            listView,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0)
+        )
+
+        var filteredIndices = labels.indices.toList()
+        lateinit var dialog: AlertDialog
+
+        fun refreshFilteredList(query: String) {
+            filteredIndices = labels.indices.filter { labels[it].contains(query, ignoreCase = true) }
+            listView.adapter = ArrayAdapter(
+                this,
+                android.R.layout.simple_list_item_1,
+                filteredIndices.map { labels[it] }
+            )
+            listView.layoutParams = listView.layoutParams.apply {
+                height = minOf(filteredIndices.size * rowHeightPx, maxListHeightPx)
+            }
+        }
+
+        refreshFilteredList("")
+
+        listView.setOnItemClickListener { _, _, position, _ ->
+            val originalIndex = filteredIndices[position]
+            viewModel.setVillage(originalIndex)
+            binding.actvVillageDropdown.setText(labels[originalIndex])
+            dialog.dismiss()
+        }
+
+        searchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+            override fun afterTextChanged(s: Editable?) {
+                refreshFilteredList(s?.toString().orEmpty())
+            }
+        })
+
+        dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.service_type_dd_village_text)
+            .setView(container)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.show()
+        dialog.window?.setLayout(
+            (resources.displayMetrics.widthPixels * 0.9f).toInt(),
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        )
+
+        val buttonPadding = (16 * density).toInt()
+        val actionTextColor = ContextCompat.getColor(this, R.color.md_theme_light_primary)
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.apply {
+            background = null
+            minWidth = 0
+            minimumWidth = 0
+            setTextColor(actionTextColor)
+            setPadding(buttonPadding, 0, buttonPadding, 0)
         }
     }
 

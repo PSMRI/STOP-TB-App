@@ -105,6 +105,29 @@ object RoleModuleConfig {
             anthropometryPermission = Permission.VIEW,
             tbScreeningPermission = Permission.VIEW
         ),
+        AppRole.LAB_TECHNICIAN to ModulePrivilege(
+            homeModules = setOf(AppModule.BENEFICIARIES, AppModule.REFERRAL, AppModule.TUBERCULOSIS),
+            multiRoleHomeModules = setOf(AppModule.BENEFICIARIES, AppModule.REFERRAL, AppModule.TUBERCULOSIS),
+            syncShowCounsellingStatusRow = false,
+            syncBottomSheetRowFilter = SyncRowFilter.ALL_EXCEPT_COUNSELLING,
+            examineRowSet = ExamineRowSet.ANTHROPOMETRY_AND_TB_SCREENING_ONLY,
+            examineReorderTbScreeningBeforeAnthropometry = false,
+            examineLockGeneralFormsBehindTbScreening = false,
+            examineShowContactTracingRows = false,
+            examineDenominatorRule = ExamineDenominatorRule.REGISTRAR_TWO,
+            canActOnReferral = true,
+            showRegisterSpouseButtons = false,
+            showTbConfirmedCounsellingUi = false,
+            showAbhaButton = true,
+            showCallButton = true,
+            showExamineButtonDefault = false,
+            allowQuickRefresh = true,
+            householdPermission = Permission.NONE,
+            beneficiaryPermission = Permission.VIEW,
+            nonHouseholdPermission = Permission.NONE,
+            anthropometryPermission = Permission.NONE,
+            tbScreeningPermission = Permission.NONE
+        ),
         // VOLUNTEER can't be assigned to a real user (login is denied instead) — this entry is
         // a defensive placeholder only, for RoleManager's initial state and privilegeFor()'s
         // fallback if a role is ever missing from this map.

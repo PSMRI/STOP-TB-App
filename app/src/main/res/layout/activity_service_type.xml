@@ -134,22 +134,26 @@
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/til_village_dropdown"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    app:endIconDrawable="@drawable/ic_arrow_drop_down"
+                    app:endIconMode="custom"
                     asteriskRequired="@{false}"
                     hintText="@{@string/service_type_dd_village_text}"
                     android:labelFor="@id/actv_village_dropdown">
 
-                    <AutoCompleteTextView
+                    <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/actv_village_dropdown"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:clickable="true"
                         android:cursorVisible="false"
+                        android:ellipsize="end"
                         android:focusable="false"
                         android:focusableInTouchMode="false"
                         android:inputType="none"
-                        app:listItems="@{viewModel.villageList}"
+                        android:maxLines="1"
                         tools:ignore="SpeakableTextPresentCheck" />
                 </com.google.android.material.textfield.TextInputLayout>
 

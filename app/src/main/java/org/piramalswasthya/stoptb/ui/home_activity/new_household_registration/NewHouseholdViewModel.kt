@@ -104,7 +104,12 @@ class NewHouseholdViewModel @Inject constructor(
 
                 val villageNames = user.villages.map { it.name }.toTypedArray()
 
-                dataset.setupPage(household, villageNames, user.villages)
+
+                val registeredMemberCount = if (household.householdId != 0L) {
+                    householdRepo.getAllBenOfHousehold(household.householdId).size
+                } else 0
+
+                dataset.setupPage(household, villageNames, user.villages, registeredMemberCount)
 
 
                 // Restore previously saved location state if editing an existing record
@@ -275,6 +280,10 @@ class NewHouseholdViewModel @Inject constructor(
     fun enableEditMode() {
         dataset.enableEditMode()
     }
+
+    fun isTotalMembersValid(): Boolean = dataset.isTotalMembersValid()
+
+    fun getTotalMembers(): Int = dataset.getTotalMembers()
 
     fun updateValueByIdAndReturnListIndex(id: Int, value: String): Int {
         dataset.setValueById(id, value)

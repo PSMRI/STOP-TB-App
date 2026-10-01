@@ -12,7 +12,6 @@ import android.widget.EditText
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.fragment.findNavController
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
@@ -132,7 +131,7 @@ class NcdListFragment : Fragment() {
             }
 
             override fun afterTextChanged(p0: Editable?) {
-                viewModel.filterText(p0?.toString() ?: "")
+                viewModel.filterText(p0?.toString()?.trim() ?: "")
             }
 
         }

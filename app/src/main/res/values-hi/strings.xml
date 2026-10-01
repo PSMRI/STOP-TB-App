@@ -154,6 +154,7 @@
     <string name="delivery_outcome_list">प्रसव परिणाम सूची</string>
     <string name="communicable_diseases">संचारी (संक्रामक) रोग</string>
     <string name="dashboard">डैशबोर्ड</string>
+    <string name="total_unscreened">अस्क्रीन किए गए लाभार्थी</string>
     <string name="sign_in">साइन इन</string>
     <string name="save_successful">सफलतापूर्वक सहेजें</string>
     <string name="something_wend_wong_contact_testing">कुछ गड़बड़ है! संपर्क परीक्षण!</string>
@@ -193,6 +194,7 @@
     <string name="follow_up_history">फॉलो-अप रिकॉर्ड </string>
 
     <string name="risk_factors">जोखिम कारक</string>
+    <string name="other_details">अन्य विवरण</string>
     <string name="total_presumptive_tb">प्रकल्पित टीबी मामले</string>
 
     <string name="pending">बाकी है</string>
@@ -368,6 +370,7 @@
     <string name="enter_a_valid_number">एक मान्य संख्या दर्ज करें</string>
     <string name="allowed_range">अनुमत सीमा: %1$d से %2$d</string>
     <string name="minimum_allowed_value">न्यूनतम अनुमत मान: %1$d</string>
+    <string name="unscreened_population_title">स्क्रीनिंग न हुई आबादी</string>
 
     <string-array name="type_of_tb_case">
         <item>टीबी का नया मामला</item>
@@ -850,6 +853,10 @@
     <string name="quick_refresh_ip_not_reachable">आईपी एड्रेस रीचेबल नहीं है: %1$s</string>
 
     <!-- Examine flow -->
+    <string name="ben_card_tb_symptoms">टीबी के लक्षण</string>
+    <string name="ben_card_chest_xray">छाती एक्स-रे</string>
+    <string name="ben_card_truenat">ट्रूनैट</string>
+    <string name="ben_card_result">परिणाम: %1$s</string>
     <string name="btn_examine">जांचें</string>
     <string name="btn_examine_count">जांचें %1$d/4</string>
     <string name="examine_bottomsheet_title">परीक्षण फॉर्म</string>
@@ -989,6 +996,7 @@
     <string name="dialog_cancel_message">क्या आप इस पंजीकरण को छोड़कर वापस जाना चाहते हैं?</string>
     <string name="dialog_yes">हाँ</string>
     <string name="dialog_no">नहीं</string>
+    <string name="registration_successful">पंजीकरण सफलतापूर्वक हुआ</string>
     <string name="patient_registered_successfully">रोगी का पंजीकरण सफलतापूर्वक हुआ।</string>
     <string name="proceed_to_register_hof">क्या आप परिवार के मुखिया के पंजीकरण के साथ आगे बढ़ना चाहते हैं?</string>
     <string name="form_submitted_successfully">फॉर्म सफलतापूर्वक सबमिट किया गया</string>
@@ -997,6 +1005,7 @@
     <string name="role_tab_registrar">पंजीकरण</string>
     <string name="role_tab_nurse">उपचार</string>
     <string name="role_tab_counseling">परामर्श</string>
+    <string name="role_tab_lab_technician">निदान</string>
 </resources>
 
 

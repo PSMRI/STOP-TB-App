@@ -11,7 +11,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:gravity="center_vertical"
+        android:paddingBottom="@dimen/_10sdp">
 
         <TextView
             android:id="@+id/tvPreviewTitle"
@@ -19,8 +20,8 @@
             android:layout_height="wrap_content"
             android:fontFamily="@font/roboto_bold"
             android:layout_weight="1"
-            android:textColor="@color/md_theme_light_shadow"
-            android:textSize="@dimen/_20sdp"
+            android:textColor="@color/md_theme_light_onSurface"
+            android:textSize="@dimen/_18sdp"
             android:text="@string/preview_title" />
 
         <ImageButton
@@ -30,15 +31,19 @@
             android:layout_marginEnd="@dimen/_10sdp"
             android:src="@drawable/ic_close"
             android:background="?attr/selectableItemBackgroundBorderless"
-            app:tint="@color/md_theme_light_shadow" />
+            app:tint="@color/md_theme_light_onSurfaceVariant" />
     </LinearLayout>
 
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/md_theme_light_ongray" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerPreview"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="4dp"
         android:layout_weight="1"
         android:overScrollMode="ifContentScrolls" />
 
@@ -46,34 +51,36 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center"
-        android:layout_marginTop="12dp">
-
+        android:gravity="center_vertical"
+        android:layout_marginTop="@dimen/_15sdp">
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSubmitPreview"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_weight="1"
+            style="@style/Widget.Material3.Button"
+            android:layout_marginEnd="@dimen/_10sdp"
             android:text="@string/submit"
-            android:textStyle="bold"
             android:fontFamily="@font/roboto_bold"
-            android:layout_marginEnd="@dimen/_40sdp"
-            android:minWidth="@dimen/_100sdp"
             android:backgroundTint="?attr/colorPrimary"
             android:textColor="@color/md_theme_light_onSecondary" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnEditPreview"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             style="@style/Widget.Material3.Button.OutlinedButton"
-            android:minWidth="@dimen/_100sdp"
+
             android:text="@string/edit"
-            android:textStyle="bold"
-            android:fontFamily="@font/roboto_bold"
-            android:backgroundTint="@color/md_theme_light_onSecondary"
+            android:fontFamily="@font/roboto_medium"
             android:textColor="?attr/colorPrimary"
+            app:strokeColor="?attr/colorPrimary"
             app:icon="@drawable/ic_edit"
-            app:iconTint="?attr/colorPrimary" />
+            app:iconTint="?attr/colorPrimary"
+            app:iconGravity="textStart"
+            app:iconPadding="@dimen/_5sdp" />
+
+
     </LinearLayout>
 </LinearLayout>

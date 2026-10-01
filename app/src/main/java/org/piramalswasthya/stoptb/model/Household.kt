@@ -312,6 +312,7 @@ data class HouseholdBasicCache(
             headSurname = household.family?.familyName ?: "Not Available",
             headFullName = "${household.family?.familyHeadName} ${household.family?.familyName ?: ""}",
             numMembers = numMembers,
+            totalHhMembers = household.family?.totalHhMembers,
             isDeactivate = household.isDeactivate,
             createdTimeStamp = household.createdTimeStamp
 
@@ -326,10 +327,17 @@ data class HouseHoldBasicDomain(
     val contactNumber: String,
     val headFullName: String = "$headName $headSurname",
     val numMembers: Int,
+    val totalHhMembers: Int? = null,
     var isDeactivate: Boolean =false,
     var createdTimeStamp: Long? = null,
 
     ) {
     val isPlaceholderMobileNo: Boolean
         get() = contactNumber == "9999999999"
+
+    val displayTotalMembers: Int
+        get() = maxOf(numMembers, totalHhMembers ?: numMembers)
+
+    val isMemberLimitReached: Boolean
+        get() = totalHhMembers != null && numMembers >= totalHhMembers
 }

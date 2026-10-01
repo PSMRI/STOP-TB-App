@@ -11,6 +11,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import org.piramalswasthya.stoptb.database.converters.GenderConverter
 import org.piramalswasthya.stoptb.database.converters.LocationEntityListConverter
+import org.piramalswasthya.stoptb.database.converters.ScreeningStatusConverter
 import org.piramalswasthya.stoptb.database.converters.StringListConverter
 import org.piramalswasthya.stoptb.database.converters.SyncStateConverter
 import org.piramalswasthya.stoptb.database.room.dao.ABHAGenratedDao
@@ -111,7 +112,9 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
     LocationEntityListConverter::class,
     SyncStateConverter::class,
     StringListConverter::class,
-    GenderConverter::class
+    GenderConverter::class,
+    ScreeningStatusConverter::class
+
 )
 abstract class InAppDb : RoomDatabase() {
 
@@ -1523,6 +1526,13 @@ abstract class InAppDb : RoomDatabase() {
                     ", 0 as isDelivered, 0 as pwHrp" +
                     ", 0 as irFilled, 0 as crFilled, 0 as doFilled" +
                     ", b.isNonHH" +
+                    ", b.isAvailableForCamp" +
+                    ", b.reasonForNotAttendingCamp" +
+                    ", b.otherReasonForNotAttendingCamp" +
+                    ", b.screeningStatus" +
+                    ", b.symptomsScreenedDate" +
+                    ", b.chestXrayDoneDate" +
+                    ", b.trunatTestDoneDate" +
                     ", b.placeOfCurrentLiving" +
                     ", b.otherPlaceOfCurrentLiving" +
                     ", b.institutionName" +
@@ -1586,7 +1596,23 @@ abstract class InAppDb : RoomDatabase() {
 
         private val MIGRATION_44_45 = object : Migration(44, 45) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                val columns = listOf(
+                val beneficiaryColumns = listOf(
+                    "isAvailableForCamp INTEGER NOT NULL DEFAULT 1",
+                    "reasonForNotAttendingCamp TEXT DEFAULT NULL",
+                    "otherReasonForNotAttendingCamp TEXT DEFAULT NULL",
+                    "screeningStatus TEXT NOT NULL DEFAULT 'UNSCREENED'",
+                    "symptomsScreenedDate INTEGER DEFAULT NULL",
+                    "chestXrayDoneDate INTEGER DEFAULT NULL",
+                    "trunatTestDoneDate INTEGER DEFAULT NULL"
+                )
+                beneficiaryColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "BENEFICIARY", columnName)) {
+                        database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN $columnDefinition")
+                    }
+                }
+
+                val tbScreeningColumns = listOf(
                     "chestPain INTEGER DEFAULT NULL",
                     "shortnessOfBreath INTEGER DEFAULT NULL",
                     "fatigue INTEGER DEFAULT NULL",
@@ -1594,7 +1620,7 @@ abstract class InAppDb : RoomDatabase() {
                     "decreasedActivityOrPlayfulnessInChildren INTEGER DEFAULT NULL",
                     "otherSymptoms INTEGER DEFAULT NULL"
                 )
-                columns.forEach { columnDefinition ->
+                tbScreeningColumns.forEach { columnDefinition ->
                     val columnName = columnDefinition.substringBefore(" ")
                     if (!columnExists(database, "TB_SCREENING", columnName)) {
                         database.execSQL("ALTER TABLE TB_SCREENING ADD COLUMN $columnDefinition")
@@ -1603,6 +1629,7 @@ abstract class InAppDb : RoomDatabase() {
                 recreateBenBasicCacheView(database)
             }
         }
+
 
         private fun addVitalGeneralExaminationColumns(database: SupportSQLiteDatabase) {
             val columns = listOf(

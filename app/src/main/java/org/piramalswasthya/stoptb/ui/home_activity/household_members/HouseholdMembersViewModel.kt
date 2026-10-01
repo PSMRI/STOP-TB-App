@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.repositories.BenRepo
+import org.piramalswasthya.stoptb.repositories.HouseholdRepo
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
@@ -20,6 +21,7 @@ import javax.inject.Inject
 class HouseholdMembersViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val benRepo: BenRepo,
+    private val householdRepo: HouseholdRepo,
     private val vitalRepo: VitalRepo,
     private val tbRepo: TBRepo,
     private val recordsRepo: RecordsRepo,
@@ -36,11 +38,21 @@ class HouseholdMembersViewModel @Inject constructor(
         )
     }
 
+    var totalHhMembers: Int? = null
+        private set
+
+    val memberLimitReached: Flow<Boolean> = benList.map { list ->
+        if (totalHhMembers == null) totalHhMembers = householdRepo.getTotalHhMembers(hhId)
+        val total = totalHhMembers
+        total != null && list.size >= total
+    }
+
     // ── Examine form fill status ──────────────────────────────────────────────
     val vitalBenIds: Flow<List<Long>>          = vitalRepo.vitalBenIds
     val unsyncedVitalBenIds: Flow<List<Long>>  = vitalRepo.unsyncedVitalBenIds
     val syncingVitalBenIds: Flow<List<Long>>   = vitalRepo.syncingVitalBenIds
     val tbScreeningBenIds: Flow<List<Long>>    = tbRepo.tbScreeningBenIds
+    val allTbDiagnostics = tbRepo.allTbDiagnostics
     val unsyncedTbScreeningBenIds: Flow<List<Long>> = tbRepo.unsyncedTbScreeningBenIds
     val syncingTbScreeningBenIds: Flow<List<Long>> = tbRepo.syncingTbScreeningBenIds
     val generalOpdBenIds: Flow<List<Long>>     = tbRepo.generalOpdBenIds
