@@ -51,11 +51,6 @@ class RoleManager @Inject constructor(
         return location?.village?.name ?: ""
     }
 
-    fun getVillage(): String {
-        val location = preferenceDao.getLocationRecord()
-        return location?.village?.name ?: ""
-    }
-
     fun setActiveRole(role: AppRole) {
         require(role in _assignedRoles) { "Role $role is not assigned to this user" }
         _activeRole.value = role
