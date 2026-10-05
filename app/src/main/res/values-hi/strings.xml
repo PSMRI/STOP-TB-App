@@ -115,7 +115,12 @@
     <string name="high_risk_babies">उच्च जोखिम वाले शिशु</string>
     <string name="low_birth_weight_babies">कम वजन वाले शिशु</string>
     <string name="registration_date">पंजीकरण तिथि</string>
+    <string name="mobile_number_ben">मोबाइल नंबर</string>
     <string name="beneficiary_id">लाभार्थी आईडी</string>
+    <string name="btn_examine_count_ben">जांच (%1$d/%2$d)</string>
+    <string name="screening_presumptive">संभावित</string>
+    <string name="screening_asymptomatic">लक्षणरहित</string>
+    <string name="family_members">परिवार के सदस्य</string>
     <string name="rch_id">आरसीएच आईडी</string>
     <string name="sync_to_local">स्थानीय से सिंक करें</string>
     <string name="husband_s_name">पति का नाम</string>
@@ -777,9 +782,9 @@
     <string name="weight_kgs">वज़न (किग्रा)</string>
     <string name="height_cms">लंबाई (सेमी)</string>
     <string name="temperature_degree_fahrenheit">तापमान (डिग्री फारेनहाइट)</string>
-    <string name="temperature_hypothermia">&lt;97 - Hypothermia</string>
-    <string name="normal_temperature_range">97-99 - Normal</string>
-    <string name="temperature_100_or_more">&gt;99 - Fever</string>
+    <string name="temperature_hypothermia">&lt;97 - हाइपोथर्मिया</string>
+    <string name="normal_temperature_range">97-99 - सामान्य</string>
+    <string name="temperature_100_or_more">&gt;99 - बुखार</string>
     <string name="anthropometry_age_gender_format">%1$d %2$s | %3$s</string>
     <string name="age_unit_years">वर्ष</string>
     <string name="age_unit_months">महीने</string>
@@ -1124,6 +1129,14 @@
     <string name="role_tab_nurse">उपचार</string>
     <string name="role_tab_counseling">परामर्श</string>
     <string name="role_tab_lab_technician">निदान</string>
+
+
+    <string name="home_village_at_a_glance">गाँव %1$s एक नज़र में</string>
+    <string name="home_glance_households">कुल परिवार</string>
+    <string name="home_glance_population">कुल जनसंख्या</string>
+    <string name="home_glance_unscreened">अस्क्रीन की गई जनसंख्या</string>
+
+
 </resources>
 
 
