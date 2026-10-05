@@ -111,7 +111,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 52, exportSchema = false
+    version = 53, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -860,7 +860,7 @@ abstract class InAppDb : RoomDatabase() {
                 }
                 database.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_t_section_response_backendSectionResponseId` " +
-                        "ON `t_section_response` (`backendSectionResponseId`)"
+                            "ON `t_section_response` (`backendSectionResponseId`)"
                 )
             }
         }
@@ -1643,6 +1643,16 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        // Repair: release-2.3 builds at v45-v47 (before the 2.2 merge) never ran the TB_SCREENING
+        // symptom columns step that 2.2 shipped in 44->45, and the renumbered 44_45/45_46 are
+        // skipped for DBs already past those versions. Re-apply both idempotently.
+        private val MIGRATION_52_53 = object : Migration(52, 53) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                MIGRATION_44_45.migrate(database)
+                MIGRATION_45_46.migrate(database)
+            }
+        }
+
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(
@@ -1922,6 +1932,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_49_50)
                         .addMigrations(MIGRATION_50_51)
                         .addMigrations(MIGRATION_51_52)
+                        .addMigrations(MIGRATION_52_53)
                         .fallbackToDestructiveMigration()
                         .build()
 
