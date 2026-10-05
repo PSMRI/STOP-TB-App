@@ -29,10 +29,10 @@ interface AmritApiService {
         @Query("userId") userId: Int
     ): UserNetworkResponse
 
-    @GET("hwc-api/master/get/visitReasonAndCategories")
+    @GET("mmu-api/master/get/visitReasonAndCategories")
     suspend fun getVisitReasonAndCategories(): Response<HwcMasterResponse<VisitReasonAndCategoriesResponse>>
 
-    @GET("hwc-api/master/nurse/masterData/{visitCategoryId}/{providerServiceMapId}")
+    @GET("mmu-api/master/nurse/masterData/{visitCategoryId}/{providerServiceMapId}/Male")
     suspend fun getChiefComplaintMaster(
         @Path("visitCategoryId") visitCategoryId: Int,
         @Path("providerServiceMapId") providerServiceMapId: Int

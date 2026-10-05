@@ -20,8 +20,7 @@ class GeneralOpdDataset(
         entries = emptyArray(),
         required = false,
         hasDependants = true,
-        showAsMultiSelectDialog = true,
-        enableSearchInMultiSelect = true
+        showAsSingleSelectDialog = true
     )
 
     private var chiefComplaintEnglishEntries = emptyArray<String>()
