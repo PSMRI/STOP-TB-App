@@ -190,16 +190,17 @@ class TBScreeningDataset(
         hasDependants = true
     )
 
-    /** Auto-computed from the 10 symptom answers — not editable by user */
+    /**
+     * Auto-computed from the symptom answers. Shown as a status banner, not a Yes/No choice.
+     * Stored value stays on the Yes/No scale: Yes = Asymptomatic, No = Symptomatic.
+     */
     private val isAsymptomatic = FormElement(
         id = 16,
-        inputType = InputType.RADIO,
-        title = resources.getString(R.string.tb_is_beneficiary_asymptomatic),
+        inputType = InputType.STATUS_INDICATOR,
+        title = resources.getString(R.string.tb_symptom_status),
         entries = resources.getStringArray(R.array.yes_no),
         required = false,
-        isEnabled = false,
-        hasDependants = true,
-        boldTitleOnYes = true
+        isEnabled = false
     )
 
     private data class CodedOption(val id: Int, val code: String, val label: String)
@@ -256,13 +257,16 @@ class TBScreeningDataset(
     private val isChildBeneficiary: Boolean
         get() = benAgeYears < 15
 
-    /** The mandatory symptom questions that drive asymptomatic auto-select, age-gated */
+    /**
+     * Symptom questions that set the status banner.
+     * History of TB, current anti-TB treatment, and family history are collected under
+     * Other Details and do not by themselves make the beneficiary symptomatic.
+     */
     private fun requiredSymptomFields(): List<FormElement> {
         val fields = mutableListOf(
             isCoughing, bloodInSputum, isFever, riseOfFever,
             lossOfAppetite, lossOfWeight, nightSweats,
-            chestPain, shortnessOfBreath, fatigue,
-            historyOfTB, currentlyTakingDrugs, familyHistoryTB
+            chestPain, shortnessOfBreath, fatigue
         )
         if (isChildBeneficiary) {
             fields += failureToGainWeightInChildren
@@ -276,10 +280,9 @@ class TBScreeningDataset(
         get() = requiredSymptomFields().map { it.id }.toSet() + others.id
 
     /**
-     * PRD rule:
-     *  - Any mandatory symptom (or "Others") = "Yes"  →  asymptomatic = "No"
-     *  - All mandatory symptoms = "No"                →  asymptomatic = "Yes"
-     *  - Not all mandatory symptoms answered yet      →  null (blank)
+     *  - Any symptom (or "Others") = "Yes"       →  Symptomatic
+     *  - Every symptom question = "No"           →  Asymptomatic
+     *  - Symptom questions still unanswered      →  blank, unless a Yes is already recorded
      */
     private fun computeAsymptomatic(): String? {
         val fields = requiredSymptomFields()
@@ -375,7 +378,7 @@ class TBScreeningDataset(
             historyOfTB.value        = boolToYesNo(saved.historyOfTb)
             currentlyTakingDrugs.value = boolToYesNo(saved.takingAntiTBDrugs)
             familyHistoryTB.value    = boolToYesNo(saved.familySufferingFromTB)
-            isAsymptomatic.value     = saved.asymptomatic ?: computeAsymptomatic()
+            isAsymptomatic.value     = computeAsymptomatic() ?: normalizeAsymptomatic(saved.asymptomatic)
 
             val savedIds = saved.keyPopulationRiskFactorIds.orEmpty()
             val savedCodes = saved.keyPopulationRiskFactors.orEmpty()
@@ -567,12 +570,12 @@ class TBScreeningDataset(
             add(decreasedActivityOrPlayfulnessInChildren)
         }
         add(others)
+        add(isAsymptomatic)
         addAll(listOf(
             otherDetailsHeading,
             historyOfTB,
             currentlyTakingDrugs,
             familyHistoryTB,
-            isAsymptomatic,
             riskFactorsHeading,
             keyPopulationRiskFactors,
             hivStatus
@@ -588,4 +591,11 @@ class TBScreeningDataset(
     }
 
     private fun isYes(formElement: FormElement): Boolean = formElement.value == yesValue
+
+    /** Saved records store YES/NO; the form compares against the localized Yes/No labels. */
+    private fun normalizeAsymptomatic(stored: String?): String? = when (stored?.trim()?.uppercase()) {
+        "YES", yesValue.uppercase() -> yesValue
+        "NO", noValue.uppercase() -> noValue
+        else -> null
+    }
 }
