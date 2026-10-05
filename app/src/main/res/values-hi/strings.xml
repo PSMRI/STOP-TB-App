@@ -449,6 +449,12 @@
     <string name="symptomatic_tb_screening">टीबी के लक्षणों की जांच</string>
     <string name="tb_asymptomatic_symptoms">बिना लक्षण वाले लोगों की टीबी जांच</string>
     <string name="tb_is_beneficiary_asymptomatic">लाभार्थी लक्षणरहित है</string>
+    <string name="tb_symptom_status">लक्षण की स्थिति</string>
+    <string name="tb_status_asymptomatic">लक्षणरहित</string>
+    <string name="tb_status_symptomatic">लक्षणयुक्त</string>
+    <string name="tb_status_asymptomatic_detail">कोई टीबी संबंधी लक्षण नहीं मिला</string>
+    <string name="tb_status_symptomatic_detail">कम से कम एक टीबी संबंधी लक्षण मिला</string>
+    <string name="tb_symptom_status_pending">लक्षण वाले प्रश्नों के उत्तर दें। यह स्थिति अपने आप तय होगी।</string>
     <string name="tb_rise_of_fever">रोजाना शाम को तेज बुखार आता है?</string>
     <string name="tb_loss_of_appetite">भूख कम लगना</string>
     <string name="tb_age_more_than_60">उम्र 60 वर्ष से अधिक</string>

@@ -37,6 +37,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.children
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -59,6 +60,7 @@ import org.piramalswasthya.stoptb.databinding.RvItemFormHeadlineV2Binding
 import org.piramalswasthya.stoptb.databinding.RvItemFormImageViewV2Binding
 import org.piramalswasthya.stoptb.databinding.RvItemFormNumberPickerBinding
 import org.piramalswasthya.stoptb.databinding.RvItemFormRadioV2Binding
+import org.piramalswasthya.stoptb.databinding.RvItemFormStatusIndicatorBinding
 import org.piramalswasthya.stoptb.databinding.RvItemFormTextViewV2Binding
 import org.piramalswasthya.stoptb.databinding.RvItemFormTimepickerV2Binding
 import org.piramalswasthya.stoptb.helpers.Konstants
@@ -75,6 +77,7 @@ import org.piramalswasthya.stoptb.model.InputType.EDIT_TEXT
 import org.piramalswasthya.stoptb.model.InputType.HEADLINE
 import org.piramalswasthya.stoptb.model.InputType.IMAGE_VIEW
 import org.piramalswasthya.stoptb.model.InputType.RADIO
+import org.piramalswasthya.stoptb.model.InputType.STATUS_INDICATOR
 import org.piramalswasthya.stoptb.model.InputType.TEXT_VIEW
 import org.piramalswasthya.stoptb.model.InputType.TIME_PICKER
 import org.piramalswasthya.stoptb.model.InputType.values
@@ -1603,6 +1606,93 @@ class FormInputAdapter(
 
 
 
+    class StatusIndicatorViewHolder private constructor(
+        private val binding: RvItemFormStatusIndicatorBinding
+    ) : ViewHolder(binding.root) {
+        companion object {
+            fun from(parent: ViewGroup): ViewHolder {
+                val layoutInflater = LayoutInflater.from(parent.context)
+                val binding = RvItemFormStatusIndicatorBinding.inflate(layoutInflater, parent, false)
+                return StatusIndicatorViewHolder(binding)
+            }
+        }
+
+        fun bind(item: FormElement) {
+            bind(item.title, item.value, item.entries)
+        }
+
+        fun bind(title: String, value: String?, entries: Array<String>?) {
+            val context = binding.root.context
+            val yes = entries?.getOrNull(0)
+            val no = entries?.getOrNull(1)
+            binding.tvStatusLabel.text = title
+            when {
+                matches(value, yes, "YES") -> showResolved(
+                    label = context.getString(R.string.tb_status_asymptomatic),
+                    detail = context.getString(R.string.tb_status_asymptomatic_detail),
+                    background = R.color.tb_status_asymptomatic,
+                    icon = R.drawable.ic_check_circle
+                )
+                matches(value, no, "NO") -> showResolved(
+                    label = context.getString(R.string.tb_status_symptomatic),
+                    detail = context.getString(R.string.tb_status_symptomatic_detail),
+                    background = R.color.tb_status_symptomatic,
+                    icon = R.drawable.ic_exclamation_circle
+                )
+                else -> showPending(context.getString(R.string.tb_symptom_status_pending))
+            }
+        }
+
+        private fun matches(value: String?, localized: String?, stored: String): Boolean {
+            if (value.isNullOrBlank()) return false
+            return value.equals(localized, ignoreCase = true) || value.equals(stored, ignoreCase = true)
+        }
+
+        private fun showResolved(label: String, detail: String, background: Int, icon: Int) {
+            val context = binding.root.context
+            val onBanner = ContextCompat.getColor(context, R.color.tb_status_on_banner)
+            tintBanner(ContextCompat.getColor(context, background))
+            val iconDrawable = AppCompatResources.getDrawable(context, icon)?.mutate()
+            if (iconDrawable != null) {
+                DrawableCompat.setTint(iconDrawable, onBanner)
+                binding.ivStatusIcon.setImageDrawable(iconDrawable)
+            }
+            binding.ivStatusIcon.visibility = View.VISIBLE
+            binding.tvStatusValue.text = label
+            binding.tvStatusValue.setTextColor(onBanner)
+            binding.tvStatusValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            binding.tvStatusValue.setTypeface(binding.tvStatusValue.typeface, Typeface.BOLD)
+            binding.tvStatusDetail.visibility = View.VISIBLE
+            binding.tvStatusDetail.text = detail
+            binding.tvStatusDetail.setTextColor(onBanner)
+            binding.llStatusBanner.contentDescription = "${binding.tvStatusLabel.text}: $label. $detail"
+        }
+
+        private fun showPending(message: String) {
+            val context = binding.root.context
+            val pendingText = ContextCompat.getColor(context, R.color.tb_status_pending_text)
+            tintBanner(ContextCompat.getColor(context, R.color.tb_status_pending_bg))
+            binding.ivStatusIcon.visibility = View.GONE
+            binding.tvStatusValue.text = message
+            binding.tvStatusValue.setTextColor(pendingText)
+            binding.tvStatusValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            binding.tvStatusValue.setTypeface(binding.tvStatusValue.typeface, Typeface.NORMAL)
+            binding.tvStatusDetail.visibility = View.GONE
+            binding.llStatusBanner.contentDescription = "${binding.tvStatusLabel.text}. $message"
+        }
+
+        private fun tintBanner(color: Int) {
+            val background = AppCompatResources.getDrawable(
+                binding.root.context,
+                R.drawable.bg_symptom_status
+            )?.mutate()
+            if (background != null) {
+                DrawableCompat.setTint(background, color)
+                binding.llStatusBanner.background = background
+            }
+        }
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val inputTypes = values()
         val safeType = inputTypes.getOrNull(viewType) ?: TEXT_VIEW
@@ -1622,6 +1712,7 @@ class FormInputAdapter(
             InputType.FILE_UPLOAD -> FileUploadInputViewHolder.from(parent)
             InputType.NUMBER_PICKER -> NumberPickerInputViewHolder.from(parent)
             InputType.MULTIFILE_UPLOAD -> MultiFileUploadInputViewHolder.from(parent)
+            STATUS_INDICATOR -> StatusIndicatorViewHolder.from(parent)
         }
     }
 
@@ -1753,6 +1844,8 @@ class FormInputAdapter(
                 InputType.NUMBER_PICKER -> (holder as NumberPickerInputViewHolder).bind(
                     item, isEnabled, formValueListener
                 )
+
+                STATUS_INDICATOR -> (holder as StatusIndicatorViewHolder).bind(item)
             }
         } catch (e: Exception) {
             e.printStackTrace()
