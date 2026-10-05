@@ -171,6 +171,7 @@ class SignInViewModel @Inject constructor(
      * function to remove data of currently logged in uset
      * clear all in app db data
      * remove shared preferences data and reset last synced time
+     * Publish IDLE after logout clears camp mode prefs to prevent a stale "Camp hub connected" status.
      * set logoutComplete live data to true to be observed in fragment
      */
     fun logout() {
@@ -188,6 +189,7 @@ class SignInViewModel @Inject constructor(
                 pref.setRememberedUsernameOnly(rememberedUser!!.trim())
             }
             _loggedInUser.value = null
+            _campHubStatus.value = CampHubStatus.IDLE
             Thread.sleep(2000)
             _logoutComplete.value = true
         }

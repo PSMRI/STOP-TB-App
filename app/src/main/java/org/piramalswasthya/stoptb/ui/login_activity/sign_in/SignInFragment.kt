@@ -109,6 +109,9 @@ class SignInFragment : Fragment() {
             }.setNegativeButton(resources.getString(R.string.no)) { dialog, _ ->
                 viewModel.updateState(NetworkResponse.Idle())
                 dialog.dismiss()
+            }.setOnCancelListener{
+                // Back dismisses the dialog and prevents the login screen from getting stuck in Loading.
+                viewModel.updateState(NetworkResponse.Idle())
             }.create()
     }
 
