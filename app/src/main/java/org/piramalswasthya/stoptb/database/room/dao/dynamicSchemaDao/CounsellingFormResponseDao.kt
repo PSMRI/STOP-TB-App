@@ -127,6 +127,39 @@ interface CounsellingFormResponseDao {
     )
     fun observeFormResponseVersionId(beneficiaryId: Long, formType: String): Flow<Int?>
 
+    // Version-agnostic live-response lookup: finds a response saved against an older version of
+    // the form so its answers can be carried over to the current schema (see FormVersionAnswerMapper).
+    @Transaction
+    @Query(
+        """
+        SELECT r.* FROM t_form_response r
+        JOIN t_form_version v ON r.formVersionId = v.versionId
+        JOIN t_dynamic_form f ON v.formId = f.formId
+        WHERE r.beneficiaryId = :beneficiaryId AND f.formType = :formType AND r.isHistorySnapshot = 0
+        ORDER BY r.responseId DESC LIMIT 1
+        """
+    )
+    suspend fun getLatestLiveResponseForFormType(beneficiaryId: Long, formType: String): CompleteFormResponse?
+
+    // A response's answers resolved to questionUuid/optionValue — both stay stable across form
+    // versions, unlike the ids, so these rows can be mapped onto any version's questions.
+    @Query(
+        """
+        SELECT sq.questionUuid AS questionUuid, qr.questionId AS questionId, qr.optionId AS optionId,
+               qo.optionValue AS optionValue, qr.answerText AS answerText
+        FROM t_question_response qr
+        JOIN t_section_response sr ON sr.sectionResponseId = qr.sectionResponseId
+        JOIN t_section_question sq ON sq.questionId = qr.questionId
+        LEFT JOIN t_question_option qo ON qo.optionId = qr.optionId
+        WHERE sr.formResponseId = :responseId
+        ORDER BY qr.questionResponseId
+        """
+    )
+    suspend fun getAnswersWithUuid(responseId: Long): List<SavedAnswerByUuid>
+
+    @Query("DELETE FROM t_section_response WHERE formResponseId = :formResponseId")
+    suspend fun deleteSectionResponsesForResponse(formResponseId: Long)
+
     // Phase-scoped status observer for TPT_FOLLOW_UP PRE_SUBMIT, avoiding newer POST_SUBMIT rows masking the submitted PRE_SUBMIT status.
     @Query(
         """
