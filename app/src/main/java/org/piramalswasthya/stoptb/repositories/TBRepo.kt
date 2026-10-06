@@ -1535,7 +1535,8 @@ class TBRepo @Inject constructor(
         resultSummary: String? = null,
         // Null resultSummary + a reason here closes the order (X-Ray/TrueNat/RIF alike) instead
         // of completing it. Sent to the backend as reasonToClose.
-        reasonForRefusal: String? = null
+        reasonForRefusal: String? = null,
+        isRetryAfterOrderCreation: Boolean = false
     ):NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
             val ben = benDao.getBen(benId)
@@ -1584,11 +1585,28 @@ class TBRepo @Inject constructor(
                         }
                         return@withContext NetworkResponse.Success("Result submitted successfully")
                     } else {
+                        val errMsg = responseBody.errorMessage ?: "Manual result submission was rejected"
+                        if (!isRetryAfterOrderCreation &&
+                            errMsg.contains("DiagnosticOrder not found for beneficiaryId=")
+                        ) {
+                            if (WorkerUtils.isDiagnosticOrderPushActive(context, benId)) {
+                                saveManualResultPendingSync(benId, orderType, resultSummary, reasonForRefusal, localResult)
+                                return@withContext NetworkResponse.Success("PENDING_SYNC")
+                            }
+                            val orderResult = createOrder(benId, orderType)
+                            if (orderResult is NetworkResponse.Success) {
+                                // A real order exists now — retry this exact submission against it, once.
+                                return@withContext submitManualResult(
+                                    benId, orderType, resultSummary, reasonForRefusal,
+                                    isRetryAfterOrderCreation = true
+                                )
+                            }
+                            saveManualResultPendingSync(benId, orderType, resultSummary, reasonForRefusal, localResult)
+                            return@withContext NetworkResponse.Success("PENDING_SYNC")
+                        }
                         // A definitive rejection (e.g. already COMPLETED) won't succeed on retry —
                         // surface it as a real error instead of queuing for offline-first retry.
-                        return@withContext NetworkResponse.Error(
-                            responseBody.errorMessage ?: "Manual result submission was rejected"
-                        )
+                        return@withContext NetworkResponse.Error(errMsg)
                     }
                 } else {
                     // Couldn't confirm anything either way — treat like an unreachable hub.

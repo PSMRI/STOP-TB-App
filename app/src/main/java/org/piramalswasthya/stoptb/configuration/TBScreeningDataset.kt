@@ -443,7 +443,13 @@ class TBScreeningDataset(
 
     override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
         (cacheModel as TBScreeningCache).let { form ->
-            form.visitDate             = getLongFromDate(dateOfVisit.value)
+            // dateOfVisit only holds "dd-MM-yyyy"; parsing it back yields local midnight, which
+            // dropped the time-of-day. Keep the cache's full timestamp when the day is unchanged.
+            form.visitDate = when (dateOfVisit.value) {
+                getDateFromLong(form.visitDate) -> form.visitDate
+                getDateFromLong(System.currentTimeMillis()) -> System.currentTimeMillis()
+                else -> getLongFromDate(dateOfVisit.value)
+            }
             form.coughMoreThan2Weeks   = isYes(isCoughing)
             form.bloodInSputum         = isYes(bloodInSputum)
             form.feverMoreThan2Weeks   = isYes(isFever)

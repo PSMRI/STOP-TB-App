@@ -529,14 +529,43 @@ class AllBenViewModel @Inject constructor(
         _retryingBenIds.value += benId
         WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, listOf(orderType))
         _orderActionState.value = OrderActionResult.Success("New order queued.", orderType)
-        // The push itself runs on WorkManager's own schedule, not awaited here — track it via
-        // retryingBenIds (same in-flight flag retryTest() uses) so the beneficiary list shows a
-        // locked/spinner state on this row for the few seconds between enqueue and the worker's
-        // createOrder() call actually landing PENDING, instead of re-rendering whatever a
-        // Paging3/RecyclerView recycle produces during that gap.
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 delay(300L)
+                while (WorkerUtils.isDiagnosticOrderPushActive(context, benId)) {
+                    delay(500L)
+                }
+            }
+            _retryingBenIds.value -= benId
+        }
+    }
+
+    // Beneficiaries this screen has already confirmed have no push currently running, for a row
+    // with no order id — avoids re-querying WorkManager on every rebind/scroll of the same
+    // ambiguous row. Deliberately not a StateFlow: it's a one-off de-dup cache, not UI state.
+    private val checkedNoPushBenIds = mutableSetOf<Long>()
+
+    // Called from BenListAdapter's bind step (not a user click) whenever it renders a row with no
+    // confirmed order id yet. Unlike createNewOrder()/retryTest(), this never enqueues a push
+    // itself — a push that started from an entirely different screen (e.g. the initial referral
+    // from TBScreeningFormViewModel) is invisible to this ViewModel's own state, but WorkManager's
+    // own unique-work tracking is keyed only by benId, not by whoever enqueued it, so a one-off
+    // check here is enough to discover it and mirror it into retryingBenIds.
+    fun checkAndTrackInFlightPush(benId: Long, context: Context) {
+        //If we are already tracking this beneficiary as "uploading/retrying", don't do anything.
+        if (_retryingBenIds.value.contains(benId)) return
+        //If we already checked WorkManager for this row and confirmed nothing is uploading, don't keep asking WorkManager on every scroll/re-render
+        if (checkedNoPushBenIds.contains(benId)) return
+        viewModelScope.launch {
+            val isActive = withContext(Dispatchers.IO) {
+                WorkerUtils.isDiagnosticOrderPushActive(context, benId)
+            }
+            if (!isActive) {
+                checkedNoPushBenIds += benId
+                return@launch
+            }
+            _retryingBenIds.value += benId
+            withContext(Dispatchers.IO) {
                 while (WorkerUtils.isDiagnosticOrderPushActive(context, benId)) {
                     delay(500L)
                 }

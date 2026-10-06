@@ -353,17 +353,12 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         "RETRY_PUSH" -> {
                             viewModel.retryTest(item.benId, orderType, requireContext())
                         }
+                        "CHECK_PUSH_ACTIVE" -> {
+                            viewModel.checkAndTrackInFlightPush(item.benId, requireContext())
+                        }
                         "RETRY_RIF_POLL" -> {
                             viewModel.retryResultFetch(item.benId, "MDR_RIF", requireContext())
                         }
-                        // "VIEW"/"VIEW_RIF" used to check naatResult == "Invalid" /
-                        // trueNatRifResult == "Indeterminate" here and offer an AlertDialog-based
-                        // "REPEAT TEST" shortcut (calling the now-unused viewModel.repeatTest()).
-                        // TrueNat & RIF order lifecycle redesign: fully superseded by the
-                        // Closed-status-driven "Create New Order" button (the "REORDER" action
-                        // above) — Invalid/Error and Indeterminate are both terminal order states
-                        // now (Closed / Completed respectively), not something a result-viewing
-                        // dialog decides to repeat. Both actions are now plain navigation.
                         "VIEW" -> {
                             findNavController().navigate(
                                 AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
