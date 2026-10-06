@@ -149,7 +149,7 @@ class SignInViewModel @Inject constructor(
     private fun normalizeCampHubUrl(url: String): String {
         val trimmedUrl = url.trim()
         val resolvedUrl = when {
-            trimmedUrl.isBlank() -> "http://192.168.137.1:8080"
+            trimmedUrl.isBlank() -> pref.defaultCampHubUrl().trimEnd('/')
             trimmedUrl.contains("://") -> trimmedUrl
             else -> "http://$trimmedUrl"
         }
