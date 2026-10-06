@@ -105,8 +105,8 @@ class TBScreeningFormFragment : Fragment() {
                         if (it.isNotEmpty()) {
                             val dateIndex = viewModel.getIndexOfDate()
                             if (dateIndex >= 0) adapter.notifyItemChanged(dateIndex)
-                            // isAsymptomatic is auto-computed in-place (same object ref),
-                            // DiffUtil won't detect the change — force-rebind it directly.
+                            // Symptom status is auto-computed in-place (same object ref),
+                            // DiffUtil won't detect the change — force-rebind the banner.
                             val asymptomaticIdx = viewModel.getIndexOfAsymptomatic()
                             if (asymptomaticIdx >= 0) adapter.notifyItemChanged(asymptomaticIdx)
                             adapter.submitList(it)

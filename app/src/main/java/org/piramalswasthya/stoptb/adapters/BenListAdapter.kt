@@ -671,13 +671,18 @@ class BenListAdapter(
                     }
                 }
 
+                val context = binding.root.context
+
                 val symptomsResultText = when (isPresumptive) {
-                    true -> "Presumptive"
-                    false -> "Asymptomatic"
+                    true -> context.getString(R.string.screening_presumptive)
+                    false -> context.getString(R.string.screening_asymptomatic)
                     null -> ""
                 }
+
                 binding.tvSymptomsResult.text = formatScreeningResult(symptomsResultText)
-                binding.tvSymptomsResult.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
+                binding.tvSymptomsResult.visibility =
+                    if (showRedesignedCard) View.VISIBLE else View.GONE
+
 
                 // ---------------------------------------------------------
                 // 2. Chest X-Ray — driven purely by DB: chestXrayDoneDate + raw result
@@ -1176,7 +1181,13 @@ class BenListAdapter(
             }
             Timber.d("RoleManager: denominatorRule=$examineDenominatorRule, filled=$examineFilledCount/$examineTotal")
 
-            binding.btnExamine.text = "Examine ($examineFilledCount/$examineTotal)"
+            binding.btnExamine.text = binding.root.context.getString(
+                R.string.btn_examine_count_ben,
+                examineFilledCount,
+                examineTotal
+            )
+
+
             val isExamineFilled = examineFilledCount > 0
             binding.btnExamine.setBackgroundTintList(
                 ContextCompat.getColorStateList(

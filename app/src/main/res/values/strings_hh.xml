@@ -164,4 +164,7 @@
     <string name="hint_other_place">Other Place *</string>
     <string name="hint_institution_name">Name of Institution *</string>
 
+    <string name="all_non_household_beneficiaries">All Non Household Beneficiaries</string>
+
+
 </resources>

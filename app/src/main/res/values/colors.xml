@@ -131,5 +131,10 @@
     <color name="dashboard_coverage_low">#E53935</color>
     <color name="dashboard_highlight_text">#0F6B63</color>
     <color name="dashboard_row_divider">#E4ECEA</color>
+    <color name="tb_status_symptomatic">#B00020</color>
+    <color name="tb_status_asymptomatic">#1B7A4B</color>
+    <color name="tb_status_on_banner">#FFFFFF</color>
+    <color name="tb_status_pending_bg">#E7EEEC</color>
+    <color name="tb_status_pending_text">#5B7073</color>
 
 </resources>

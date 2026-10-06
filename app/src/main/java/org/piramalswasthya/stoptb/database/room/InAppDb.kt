@@ -111,7 +111,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 51, exportSchema = false
+    version = 53, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -488,7 +488,7 @@ abstract class InAppDb : RoomDatabase() {
                         PRIMARY KEY(`formId`)
                     )
                 """.trimIndent())
-                
+
                 database.execSQL("""
                     CREATE TABLE IF NOT EXISTS `t_form_version` (
                         `versionId` INTEGER NOT NULL, 
@@ -724,33 +724,33 @@ abstract class InAppDb : RoomDatabase() {
                 if (!columnExists(database, "t_form_response", "totalSections")) {
                     database.execSQL("ALTER TABLE t_form_response ADD COLUMN totalSections INTEGER DEFAULT NULL")
                 }
-                
-               if (!columnExists(database, "BENEFICIARY", "pinCode")) {
+
+                if (!columnExists(database, "BENEFICIARY", "pinCode")) {
                     database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN pinCode TEXT")
                 }
-                
-                
-                 if (!columnExists(database, "t_form_section", "isEditable")) {
+
+
+                if (!columnExists(database, "t_form_section", "isEditable")) {
                     database.execSQL("ALTER TABLE t_form_section ADD COLUMN isEditable INTEGER NOT NULL DEFAULT 0")
                 }
             }
         }
-     /*   private val MIGRATION_23_24 = object : Migration(23, 24) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                val householdFamilyColumns = listOf(
-                    "fam_totalHhMembers INTEGER DEFAULT NULL",
-                    "fam_isRegisteredAtCampSite TEXT DEFAULT NULL",
-                    "fam_isRegisteredAtCampSiteId INTEGER NOT NULL DEFAULT 0"
-                )
-                householdFamilyColumns.forEach { columnDefinition ->
-                    val columnName = columnDefinition.substringBefore(" ")
-                    if (!columnExists(database, "HOUSEHOLD", columnName)) {
-                        database.execSQL("ALTER TABLE HOUSEHOLD ADD COLUMN $columnDefinition")
-                    }
-                }
-            }
-        }
-*/
+        /*   private val MIGRATION_23_24 = object : Migration(23, 24) {
+               override fun migrate(database: SupportSQLiteDatabase) {
+                   val householdFamilyColumns = listOf(
+                       "fam_totalHhMembers INTEGER DEFAULT NULL",
+                       "fam_isRegisteredAtCampSite TEXT DEFAULT NULL",
+                       "fam_isRegisteredAtCampSiteId INTEGER NOT NULL DEFAULT 0"
+                   )
+                   householdFamilyColumns.forEach { columnDefinition ->
+                       val columnName = columnDefinition.substringBefore(" ")
+                       if (!columnExists(database, "HOUSEHOLD", columnName)) {
+                           database.execSQL("ALTER TABLE HOUSEHOLD ADD COLUMN $columnDefinition")
+                       }
+                   }
+               }
+           }
+   */
 
         private val MIGRATION_22_23 = object : Migration(22, 23) {
             override fun migrate(database: SupportSQLiteDatabase) {
@@ -760,20 +760,20 @@ abstract class InAppDb : RoomDatabase() {
                         originalSql = cursor.getString(0)
                     }
                 }
-                
+
                 if (originalSql.isNotEmpty()) {
                     var newSql = originalSql.replace("CREATE TABLE `BENEFICIARY`", "CREATE TABLE `BENEFICIARY_new`")
                     newSql = newSql.replace("CREATE TABLE BENEFICIARY", "CREATE TABLE BENEFICIARY_new")
                     newSql = newSql.replace("`householdId` INTEGER NOT NULL", "`householdId` INTEGER")
                     newSql = newSql.replace("householdId INTEGER NOT NULL", "householdId INTEGER")
-                    
+
                     database.execSQL(newSql)
-                    
+
                     database.execSQL("ALTER TABLE `BENEFICIARY_new` ADD COLUMN `isNonHH` INTEGER NOT NULL DEFAULT 0")
                     database.execSQL("ALTER TABLE `BENEFICIARY_new` ADD COLUMN `placeOfCurrentLiving` INTEGER DEFAULT NULL")
                     database.execSQL("ALTER TABLE `BENEFICIARY_new` ADD COLUMN `otherPlaceOfCurrentLiving` TEXT DEFAULT NULL")
                     database.execSQL("ALTER TABLE `BENEFICIARY_new` ADD COLUMN `institutionName` TEXT DEFAULT NULL")
-                    
+
                     val columns = ArrayList<String>()
                     database.query("PRAGMA table_info(`BENEFICIARY`)").use { cursor ->
                         val nameIndex = cursor.getColumnIndex("name")
@@ -782,9 +782,9 @@ abstract class InAppDb : RoomDatabase() {
                         }
                     }
                     val columnsCsv = columns.joinToString(", ") { "`$it`" }
-                    
+
                     database.execSQL("INSERT INTO `BENEFICIARY_new` ($columnsCsv) SELECT $columnsCsv FROM `BENEFICIARY`")
-                    
+
                     val indexSqls = ArrayList<String>()
                     database.query("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='BENEFICIARY' AND sql IS NOT NULL").use { cursor ->
                         while (cursor.moveToNext()) {
@@ -845,7 +845,7 @@ abstract class InAppDb : RoomDatabase() {
                 database.execSQL("DROP INDEX IF EXISTS `index_t_form_response_beneficiaryId_formVersionId`")
                 database.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_t_form_response_beneficiaryId_formVersionId_isHistorySnapshot` " +
-                        "ON `t_form_response` (`beneficiaryId`, `formVersionId`, `isHistorySnapshot`)"
+                            "ON `t_form_response` (`beneficiaryId`, `formVersionId`, `isHistorySnapshot`)"
                 )
             }
         }
@@ -860,7 +860,7 @@ abstract class InAppDb : RoomDatabase() {
                 }
                 database.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_t_section_response_backendSectionResponseId` " +
-                        "ON `t_section_response` (`backendSectionResponseId`)"
+                            "ON `t_section_response` (`backendSectionResponseId`)"
                 )
             }
         }
@@ -1323,7 +1323,7 @@ abstract class InAppDb : RoomDatabase() {
                 val indexSqls = ArrayList<String>()
                 database.query(
                     "SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='t_form_response' AND sql IS NOT NULL " +
-                        "AND name != 'index_t_form_response_beneficiaryId'"
+                            "AND name != 'index_t_form_response_beneficiaryId'"
                 ).use { cursor ->
                     while (cursor.moveToNext()) {
                         indexSqls.add(cursor.getString(0))
@@ -1505,8 +1505,47 @@ abstract class InAppDb : RoomDatabase() {
                 }
             }
         }
-
+        private val MIGRATION_44_45 = object : Migration(44, 45) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val tbScreeningColumns = listOf(
+                    "chestPain INTEGER DEFAULT NULL",
+                    "shortnessOfBreath INTEGER DEFAULT NULL",
+                    "fatigue INTEGER DEFAULT NULL",
+                    "failureToGainWeightInChildren INTEGER DEFAULT NULL",
+                    "decreasedActivityOrPlayfulnessInChildren INTEGER DEFAULT NULL",
+                    "otherSymptoms INTEGER DEFAULT NULL"
+                )
+                tbScreeningColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "TB_SCREENING", columnName)) {
+                        database.execSQL("ALTER TABLE TB_SCREENING ADD COLUMN $columnDefinition")
+                    }
+                }
+                recreateBenBasicCacheView(database)
+            }
+        }
         private val MIGRATION_45_46 = object : Migration(45, 46) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val beneficiaryColumns = listOf(
+                    "isAvailableForCamp INTEGER NOT NULL DEFAULT 1",
+                    "reasonForNotAttendingCamp TEXT DEFAULT NULL",
+                    "otherReasonForNotAttendingCamp TEXT DEFAULT NULL",
+                    "screeningStatus TEXT NOT NULL DEFAULT 'UNSCREENED'",
+                    "symptomsScreenedDate INTEGER DEFAULT NULL",
+                    "chestXrayDoneDate INTEGER DEFAULT NULL",
+                    "trunatTestDoneDate INTEGER DEFAULT NULL"
+                )
+                beneficiaryColumns.forEach { columnDefinition ->
+                    val columnName = columnDefinition.substringBefore(" ")
+                    if (!columnExists(database, "BENEFICIARY", columnName)) {
+                        database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN $columnDefinition")
+                    }
+                }
+                recreateBenBasicCacheView(database)
+            }
+        }
+
+        private val MIGRATION_46_47 = object : Migration(46, 47) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
                     "CREATE TABLE IF NOT EXISTS `VISIT_CATEGORY_MASTER` (`visitCategoryId` INTEGER NOT NULL, `visitCategory` TEXT NOT NULL, PRIMARY KEY(`visitCategoryId`))"
@@ -1521,7 +1560,7 @@ abstract class InAppDb : RoomDatabase() {
         // distinguishable from the generic isConfirmed/isTBConfirmed flags (isDrTbConfirmed, set
         // only for RIF DR-TB results), and RIF's own "Not Conducted" flow needs its own reason
         // columns distinct from NAAT's reasonNotConductedNaat/Other (which stay MTB-only).
-        private val MIGRATION_46_47 = object : Migration(46, 47) {
+        private val MIGRATION_47_48 = object : Migration(47, 48) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 val columns = listOf(
                     "isDrTbConfirmed INTEGER",
@@ -1538,16 +1577,8 @@ abstract class InAppDb : RoomDatabase() {
         }
 
 
-        private val MIGRATION_47_48 = object : Migration(47, 48) {
+        private val MIGRATION_48_49 = object : Migration(48, 49) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                // Some feature-branch builds shipped version 47 without the 44->47 schema
-                // changes (e.g. missing TB_SCREENING symptom columns) — re-apply them first.
-                // Each of 44_45/45_46/46_47 is itself guarded (columnExists()/CREATE TABLE IF
-                // NOT EXISTS), so this is a safe no-op on a device that already has them.
-                MIGRATION_44_45.migrate(database)
-                MIGRATION_45_46.migrate(database)
-                MIGRATION_46_47.migrate(database)
-
                 listOf("xrayOrderStatus", "trueNatOrderStatus", "rifOrderStatus").forEach { column ->
                     database.execSQL(
                         "UPDATE TB_DIAGNOSTICS SET $column = 'PENDING' WHERE UPPER($column) = 'AWAITING_TEST_COMPLETION'"
@@ -1559,7 +1590,7 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_48_49 = object : Migration(48, 49) {
+        private val MIGRATION_49_50 = object : Migration(49, 50) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 val columns = listOf(
                     "xrayManualResultPendingSync INTEGER",
@@ -1587,7 +1618,7 @@ abstract class InAppDb : RoomDatabase() {
                 }
             }
         }
-        private val MIGRATION_49_50 = object : Migration(49, 50) {
+        private val MIGRATION_50_51 = object : Migration(50, 51) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
                     "CREATE INDEX IF NOT EXISTS `ind_ben_draft_created` ON `BENEFICIARY` (`isDraft`, `createdDate`)"
@@ -1600,12 +1631,25 @@ abstract class InAppDb : RoomDatabase() {
         // it never tracked whether a sample was actually collected). Split it: isReferredForSputum
         // is the new home for the referral answer, backfilled from the old isSputumCollected
         // values; isSputumCollected now holds the answer to the new "Is sputum collected?" question.
-        private val MIGRATION_50_51 = object : Migration(50, 51) {
+        private val MIGRATION_51_52 = object : Migration(51, 52) {
             override fun migrate(database: SupportSQLiteDatabase) {
+                // Backfill only when the column is added here. A DB that already ran the former
+                // 50->51 (same change, before renumbering) holds real, distinct referral answers;
+                // re-copying isSputumCollected would overwrite them.
                 if (!columnExists(database, "TB_DIAGNOSTICS", "isReferredForSputum")) {
                     database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN isReferredForSputum INTEGER")
+                    database.execSQL("UPDATE TB_DIAGNOSTICS SET isReferredForSputum = isSputumCollected")
                 }
-                database.execSQL("UPDATE TB_DIAGNOSTICS SET isReferredForSputum = isSputumCollected")
+            }
+        }
+
+        // Repair: release-2.3 builds at v45-v47 (before the 2.2 merge) never ran the TB_SCREENING
+        // symptom columns step that 2.2 shipped in 44->45, and the renumbered 44_45/45_46 are
+        // skipped for DBs already past those versions. Re-apply both idempotently.
+        private val MIGRATION_52_53 = object : Migration(52, 53) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                MIGRATION_44_45.migrate(database)
+                MIGRATION_45_46.migrate(database)
             }
         }
 
@@ -1613,44 +1657,44 @@ abstract class InAppDb : RoomDatabase() {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(
                 "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId" +
-                    ", b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod" +
-                    ", b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus" +
-                    ", b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId" +
-                    ", b.isNewAbha" +
-                    ", IFNULL(cbac.benId IS NOT NULL, 0) as cbacFilled, cbac.syncState as cbacSyncState" +
-                    ", 0 as cdrFilled, NULL as cdrSyncState" +
-                    ", 0 as mdsrFilled, NULL as mdsrSyncState" +
-                    ", NULL as pmsmaSyncState, 0 as pmsmaFilled" +
-                    ", 0 as hbncFilled" +
-                    ", 0 as hbycFilled" +
-                    ", 0 as pwrFilled, NULL as pwrSyncState" +
-                    ", NULL as doSyncState, NULL as irSyncState, NULL as crSyncState" +
-                    ", 0 as ecrFilled, 0 as ectFilled" +
-                    ", 0 as isMdsr" +
-                    ", IFNULL(tbsn.benId IS NOT NULL, 0) as tbsnFilled, tbsn.syncState as tbsnSyncState" +
-                    ", IFNULL(tbsp.benId IS NOT NULL, 0) as tbspFilled, tbsp.syncState as tbspSyncState" +
-                    ", 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled" +
-                    ", 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled" +
-                    ", NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState" +
-                    ", 0 as isDelivered, 0 as pwHrp" +
-                    ", 0 as irFilled, 0 as crFilled, 0 as doFilled" +
-                    ", b.isNonHH" +
-                    ", b.isAvailableForCamp" +
-                    ", b.reasonForNotAttendingCamp" +
-                    ", b.otherReasonForNotAttendingCamp" +
-                    ", b.screeningStatus" +
-                    ", b.symptomsScreenedDate" +
-                    ", b.chestXrayDoneDate" +
-                    ", b.trunatTestDoneDate" +
-                    ", b.placeOfCurrentLiving" +
-                    ", b.otherPlaceOfCurrentLiving" +
-                    ", b.institutionName" +
-                    " FROM BENEFICIARY b " +
-                    "LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId " +
-                    "LEFT OUTER JOIN CBAC cbac ON b.beneficiaryId = cbac.benId " +
-                    "LEFT OUTER JOIN TB_SCREENING tbsn ON b.beneficiaryId = tbsn.benId " +
-                    "LEFT OUTER JOIN TB_SUSPECTED tbsp ON b.beneficiaryId = tbsp.benId " +
-                    "WHERE b.isDraft = 0 GROUP BY b.beneficiaryId ORDER BY b.updatedDate DESC"
+                        ", b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod" +
+                        ", b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus" +
+                        ", b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId" +
+                        ", b.isNewAbha" +
+                        ", IFNULL(cbac.benId IS NOT NULL, 0) as cbacFilled, cbac.syncState as cbacSyncState" +
+                        ", 0 as cdrFilled, NULL as cdrSyncState" +
+                        ", 0 as mdsrFilled, NULL as mdsrSyncState" +
+                        ", NULL as pmsmaSyncState, 0 as pmsmaFilled" +
+                        ", 0 as hbncFilled" +
+                        ", 0 as hbycFilled" +
+                        ", 0 as pwrFilled, NULL as pwrSyncState" +
+                        ", NULL as doSyncState, NULL as irSyncState, NULL as crSyncState" +
+                        ", 0 as ecrFilled, 0 as ectFilled" +
+                        ", 0 as isMdsr" +
+                        ", IFNULL(tbsn.benId IS NOT NULL, 0) as tbsnFilled, tbsn.syncState as tbsnSyncState" +
+                        ", IFNULL(tbsp.benId IS NOT NULL, 0) as tbspFilled, tbsp.syncState as tbspSyncState" +
+                        ", 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled" +
+                        ", 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled" +
+                        ", NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState" +
+                        ", 0 as isDelivered, 0 as pwHrp" +
+                        ", 0 as irFilled, 0 as crFilled, 0 as doFilled" +
+                        ", b.isNonHH" +
+                        ", b.isAvailableForCamp" +
+                        ", b.reasonForNotAttendingCamp" +
+                        ", b.otherReasonForNotAttendingCamp" +
+                        ", b.screeningStatus" +
+                        ", b.symptomsScreenedDate" +
+                        ", b.chestXrayDoneDate" +
+                        ", b.trunatTestDoneDate" +
+                        ", b.placeOfCurrentLiving" +
+                        ", b.otherPlaceOfCurrentLiving" +
+                        ", b.institutionName" +
+                        " FROM BENEFICIARY b " +
+                        "LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId " +
+                        "LEFT OUTER JOIN CBAC cbac ON b.beneficiaryId = cbac.benId " +
+                        "LEFT OUTER JOIN TB_SCREENING tbsn ON b.beneficiaryId = tbsn.benId " +
+                        "LEFT OUTER JOIN TB_SUSPECTED tbsp ON b.beneficiaryId = tbsp.benId " +
+                        "WHERE b.isDraft = 0 GROUP BY b.beneficiaryId ORDER BY b.updatedDate DESC"
             )
         }
 
@@ -1700,42 +1744,6 @@ abstract class InAppDb : RoomDatabase() {
                 if (!columnExists(database, "TB_DIAGNOSTICS", "rifOrderStatus")) {
                     database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN rifOrderStatus TEXT DEFAULT NULL")
                 }
-            }
-        }
-
-        private val MIGRATION_44_45 = object : Migration(44, 45) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                val beneficiaryColumns = listOf(
-                    "isAvailableForCamp INTEGER NOT NULL DEFAULT 1",
-                    "reasonForNotAttendingCamp TEXT DEFAULT NULL",
-                    "otherReasonForNotAttendingCamp TEXT DEFAULT NULL",
-                    "screeningStatus TEXT NOT NULL DEFAULT 'UNSCREENED'",
-                    "symptomsScreenedDate INTEGER DEFAULT NULL",
-                    "chestXrayDoneDate INTEGER DEFAULT NULL",
-                    "trunatTestDoneDate INTEGER DEFAULT NULL"
-                )
-                beneficiaryColumns.forEach { columnDefinition ->
-                    val columnName = columnDefinition.substringBefore(" ")
-                    if (!columnExists(database, "BENEFICIARY", columnName)) {
-                        database.execSQL("ALTER TABLE BENEFICIARY ADD COLUMN $columnDefinition")
-                    }
-                }
-
-                val tbScreeningColumns = listOf(
-                    "chestPain INTEGER DEFAULT NULL",
-                    "shortnessOfBreath INTEGER DEFAULT NULL",
-                    "fatigue INTEGER DEFAULT NULL",
-                    "failureToGainWeightInChildren INTEGER DEFAULT NULL",
-                    "decreasedActivityOrPlayfulnessInChildren INTEGER DEFAULT NULL",
-                    "otherSymptoms INTEGER DEFAULT NULL"
-                )
-                tbScreeningColumns.forEach { columnDefinition ->
-                    val columnName = columnDefinition.substringBefore(" ")
-                    if (!columnExists(database, "TB_SCREENING", columnName)) {
-                        database.execSQL("ALTER TABLE TB_SCREENING ADD COLUMN $columnDefinition")
-                    }
-                }
-                recreateBenBasicCacheView(database)
             }
         }
 
@@ -1923,6 +1931,8 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_48_49)
                         .addMigrations(MIGRATION_49_50)
                         .addMigrations(MIGRATION_50_51)
+                        .addMigrations(MIGRATION_51_52)
+                        .addMigrations(MIGRATION_52_53)
                         .fallbackToDestructiveMigration()
                         .build()
 

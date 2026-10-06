@@ -17,6 +17,9 @@
     <string name="error_login_username_required">Username required</string>
     <string name="error_login_password_required">Password required</string>
     <string name="error_login_failed">Login failed. Please try again.</string>
+    <string name="error_login_remaining_attempts">Invalid username or password. Remaining attempts: %1$d</string>
+    <string name="error_login_last_attempt">Invalid username or password. Only 1 attempt remaining. If you enter a wrong password again, your account will be locked.</string>
+    <string name="error_login_account_locked">Your account has been locked due to multiple failed login attempts. Please try again tomorrow or contact your administrator.</string>
     <string name="error_login_unable_to_reach_server">Unable to connect to the server.</string>
     <string name="error_login_server_refused">Server refused connection.</string>
     <string name="error_login_generic">Something went wrong. Please try again later.</string>

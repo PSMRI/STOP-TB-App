@@ -168,4 +168,8 @@
     <string name="hint_other_place">अन्य स्थान *</string>
     <string name="hint_institution_name">संस्था का नाम *</string>
 
+    <string name="all_non_household_beneficiaries">सभी गैर-परिवार लाभार्थी</string>
+
+
+
 </resources>
