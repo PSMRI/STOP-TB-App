@@ -259,7 +259,7 @@
         android:paddingBottom="120dp"
         app:layout_constraintWidth_max="760dp"
         app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-        app:layout_constraintBottom_toTopOf="@id/btn_next_page"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/filterText"
@@ -273,7 +273,7 @@
         android:layout_marginStart="32dp"
         android:layout_marginEnd="32dp"
         app:layout_constraintWidth_max="760dp"
-        app:layout_constraintBottom_toTopOf="@id/btn_next_page"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/topLayout">
@@ -287,20 +287,6 @@
             android:text="@string/no_records_found"
             android:textAppearance="@style/TextAppearance.Material3.TitleLarge" />
     </FrameLayout>
-
-<!--    <com.google.android.material.button.MaterialButton-->
-<!--        android:id="@+id/btn_next_page"-->
-<!--        android:layout_width="0dp"-->
-<!--        android:layout_height="wrap_content"-->
-<!--        android:layout_margin="@dimen/margin_normal"-->
-<!--        android:layout_marginBottom="24dp"-->
-<!--        android:padding="@dimen/padding_normal"-->
-<!--        android:text="@string/btn_text_frag_home_nhhr"-->
-<!--        android:textAppearance="@style/TextAppearance.Material3.BodyLarge"-->
-<!--        app:layout_constraintBottom_toBottomOf="parent"-->
-<!--        app:layout_constraintEnd_toEndOf="parent"-->
-<!--        app:layout_constraintStart_toStartOf="parent"-->
-<!--        app:layout_constraintWidth_max="760dp" />-->
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/btn_next_page"
