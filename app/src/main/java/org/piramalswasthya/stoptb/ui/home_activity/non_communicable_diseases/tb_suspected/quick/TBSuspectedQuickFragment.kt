@@ -87,7 +87,7 @@ class TBSuspectedQuickFragment : Fragment() {
             if (!(isXrayDone || isNaatDone)) {
                 binding.btnSubmit.visibility = if (it) View.VISIBLE else View.GONE
                 if (!viewModel.viewOnly && (viewModel.referralType == 6 || viewModel.referralType == 7)) {
-                    binding.btnSubmit.text = "SUBMIT REFERRAL"
+                    binding.btnSubmit.text = getString(R.string.btn_submit)
                 }
             }
         }
@@ -143,25 +143,19 @@ class TBSuspectedQuickFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
+        // Title/icon now match the specific test this screen is for (same icons the dashboard
+        // uses for its Chest X-Ray / TrueNat tiles) instead of a generic "Diagnostics" label —
+        // RIF shares the TrueNat icon/title since it's the same referralType (7) and the same
+        // order family as TrueNat, just a follow-on sub-test.
+        val (icon, title) = if (viewModel.referralType == 6) {
+            R.drawable.ic_health_xray to getString(R.string.ben_card_chest_xray)
+        } else {
+            R.drawable.ic_truenat_device to getString(R.string.ben_card_truenat)
+        }
         activity?.let {
             when (it) {
-//                is HomeActivity -> it.updateActionBar(
-//                    R.drawable.ic__ncd,
-//                    getString(R.string.tb_suspected_quick_title)
-//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
-//                is VolunteerActivity -> it.updateActionBar(
-//                    R.drawable.ic__ncd,
-//                    getString(R.string.tb_suspected_quick_title)
-//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
-
-                is HomeActivity -> it.updateActionBar(
-                    R.drawable.ic__ncd,
-                    getString(R.string.tb_suspected_quick_title)
-                )
-                is VolunteerActivity -> it.updateActionBar(
-                    R.drawable.ic__ncd,
-                    getString(R.string.tb_suspected_quick_title)
-                )
+                is HomeActivity -> it.updateActionBar(icon, title)
+                is VolunteerActivity -> it.updateActionBar(icon, title)
             }
         }
     }

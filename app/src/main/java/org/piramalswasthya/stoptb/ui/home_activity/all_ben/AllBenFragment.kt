@@ -872,9 +872,17 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 getString(R.string.icon_title_ben)
             }
 
+            val icon = if (args.source == 6) {
+                R.drawable.ic_health_xray
+            } else if (args.source == 7) {
+                R.drawable.ic_truenat_device
+            } else {
+                R.drawable.ic__ben
+            }
+
             when (it) {
-                is HomeActivity -> it.updateActionBar(R.drawable.ic__ben, title)
-                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ben, title)
+                is HomeActivity -> it.updateActionBar(icon, title)
+                is VolunteerActivity -> it.updateActionBar(icon, title)
             }
         }
     }

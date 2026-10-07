@@ -104,6 +104,10 @@
     <string name="tb_ai_cough_assessment_result">AI Cough Assessment result</string>
     <string name="tb_naat_conducted">True NAT conducted?</string>
     <string name="tb_naat_result">True NAT result</string>
+    <string name="tb_quick_naat_conducted">Is Truenat - MTB Test Conducted?</string>
+    <string name="tb_quick_naat_result">Truenat - MTB Test Result</string>
+    <string name="tb_quick_rif_conducted">Is Truenat - RIF Test Conducted?</string>
+    <string name="tb_quick_rif_result">Truenat - RIF Test Result</string>
     <string name="tb_liquid_culture_conducted">Is Liquid culture conducted?</string>
     <string name="tb_liquid_culture_result">Liquid Culture result</string>
     <string name="tb_suspected_quick_title">Diagnostics</string>

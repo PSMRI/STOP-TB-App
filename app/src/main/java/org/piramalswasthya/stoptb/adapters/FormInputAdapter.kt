@@ -549,16 +549,23 @@ class FormInputAdapter(
 
             binding.rg.apply {
                 item.entries?.let { items ->
+                    val isVertical = item.orientation == LinearLayout.VERTICAL
                     orientation = item.orientation ?: LinearLayout.HORIZONTAL
-                    weightSum = items.size.toFloat()
-                    items.forEach {
+                    weightSum = if (isVertical) 0f else items.size.toFloat()
+                    items.forEachIndexed { index, it ->
                         val rdBtn = RadioButton(this.context)
                         rdBtn.layoutParams = RadioGroup.LayoutParams(
+                            if (isVertical) RadioGroup.LayoutParams.MATCH_PARENT else RadioGroup.LayoutParams.WRAP_CONTENT,
                             RadioGroup.LayoutParams.WRAP_CONTENT,
-                            RadioGroup.LayoutParams.WRAP_CONTENT,
-                            1.0F
+                            if (isVertical) 0f else 1.0F
                         ).apply {
-                            gravity = Gravity.CENTER_HORIZONTAL
+                            gravity = if (isVertical) Gravity.START else Gravity.CENTER_HORIZONTAL
+                            if (isVertical && index > 0) {
+                                topMargin = binding.root.resources.getDimensionPixelSize(R.dimen.padding_normal)
+                            }
+                        }
+                        if (isVertical) {
+                            rdBtn.gravity = Gravity.CENTER_VERTICAL or Gravity.START
                         }
                         rdBtn.id = View.generateViewId()
                         val colorStateList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

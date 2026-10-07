@@ -1,6 +1,7 @@
 package org.piramalswasthya.stoptb.configuration
 
 import android.content.Context
+import android.widget.LinearLayout
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.model.AgeUnit
@@ -122,7 +123,8 @@ class TBSuspectedQuickDataset(
     // binary — see model.ChestXrayResult for the mapping used at save time.
     val digitalChestXrayResult = FormElement(
         id = 5,
-        inputType = InputType.DROPDOWN,
+        inputType = InputType.RADIO,
+        orientation = LinearLayout.VERTICAL,
         title = resources.getString(R.string.tb_digital_chest_xray_result),
         arrayId = R.array.tb_digital_xray_result,
         entries = resources.getStringArray(R.array.tb_digital_xray_result),
@@ -184,7 +186,7 @@ class TBSuspectedQuickDataset(
     val trueNatConducted = FormElement(
         id = 3,
         inputType = InputType.RADIO,
-        title = resources.getString(R.string.tb_naat_conducted),
+        title = resources.getString(R.string.tb_quick_naat_conducted),
         entries = yesNoEntries,
         required = true,
         hasDependants = true
@@ -210,8 +212,9 @@ class TBSuspectedQuickDataset(
 
     private val trueNatResult = FormElement(
         id = 6,
-        inputType = InputType.DROPDOWN,
-        title = resources.getString(R.string.tb_naat_result),
+        inputType = InputType.RADIO,
+        orientation = LinearLayout.VERTICAL,
+        title = resources.getString(R.string.tb_quick_naat_result),
         arrayId = R.array.tb_truenat_mtb_result,
         entries = resources.getStringArray(R.array.tb_truenat_mtb_result),
         required = false,
@@ -220,8 +223,9 @@ class TBSuspectedQuickDataset(
 
     val trueNatRifResult = FormElement(
         id = 20,
-        inputType = InputType.DROPDOWN,
-        title = "TrueNat Rif Test Result",
+        inputType = InputType.RADIO,
+        orientation = LinearLayout.VERTICAL,
+        title = resources.getString(R.string.tb_quick_rif_result),
         arrayId = R.array.tb_truenat_rif_result,
         entries = resources.getStringArray(R.array.tb_truenat_rif_result),
         required = false
@@ -230,7 +234,7 @@ class TBSuspectedQuickDataset(
     val rifConducted = FormElement(
         id = 21,
         inputType = InputType.RADIO,
-        title = "Is Truenat Rif Test Conducted?",
+        title = resources.getString(R.string.tb_quick_rif_conducted),
         entries = yesNoEntries,
         required = true,
         hasDependants = true
@@ -329,7 +333,7 @@ class TBSuspectedQuickDataset(
             digitalChestXrayResult.inputType = InputType.TEXT_VIEW
             digitalChestXrayResult.value = "Waiting for Result"
         } else {
-            digitalChestXrayResult.inputType = InputType.DROPDOWN
+            digitalChestXrayResult.inputType = InputType.RADIO
             digitalChestXrayResult.value = null
         }
 
@@ -365,7 +369,7 @@ class TBSuspectedQuickDataset(
             trueNatResult.inputType = InputType.TEXT_VIEW
             trueNatResult.value = "Waiting for Result"
         } else {
-            trueNatResult.inputType = InputType.DROPDOWN
+            trueNatResult.inputType = InputType.RADIO
             trueNatResult.value = null
         }
 
@@ -394,7 +398,7 @@ class TBSuspectedQuickDataset(
             trueNatRifResult.inputType = InputType.TEXT_VIEW
             trueNatRifResult.value = "Waiting for Result"
         } else {
-            trueNatRifResult.inputType = InputType.DROPDOWN
+            trueNatRifResult.inputType = InputType.RADIO
             trueNatRifResult.value = null
         }
 
@@ -1220,7 +1224,7 @@ class TBSuspectedQuickDataset(
                 }
             }
         } else {
-            digitalChestXrayResult.inputType = InputType.DROPDOWN
+            digitalChestXrayResult.inputType = InputType.RADIO
             val showXrayResult = shouldShowDigitalChestXray() && isYes(digitalChestXrayConducted)
             digitalChestXrayResult.isEnabled = showXrayResult && !lockDigitalChestXray
             digitalChestXrayResult.required = showXrayResult && !lockDigitalChestXray
@@ -1348,7 +1352,7 @@ class TBSuspectedQuickDataset(
                 }
             }
         } else {
-            trueNatResult.inputType = InputType.DROPDOWN
+            trueNatResult.inputType = InputType.RADIO
             val showTrueNatResult = shouldShowTrueNatConducted() && isYes(trueNatConducted)
             trueNatResult.isEnabled = showTrueNatResult && !lockTrueNat
             trueNatResult.required = showTrueNatResult && !lockTrueNat
@@ -1420,7 +1424,7 @@ class TBSuspectedQuickDataset(
                 }
             }
         } else {
-            trueNatRifResult.inputType = InputType.DROPDOWN
+            trueNatRifResult.inputType = InputType.RADIO
             val showRifResult = showRif && isYes(rifConducted)
             trueNatRifResult.isEnabled = showRifResult && !lockRif
             trueNatRifResult.required = showRifResult && !lockRif
