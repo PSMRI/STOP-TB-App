@@ -473,13 +473,35 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             }
         }
 
-        binding.btnExpandSearchBlock.setOnClickListener {
-            viewModel.expandSearchToBlock()
-        }
-
         var lastSearchGeneration = -1
         var settledForGeneration = false
         var currentlyShowingEmpty = false
+        // Tracks the search generation when "Search in other villages" is tapped, while the expanded search is running.
+        var expandPendingSinceGeneration: Int? = null
+
+        binding.btnExpandSearchBlock.setOnClickListener {
+            expandPendingSinceGeneration = viewModel.searchGeneration.value
+            currentlyShowingEmpty = false
+            binding.flEmpty.visibility = View.GONE
+            binding.btnExpandSearchBlock.visibility = View.GONE
+            binding.pbSearchLoading.visibility = View.VISIBLE
+            viewModel.expandSearchToBlock()
+        }
+
+        lifecycleScope.launch {
+            // Waits for the new PagingData to reach the adapter, avoiding stale state from the previous search.
+            benAdapter.onPagesUpdatedFlow.collect {
+                val pendingGeneration = expandPendingSinceGeneration ?: return@collect
+                if (viewModel.searchGeneration.value <= pendingGeneration) return@collect
+                expandPendingSinceGeneration = null
+                settledForGeneration = true
+                val isEmpty = benAdapter.itemCount == 0
+                binding.pbSearchLoading.visibility = View.GONE
+                binding.flEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
+                binding.btnExpandSearchBlock.visibility = View.GONE
+                currentlyShowingEmpty = isEmpty
+            }
+        }
 
         lifecycleScope.launch {
             combine(
@@ -499,6 +521,11 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         // A genuinely new search started (typed text/filter/expand changed) - reset.
                         lastSearchGeneration = state.generation
                         settledForGeneration = false
+                    }
+
+                    // Expanded search still running - keep the loader; onPagesUpdatedFlow above settles the UI.
+                    if (expandPendingSinceGeneration != null) {
+                        return@collectLatest
                     }
 
                     if (settledForGeneration && state.isLoading) {

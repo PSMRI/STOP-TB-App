@@ -104,7 +104,7 @@ class AllBenViewModel @Inject constructor(
      * not background reloads, so the UI can distinguish a fresh search from a silent re-run.
      * */
     private val _searchGeneration = MutableStateFlow(0)
-    val searchGeneration: Flow<Int> = _searchGeneration
+    val searchGeneration: StateFlow<Int> = _searchGeneration.asStateFlow()
 
     init {
         fetchBeneficiaryStatuses()
