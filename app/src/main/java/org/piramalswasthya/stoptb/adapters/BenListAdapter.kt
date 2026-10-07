@@ -311,7 +311,7 @@ class BenListAdapter(
                         binding.tvRifErrorMsg.text = ctx.getString(R.string.error_message) + tbDiag?.errorMsgRif
                     }
                     binding.btnRifPrimary.visibility = View.VISIBLE
-                    binding.btnRifPrimary.text = "Retry Referral"
+                    binding.btnRifPrimary.text = ctx.getString(R.string.order_status_retry_referral)
                     binding.btnRifPrimary.setBackgroundTintList(ContextCompat.getColorStateList(ctx, android.R.color.holo_red_dark))
                     val enabled = canActOnReferral && !retryingBenIds.contains(item.benId)
                     binding.btnRifPrimary.isEnabled = enabled
@@ -345,6 +345,22 @@ class BenListAdapter(
                     binding.btnRifPrimary.alpha = if (reorderEnabled) 1.0f else 0.5f
                     binding.btnRifPrimary.setOnClickListener {
                         clickListener?.onClickOrderAction(item, "REORDER", "MDR_RIF")
+                    }
+                }
+                tbDiag?.rifOrderId.isNullOrBlank() -> {
+                    clickListener?.onClickOrderAction(item, "CHECK_PUSH_ACTIVE", "MDR_RIF")
+                    if (!tbDiag?.errorMsgRif.isNullOrBlank()) {
+                        binding.tvRifErrorMsg.visibility = View.VISIBLE
+                        binding.tvRifErrorMsg.text = ctx.getString(R.string.error_message) + tbDiag?.errorMsgRif
+                    }
+                    binding.btnRifPrimary.visibility = View.VISIBLE
+                    binding.btnRifPrimary.text = ctx.getString(R.string.order_status_retry_referral)
+                    binding.btnRifPrimary.setBackgroundTintList(ContextCompat.getColorStateList(ctx, android.R.color.holo_red_dark))
+                    val enabled = canActOnReferral && !retryingBenIds.contains(item.benId)
+                    binding.btnRifPrimary.isEnabled = enabled
+                    binding.btnRifPrimary.alpha = if (enabled) 1.0f else 0.5f
+                    binding.btnRifPrimary.setOnClickListener {
+                        clickListener?.onClickOrderAction(item, "RETRY_PUSH", "MDR_RIF")
                     }
                 }
                 else -> {
@@ -738,13 +754,18 @@ class BenListAdapter(
                                 }
                                 status.equals(OrderStatus.FAILED.name, ignoreCase = true) -> {
                                     bindErrorMsg(tbDiag?.errorMsgXray)
-                                    ButtonConfig("Retry Referral", android.R.color.holo_red_dark, "RETRY_PUSH", "XRAY_CHEST")
+                                    ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, "RETRY_PUSH", "XRAY_CHEST")
                                 }
                                 status.equals(OrderStatus.COMPLETED.name, ignoreCase = true) -> {
                                     ButtonConfig("VIEW RESULT", android.R.color.holo_green_dark, "VIEW", "XRAY_CHEST")
                                 }
                                 status.equals(OrderStatus.CLOSED.name, ignoreCase = true) -> {
                                     ButtonConfig("Create New X-Ray Order", android.R.color.holo_blue_dark, "REORDER", "XRAY_CHEST")
+                                }
+                                tbDiag?.xrayOrderId.isNullOrBlank() -> {
+                                    clickListener?.onClickOrderAction(item, "CHECK_PUSH_ACTIVE", "XRAY_CHEST")
+                                    bindErrorMsg(tbDiag?.errorMsgXray)
+                                    ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, "RETRY_PUSH", "XRAY_CHEST")
                                 }
                                 else -> {
                                     binding.btnVitalScreenSecondary.visibility = View.VISIBLE
@@ -776,7 +797,7 @@ class BenListAdapter(
                                 }
                                 status.equals(OrderStatus.FAILED.name, ignoreCase = true) -> {
                                     bindErrorMsg(tbDiag?.errorMsgTrueNat)
-                                    ButtonConfig("Retry Referral", android.R.color.holo_red_dark, "RETRY_PUSH", "SPUTUM_TRUENAT")
+                                    ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, "RETRY_PUSH", "SPUTUM_TRUENAT")
                                 }
                                 status.equals(OrderStatus.COMPLETED.name, ignoreCase = true) -> {
                                     // Collapses to the compact one-line summary strip (bound
@@ -787,6 +808,11 @@ class BenListAdapter(
                                 }
                                 status.equals(OrderStatus.CLOSED.name, ignoreCase = true) -> {
                                     ButtonConfig("Create New Order", android.R.color.holo_blue_dark, "REORDER", "SPUTUM_TRUENAT")
+                                }
+                                tbDiag?.trueNatOrderId.isNullOrBlank() -> {
+                                    clickListener?.onClickOrderAction(item, "CHECK_PUSH_ACTIVE", "SPUTUM_TRUENAT")
+                                    bindErrorMsg(tbDiag?.errorMsgTrueNat)
+                                    ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, "RETRY_PUSH", "SPUTUM_TRUENAT")
                                 }
                                 else -> {
                                     // PENDING / MANUAL_ENTRY (or no order status yet) —

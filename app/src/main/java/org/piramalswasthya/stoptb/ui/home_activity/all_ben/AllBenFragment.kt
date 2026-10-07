@@ -355,17 +355,12 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         "RETRY_PUSH" -> {
                             viewModel.retryTest(item.benId, orderType, requireContext())
                         }
+                        "CHECK_PUSH_ACTIVE" -> {
+                            viewModel.checkAndTrackInFlightPush(item.benId, requireContext())
+                        }
                         "RETRY_RIF_POLL" -> {
                             viewModel.retryResultFetch(item.benId, "MDR_RIF", requireContext())
                         }
-                        // "VIEW"/"VIEW_RIF" used to check naatResult == "Invalid" /
-                        // trueNatRifResult == "Indeterminate" here and offer an AlertDialog-based
-                        // "REPEAT TEST" shortcut (calling the now-unused viewModel.repeatTest()).
-                        // TrueNat & RIF order lifecycle redesign: fully superseded by the
-                        // Closed-status-driven "Create New Order" button (the "REORDER" action
-                        // above) — Invalid/Error and Indeterminate are both terminal order states
-                        // now (Closed / Completed respectively), not something a result-viewing
-                        // dialog decides to repeat. Both actions are now plain navigation.
                         "VIEW" -> {
                             findNavController().navigate(
                                 AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
@@ -898,12 +893,9 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     override fun onResume() {
         super.onResume()
         updateToolbarTitle()
+        viewModel.invalidateCheckedNoPushBenIds()
         viewModel.fetchBeneficiaryStatuses()
-
-        // If TBSuspectedQuickFragment (Diagnosis) signalled that the examine flow
-        // is fully complete, clear pendingExamineBenId so the BottomSheet does NOT
-        // re-open — otherwise the back button would have to dismiss the BottomSheet
-        // before it could navigate away from this screen.
+        
         val sh = findNavController().currentBackStackEntry?.savedStateHandle
         if (sh?.remove<Boolean>("examine_flow_done") == true) {
             pendingExamineBenId = null
@@ -939,9 +931,17 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 getString(R.string.icon_title_ben)
             }
 
+            val icon = if (args.source == 6) {
+                R.drawable.ic_health_xray
+            } else if (args.source == 7) {
+                R.drawable.ic_truenat_device
+            } else {
+                R.drawable.ic__ben
+            }
+
             when (it) {
-                is HomeActivity -> it.updateActionBar(R.drawable.ic__ben, title)
-                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ben, title)
+                is HomeActivity -> it.updateActionBar(icon, title)
+                is VolunteerActivity -> it.updateActionBar(icon, title)
             }
         }
     }

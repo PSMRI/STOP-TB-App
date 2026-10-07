@@ -13,6 +13,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
@@ -1535,11 +1536,12 @@ class TBRepo @Inject constructor(
         resultSummary: String? = null,
         // Null resultSummary + a reason here closes the order (X-Ray/TrueNat/RIF alike) instead
         // of completing it. Sent to the backend as reasonToClose.
-        reasonForRefusal: String? = null
+        reasonForRefusal: String? = null,
+        isRetryAfterOrderCreation: Boolean = false
     ):NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
             val ben = benDao.getBen(benId)
-                ?: return@withContext NetworkResponse.Error("Beneficiary not found")
+                ?: return@withContext NetworkResponse.Error(context.getString(R.string.error_beneficiary_not_found))
             val targetBenId = ben.beneficiaryId
 
             val apiOrderType = if (orderType.equals("SPUTUM_TRUENAT", ignoreCase = true)) "MTB" else orderType
@@ -1582,13 +1584,42 @@ class TBRepo @Inject constructor(
                             )
                             tbDao.saveTbDiagnostics(cache)
                         }
-                        return@withContext NetworkResponse.Success("Result submitted successfully")
+                        return@withContext NetworkResponse.Success(context.getString(R.string.diagnostic_manual_result_success))
                     } else {
+                        val errMsg = responseBody.errorMessage ?: context.getString(R.string.error_manual_result_rejected)
+                        if (!isRetryAfterOrderCreation &&
+                            errMsg.contains("DiagnosticOrder not found for beneficiaryId=")
+                        ) {
+                            if (WorkerUtils.isDiagnosticOrderPushActive(context, benId)) {
+                                saveManualResultPendingSync(benId, orderType, resultSummary, reasonForRefusal, localResult)
+                                return@withContext NetworkResponse.Success("PENDING_SYNC")
+                            }
+                            val orderResult = createOrder(benId, orderType)
+                            if (orderResult is NetworkResponse.Success) {
+                                // A real order exists now — retry this exact submission against it, once.
+                                return@withContext submitManualResult(
+                                    benId, orderType, resultSummary, reasonForRefusal,
+                                    isRetryAfterOrderCreation = true
+                                )
+                            }
+                            val orderErrMsg = (orderResult as? NetworkResponse.Error)?.message
+                            // Compared against the same localized resources createOrder() itself
+                            // returns below — a raw English literal here would stop matching as
+                            // soon as the device locale changes createOrder()'s actual message.
+                            val isDefinitiveOrderFailure = orderErrMsg == context.getString(R.string.error_no_user_logged_in) ||
+                                orderErrMsg == context.getString(R.string.error_beneficiary_not_found) ||
+                                orderErrMsg == context.getString(R.string.error_beneficiary_id_invalid)
+                            if (isDefinitiveOrderFailure) {
+                                return@withContext NetworkResponse.Error(
+                                    context.getString(R.string.diagnostic_order_creation_failed, orderErrMsg)
+                                )
+                            }
+                            saveManualResultPendingSync(benId, orderType, resultSummary, reasonForRefusal, localResult)
+                            return@withContext NetworkResponse.Success("PENDING_SYNC")
+                        }
                         // A definitive rejection (e.g. already COMPLETED) won't succeed on retry —
                         // surface it as a real error instead of queuing for offline-first retry.
-                        return@withContext NetworkResponse.Error(
-                            responseBody.errorMessage ?: "Manual result submission was rejected"
-                        )
+                        return@withContext NetworkResponse.Error(errMsg)
                     }
                 } else {
                     // Couldn't confirm anything either way — treat like an unreachable hub.
@@ -1839,16 +1870,16 @@ class TBRepo @Inject constructor(
     ): NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
             val user = preferenceDao.getLoggedInUser()
-                ?: return@withContext NetworkResponse.Error("No user logged in!!")
+                ?: return@withContext NetworkResponse.Error(context.getString(R.string.error_no_user_logged_in))
             val ben = benDao.getBen(benId)
-                ?: return@withContext NetworkResponse.Error("Beneficiary not found")
+                ?: return@withContext NetworkResponse.Error(context.getString(R.string.error_beneficiary_not_found))
             val targetBenId = ben.beneficiaryId
             if (targetBenId <= 0) {
-                return@withContext NetworkResponse.Error("Beneficiary ID not valid")
+                return@withContext NetworkResponse.Error(context.getString(R.string.error_beneficiary_id_invalid))
             }
             if (preferenceDao.isCampModeEnabled() && !preferenceDao.isCampHubConnected()) {
-                saveFailedOrderStatus(benId, testType, "Camp Hub not connected")
-                return@withContext NetworkResponse.Error("Camp Hub not connected")
+                saveFailedOrderStatus(benId, testType, context.getString(R.string.error_camp_hub_not_connected))
+                return@withContext NetworkResponse.Error(context.getString(R.string.error_camp_hub_not_connected))
             }
             try {
                 val dobString = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).format(java.util.Date(ben.dob))
@@ -1949,14 +1980,14 @@ class TBRepo @Inject constructor(
                             }
                             return@withContext NetworkResponse.Success(orderId ?: "")
                         } else {
-                            val errorMsg =  response.body()?.errorMessage?: "Failed to push order"
+                            val errorMsg =  response.body()?.errorMessage?: context.getString(R.string.error_push_order_failed)
                             saveFailedOrderStatus(benId, testType, errorMsg)
                             return@withContext NetworkResponse.Error(errorMsg)
                         }
                     }
                 }
-                saveFailedOrderStatus(benId, testType, "HTTP Error $statusCode")
-                NetworkResponse.Error("HTTP Error $statusCode")
+                saveFailedOrderStatus(benId, testType, context.getString(R.string.error_http_code, statusCode))
+                NetworkResponse.Error(context.getString(R.string.error_http_code, statusCode))
             } catch (e: Exception) {
                 Timber.e(e, "createOrder failed")
                 saveFailedOrderStatus(benId, testType)
@@ -1971,10 +2002,10 @@ class TBRepo @Inject constructor(
     ): NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
             val ben = benDao.getBen(benId)
-                ?: return@withContext NetworkResponse.Error("Beneficiary not found")
+                ?: return@withContext NetworkResponse.Error(context.getString(R.string.error_beneficiary_not_found))
             val targetBenId = ben.beneficiaryId
             if (targetBenId <= 0) {
-                return@withContext NetworkResponse.Error("Beneficiary ID not valid")
+                return@withContext NetworkResponse.Error(context.getString(R.string.error_beneficiary_id_invalid))
             }
             try {
                 val apiOrderType = if (testType.equals("SPUTUM_TRUENAT", ignoreCase = true)) "MTB" else testType
@@ -2035,12 +2066,12 @@ class TBRepo @Inject constructor(
                             }
                             return@withContext NetworkResponse.Success(orderId ?: "")
                         } else {
-                            val errorMsg = responseBody.errorMessage ?: "Failed to retry order"
+                            val errorMsg = responseBody.errorMessage ?: context.getString(R.string.error_retry_order_failed)
                             return@withContext NetworkResponse.Error(errorMsg)
                         }
                     }
                 }
-                return@withContext NetworkResponse.Error("HTTP Error $statusCode")
+                return@withContext NetworkResponse.Error(context.getString(R.string.error_http_code, statusCode))
             } catch (e: Exception) {
                 Timber.e(e, "retryOrder failed")
                 return@withContext NetworkResponse.Error(e.message ?: "Unknown error")
@@ -2286,7 +2317,7 @@ class TBRepo @Inject constructor(
     suspend fun markTestCompleted(benId: Long, orderType: String): NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
             val ben = benDao.getBen(benId)
-                ?: return@withContext NetworkResponse.Error("Beneficiary not found")
+                ?: return@withContext NetworkResponse.Error(context.getString(R.string.error_beneficiary_not_found))
             try {
                 val apiOrderType = if (orderType.equals("SPUTUM_TRUENAT", ignoreCase = true)) "MTB" else orderType
                 val response = tmcNetworkApiService.markTestCompleted(benRegID = ben.beneficiaryId, orderType = apiOrderType)
@@ -2347,7 +2378,7 @@ class TBRepo @Inject constructor(
                         }
                     }
                 }
-                NetworkResponse.Error("HTTP Error $statusCode")
+                NetworkResponse.Error(context.getString(R.string.error_http_code, statusCode))
             } catch (e: Exception) {
                 Timber.e(e, "markTestCompleted failed")
                 NetworkResponse.Error(e.message ?: "Unknown error")
@@ -2358,10 +2389,10 @@ class TBRepo @Inject constructor(
     suspend fun fetchOrderResult(benId: Long, orderType: String): NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
             val ben = benDao.getBen(benId)
-                ?: return@withContext NetworkResponse.Error("Beneficiary not found")
+                ?: return@withContext NetworkResponse.Error(context.getString(R.string.error_beneficiary_not_found))
             val targetBenId = ben.beneficiaryId
             if (targetBenId <= 0) {
-                return@withContext NetworkResponse.Error("Beneficiary ID not valid")
+                return@withContext NetworkResponse.Error(context.getString(R.string.error_beneficiary_id_invalid))
             }
             val isXrayType = orderType.equals("XRAY_CHEST", ignoreCase = true)
             val isRifType = orderType.equals("MDR_RIF", ignoreCase = true)
@@ -2665,12 +2696,12 @@ class TBRepo @Inject constructor(
 
                             return@withContext NetworkResponse.Success(status)
                         } else {
-                            val errorMsg = responseBody.errorMessage ?: "Failed to fetch result"
+                            val errorMsg = responseBody.errorMessage ?: context.getString(R.string.error_fetch_result_failed)
                             return@withContext NetworkResponse.Error(errorMsg)
                         }
                     }
                 }
-                NetworkResponse.Error("HTTP Error $statusCode")
+                NetworkResponse.Error(context.getString(R.string.error_http_code, statusCode))
             } catch (e: Exception) {
                 Timber.e(e, "fetchOrderResult failed")
                 NetworkResponse.Error(e.message ?: "Unknown error")
@@ -2681,9 +2712,9 @@ class TBRepo @Inject constructor(
     suspend fun fetchBeneficiariesByStatus(orderType: String, fetchResult: Boolean = true): NetworkResponse<DiagnosticBeneficiaryStatusData> {
         return withContext(Dispatchers.IO) {
             val user = preferenceDao.getLoggedInUser()
-                ?: return@withContext NetworkResponse.Error("No user logged in")
+                ?: return@withContext NetworkResponse.Error(context.getString(R.string.error_no_user_logged_in))
             val locationRecord = preferenceDao.getLocationRecord()
-                ?: return@withContext NetworkResponse.Error("No location record found")
+                ?: return@withContext NetworkResponse.Error(context.getString(R.string.error_no_location_record_found))
 
             val villageId = locationRecord.village.id
             val providerServiceMapId = user.serviceMapId
@@ -3047,7 +3078,7 @@ class TBRepo @Inject constructor(
                         }
                     }
                 }
-                NetworkResponse.Error("HTTP Error $statusCode")
+                NetworkResponse.Error(context.getString(R.string.error_http_code, statusCode))
             } catch (e: Exception) {
                 Timber.e(e, "fetchBeneficiariesByStatus failed for $orderType")
                 NetworkResponse.Error(e.message ?: "Unknown error")
@@ -3059,10 +3090,10 @@ class TBRepo @Inject constructor(
         return withContext(Dispatchers.IO) {
             try {
                 if (!preferenceDao.isCampModeEnabled()) {
-                    return@withContext NetworkResponse.Error("Camp Mode is disabled")
+                    return@withContext NetworkResponse.Error(context.getString(R.string.error_camp_mode_disabled))
                 }
                 if (!preferenceDao.isCampHubConnected()) {
-                    return@withContext NetworkResponse.Error("Camp Hub is disconnected")
+                    return@withContext NetworkResponse.Error(context.getString(R.string.error_camp_hub_disconnected))
                 }
                 val response = tmcNetworkApiService.getVendorHealth(orderType)
                 val statusCode = response.code()
@@ -3083,7 +3114,7 @@ class TBRepo @Inject constructor(
                         }
                     }
                 }
-                NetworkResponse.Error("HTTP Error $statusCode")
+                NetworkResponse.Error(context.getString(R.string.error_http_code, statusCode))
             } catch (e: Exception) {
                 Timber.e(e, "getVendorHealth failed for $orderType")
                 NetworkResponse.Error(e.message ?: "Unknown error")
