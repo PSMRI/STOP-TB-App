@@ -22,6 +22,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
@@ -467,8 +468,13 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             }
         })
 
+        // Search generation of the PagingData currently submitted to the adapter.
+        // flatMapLatest bumps the generation before building the new Pager, so the value read here belongs to `it`.
+        var submittedGeneration = -1
+
         lifecycleScope.launch {
             viewModel.benList.collectLatest {
+                submittedGeneration = viewModel.searchGeneration.value
                 benAdapter.submitData(it)
             }
         }
@@ -489,10 +495,12 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         }
 
         lifecycleScope.launch {
-            // Waits for the new PagingData to reach the adapter, avoiding stale state from the previous search.
+            // Settles only once the expanded search's PagingData is submitted and its refresh has completed,
+            // so page updates from the previous search can't end the loading state early.
             benAdapter.onPagesUpdatedFlow.collect {
                 val pendingGeneration = expandPendingSinceGeneration ?: return@collect
-                if (viewModel.searchGeneration.value <= pendingGeneration) return@collect
+                if (submittedGeneration <= pendingGeneration) return@collect
+                if (benAdapter.loadStateFlow.first().refresh is LoadState.Loading) return@collect
                 expandPendingSinceGeneration = null
                 settledForGeneration = true
                 val isEmpty = benAdapter.itemCount == 0
