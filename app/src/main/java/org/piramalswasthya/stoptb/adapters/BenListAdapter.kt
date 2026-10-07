@@ -763,16 +763,6 @@ class BenListAdapter(
                                     ButtonConfig("Create New X-Ray Order", android.R.color.holo_blue_dark, "REORDER", "XRAY_CHEST")
                                 }
                                 tbDiag?.xrayOrderId.isNullOrBlank() -> {
-                                    // No real backend order exists yet for this beneficiary/test
-                                    // type (referral may be mid-push, or that push never actually
-                                    // landed) — Enter Result/Not Conducted would fail server-side
-                                    // with "DiagnosticOrder not found". Treat the same as FAILED:
-                                    // offer Retry Referral. CHECK_PUSH_ACTIVE lets the ViewModel
-                                    // discover an in-flight push this screen didn't itself start
-                                    // (e.g. the original referral from TBScreeningForm) and track
-                                    // it in retryingBenIds, so isRetryPushInFlight below correctly
-                                    // renders a locked/spinner state instead of a clickable retry
-                                    // while that push is still genuinely running.
                                     clickListener?.onClickOrderAction(item, "CHECK_PUSH_ACTIVE", "XRAY_CHEST")
                                     bindErrorMsg(tbDiag?.errorMsgXray)
                                     ButtonConfig("Retry Referral", android.R.color.holo_red_dark, "RETRY_PUSH", "XRAY_CHEST")
@@ -820,8 +810,6 @@ class BenListAdapter(
                                     ButtonConfig("Create New Order", android.R.color.holo_blue_dark, "REORDER", "SPUTUM_TRUENAT")
                                 }
                                 tbDiag?.trueNatOrderId.isNullOrBlank() -> {
-                                    // Same reasoning as the X-ray block above — no real order
-                                    // exists yet, Enter Result/Not Conducted would fail server-side.
                                     clickListener?.onClickOrderAction(item, "CHECK_PUSH_ACTIVE", "SPUTUM_TRUENAT")
                                     bindErrorMsg(tbDiag?.errorMsgTrueNat)
                                     ButtonConfig("Retry Referral", android.R.color.holo_red_dark, "RETRY_PUSH", "SPUTUM_TRUENAT")

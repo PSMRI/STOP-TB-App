@@ -539,8 +539,10 @@ class AllBenViewModel @Inject constructor(
             _retryingBenIds.value -= benId
         }
     }
+    //Cache of beneficiaries confirmed to have no active push
     private val checkedNoPushBenIds = mutableSetOf<Long>()
 
+    //Tracks beneficiaries with an active check coroutine in flight.
     private val checkingBenIds = mutableSetOf<Long>()
 
     fun invalidateCheckedNoPushBenIds() {
@@ -548,7 +550,6 @@ class AllBenViewModel @Inject constructor(
     }
 
     fun checkAndTrackInFlightPush(benId: Long, context: Context) {
-        //If we are already tracking this beneficiary as "uploading/retrying", don't do anything.
         if (_retryingBenIds.value.contains(benId)) return
         //If we already checked WorkManager for this row and confirmed nothing is uploading, don't keep asking WorkManager on every scroll/re-render
         if (checkedNoPushBenIds.contains(benId)) return
