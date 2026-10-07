@@ -1601,6 +1601,15 @@ class TBRepo @Inject constructor(
                                     isRetryAfterOrderCreation = true
                                 )
                             }
+                            val orderErrMsg = (orderResult as? NetworkResponse.Error)?.message
+                            val isDefinitiveOrderFailure = orderErrMsg == "No user logged in!!" ||
+                                orderErrMsg == "Beneficiary not found" ||
+                                orderErrMsg == "Beneficiary ID not valid"
+                            if (isDefinitiveOrderFailure) {
+                                return@withContext NetworkResponse.Error(
+                                    "Unable to submit result: order could not be created ($orderErrMsg)"
+                                )
+                            }
                             saveManualResultPendingSync(benId, orderType, resultSummary, reasonForRefusal, localResult)
                             return@withContext NetworkResponse.Success("PENDING_SYNC")
                         }
