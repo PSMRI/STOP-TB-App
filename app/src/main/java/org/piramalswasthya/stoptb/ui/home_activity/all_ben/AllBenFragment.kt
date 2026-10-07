@@ -18,6 +18,7 @@ import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import androidx.paging.LoadState
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -508,6 +509,29 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 binding.flEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
                 binding.btnExpandSearchBlock.visibility = View.GONE
                 currentlyShowingEmpty = isEmpty
+            }
+        }
+
+        lifecycleScope.launch {
+            // A failed refresh never produces a page update, so settle the expanded search's error here
+            // instead of leaving the loader up; Retry re-runs the same refresh via benAdapter.retry().
+            benAdapter.loadStateFlow.collect { loadStates ->
+                val pendingGeneration = expandPendingSinceGeneration ?: return@collect
+                if (submittedGeneration <= pendingGeneration) return@collect
+                if (loadStates.refresh !is LoadState.Error) return@collect
+                expandPendingSinceGeneration = null
+                settledForGeneration = true
+                currentlyShowingEmpty = false
+                binding.pbSearchLoading.visibility = View.GONE
+                binding.flEmpty.visibility = View.GONE
+                binding.btnExpandSearchBlock.visibility = View.GONE
+                Snackbar.make(binding.root, R.string.search_other_villages_failed, Snackbar.LENGTH_INDEFINITE)
+                    .setAction(R.string.search_other_villages_retry) {
+                        expandPendingSinceGeneration = pendingGeneration
+                        binding.pbSearchLoading.visibility = View.VISIBLE
+                        benAdapter.retry()
+                    }
+                    .show()
             }
         }
 
