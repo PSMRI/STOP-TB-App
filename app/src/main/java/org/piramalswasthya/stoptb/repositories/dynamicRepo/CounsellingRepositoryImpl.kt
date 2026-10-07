@@ -92,8 +92,12 @@ class CounsellingRepositoryImpl @Inject constructor(
                 return false
             }
             val response = amritApiService.getLatestFormVersions(authHeader)
+            if(!response.isSuccessful){
+                Timber.w("response is not successful, code=${response.code()}")
+                return false
+            }
             val latestVersions = response.body()?.data
-            if (!response.isSuccessful || latestVersions == null) {
+            if (latestVersions == null) {
                 Timber.w("refreshFormsIfOutdated: version check failed, code=${response.code()}")
                 return false
             }
