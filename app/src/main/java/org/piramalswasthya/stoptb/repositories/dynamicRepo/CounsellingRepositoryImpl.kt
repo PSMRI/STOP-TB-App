@@ -83,6 +83,44 @@ class CounsellingRepositoryImpl @Inject constructor(
         }
     }
 
+
+    // Re-pulls all forms via getAllForms when the backend currentVersionNumber of any given form differs from its local active versionNumber.
+    override suspend fun refreshFormsIfOutdated(formTypes: List<FormType>): Boolean {
+        return try {
+            val authHeader = preferenceDao.getJWTAmritToken() ?: run {
+                Timber.w("refreshFormsIfOutdated: JWT token is null, skipping version check")
+                return false
+            }
+            val response = amritApiService.getLatestFormVersions(authHeader)
+            if(!response.isSuccessful){
+                Timber.w("response is not successful, code=${response.code()}")
+                return false
+            }
+            val latestVersions = response.body()?.data
+            if (latestVersions == null) {
+                Timber.w("refreshFormsIfOutdated: version check failed, code=${response.code()}")
+                return false
+            }
+            val formUuids = formTypes.map { it.name }.toSet()
+            val outdated = latestVersions
+                .filter { it.formUuid in formUuids }
+                .filter { latest ->
+                    val localVersion = metadataDao.getActiveVersionNumber(latest.formId)
+                    Timber.d("refreshFormsIfOutdated: ${latest.formUuid} local=$localVersion backend=${latest.currentVersionNumber}")
+                    localVersion != latest.currentVersionNumber
+                }
+            if (outdated.isEmpty()) {
+                true
+            } else {
+                // forceUpdate: the non-force path wipes old versions, which t_form_response RESTRICTs.
+                downloadAndStoreAllForms(forceUpdate = true)
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "refreshFormsIfOutdated failed")
+            false
+        }
+    }
+
     private val gson = com.google.gson.Gson()
 
     private suspend fun storeFormSchemaInDb(apiSchema: FormSchemaDto, wipeExistingVersions: Boolean = true) {

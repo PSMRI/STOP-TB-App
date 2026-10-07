@@ -310,6 +310,14 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             true
         }
 
+        // Observes the role rather than the click so a Counselling start tab (selected before the
+        // listener is attached) is checked too.
+        lifecycleScope.launch {
+            roleManager.activeRole.collect { role ->
+                if (role == AppRole.COUNSELING) viewModel.checkFormVersions()
+            }
+        }
+
         // Visible on Home only; addOnDestinationChangedListener fires immediately with the
         // current destination, so this also sets the correct initial state.
         navController.addOnDestinationChangedListener { _, destination, _ ->
