@@ -2,9 +2,11 @@ package org.piramalswasthya.stoptb.network
 
 import okhttp3.ResponseBody
 import org.piramalswasthya.stoptb.model.*
+import org.piramalswasthya.stoptb.model.dynamicEntity.CompletedBeneficiaryStatus
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormNCDFollowUpSubmitRequest
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormSchemaDto
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormSubmitRequest
+import org.piramalswasthya.stoptb.model.dynamicEntity.LatestFormVersionDto
 import org.piramalswasthya.stoptb.model.dynamicEntity.NCDFollowUpResponse
 import org.piramalswasthya.stoptb.model.dynamicModel.ApiResponse
 import org.piramalswasthya.stoptb.model.dynamicModel.HBNCVisitRequest
@@ -189,6 +191,11 @@ interface AmritApiService {
         @Header("Authorization") authHeader: String,
     ): Response<ApiResponse<List<FormSchemaDto>>>
 
+    @GET("flw-api/dynamicForm/getLatestFormVersions")
+    suspend fun getLatestFormVersions(
+        @Header("Authorization") authHeader: String,
+    ): Response<ApiResponse<List<LatestFormVersionDto>>>
+
     @POST("flw-api/child-care/hbncVisit/saveAll")
     suspend fun submitForm(
         @Body request: List<FormSubmitRequest>
@@ -208,7 +215,7 @@ interface AmritApiService {
     suspend fun completeCounselling(
         @Header("Authorization") authHeader: String,
         @Body request: CounsellingBulkSubmitRequest
-    ): Response<okhttp3.ResponseBody>
+    ): Response<ResponseBody>
     @GET("flw-api/dynamicForm/response/getByBeneficiary")
     suspend fun getBeneficiaryFormResponses(
         @Header("Authorization") jwtToken: String,
@@ -224,7 +231,7 @@ interface AmritApiService {
         @Query("formType") formType: String,
         @Query("villageId") villageId: Int,
         @Query("providerServiceMapId") providerServiceMapId: Int
-    ): Response<ApiResponse<List<org.piramalswasthya.stoptb.model.dynamicEntity.CompletedBeneficiaryStatus>>>
+    ): Response<ApiResponse<List<CompletedBeneficiaryStatus>>>
 
 
     @POST("flw-api/disease/cdtfVisit/saveAll")

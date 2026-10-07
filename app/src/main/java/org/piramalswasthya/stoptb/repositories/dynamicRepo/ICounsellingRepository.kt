@@ -10,6 +10,8 @@ interface ICounsellingRepository {
 //    suspend fun downloadLatestFormSchema(formType: String): Boolean
     /** @param forceUpdate true (login refresh) overwrites stored forms even when the version is unchanged. */
     suspend fun downloadAndStoreAllForms(forceUpdate: Boolean = false): Boolean
+    /** Re-pulls all forms only when any of [formTypes] has a different versionNumber on the backend. */
+    suspend fun refreshFormsIfOutdated(formTypes: List<FormType>): Boolean
     suspend fun getOrCreateDraft(beneficiaryId: Long, formVersionId: Int): CompleteFormResponse
     suspend fun saveDraftSection(
         responseId: Long,
