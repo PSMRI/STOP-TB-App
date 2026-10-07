@@ -18,10 +18,12 @@ import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import androidx.paging.LoadState
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
@@ -467,19 +469,71 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             }
         })
 
+        // Search generation of the PagingData currently submitted to the adapter.
+        // flatMapLatest bumps the generation before building the new Pager, so the value read here belongs to `it`.
+        var submittedGeneration = -1
+
         lifecycleScope.launch {
             viewModel.benList.collectLatest {
+                submittedGeneration = viewModel.searchGeneration.value
                 benAdapter.submitData(it)
             }
-        }
-
-        binding.btnExpandSearchBlock.setOnClickListener {
-            viewModel.expandSearchToBlock()
         }
 
         var lastSearchGeneration = -1
         var settledForGeneration = false
         var currentlyShowingEmpty = false
+        // Tracks the search generation when "Search in other villages" is tapped, while the expanded search is running.
+        var expandPendingSinceGeneration: Int? = null
+
+        binding.btnExpandSearchBlock.setOnClickListener {
+            expandPendingSinceGeneration = viewModel.searchGeneration.value
+            currentlyShowingEmpty = false
+            binding.flEmpty.visibility = View.GONE
+            binding.btnExpandSearchBlock.visibility = View.GONE
+            binding.pbSearchLoading.visibility = View.VISIBLE
+            viewModel.expandSearchToBlock()
+        }
+
+        lifecycleScope.launch {
+            // Settles only once the expanded search's PagingData is submitted and its refresh has completed,
+            // so page updates from the previous search can't end the loading state early.
+            benAdapter.onPagesUpdatedFlow.collect {
+                val pendingGeneration = expandPendingSinceGeneration ?: return@collect
+                if (submittedGeneration <= pendingGeneration) return@collect
+                if (benAdapter.loadStateFlow.first().refresh is LoadState.Loading) return@collect
+                expandPendingSinceGeneration = null
+                settledForGeneration = true
+                val isEmpty = benAdapter.itemCount == 0
+                binding.pbSearchLoading.visibility = View.GONE
+                binding.flEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
+                binding.btnExpandSearchBlock.visibility = View.GONE
+                currentlyShowingEmpty = isEmpty
+            }
+        }
+
+        lifecycleScope.launch {
+            // A failed refresh never produces a page update, so settle the expanded search's error here
+            // instead of leaving the loader up; Retry re-runs the same refresh via benAdapter.retry().
+            benAdapter.loadStateFlow.collect { loadStates ->
+                val pendingGeneration = expandPendingSinceGeneration ?: return@collect
+                if (submittedGeneration <= pendingGeneration) return@collect
+                if (loadStates.refresh !is LoadState.Error) return@collect
+                expandPendingSinceGeneration = null
+                settledForGeneration = true
+                currentlyShowingEmpty = false
+                binding.pbSearchLoading.visibility = View.GONE
+                binding.flEmpty.visibility = View.GONE
+                binding.btnExpandSearchBlock.visibility = View.GONE
+                Snackbar.make(binding.root, R.string.search_other_villages_failed, Snackbar.LENGTH_INDEFINITE)
+                    .setAction(R.string.search_other_villages_retry) {
+                        expandPendingSinceGeneration = pendingGeneration
+                        binding.pbSearchLoading.visibility = View.VISIBLE
+                        benAdapter.retry()
+                    }
+                    .show()
+            }
+        }
 
         lifecycleScope.launch {
             combine(
@@ -499,6 +553,11 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         // A genuinely new search started (typed text/filter/expand changed) - reset.
                         lastSearchGeneration = state.generation
                         settledForGeneration = false
+                    }
+
+                    // Expanded search still running - keep the loader; onPagesUpdatedFlow above settles the UI.
+                    if (expandPendingSinceGeneration != null) {
+                        return@collectLatest
                     }
 
                     if (settledForGeneration && state.isLoading) {
