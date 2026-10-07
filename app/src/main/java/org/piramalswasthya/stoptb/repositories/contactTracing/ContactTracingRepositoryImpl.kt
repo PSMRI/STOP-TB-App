@@ -102,13 +102,13 @@ class ContactTracingRepositoryImpl @Inject constructor(
     override suspend fun upgradeResponseToVersion(
         responseId: Long,
         targetVersionId: Int,
-        targetSectionIds: List<Int>
+        answersBySectionId: Map<Int, List<QuestionResponseEntity>>
     ) {
         db.withTransaction {
             val resp = responseDao.getFormResponseById(responseId) ?: return@withTransaction
             if (resp.formResponse.formVersionId == targetVersionId) return@withTransaction
-            // Old sections belong to the old version; deleting them cascades their answers, which
-            // the caller re-saves from the current-version UI (removed fields are thereby dropped).
+            // Old sections belong to the old version; deleting them cascades their answers, which are
+            // re-inserted below already mapped onto the current version (removed fields are dropped).
             responseDao.deleteSectionResponsesForResponse(responseId)
             responseDao.updateFormResponse(
                 resp.formResponse.copy(
@@ -118,8 +118,16 @@ class ContactTracingRepositoryImpl @Inject constructor(
                 )
             )
             responseDao.insertSectionResponses(
-                targetSectionIds.map { SectionResponseEntity(formResponseId = responseId, sectionId = it) }
+                answersBySectionId.keys.map { SectionResponseEntity(formResponseId = responseId, sectionId = it) }
             )
+            val sectionResponseIds = responseDao.getFormResponseById(responseId)?.sectionResponses
+                ?.associate { it.sectionResponse.sectionId to it.sectionResponse.sectionResponseId }
+                .orEmpty()
+            val mappedAnswers = answersBySectionId.flatMap { (sectionId, answers) ->
+                val sectionResponseId = sectionResponseIds[sectionId] ?: return@flatMap emptyList()
+                answers.map { it.copy(questionResponseId = 0, sectionResponseId = sectionResponseId) }
+            }
+            if (mappedAnswers.isNotEmpty()) responseDao.insertQuestionResponses(mappedAnswers)
         }
     }
 

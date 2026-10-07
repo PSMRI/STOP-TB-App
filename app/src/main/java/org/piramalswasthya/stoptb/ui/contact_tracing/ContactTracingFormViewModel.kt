@@ -89,7 +89,7 @@ class ContactTracingFormViewModel @Inject constructor(
 
     private var legacyAnswersByUuid: Map<String, List<SavedAnswerByUuid>>? = null
     private var legacyRemovedQuestions: List<SectionQuestionWithDetails> = emptyList()
-    private var activeVersionSectionIds: List<Int> = emptyList()
+    private var activeVersionSections: List<FormSectionWithQuestions> = emptyList()
 
     private val _activeQuestions = MutableLiveData<List<CounsellingQuestionDto>>()
     val activeQuestions: LiveData<List<CounsellingQuestionDto>> get() = _activeQuestions
@@ -157,7 +157,7 @@ class ContactTracingFormViewModel @Inject constructor(
                 return@launch
             }
             val allSections = activeVersion.sections.sortedBy { it.section.sectionOrder }
-            activeVersionSectionIds = allSections.map { it.section.sectionId }
+            activeVersionSections = allSections
 
             sections = sectionPhase?.let { p -> allSections.filter { it.section.sectionPhase == p.value } }
                 ?: allSections
@@ -273,8 +273,18 @@ class ContactTracingFormViewModel @Inject constructor(
     /** Moves an older-version response onto the active version before its first save, so it is
      * stored and synced under the current questionUuids; answers to removed fields are dropped. */
     private suspend fun upgradeLegacyResponseIfNeeded() {
-        if (legacyAnswersByUuid == null || responseId <= 0) return
-        repository.upgradeResponseToVersion(responseId, pendingFormVersionId, activeVersionSectionIds)
+        val legacyAnswers = legacyAnswersByUuid
+        if (legacyAnswers == null || responseId <= 0) return
+        // Every section gets its carried-over answers persisted, not just the one being saved, so
+        // sections the user never revisits keep their older-version data.
+        val answersBySectionId = activeVersionSections.associate { sectionWithQuestions ->
+            val questions = sectionWithQuestions.questions.map { it.toCounsellingQuestionDto(isHindi) }
+            questions.forEach { q ->
+                q.value = legacyAnswers[q.questionUuid]?.let { FormVersionAnswerMapper.resolveValue(q, it) }
+            }
+            sectionWithQuestions.section.sectionId to buildAnswerRows(questions)
+        }
+        repository.upgradeResponseToVersion(responseId, pendingFormVersionId, answersBySectionId)
         legacyAnswersByUuid = null
         legacyRemovedQuestions = emptyList()
     }

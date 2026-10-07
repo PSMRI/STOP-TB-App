@@ -50,8 +50,12 @@ interface IContactTracingRepository {
     suspend fun getQuestionsWithDetails(questionIds: List<Int>): List<SectionQuestionWithDetails>
 
     // Re-points an older-version response at targetVersionId: its old section rows (and their
-    // answers) are replaced by empty rows for targetSectionIds, ready for the current answers.
-    suspend fun upgradeResponseToVersion(responseId: Long, targetVersionId: Int, targetSectionIds: List<Int>)
+    // answers) are replaced by one row per key of answersBySectionId, holding the mapped answers.
+    suspend fun upgradeResponseToVersion(
+        responseId: Long,
+        targetVersionId: Int,
+        answersBySectionId: Map<Int, List<QuestionResponseEntity>>
+    )
 
     // Fetches the beneficiary's previously submitted answers for this form type from the server and stores them locally for prefill.
     suspend fun fetchAndStoreContactResponse(
