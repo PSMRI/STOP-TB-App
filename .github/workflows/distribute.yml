@@ -60,8 +60,8 @@ on:
         required: true
         type: choice
         options:
-          - qa-1
-          - qa-2
+          - QA-Group-1
+          - QA-Group-2
 
 permissions:
   contents: read
@@ -201,10 +201,10 @@ jobs:
           
             if [ "$TARGET_ENV" = uat ]; then 
               case "$DEPLOY_TO" in
-                qa-1)
+                QA-Group-1)
                   INTUNE_GROUP_ID="$INTUNE_GROUP_QA_1"
                   ;;
-                qa-2)
+                QA-Group-2)
                   INTUNE_GROUP_ID="$INTUNE_GROUP_QA_2"
                   ;;
                 *)
