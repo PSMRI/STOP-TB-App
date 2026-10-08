@@ -367,7 +367,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
                 }
             }
         }
-        binding.versionName.text = "${BuildConfig.VERSION_NAME}"//"APK Version 2.2.3"
+        binding.versionName.text = getString(R.string.login_app_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
 
 
         inAppUpdateHelper = InAppUpdateHelper(this)
@@ -585,7 +585,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
                 .setPositiveButton("Exit") { dialog, id -> finish() }
                 .show()
         }
-        binding.versionName.text ="${BuildConfig.VERSION_NAME}" //"APK Version 2.2.3"
+        binding.versionName.text = getString(R.string.login_app_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)  //"APK Version 2.2.3"
         inAppUpdateHelper.resumeUpdateIfNeeded()
     }
 
