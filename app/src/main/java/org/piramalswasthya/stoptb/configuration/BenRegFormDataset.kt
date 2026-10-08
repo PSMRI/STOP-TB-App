@@ -39,7 +39,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     private var currentLocation: LocationRecord? = null
 
     private val preferenceDao = PreferenceDao(context)
-    private var youngestParentDob: Long? = null
+    private var hofForDobRules: BenRegCache? = null
+    private var hofSpouseForDobRules: BenRegCache? = null
+    private var selectedMemberForDobRules: BenRegCache? = null
 
 
 
@@ -55,6 +57,13 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         private fun getMinDobMillis(): Long {
             val cal = Calendar.getInstance()
             cal.add(Calendar.YEAR, -1 * Konstants.maxAgeForGenBen)
+            return cal.timeInMillis
+        }
+
+        /** Latest DOB for a member who must be at least [Konstants.minAgeForGenBen] years old. */
+        private fun getMinAdultDobMillis(): Long {
+            val cal = Calendar.getInstance()
+            cal.add(Calendar.YEAR, -1 * Konstants.minAgeForGenBen)
             return cal.timeInMillis
         }
     }
@@ -459,7 +468,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         relToHeadId: Int = -1,
         spouseRegistrationRelToHeadId: Int = -1,
         isNonHH: Boolean = false,
-        minimumChildDob: Long? = null
+        hofForDobRules: BenRegCache? = null,
+        hofSpouseForDobRules: BenRegCache? = null,
+        selectedMemberForDobRules: BenRegCache? = null
     ) {
         val list = mutableListOf(
             pic,
@@ -493,10 +504,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         )
 
         this.familyHeadPhoneNo = familyHeadPhoneNo?.toString()
-        this.youngestParentDob = minimumChildDob?.minus(24 * 60 * 60 * 1000L)
-        minimumChildDob?.let { childDobMin ->
-            agePopup.min = maxOf(agePopup.min ?: childDobMin, childDobMin)
-        }
+        this.hofForDobRules = hofForDobRules
+        this.hofSpouseForDobRules = hofSpouseForDobRules
+        this.selectedMemberForDobRules = selectedMemberForDobRules
 
         if (relToHeadId >= 0 && !isNonHH) {
             list.add(list.indexOf(gender) + 1, relationToHead)
@@ -732,11 +742,6 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             // Lock gender — pre-filled from nav args, not changeable
             gender.inputType = TEXT_VIEW
 
-            // Minimum age 15 for wife/husband — restrict DOB picker upper bound
-            val maxDobForSpouse = Calendar.getInstance()
-                .apply { add(Calendar.YEAR, -Konstants.minAgeForGenBen) }.timeInMillis
-            agePopup.max = maxDobForSpouse
-
             // Force marital status = Married and lock it
             val genderId = ben?.genderId ?: 0
             maritalStatus.entries = if (genderId == 2) maritalStatusFemale else maritalStatusMale
@@ -820,6 +825,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             economicStatus.required = false
         }
 
+        if (!isNonHH && relToHeadId >= 0 && relToHeadId != 18) {
+            applyRelationDobRange(relToHeadId)
+        }
 
         setUpPage(list)
 
@@ -864,8 +872,35 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     }
 
     // Keep setFirstPageToRead as alias for backward compat with ViewModel
-    suspend fun setFirstPageToRead(ben: BenRegCache?, familyHeadPhoneNo: Long?, familyHeadCommunityId: Int = 0, villageName: String? = null,  pinCodeValue: String? = null, villageNames: Array<String>? = null, villageEntityList: List<LocationEntity> = emptyList(), subCentreName: String? = null, relToHeadId: Int = -1,isNonHH: Boolean = false) =
-        setUpPage(ben, familyHeadPhoneNo, familyHeadCommunityId, villageName, pinCodeValue,villageNames, villageEntityList, subCentreName, relToHeadId,isNonHH = isNonHH)
+    suspend fun setFirstPageToRead(
+        ben: BenRegCache?,
+        familyHeadPhoneNo: Long?,
+        familyHeadCommunityId: Int = 0,
+        villageName: String? = null,
+        pinCodeValue: String? = null,
+        villageNames: Array<String>? = null,
+        villageEntityList: List<LocationEntity> = emptyList(),
+        subCentreName: String? = null,
+        relToHeadId: Int = -1,
+        isNonHH: Boolean = false,
+        hofForDobRules: BenRegCache? = null,
+        hofSpouseForDobRules: BenRegCache? = null,
+        selectedMemberForDobRules: BenRegCache? = null
+    ) = setUpPage(
+        ben,
+        familyHeadPhoneNo,
+        familyHeadCommunityId,
+        villageName,
+        pinCodeValue,
+        villageNames,
+        villageEntityList,
+        subCentreName,
+        relToHeadId,
+        isNonHH = isNonHH,
+        hofForDobRules = hofForDobRules,
+        hofSpouseForDobRules = hofSpouseForDobRules,
+        selectedMemberForDobRules = selectedMemberForDobRules
+    )
 
 
     private var familyHeadPhoneNo: String? = null
@@ -987,7 +1022,6 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             agePopup.id -> {
 
                 val age = try { getAgeFromDob(getLongFromDate(agePopup.value)) } catch (_: Exception) { 0 }
-                validateChildAgeAgainstParent()
 
                 // Refresh reason of death when age changes and beneficiary is already marked Death
                 if (beneficiaryStatus.value == BenStatus.Death.name) {
@@ -1348,19 +1382,60 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         }
     }
 
-    private fun validateChildAgeAgainstParent() {
-        val parentDob = youngestParentDob ?: run {
-            agePopup.errorText = null
-            return
+
+    private fun applyRelationDobRange(relationToHeadId: Int) {
+        agePopup.min = getMinDobMillis()
+        agePopup.max = System.currentTimeMillis()
+
+        val hof = hofForDobRules
+        val hofSpouse = hofSpouseForDobRules
+        val selectedMember = selectedMemberForDobRules
+        val hofIsMarried = hof?.genDetails?.maritalStatusId == 2 || hof?.isMarried == true
+        val selectedMemberIsMarried =
+            selectedMember?.genDetails?.maritalStatusId == 2 || selectedMember?.isMarried == true
+
+        // Wife / Husband of HoF.
+        if ((relationToHeadId == 4 || relationToHeadId == 5) && hofIsMarried) {
+            agePopup.min = getMinDobMillis()
+            agePopup.max = getMinAdultDobMillis()
         }
-        val selectedDob = agePopup.value?.let { runCatching { getLongFromDate(it) }.getOrNull() } ?: run {
-            agePopup.errorText = null
-            return
+
+        // Brother, sister, in-laws, nephew, niece, grandchildren, and other relations.
+        // Grand Father (10) and Grand Mother (11) are not included: they keep 0–99.
+        val marriedMemberRelationIds = setOf(
+            2, 3, 6, 7, 12, 13, 14, 15, 16, 17, 19, 20
+        )
+        if (relationToHeadId in marriedMemberRelationIds && selectedMemberIsMarried) {
+            agePopup.min = getMinDobMillis()
+            agePopup.max = getMinAdultDobMillis()
         }
-        agePopup.errorText = if (selectedDob <= parentDob) {
-            resources.getString(R.string.child_age_less_than_parent_error)
-        } else {
-            null
+
+        // Son / Daughter: earliest DOB is the younger parent's DOB + marriage age + 7 months.
+        if ((relationToHeadId == 8 || relationToHeadId == 9) && hof != null && hof.dob > 0L) {
+            val spouseDob = hofSpouse?.dob?.takeIf { it > 0L }
+            val youngerParentDob = spouseDob?.let { maxOf(hof.dob, it) } ?: hof.dob
+            val hofAgeAtMarriage = hof.genDetails?.ageAtMarriage?.takeIf { it > 0 }
+            val spouseAgeAtMarriage = hofSpouse?.genDetails?.ageAtMarriage?.takeIf { it > 0 }
+            val marriageAge = when {
+                hofAgeAtMarriage != null && spouseAgeAtMarriage != null ->
+                    minOf(hofAgeAtMarriage, spouseAgeAtMarriage)
+                else -> hofAgeAtMarriage ?: spouseAgeAtMarriage ?: Konstants.minAgeForGenBen
+            }
+            agePopup.max = System.currentTimeMillis()
+            agePopup.min = Calendar.getInstance().apply {
+                timeInMillis = youngerParentDob
+                add(Calendar.YEAR, marriageAge)
+                add(Calendar.MONTH, 7)
+            }.timeInMillis
+        }
+
+        // Mother / Father: DOB at least 15 years before the HoF's DOB, and not older than 99.
+        if ((relationToHeadId == 0 || relationToHeadId == 1) && hof != null && hof.dob > 0L) {
+            agePopup.min = getMinDobMillis()
+            agePopup.max = Calendar.getInstance().apply {
+                timeInMillis = hof.dob
+                add(Calendar.YEAR, -Konstants.minAgeForGenBen)
+            }.timeInMillis
         }
     }
 
@@ -1506,7 +1581,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                 ?: wifeName.value.takeIf { !it.isNullOrEmpty() }
                         ?: spouseName.value.takeIf { !it.isNullOrEmpty() }
             ben.genDetails?.marriageDate = 0
-            ben.genDetails?.ageAtMarriage = 0
+            ben.genDetails?.ageAtMarriage =
+                ageAtMarriage.value?.toIntOrNull()?.takeIf { it > 0 } ?: 0
 
             // Reproductive Status
             ben.genDetails?.let { gen ->
