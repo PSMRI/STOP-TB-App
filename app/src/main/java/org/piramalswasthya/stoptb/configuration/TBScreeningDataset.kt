@@ -256,17 +256,12 @@ class TBScreeningDataset(
     /** Children (< 15 years) get 2 extra mandatory symptom questions; see [buildFormList] */
     private val isChildBeneficiary: Boolean
         get() = benAgeYears < 15
-
-    /**
-     * Symptom questions that set the status banner.
-     * History of TB, current anti-TB treatment, and family history are collected under
-     * Other Details and do not by themselves make the beneficiary symptomatic.
-     */
     private fun requiredSymptomFields(): List<FormElement> {
         val fields = mutableListOf(
             isCoughing, bloodInSputum, isFever, riseOfFever,
             lossOfAppetite, lossOfWeight, nightSweats,
-            chestPain, shortnessOfBreath, fatigue
+            chestPain, shortnessOfBreath, fatigue,
+            historyOfTB, currentlyTakingDrugs, familyHistoryTB
         )
         if (isChildBeneficiary) {
             fields += failureToGainWeightInChildren
