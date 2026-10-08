@@ -1478,9 +1478,7 @@ class FormInputAdapter(
             binding.etNumberInput.isEnabled = isEnabled
             binding.btnDecrement.isEnabled = isEnabled
             binding.btnIncrement.isEnabled = isEnabled
-            val readOnlyAlpha = if (isEnabled) 1f else 0.5f
-            binding.tvLabel.alpha = readOnlyAlpha
-            binding.containerNumberPickerCard.alpha = readOnlyAlpha
+            binding.containerNumberPickerCard.alpha = if (isEnabled) 1f else 0.5f
             if (!isEnabled) {
                 hideError()
                 return
