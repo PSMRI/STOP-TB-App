@@ -1478,6 +1478,7 @@ class FormInputAdapter(
             binding.etNumberInput.isEnabled = isEnabled
             binding.btnDecrement.isEnabled = isEnabled
             binding.btnIncrement.isEnabled = isEnabled
+            binding.containerNumberPickerCard.alpha = if (isEnabled) 1f else 0.5f
             if (!isEnabled) {
                 hideError()
                 return
