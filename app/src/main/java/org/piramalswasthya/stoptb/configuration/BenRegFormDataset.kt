@@ -48,22 +48,6 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
 
     companion object {
-        /**
-         * Maximum child age in years and months:
-         * parent age − marriage age − extra marriage months (7-month buffer).
-         */
-        fun calculateMaxSonAge(
-            parentYears: Int,
-            parentMonths: Int,
-            marriageYears: Int,
-            marriageMonths: Int
-        ): Pair<Int, Int> {
-            val parentTotalMonths = parentYears * 12 + parentMonths
-            val bufferTotalMonths = marriageYears * 12 + marriageMonths
-            val diffMonths = (parentTotalMonths - bufferTotalMonths).coerceAtLeast(0)
-            return Pair(diffMonths / 12, diffMonths % 12)
-        }
-
         private fun getCurrentDateString(): String {
             val calendar = Calendar.getInstance()
             val mdFormat = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
@@ -82,14 +66,6 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             cal.add(Calendar.YEAR, -1 * Konstants.minAgeForGenBen)
             return cal.timeInMillis
         }
-
-        private fun startOfToday(): Calendar =
-            Calendar.getInstance().apply {
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
     }
 
     private fun isMobileNotAvailableChecked(): Boolean {
@@ -1406,12 +1382,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         }
     }
 
-    /**
-     * DOB picker limits for a new family member, matching the HoF relation rules:
-     * default 0–99 and no future date; son/daughter from parent age, marriage age and a
-     * 7-month buffer; mother/father at least 15 years older than the HoF; wife/husband
-     * 15–99 when the HoF is married. Grandparents stay on the default range.
-     */
+
     private fun applyRelationDobRange(relationToHeadId: Int) {
         agePopup.min = getMinDobMillis()
         agePopup.max = System.currentTimeMillis()
@@ -1439,37 +1410,31 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             agePopup.max = getMinAdultDobMillis()
         }
 
-        // Son / Daughter: earliest DOB is younger-parent age − marriage age − 7 months.
+        // Son / Daughter: earliest DOB is the younger parent's DOB + marriage age + 7 months.
         if ((relationToHeadId == 8 || relationToHeadId == 9) && hof != null && hof.dob > 0L) {
-            val hofAge = getAgeFromDob(hof.dob)
-            val spouseAge = hofSpouse?.dob?.takeIf { it > 0L }?.let { getAgeFromDob(it) }
-            val minParentAge = spouseAge?.let { minOf(hofAge, it) } ?: hofAge
+            val spouseDob = hofSpouse?.dob?.takeIf { it > 0L }
+            val youngerParentDob = spouseDob?.let { maxOf(hof.dob, it) } ?: hof.dob
             val hofAgeAtMarriage = hof.genDetails?.ageAtMarriage?.takeIf { it > 0 }
             val spouseAgeAtMarriage = hofSpouse?.genDetails?.ageAtMarriage?.takeIf { it > 0 }
-            val minAgeAtMarriage = when {
+            val marriageAge = when {
                 hofAgeAtMarriage != null && spouseAgeAtMarriage != null ->
                     minOf(hofAgeAtMarriage, spouseAgeAtMarriage)
-                else -> hofAgeAtMarriage ?: spouseAgeAtMarriage ?: 0
+                else -> hofAgeAtMarriage ?: spouseAgeAtMarriage ?: Konstants.minAgeForGenBen
             }
-            val (maxSonYears, maxSonMonths) = calculateMaxSonAge(
-                parentYears = minParentAge,
-                parentMonths = 0,
-                marriageYears = minAgeAtMarriage,
-                marriageMonths = 7
-            )
-            val totalMonthsToSubtract = maxSonYears * 12 + maxSonMonths
             agePopup.max = System.currentTimeMillis()
-            agePopup.min = startOfToday().apply {
-                add(Calendar.MONTH, -totalMonthsToSubtract)
+            agePopup.min = Calendar.getInstance().apply {
+                timeInMillis = youngerParentDob
+                add(Calendar.YEAR, marriageAge)
+                add(Calendar.MONTH, 7)
             }.timeInMillis
         }
 
-        // Mother / Father: at least 15 years older than the HoF, and not older than 99.
+        // Mother / Father: DOB at least 15 years before the HoF's DOB, and not older than 99.
         if ((relationToHeadId == 0 || relationToHeadId == 1) && hof != null && hof.dob > 0L) {
-            val minAge = getAgeFromDob(hof.dob) + Konstants.minAgeForGenBen
             agePopup.min = getMinDobMillis()
-            agePopup.max = startOfToday().apply {
-                add(Calendar.YEAR, -minAge)
+            agePopup.max = Calendar.getInstance().apply {
+                timeInMillis = hof.dob
+                add(Calendar.YEAR, -Konstants.minAgeForGenBen)
             }.timeInMillis
         }
     }
@@ -1616,9 +1581,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                 ?: wifeName.value.takeIf { !it.isNullOrEmpty() }
                         ?: spouseName.value.takeIf { !it.isNullOrEmpty() }
             ben.genDetails?.marriageDate = 0
-            ageAtMarriage.value?.toIntOrNull()?.takeIf { it > 0 }?.let {
-                ben.genDetails?.ageAtMarriage = it
-            }
+            ben.genDetails?.ageAtMarriage =
+                ageAtMarriage.value?.toIntOrNull()?.takeIf { it > 0 } ?: 0
 
             // Reproductive Status
             ben.genDetails?.let { gen ->
