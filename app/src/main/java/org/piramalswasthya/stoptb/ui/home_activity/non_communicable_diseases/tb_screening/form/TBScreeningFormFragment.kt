@@ -276,6 +276,13 @@ class TBScreeningFormFragment : Fragment() {
             isAutoFlow = viewModel.autoFlow,
             allowBack = true
         )
+        viewLifecycleOwner.lifecycleScope.launch {
+            if (!viewModel.refreshAutoSelectedRiskFactors()) return@launch
+            val index = viewModel.getIndexOfKeyPopulationRiskFactors()
+            if (index >= 0) {
+                binding.form.rvInputForm.adapter?.notifyItemChanged(index)
+            }
+        }
     }
 
     override fun onDestroyView() {
