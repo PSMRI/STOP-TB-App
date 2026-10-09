@@ -8,7 +8,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
@@ -182,6 +181,16 @@ class DashboardViewModel @Inject constructor(
 
     private fun getAssignedVillageIds(): List<Int> =
         villageList.flatMap { idsForVillage(it) }.distinct().ifEmpty { listOf(-1) }
+
+    /** Same village ids and living-beneficiary rules as the home Total Population card. */
+    private fun populationVillageIds(selectedVillageId: Int, selectedVillage: LocationEntity?): List<Int> {
+        val ids = if (selectedVillageId == 0 || selectedVillage == null) {
+            villageList.map { it.id }.filter { it != 0 }.distinct()
+        } else {
+            listOf(selectedVillage.id)
+        }.ifEmpty { listOf(-1) }
+        return if (ids.size == 1) listOf(ids.first(), ids.first()) else ids
+    }
 
     private fun idsForVillageFilter(selectedVillageId: Int, selectedVillage: LocationEntity?): List<Int> {
         val ids = if (selectedVillageId == 0 || selectedVillage == null) {
@@ -398,16 +407,14 @@ class DashboardViewModel @Inject constructor(
             )
 
         collectJobs += viewModelScope.launch {
-            combine(
-                tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, 0, 0, "", 0, 0),
-                tbDao.getDashboardUnscreenedCount(assignedVillageIds, villageName, 0, 0, "", 0)
-            ) { screened, unscreened ->
-                CoverageStats(
-                    population = screened + unscreened,
-                    screened = screened,
-                    unscreened = unscreened
-                )
-            }.collect { _coverage.value = it }
+            benDao.getVillageHeadcount(populationVillageIds(selectedVillageId, selectedVillage))
+                .collect { headcount ->
+                    _coverage.value = CoverageStats(
+                        population = headcount.population,
+                        screened = (headcount.population - headcount.unscreened).coerceAtLeast(0),
+                        unscreened = headcount.unscreened,
+                    )
+                }
         }
 
         collectBreakdown(

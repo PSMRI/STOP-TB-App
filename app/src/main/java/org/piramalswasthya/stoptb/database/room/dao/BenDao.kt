@@ -922,7 +922,7 @@ interface BenDao {
     // Dashboard ABHA count with time + village filter
     @Query("""
         SELECT COUNT(*) FROM BEN_BASIC_CACHE
-        WHERE isDeactivate = 0 AND abhaId IS NOT NULL
+        WHERE isDeactivate = 0 AND isDeath = 0 AND abhaId IS NOT NULL
         AND villageId IN (:assignedVillageIds)
         AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN IFNULL(regDate, 0) >= 100000000000 THEN regDate WHEN IFNULL(regDate, 0) > 0 THEN regDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
         AND (:endTime = :endTime)
@@ -1599,17 +1599,18 @@ interface BenDao {
     fun getUnscreenedCount(selectedVillage: Int): Flow<Int>
 
     /**
-     * Population and unscreened for one village, from the same view read as [getAllBenCount].
-     * tbsnFilled is already on each row, so unscreened is not a second pass over the population.
+     * Living, active people in the given villages. Home Total Population and dashboard
+     * Village Population both use this so the two cards stay on the same count.
      */
     @Query("""
         SELECT
             COUNT(*) AS population,
             COUNT(CASE WHEN screeningStatus = 'UNSCREENED' AND tbsnFilled = 0 THEN 1 END) AS unscreened
         FROM BEN_BASIC_CACHE
-        WHERE isDeactivate = 0 AND villageId = :selectedVillage
+        WHERE isDeactivate = 0 AND isDeath = 0
+          AND villageId IN (:villageIds)
     """)
-    fun getVillageHeadcount(selectedVillage: Int): Flow<VillageHeadcount>
+    fun getVillageHeadcount(villageIds: List<Int>): Flow<VillageHeadcount>
 
     @Query("""
         SELECT * FROM BEN_BASIC_CACHE
