@@ -8,6 +8,11 @@ import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.model.*
 
+data class VillageHeadcount(
+    val population: Int = 0,
+    val unscreened: Int = 0,
+)
+
 @Dao
 interface BenDao {
 
@@ -905,13 +910,6 @@ interface BenDao {
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0")
     fun getAllBenCount(selectedVillage: Int): Flow<Int>
 
-    @Query("""
-        SELECT COUNT(*) FROM BEN_BASIC_CACHE
-        WHERE isDeactivate = 0
-        AND villageId IN (:assignedVillageIds)
-    """)
-    fun getGlancePopulationCount(assignedVillageIds: List<Int>): Flow<Int>
-
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage AND isDeactivate=0 AND abhaId IS NOT NULL")
     fun getAllBenWithAbhaCount(selectedVillage: Int): Flow<Int>
 
@@ -1600,17 +1598,18 @@ interface BenDao {
 """)
     fun getUnscreenedCount(selectedVillage: Int): Flow<Int>
 
+    /**
+     * Population and unscreened for one village, from the same view read as [getAllBenCount].
+     * tbsnFilled is already on each row, so unscreened is not a second pass over the population.
+     */
     @Query("""
-        SELECT COUNT(*)
-        FROM BEN_BASIC_CACHE b
-        WHERE b.isDeactivate = 0
-          AND b.screeningStatus = 'UNSCREENED'
-          AND b.villageId IN (:assignedVillageIds)
-          AND NOT EXISTS (
-              SELECT 1 FROM TB_SCREENING ts WHERE ts.benId = b.benId
-          )
+        SELECT
+            COUNT(*) AS population,
+            COUNT(CASE WHEN screeningStatus = 'UNSCREENED' AND tbsnFilled = 0 THEN 1 END) AS unscreened
+        FROM BEN_BASIC_CACHE
+        WHERE isDeactivate = 0 AND villageId = :selectedVillage
     """)
-    fun getGlanceUnscreenedCount(assignedVillageIds: List<Int>): Flow<Int>
+    fun getVillageHeadcount(selectedVillage: Int): Flow<VillageHeadcount>
 
     @Query("""
         SELECT * FROM BEN_BASIC_CACHE

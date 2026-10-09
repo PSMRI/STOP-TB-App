@@ -28,23 +28,33 @@ class VolunteerHomeGlanceViewModel @Inject constructor(
     preferenceDao: PreferenceDao,
 ) : ViewModel() {
 
-    private val assignedVillageIds = preferenceDao.getLoggedInUser()
-        ?.villages
-        .orEmpty()
-        .map { it.id }
-        .ifEmpty { listOf(-1) }
+    // Login (or the home village switch) stores one village on the location record.
+    // Counts follow that village by ID, same as the household and headcount queries.
+    private val selectedVillageId: Int = preferenceDao.getLocationRecord()
+        ?.village
+        ?.id
+        ?.takeIf { it != 0 }
+        ?: -1
+    // Room IN-lists of size 1 are expanded unreliably; pass the id twice.
+    private val selectedVillageIds: List<Int> = listOf(selectedVillageId, selectedVillageId)
 
     val glance: StateFlow<HomeGlance> = combine(
-        tbDao.getDashboardPresumptiveTbCount(assignedVillageIds, "", 0L, 0L, "", 0),
-        householdDao.getGlanceHouseholdCount(assignedVillageIds),
-        benDao.getGlancePopulationCount(assignedVillageIds),
-        benDao.getGlanceUnscreenedCount(assignedVillageIds),
-    ) { presumptive, households, population, unscreened ->
+        tbDao.getDashboardPresumptiveTbCount(
+            selectedVillageIds,
+            "",
+            0L,
+            0L,
+            "",
+            0
+        ),
+        householdDao.getAllHouseholdsCount(selectedVillageId),
+        benDao.getVillageHeadcount(selectedVillageId),
+    ) { presumptive, households, headcount ->
         HomeGlance(
             presumptiveReferral = presumptive,
             households = households,
-            population = population,
-            unscreened = unscreened,
+            population = headcount.population,
+            unscreened = headcount.unscreened,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeGlance())
 }

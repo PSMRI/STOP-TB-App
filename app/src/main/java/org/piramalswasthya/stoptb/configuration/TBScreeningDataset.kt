@@ -217,6 +217,12 @@ class TBScreeningDataset(
     private var isMaleBen: Boolean = false
     private var isPregnantBen: Boolean = false
     private var riskFactorOptions: List<CodedOption> = emptyList()
+    private var residentialAreaLabel: String? = null
+    private var residentialAreaId: Int? = null
+    private var editingExistingScreening: Boolean = false
+    private var formReady: Boolean = false
+    private val autoSelectSession = KeyPopulationRiskFactorAutoSelect.Session()
+    private var lastCommittedRiskFactorIndexes: Set<Int> = emptySet()
 
     private val hivStatusOptions: List<CodedOption>
         get() = listOf(
@@ -327,7 +333,22 @@ class TBScreeningDataset(
 
     // ── Page setup ───────────────────────────────────────────────────────────
 
-    suspend fun setUpPage(ben: BenRegCache?, saved: TBScreeningCache?) {
+    suspend fun setUpPage(
+        ben: BenRegCache?,
+        saved: TBScreeningCache?,
+        residentialArea: String? = null,
+        residentialAreaId: Int? = null
+    ) {
+        formReady = false
+        editingExistingScreening = saved != null
+        residentialAreaLabel = residentialArea
+        this.residentialAreaId = residentialAreaId
+        autoSelectSession.elderlySuppressedByUser = false
+        autoSelectSession.urbanSlumSuppressedByUser = false
+        autoSelectSession.elderlyAppliedByAuto = false
+        autoSelectSession.urbanSlumAppliedByAuto = false
+        autoSelectSession.lastElderly = null
+        autoSelectSession.lastUrbanSlum = null
         ben?.let {
             dateOfVisit.min = it.regDate
             benAgeYears = if (it.dob > 0L) BenBasicCache.getAgeFromDob(it.dob) else it.age
@@ -348,12 +369,14 @@ class TBScreeningDataset(
 
         if (saved == null) {
             dateOfVisit.value = getDateFromLong(System.currentTimeMillis())
+            val selectedIndexes = mutableSetOf<Int>()
             val pregnancyIndex = riskFactorOptions.indexOfFirst { it.code == "PREGNANCY" }
-
-            keyPopulationRiskFactors.value = when {
-                isPregnantBen && pregnancyIndex >= 0 -> pregnancyIndex.toString()
-                else -> null
+            if (isPregnantBen && pregnancyIndex >= 0) {
+                selectedIndexes.add(pregnancyIndex)
             }
+            applyAutoSelectedRiskFactors(ben, selectedIndexes)
+            keyPopulationRiskFactors.value = selectedIndexes.toRiskFactorValue()
+            lastCommittedRiskFactorIndexes = selectedIndexes
             hivStatus.value = null
         } else {
             dateOfVisit.value        = getDateFromLong(saved.visitDate)
@@ -384,6 +407,7 @@ class TBScreeningDataset(
             }
             keyPopulationRiskFactors.value =
                 if (selectedIndexes.isEmpty()) null else selectedIndexes.sorted().joinToString("|")
+            lastCommittedRiskFactorIndexes = selectedIndexes.toSet()
 
             hivStatus.value = hivStatusOptions.firstOrNull {
                 it.id == saved.hivStatusId ||
@@ -393,6 +417,28 @@ class TBScreeningDataset(
         }
 
         setUpPage(buildFormList())
+        formReady = true
+    }
+
+    /**
+     * Re-reads age and residential area for a screening that has not been saved yet.
+     * Returns true when the Key Population selection changed.
+     */
+    fun refreshAutoSelectedRiskFactors(
+        ben: BenRegCache?,
+        residentialArea: String?,
+        residentialAreaId: Int?
+    ): Boolean {
+        if (!formReady || editingExistingScreening || ben == null) return false
+        residentialAreaLabel = residentialArea
+        this.residentialAreaId = residentialAreaId
+        val selectedIndexes = currentRiskFactorIndexes().toMutableSet()
+        val changed = applyAutoSelectedRiskFactors(ben, selectedIndexes)
+        if (changed) {
+            keyPopulationRiskFactors.value = selectedIndexes.toRiskFactorValue()
+        }
+        lastCommittedRiskFactorIndexes = selectedIndexes
+        return changed
     }
     // ── Value change handling ────────────────────────────────────────────────
 
@@ -414,7 +460,10 @@ class TBScreeningDataset(
             historyOfTB.id          -> historyOfTB.value          = yesNoFromIndex(index)
             currentlyTakingDrugs.id -> currentlyTakingDrugs.value = yesNoFromIndex(index)
             familyHistoryTB.id      -> familyHistoryTB.value      = yesNoFromIndex(index)
-            keyPopulationRiskFactors.id -> enforceNotApplicableExclusivity()
+            keyPopulationRiskFactors.id -> {
+                enforceNotApplicableExclusivity()
+                recordRiskFactorUserEdit()
+            }
         }
         // If a symptom question was answered, recompute asymptomatic and signal a
         // list refresh so the fragment can force-rebind the auto-computed field.
@@ -423,6 +472,83 @@ class TBScreeningDataset(
             Log.d("ASYM_TEST", "Computed = ${isAsymptomatic.value}")
             listFlow.value.indexOf(isAsymptomatic).takeIf { it >= 0 } ?: -1
         } else -1
+    }
+
+    private fun applyAutoSelectedRiskFactors(
+        ben: BenRegCache?,
+        selectedIndexes: MutableSet<Int>
+    ): Boolean {
+        val ageYears = ben?.let {
+            KeyPopulationRiskFactorAutoSelect.ageInYears(it.dob, it.age, it.ageUnit, it.ageUnitId)
+        } ?: 0
+        val urbanSlumAreaId = urbanSlumResidentialAreaId()
+        val acceptedLabels = urbanSlumLabels()
+        return KeyPopulationRiskFactorAutoSelect.apply(
+            selected = selectedIndexes,
+            elderlyIndex = riskFactorOptions.indexOfFirst {
+                it.code == KeyPopulationRiskFactorAutoSelect.ELDERLY_CODE
+            },
+            urbanSlumIndex = riskFactorOptions.indexOfFirst {
+                it.code == KeyPopulationRiskFactorAutoSelect.URBAN_SLUM_CODE
+            },
+            notApplicableIndex = riskFactorOptions.indexOfFirst {
+                it.code == KeyPopulationRiskFactorAutoSelect.NOT_APPLICABLE_CODE
+            },
+            isElderly = KeyPopulationRiskFactorAutoSelect.isElderly(ageYears),
+            isUrbanSlum = KeyPopulationRiskFactorAutoSelect.isUrbanSlumResidentialArea(
+                residentialAreaLabel,
+                residentialAreaId,
+                urbanSlumAreaId,
+                acceptedLabels
+            ),
+            session = autoSelectSession
+        )
+    }
+
+    private fun recordRiskFactorUserEdit() {
+        val current = currentRiskFactorIndexes()
+        KeyPopulationRiskFactorAutoSelect.recordUserEdit(
+            previous = lastCommittedRiskFactorIndexes,
+            current = current,
+            elderlyIndex = riskFactorOptions.indexOfFirst {
+                it.code == KeyPopulationRiskFactorAutoSelect.ELDERLY_CODE
+            },
+            urbanSlumIndex = riskFactorOptions.indexOfFirst {
+                it.code == KeyPopulationRiskFactorAutoSelect.URBAN_SLUM_CODE
+            },
+            isElderly = autoSelectSession.lastElderly == true,
+            isUrbanSlum = autoSelectSession.lastUrbanSlum == true,
+            session = autoSelectSession
+        )
+        lastCommittedRiskFactorIndexes = current
+    }
+
+    private fun currentRiskFactorIndexes(): Set<Int> =
+        keyPopulationRiskFactors.value
+            ?.split("|")
+            ?.mapNotNull { it.toIntOrNull() }
+            ?.toSet()
+            .orEmpty()
+
+    private fun Set<Int>.toRiskFactorValue(): String? =
+        if (isEmpty()) null else sorted().joinToString("|")
+
+    private fun urbanSlumResidentialAreaId(): Int {
+        val english = englishResources.getStringArray(R.array.nbr_residential_area_array)
+        val index = english.indexOfFirst {
+            it.equals(KeyPopulationRiskFactorAutoSelect.URBAN_SLUM_AREA_LABEL, ignoreCase = true)
+        }
+        return if (index >= 0) index + 1 else -1
+    }
+
+    private fun urbanSlumLabels(): Set<String> {
+        val english = englishResources.getStringArray(R.array.nbr_residential_area_array)
+        val localized = resources.getStringArray(R.array.nbr_residential_area_array)
+        val index = english.indexOfFirst {
+            it.equals(KeyPopulationRiskFactorAutoSelect.URBAN_SLUM_AREA_LABEL, ignoreCase = true)
+        }
+        if (index < 0) return setOf(KeyPopulationRiskFactorAutoSelect.URBAN_SLUM_AREA_LABEL)
+        return setOfNotNull(english.getOrNull(index), localized.getOrNull(index))
     }
 
     private fun enforceNotApplicableExclusivity() {
@@ -552,6 +678,7 @@ class TBScreeningDataset(
 
     fun getIndexOfDate(): Int        = listFlow.value.indexOf(dateOfVisit)
     fun getIndexOfAsymptomatic(): Int = listFlow.value.indexOf(isAsymptomatic)
+    fun getIndexOfKeyPopulationRiskFactors(): Int = listFlow.value.indexOf(keyPopulationRiskFactors)
 
     private fun buildFormList(): List<FormElement> = buildList {
         addAll(listOf(
