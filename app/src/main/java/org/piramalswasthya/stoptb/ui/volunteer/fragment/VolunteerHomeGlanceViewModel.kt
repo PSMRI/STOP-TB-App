@@ -48,7 +48,7 @@ class VolunteerHomeGlanceViewModel @Inject constructor(
             0
         ),
         householdDao.getAllHouseholdsCount(selectedVillageId),
-        benDao.getVillageHeadcount(selectedVillageId),
+        benDao.getVillageHeadcount(selectedVillageIds),
     ) { presumptive, households, headcount ->
         HomeGlance(
             presumptiveReferral = presumptive,
