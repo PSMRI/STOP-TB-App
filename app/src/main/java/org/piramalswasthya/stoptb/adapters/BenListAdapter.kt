@@ -1004,20 +1004,33 @@ class BenListAdapter(
                         7 -> tbDiag?.isReferredForSputum == true || !tbDiag?.trueNatOrderStatus.isNullOrBlank()
                         else -> false
                     }
+                    val rifOrderId = if (source == 7) {
+                        tbDiag?.rifOrderId?.takeIf { it.isNotBlank() && !it.equals("N/A", ignoreCase = true) }
+                    } else null
+                    val hasRifOrderBeenPlaced = source == 7 && !tbDiag?.rifOrderStatus.isNullOrBlank()
 
                     if (BuildConfig.FLAVOR.contains("uat", ignoreCase = true)) {
-                        when {
-                            orderId != null -> {
-                                binding.tvOrderID.visibility = View.VISIBLE
-                                binding.tvOrderID.text = "Order ID : $orderId"
-                            }
-                            hasOrderBeenPlaced -> {
-                                binding.tvOrderID.visibility = View.VISIBLE
-                                binding.tvOrderID.text = "Order ID : Pending"
-                            }
-                            else -> {
-                                binding.tvOrderID.visibility = View.GONE
-                            }
+                        val mainOrderLabel = when (source) {
+                            6 -> "X-Ray Order ID"
+                            7 -> "MTB Order ID"
+                            else -> "Order ID"
+                        }
+                        val mainOrderLine = when {
+                            orderId != null -> "$mainOrderLabel : $orderId"
+                            hasOrderBeenPlaced -> "$mainOrderLabel : Pending"
+                            else -> null
+                        }
+                        val rifOrderLine = when {
+                            rifOrderId != null -> "RIF Order ID : $rifOrderId"
+                            hasRifOrderBeenPlaced -> "RIF Order ID : Pending"
+                            else -> null
+                        }
+                        val orderIdDisplayText = listOfNotNull(mainOrderLine, rifOrderLine).joinToString("\n")
+                        if (orderIdDisplayText.isNotEmpty()) {
+                            binding.tvOrderID.visibility = View.VISIBLE
+                            binding.tvOrderID.text = orderIdDisplayText
+                        } else {
+                            binding.tvOrderID.visibility = View.GONE
                         }
                     } else {
                         binding.tvOrderID.visibility = View.GONE
