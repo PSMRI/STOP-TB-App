@@ -20,6 +20,7 @@ import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.BeneficiaryIdsAvailDao
 import org.piramalswasthya.stoptb.database.room.dao.CbacDao
 import org.piramalswasthya.stoptb.database.room.dao.ChiefComplaintMasterDao
+import org.piramalswasthya.stoptb.database.room.dao.DrugMasterDao
 import org.piramalswasthya.stoptb.database.room.dao.FilariaDao
 import org.piramalswasthya.stoptb.database.room.dao.HouseholdDao
 import org.piramalswasthya.stoptb.database.room.dao.KalaAzarDao
@@ -40,8 +41,13 @@ import org.piramalswasthya.stoptb.model.BenBasicCache
 import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.CbacCache
 import org.piramalswasthya.stoptb.model.ChiefComplaintMasterCache
+import org.piramalswasthya.stoptb.model.DrugItemMasterCache
+import org.piramalswasthya.stoptb.model.DrugFormMasterCache
+import org.piramalswasthya.stoptb.model.DrugFrequencyMasterCache
+import org.piramalswasthya.stoptb.model.DrugDurationUnitMasterCache
 import org.piramalswasthya.stoptb.model.FilariaScreeningCache
 import org.piramalswasthya.stoptb.model.GeneralOpdCache
+import org.piramalswasthya.stoptb.model.GeneralOpdPrescription
 import org.piramalswasthya.stoptb.model.HouseholdCache
 import org.piramalswasthya.stoptb.model.KalaAzarScreeningCache
 import org.piramalswasthya.stoptb.model.LeprosyFollowUpCache
@@ -97,7 +103,12 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         VitalCache::class,
         VisitCategoryMasterCache::class,
         ChiefComplaintMasterCache::class,
+        DrugItemMasterCache::class,
+        DrugFormMasterCache::class,
+        DrugFrequencyMasterCache::class,
+        DrugDurationUnitMasterCache::class,
         GeneralOpdCache::class,
+        GeneralOpdPrescription::class,
         TBDiagnosticsCache::class,
         DynamicFormEntity::class,
         FormVersionEntity::class,
@@ -111,7 +122,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 53, exportSchema = false
+    version = 57, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -128,6 +139,7 @@ abstract class InAppDb : RoomDatabase() {
     abstract val benDao: BenDao
     abstract val cbacDao: CbacDao
     abstract val chiefComplaintMasterDao: ChiefComplaintMasterDao
+    abstract val drugMasterDao: DrugMasterDao
     abstract val tbDao: TBDao
     abstract val malariaDao: MalariaDao
     abstract val aesDao: AesDao
@@ -1653,6 +1665,58 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        val MIGRATION_53_54 = object : Migration(53, 54) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `GENERAL_OPD_PRESCRIPTION` (
+                        `opdId` INTEGER NOT NULL,
+                        `position` INTEGER NOT NULL,
+                        `medicine` TEXT NOT NULL,
+                        `frequency` TEXT NOT NULL,
+                        `durationCount` INTEGER NOT NULL,
+                        `durationUnit` TEXT NOT NULL,
+                        `instruction` TEXT NOT NULL,
+                        PRIMARY KEY(`opdId`, `position`),
+                        FOREIGN KEY(`opdId`) REFERENCES `GENERAL_OPD`(`id`) ON UPDATE CASCADE ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_GENERAL_OPD_PRESCRIPTION_opdId` ON `GENERAL_OPD_PRESCRIPTION` (`opdId`)")
+            }
+        }
+
+        val MIGRATION_54_55 = object : Migration(54, 55) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `DRUG_ITEM_MASTER` (
+                        `scope` TEXT NOT NULL, `id` INTEGER NOT NULL, `itemId` INTEGER NOT NULL,
+                        `itemName` TEXT NOT NULL, `strength` TEXT, `unitOfMeasurement` TEXT,
+                        `quantityInHand` REAL, `itemFormId` INTEGER, `routeId` INTEGER,
+                        `facilityId` INTEGER, PRIMARY KEY(`scope`, `id`)
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE TABLE IF NOT EXISTS `DRUG_FORM_MASTER` (`scope` TEXT NOT NULL, `itemFormId` INTEGER NOT NULL, `itemFormName` TEXT NOT NULL, PRIMARY KEY(`scope`, `itemFormId`))")
+                database.execSQL("CREATE TABLE IF NOT EXISTS `DRUG_FREQUENCY_MASTER` (`scope` TEXT NOT NULL, `drugFrequencyId` INTEGER NOT NULL, `frequency` TEXT NOT NULL, PRIMARY KEY(`scope`, `drugFrequencyId`))")
+                database.execSQL("CREATE TABLE IF NOT EXISTS `DRUG_DURATION_UNIT_MASTER` (`scope` TEXT NOT NULL, `drugDurationId` INTEGER NOT NULL, `drugDuration` TEXT NOT NULL, PRIMARY KEY(`scope`, `drugDurationId`))")
+            }
+        }
+
+        val MIGRATION_55_56 = object : Migration(55, 56) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE `GENERAL_OPD` ADD COLUMN `submissionId` TEXT")
+                database.execSQL("ALTER TABLE `GENERAL_OPD` ADD COLUMN `chiefComplaintIds` TEXT")
+                database.execSQL("CREATE UNIQUE INDEX `index_GENERAL_OPD_submissionId` ON `GENERAL_OPD` (`submissionId`)")
+                database.execSQL("ALTER TABLE `GENERAL_OPD_PRESCRIPTION` ADD COLUMN `drugId` INTEGER")
+                database.execSQL("ALTER TABLE `GENERAL_OPD_PRESCRIPTION` ADD COLUMN `drugName` TEXT")
+            }
+        }
+
+        val MIGRATION_56_57 = object : Migration(56, 57) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE `GENERAL_OPD_PRESCRIPTION` ADD COLUMN `itemFormId` INTEGER")
+                database.execSQL("ALTER TABLE `GENERAL_OPD_PRESCRIPTION` ADD COLUMN `drugForm` TEXT")
+            }
+        }
+
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(
@@ -1933,6 +1997,10 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_50_51)
                         .addMigrations(MIGRATION_51_52)
                         .addMigrations(MIGRATION_52_53)
+                        .addMigrations(MIGRATION_53_54)
+                        .addMigrations(MIGRATION_54_55)
+                        .addMigrations(MIGRATION_55_56)
+                        .addMigrations(MIGRATION_56_57)
                         .fallbackToDestructiveMigration()
                         .build()
 

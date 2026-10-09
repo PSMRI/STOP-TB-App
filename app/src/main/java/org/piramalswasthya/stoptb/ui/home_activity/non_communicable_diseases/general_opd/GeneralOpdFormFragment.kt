@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.core.os.bundleOf
+import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -14,12 +15,10 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
-import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
+import org.piramalswasthya.stoptb.databinding.FragmentGeneralOpdFormBinding
 import org.piramalswasthya.stoptb.helpers.applyManagedFlowBackPolicyOnResume
-import org.piramalswasthya.stoptb.helpers.blockBackNavigationInManagedFlow
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
-import org.piramalswasthya.stoptb.utils.scrollToFormValidationError
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
@@ -30,11 +29,12 @@ class GeneralOpdFormFragment : Fragment() {
 
     @Inject lateinit var preferenceDao: PreferenceDao
 
-    private var _binding: FragmentNewFormBinding? = null
-    private val binding: FragmentNewFormBinding
+    private var _binding: FragmentGeneralOpdFormBinding? = null
+    private val binding: FragmentGeneralOpdFormBinding
         get() = _binding!!
 
     private val viewModel: GeneralOpdFormViewModel by viewModels()
+    private var prescriptionBound = false
     private val openedFromHousehold: Boolean
         get() = arguments?.getBoolean("openedFromHousehold", false) == true
 
@@ -52,7 +52,7 @@ class GeneralOpdFormFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        _binding = FragmentNewFormBinding.inflate(inflater, container, false)
+        _binding = FragmentGeneralOpdFormBinding.inflate(inflater, container, false)
         return binding.root
     }
 
@@ -63,6 +63,10 @@ class GeneralOpdFormFragment : Fragment() {
 
         viewModel.recordExists.observe(viewLifecycleOwner) { exists ->
             exists?.let { recordExists ->
+                val readOnly = recordExists || viewModel.viewOnly
+                binding.form.root.visibility = if (readOnly) View.GONE else View.VISIBLE
+                binding.savedChiefComplaintLayout.visibility = if (readOnly) View.VISIBLE else View.GONE
+                binding.savedChiefComplaint.setText(viewModel.savedChiefComplaintText.value.orEmpty())
                 val adapter = FormInputAdapter(
                     formValueListener = FormInputAdapter.FormValueListener { formId, index ->
                         viewModel.updateListOnValueChanged(formId, index)
@@ -75,7 +79,7 @@ class GeneralOpdFormFragment : Fragment() {
                     if (recordExists || viewModel.viewOnly) View.GONE else View.VISIBLE
                 binding.btnCancel.text = getString(R.string.btn_skip)
                 binding.form.rvInputForm.adapter = adapter
-                lifecycleScope.launch {
+                viewLifecycleOwner.lifecycleScope.launch {
                     viewModel.formList.collect {
                         adapter.submitList(it)
                     }
@@ -89,6 +93,28 @@ class GeneralOpdFormFragment : Fragment() {
         viewModel.benAgeGender.observe(viewLifecycleOwner) {
             binding.tvAgeGender.text = it
         }
+        viewModel.savedChiefComplaintText.observe(viewLifecycleOwner) {
+            binding.savedChiefComplaint.setText(it)
+        }
+        viewModel.drugMasters.observe(viewLifecycleOwner) {
+            binding.prescriptionEditor.setMasters(it)
+        }
+
+        viewModel.medicines.observe(viewLifecycleOwner) { rows ->
+            // Card edits already update their views; rebinding would interrupt dropdowns.
+            if (prescriptionBound) return@observe
+            binding.prescriptionEditor.bind(rows, !(viewModel.recordExists.value == true || viewModel.viewOnly))
+            binding.prescriptionEditor.onChanged = medicineListener
+            prescriptionBound = true
+        }
+        viewModel.prescriptionVisible.observe(viewLifecycleOwner) {
+            binding.prescriptionSection.visibility = if (it) View.VISIBLE else View.GONE
+        }
+        viewModel.notes.observe(viewLifecycleOwner) {
+            if (binding.notes.text.toString() != it) binding.notes.setText(it)
+            binding.notes.isEnabled = !(viewModel.recordExists.value == true || viewModel.viewOnly)
+        }
+        binding.notes.doAfterTextChanged { viewModel.updateNotes(it?.toString().orEmpty()) }
 
         binding.btnCancel.setOnClickListener {
             viewModel.skipForm()
@@ -127,15 +153,17 @@ class GeneralOpdFormFragment : Fragment() {
     }
 
     private fun submitGeneralOpdForm() {
-        val businessRuleResult = viewModel.validateBusinessRules()
-        if (businessRuleResult != -1) {
-            binding.form.rvInputForm.adapter?.notifyItemChanged(businessRuleResult)
-            binding.form.rvInputForm.scrollToFormValidationError(businessRuleResult)
+        if (!binding.prescriptionEditor.validate(viewModel.requiresMedicine())) {
+            Toast.makeText(requireContext(), R.string.opd_complete_medicine, Toast.LENGTH_SHORT).show()
             return
         }
         if (validateCurrentPage()) {
             viewModel.saveForm()
         }
+    }
+
+    private val medicineListener: (List<org.piramalswasthya.stoptb.model.OpdMedicineDraft>) -> Unit = {
+        viewModel.updateMedicines(it)
     }
 
     private fun validateCurrentPage(): Boolean {
@@ -195,5 +223,6 @@ class GeneralOpdFormFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+        prescriptionBound = false
     }
 }

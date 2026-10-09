@@ -432,33 +432,6 @@ data class TBScreeningSaveRequest(
 }
 data class TBDiagnosticsRequestDTO(val userId: Int, val tbDiagnosticsList: List<TBDiagnosticsDTO>)
 data class GeneralOpdRequestDTO(val userId: Int, val generalOpdList: List<GeneralOpdDTO>)
-data class GeneralOpdSaveRequest(
-    val beneficiaryRegID: Long,
-    val providerServiceMapID: Int,
-    val chiefComplaint: List<String>?,
-    val medication: String?,
-    val dosage: String?,
-    val frequency: String?,
-    val duration: String?,
-    val notes: String?,
-    val createdBy: String?
-) {
-    companion object {
-        fun from(cache: GeneralOpdCache, beneficiaryRegID: Long, providerServiceMapID: Int, createdBy: String?): GeneralOpdSaveRequest {
-            return GeneralOpdSaveRequest(
-                beneficiaryRegID = beneficiaryRegID,
-                providerServiceMapID = providerServiceMapID,
-                chiefComplaint = cache.chiefComplaints,
-                medication = cache.medications?.joinToString(", "),
-                dosage = cache.dosage,
-                frequency = cache.frequency,
-                duration = cache.duration,
-                notes = cache.notes,
-                createdBy = createdBy
-            )
-        }
-    }
-}
 data class PatientRequest(
     val firstName: String,
     val lastName: String,

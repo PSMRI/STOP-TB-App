@@ -1263,6 +1263,28 @@
 
     <string name="general_opd">General OPD</string>
     <string name="chief_complaint">Chief Complaint</string>
+    <string name="prescription">Prescription</string>
+    <string name="opd_medicine_title">Medicine-%1$d</string>
+    <string name="opd_medicine_hint">Medicine</string>
+    <string name="opd_drug_form">Drug Form</string>
+    <string name="opd_no_medicine_matches">No medicines found</string>
+    <string name="opd_drug_master_unavailable">Medicine master is unavailable. Connect and sync to load medicines.</string>
+    <string name="opd_out_of_stock">Out of Stock</string>
+    <string name="opd_duration_unit">Unit</string>
+    <string name="opd_instruction">Instruction</string>
+    <string name="opd_reset_medicine">Reset medicine</string>
+    <string name="opd_add_medicine">Add medicine</string>
+    <string name="opd_remove_medicine">Remove medicine</string>
+    <string name="opd_increase_duration">Increase duration</string>
+    <string name="opd_decrease_duration">Decrease duration</string>
+    <string name="opd_complete_medicine">Select medicine, frequency and duration unit for each card.</string>
+    <string-array name="opd_duration_units">
+        <item>Day(s)</item><item>Week(s)</item><item>Month(s)</item>
+    </string-array>
+    <string-array name="opd_instructions">
+        <item>Before food</item><item>After food</item><item>With food</item><item>At bedtime</item>
+    </string-array>
+    <string name="general_opd_medicine_one">Medicine - 1: Form / Medicine / Dosage</string>
     <string name="medication">Medication</string>
     <string name="dosage">Dosage</string>
     <string name="frequency">Frequency</string>

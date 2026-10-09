@@ -4,6 +4,9 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
+import androidx.room.Update
+import org.piramalswasthya.stoptb.model.GeneralOpdPrescription
 import kotlinx.coroutines.flow.Flow
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.model.GeneralOpdCache
@@ -54,8 +57,53 @@ interface TBDao {
     @Query("SELECT * FROM TB_DIAGNOSTICS")
     suspend fun getDiagnosticsList(): List<TBDiagnosticsCache>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun saveGeneralOpd(generalOpdCache: GeneralOpdCache)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertGeneralOpd(generalOpdCache: GeneralOpdCache): Long
+
+    @Update
+    suspend fun updateGeneralOpd(generalOpdCache: GeneralOpdCache)
+
+    @Query("SELECT * FROM GENERAL_OPD WHERE id = :opdId")
+    suspend fun getGeneralOpdById(opdId: Int): GeneralOpdCache?
+
+    @Query("SELECT COUNT(*) FROM GENERAL_OPD WHERE submissionId = :submissionId")
+    suspend fun countGeneralOpdSubmissionId(submissionId: String): Int
+
+    @Query("UPDATE GENERAL_OPD SET submissionId = :submissionId WHERE id = :opdId AND submissionId IS NULL")
+    suspend fun assignGeneralOpdSubmissionId(opdId: Int, submissionId: String)
+
+    // REPLACE deletes the parent row and cascades to its saved prescriptions.
+    @Transaction
+    suspend fun saveGeneralOpd(generalOpdCache: GeneralOpdCache): Long {
+        val insertedId = insertGeneralOpd(generalOpdCache)
+        if (insertedId != -1L) return insertedId
+        val existing = getGeneralOpdById(generalOpdCache.id)
+        updateGeneralOpd(generalOpdCache.copy(
+            submissionId = existing?.submissionId ?: generalOpdCache.submissionId,
+            chiefComplaintIds = generalOpdCache.chiefComplaintIds ?:
+                existing?.chiefComplaintIds?.takeIf { existing?.chiefComplaints == generalOpdCache.chiefComplaints }
+        ))
+        return generalOpdCache.id.toLong()
+    }
+
+    @Transaction
+    suspend fun ensureGeneralOpdSubmissionId(opdId: Int): String {
+        getGeneralOpdById(opdId)?.submissionId?.let { return it }
+        var candidate: String
+        do { candidate = java.util.UUID.randomUUID().toString() }
+        while (countGeneralOpdSubmissionId(candidate) > 0)
+        assignGeneralOpdSubmissionId(opdId, candidate)
+        return requireNotNull(getGeneralOpdById(opdId)?.submissionId)
+    }
+
+    @Query("SELECT * FROM GENERAL_OPD_PRESCRIPTION WHERE opdId = :opdId ORDER BY position")
+    suspend fun getGeneralOpdPrescriptions(opdId: Int): List<GeneralOpdPrescription>
+
+    @Query("DELETE FROM GENERAL_OPD_PRESCRIPTION WHERE opdId = :opdId")
+    suspend fun deleteGeneralOpdPrescriptions(opdId: Int)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertGeneralOpdPrescriptions(rows: List<GeneralOpdPrescription>)
 
     @Query("SELECT * FROM TB_DIAGNOSTICS WHERE benId =:benId limit 1")
     suspend fun getTbDiagnostics(benId: Long): TBDiagnosticsCache?

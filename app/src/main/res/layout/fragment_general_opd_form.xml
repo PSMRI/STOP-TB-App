@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="16dp"
+    android:background="@android:color/white">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="16dp" android:background="?attr/colorPrimary">
+        <TextView android:id="@+id/tv_ben_name" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textSize="16sp" android:textStyle="bold"
+            android:textColor="@android:color/white" />
+        <TextView android:id="@+id/tv_age_gender" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="8dp"
+            android:textColor="@android:color/white" />
+    </LinearLayout>
+    <androidx.core.widget.NestedScrollView android:id="@+id/scroll_form"
+        android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical">
+            <include android:id="@+id/form" layout="@layout/rv_input_form"
+                android:layout_width="match_parent" android:layout_height="wrap_content" />
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/saved_chief_complaint_layout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_margin="@dimen/padding_normal"
+                android:hint="@string/chief_complaint" android:visibility="gone">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/saved_chief_complaint"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:inputType="textMultiLine" android:focusable="false"
+                    android:clickable="false" android:cursorVisible="false" />
+            </com.google.android.material.textfield.TextInputLayout>
+            <LinearLayout android:id="@+id/prescription_section" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="@string/prescription" android:gravity="center" android:padding="12dp"
+                    android:textSize="22sp" android:textStyle="bold" android:background="?attr/colorPrimary"
+                    android:textColor="@android:color/white" />
+                <org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.general_opd.OpdPrescriptionEditor
+                    android:id="@+id/prescription_editor" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" android:hint="@string/notes_remarks">
+                <com.google.android.material.textfield.TextInputEditText android:id="@+id/notes"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:inputType="textMultiLine" android:maxLength="250" />
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:gravity="center" android:orientation="horizontal">
+        <com.google.android.material.button.MaterialButton android:id="@+id/btn_cancel"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginEnd="16dp" android:text="@string/btn_skip" android:visibility="gone" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/btn_submit"
+            android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/btn_submit" android:visibility="gone" />
+    </LinearLayout>
+    <ProgressBar android:id="@+id/pb_form" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:layout_gravity="center" android:visibility="gone" />
+</LinearLayout>
