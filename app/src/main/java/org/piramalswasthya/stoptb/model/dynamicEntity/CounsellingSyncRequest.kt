@@ -49,6 +49,7 @@ data class ServerCounsellingResponseDto(
     @SerializedName("beneficiaryId") val beneficiaryId: Long,
     @SerializedName("formId") val formId: Int,
     @SerializedName("versionId") val versionId: Int,
+    @SerializedName("versionNumber") val versionNumber : Int,
     @SerializedName("officerId") val officerId: Long,
     @SerializedName("status") val status: String? = null,
     @SerializedName("submittedAt") val submittedAt: String? = null,
@@ -69,7 +70,7 @@ data class ServerAnswerDto(
     @SerializedName("questionResponseId") val questionResponseId: Long,
     @SerializedName("questionId") val questionId: Int,
     @SerializedName("optionId") val optionId: Int? = null,
-    @SerializedName("answerText") val answerText: String? = null
+    @SerializedName("answerText") val answerText: String? = null,
+    @SerializedName("questionUuid") val questionUuid: String? = null,
+    @SerializedName("optionValue") val optionValue: String? = null
 )
-
-

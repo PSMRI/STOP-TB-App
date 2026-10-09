@@ -237,7 +237,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         }
         refreshCampHubOfflineBanner()
 
-        binding.versionName.text = "App Version ${BuildConfig.VERSION_NAME}"
+        binding.versionName.text = getString(R.string.login_app_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
 
 
         viewModel.navigateToLoginPage.observe(this) {
@@ -308,6 +308,14 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         binding.bottomNavRole.setOnItemSelectedListener { item ->
             itemIdToRole[item.itemId]?.let { roleManager.setActiveRole(it) }
             true
+        }
+
+        // Observes the role rather than the click so a Counselling start tab (selected before the
+        // listener is attached) is checked too.
+        lifecycleScope.launch {
+            roleManager.activeRole.collect { role ->
+                if (role == AppRole.COUNSELING) viewModel.checkFormVersions()
+            }
         }
 
         // Visible on Home only; addOnDestinationChangedListener fires immediately with the

@@ -7,6 +7,8 @@
     <string name="no_records_found">কোনো ৰেকৰ্ড পোৱা নগল</string>
     <string name="household_search">সন্ধান</string>
     <string name="search_other_villages">অন্য গাঁৱত সন্ধান কৰক</string>
+    <string name="search_other_villages_failed">অন্য গাঁৱত সন্ধান কৰিব পৰা নগ\'ল। অনুগ্ৰহ কৰি পুনৰ চেষ্টা কৰক।</string>
+    <string name="search_other_villages_retry">পুনৰ চেষ্টা কৰক</string>
 
     <string name="rv_item_hh_ph_1">HHID : </string>
     <string name="rv_item_hh_ph_2">পৰিয়ালৰ মূৰব্বীৰ নাম :</string>

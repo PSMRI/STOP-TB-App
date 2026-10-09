@@ -12,9 +12,11 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.piramalswasthya.stoptb.configuration.KeyPopulationRiskFactorAutoSelect
 import org.piramalswasthya.stoptb.configuration.TBScreeningDataset
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.OrderStatus
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
@@ -98,11 +100,40 @@ class TBScreeningFormViewModel @Inject constructor(
                 _recordExists.value = false
             }
 
+            val residentialArea = ben?.let { resolveResidentialArea(it) }
             dataset.setUpPage(
                 ben,
-                if (recordExists.value == true) tbScreeningCache else null
+                if (recordExists.value == true) tbScreeningCache else null,
+                residentialArea?.label,
+                residentialArea?.id
             )
         }
+    }
+
+    /**
+     * Picks up an age or residential-area edit made before this screening is saved.
+     * Returns true when Elderly or Urban Slum was added or removed.
+     */
+    suspend fun refreshAutoSelectedRiskFactors(): Boolean {
+        if (_recordExists.value == true) return false
+        val ben = benRepo.getBenFromId(benId) ?: return false
+        _benAgeGender.postValue(ben.getAgeGenderDisplayString())
+        val residentialArea = resolveResidentialArea(ben)
+        return dataset.refreshAutoSelectedRiskFactors(
+            ben,
+            residentialArea.label,
+            residentialArea.id
+        )
+    }
+
+    private suspend fun resolveResidentialArea(ben: BenRegCache): KeyPopulationRiskFactorAutoSelect.ResidentialArea {
+        val household = ben.householdId?.takeIf { it > 0L }?.let { benRepo.getHousehold(it) }
+        return KeyPopulationRiskFactorAutoSelect.resolveResidentialArea(
+            benLabel = ben.residentialArea,
+            benId = ben.residentialAreaId,
+            householdLabel = household?.details?.residentialArea,
+            householdId = household?.details?.residentialAreaId
+        )
     }
 
     fun updateListOnValueChanged(formId: Int, index: Int) {
@@ -247,5 +278,6 @@ class TBScreeningFormViewModel @Inject constructor(
 
     fun getIndexOfDate(): Int        = dataset.getIndexOfDate()
     fun getIndexOfAsymptomatic(): Int = dataset.getIndexOfAsymptomatic()
+    fun getIndexOfKeyPopulationRiskFactors(): Int = dataset.getIndexOfKeyPopulationRiskFactors()
 }
 

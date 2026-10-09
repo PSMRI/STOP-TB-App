@@ -819,6 +819,8 @@ class FormInputAdapterOld(
             FILE_UPLOAD -> FileUploadInputViewHolder.from(parent)
             org.piramalswasthya.stoptb.model.InputType.MULTIFILE_UPLOAD -> MultiFileUploadInputViewHolder.from(parent)
             NUMBER_PICKER ->NumberPickerInputViewHolder.from(parent)
+            org.piramalswasthya.stoptb.model.InputType.STATUS_INDICATOR ->
+                FormInputAdapter.StatusIndicatorViewHolder.from(parent)
         }
     }
 
@@ -844,7 +846,12 @@ class FormInputAdapterOld(
             FILE_UPLOAD -> (holder as FileUploadInputViewHolder).bind(item, isEnabled)
             org.piramalswasthya.stoptb.model.InputType.MULTIFILE_UPLOAD -> (holder as FileUploadInputViewHolder).bind(item, isEnabled)
             NUMBER_PICKER -> null
-
+            org.piramalswasthya.stoptb.model.InputType.STATUS_INDICATOR ->
+                (holder as FormInputAdapter.StatusIndicatorViewHolder).bind(
+                    item.title,
+                    item.value.value,
+                    item.entries
+                )
         }
     }
 

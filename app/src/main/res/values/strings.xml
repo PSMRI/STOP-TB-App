@@ -58,6 +58,11 @@
     <string name="long_to_string">%d</string>
     <string name="tv_reg_date_ph">Registration Date</string>
     <string name="reg_date">Reg Date</string>
+    <string name="family_members">Family members</string>
+    <string name="mobile_number_ben">Mobile Number</string>
+    <string name="btn_examine_count_ben">Examine (%1$d/%2$d)</string>
+    <string name="screening_presumptive">Presumptive</string>
+    <string name="screening_asymptomatic">Asymptomatic</string>
     <string name="tv_ben_name_ph">Beneficiary Name</string>
     <string name="tv_type_of_list">Type of List</string>
     <string name="tv_rch_id">RCH ID</string>
@@ -99,6 +104,10 @@
     <string name="tb_ai_cough_assessment_result">AI Cough Assessment result</string>
     <string name="tb_naat_conducted">True NAT conducted?</string>
     <string name="tb_naat_result">True NAT result</string>
+    <string name="tb_quick_naat_conducted">Is Truenat - MTB Test Conducted?</string>
+    <string name="tb_quick_naat_result">Truenat - MTB Test Result</string>
+    <string name="tb_quick_rif_conducted">Is Truenat - RIF Test Conducted?</string>
+    <string name="tb_quick_rif_result">Truenat - RIF Test Result</string>
     <string name="tb_liquid_culture_conducted">Is Liquid culture conducted?</string>
     <string name="tb_liquid_culture_result">Liquid Culture result</string>
     <string name="tb_suspected_quick_title">Diagnostics</string>
@@ -1016,6 +1025,12 @@
     <string name="check_if_the_person_has_any_of_these_symptoms">Check if the person has any of these Symptoms:</string>
     <string name="tb_asymptomatic_screening">Asymptomatic Screening</string>
     <string name="tb_is_beneficiary_asymptomatic">Beneficiary is Asymptomatic</string>
+    <string name="tb_symptom_status">Symptom status</string>
+    <string name="tb_status_asymptomatic">Asymptomatic</string>
+    <string name="tb_status_symptomatic">Symptomatic</string>
+    <string name="tb_status_asymptomatic_detail">No TB-related symptoms were identified</string>
+    <string name="tb_status_symptomatic_detail">At least one TB-related symptom was identified</string>
+    <string name="tb_symptom_status_pending">Answer the symptom questions. This status is set automatically.</string>
     <string name="risk_factors">Risk Factors</string>
     <string name="other_details">Other Details</string>
     <string name="tb_rise_of_fever">Rise of fever in evening</string>
@@ -1245,7 +1260,7 @@
         <item>Urban Slum</item>
         <item>H/o Adult BCG Vaccination</item>
         <item>Undernourished / Malnourished (BMI &lt;18.5 kg/m2)</item>
-        <item>Elderly (age &gt;60 years)</item>
+        <item>Elderly (age &gt;=60 years)</item>
         <item>Workplace settings (coal/sandblasting/brick kiln)</item>
         <item>Tea garden worker</item>
         <item>Construction site worker</item>
@@ -1396,6 +1411,21 @@
     <string name="order_status_rif_block_label">RIF Test · triggered by MTB Positive</string>
     <string name="order_status_create_new_order">Create New Order</string>
     <string name="order_status_clinical_assessment_referred">Referred for Clinical Assessment &amp; Diagnosis</string>
+    <string name="order_status_retry_referral">Retry Referral</string>
+    <string name="diagnostic_manual_result_success">Result submitted successfully</string>
+    <string name="diagnostic_order_creation_failed">Unable to submit result: order could not be created (%1$s)</string>
+    <string name="error_beneficiary_not_found">Beneficiary not found</string>
+    <string name="error_beneficiary_id_invalid">Beneficiary ID not valid</string>
+    <string name="error_no_user_logged_in">No user logged in!!</string>
+    <string name="error_camp_hub_not_connected">Camp Hub not connected</string>
+    <string name="error_http_code">HTTP Error %1$d</string>
+    <string name="error_no_location_record_found">No location record found</string>
+    <string name="error_camp_mode_disabled">Camp Mode is disabled</string>
+    <string name="error_camp_hub_disconnected">Camp Hub is disconnected</string>
+    <string name="error_manual_result_rejected">Manual result submission was rejected</string>
+    <string name="error_push_order_failed">Failed to push order</string>
+    <string name="error_retry_order_failed">Failed to retry order</string>
+    <string name="error_fetch_result_failed">Failed to fetch result</string>
     <string name="btn_examine">Examine</string>
     <string name="btn_examine_count">Examine %1$d/4</string>
     <string name="btn_examine_count_of">Examine %1$d/%2$d</string>
@@ -1561,7 +1591,23 @@
     <string name="home_card_tb_treatment_followup_title">TB Treatment Follow-up</string>
     <string name="home_card_tpt_title">TPT</string>
     <string name="home_card_coming_soon_subtitle">Coming soon</string>
+
+
+
+    <string name="sync_beneficiary">Beneficiary</string>
+    <string name="sync_anthropometric">Anthropometric</string>
+    <string name="sync_tb_screening">TB Screening</string>
+    <string name="sync_tb_confirmed">TB Confirmed</string>
+    <string name="sync_counselling">Counselling</string>
+
+
+
+
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
+
+
+
+
 </resources>
 

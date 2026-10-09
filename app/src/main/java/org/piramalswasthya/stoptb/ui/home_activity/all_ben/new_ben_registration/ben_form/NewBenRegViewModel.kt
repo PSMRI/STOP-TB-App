@@ -180,6 +180,15 @@ class NewBenRegViewModel @Inject constructor(
             village  = LocationEntity(0, "")
         )
 
+        val householdMembers =
+            if (hhId > 0L) benRepo.getBenListFromHousehold(hhId) else emptyList()
+        // HoF = Self (familyHeadRelationPosition = 19). household.benId is not set here.
+        val hofBen = householdMembers.firstOrNull { it.familyHeadRelationPosition == 19 }
+        val hofSpouse = householdMembers.firstOrNull {
+            (it.familyHeadRelationPosition == 5 || it.familyHeadRelationPosition == 6) &&
+                it.beneficiaryId != hofBen?.beneficiaryId
+        }
+
         if (benIdFromArgs != 0L) {
             ben = benRepo.getBeneficiaryRecord(benIdFromArgs, hhId)!!
             _isDeath.postValue(ben.isDeath ?: false)
@@ -196,7 +205,9 @@ class NewBenRegViewModel @Inject constructor(
                 // familyHeadRelationPosition is stored 1-indexed (getPosition = indexOf+1),
                 // but setUpPage uses it as 0-indexed with getOrNull(). Subtract 1 to align.
                 relToHeadId = (ben.familyHeadRelationPosition - 1).takeIf { it >= 0 } ?: relToHeadId,
-                isNonHH = ben.isNonHH
+                isNonHH = ben.isNonHH,
+                hofForDobRules = hofBen,
+                hofSpouseForDobRules = hofSpouse
             )
         } else {
             val villageNames = user.villages.map { it.name }.toTypedArray()
@@ -204,7 +215,8 @@ class NewBenRegViewModel @Inject constructor(
             // For wife/husband: look up spouse's first name from the matching member's stored spouseName
             val selectedSpouseMember =
                 if (relToHeadId == 4 || relToHeadId == 5)
-                    benRepo.getBeneficiaryRecord(selectedBenIdFromArgs, hhId)
+                    householdMembers.firstOrNull { it.beneficiaryId == selectedBenIdFromArgs }
+                        ?: benRepo.getBeneficiaryRecord(selectedBenIdFromArgs, hhId)
                 else null
             val selectedMemberSpouseName =
                 selectedSpouseMember
@@ -212,11 +224,11 @@ class NewBenRegViewModel @Inject constructor(
                     ?.spouseName
                     ?.takeIf { it.isNotBlank() }
             val spouseFirstName: String? = selectedMemberSpouseName ?: if (selectedBenIdFromArgs == 0L) when (relToHeadId) {
-                4 -> benRepo.getBenListFromHousehold(hhId)          // wife reg → get male member's stored wife name
+                4 -> householdMembers          // wife reg → get male member's stored wife name
                         .filter { it.genderId == 1 }
                         .mapNotNull { it.genDetails?.spouseName }
                         .firstOrNull { it.isNotBlank() }
-                5 -> benRepo.getBenListFromHousehold(hhId)          // husband reg → get female member's stored husband name
+                5 -> householdMembers          // husband reg → get female member's stored husband name
                         .filter { it.genderId == 2 }
                         .mapNotNull { it.genDetails?.spouseName }
                         .firstOrNull { it.isNotBlank() }
@@ -229,45 +241,28 @@ class NewBenRegViewModel @Inject constructor(
             // For Son (8) / Daughter (9): pre-fill Father's Name and Mother's Name
             // Logic matches FLW2.9: use HoF as primary parent; spouse record (relPos 5/6) as the other parent;
             // fallback to HoF's stored genDetails.spouseName if no spouse is registered yet.
-            val (prefillFatherName, prefillMotherName, minimumChildDob) = if (relToHeadId == 8 || relToHeadId == 9) {
-                val members = benRepo.getBenListFromHousehold(hhId)
-                // HoF = Self (familyHeadRelationPosition = 19: index 18 in array + 1 for 1-indexed storage)
-                // Note: household.benId is not set in NikshayMitra, so we cannot use it for lookup.
-                val hofBen = members.firstOrNull { it.familyHeadRelationPosition == 19 }
-                    ?: members.firstOrNull()   // fallback: first registered member if HoF not found
-
-                // Spouse of HoF = Wife (pos 5) or Husband (pos 6), but NOT the HoF themselves
-                val hofSpouse = members.firstOrNull {
-                    (it.familyHeadRelationPosition == 5 || it.familyHeadRelationPosition == 6) &&
-                    it.beneficiaryId != hofBen?.beneficiaryId
-                }
-
-                val youngestParentDob = listOfNotNull(
-                    hofBen?.dob?.takeIf { it > 0L },
-                    hofSpouse?.dob?.takeIf { it > 0L }
-                ).maxOrNull()
-                val minimumChildDob = youngestParentDob?.plus(24 * 60 * 60 * 1000L)
-
-                if (hofBen != null) {
-                    val hofFullName = listOfNotNull(hofBen.firstName?.trim(), hofBen.lastName?.trim())
+            val (prefillFatherName, prefillMotherName) = if (relToHeadId == 8 || relToHeadId == 9) {
+                val nameSourceHof = hofBen ?: householdMembers.firstOrNull()
+                if (nameSourceHof != null) {
+                    val hofFullName = listOfNotNull(nameSourceHof.firstName?.trim(), nameSourceHof.lastName?.trim())
                         .filter { it.isNotBlank() }.joinToString(" ").takeIf { it.isNotBlank() }
                     val spouseFullName = hofSpouse?.let {
                         listOfNotNull(it.firstName?.trim(), it.lastName?.trim())
                             .filter { n -> n.isNotBlank() }.joinToString(" ").takeIf { n -> n.isNotBlank() }
-                    } ?: hofBen.genDetails?.spouseName?.takeIf { it.isNotBlank() }
+                    } ?: nameSourceHof.genDetails?.spouseName?.takeIf { it.isNotBlank() }
 
-                    if (hofBen.genderId == 1) {
+                    if (nameSourceHof.genderId == 1) {
                         // HoF is male → he is the father; his spouse is the mother
-                        Triple(hofFullName, spouseFullName, minimumChildDob)
+                        hofFullName to spouseFullName
                     } else {
                         // HoF is female → she is the mother; her spouse is the father
-                        Triple(spouseFullName, hofFullName, minimumChildDob)
+                        spouseFullName to hofFullName
                     }
                 } else {
-                    Triple(null, null, minimumChildDob)
+                    null to null
                 }
             } else {
-                Triple(null, null, null)
+                null to null
             }
 
             val prefillBen = getHouseholdPrefillBen(
@@ -276,23 +271,23 @@ class NewBenRegViewModel @Inject constructor(
                 prefillMotherName,
                 selectedSpouseMemberName
             )
-            val hof = benRepo.getBenListFromHousehold(hhId)
-                .firstOrNull { it.familyHeadRelationPosition == 19 }
 
             val prefillLocation = prefillBen?.locationRecord ?: locationRecord
             dataset.setUpPage(
                 prefillBen,
                 household.family?.familyHeadPhoneNo,
-                familyHeadCommunityId = hof?.communityId ?: 0,
+                familyHeadCommunityId = hofBen?.communityId ?: 0,
                 prefillLocation.village.name,
-                pinCodeValue = hof?.pinCode,
+                pinCodeValue = hofBen?.pinCode,
                 villageNames,
                 user.villages,
                 user.subCentre,
                 relToHeadId = effectiveRelToHeadId,
                 spouseRegistrationRelToHeadId = relToHeadId,
                 isNonHH = isNonHHArg,
-                minimumChildDob = minimumChildDob
+                hofForDobRules = hofBen,
+                hofSpouseForDobRules = hofSpouse,
+                selectedMemberForDobRules = selectedSpouseMember
             )
         }
         // Restore/Inherit Location details

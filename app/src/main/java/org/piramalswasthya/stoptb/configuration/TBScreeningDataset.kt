@@ -190,16 +190,17 @@ class TBScreeningDataset(
         hasDependants = true
     )
 
-    /** Auto-computed from the 10 symptom answers — not editable by user */
+    /**
+     * Auto-computed from the symptom answers. Shown as a status banner, not a Yes/No choice.
+     * Stored value stays on the Yes/No scale: Yes = Asymptomatic, No = Symptomatic.
+     */
     private val isAsymptomatic = FormElement(
         id = 16,
-        inputType = InputType.RADIO,
-        title = resources.getString(R.string.tb_is_beneficiary_asymptomatic),
+        inputType = InputType.STATUS_INDICATOR,
+        title = resources.getString(R.string.tb_symptom_status),
         entries = resources.getStringArray(R.array.yes_no),
         required = false,
-        isEnabled = false,
-        hasDependants = true,
-        boldTitleOnYes = true
+        isEnabled = false
     )
 
     private data class CodedOption(val id: Int, val code: String, val label: String)
@@ -216,6 +217,12 @@ class TBScreeningDataset(
     private var isMaleBen: Boolean = false
     private var isPregnantBen: Boolean = false
     private var riskFactorOptions: List<CodedOption> = emptyList()
+    private var residentialAreaLabel: String? = null
+    private var residentialAreaId: Int? = null
+    private var editingExistingScreening: Boolean = false
+    private var formReady: Boolean = false
+    private val autoSelectSession = KeyPopulationRiskFactorAutoSelect.Session()
+    private var lastCommittedRiskFactorIndexes: Set<Int> = emptySet()
 
     private val hivStatusOptions: List<CodedOption>
         get() = listOf(
@@ -255,8 +262,6 @@ class TBScreeningDataset(
     /** Children (< 15 years) get 2 extra mandatory symptom questions; see [buildFormList] */
     private val isChildBeneficiary: Boolean
         get() = benAgeYears < 15
-
-    /** The mandatory symptom questions that drive asymptomatic auto-select, age-gated */
     private fun requiredSymptomFields(): List<FormElement> {
         val fields = mutableListOf(
             isCoughing, bloodInSputum, isFever, riseOfFever,
@@ -276,10 +281,9 @@ class TBScreeningDataset(
         get() = requiredSymptomFields().map { it.id }.toSet() + others.id
 
     /**
-     * PRD rule:
-     *  - Any mandatory symptom (or "Others") = "Yes"  →  asymptomatic = "No"
-     *  - All mandatory symptoms = "No"                →  asymptomatic = "Yes"
-     *  - Not all mandatory symptoms answered yet      →  null (blank)
+     *  - Any symptom (or "Others") = "Yes"       →  Symptomatic
+     *  - Every symptom question = "No"           →  Asymptomatic
+     *  - Symptom questions still unanswered      →  blank, unless a Yes is already recorded
      */
     private fun computeAsymptomatic(): String? {
         val fields = requiredSymptomFields()
@@ -329,7 +333,22 @@ class TBScreeningDataset(
 
     // ── Page setup ───────────────────────────────────────────────────────────
 
-    suspend fun setUpPage(ben: BenRegCache?, saved: TBScreeningCache?) {
+    suspend fun setUpPage(
+        ben: BenRegCache?,
+        saved: TBScreeningCache?,
+        residentialArea: String? = null,
+        residentialAreaId: Int? = null
+    ) {
+        formReady = false
+        editingExistingScreening = saved != null
+        residentialAreaLabel = residentialArea
+        this.residentialAreaId = residentialAreaId
+        autoSelectSession.elderlySuppressedByUser = false
+        autoSelectSession.urbanSlumSuppressedByUser = false
+        autoSelectSession.elderlyAppliedByAuto = false
+        autoSelectSession.urbanSlumAppliedByAuto = false
+        autoSelectSession.lastElderly = null
+        autoSelectSession.lastUrbanSlum = null
         ben?.let {
             dateOfVisit.min = it.regDate
             benAgeYears = if (it.dob > 0L) BenBasicCache.getAgeFromDob(it.dob) else it.age
@@ -350,12 +369,14 @@ class TBScreeningDataset(
 
         if (saved == null) {
             dateOfVisit.value = getDateFromLong(System.currentTimeMillis())
+            val selectedIndexes = mutableSetOf<Int>()
             val pregnancyIndex = riskFactorOptions.indexOfFirst { it.code == "PREGNANCY" }
-
-            keyPopulationRiskFactors.value = when {
-                isPregnantBen && pregnancyIndex >= 0 -> pregnancyIndex.toString()
-                else -> null
+            if (isPregnantBen && pregnancyIndex >= 0) {
+                selectedIndexes.add(pregnancyIndex)
             }
+            applyAutoSelectedRiskFactors(ben, selectedIndexes)
+            keyPopulationRiskFactors.value = selectedIndexes.toRiskFactorValue()
+            lastCommittedRiskFactorIndexes = selectedIndexes
             hivStatus.value = null
         } else {
             dateOfVisit.value        = getDateFromLong(saved.visitDate)
@@ -375,7 +396,7 @@ class TBScreeningDataset(
             historyOfTB.value        = boolToYesNo(saved.historyOfTb)
             currentlyTakingDrugs.value = boolToYesNo(saved.takingAntiTBDrugs)
             familyHistoryTB.value    = boolToYesNo(saved.familySufferingFromTB)
-            isAsymptomatic.value     = saved.asymptomatic ?: computeAsymptomatic()
+            isAsymptomatic.value     = computeAsymptomatic() ?: normalizeAsymptomatic(saved.asymptomatic)
 
             val savedIds = saved.keyPopulationRiskFactorIds.orEmpty()
             val savedCodes = saved.keyPopulationRiskFactors.orEmpty()
@@ -386,6 +407,7 @@ class TBScreeningDataset(
             }
             keyPopulationRiskFactors.value =
                 if (selectedIndexes.isEmpty()) null else selectedIndexes.sorted().joinToString("|")
+            lastCommittedRiskFactorIndexes = selectedIndexes.toSet()
 
             hivStatus.value = hivStatusOptions.firstOrNull {
                 it.id == saved.hivStatusId ||
@@ -395,6 +417,28 @@ class TBScreeningDataset(
         }
 
         setUpPage(buildFormList())
+        formReady = true
+    }
+
+    /**
+     * Re-reads age and residential area for a screening that has not been saved yet.
+     * Returns true when the Key Population selection changed.
+     */
+    fun refreshAutoSelectedRiskFactors(
+        ben: BenRegCache?,
+        residentialArea: String?,
+        residentialAreaId: Int?
+    ): Boolean {
+        if (!formReady || editingExistingScreening || ben == null) return false
+        residentialAreaLabel = residentialArea
+        this.residentialAreaId = residentialAreaId
+        val selectedIndexes = currentRiskFactorIndexes().toMutableSet()
+        val changed = applyAutoSelectedRiskFactors(ben, selectedIndexes)
+        if (changed) {
+            keyPopulationRiskFactors.value = selectedIndexes.toRiskFactorValue()
+        }
+        lastCommittedRiskFactorIndexes = selectedIndexes
+        return changed
     }
     // ── Value change handling ────────────────────────────────────────────────
 
@@ -416,7 +460,10 @@ class TBScreeningDataset(
             historyOfTB.id          -> historyOfTB.value          = yesNoFromIndex(index)
             currentlyTakingDrugs.id -> currentlyTakingDrugs.value = yesNoFromIndex(index)
             familyHistoryTB.id      -> familyHistoryTB.value      = yesNoFromIndex(index)
-            keyPopulationRiskFactors.id -> enforceNotApplicableExclusivity()
+            keyPopulationRiskFactors.id -> {
+                enforceNotApplicableExclusivity()
+                recordRiskFactorUserEdit()
+            }
         }
         // If a symptom question was answered, recompute asymptomatic and signal a
         // list refresh so the fragment can force-rebind the auto-computed field.
@@ -425,6 +472,83 @@ class TBScreeningDataset(
             Log.d("ASYM_TEST", "Computed = ${isAsymptomatic.value}")
             listFlow.value.indexOf(isAsymptomatic).takeIf { it >= 0 } ?: -1
         } else -1
+    }
+
+    private fun applyAutoSelectedRiskFactors(
+        ben: BenRegCache?,
+        selectedIndexes: MutableSet<Int>
+    ): Boolean {
+        val ageYears = ben?.let {
+            KeyPopulationRiskFactorAutoSelect.ageInYears(it.dob, it.age, it.ageUnit, it.ageUnitId)
+        } ?: 0
+        val urbanSlumAreaId = urbanSlumResidentialAreaId()
+        val acceptedLabels = urbanSlumLabels()
+        return KeyPopulationRiskFactorAutoSelect.apply(
+            selected = selectedIndexes,
+            elderlyIndex = riskFactorOptions.indexOfFirst {
+                it.code == KeyPopulationRiskFactorAutoSelect.ELDERLY_CODE
+            },
+            urbanSlumIndex = riskFactorOptions.indexOfFirst {
+                it.code == KeyPopulationRiskFactorAutoSelect.URBAN_SLUM_CODE
+            },
+            notApplicableIndex = riskFactorOptions.indexOfFirst {
+                it.code == KeyPopulationRiskFactorAutoSelect.NOT_APPLICABLE_CODE
+            },
+            isElderly = KeyPopulationRiskFactorAutoSelect.isElderly(ageYears),
+            isUrbanSlum = KeyPopulationRiskFactorAutoSelect.isUrbanSlumResidentialArea(
+                residentialAreaLabel,
+                residentialAreaId,
+                urbanSlumAreaId,
+                acceptedLabels
+            ),
+            session = autoSelectSession
+        )
+    }
+
+    private fun recordRiskFactorUserEdit() {
+        val current = currentRiskFactorIndexes()
+        KeyPopulationRiskFactorAutoSelect.recordUserEdit(
+            previous = lastCommittedRiskFactorIndexes,
+            current = current,
+            elderlyIndex = riskFactorOptions.indexOfFirst {
+                it.code == KeyPopulationRiskFactorAutoSelect.ELDERLY_CODE
+            },
+            urbanSlumIndex = riskFactorOptions.indexOfFirst {
+                it.code == KeyPopulationRiskFactorAutoSelect.URBAN_SLUM_CODE
+            },
+            isElderly = autoSelectSession.lastElderly == true,
+            isUrbanSlum = autoSelectSession.lastUrbanSlum == true,
+            session = autoSelectSession
+        )
+        lastCommittedRiskFactorIndexes = current
+    }
+
+    private fun currentRiskFactorIndexes(): Set<Int> =
+        keyPopulationRiskFactors.value
+            ?.split("|")
+            ?.mapNotNull { it.toIntOrNull() }
+            ?.toSet()
+            .orEmpty()
+
+    private fun Set<Int>.toRiskFactorValue(): String? =
+        if (isEmpty()) null else sorted().joinToString("|")
+
+    private fun urbanSlumResidentialAreaId(): Int {
+        val english = englishResources.getStringArray(R.array.nbr_residential_area_array)
+        val index = english.indexOfFirst {
+            it.equals(KeyPopulationRiskFactorAutoSelect.URBAN_SLUM_AREA_LABEL, ignoreCase = true)
+        }
+        return if (index >= 0) index + 1 else -1
+    }
+
+    private fun urbanSlumLabels(): Set<String> {
+        val english = englishResources.getStringArray(R.array.nbr_residential_area_array)
+        val localized = resources.getStringArray(R.array.nbr_residential_area_array)
+        val index = english.indexOfFirst {
+            it.equals(KeyPopulationRiskFactorAutoSelect.URBAN_SLUM_AREA_LABEL, ignoreCase = true)
+        }
+        if (index < 0) return setOf(KeyPopulationRiskFactorAutoSelect.URBAN_SLUM_AREA_LABEL)
+        return setOfNotNull(english.getOrNull(index), localized.getOrNull(index))
     }
 
     private fun enforceNotApplicableExclusivity() {
@@ -443,7 +567,13 @@ class TBScreeningDataset(
 
     override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
         (cacheModel as TBScreeningCache).let { form ->
-            form.visitDate             = getLongFromDate(dateOfVisit.value)
+            // dateOfVisit only holds "dd-MM-yyyy"; parsing it back yields local midnight, which
+            // dropped the time-of-day. Keep the cache's full timestamp when the day is unchanged.
+            form.visitDate = when (dateOfVisit.value) {
+                getDateFromLong(form.visitDate) -> form.visitDate
+                getDateFromLong(System.currentTimeMillis()) -> System.currentTimeMillis()
+                else -> getLongFromDate(dateOfVisit.value)
+            }
             form.coughMoreThan2Weeks   = isYes(isCoughing)
             form.bloodInSputum         = isYes(bloodInSputum)
             form.feverMoreThan2Weeks   = isYes(isFever)
@@ -548,6 +678,7 @@ class TBScreeningDataset(
 
     fun getIndexOfDate(): Int        = listFlow.value.indexOf(dateOfVisit)
     fun getIndexOfAsymptomatic(): Int = listFlow.value.indexOf(isAsymptomatic)
+    fun getIndexOfKeyPopulationRiskFactors(): Int = listFlow.value.indexOf(keyPopulationRiskFactors)
 
     private fun buildFormList(): List<FormElement> = buildList {
         addAll(listOf(
@@ -567,12 +698,12 @@ class TBScreeningDataset(
             add(decreasedActivityOrPlayfulnessInChildren)
         }
         add(others)
+        add(isAsymptomatic)
         addAll(listOf(
             otherDetailsHeading,
             historyOfTB,
             currentlyTakingDrugs,
             familyHistoryTB,
-            isAsymptomatic,
             riskFactorsHeading,
             keyPopulationRiskFactors,
             hivStatus
@@ -588,4 +719,11 @@ class TBScreeningDataset(
     }
 
     private fun isYes(formElement: FormElement): Boolean = formElement.value == yesValue
+
+    /** Saved records store YES/NO; the form compares against the localized Yes/No labels. */
+    private fun normalizeAsymptomatic(stored: String?): String? = when (stored?.trim()?.uppercase()) {
+        "YES", yesValue.uppercase() -> yesValue
+        "NO", noValue.uppercase() -> noValue
+        else -> null
+    }
 }

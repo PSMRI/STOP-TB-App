@@ -7,6 +7,8 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.CompleteFormDefinition
 import org.piramalswasthya.stoptb.model.dynamicEntity.CompleteFormResponse
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormResponseEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionResponseEntity
+import org.piramalswasthya.stoptb.model.dynamicEntity.SavedAnswerByUuid
+import org.piramalswasthya.stoptb.model.dynamicEntity.SectionQuestionWithDetails
 import org.piramalswasthya.stoptb.ui.contact_tracing.ClinicalScreeningStatus
 import org.piramalswasthya.stoptb.ui.contact_tracing.RegimenAdvised
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
@@ -32,6 +34,28 @@ interface IContactTracingRepository {
         indexCaseBenId: Long,
         formVersionId: Int
     ): FormResponseEntity
+
+    // The beneficiary's live response for formType if it was saved against an older form version
+    // than activeVersionId (null if none, or if it is already on the active version).
+    suspend fun getLegacyResponse(
+        beneficiaryId: Long,
+        formType: FormType,
+        activeVersionId: Int
+    ): FormResponseEntity?
+
+    // Answers of a response resolved to questionUuid/optionValue for cross-version mapping.
+    suspend fun getAnswersWithUuid(responseId: Long): List<SavedAnswerByUuid>
+
+    // Schema rows (with options/validations) for questionIds that may belong to an older form version.
+    suspend fun getQuestionsWithDetails(questionIds: List<Int>): List<SectionQuestionWithDetails>
+
+    // Re-points an older-version response at targetVersionId: its old section rows (and their
+    // answers) are replaced by one row per key of answersBySectionId, holding the mapped answers.
+    suspend fun upgradeResponseToVersion(
+        responseId: Long,
+        targetVersionId: Int,
+        answersBySectionId: Map<Int, List<QuestionResponseEntity>>
+    )
 
     // Fetches the beneficiary's previously submitted answers for this form type from the server and stores them locally for prefill.
     suspend fun fetchAndStoreContactResponse(

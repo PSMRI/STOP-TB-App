@@ -128,13 +128,18 @@ class TBSuspectedQuickViewModel @Inject constructor(
                 }
                 // Real order/result contract: PENDING is the only "in flight" value our own
                 // writes ever produce (IN_PROGRESS/AWAITING_PROVIDER_RESULT are never actually
-                // stored — see TBRepo.reducedOrderStatus).
+                // stored — see TBRepo.reducedOrderStatus). Also require a real order id — a
+                // status can be optimistically PENDING before the referral's own push has
+                // actually landed (see TBScreeningFormViewModel), and fetching a result for an
+                // order that doesn't exist yet would just fail server-side for no benefit.
                 val isOrderActive = if (orderType == "XRAY_CHEST") {
                     val status = tbDiagnostics.xrayOrderStatus
-                    status.equals("COMPLETED", ignoreCase = true) || status.equals("PENDING", ignoreCase = true)
+                    !tbDiagnostics.xrayOrderId.isNullOrBlank() &&
+                        (status.equals("COMPLETED", ignoreCase = true) || status.equals("PENDING", ignoreCase = true))
                 } else {
                     val status = tbDiagnostics.trueNatOrderStatus
-                    status.equals("COMPLETED", ignoreCase = true) || status.equals("PENDING", ignoreCase = true)
+                    !tbDiagnostics.trueNatOrderId.isNullOrBlank() &&
+                        (status.equals("COMPLETED", ignoreCase = true) || status.equals("PENDING", ignoreCase = true))
                 }
                 if (!hasLocalResult && isOrderActive) {
                     try {
@@ -145,8 +150,9 @@ class TBSuspectedQuickViewModel @Inject constructor(
                 }
                 if (orderType == "SPUTUM_TRUENAT" && MtbResult.fromResultText(tbDiagnostics.naatResult) == MtbResult.TB_POSITIVE) {
                     val hasLocalRifResult = !tbDiagnostics.trueNatRifResult.isNullOrBlank()
-                    val isRifActive = tbDiagnostics.rifOrderStatus.equals("COMPLETED", ignoreCase = true) ||
-                            tbDiagnostics.rifOrderStatus.equals("PENDING", ignoreCase = true)
+                    val isRifActive = !tbDiagnostics.rifOrderId.isNullOrBlank() &&
+                            (tbDiagnostics.rifOrderStatus.equals("COMPLETED", ignoreCase = true) ||
+                                    tbDiagnostics.rifOrderStatus.equals("PENDING", ignoreCase = true))
                     if (!hasLocalRifResult && isRifActive) {
                         try {
                             tbRepo.fetchOrderResult(benId, "MDR_RIF")

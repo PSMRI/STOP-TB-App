@@ -104,7 +104,7 @@ class AllBenViewModel @Inject constructor(
      * not background reloads, so the UI can distinguish a fresh search from a silent re-run.
      * */
     private val _searchGeneration = MutableStateFlow(0)
-    val searchGeneration: Flow<Int> = _searchGeneration
+    val searchGeneration: StateFlow<Int> = _searchGeneration.asStateFlow()
 
     init {
         fetchBeneficiaryStatuses()
@@ -529,11 +529,6 @@ class AllBenViewModel @Inject constructor(
         _retryingBenIds.value += benId
         WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, listOf(orderType))
         _orderActionState.value = OrderActionResult.Success("New order queued.", orderType)
-        // The push itself runs on WorkManager's own schedule, not awaited here — track it via
-        // retryingBenIds (same in-flight flag retryTest() uses) so the beneficiary list shows a
-        // locked/spinner state on this row for the few seconds between enqueue and the worker's
-        // createOrder() call actually landing PENDING, instead of re-rendering whatever a
-        // Paging3/RecyclerView recycle produces during that gap.
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 delay(300L)
@@ -542,6 +537,46 @@ class AllBenViewModel @Inject constructor(
                 }
             }
             _retryingBenIds.value -= benId
+        }
+    }
+    //Cache of beneficiaries confirmed to have no active push
+    private val checkedNoPushBenIds = mutableSetOf<Long>()
+
+    //Tracks beneficiaries with an active check coroutine in flight.
+    private val checkingBenIds = mutableSetOf<Long>()
+
+    fun invalidateCheckedNoPushBenIds() {
+        checkedNoPushBenIds.clear()
+    }
+
+    fun checkAndTrackInFlightPush(benId: Long, context: Context) {
+        if (_retryingBenIds.value.contains(benId)) return
+        //If we already checked WorkManager for this row and confirmed nothing is uploading, don't keep asking WorkManager on every scroll/re-render
+        if (checkedNoPushBenIds.contains(benId)) return
+        //If a query for this row is already in flight, don't launch a redundant second one.
+        if (!checkingBenIds.add(benId)) return
+        viewModelScope.launch {
+            try {
+                val isActive = withContext(Dispatchers.IO) {
+                    WorkerUtils.isDiagnosticOrderPushActive(context, benId)
+                }
+                if (!isActive) {
+                    checkedNoPushBenIds += benId
+                    return@launch
+                }
+                _retryingBenIds.value += benId
+                try {
+                    withContext(Dispatchers.IO) {
+                        while (WorkerUtils.isDiagnosticOrderPushActive(context, benId)) {
+                            delay(500L)
+                        }
+                    }
+                } finally {
+                    _retryingBenIds.value -= benId
+                }
+            } finally {
+                checkingBenIds.remove(benId)
+            }
         }
     }
 }

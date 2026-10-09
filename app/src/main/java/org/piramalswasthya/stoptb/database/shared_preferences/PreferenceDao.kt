@@ -236,8 +236,15 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
 
     fun getCampHubUrl(): String {
         val key = context.getString(R.string.PREF_camp_hub_url)
-        return pref.getString(key, null) ?: "http://192.168.137.1:8080/"
+        return pref.getString(key, null) ?: defaultCampHubUrl()
     }
+
+    /** URL baked into this build. Blank outside the UAT flavor. */
+    fun configuredCampHubUrl(): String =
+        context.getString(R.string.camp_hub_default_url).trim()
+
+    fun defaultCampHubUrl(): String =
+        configuredCampHubUrl().ifBlank { "http://192.168.137.1:8080/" }
 
     fun getStoredCampHubUrl(): String? {
         val key = context.getString(R.string.PREF_camp_hub_url)

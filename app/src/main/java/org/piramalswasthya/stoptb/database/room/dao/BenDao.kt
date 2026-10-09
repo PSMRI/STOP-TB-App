@@ -8,6 +8,11 @@ import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.model.*
 
+data class VillageHeadcount(
+    val population: Int = 0,
+    val unscreened: Int = 0,
+)
+
 @Dao
 interface BenDao {
 
@@ -905,13 +910,6 @@ interface BenDao {
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0")
     fun getAllBenCount(selectedVillage: Int): Flow<Int>
 
-    @Query("""
-        SELECT COUNT(*) FROM BEN_BASIC_CACHE
-        WHERE isDeactivate = 0
-        AND villageId IN (:assignedVillageIds)
-    """)
-    fun getGlancePopulationCount(assignedVillageIds: List<Int>): Flow<Int>
-
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage AND isDeactivate=0 AND abhaId IS NOT NULL")
     fun getAllBenWithAbhaCount(selectedVillage: Int): Flow<Int>
 
@@ -924,7 +922,7 @@ interface BenDao {
     // Dashboard ABHA count with time + village filter
     @Query("""
         SELECT COUNT(*) FROM BEN_BASIC_CACHE
-        WHERE isDeactivate = 0 AND abhaId IS NOT NULL
+        WHERE isDeactivate = 0 AND isDeath = 0 AND abhaId IS NOT NULL
         AND villageId IN (:assignedVillageIds)
         AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN IFNULL(regDate, 0) >= 100000000000 THEN regDate WHEN IFNULL(regDate, 0) > 0 THEN regDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
         AND (:endTime = :endTime)
@@ -1600,17 +1598,19 @@ interface BenDao {
 """)
     fun getUnscreenedCount(selectedVillage: Int): Flow<Int>
 
+    /**
+     * Living, active people in the given villages. Home Total Population and dashboard
+     * Village Population both use this so the two cards stay on the same count.
+     */
     @Query("""
-        SELECT COUNT(*)
-        FROM BEN_BASIC_CACHE b
-        WHERE b.isDeactivate = 0
-          AND b.screeningStatus = 'UNSCREENED'
-          AND b.villageId IN (:assignedVillageIds)
-          AND NOT EXISTS (
-              SELECT 1 FROM TB_SCREENING ts WHERE ts.benId = b.benId
-          )
+        SELECT
+            COUNT(*) AS population,
+            COUNT(CASE WHEN screeningStatus = 'UNSCREENED' AND tbsnFilled = 0 THEN 1 END) AS unscreened
+        FROM BEN_BASIC_CACHE
+        WHERE isDeactivate = 0 AND isDeath = 0
+          AND villageId IN (:villageIds)
     """)
-    fun getGlanceUnscreenedCount(assignedVillageIds: List<Int>): Flow<Int>
+    fun getVillageHeadcount(villageIds: List<Int>): Flow<VillageHeadcount>
 
     @Query("""
         SELECT * FROM BEN_BASIC_CACHE
