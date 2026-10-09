@@ -138,7 +138,7 @@ class SignInFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         updateLoginAppName()
-        binding.tvLoginVersion?.text = getString(R.string.login_app_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
+        binding.tvLoginVersion?.text = getString(R.string.login_app_version, BuildConfig.VERSION_NAME)
         val initialLeft = binding.root.paddingLeft
         val initialTop = binding.root.paddingTop
         val initialRight = binding.root.paddingRight
