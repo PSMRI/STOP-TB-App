@@ -13,7 +13,11 @@ data class Icon(
     // destination yet — tapping them is a no-op, see IconGridAdapter.GridIconClickListener.
     val navAction: NavDirections? = null,
     var colorPrimary: Boolean = true,
-    val allowRedBorder: Boolean = false
+    val allowRedBorder: Boolean = false,
+    // When false, the card renders dimmed and tapping it shows disabledMessage instead of
+    // navigating via navAction — used for a role with no permission on this card's destination.
+    val enabled: Boolean = true,
+    val disabledMessage: String? = null
 )
 
 
