@@ -567,13 +567,12 @@ def _app_package_ids(app: dict[str, Any]) -> set[str]:
         if isinstance(value, str) and value
     }
 
-
 def canonical_display_name(package_id: str, requested: str | None = None) -> str:
-    del requested
+    if requested:
+        return requested
     if ".uat" in package_id:
         return "StopTB_Internal_Testing_UAT"
     return "TBMJA_Internal_Testing_Prod"
-
 
 def canonical_description(package_id: str, version_name: str, version_code: str) -> str:
     label = "UAT" if ".uat" in package_id else "PROD"
@@ -1113,6 +1112,47 @@ def preflight() -> None:
     apps = list_android_lob_apps(token)
     log(f"Preflight OK: Intune app list succeeded ({len(apps)} Android LOB app(s)).")
 
+def assert_only_group_assigned(token: str, app_id: str, group_id: str) -> None:
+    others = []
+    for a in list_app_assignments(token, app_id):
+        target = a.get("target") or {}
+        if target.get("groupId") != group_id:
+            others.append(f"{a.get('intent')}:{target.get('@odata.type')}:{target.get('groupId') or '-'}")
+    if others:
+        raise RuntimeError(
+            f"Intune app {app_id} has assignments outside group {group_id}: {others}. "
+            "Remove them so this build cannot reach other devices."
+        )
+
+def create_android_lob_app(
+    token: str,
+    display_name: str,
+    publisher: str,
+    description: str,
+    filename: str,
+    package_id: str,
+    version_code: str,
+    version_name: str,
+) -> dict[str, Any]:
+    log(f"No Intune app named {display_name} exists. Creating it (package {package_id}).")
+    body = android_app_body(
+        display_name, publisher, description, filename, package_id, version_code, version_name
+    )
+    created = graph_request(token, "POST", "deviceAppManagement/mobileApps", body)
+    new_id = str(created.get("id") or "")
+    if not new_id:
+        raise RuntimeError("Intune did not return an id for the newly created app")
+    for attempt in range(1, 11):
+        try:
+            app = refresh_app(token, new_id)
+            log(f"Created Intune app {new_id} ({display_name})")
+            return app
+        except Exception as exc:  # noqa: BLE001
+            if not _is_missing_app_error(exc):
+                raise
+            log(f"New Intune app {new_id} is not visible yet; waiting ({attempt}/10)")
+            time.sleep(3)
+    raise RuntimeError(f"Created Intune app {new_id} but Graph never returned it")
 
 def upload_apk(args: argparse.Namespace) -> None:
     token = acquire_graph_token()
@@ -1182,16 +1222,37 @@ def upload_apk(args: argparse.Namespace) -> None:
         named = [app for app in enterprise_apps if _normalized_app_name(app) == want]
         target = named[0] if named else None
         if target is None:
-            raise RuntimeError(
-                f"No existing Intune app named {app_display_name} was found. "
-                "The pipeline only replaces the APK on that app; it will not create, delete, "
-                f"or change other MDM apps. Create {app_display_name} in Intune first."
+            same_name = [app for app in matching if _normalized_app_name(app) == want]
+            if same_name:
+                raise RuntimeError(
+                    f"An Intune app named {app_display_name} exists (id={same_name[0].get('id')}) "
+                    "but is not an Android Enterprise LOB app. Refusing to create a duplicate; "
+                    "delete or fix that app in Intune."
+                )
+            if not args.create_if_missing:
+                raise RuntimeError(
+                    f"No existing Intune app named {app_display_name} was found. "
+                    f"Create {app_display_name} in Intune first."
+                )
+            target = create_android_lob_app(
+                token,
+                app_display_name,
+                args.publisher,
+                app_description,
+                filename,
+                args.package_id,
+                str(args.version_code),
+                str(args.version_name),
             )
-        log(
-            f"Using existing Intune app {target.get('id')} ({target.get('displayName')}) "
-            "for in-place APK replace. Other MDM apps will be left unchanged."
-        )
+        else:
+            log(
+                f"Using existing Intune app {target.get('id')} ({target.get('displayName')}) "
+                "for in-place APK replace. Other MDM apps will be left unchanged."
+            )
+
     app_id = str(target["id"])
+    if args.exclusive:
+        assert_only_group_assigned(token, app_id, args.group_id)
     replace_mode = "in-place"
     skip_upload = False
     current_code = existing_app_version_code(target)
@@ -1298,6 +1359,9 @@ def upload_apk(args: argparse.Namespace) -> None:
         str(args.version_code),
         str(args.version_name),
     )
+    if args.exclusive:
+        ensure_group_assignment(token, app_id, args.group_id, "required")
+        assert_only_group_assigned(token, app_id, args.group_id)
     if not skip_upload:
         log_published_app(token, app_id, args.version_code, args.version_name)
     try:
@@ -1344,6 +1408,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--publisher", default="Piramal Swasthya")
     parser.add_argument("--description", default="StopTB UAT signed build")
     parser.add_argument("--app-id", default="")
+    parser.add_argument("--exclusive", action="store_true",
+                        help="Fail unless the app is assigned only to --group-id; ensure that assignment exists.")
+    parser.add_argument("--create-if-missing", action="store_true",
+                        help="Create the Intune app if none with the requested name exists.")
     args = parser.parse_args()
     args.app_id = args.app_id.strip() or None
     if args.preflight:
@@ -1355,6 +1423,8 @@ def parse_args() -> argparse.Namespace:
     ]
     if missing:
         parser.error("the following arguments are required unless --preflight: " + ", ".join(f"--{name.replace('_', '-')}" for name in missing))
+    if args.create_if_missing and not args.exclusive:
+        parser.error("--create-if-missing requires --exclusive so the new app is assigned to --group-id only")
     return args
 
 

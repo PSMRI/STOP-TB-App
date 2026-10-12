@@ -68,7 +68,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: distribute-${{ inputs.environment }}-${{ inputs.signing }}-${{ inputs.branch }}
+  group: distribute-${{ inputs.environment }}-${{ inputs.signing }}-${{ inputs.branch }}-${{ inputs.deployTo }}
   cancel-in-progress: true
 
 jobs:
@@ -201,17 +201,14 @@ jobs:
           
             if [ "$TARGET_ENV" = uat ]; then 
               case "$DEPLOY_TO" in
-                QA-Group-1)
-                  INTUNE_GROUP_ID="$INTUNE_GROUP_QA_1"
-                  ;;
-                QA-Group-2)
-                  INTUNE_GROUP_ID="$INTUNE_GROUP_QA_2"
-                  ;;
+                QA-Group-1) INTUNE_GROUP_ID="$INTUNE_GROUP_QA_1"; QA_SUFFIX=QA1 ;;
+                QA-Group-2) INTUNE_GROUP_ID="$INTUNE_GROUP_QA_2"; QA_SUFFIX=QA2 ;;
                 *)
                   echo "ERROR: Unknown Intune deployment target: '$DEPLOY_TO'"
                   exit 1
                   ;;
               esac
+              INTUNE_DISPLAY_NAME="StopTB_Internal_Testing_UAT_${QA_SUFFIX}"
             else
               INTUNE_GROUP_ID="$INTUNE_GROUP_ID_PROD" 
             fi
@@ -571,6 +568,9 @@ jobs:
           EXTRA_ARGS=()
           if [ -n "${INTUNE_APP_ID:-}" ]; then
             EXTRA_ARGS+=(--app-id "${INTUNE_APP_ID}")
+          fi
+          if [ "${{ inputs.environment }}" = uat ]; then
+            EXTRA_ARGS+=(--exclusive --create-if-missing)
           fi
           python3 "$RUNNER_TEMP/upload_intune_android_lob.py" \
             --apk "${{ steps.apk.outputs.apk_path }}" \
