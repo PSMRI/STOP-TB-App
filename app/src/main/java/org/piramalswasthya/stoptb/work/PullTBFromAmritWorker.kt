@@ -178,10 +178,12 @@ class PullTBFromAmritWorker @AssistedInject constructor(
             try {
                 val res = tbRepo.getGeneralOpdDetailsFromServer()
                 return@withContext res == 1 || res == 0
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
             }
-            true
+            false
         }
     }
 

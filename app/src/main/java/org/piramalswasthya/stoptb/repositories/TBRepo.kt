@@ -473,12 +473,13 @@ class TBRepo @Inject constructor(
                         when (val responseStatusCode = jsonObj.getInt("statusCode")) {
                             200 -> {
                                 try {
-                                    saveGeneralOpdCacheFromNewResponse(jsonObj)
+                                    return@withContext if (saveGeneralOpdCacheFromNewResponse(jsonObj)) 1 else -1
+                                } catch (e: kotlinx.coroutines.CancellationException) {
+                                    throw e
                                 } catch (e: Exception) {
-                                    Timber.d("General OPD entries not synced $e")
-                                    return@withContext 0
+                                    Timber.e(e, "General OPD entries not synced")
+                                    return@withContext -1
                                 }
-                                return@withContext 1
                             }
 
                             401, 5002 -> {
@@ -500,6 +501,8 @@ class TBRepo @Inject constructor(
                         }
                     }
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: SocketTimeoutException) {
                 Timber.e("get_general_opd error : $e")
                 return@withContext -2
@@ -587,64 +590,70 @@ class TBRepo @Inject constructor(
         return generalOpdList
     }
 
-    private suspend fun saveGeneralOpdCacheFromNewResponse(jsonObj: JSONObject): MutableList<GeneralOpdCache> {
-        val generalOpdList = mutableListOf<GeneralOpdCache>()
+    private suspend fun saveGeneralOpdCacheFromNewResponse(jsonObj: JSONObject): Boolean {
         val records = getStopTbDataArray(jsonObj)
-        for (index in 0 until records.length()) {
-            val item = records.optJSONObject(index) ?: continue
-            val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { it > 0 } ?: continue
-            val ben = benDao.getBenByRegId(benRegId) ?: continue
-            val serverUpdatedDate = getServerUpdatedDate(item)
-            val incomingComplaints = item.optChiefComplaintsOrNull()
-            val hasDrugs = item.has("drugs") && !item.isNull("drugs")
-            val incomingRows = if (hasDrugs) {
-                val drugs = requireNotNull(item.optJSONArray("drugs")) { "Invalid General OPD drugs array" }
-                GeneralOpdDrugResponse.parsePrescriptions(drugs.toString(), 0)
-            } else emptyList()
-            val saved = database.withTransaction {
-                val existing = tbDao.getGeneralOpd(ben.beneficiaryId)
-                val applyRecord = shouldApplyServerRecord(existing?.syncState,
-                    existing?.serverUpdatedDate, serverUpdatedDate)
-                val recoverDrugs = canRecoverGeneralOpdDrugs(existing, incomingRows, serverUpdatedDate)
-                if (!applyRecord && !recoverDrugs) {
-                    if (canRecoverChiefComplaints(existing, incomingComplaints, serverUpdatedDate)) {
-                        val recovered = existing!!.copy(chiefComplaints = incomingComplaints,
-                            chiefComplaintIds = null)
-                        tbDao.saveGeneralOpd(recovered)
-                        return@withTransaction recovered
+        return processGeneralOpdPullBatch(
+            records = (0 until records.length()).map { records.optJSONObject(it) },
+            parse = { record ->
+                val item = requireNotNull(record) { "Invalid General OPD record" }
+                val hasDrugs = item.has("drugs") && !item.isNull("drugs")
+                if (hasDrugs) {
+                    val drugs = requireNotNull(item.optJSONArray("drugs")) { "Invalid General OPD drugs array" }
+                    GeneralOpdDrugResponse.parsePrescriptions(drugs.toString(), 0)
+                } else emptyList()
+            },
+            save = saveRecord@ { record, incomingRows ->
+                val item = requireNotNull(record)
+                val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { it > 0 } ?: return@saveRecord
+                val ben = benDao.getBenByRegId(benRegId) ?: return@saveRecord
+                val serverUpdatedDate = getServerUpdatedDate(item)
+                val incomingComplaints = item.optChiefComplaintsOrNull()
+                val hasDrugs = item.has("drugs") && !item.isNull("drugs")
+                database.withTransaction {
+                    val existing = tbDao.getGeneralOpd(ben.beneficiaryId)
+                    val applyRecord = shouldApplyServerRecord(existing?.syncState,
+                        existing?.serverUpdatedDate, serverUpdatedDate)
+                    val recoverDrugs = canRecoverGeneralOpdDrugs(existing, incomingRows, serverUpdatedDate)
+                    if (!applyRecord && !recoverDrugs) {
+                        if (canRecoverChiefComplaints(existing, incomingComplaints, serverUpdatedDate)) {
+                            val recovered = existing!!.copy(chiefComplaints = incomingComplaints,
+                                chiefComplaintIds = null)
+                            tbDao.saveGeneralOpd(recovered)
+                            return@withTransaction
+                        }
+                        return@withTransaction
                     }
-                    return@withTransaction null
+                    val complaints = incomingComplaints ?: existing?.chiefComplaints
+                    val cache = (existing ?: GeneralOpdCache(benId = ben.beneficiaryId)).copy(
+                        chiefComplaints = complaints,
+                        chiefComplaintIds = existing?.chiefComplaintIds?.takeIf { complaints == existing?.chiefComplaints },
+                        medications = if (incomingRows.isNotEmpty()) incomingRows.map { it.medicine }
+                            else item.optStringOrNull("medication")?.split(",")?.map { it.trim() }
+                                ?.filter { it.isNotBlank() } ?: existing?.medications,
+                        dosage = item.optStringOrNull("dosage") ?: existing?.dosage,
+                        frequency = if (incomingRows.isNotEmpty()) incomingRows.joinToString(", ") { it.frequency }
+                            else item.optStringOrNull("frequency") ?: existing?.frequency,
+                        duration = if (incomingRows.isNotEmpty()) incomingRows.joinToString(", ") {
+                            "${it.durationCount} ${it.durationUnit}"
+                        } else item.optStringOrNull("duration") ?: existing?.duration,
+                        notes = item.optStringOrNull("notes") ?: existing?.notes,
+                        serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
+                        syncState = SyncState.SYNCED
+                    )
+                    val opdId = tbDao.saveGeneralOpd(cache).toInt()
+                    // Parent and per-drug rows must become visible together, never from different revisions.
+                    if (hasDrugs || cache.medications != existing?.medications ||
+                        cache.frequency != existing?.frequency || cache.duration != existing?.duration) {
+                        tbDao.deleteGeneralOpdPrescriptions(opdId)
+                        if (incomingRows.isNotEmpty()) tbDao.insertGeneralOpdPrescriptions(
+                            incomingRows.map { it.copy(opdId = opdId) })
+                    }
                 }
-                val complaints = incomingComplaints ?: existing?.chiefComplaints
-                val cache = (existing ?: GeneralOpdCache(benId = ben.beneficiaryId)).copy(
-                    chiefComplaints = complaints,
-                    chiefComplaintIds = existing?.chiefComplaintIds?.takeIf { complaints == existing?.chiefComplaints },
-                    medications = if (incomingRows.isNotEmpty()) incomingRows.map { it.medicine }
-                        else item.optStringOrNull("medication")?.split(",")?.map { it.trim() }
-                            ?.filter { it.isNotBlank() } ?: existing?.medications,
-                    dosage = item.optStringOrNull("dosage") ?: existing?.dosage,
-                    frequency = if (incomingRows.isNotEmpty()) incomingRows.joinToString(", ") { it.frequency }
-                        else item.optStringOrNull("frequency") ?: existing?.frequency,
-                    duration = if (incomingRows.isNotEmpty()) incomingRows.joinToString(", ") {
-                        "${it.durationCount} ${it.durationUnit}"
-                    } else item.optStringOrNull("duration") ?: existing?.duration,
-                    notes = item.optStringOrNull("notes") ?: existing?.notes,
-                    serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
-                    syncState = SyncState.SYNCED
-                )
-                val opdId = tbDao.saveGeneralOpd(cache).toInt()
-                // Parent and per-drug rows must become visible together, never from different revisions.
-                if (hasDrugs || cache.medications != existing?.medications ||
-                    cache.frequency != existing?.frequency || cache.duration != existing?.duration) {
-                    tbDao.deleteGeneralOpdPrescriptions(opdId)
-                    if (incomingRows.isNotEmpty()) tbDao.insertGeneralOpdPrescriptions(
-                        incomingRows.map { it.copy(opdId = opdId) })
-                }
-                cache.copy(id = opdId)
+            },
+            onInvalid = { index, error ->
+                Timber.e("General OPD pull skipped invalid record at index $index (${error.javaClass.simpleName})")
             }
-            saved?.let { generalOpdList.add(it) }
-        }
-        return generalOpdList
+        )
     }
 
     suspend fun getTbDiagnosticsDetailsFromServer(): Int {
