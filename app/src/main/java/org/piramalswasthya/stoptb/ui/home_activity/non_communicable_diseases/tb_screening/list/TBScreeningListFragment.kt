@@ -18,6 +18,8 @@ import org.piramalswasthya.stoptb.adapters.TbScreeningListAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchRvButtonBinding
+import org.piramalswasthya.stoptb.helpers.RoleManager
+import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import javax.inject.Inject
@@ -27,6 +29,9 @@ class TBScreeningListFragment : Fragment() {
 
     @Inject
     lateinit var pref: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
     private var _binding: FragmentDisplaySearchRvButtonBinding? = null
     private val binding: FragmentDisplaySearchRvButtonBinding
         get() = _binding!!
@@ -54,11 +59,13 @@ class TBScreeningListFragment : Fragment() {
         binding.btnNextPage.visibility = View.GONE
         val benAdapter = TbScreeningListAdapter(
             TbScreeningListAdapter.ClickListener { hhId, benId, viewOnly ->
+                val effectiveViewOnly =
+                    viewOnly || roleManager.privilegesUnion().tbScreeningPermission != Permission.FULL
                 findNavController().navigate(
                     TBScreeningListFragmentDirections.actionTBScreeningListFragmentToTBScreeningFormFragment(
                         benId = benId,
-                        viewOnly = viewOnly,
-                        syncImmediately = !viewOnly
+                        viewOnly = effectiveViewOnly,
+                        syncImmediately = !effectiveViewOnly
                     )
                 )
             },
