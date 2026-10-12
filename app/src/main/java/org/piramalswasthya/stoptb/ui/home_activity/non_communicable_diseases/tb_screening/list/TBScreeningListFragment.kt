@@ -7,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -57,19 +58,32 @@ class TBScreeningListFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         binding.btnNextPage.visibility = View.GONE
+        // Account-wide, like every other CRUD permission check — a Lab Technician+Registrar
+        // account still gets full access via the union, not just their Lab Technician privileges.
+        val canFillTbScreening =
+            roleManager.privilegesUnion().tbScreeningPermission == Permission.FULL
         val benAdapter = TbScreeningListAdapter(
-            TbScreeningListAdapter.ClickListener { hhId, benId, viewOnly ->
-                val effectiveViewOnly =
-                    viewOnly || roleManager.privilegesUnion().tbScreeningPermission != Permission.FULL
-                findNavController().navigate(
-                    TBScreeningListFragmentDirections.actionTBScreeningListFragmentToTBScreeningFormFragment(
-                        benId = benId,
-                        viewOnly = effectiveViewOnly,
-                        syncImmediately = !effectiveViewOnly
+            TbScreeningListAdapter.ClickListener(
+                clickedForm = { hhId, benId, viewOnly ->
+                    findNavController().navigate(
+                        TBScreeningListFragmentDirections.actionTBScreeningListFragmentToTBScreeningFormFragment(
+                            benId = benId,
+                            viewOnly = viewOnly,
+                            syncImmediately = !viewOnly
+                        )
                     )
-                )
-            },
-            pref = pref
+                },
+                onAccessDenied = {
+                    Toast.makeText(
+                        requireContext(),
+                        getString(R.string.tb_screening_no_permission_msg),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                },
+                canFill = canFillTbScreening
+            ),
+            pref = pref,
+            canFill = canFillTbScreening
         )
         binding.rvAny.adapter = benAdapter
 

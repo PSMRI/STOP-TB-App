@@ -1417,6 +1417,7 @@
     <string name="diagnosis_locked_msg">Please fill TB Screening form first</string>
     <string name="tb_screening_locked_msg">Please fill TB Screening form first</string>
     <string name="examine_form_view_only_msg">You have view-only access to this form</string>
+    <string name="tb_screening_no_permission_msg">You don\'t have permission to access TB Screening</string>
     <string name="tb_screening_legend_xray_sputum">* Refer for Digital Chest X-Ray or for Sputum Collection</string>
     <string name="tb_screening_legend_family_members">** Advise for screening of all family members</string>
 
