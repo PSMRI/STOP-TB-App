@@ -840,10 +840,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             applyRelationDobRange(relToHeadId)
         }
 
-        if (showUpdateLocation && ben != null && !ben.isDraft) {
-            updateLocationDetails.value = updateLocationDetails.entries?.getOrNull(1)   // default "No"
-            list.add(updateLocationDetails)
-        }
+//        if (showUpdateLocation && ben != null && !ben.isDraft) {
+//            updateLocationDetails.value = updateLocationDetails.entries?.getOrNull(1)   // default "No"
+//            list.add(updateLocationDetails)
+//        }
         setUpPage(list)
 
 

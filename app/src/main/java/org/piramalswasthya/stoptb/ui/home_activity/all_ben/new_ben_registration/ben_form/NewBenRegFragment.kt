@@ -427,19 +427,7 @@ class NewBenRegFragment : Fragment() {
     }
 
     private fun onUpdateLocationToggled(index: Int) {
-        if (index == 0) {   // Yes
-            if (originalLocationState == null) originalLocationState = viewModel.locationState.value
-            updateLocationRequested = true
-            updateLocationControls()
-            captureLocationSilently()
-        } else {            // No → drop any new capture, keep the saved location
-            updateLocationRequested = false
-            cancelLocationFetch()
-            originalLocationState?.let { viewModel.restoreLocationState(it) }
-            originalLocationState = null
-            updateLocationControls()
-            updateSubmitButtonState()
-        }
+        onUpdateLocationChanged(index == 0)
     }
 
     private fun cancelLocationFetch() {
