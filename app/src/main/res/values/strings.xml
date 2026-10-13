@@ -272,6 +272,7 @@
     <string name="contact_tracing_load_error">Could not load this form.</string>
     <string name="community_contact_tracing">Community Contacts</string>
     <string name="occupational_contact_tracing">Occupational Contacts</string>
+    <string name="household_contact_tracing">Household Contacts</string>
     <string name="contact_tracing_section_progress">Section %1$d of %2$d</string>
     <string name="contact_tracing_number_picker_decrement">Decrease</string>
     <string name="contact_tracing_number_picker_increment">Increase</string>

@@ -107,4 +107,40 @@
             app:tint="?attr/colorOnSurfaceVariant" />
     </LinearLayout>
 
+    <LinearLayout
+        android:id="@+id/btn_type_household"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingVertical="16dp"
+        android:background="?attr/selectableItemBackground">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/household_contact_tracing"
+            android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+            android:textColor="?attr/colorOnSurface"
+            android:fontFamily="@font/roboto_medium" />
+
+        <ImageView
+            android:id="@+id/iv_status_household"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginEnd="12dp"
+            android:src="@drawable/ic_close"
+            android:visibility="gone"
+            android:contentDescription="@null" />
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/ic_chevron_right"
+            android:contentDescription="@null"
+            app:tint="?attr/colorOnSurfaceVariant" />
+    </LinearLayout>
+
 </LinearLayout>
