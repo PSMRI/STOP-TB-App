@@ -73,6 +73,7 @@ class ContactTracingTypeBottomSheetFragment : BottomSheetDialogFragment() {
             )
             dismiss()
         }
+        binding.btnTypeHousehold.visibility = if (hhId > 0L) View.VISIBLE else View.GONE
 
         viewModel.status.observe(viewLifecycleOwner) { status -> updateStatusIcons(status) }
     }
