@@ -1505,6 +1505,8 @@
     </string-array>
     <string name="counselling_date_hint">Date</string>
     <!-- Location Details Section -->
+    <string name="loc_gps_not_captured">(GPS not captured)</string>
+    <string name="loc_camp_site_msg">Registration done at camp site</string>
     <string name="loc_section_title">Location Details</string>
     <string name="loc_btn_refresh">Refresh</string>
     <string name="loc_status_fetching">Fetching Location…</string>
@@ -1579,7 +1581,7 @@
     <string name="sync_counselling">Counselling</string>
 
 
-
+    <string name="loc_cb_update_location">Do you want to update the location details?</string>
 
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>

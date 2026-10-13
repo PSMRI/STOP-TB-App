@@ -451,6 +451,16 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         required = true, hasDependants = false
     )
 
+    private val updateLocationDetails = FormElement(
+        id = 1060,
+        inputType = RADIO,
+        title = resources.getString(R.string.loc_cb_update_location),
+        arrayId = R.array.nhhr_yes_no_array,
+        entries = resources.getStringArray(R.array.nhhr_yes_no_array),
+        required = false,
+        hasDependants = true
+    )
+
     // ─────────────────────────── PAGE SETUP ───────────────────────────
 
     /**
@@ -470,7 +480,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         isNonHH: Boolean = false,
         hofForDobRules: BenRegCache? = null,
         hofSpouseForDobRules: BenRegCache? = null,
-        selectedMemberForDobRules: BenRegCache? = null
+        selectedMemberForDobRules: BenRegCache? = null,
+        showUpdateLocation: Boolean = false
     ) {
         val list = mutableListOf(
             pic,
@@ -829,6 +840,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             applyRelationDobRange(relToHeadId)
         }
 
+        if (showUpdateLocation && ben != null && !ben.isDraft) {
+            updateLocationDetails.value = updateLocationDetails.entries?.getOrNull(1)   // default "No"
+            list.add(updateLocationDetails)
+        }
         setUpPage(list)
 
 
@@ -885,7 +900,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         isNonHH: Boolean = false,
         hofForDobRules: BenRegCache? = null,
         hofSpouseForDobRules: BenRegCache? = null,
-        selectedMemberForDobRules: BenRegCache? = null
+        selectedMemberForDobRules: BenRegCache? = null,
+        showUpdateLocation: Boolean = false
     ) = setUpPage(
         ben,
         familyHeadPhoneNo,
@@ -899,7 +915,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         isNonHH = isNonHH,
         hofForDobRules = hofForDobRules,
         hofSpouseForDobRules = hofSpouseForDobRules,
-        selectedMemberForDobRules = selectedMemberForDobRules
+        selectedMemberForDobRules = selectedMemberForDobRules,
+        showUpdateLocation = showUpdateLocation
+
     )
 
 

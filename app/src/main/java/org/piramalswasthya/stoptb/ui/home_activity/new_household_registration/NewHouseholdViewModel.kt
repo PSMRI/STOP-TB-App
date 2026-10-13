@@ -72,6 +72,14 @@ class NewHouseholdViewModel @Inject constructor(
 
     // ─── Location state ───────────────────────────────────────────────────────
 
+    private companion object {
+        const val CAMP_SITE_REASON = "Registration done at camp site" // stored in existing gpsUnavailableReason
+    }
+
+    private val _isCampSite = MutableStateFlow(false)
+    val isCampSite: StateFlow<Boolean> = _isCampSite.asStateFlow()
+
+
     private val _locationState = MutableStateFlow<LocationState>(LocationState.Idle)
     val locationState: StateFlow<LocationState> = _locationState.asStateFlow()
 
@@ -110,7 +118,7 @@ class NewHouseholdViewModel @Inject constructor(
                 } else 0
 
                 dataset.setupPage(household, villageNames, user.villages, registeredMemberCount)
-
+                _isCampSite.value = dataset.isRegisteredAtCampSite()
 
                 // Restore previously saved location state if editing an existing record
                 household.let { hh ->
@@ -145,7 +153,11 @@ class NewHouseholdViewModel @Inject constructor(
         _locationState.value = LocationState.Fetching
     }
 
+
     fun onLocationResult(lat: Double, lon: Double, detail: String? = null) {
+
+        if (_isCampSite.value) return
+
         val digipin = DigiPinHelper.generate(lat, lon)
         if (digipin == null) {
             Timber.tag(GpsDiagnostics.TAG).w("onLocationResult rejected: lat=$lat lon=$lon is outside supported bounds")
@@ -166,6 +178,7 @@ class NewHouseholdViewModel @Inject constructor(
     }
 
     fun onLocationFailed(reason: LocationState.Failed, detail: String? = null) {
+        if (_isCampSite.value) return
         Timber.tag(GpsDiagnostics.TAG).w("onLocationFailed: reason=$reason detail=$detail")
         _locationDetail.value = detail
         _locationState.value = reason
@@ -184,15 +197,27 @@ class NewHouseholdViewModel @Inject constructor(
         _gpsUnavailableReason.value = reason
     }
 
-    // ─── Validation ───────────────────────────────────────────────────────────
 
-    fun isLocationValid(): Boolean {
-        return when {
-            locationState.value is LocationState.Captured -> true
-            isGpsUnavailable.value && !gpsUnavailableReason.value.isNullOrBlank() -> true
-            else -> false
+    fun onCampSiteChanged(camp: Boolean) {
+        _isCampSite.value = camp
+        if (camp) {
+            _locationDetail.value = null
+            _locationState.value = LocationState.Idle
         }
     }
+
+    fun restoreLocationState(state: LocationState) {
+        _locationDetail.value = null
+        _locationState.value = state
+    }
+
+
+    // ─── Validation ───────────────────────────────────────────────────────────
+
+
+
+    fun isLocationValid(): Boolean =
+        _isCampSite.value || locationState.value is LocationState.Captured
 
     // ─── Save ─────────────────────────────────────────────────────────────────
 
@@ -207,7 +232,14 @@ class NewHouseholdViewModel @Inject constructor(
 
                     // Map location fields onto entity
                     val locState = locationState.value
-                    if (locState is LocationState.Captured) {
+                    if (_isCampSite.value) {
+                        household.gpsLatitude = null
+                        household.gpsLongitude = null
+                        household.digipin = null
+                        household.gpsTimestamp = null
+                        household.isGpsUnavailable = true
+                        household.gpsUnavailableReason = CAMP_SITE_REASON
+                    } else if (locState is LocationState.Captured) {
                         household.gpsLatitude = locState.lat
                         household.gpsLongitude = locState.lon
                         household.digipin = locState.digipin

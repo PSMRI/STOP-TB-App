@@ -110,6 +110,15 @@ class NewBenRegFragment : Fragment() {
     private var fusedLocationClient: FusedLocationProviderClient? = null
     private var activeCancellationTokenSource: CancellationTokenSource? = null
 
+    private var isEditingExisting = false
+    private var updateLocationRequested = false
+
+    private var originalLocationState: LocationState? = null
+
+    private var originalCampSite = false
+    private var suppressRadioCallbacks = false
+    private var fetchTimeoutJob: Job? = null
+
     private val requestLocationPermission =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
             val granted = grants[Manifest.permission.ACCESS_FINE_LOCATION] == true
@@ -179,13 +188,10 @@ class NewBenRegFragment : Fragment() {
 
         // Location section
         binding.cardLocation.visibility = View.VISIBLE
-        if (viewModel.isStandalone) {
-            setupLocationSection()
-            if (viewModel.recordExists.value == false && viewModel.getIsConsentAgreed()) {
-                captureLocationSilently()
-            }
-        } else {
-            setupLinkedLocationSection()
+        setupLocationSection()
+        if (viewModel.isStandalone && viewModel.recordExists.value == false
+            && !isEditingExisting && viewModel.getIsConsentAgreed()) {
+            captureLocationSilently()
         }
 
         // Submit button
@@ -231,6 +237,8 @@ class NewBenRegFragment : Fragment() {
                     else -> {
                         viewModel.updateListOnValueChanged(formId, index)
                         hardCodedListUpdate(formId)
+                        if (formId == 1060) onUpdateLocationToggled(index)
+
                     }
                 }
             },
@@ -272,11 +280,10 @@ class NewBenRegFragment : Fragment() {
             binding.btnSubmit.visibility = if (recordExists) View.GONE else View.VISIBLE
             binding.btnLinkHousehold.visibility = if (!recordExists && viewModel.showLinkHouseholdButton) View.VISIBLE else View.GONE
             adapter.isEnabled = !recordExists
-            if (viewModel.isStandalone) {
-                binding.btnRefreshLocation.isEnabled = !recordExists
-                binding.cbGpsUnavailable.isEnabled = !recordExists
-                binding.acvReason.isEnabled = !recordExists
-            }
+            updateLocationControls()
+            updateCampSiteBox()
+            updateCampSiteBox()
+            updateSubmitButtonState()
             if (!recordExists && !viewModel.getIsConsentAgreed()) consentAlert.show()
         }
 
@@ -315,6 +322,16 @@ class NewBenRegFragment : Fragment() {
 
         // Edit FAB
         binding.fabEdit.setOnClickListener {
+            isEditingExisting = true
+            originalLocationState = viewModel.locationState.value
+            originalCampSite = viewModel.isCampSite.value
+            updateLocationRequested = false
+
+            viewModel.setLocationOverridden(false)
+            suppressRadioCallbacks = true
+            binding.rbUpdateNo.isChecked = true
+            binding.rgCampSite.check(if (originalCampSite) R.id.rb_camp_yes else R.id.rb_camp_no)
+            suppressRadioCallbacks = false
             viewModel.setRecordExist(false)
             viewModel.enableEditMode()
             binding.fabEdit.visibility = View.GONE
@@ -337,146 +354,171 @@ class NewBenRegFragment : Fragment() {
 
     // ─── Location section setup (standalone only) ─────────────────────────
     private fun setupLocationSection() {
-        val reasons = resources.getStringArray(R.array.loc_gps_unavailable_reasons)
-        val reasonAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, reasons)
-        binding.acvReason.setAdapter(reasonAdapter)
-        binding.acvReason.setOnItemClickListener { _, _, position, _ ->
-            viewModel.onGpsUnavailableReasonSelected(reasons[position])
-            binding.tilReason.error = null
-        }
-
         binding.btnRefreshLocation.setOnClickListener { refreshLocation() }
 
-        binding.cbGpsUnavailable.setOnCheckedChangeListener { _, isChecked ->
-            viewModel.onGpsUnavailableToggled(isChecked)
-            binding.llGpsReason.visibility = if (isChecked) View.VISIBLE else View.GONE
-            toggleGpsFields(!isChecked)
-            if (!isChecked) {
-                binding.acvReason.setText("", false)
-                captureLocationSilently()
-            }
+        binding.rgUpdateLocation.setOnCheckedChangeListener { _, checkedId ->
+            if (!suppressRadioCallbacks) onUpdateLocationChanged(checkedId == R.id.rb_update_yes)
+        }
+        binding.rgCampSite.setOnCheckedChangeListener { _, checkedId ->
+            if (!suppressRadioCallbacks) onCampSiteChoiceChanged(checkedId == R.id.rb_camp_yes)
         }
 
-        // Observe location state
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.locationState.collect { state -> updateLocationUI(state) }
         }
-
-        // Observe location diagnostic detail — why the status above is what it is
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.locationDetail.collect { detail -> updateLocationDetailText(detail) }
         }
-
-        // Observe GPS unavailable toggle
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.isGpsUnavailable.collect { unavailable ->
-                binding.cbGpsUnavailable.isChecked = unavailable
-                binding.llGpsReason.visibility = if (unavailable) View.VISIBLE else View.GONE
-                toggleGpsFields(!unavailable)
+            viewModel.isCampSite.collect {
+                updateCampSiteBox()
+                updateLocationControls()
+                updateSubmitButtonState()
             }
         }
-
-        // Observe GPS unavailable reason
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.gpsUnavailableReason.collect { reason ->
-                if (!reason.isNullOrBlank() && binding.acvReason.text.toString() != reason) {
-                    binding.acvReason.setText(reason, false)
-                }
-            }
+            viewModel.gpsUnavailableReason.collect { updateCampSiteBox() }
         }
     }
 
-    private fun setupLinkedLocationSection() {
-        // Disable refresh button, GPS capture, DIGIPIN generation, and GPS unavailable checkbox
-        binding.btnRefreshLocation.visibility = View.GONE
-        binding.cbGpsUnavailable.isEnabled = false
-        binding.acvReason.isEnabled = false
 
-        // Observe location state to populate fields read-only
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.locationState.collect { state ->
-                updateLocationUI(state)
-                binding.btnRefreshLocation.visibility = View.GONE
-                binding.cbGpsUnavailable.isEnabled = false
-                binding.acvReason.isEnabled = false
-            }
-        }
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.locationDetail.collect { detail -> updateLocationDetailText(detail) }
-        }
-
-        // Observe GPS unavailable toggle to set checkbox & hide/show fields
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.isGpsUnavailable.collect { unavailable ->
-                binding.cbGpsUnavailable.isChecked = unavailable
-                binding.llGpsReason.visibility = if (unavailable) View.VISIBLE else View.GONE
-                toggleGpsFields(!unavailable)
-                binding.btnRefreshLocation.visibility = View.GONE
-                binding.cbGpsUnavailable.isEnabled = false
-                binding.acvReason.isEnabled = false
-            }
-        }
-
-        // Observe GPS unavailable reason
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.gpsUnavailableReason.collect { reason ->
-                if (!reason.isNullOrBlank() && binding.acvReason.text.toString() != reason) {
-                    binding.acvReason.setText(reason, false)
-                }
-            }
+    // Shows the "registration done at camp site" box instead of the DIGIPIN section when the
+    // record has no GPS (camp site / unavailable) and the user is not actively editing it.
+    private fun updateCampSiteBox() {
+        if (_binding == null) return
+        val showBox = viewModel.isCampSite.value
+        binding.llGpsSection.visibility = if (showBox) View.GONE else View.VISIBLE
+        binding.llCampSite.visibility = if (showBox) View.VISIBLE else View.GONE
+        if (showBox) {
+            binding.tvCampSiteMsg.text = viewModel.gpsUnavailableReason.value
+                ?.takeIf { it.isNotBlank() }
+                ?: getString(R.string.loc_camp_site_msg)
         }
     }
+
+    private fun isLocationEditable(): Boolean {
+        if (viewModel.recordExists.value != false) return false
+        return if (isEditingExisting) updateLocationRequested && !viewModel.isCampSite.value
+        else viewModel.isStandalone
+    }
+
+    private fun updateLocationControls() {
+        if (_binding == null) return
+        val editing = viewModel.recordExists.value == false
+        binding.llUpdateLocation.visibility =
+            if (editing && isEditingExisting) View.VISIBLE else View.GONE
+        binding.llCampSiteChoice.visibility =
+            if (editing && isEditingExisting && updateLocationRequested) View.VISIBLE else View.GONE
+        // A new member of a household inherits the household location, so no refresh there
+        binding.btnRefreshLocation.visibility =
+            if (viewModel.isStandalone || isEditingExisting) View.VISIBLE else View.GONE
+        binding.btnRefreshLocation.isEnabled =
+            isLocationEditable() && viewModel.locationState.value !is LocationState.Fetching
+    }
+
+    private fun updateSubmitButtonState() {
+        if (_binding == null) return
+        val locationOk = when {
+            isEditingExisting && !updateLocationRequested -> true
+            viewModel.isStandalone || isEditingExisting -> viewModel.isLocationValid()
+            else -> true
+        }
+        binding.btnSubmit.isEnabled = locationOk
+    }
+
+    private fun onUpdateLocationToggled(index: Int) {
+        if (index == 0) {   // Yes
+            if (originalLocationState == null) originalLocationState = viewModel.locationState.value
+            updateLocationRequested = true
+            updateLocationControls()
+            captureLocationSilently()
+        } else {            // No → drop any new capture, keep the saved location
+            updateLocationRequested = false
+            cancelLocationFetch()
+            originalLocationState?.let { viewModel.restoreLocationState(it) }
+            originalLocationState = null
+            updateLocationControls()
+            updateSubmitButtonState()
+        }
+    }
+
+    private fun cancelLocationFetch() {
+        gpsWatchdogJob?.cancel()
+        fetchTimeoutJob?.cancel()
+        stopListeningForLocation()
+    }
+
+    private fun onUpdateLocationChanged(yes: Boolean) {
+        if (yes == updateLocationRequested) return
+        updateLocationRequested = yes
+        viewModel.setLocationOverridden(yes)
+        if (yes) {
+            suppressRadioCallbacks = true
+            binding.rgCampSite.check(
+                if (viewModel.isCampSite.value) R.id.rb_camp_yes else R.id.rb_camp_no
+            )
+            suppressRadioCallbacks = false
+            if (!viewModel.isCampSite.value) captureLocationSilently()
+        } else {
+            cancelLocationFetch()
+            viewModel.onCampSiteChanged(originalCampSite)
+            originalLocationState?.let { viewModel.restoreLocationState(it) }
+        }
+        updateCampSiteBox()
+        updateLocationControls()
+        updateSubmitButtonState()
+    }
+
+    private fun onCampSiteChoiceChanged(camp: Boolean) {
+        if (camp == viewModel.isCampSite.value) return
+        viewModel.onCampSiteChanged(camp)
+        if (camp) {
+            cancelLocationFetch()
+        } else {
+            val s = viewModel.locationState.value
+            if (s !is LocationState.Captured && s !is LocationState.Fetching) captureLocationSilently()
+        }
+        updateCampSiteBox()
+        updateLocationControls()
+        updateSubmitButtonState()
+    }
+
+
 
     // ─── Location UI updates ─────────────────────────────────────────────
     private fun updateLocationUI(state: LocationState) {
-        val isEditMode = viewModel.recordExists.value == false
+        binding.pbLocation.visibility = if (state is LocationState.Fetching) View.VISIBLE else View.GONE
+        updateLocationControls()
+
         when (state) {
-            is LocationState.Idle -> setStatusText("", "#FF9800")
+            is LocationState.Idle -> {
+                setStatusText("", "#FF9800")
+                binding.etDigipin.setText("")
+            }
             is LocationState.Fetching -> {
                 setStatusText(getString(R.string.loc_status_fetching), "#FF9800")
-                binding.btnRefreshLocation.isEnabled = false
+                binding.etDigipin.setText("")
             }
             is LocationState.Captured -> {
-                binding.btnRefreshLocation.isEnabled = isEditMode
                 setStatusText(getString(R.string.loc_status_captured), "#4CAF50")
-                binding.etLatitude.setText(String.format(java.util.Locale.ENGLISH, "%.6f", state.lat))
-                binding.etLongitude.setText(String.format(java.util.Locale.ENGLISH, "%.6f", state.lon))
                 binding.etDigipin.setText(formatDigiPin(state.digipin))
-                binding.etTimestamp.setText(formatEpochToDateTime(state.timestamp))
             }
-            is LocationState.Failed.PermissionDenied -> {
-                binding.btnRefreshLocation.isEnabled = isEditMode
-                setStatusText(getString(R.string.loc_status_permission_denied), "#F44336")
-                clearLocationFields()
-            }
-            is LocationState.Failed.GpsDisabled -> {
-                binding.btnRefreshLocation.isEnabled = isEditMode
-                setStatusText(getString(R.string.loc_status_gps_disabled), "#F44336")
-                clearLocationFields()
-            }
-            is LocationState.Failed.NoSignal -> {
-                binding.btnRefreshLocation.isEnabled = isEditMode
-                setStatusText(getString(R.string.loc_status_failed), "#F44336")
-                clearLocationFields()
-            }
+            is LocationState.Failed.PermissionDenied -> failedUi(getString(R.string.loc_status_permission_denied))
+            is LocationState.Failed.GpsDisabled -> failedUi(getString(R.string.loc_status_gps_disabled))
+            is LocationState.Failed.NoSignal -> failedUi(getString(R.string.loc_status_failed))
             is LocationState.Failed.OutsideIndia -> {
-                binding.btnRefreshLocation.isEnabled = isEditMode
-                setStatusText(getString(R.string.loc_status_failed), "#F44336")
-                clearLocationFields()
+                failedUi(getString(R.string.loc_status_failed))
                 Toast.makeText(context, getString(R.string.loc_msg_outside_india), Toast.LENGTH_LONG).show()
             }
-            is LocationState.Failed.NoGpsProvider -> {
-                binding.btnRefreshLocation.isEnabled = isEditMode
-                setStatusText(getString(R.string.loc_status_no_gps_provider), "#F44336")
-                clearLocationFields()
-            }
-            is LocationState.Failed.Timeout -> {
-                binding.btnRefreshLocation.isEnabled = isEditMode
-                setStatusText(getString(R.string.loc_status_timeout), "#F44336")
-                clearLocationFields()
-            }
+            is LocationState.Failed.NoGpsProvider -> failedUi(getString(R.string.loc_status_no_gps_provider))
+            is LocationState.Failed.Timeout -> failedUi(getString(R.string.loc_status_timeout))
         }
+        updateSubmitButtonState()
+    }
+
+    private fun failedUi(text: String) {
+        setStatusText(text, "#F44336")
+        binding.etDigipin.setText("")
     }
 
     private fun updateLocationDetailText(detail: String?) {
@@ -513,23 +555,6 @@ class NewBenRegFragment : Fragment() {
         catch (_: Exception) {}
     }
 
-    private fun clearLocationFields() {
-        binding.etLatitude.setText("")
-        binding.etLongitude.setText("")
-        binding.etDigipin.setText("")
-        binding.etTimestamp.setText("")
-    }
-
-    private fun toggleGpsFields(visible: Boolean) {
-        val v = if (visible) View.VISIBLE else View.GONE
-        binding.btnRefreshLocation.visibility = v
-        binding.tvLocationStatus.visibility = v
-        binding.tilLatitude.visibility = v
-        binding.tilLongitude.visibility = v
-        binding.tilDigipin.visibility = v
-        binding.tilTimestamp.visibility = v
-    }
-
     // ─── Location capture ─────────────────────────────────────────────────
     private fun captureLocationSilently() {
         if (!hasLocationPermission()) {
@@ -552,6 +577,8 @@ class NewBenRegFragment : Fragment() {
     }
 
     private fun checkSettingsAndFetch() {
+        // A new capture replaces any legacy "GPS unavailable" state so the captured location is saved.
+        viewModel.onGpsUnavailableToggled(false)
         viewModel.setFetching()
         GpsDiagnostics.logPreflight(requireContext(), "NewBenRegFragment")
 
@@ -598,8 +625,8 @@ class NewBenRegFragment : Fragment() {
             if (viewModel.locationState.value !is LocationState.Fetching) return@launch
             Timber.tag(GpsDiagnostics.TAG).e(
                 "GPS watchdog fired — no terminal state after ${GpsDiagnostics.MASTER_TIMEOUT_MS}ms. " +
-                    "Forcing UI out of Fetching (likely an OEM battery/background-process throttle, " +
-                    "or a hung Play Services task on the fused fast path)."
+                        "Forcing UI out of Fetching (likely an OEM battery/background-process throttle, " +
+                        "or a hung Play Services task on the fused fast path)."
             )
             viewModel.onLocationFailed(LocationState.Failed.Timeout, getString(R.string.loc_detail_watchdog_timeout))
         }
@@ -641,6 +668,8 @@ class NewBenRegFragment : Fragment() {
             stopListeningForLocation()
             resolveWithCachedLocation(fetchStartElapsed)
         }
+        fetchTimeoutJob = fetchCancelJob
+
 
         try {
             client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
@@ -707,7 +736,7 @@ class NewBenRegFragment : Fragment() {
             delay(GpsDiagnostics.FETCH_TIMEOUT_MS)
             Timber.tag(GpsDiagnostics.TAG).w(
                 "GPS fetch exceeded ${GpsDiagnostics.FETCH_TIMEOUT_MS}ms with no fix — removing listener. " +
-                    "Offline cold fixes can legitimately take this long without A-GPS assistance data."
+                        "Offline cold fixes can legitimately take this long without A-GPS assistance data."
             )
             stopListeningForLocation()
             resolveWithCachedLocation(fetchStartElapsed)
@@ -784,7 +813,7 @@ class NewBenRegFragment : Fragment() {
 
     private fun hasLocationPermission(): Boolean =
         ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-        ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
     // Deliberately stricter than hasLocationPermission(): COARSE-only is enough to reach this
     // screen without a system permission prompt, but not enough to guarantee an offline-capable
@@ -810,13 +839,8 @@ class NewBenRegFragment : Fragment() {
     // ─── Location validation (standalone only) ───────────────────────────
     private fun validateLocationSection(): Boolean {
         if (viewModel.isLocationValid()) return true
-        if (viewModel.isGpsUnavailable.value && viewModel.gpsUnavailableReason.value.isNullOrBlank()) {
-            binding.tilReason.error = getString(R.string.loc_err_reason_required)
-            binding.nestedScroll.post { binding.nestedScroll.smoothScrollTo(0, binding.cardLocation.top) }
-        } else {
-            Toast.makeText(context, getString(R.string.loc_err_location_required), Toast.LENGTH_LONG).show()
-            binding.nestedScroll.post { binding.nestedScroll.smoothScrollTo(0, binding.cardLocation.top) }
-        }
+        Toast.makeText(context, getString(R.string.loc_err_location_required), Toast.LENGTH_LONG).show()
+        binding.nestedScroll.post { binding.nestedScroll.smoothScrollTo(0, binding.cardLocation.top) }
         return false
     }
 
@@ -862,7 +886,7 @@ class NewBenRegFragment : Fragment() {
             if (alertBinding.checkBox.isChecked) {
                 viewModel.setConsentAgreed()
                 alertDialog.dismiss()
-                if (viewModel.isStandalone && viewModel.recordExists.value == false) {
+                if (viewModel.isStandalone && viewModel.recordExists.value == false && !isEditingExisting) {
                     captureLocationSilently()
                 }
             } else {
@@ -1195,8 +1219,8 @@ class NewBenRegFragment : Fragment() {
                     } else {
                         searchItems.filter { item ->
                             item.headName.contains(query, ignoreCase = true) ||
-                            item.famName.contains(query, ignoreCase = true) ||
-                            item.hhId.toString().contains(query, ignoreCase = true)
+                                    item.famName.contains(query, ignoreCase = true) ||
+                                    item.hhId.toString().contains(query, ignoreCase = true)
                         }
                     }
                     arrayAdapter.clear()

@@ -1114,6 +1114,10 @@
     <string name="loc_dialog_open_settings">सेटिंग खोलें</string>
     <string name="loc_permission_rationale">इस घरेलू पंजीकरण के लिए GPS निर्देशांक कैप्चर करने हेतु स्थान अनुमति आवश्यक है।</string>
     <string name="loc_timeout_msg">स्थान प्राप्त करने में समय समाप्त। कृपया खुले क्षेत्र में जाएँ और रिफ्रेश दबाएं।</string>
+
+    <string name="loc_gps_not_captured">(GPS कैप्चर नहीं हुआ)</string>
+    <string name="loc_camp_site_msg">कैंप साइट पर पंजीकरण पूरा हो गया है।</string>
+
     <string-array name="loc_gps_unavailable_reasons">
         <item>GPS सिग्नल नहीं</item>
         <item>इनडोर स्थान</item>
@@ -1142,6 +1146,8 @@
     <string name="home_glance_population">कुल जनसंख्या</string>
     <string name="home_glance_unscreened">अस्क्रीन की गई जनसंख्या</string>
 
+
+    <string name="loc_cb_update_location">क्या आप स्थान का विवरण अपडेट करना चाहते हैं?</string>
 
 </resources>
 

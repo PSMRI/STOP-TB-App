@@ -80,7 +80,20 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_registered_camp_site),
         arrayId = R.array.nhhr_yes_no_array,
         entries = resources.getStringArray(R.array.nhhr_yes_no_array),
-        required = true
+        required = true,
+        hasDependants = true
+
+
+    )
+
+    private val updateLocationDetails = FormElement(
+        id = 1060,
+        inputType = RADIO,
+        title = resources.getString(R.string.loc_cb_update_location),
+        arrayId = R.array.nhhr_yes_no_array,
+        entries = resources.getStringArray(R.array.nhhr_yes_no_array),
+        required = false,
+        hasDependants = true   // needed, otherwise the fragment listener never fires
     )
 
     private val firstNameHeadOfFamily = FormElement(
@@ -321,6 +334,11 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         }
         if (availOfToilet.value == availOfToilet.entries!!.let { it[it.size - 2] }) {
             list.add(list.indexOf(availOfToilet) + 1, otherAvailOfToilet)
+        }
+        // Only for already-saved households: ask whether to update the location (default "No")
+        if (hh != null && hh.householdId != 0L) {
+            updateLocationDetails.value = updateLocationDetails.entries?.getOrNull(1)
+            list.add(updateLocationDetails)
         }
         setUpPage(list)
     }
@@ -783,6 +801,8 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
     fun getTotalMembers(): Int = totalMembersInHousehold.value?.toIntOrNull() ?: 0
 
     fun isTotalMembersValid(): Boolean = getTotalMembers() >= minRequiredMembers
+
+    fun isRegisteredAtCampSite(): Boolean = registeredAtCampSite.getPosition() == 0 // entries = [Yes, No]
 
     fun enableEditMode() {
         if (firstNameHeadOfFamily.inputType == TEXT_VIEW) firstNameHeadOfFamily.inputType = EDIT_TEXT

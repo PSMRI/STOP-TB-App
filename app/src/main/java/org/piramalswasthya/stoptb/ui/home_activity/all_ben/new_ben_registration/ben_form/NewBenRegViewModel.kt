@@ -77,7 +77,9 @@ class NewBenRegViewModel @Inject constructor(
     companion object {
         var isOtpVerified = false
         var isConsentAgreed = false
+        const val CAMP_SITE_REASON = "Registration done at camp site"
     }
+
 
     // ─── State ──────────────────────────────────────────────────────────
     private val _state = MutableLiveData(State.IDLE)
@@ -101,6 +103,13 @@ class NewBenRegViewModel @Inject constructor(
     // Location state — only used for standalone registrations
     private val _locationState = MutableStateFlow<LocationState>(LocationState.Idle)
     val locationState: StateFlow<LocationState> = _locationState.asStateFlow()
+
+    private val _isCampSite = MutableStateFlow(false)
+    val isCampSite: StateFlow<Boolean> = _isCampSite.asStateFlow()
+
+    // True once the user chose "update the location details = Yes" for this record
+    private var locationOverridden = false
+    fun setLocationOverridden(value: Boolean) { locationOverridden = value }
 
     private val _isGpsUnavailable = MutableStateFlow(false)
     val isGpsUnavailable: StateFlow<Boolean> = _isGpsUnavailable.asStateFlow()
@@ -207,7 +216,8 @@ class NewBenRegViewModel @Inject constructor(
                 relToHeadId = (ben.familyHeadRelationPosition - 1).takeIf { it >= 0 } ?: relToHeadId,
                 isNonHH = ben.isNonHH,
                 hofForDobRules = hofBen,
-                hofSpouseForDobRules = hofSpouse
+                hofSpouseForDobRules = hofSpouse,
+                showUpdateLocation = isStandalone
             )
         } else {
             val villageNames = user.villages.map { it.name }.toTypedArray()
@@ -291,10 +301,29 @@ class NewBenRegViewModel @Inject constructor(
             )
         }
         // Restore/Inherit Location details
-        if (!isStandalone) {
+        // Restore/Inherit Location details.
+// A saved beneficiary keeps its own location (it may have been updated separately from the household).
+        val benHasOwnLocation = benIdFromArgs != 0L &&
+                (ben.isGpsUnavailable ||
+                        (ben.gpsLatitude != null && ben.gpsLongitude != null && ben.digipin != null))
+        if (benHasOwnLocation) {
+            if (ben.isGpsUnavailable) {
+                _isGpsUnavailable.value = true
+                _gpsUnavailableReason.value = ben.gpsUnavailableReason
+                _isCampSite.value = true
+            } else {
+                _locationState.value = LocationState.Captured(
+                    lat = ben.gpsLatitude!!,
+                    lon = ben.gpsLongitude!!,
+                    digipin = ben.digipin!!,
+                    timestamp = ben.gpsTimestamp.orEmpty()
+                )
+            }
+        } else if (!isStandalone) {
             if (household.isGpsUnavailable) {
                 _isGpsUnavailable.value = true
                 _gpsUnavailableReason.value = household.gpsUnavailableReason
+                _isCampSite.value = true
             } else if (household.gpsLatitude != null && household.gpsLongitude != null && household.digipin != null) {
                 _locationState.value = LocationState.Captured(
                     lat = household.gpsLatitude!!,
@@ -322,6 +351,7 @@ class NewBenRegViewModel @Inject constructor(
     fun setFetching() { _locationState.value = LocationState.Fetching }
 
     fun onLocationResult(lat: Double, lon: Double, detail: String? = null) {
+        if (_isCampSite.value) return
         val digipin = DigiPinHelper.generate(lat, lon)
         if (digipin == null) {
             Timber.tag(GpsDiagnostics.TAG).w("onLocationResult rejected: lat=$lat lon=$lon is outside supported bounds")
@@ -336,6 +366,7 @@ class NewBenRegViewModel @Inject constructor(
     }
 
     fun onLocationFailed(reason: LocationState.Failed, detail: String? = null) {
+        if (_isCampSite.value) return
         Timber.tag(GpsDiagnostics.TAG).w("onLocationFailed: reason=$reason detail=$detail")
         _locationDetail.value = detail
         _locationState.value = reason
@@ -349,11 +380,22 @@ class NewBenRegViewModel @Inject constructor(
 
     fun onGpsUnavailableReasonSelected(reason: String?) { _gpsUnavailableReason.value = reason }
 
-    fun isLocationValid(): Boolean = when {
-        locationState.value is LocationState.Captured -> true
-        isGpsUnavailable.value && !gpsUnavailableReason.value.isNullOrBlank() -> true
-        else -> false
+    fun onCampSiteChanged(camp: Boolean) {
+        _isCampSite.value = camp
+        if (camp) {
+            _locationDetail.value = null
+            _locationState.value = LocationState.Idle
+        }
     }
+
+    fun restoreLocationState(state: LocationState) {
+        _locationDetail.value = null
+        _locationState.value = state
+    }
+
+
+
+    fun isLocationValid(): Boolean = _isCampSite.value || locationState.value is LocationState.Captured
 
     // ─── Save ────────────────────────────────────────────────────────────
     private fun getSpouseRegistrationRelationToHeadId(
@@ -496,31 +538,35 @@ class NewBenRegViewModel @Inject constructor(
 
                     dataset.mapValues(ben, 1)
 
-                    // Set GPS location: inherit from household when registered under one,
-                    // otherwise persist the standalone-captured GPS state
-                    if (!isStandalone) {
-                        ben.gpsLatitude = household.gpsLatitude
-                        ben.gpsLongitude = household.gpsLongitude
-                        ben.digipin = household.digipin
-                        ben.gpsTimestamp = household.gpsTimestamp
-                        ben.isGpsUnavailable = household.isGpsUnavailable
-                        ben.gpsUnavailableReason = household.gpsUnavailableReason
-                    } else {
+                    // Own location is saved for a new standalone registration, or when the user chose to update it.
+                    // A new household member inherits the household location; a saved member keeps what it already has.
+                    val saveOwnLocation = locationOverridden || (isStandalone && benIdFromArgs == 0L)
+                    if (saveOwnLocation) {
                         val locState = locationState.value
-                        if (locState is LocationState.Captured) {
+                        if (_isCampSite.value) {
+                            ben.gpsLatitude = null
+                            ben.gpsLongitude = null
+                            ben.digipin = null
+                            ben.gpsTimestamp = null
+                            ben.isGpsUnavailable = true
+                            ben.gpsUnavailableReason = CAMP_SITE_REASON
+                        } else if (locState is LocationState.Captured) {
                             ben.gpsLatitude = locState.lat
                             ben.gpsLongitude = locState.lon
                             ben.digipin = locState.digipin
                             ben.gpsTimestamp = locState.timestamp
                             ben.isGpsUnavailable = false
                             ben.gpsUnavailableReason = null
-                        } else if (isGpsUnavailable.value) {
-                            ben.gpsLatitude = null
-                            ben.gpsLongitude = null
-                            ben.digipin = null
-                            ben.gpsTimestamp = null
-                            ben.isGpsUnavailable = true
-                            ben.gpsUnavailableReason = gpsUnavailableReason.value
+                        }
+                    } else if (!isStandalone) {
+                        val hasOwnLocation = benIdFromArgs != 0L && (ben.isGpsUnavailable || ben.gpsLatitude != null)
+                        if (!hasOwnLocation) {
+                            ben.gpsLatitude = household.gpsLatitude
+                            ben.gpsLongitude = household.gpsLongitude
+                            ben.digipin = household.digipin
+                            ben.gpsTimestamp = household.gpsTimestamp
+                            ben.isGpsUnavailable = household.isGpsUnavailable
+                            ben.gpsUnavailableReason = household.gpsUnavailableReason
                         }
                     }
 
