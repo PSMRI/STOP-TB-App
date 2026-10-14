@@ -1485,9 +1485,14 @@ class TBSuspectedQuickDataset(
     private fun shouldShowTrueNatConducted(): Boolean =
         shouldShowIsSputumCollected() && isYes(isSputumCollectedField)
 
-    /** Liquid Culture shown when both history of TB AND taking anti-TB drugs */
+    /**
+     * Liquid Culture shown when any one of the three "Other Details" questions is Yes:
+     * History of TB, currently taking anti-TB drugs, or family history of TB.
+     */
     private fun shouldShowLiquidCultureConducted(): Boolean =
-        screeningCache?.historyOfTb == true && screeningCache?.takingAntiTBDrugs == true
+        screeningCache?.historyOfTb == true ||
+            screeningCache?.takingAntiTBDrugs == true ||
+            screeningCache?.familySufferingFromTB == true
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 

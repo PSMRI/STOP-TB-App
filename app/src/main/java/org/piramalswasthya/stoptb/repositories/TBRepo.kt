@@ -2242,7 +2242,14 @@ class TBRepo @Inject constructor(
                 isDRTBConfirmed = mappedIsDRTBConfirmed,
                 isTBConfirmed = mappedSputumTestResult == "TB Positive",
                 isConfirmed = mappedSputumTestResult == "TB Positive",
-                sputumTestResult = mappedSputumTestResult
+                sputumTestResult = mappedSputumTestResult,
+                // Previously missing entirely — TB_SUSPECTED's own copy of these fields stayed
+                // null forever for any beneficiary referred via the quick-entry screen (which only
+                // writes them onto TB_DIAGNOSTICS), even though TB_SUSPECTED has its own push to
+                // the backend (saveTBSuspectedData) that would otherwise send stale/incomplete data.
+                recommendedForLiquidCultureTest = diag.recommendedForLiquidCultureTest ?: existing?.recommendedForLiquidCultureTest,
+                isLiquidCultureConducted = diag.isLiquidCultureConducted ?: existing?.isLiquidCultureConducted,
+                liquidCultureResult = diag.liquidCultureResult ?: existing?.liquidCultureResult
             )
 
             // hasSymptoms is deliberately always forced true above (this function only runs off
@@ -2273,6 +2280,9 @@ class TBRepo @Inject constructor(
                     if (existing.isTBConfirmed != provisionalCache.isTBConfirmed) add("isTBConfirmed: ${existing.isTBConfirmed} -> ${provisionalCache.isTBConfirmed}")
                     if (existing.isConfirmed != provisionalCache.isConfirmed) add("isConfirmed: ${existing.isConfirmed} -> ${provisionalCache.isConfirmed}")
                     if (existing.sputumTestResult != provisionalCache.sputumTestResult) add("sputumTestResult: ${existing.sputumTestResult} -> ${provisionalCache.sputumTestResult}")
+                    if (existing.recommendedForLiquidCultureTest != provisionalCache.recommendedForLiquidCultureTest) add("recommendedForLiquidCultureTest: ${existing.recommendedForLiquidCultureTest} -> ${provisionalCache.recommendedForLiquidCultureTest}")
+                    if (existing.isLiquidCultureConducted != provisionalCache.isLiquidCultureConducted) add("isLiquidCultureConducted: ${existing.isLiquidCultureConducted} -> ${provisionalCache.isLiquidCultureConducted}")
+                    if (existing.liquidCultureResult != provisionalCache.liquidCultureResult) add("liquidCultureResult: ${existing.liquidCultureResult} -> ${provisionalCache.liquidCultureResult}")
                 }
                 Timber.w("TB_SUSPECTED_DIRTY: benId=$benId marking UNSYNCED (was ${existing.syncState}), diag.xrayOrderStatus=${diag.xrayOrderStatus} trueNatOrderStatus=${diag.trueNatOrderStatus} rifOrderStatus=${diag.rifOrderStatus}, changes=$diffs")
             } else {

@@ -41,11 +41,6 @@ class DiagnosticOrderPushWorker @AssistedInject constructor(
         }
         return try {
             withContext(Dispatchers.IO) {
-                // Refresh the cached integration flags first — they're only ever set by this
-                // call, and a stale cached "not integrated" (e.g. fresh login, or the last
-                // refresh ran while the hub was disconnected) would otherwise suppress the
-                // triggerDiagnosticResultPollWorker() call below even though the order that was
-                // just created actually is device-integrated.
                 tbRepo.refreshDeviceIntegrationConfig()
                 val response = tbRepo.createOrder(benId, testType)
                 val isIntegrated = when (testType) {
