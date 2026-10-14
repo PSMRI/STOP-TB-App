@@ -1,5 +1,7 @@
 package org.piramalswasthya.stoptb.repositories.dynamicRepo
 
+import org.piramalswasthya.stoptb.helpers.SyncDailyStore
+
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.room.withTransaction
@@ -241,6 +243,7 @@ class CounsellingRepositoryImpl @Inject constructor(
         phase: String,
         status: String
     ) {
+        var savedForDiagnostics = false
         db.withTransaction {
             val formResponseWithDetails = responseDao.getFormResponseById(responseId)
                 ?: return@withTransaction
@@ -280,7 +283,9 @@ class CounsellingRepositoryImpl @Inject constructor(
                     updatedAt = System.currentTimeMillis()
                 )
             )
+            savedForDiagnostics = true
         }
+        if (savedForDiagnostics) SyncDailyStore.record("COUNSELLING", listOf(responseId), "SAVE", "SUCCESS")
     }
 
     override suspend fun submitSectionE(responseId: Long, answers: List<QuestionResponseEntity>) {
@@ -393,12 +398,17 @@ class CounsellingRepositoryImpl @Inject constructor(
             }
             Timber.d("syncUnsyncedRecords: unsynced records details: $unsyncedDetails")
         }
-        if (unsynced.isEmpty()) return true
+        if (unsynced.isEmpty()) {
+            org.piramalswasthya.stoptb.helpers.logSyncModule("COUNSELLING", "PUSH",
+                "NO_PENDING_DATA", "selectedUnsynced" to 0)
+            return true
+        }
 
         val officerId = preferenceDao.getLoggedInUser()?.userId?.toLong() ?: DEFAULT_OFFICER_ID
         val jwt = preferenceDao.getJWTAmritToken()
         val authHeader = jwt ?: ""
         var allSuccess = true
+        var syncedRecords = 0
 
         for (resp in unsynced) {
             val responseId = resp.formResponse.responseId
@@ -422,8 +432,11 @@ class CounsellingRepositoryImpl @Inject constructor(
                     responseDao.updateFormResponse(
                         resp.formResponse.copy(syncStatus = "SYNCED", syncedAt = System.currentTimeMillis())
                     )
+                    syncedRecords++
+                    SyncDailyStore.record("COUNSELLING", listOf(responseId), "PUSH", "SUCCESS")
                 } else {
                     allSuccess = false
+                    SyncDailyStore.record("COUNSELLING", listOf(responseId), "PUSH", "FAILURE", "COUNSELLING_REFUSAL_NOT_ACKNOWLEDGED")
                 }
                 continue
             }
@@ -448,6 +461,7 @@ class CounsellingRepositoryImpl @Inject constructor(
 
             if (!nonFinalSuccess) {
                 allSuccess = false
+                SyncDailyStore.record("COUNSELLING", listOf(responseId), "PUSH", "FAILURE", "SECTION_UPLOAD_NOT_ACKNOWLEDGED")
                 continue
             }
 
@@ -463,6 +477,8 @@ class CounsellingRepositoryImpl @Inject constructor(
                 responseDao.updateFormResponse(
                     resp.formResponse.copy(syncStatus = "SYNCED", syncedAt = System.currentTimeMillis())
                 )
+                syncedRecords++
+                SyncDailyStore.record("COUNSELLING", listOf(responseId), "PUSH", "SUCCESS")
 
                 val finalSectionResponse = resp.sectionResponses.find { it.sectionResponse.sectionId == finalSectionId }
                 if (finalSectionResponse != null) {
@@ -472,9 +488,14 @@ class CounsellingRepositoryImpl @Inject constructor(
                 }
             } else {
                 allSuccess = false
+                SyncDailyStore.record("COUNSELLING", listOf(responseId), "PUSH", "FAILURE", "COUNSELLING_COMPLETE_NOT_ACKNOWLEDGED")
             }
         }
 
+        org.piramalswasthya.stoptb.helpers.logSyncModule("COUNSELLING", "PUSH",
+            if (!allSuccess) "PARTIAL_FAILURE" else if (syncedRecords < unsynced.size) "DEFERRED" else "SUCCESS",
+            "selectedUnsynced" to unsynced.size, "locallyMarkedSynced" to syncedRecords,
+            "remaining" to unsynced.size - syncedRecords)
         return allSuccess
     }
 

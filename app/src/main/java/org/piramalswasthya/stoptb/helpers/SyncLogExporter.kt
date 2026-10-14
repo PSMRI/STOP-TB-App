@@ -33,6 +33,12 @@ class SyncLogExporter @Inject constructor(
 
         val zipFile = File(context.cacheDir, "sync-logs-${System.currentTimeMillis()}.zip")
         ZipOutputStream(BufferedOutputStream(FileOutputStream(zipFile))).use { zos ->
+            zos.putNextEntry(ZipEntry("sync-context.txt"))
+            val exportContext = "EXPORT CONTEXT (current installation, not historical record context)\n" +
+                "exportedAtEpochMs=${System.currentTimeMillis()}\n" +
+                "timezone=${java.util.TimeZone.getDefault().id}\n" + SyncDiagnostics.identity(context) + "\n"
+            zos.write(exportContext.toByteArray(Charsets.UTF_8))
+            zos.closeEntry()
             for (file in logFiles.sortedBy { it.name }) {
                 zos.putNextEntry(ZipEntry(file.name))
                 BufferedInputStream(FileInputStream(file)).use { bis ->

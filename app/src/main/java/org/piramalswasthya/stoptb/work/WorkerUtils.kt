@@ -20,6 +20,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceManager
 import org.piramalswasthya.stoptb.work.dynamicWoker.FormSyncWorker
 import org.piramalswasthya.stoptb.work.dynamicWoker.NCDFollowUpSyncWorker
 import org.piramalswasthya.stoptb.work.dynamicWoker.NDCFollowUpPushWorker
+import org.piramalswasthya.stoptb.helpers.SyncDiagnostics
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
 
@@ -79,7 +80,8 @@ object WorkerUtils {
         }
     }
 
-    fun triggerAmritPushWorker(context: Context): List<java.util.UUID> {
+    fun triggerAmritPushWorker(context: Context, triggerSource: String = "DIRECT",
+                              syncRunId: String = java.util.UUID.randomUUID().toString()): List<java.util.UUID> {
         if (!hasLoggedInUser(context)) {
             Timber.w("Push worker skipped: no logged-in user is stored yet")
             return emptyList()
@@ -112,11 +114,13 @@ object WorkerUtils {
 
         // StopTB push chain:
         // Registration → NCD Referrals + TB data + ABHA
+        val traceData = Data.Builder().putString(SyncDiagnostics.RUN_ID, syncRunId)
+            .putString(SyncDiagnostics.TRIGGER, triggerSource).build()
         val registration = if (isCampHubSyncActive) {
             campSyncRequestBuilder<PushToAmritWorker>()
         } else {
             syncRequestBuilder<PushToAmritWorker>()
-        }.addTag("push_group1_registration").build()
+        }.setInputData(traceData).addTag("push_group1_registration").build()
 
         val afterRegistration = workManager.beginUniqueWork(
             pushWorkerUniqueName, ExistingWorkPolicy.KEEP, registration)
@@ -126,26 +130,30 @@ object WorkerUtils {
                 campSyncRequestBuilder<PushTBToAmritWorker>()
             } else {
                 syncRequestBuilder<PushTBToAmritWorker>()
-            }).addTag("push_group5_tb").build(),
+            }).setInputData(traceData).addTag("push_group5_tb").build(),
         ) 
 
         val groupAbha = if (isCampHubSyncActive) {
             campSyncRequestBuilder<PushMapAbhatoBenficiaryWorker>()
         } else {
             syncRequestBuilder<PushMapAbhatoBenficiaryWorker>()
-        }.addTag("push_group9_digital_health").build()
+        }.setInputData(traceData).addTag("push_group9_digital_health").build()
 
         val chainTB = afterRegistration.then(groupTB)
         val chainAbha = afterRegistration.then(listOf(groupAbha))
 
+        SyncDiagnostics.prepareRun(syncRunId, "PUSH")
         WorkContinuation.combine(listOf(chainTB, chainAbha)).enqueue()
-        return listOf(registration.id, groupAbha.id) + groupTB.map { it.id }
+        val ids = listOf(registration.id, groupAbha.id) + groupTB.map { it.id }
+        SyncDiagnostics.observeRun(context, syncRunId, "PUSH", triggerSource, ids)
+        return ids
     }
 
     fun triggerAmritPullWorker(
         context: Context,
         force: Boolean = false,
-        triggerSource: String = "DIRECT"
+        triggerSource: String = "DIRECT",
+        syncRunId: String = java.util.UUID.randomUUID().toString()
     ): List<java.util.UUID> {
         if (!hasLoggedInUser(context)) {
             Timber.w("Pull worker skipped: no logged-in user is stored yet")
@@ -162,6 +170,8 @@ object WorkerUtils {
 
         Timber.i("Pull [$triggerSource] enqueued")
         val pullRunData = Data.Builder()
+            .putString(SyncDiagnostics.RUN_ID, syncRunId)
+            .putString(SyncDiagnostics.TRIGGER, triggerSource)
             .putString(pullTriggerSourceKey, triggerSource)
             .putLong(pullStartedAtKey, SystemClock.elapsedRealtime())
             .build()
@@ -194,8 +204,11 @@ object WorkerUtils {
 
         val chainTB = afterFoundation.then(groupTB)
 
+        SyncDiagnostics.prepareRun(syncRunId, "PULL")
         chainTB.then(setSyncCompleteWorker).enqueue()
-        return listOf(pullWorkRequest.id, setSyncCompleteWorker.id) + groupTB.map { it.id }
+        val ids = listOf(pullWorkRequest.id, setSyncCompleteWorker.id) + groupTB.map { it.id }
+        SyncDiagnostics.observeRun(context, syncRunId, "PULL", triggerSource, ids)
+        return ids
     }
 
     /** Convenience alias — camp check is already inside [triggerAmritPushWorker]. */
@@ -235,11 +248,13 @@ object WorkerUtils {
     ): List<java.util.UUID> {
         manualCampRefreshInProgress = true
         Timber.i("Camp sync [MANUAL_REFRESH] requested by user")
-        val pushIds = triggerAmritPushWorker(context)
+        val runId = java.util.UUID.randomUUID().toString()
+        val pushIds = triggerAmritPushWorker(context, "MANUAL_REFRESH", runId)
         val pullIds = triggerAmritPullWorker(
             context,
             force = true,
-            triggerSource = "MANUAL_REFRESH"
+            triggerSource = "MANUAL_REFRESH",
+            syncRunId = runId
         )
         return pushIds + pullIds
     }

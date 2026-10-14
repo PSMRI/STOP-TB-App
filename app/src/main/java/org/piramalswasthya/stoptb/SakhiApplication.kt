@@ -48,6 +48,7 @@ class SakhiApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        org.piramalswasthya.stoptb.helpers.SyncDailyStore.initialize(this)
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
         val builder = VmPolicy.Builder()
         StrictMode.setVmPolicy(builder.build())

@@ -7,6 +7,14 @@ import org.junit.Test
 import org.piramalswasthya.stoptb.network.GeneralOpdDrugResponse
 
 class GeneralOpdPullBatchTest {
+    @Test
+    fun skipReasonExplainsValidationWithoutExposingExceptionValues() {
+        assertEquals("INVALID_DRUGS_ARRAY", generalOpdSkipReason(IllegalArgumentException("Invalid General OPD drugs array")))
+        assertEquals("DURATION_NOT_POSITIVE_OR_FREQUENCY_OR_UNIT_BLANK",
+            generalOpdSkipReason(IllegalArgumentException("Invalid General OPD prescription details")))
+        assertFalse(generalOpdSkipReason(IllegalArgumentException("patient-secret-value")).contains("patient-secret-value"))
+    }
+
     private val valid = """[{"drugID":1,"drugName":"Medicine","frequency":"Once daily","duration":2,"durationUnit":"Day(s)","itemFormID":1,"drugForm":"Tablet"}]"""
 
     @Test

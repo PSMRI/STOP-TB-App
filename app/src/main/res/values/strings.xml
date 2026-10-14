@@ -1610,5 +1610,15 @@
 
 
 
+    <string name="sync_dashboard_tab_summary">Summary</string>
+    <string name="sync_summary_refresh">Refresh Summary</string>
+    <string name="sync_summary_scope">PUSH: day-wise local saves and their upload status. PULL: selected sync records saved to DB and skipped reasons. Today is default. PUSH totals persist; PULL run history covers this app session.</string>
+    <string name="sync_summary_push">PUSH</string>
+    <string name="sync_summary_pull">PULL</string>
+    <string name="sync_summary_history">History</string>
+    <string name="sync_summary_today">Today</string>
+    <string name="sync_summary_yesterday">Yesterday</string>
+    <string name="sync_summary_all">All</string>
+    <string name="sync_summary_empty">No structured sync reports yet. Run sync, then refresh this summary.</string>
 </resources>
 

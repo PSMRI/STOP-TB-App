@@ -43,6 +43,12 @@ abstract class BasePushWorker(
         createForegroundInfo("Syncing data...")
 
     override suspend fun doWork(): Result {
+        return org.piramalswasthya.stoptb.helpers.SyncDiagnostics.worker(
+            applicationContext, inputData, workerName, id, runAttemptCount, "PUSH"
+        ) { doLoggedWork() }
+    }
+
+    private suspend fun doLoggedWork(): Result {
         if (runAttemptCount >= MAX_RETRY_COUNT) {
             Timber.e("[$workerName] Max retries ($MAX_RETRY_COUNT) exceeded, giving up")
             return Result.failure(workDataOf(

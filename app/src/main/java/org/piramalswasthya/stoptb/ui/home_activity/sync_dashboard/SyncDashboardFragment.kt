@@ -19,7 +19,8 @@ class SyncDashboardFragment : Fragment() {
     private val tabTitles by lazy {
         arrayOf(
             getString(R.string.sync_dashboard_tab_status),
-            getString(R.string.sync_dashboard_tab_logs)
+            getString(R.string.sync_dashboard_tab_logs),
+            getString(R.string.sync_dashboard_tab_summary)
         )
     }
 

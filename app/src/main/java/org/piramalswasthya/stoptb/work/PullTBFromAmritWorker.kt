@@ -53,6 +53,12 @@ class PullTBFromAmritWorker @AssistedInject constructor(
     override suspend fun getForegroundInfo(): ForegroundInfo = createForegroundInfo("Syncing data...")
 
     override suspend fun doWork(): Result {
+        return org.piramalswasthya.stoptb.helpers.SyncDiagnostics.worker(
+            applicationContext, inputData, name, id, runAttemptCount, "PULL"
+        ) { doLoggedWork() }
+    }
+
+    private suspend fun doLoggedWork(): Result {
         setForeground(getForegroundInfo())
         val triggerSource = inputData.getString(WorkerUtils.pullTriggerSourceKey) ?: "DIRECT"
         val startedAt = inputData.getLong(WorkerUtils.pullStartedAtKey, SystemClock.elapsedRealtime())

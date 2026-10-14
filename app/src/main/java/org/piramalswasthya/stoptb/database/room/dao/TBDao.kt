@@ -25,7 +25,7 @@ interface TBDao {
     suspend fun getTbScreening(benId: Long, visitDate: Long, visitDateGMT: Long): TBScreeningCache?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun saveTbScreening(tbScreeningCache: TBScreeningCache)
+    suspend fun saveTbScreening(tbScreeningCache: TBScreeningCache): Long
 
     @Query("SELECT * FROM GENERAL_OPD WHERE benId =:benId limit 1")
     suspend fun getGeneralOpd(benId: Long): GeneralOpdCache?
@@ -116,7 +116,7 @@ interface TBDao {
     suspend fun getTbDiagnosticsByBenId(benId: Long): TBDiagnosticsCache?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun saveTbDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache)
+    suspend fun saveTbDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache): Long
 
     @Query("SELECT * FROM TB_SUSPECTED WHERE benId =:benId ORDER BY id DESC limit 1")
     suspend fun getTbSuspected(benId: Long): TBSuspectedCache?
@@ -143,10 +143,10 @@ interface TBDao {
     suspend fun getTbSuspected(benId: Long, visitDate: Long, visitDateGMT: Long): TBSuspectedCache?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun saveTbSuspected(tbSuspectedCache: TBSuspectedCache)
+    suspend fun saveTbSuspected(tbSuspectedCache: TBSuspectedCache): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun saveTbConfirmed(tbConfirmedCache: TBConfirmedTreatmentCache)
+    suspend fun saveTbConfirmed(tbConfirmedCache: TBConfirmedTreatmentCache): Long
 
 
 

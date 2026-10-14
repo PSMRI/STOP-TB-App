@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.repositories
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import org.piramalswasthya.stoptb.helpers.SyncDailyStore
 import org.json.JSONArray
 import org.json.JSONObject
 import org.piramalswasthya.stoptb.database.room.SyncState
@@ -41,6 +42,7 @@ class VitalRepo @Inject constructor(
     suspend fun saveVitals(vitalCache: VitalCache) {
         withContext(Dispatchers.IO) {
             vitalDao.saveVitals(vitalCache)
+            SyncDailyStore.record("GENERAL_EXAMINATION", listOf(vitalCache.benId), "SAVE", "SUCCESS")
         }
     }
 
@@ -49,11 +51,13 @@ class VitalRepo @Inject constructor(
             val localData = vitalCache.copy(syncState = SyncState.UNSYNCED)
 
             vitalDao.saveVitals(localData)
+            SyncDailyStore.record("GENERAL_EXAMINATION", listOf(localData.benId), "SAVE", "SUCCESS")
 
             val synced = pushSingleVital(localData)
 
             if (synced) {
                 vitalDao.saveVitals(localData.copy(syncState = SyncState.SYNCED))
+                SyncDailyStore.record("GENERAL_EXAMINATION", listOf(localData.benId), "PUSH", "SUCCESS")
             }
 
             synced
@@ -63,7 +67,11 @@ class VitalRepo @Inject constructor(
     suspend fun pushUnSyncedVitals(): Boolean {
         return withContext(Dispatchers.IO) {
             val vitals = vitalDao.getVitals(SyncState.UNSYNCED)
-            if (vitals.isEmpty()) return@withContext true
+            if (vitals.isEmpty()) {
+                org.piramalswasthya.stoptb.helpers.logSyncModule("GENERAL_EXAMINATION", "PUSH",
+                    "NO_PENDING_DATA", "pending" to 0)
+                return@withContext true
+            }
 
             var successCount = 0
             var failCount = 0
@@ -72,6 +80,7 @@ class VitalRepo @Inject constructor(
                 val synced = pushSingleVital(vital)
                 if (synced) {
                     vitalDao.saveVitals(vital.copy(syncState = SyncState.SYNCED))
+                    SyncDailyStore.record("GENERAL_EXAMINATION", listOf(vital.benId), "PUSH", "SUCCESS")
                     successCount += 1
                 } else {
                     failCount += 1
@@ -86,6 +95,10 @@ class VitalRepo @Inject constructor(
             )
 
             // Keep the worker successful so failed records remain UNSYNCED for the next refresh.
+            org.piramalswasthya.stoptb.helpers.logSyncModule("GENERAL_EXAMINATION", "PUSH",
+                org.piramalswasthya.stoptb.helpers.syncPushOutcome(vitals.size, successCount),
+                "pending" to vitals.size, "locallyMarkedSynced" to successCount,
+                "remaining" to vitals.size - successCount)
             true
         }
     }
@@ -180,6 +193,7 @@ class VitalRepo @Inject constructor(
                             syncState = SyncState.SYNCED
                         )
                     )
+                    SyncDailyStore.record("GENERAL_EXAMINATION", listOf(benId), "PULL", "SUCCESS")
                 }
 
                 if (records.isEmpty()) 0 else 1
@@ -205,6 +219,7 @@ class VitalRepo @Inject constructor(
             )
 
             val responseBody = response.body()?.string()
+            SyncDailyStore.response("GENERAL_EXAMINATION", listOf(vitalCache.benId), response.code(), responseBody)
 
             if (!response.isSuccessful || responseBody.isNullOrBlank()) {
                 return false
@@ -230,6 +245,7 @@ class VitalRepo @Inject constructor(
             if (e.message == "Refreshed Token") {
                 pushSingleVital(vitalCache)
             } else {
+                SyncDailyStore.record("GENERAL_EXAMINATION", listOf(vitalCache.benId), "PUSH", "FAILURE", "TIMEOUT")
                 false
             }
 
@@ -238,6 +254,7 @@ class VitalRepo @Inject constructor(
                 pushSingleVital(vitalCache)
             } else {
                 Timber.e(e, "Vital sync failed for benId=%s", vitalCache.benId)
+                SyncDailyStore.record("GENERAL_EXAMINATION", listOf(vitalCache.benId), "PUSH", "FAILURE", "EXCEPTION_${e.javaClass.simpleName}")
                 false
             }
         }

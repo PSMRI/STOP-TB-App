@@ -20,6 +20,10 @@ import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.TBDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Konstants
+import org.piramalswasthya.stoptb.helpers.logSyncModule
+import org.piramalswasthya.stoptb.helpers.logSyncSkip
+import org.piramalswasthya.stoptb.helpers.SyncDailyStore
+import org.piramalswasthya.stoptb.helpers.syncPushOutcome
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.GeneralOpdCache
 import org.piramalswasthya.stoptb.model.GeneralOpdPrescription
@@ -113,8 +117,9 @@ class TBRepo @Inject constructor(
                 ben.gpsLatitude?.let { tbScreeningCache.latitude = it }
                 ben.gpsLongitude?.let { tbScreeningCache.longitude = it }
             }
-            tbDao.saveTbScreening(tbScreeningCache)
+            val savedId = tbDao.saveTbScreening(tbScreeningCache)
             benDao.updateScreeningStatus(tbScreeningCache.benId,"SCREENED")   // NEW
+            SyncDailyStore.record("TB_SCREENING", listOf(savedId), "SAVE", "SUCCESS")
         }
     }
 
@@ -134,9 +139,11 @@ class TBRepo @Inject constructor(
     suspend fun saveGeneralOpdWithPrescriptions(cache: GeneralOpdCache, medicines: List<OpdMedicineDraft>) =
         withContext(Dispatchers.IO) {
             val masters = drugMasterRepo.getCachedMasters()
+            var diagnosticSavedId = 0
             database.withTransaction {
                 val complaints = resolveChiefComplaintIds(cache)
                 val opdId = tbDao.saveGeneralOpd(cache.copy(chiefComplaintIds = complaints)).toInt()
+                diagnosticSavedId = opdId
                 tbDao.ensureGeneralOpdSubmissionId(opdId)
                 tbDao.deleteGeneralOpdPrescriptions(opdId)
                 tbDao.insertGeneralOpdPrescriptions(medicines.mapIndexed { index, medicine ->
@@ -145,6 +152,7 @@ class TBRepo @Inject constructor(
                         medicine.drugId, medicine.drugName, medicine.itemFormId, medicine.drugForm).resolveDrug(masters)
                 })
             }
+            SyncDailyStore.record("GENERAL_OPD", listOf(diagnosticSavedId), "SAVE", "SUCCESS")
         }
 
     private suspend fun resolveChiefComplaintIds(cache: GeneralOpdCache): List<Int>? {
@@ -268,7 +276,8 @@ class TBRepo @Inject constructor(
 
     suspend fun saveGeneralOpd(generalOpdCache: GeneralOpdCache) {
         withContext(Dispatchers.IO) {
-            tbDao.saveGeneralOpd(generalOpdCache)
+            val savedId = tbDao.saveGeneralOpd(generalOpdCache)
+            SyncDailyStore.record("GENERAL_OPD", listOf(savedId), "SAVE", "SUCCESS")
         }
     }
 
@@ -318,7 +327,8 @@ class TBRepo @Inject constructor(
                         cache.rifOrderStatus = fresh.rifOrderStatus
                     }
                 }
-                tbDao.saveTbDiagnostics(cache)
+                val savedId = tbDao.saveTbDiagnostics(cache)
+                SyncDailyStore.record("TB_DIAGNOSTICS", listOf(savedId), "SAVE", "SUCCESS")
             }
             if (tbDiagnosticsCache.isChestXRayDone == true) benDao.updateScreeningStatus(tbDiagnosticsCache.benId,"SCREENED")   // NEW
 
@@ -338,7 +348,8 @@ class TBRepo @Inject constructor(
                 ben.gpsLatitude?.let { tbSuspectedCache.latitude = it }
                 ben.gpsLongitude?.let { tbSuspectedCache.longitude = it }
             }
-            tbDao.saveTbSuspected(tbSuspectedCache)
+            val savedId = tbDao.saveTbSuspected(tbSuspectedCache)
+            SyncDailyStore.record("TB_SUSPECTED", listOf(savedId), "SAVE", "SUCCESS")
         }
     }
 
@@ -351,7 +362,8 @@ class TBRepo @Inject constructor(
     suspend fun saveTBConfirmed(tbConfirmedTreatmentCache: TBConfirmedTreatmentCache) {
         withContext(Dispatchers.IO)
         {
-            tbDao.saveTbConfirmed(tbConfirmedTreatmentCache)
+            val savedId = tbDao.saveTbConfirmed(tbConfirmedTreatmentCache)
+            SyncDailyStore.record("TB_CONFIRMED", listOf(savedId), "SAVE", "SUCCESS")
         }
     }
 
@@ -385,9 +397,13 @@ class TBRepo @Inject constructor(
                         when (responseStatusCode) {
                             200 -> {
                                 try {
-                                    saveTBScreeningCacheFromNewResponse(jsonObj)
+                                    val saved = saveTBScreeningCacheFromNewResponse(jsonObj)
+                                    logSyncModule("TB_SCREENING", "PULL", "SUCCESS",
+                                        "received" to getStopTbDataArray(jsonObj).length(), "saved" to saved.size,
+                                        "skipped" to getStopTbDataArray(jsonObj).length() - saved.size)
                                 } catch (e: Exception) {
                                     Timber.d("TB Screening entries not synced $e")
+                                    logSyncModule("TB_SCREENING", "PULL", "FAILURE", "reason" to e.javaClass.simpleName)
                                     return@withContext 0
                                 }
 
@@ -403,7 +419,12 @@ class TBRepo @Inject constructor(
                             }
 
                             5000 -> {
-                                if (errorMessage == "No record found") return@withContext 0
+                                if (errorMessage == "No record found") {
+                                    logSyncModule("TB_SCREENING", "PULL", "NO_RECORDS_RETURNED",
+                                        "received" to 0, "saved" to 0, "httpCode" to statusCode,
+                                        "backendStatus" to 5000)
+                                    return@withContext 0
+                                }
                             }
 
                             else -> {
@@ -444,7 +465,8 @@ class TBRepo @Inject constructor(
                     )
                 ) {
                     benDao.getBen(tbScreeningDTO.benId)?.let {
-                        tbDao.saveTbScreening(cache)
+                        val savedId = tbDao.saveTbScreening(cache)
+                        SyncDailyStore.record("TB_SCREENING", listOf(savedId), "PULL", "SUCCESS")
                     }
                 }
             }
@@ -478,6 +500,7 @@ class TBRepo @Inject constructor(
                                     throw e
                                 } catch (e: Exception) {
                                     Timber.e(e, "General OPD entries not synced")
+                                    logSyncModule("GENERAL_OPD", "PULL", "FAILURE", "reason" to e.javaClass.simpleName)
                                     return@withContext -1
                                 }
                             }
@@ -492,7 +515,12 @@ class TBRepo @Inject constructor(
                             }
 
                             5000 -> {
-                                if (errorMessage == "No record found") return@withContext 0
+                                if (errorMessage == "No record found") {
+                                    logSyncModule("GENERAL_OPD", "PULL", "NO_RECORDS_RETURNED",
+                                        "received" to 0, "saved" to 0, "httpCode" to statusCode,
+                                        "backendStatus" to 5000)
+                                    return@withContext 0
+                                }
                             }
 
                             else -> {
@@ -514,6 +542,17 @@ class TBRepo @Inject constructor(
         }
     }
 
+    private suspend fun logTbSkip(module: String, item: JSONObject?, index: Int?, reason: String,
+                                  state: SyncState? = null, localUpdatedAt: Long? = null,
+                                  serverUpdatedAt: Long? = null) {
+        logSyncSkip(module, "PULL", reason, "recordIndex" to index,
+            "recordId" to item?.optLong("id", 0L)?.takeIf { it > 0L },
+            "benRegId" to (item?.optLong("beneficiaryRegID", 0L)?.takeIf { it > 0L }
+                ?: item?.optLong("benRegID", 0L)?.takeIf { it > 0L }),
+            "localSyncState" to state?.name, "localUpdatedAt" to localUpdatedAt,
+            "serverUpdatedAt" to serverUpdatedAt)
+    }
+
     private suspend fun saveTBScreeningCacheFromNewResponse(jsonObj: JSONObject): MutableList<TBScreeningCache> {
         val tbScreeningList = mutableListOf<TBScreeningCache>()
         val records = when (val data = jsonObj.opt("data")) {
@@ -522,13 +561,29 @@ class TBRepo @Inject constructor(
             else -> org.json.JSONArray()
         }
         for (index in 0 until records.length()) {
-            val item = records.optJSONObject(index) ?: continue
-            val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { it > 0 } ?: continue
-            val ben = benDao.getBenByRegId(benRegId) ?: continue
+            val item = records.optJSONObject(index)
+            if (item == null) {
+                logTbSkip("TB_SCREENING", null, index, "INVALID_RECORD_OBJECT")
+                continue
+            }
+            val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { it > 0 }
+            if (benRegId == null) {
+                logTbSkip("TB_SCREENING", item, index, "BENEFICIARY_REGISTRATION_ID_MISSING")
+                continue
+            }
+            val ben = benDao.getBenByRegId(benRegId)
+            if (ben == null) {
+                logTbSkip("TB_SCREENING", item, index, "BENEFICIARY_NOT_FOUND_LOCALLY")
+                continue
+            }
             val visitDate = getLongFromDateMultipleSupport(item.optString("visitDate"))
             val existing = tbDao.getTbScreening(ben.beneficiaryId)
             val serverUpdatedDate = getServerUpdatedDate(item)
             if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
+                logTbSkip("TB_SCREENING", item, index,
+                    if (existing?.syncState != null && existing.syncState != SyncState.SYNCED)
+                        "LOCAL_PENDING_EDITS_PROTECTED" else "SERVER_VERSION_NOT_NEWER",
+                    existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)
                 continue
             }
             val cache = (existing ?: TBScreeningCache(benId = ben.beneficiaryId)).copy(
@@ -563,7 +618,8 @@ class TBRepo @Inject constructor(
                 serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
                 syncState = SyncState.SYNCED
             )
-            tbDao.saveTbScreening(cache)
+            val savedId = tbDao.saveTbScreening(cache)
+            SyncDailyStore.record("TB_SCREENING", listOf(savedId), "PULL", "SUCCESS")
             tbScreeningList.add(cache)
         }
         return tbScreeningList
@@ -592,7 +648,10 @@ class TBRepo @Inject constructor(
 
     private suspend fun saveGeneralOpdCacheFromNewResponse(jsonObj: JSONObject): Boolean {
         val records = getStopTbDataArray(jsonObj)
-        return processGeneralOpdPullBatch(
+        var savedCount = 0
+        var skippedCount = 0
+        var invalidCount = 0
+        val complete = processGeneralOpdPullBatch(
             records = (0 until records.length()).map { records.optJSONObject(it) },
             parse = { record ->
                 val item = requireNotNull(record) { "Invalid General OPD record" }
@@ -604,11 +663,18 @@ class TBRepo @Inject constructor(
             },
             save = saveRecord@ { record, incomingRows ->
                 val item = requireNotNull(record)
-                val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { it > 0 } ?: return@saveRecord
-                val ben = benDao.getBenByRegId(benRegId) ?: return@saveRecord
+                val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { it > 0 }
+                val ben = benRegId?.let { benDao.getBenByRegId(it) }
+                if (ben == null) {
+                    logTbSkip("GENERAL_OPD", item, null,
+                        if (benRegId == null) "BENEFICIARY_REGISTRATION_ID_MISSING" else "BENEFICIARY_NOT_FOUND_LOCALLY")
+                    skippedCount++
+                    return@saveRecord
+                }
                 val serverUpdatedDate = getServerUpdatedDate(item)
                 val incomingComplaints = item.optChiefComplaintsOrNull()
                 val hasDrugs = item.has("drugs") && !item.isNull("drugs")
+                var diagnosticSavedId = 0L
                 database.withTransaction {
                     val existing = tbDao.getGeneralOpd(ben.beneficiaryId)
                     val applyRecord = shouldApplyServerRecord(existing?.syncState,
@@ -619,8 +685,15 @@ class TBRepo @Inject constructor(
                             val recovered = existing!!.copy(chiefComplaints = incomingComplaints,
                                 chiefComplaintIds = null)
                             tbDao.saveGeneralOpd(recovered)
+                            diagnosticSavedId = recovered.id.toLong()
+                            savedCount++
                             return@withTransaction
                         }
+                        skippedCount++
+                        logTbSkip("GENERAL_OPD", item, null,
+                            if (existing?.syncState != null && existing.syncState != SyncState.SYNCED)
+                                "LOCAL_PENDING_EDITS_PROTECTED" else "SERVER_VERSION_NOT_NEWER",
+                            existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)
                         return@withTransaction
                     }
                     val complaints = incomingComplaints ?: existing?.chiefComplaints
@@ -641,6 +714,7 @@ class TBRepo @Inject constructor(
                         syncState = SyncState.SYNCED
                     )
                     val opdId = tbDao.saveGeneralOpd(cache).toInt()
+                    diagnosticSavedId = opdId.toLong()
                     // Parent and per-drug rows must become visible together, never from different revisions.
                     if (hasDrugs || cache.medications != existing?.medications ||
                         cache.frequency != existing?.frequency || cache.duration != existing?.duration) {
@@ -648,12 +722,26 @@ class TBRepo @Inject constructor(
                         if (incomingRows.isNotEmpty()) tbDao.insertGeneralOpdPrescriptions(
                             incomingRows.map { it.copy(opdId = opdId) })
                     }
+                    savedCount++
+                }
+                if (diagnosticSavedId > 0) {
+                    item.optLong("id", 0L).takeIf { it > 0 }?.let { SyncDailyStore.alias("GENERAL_OPD", "server:$it", diagnosticSavedId) }
+                    SyncDailyStore.record("GENERAL_OPD", listOf(diagnosticSavedId), "PULL", "SUCCESS")
                 }
             },
             onInvalid = { index, error ->
+                invalidCount++
+                logTbSkip("GENERAL_OPD", records.optJSONObject(index), index,
+                    generalOpdSkipReason(error))
+                val failedRecordId = records.optJSONObject(index)?.optLong("id", 0L)?.takeIf { it > 0 }
+                if (failedRecordId != null) SyncDailyStore.record("GENERAL_OPD", listOf("server:$failedRecordId"), "PULL", "FAILURE", generalOpdSkipReason(error))
                 Timber.e("General OPD pull skipped invalid record at index $index (${error.javaClass.simpleName})")
             }
         )
+        logSyncModule("GENERAL_OPD", "PULL", if (complete) "SUCCESS" else "PARTIAL_FAILURE",
+            "received" to records.length(), "saved" to savedCount, "skipped" to skippedCount,
+            "failed" to invalidCount)
+        return complete
     }
 
     suspend fun getTbDiagnosticsDetailsFromServer(): Int {
@@ -676,9 +764,13 @@ class TBRepo @Inject constructor(
                         when (val responseStatusCode = jsonObj.getInt("statusCode")) {
                             200 -> {
                                 try {
-                                    saveTBDiagnosticsCacheFromNewResponse(jsonObj)
+                                    val saved = saveTBDiagnosticsCacheFromNewResponse(jsonObj)
+                                    logSyncModule("TB_DIAGNOSTICS", "PULL", "SUCCESS",
+                                        "received" to getStopTbDataArray(jsonObj).length(), "saved" to saved.size,
+                                        "skipped" to getStopTbDataArray(jsonObj).length() - saved.size)
                                 } catch (e: Exception) {
                                     Timber.d("TB Diagnostics entries not synced $e")
+                                    logSyncModule("TB_DIAGNOSTICS", "PULL", "FAILURE", "reason" to e.javaClass.simpleName)
                                     return@withContext 0
                                 }
                                 return@withContext 1
@@ -693,7 +785,12 @@ class TBRepo @Inject constructor(
                             }
 
                             5000 -> {
-                                if (errorMessage == "No record found") return@withContext 0
+                                if (errorMessage == "No record found") {
+                                    logSyncModule("TB_DIAGNOSTICS", "PULL", "NO_RECORDS_RETURNED",
+                                        "received" to 0, "saved" to 0, "httpCode" to response.code(),
+                                        "backendStatus" to 5000)
+                                    return@withContext 0
+                                }
                             }
 
                             else -> {
@@ -732,7 +829,8 @@ class TBRepo @Inject constructor(
                     )
                 ) {
                     benDao.getBen(tbDiagnosticsDTO.benId)?.let {
-                        tbDao.saveTbDiagnostics(cache)
+                        val savedId = tbDao.saveTbDiagnostics(cache)
+                        SyncDailyStore.record("TB_DIAGNOSTICS", listOf(savedId), "PULL", "SUCCESS")
                         tbDiagnosticsList.add(cache)
                     }
                 }
@@ -745,9 +843,21 @@ class TBRepo @Inject constructor(
         val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
         val records = getStopTbDataArray(jsonObj)
         for (index in 0 until records.length()) {
-            val item = records.optJSONObject(index) ?: continue
-            val benRegId = item.optLong("benRegID", 0L).takeIf { it > 0 } ?: continue
-            val ben = benDao.getBenByRegId(benRegId) ?: continue
+            val item = records.optJSONObject(index)
+            if (item == null) {
+                logTbSkip("TB_DIAGNOSTICS", null, index, "INVALID_RECORD_OBJECT")
+                continue
+            }
+            val benRegId = item.optLong("benRegID", 0L).takeIf { it > 0 }
+            if (benRegId == null) {
+                logTbSkip("TB_DIAGNOSTICS", item, index, "BENEFICIARY_REGISTRATION_ID_MISSING")
+                continue
+            }
+            val ben = benDao.getBenByRegId(benRegId)
+            if (ben == null) {
+                logTbSkip("TB_DIAGNOSTICS", item, index, "BENEFICIARY_NOT_FOUND_LOCALLY")
+                continue
+            }
             val visitDate = getLongFromDateMultipleSupport(item.optString("visitDate"))
             val serverUpdatedDate = getServerUpdatedDate(item)
             // Unlike every other TB_DIAGNOSTICS write path in this file, this pull used to read
@@ -760,6 +870,10 @@ class TBRepo @Inject constructor(
             withBenIdLock(ben.beneficiaryId) {
                 val existing = tbDao.getTbDiagnostics(ben.beneficiaryId)
                 if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
+                    logTbSkip("TB_DIAGNOSTICS", item, index,
+                        if (existing?.syncState != null && existing.syncState != SyncState.SYNCED)
+                            "LOCAL_PENDING_EDITS_PROTECTED" else "SERVER_VERSION_NOT_NEWER",
+                        existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)
                     return@withBenIdLock
                 }
                 val cache = (existing ?: TBDiagnosticsCache(benId = ben.beneficiaryId)).copy(
@@ -781,8 +895,9 @@ class TBRepo @Inject constructor(
                     serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
                     syncState = SyncState.SYNCED
                 )
-                tbDao.saveTbDiagnostics(cache)
+                val savedId = tbDao.saveTbDiagnostics(cache)
                 tbDiagnosticsList.add(cache)
+                SyncDailyStore.record("TB_DIAGNOSTICS", listOf(savedId), "PULL", "SUCCESS")
             }
         }
         return tbDiagnosticsList
@@ -819,9 +934,12 @@ class TBRepo @Inject constructor(
                             200 -> {
                                 try {
                                     val dataObj = jsonObj.getString("data")
-                                    saveTBSuspectedCacheFromResponse(dataObj)
+                                    val saved = saveTBSuspectedCacheFromResponse(dataObj)
+                                    logSyncModule("TB_SUSPECTED", "PULL", "SUCCESS", "saved" to saved.size,
+                                        "received" to null)
                                 } catch (e: Exception) {
                                     Timber.d("TB Suspected entries not synced $e")
+                                    logSyncModule("TB_SUSPECTED", "PULL", "FAILURE", "reason" to e.javaClass.simpleName)
                                     return@withContext 0
                                 }
 
@@ -837,7 +955,12 @@ class TBRepo @Inject constructor(
                             }
 
                             5000 -> {
-                                if (errorMessage == "No record found") return@withContext 0
+                                if (errorMessage == "No record found") {
+                                    logSyncModule("TB_SUSPECTED", "PULL", "NO_RECORDS_RETURNED",
+                                        "received" to 0, "saved" to 0, "httpCode" to statusCode,
+                                        "backendStatus" to 5000)
+                                    return@withContext 0
+                                }
                             }
 
                             else -> {
@@ -913,10 +1036,14 @@ class TBRepo @Inject constructor(
                 Timber.d("SYNC_DIAG TB Suspected pull: benId=${tbSuspectedDTO.benId} serverId=${tbSuspectedDTO.id} matchedLocalId=${tbSuspectedCache?.id} localSyncState=${tbSuspectedCache?.syncState} localServerUpdatedDate=${tbSuspectedCache?.serverUpdatedDate} incomingServerUpdatedDate=${cache.serverUpdatedDate} shouldApply=$shouldApply")
                 if (shouldApply) {
                     benDao.getBen(tbSuspectedDTO.benId)?.let {
-                        tbDao.saveTbSuspected(cache)
+                        val rowId = tbDao.saveTbSuspected(cache)
+                        SyncDailyStore.record("TB_SUSPECTED", listOf(rowId), "PULL", "SUCCESS")
                         tbSuspectedList.add(cache)
                     }
                 } else if (tbSuspectedCache != null && tbSuspectedCache.syncState != SyncState.SYNCED) {
+                    logSyncSkip("TB_SUSPECTED", "PULL", "LOCAL_PENDING_EDITS_PROTECTED",
+                        "benId" to tbSuspectedDTO.benId, "recordId" to tbSuspectedDTO.id,
+                        "localSyncState" to tbSuspectedCache.syncState.name)
                     Timber.w("SYNC_DIAG TB Suspected pull: benId=${tbSuspectedDTO.benId} server already has this record (serverId=${tbSuspectedDTO.id}) but local id=${tbSuspectedCache.id} is stuck at syncState=${tbSuspectedCache.syncState} — reconciliation SKIPPED, will remain unsynced until a push of this local row succeeds")
                 }
             }
@@ -953,10 +1080,13 @@ class TBRepo @Inject constructor(
                                 try {
                                     val dataObj = jsonObj.getString("data")
 
-                                    saveTBConfirmedCacheFromResponse(dataObj)
+                                    val saved = saveTBConfirmedCacheFromResponse(dataObj)
+                                    logSyncModule("TB_CONFIRMED", "PULL", "SUCCESS", "saved" to saved.size,
+                                        "received" to null)
 
                                 } catch (e: Exception) {
                                     Timber.e(e, "TBConfirmed: Error while saving data")
+                                    logSyncModule("TB_CONFIRMED", "PULL", "FAILURE", "reason" to e.javaClass.simpleName)
                                     return@withContext 0
                                 }
 
@@ -972,6 +1102,8 @@ class TBRepo @Inject constructor(
 
                             5000 -> {
                                 if (errorMessage == "No record found") {
+                                    logSyncModule("TB_CONFIRMED", "PULL", "NO_RECORDS_RETURNED",
+                                        "received" to 0, "saved" to 0)
                                     return@withContext 0
                                 }
                             }
@@ -1026,16 +1158,31 @@ class TBRepo @Inject constructor(
                         )
                     ) {
                         val cacheToSave = if (existing != null) cache.copy(id = existing.id) else cache
-                        tbDao.saveTbConfirmed(cacheToSave)
+                        val rowId = tbDao.saveTbConfirmed(cacheToSave)
+                        SyncDailyStore.record("TB_CONFIRMED", listOf(rowId), "PULL", "SUCCESS")
                         tbConfirmedList.add(cacheToSave)
+                    } else {
+                        logSyncSkip("TB_CONFIRMED", "PULL",
+                            if (existing?.syncState != null && existing.syncState != SyncState.SYNCED)
+                                "LOCAL_PENDING_EDITS_PROTECTED" else "SERVER_VERSION_NOT_NEWER",
+                            "recordIndex" to index, "benId" to cache.benId,
+                            "localSyncState" to existing?.syncState?.name,
+                            "localUpdatedAt" to existing?.serverUpdatedDate,
+                            "serverUpdatedAt" to cache.serverUpdatedDate)
                     }
 
                 } catch (e: Exception) {
+                    logSyncSkip("TB_CONFIRMED", "PULL", "INVALID_RECORD_OR_SAVE_ERROR",
+                        "recordIndex" to index, "benId" to tbConfirmedDTO.benId,
+                        "errorType" to e.javaClass.simpleName)
+                    logSyncModule("TB_CONFIRMED", "PULL", "PARTIAL_FAILURE",
+                        "recordIndex" to index, "reason" to e.javaClass.simpleName)
                 }
             }
 
         } catch (e: Exception) {
             Timber.e(e, "TBConfirmed: Error parsing or saving JSON")
+            logSyncModule("TB_CONFIRMED", "PULL", "FAILURE", "reason" to e.javaClass.simpleName)
         }
 
         return tbConfirmedList
@@ -1078,18 +1225,25 @@ class TBRepo @Inject constructor(
 
             val tbsnList: List<TBScreeningCache> = tbDao.getTBScreening(SyncState.UNSYNCED)
 
-            if (tbsnList.isEmpty()) return@withContext 1
+            if (tbsnList.isEmpty()) {
+                logSyncModule("TB_SCREENING", "PUSH", "NO_PENDING_DATA", "pending" to 0)
+                return@withContext 1
+            }
 
             var successCount = 0
             var failCount = 0
+            var sentCount = 0
+            var acknowledgedCount = 0
 
             for (screening in tbsnList) {
                 try {
                     val beneficiaryRegID = benDao.getBen(screening.benId)?.benRegId
                     if (beneficiaryRegID == null || beneficiaryRegID <= 0L) {
+                        SyncDailyStore.record("TB_SCREENING", listOf(screening.id), "PUSH", "PENDING", "SERVER_REGISTRATION_ID_NOT_AVAILABLE")
                         failCount += 1
                         continue
                     }
+                    sentCount += 1
                     val response = tmcNetworkApiService.saveTBScreeningData(
                         listOf(
                             TBScreeningSaveRequest.from(
@@ -1102,13 +1256,15 @@ class TBRepo @Inject constructor(
                     )
                     val statusCode = response.code()
                     if (statusCode == 200) {
-                        val responseString = response.body()?.string()
+                        val responseString = SyncDailyStore.observedBody("TB_SCREENING", listOf(screening.id), response)
                         if (responseString != null) {
                             val jsonObj = JSONObject(responseString)
                             val responseStatusCode = jsonObj.getInt("statusCode")
                             Timber.d("Push to Amrit TB Screening record: $responseStatusCode")
+                            SyncDailyStore.response("TB_SCREENING", listOf(screening.id), statusCode, responseString)
                             when (responseStatusCode) {
                                 200 -> {
+                                    acknowledgedCount += 1
                                     updateSyncStatusScreening(listOf(screening))
                                     successCount += 1
                                 }
@@ -1129,15 +1285,21 @@ class TBRepo @Inject constructor(
                         }
                     } else {
                         Timber.e("TB Screening record HTTP error: $statusCode")
+                        SyncDailyStore.response("TB_SCREENING", listOf(screening.id), statusCode, null)
                         failCount += 1
                     }
                 } catch (e: Exception) {
                     Timber.e(e, "TB Screening record push failed for benId=${screening.benId}")
+                    SyncDailyStore.record("TB_SCREENING", listOf(screening.id), "PUSH", "FAILURE", "EXCEPTION_${e.javaClass.simpleName}")
                     failCount += 1
                 }
             }
 
             Timber.d("TB Screening push complete: $successCount succeeded, $failCount failed out of ${tbsnList.size}")
+            logSyncModule("TB_SCREENING", "PUSH", syncPushOutcome(tbsnList.size, minOf(successCount, acknowledgedCount)),
+                "pending" to tbsnList.size, "sent" to sentCount,
+                "acknowledgedBatchItems" to acknowledgedCount, "locallyMarkedSynced" to successCount,
+                "remaining" to tbsnList.size - successCount)
             // Worker succeeds — failed records stay UNSYNCED for next cycle
             return@withContext 1
         }
@@ -1150,24 +1312,34 @@ class TBRepo @Inject constructor(
                     ?: throw IllegalStateException("No user logged in!!")
 
             val opdList: List<GeneralOpdCache> = tbDao.getGeneralOpd(SyncState.UNSYNCED)
-            if (opdList.isEmpty()) return@withContext 1
+            if (opdList.isEmpty()) {
+                logSyncModule("GENERAL_OPD", "PUSH", "NO_PENDING_DATA", "pending" to 0)
+                return@withContext 1
+            }
 
             // Keep the list-shaped endpoint, but acknowledge each OPD independently.
             val chunks = opdList.chunked(1)
             var successCount = 0
             var failCount = 0
+            var sentCount = 0
+            var acknowledgedCount = 0
+            var markedSyncedCount = 0
 
             for (chunk in chunks) {
                 try {
                     val prepared = chunk.mapNotNull { opd ->
                         val benRegId = benDao.getBen(opd.benId)?.benRegId?.takeIf { it > 0L }
-                        if (benRegId == null) return@mapNotNull null
+                        if (benRegId == null) {
+                            SyncDailyStore.record("GENERAL_OPD", listOf(opd.id), "PUSH", "PENDING", "SERVER_REGISTRATION_ID_NOT_AVAILABLE")
+                            return@mapNotNull null
+                        }
                         try {
                             prepareGeneralOpdRequest(opd.id, benRegId, user.serviceMapId, user.userName)
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (e: IllegalArgumentException) {
                             Timber.w("General OPD id=%s remains pending: unresolved or incomplete prescription data", opd.id)
+                            SyncDailyStore.record("GENERAL_OPD", listOf(opd.id), "PUSH", "PENDING", "PRESCRIPTION_INCOMPLETE_OR_UNRESOLVED")
                             null
                         }
                     }
@@ -1175,17 +1347,19 @@ class TBRepo @Inject constructor(
                     if (prepared.isEmpty()) {
                         continue
                     }
+                    sentCount += prepared.size
                     val response = tmcNetworkApiService.saveGeneralOpdData(
                         prepared.map { it.second }
                     )
                     val statusCode = response.code()
                     if (statusCode == 200) {
-                        val responseString = response.body()?.string()
+                        val responseString = SyncDailyStore.observedBody("GENERAL_OPD", prepared.map { it.first.id }, response)
                         if (responseString != null) {
                             val jsonObj = JSONObject(responseString)
                             when (val responseStatusCode = jsonObj.getInt("statusCode")) {
                                 200 -> {
-                                    updateSyncStatusGeneralOpd(prepared)
+                                    acknowledgedCount += prepared.size
+                                    markedSyncedCount += updateSyncStatusGeneralOpd(prepared)
                                     successCount += prepared.size
                                 }
 
@@ -1193,28 +1367,36 @@ class TBRepo @Inject constructor(
                                     if (userRepo.refreshTokenTmc(user.userName, user.password)) {
                                         Timber.d("Token refreshed, General OPD chunk will retry next cycle")
                                     }
+                                    SyncDailyStore.response("GENERAL_OPD", prepared.map { it.first.id }, statusCode, responseString)
                                     failCount += prepared.size
                                 }
 
                                 else -> {
                                     Timber.e("General OPD chunk failed with statusCode: $responseStatusCode")
+                                    SyncDailyStore.response("GENERAL_OPD", prepared.map { it.first.id }, statusCode, responseString)
                                     failCount += prepared.size
                                 }
                             }
                         }
                     } else {
                         Timber.e("General OPD chunk HTTP error: $statusCode")
+                        SyncDailyStore.response("GENERAL_OPD", prepared.map { it.first.id }, statusCode, null)
                         failCount += prepared.size
                     }
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     Timber.e(e, "General OPD chunk push failed: ${chunk.size} records")
+                    SyncDailyStore.record("GENERAL_OPD", chunk.map { it.id }, "PUSH", "FAILURE", "EXCEPTION_${e.javaClass.simpleName}")
                     failCount += chunk.size
                 }
             }
 
             Timber.d("General OPD push complete: $successCount succeeded, $failCount failed out of ${opdList.size}")
+            logSyncModule("GENERAL_OPD", "PUSH", syncPushOutcome(opdList.size, minOf(markedSyncedCount, acknowledgedCount)),
+                "pending" to opdList.size, "sent" to sentCount,
+                "acknowledgedBatchItems" to acknowledgedCount, "locallyMarkedSynced" to markedSyncedCount,
+                "remaining" to opdList.size - markedSyncedCount)
             return@withContext 1
         } }
     }
@@ -1227,14 +1409,21 @@ class TBRepo @Inject constructor(
 
             val diagnosticsList: List<TBDiagnosticsCache> =
                 tbDao.getTbDiagnostics(SyncState.UNSYNCED)
-            if (diagnosticsList.isEmpty()) return@withContext 1
+            if (diagnosticsList.isEmpty()) {
+                logSyncModule("TB_DIAGNOSTICS", "PUSH", "NO_PENDING_DATA", "pending" to 0)
+                return@withContext 1
+            }
 
             val chunks = diagnosticsList.chunked(20)
             var successCount = 0
             var failCount = 0
+            var sentCount = 0
+            var acknowledgedCount = 0
+            var markedSyncedCount = 0
 
             for (chunk in chunks) {
                 try {
+                    val sentIds = mutableSetOf<Int>()
                     val request = chunk.mapNotNull { diagnostics ->
                         val benRegId = benDao.getBen(diagnostics.benId)?.benRegId?.takeIf { it > 0L }
                         benRegId?.let {
@@ -1243,24 +1432,26 @@ class TBRepo @Inject constructor(
                                 benRegID = it,
                                 providerServiceMapID = user.serviceMapId,
                                 createdBy = user.userName
-                            )
+                            ).also { sentIds.add(diagnostics.id) }
                         }
                     }
                     if (request.isEmpty()) {
                         failCount += chunk.size
                         continue
                     }
+                    sentCount += request.size
                     val response = tmcNetworkApiService.saveTBDiagnosticsData(
                         request
                     )
                     val statusCode = response.code()
                     if (statusCode == 200) {
-                        val responseString = response.body()?.string()
+                        val responseString = SyncDailyStore.observedBody("TB_DIAGNOSTICS", sentIds, response)
                         if (responseString != null) {
                             val jsonObj = JSONObject(responseString)
                             when (val responseStatusCode = jsonObj.getInt("statusCode")) {
                                 200 -> {
-                                    updateSyncStatusDiagnostics(chunk)
+                                    acknowledgedCount += request.size
+                                    markedSyncedCount += updateSyncStatusDiagnostics(chunk, sentIds)
                                     successCount += chunk.size
                                 }
 
@@ -1268,26 +1459,34 @@ class TBRepo @Inject constructor(
                                     if (userRepo.refreshTokenTmc(user.userName, user.password)) {
                                         Timber.d("Token refreshed, TB Diagnostics chunk will retry next cycle")
                                     }
+                                    SyncDailyStore.response("TB_DIAGNOSTICS", sentIds, statusCode, responseString)
                                     failCount += chunk.size
                                 }
 
                                 else -> {
                                     Timber.e("TB Diagnostics chunk failed with statusCode: $responseStatusCode")
+                                    SyncDailyStore.response("TB_DIAGNOSTICS", sentIds, statusCode, responseString)
                                     failCount += chunk.size
                                 }
                             }
                         }
                     } else {
                         Timber.e("TB Diagnostics chunk HTTP error: $statusCode")
+                        SyncDailyStore.response("TB_DIAGNOSTICS", sentIds, statusCode, null)
                         failCount += chunk.size
                     }
                 } catch (e: Exception) {
                     Timber.e(e, "TB Diagnostics chunk push failed: ${chunk.size} records")
+                    SyncDailyStore.record("TB_DIAGNOSTICS", chunk.map { it.id }, "PUSH", "FAILURE", "EXCEPTION_${e.javaClass.simpleName}")
                     failCount += chunk.size
                 }
             }
 
             Timber.d("TB Diagnostics push complete: $successCount succeeded, $failCount failed out of ${diagnosticsList.size}")
+            logSyncModule("TB_DIAGNOSTICS", "PUSH", syncPushOutcome(diagnosticsList.size, minOf(markedSyncedCount, acknowledgedCount)),
+                "pending" to diagnosticsList.size, "sent" to sentCount,
+                "acknowledgedBatchItems" to acknowledgedCount, "locallyMarkedSynced" to markedSyncedCount,
+                "remaining" to diagnosticsList.size - markedSyncedCount)
             return@withContext 1
         }
     }
@@ -1302,7 +1501,10 @@ class TBRepo @Inject constructor(
 
             val tbspList: List<TBSuspectedCache> = tbDao.getTbSuspected(SyncState.UNSYNCED)
 
-            if (tbspList.isEmpty()) return@withContext 1
+            if (tbspList.isEmpty()) {
+                logSyncModule("TB_SUSPECTED", "PUSH", "NO_PENDING_DATA", "pending" to 0)
+                return@withContext 1
+            }
 
             val callTag = java.util.UUID.randomUUID().toString().take(6)
             Timber.d("SYNC_DIAG[$callTag] TB Suspected push: ${tbspList.size} unsynced records, benIds=${tbspList.map { it.benId }}")
@@ -1311,6 +1513,9 @@ class TBRepo @Inject constructor(
             val chunks = tbspList.chunked(CHUNK_SIZE)
             var successCount = 0
             var failCount = 0
+            var sentCount = 0
+            var acknowledgedCount = 0
+            var markedSyncedCount = 0
 
             for (chunk in chunks) {
                 try {
@@ -1332,6 +1537,7 @@ class TBRepo @Inject constructor(
                         continue
                     }
 
+                    sentCount += chunkDtos.size
                     val response = tmcNetworkApiService.saveTBSuspectedData(
                         TBSuspectedRequestDTO(
                             userId = user.userId,
@@ -1340,7 +1546,7 @@ class TBRepo @Inject constructor(
                     )
                     val statusCode = response.code()
                     if (statusCode == 200) {
-                        val responseString = response.body()?.string()
+                        val responseString = SyncDailyStore.observedBody("TB_SUSPECTED", chunk.filter { it.benId !in excludedBenIds }.map { it.id }, response)
                         if (responseString != null) {
                             val jsonObj = JSONObject(responseString)
                             val responseStatusCode = jsonObj.getInt("statusCode")
@@ -1350,7 +1556,8 @@ class TBRepo @Inject constructor(
                                     if (excludedBenIds.isNotEmpty()) {
                                         Timber.w("SYNC_DIAG[$callTag] TB Suspected push: marking benIds=$excludedBenIds SYNCED even though they were NOT sent (benId resolution failed above) — this hides a real failure for those records")
                                     }
-                                    updateSyncStatusSuspected(chunk)
+                                    acknowledgedCount += chunkDtos.size
+                                    markedSyncedCount += updateSyncStatusSuspected(chunk, chunk.filter { it.benId !in excludedBenIds }.map { it.id }.toSet())
                                     successCount += chunk.size
                                     Timber.d("SYNC_DIAG[$callTag] TB Suspected push: chunk marked SYNCED, benIds=${chunk.map { it.benId }}")
                                 }
@@ -1361,25 +1568,33 @@ class TBRepo @Inject constructor(
                                     }
                                     failCount += chunk.size
                                     Timber.w("SYNC_DIAG[$callTag] TB Suspected push: token issue, benIds=${chunk.map { it.benId }}")
+                                    SyncDailyStore.response("TB_SUSPECTED", chunk.filter { it.benId !in excludedBenIds }.map { it.id }, statusCode, responseString)
                                 }
 
                                 else -> {
                                     Timber.e("SYNC_DIAG[$callTag] TB Suspected chunk failed with statusCode: $responseStatusCode, benIds=${chunk.map { it.benId }}, body=$responseString")
+                                    SyncDailyStore.response("TB_SUSPECTED", chunk.filter { it.benId !in excludedBenIds }.map { it.id }, statusCode, responseString)
                                     failCount += chunk.size
                                 }
                             }
                         }
                     } else {
                         Timber.e("SYNC_DIAG[$callTag] TB Suspected chunk HTTP error: $statusCode, benIds=${chunk.map { it.benId }}")
+                        SyncDailyStore.response("TB_SUSPECTED", chunk.filter { it.benId !in excludedBenIds }.map { it.id }, statusCode, null)
                         failCount += chunk.size
                     }
                 } catch (e: Exception) {
                     Timber.e(e, "SYNC_DIAG[$callTag] TB Suspected chunk push failed: ${chunk.size} records, benIds=${chunk.map { it.benId }}")
+                    SyncDailyStore.record("TB_SUSPECTED", chunk.map { it.id }, "PUSH", "FAILURE", "EXCEPTION_${e.javaClass.simpleName}")
                     failCount += chunk.size
                 }
             }
 
             Timber.d("SYNC_DIAG[$callTag] TB Suspected push complete: $successCount succeeded, $failCount failed out of ${tbspList.size}")
+            logSyncModule("TB_SUSPECTED", "PUSH", syncPushOutcome(tbspList.size, minOf(markedSyncedCount, acknowledgedCount)),
+                "pending" to tbspList.size, "sent" to sentCount,
+                "acknowledgedBatchItems" to acknowledgedCount, "locallyMarkedSynced" to markedSyncedCount,
+                "remaining" to tbspList.size - markedSyncedCount)
             return@withContext 1
         }
     }
@@ -1394,12 +1609,17 @@ class TBRepo @Inject constructor(
 
             val tbspList: List<TBConfirmedTreatmentCache> = tbDao.getTbConfirmed(SyncState.UNSYNCED)
 
-            if (tbspList.isEmpty()) return@withContext 1
+            if (tbspList.isEmpty()) {
+                logSyncModule("TB_CONFIRMED", "PUSH", "NO_PENDING_DATA", "pending" to 0)
+                return@withContext 1
+            }
 
             val CHUNK_SIZE = 20
             val chunks = tbspList.chunked(CHUNK_SIZE)
             var successCount = 0
             var failCount = 0
+            var sentCount = 0
+            var acknowledgedCount = 0
 
             for (chunk in chunks) {
                 try {
@@ -1414,6 +1634,7 @@ class TBRepo @Inject constructor(
                         continue
                     }
 
+                    sentCount += chunkDtos.size
                     val response = tmcNetworkApiService.saveTBConfirmedData(
                         TBConfirmedRequestDTO(
                             userId = user.userId,
@@ -1422,14 +1643,15 @@ class TBRepo @Inject constructor(
                     )
                     val statusCode = response.code()
                     if (statusCode == 200) {
-                        val responseString = response.body()?.string()
+                        val responseString = SyncDailyStore.observedBody("TB_CONFIRMED", chunk.filter { item -> chunkDtos.any { it.benId == item.benId } }.map { it.id }, response)
                         if (responseString != null) {
                             val jsonObj = JSONObject(responseString)
                             val responseStatusCode = jsonObj.getInt("statusCode")
                             Timber.d("Push to Amrit TB Confirmed chunk: $responseStatusCode")
                             when (responseStatusCode) {
                                 200 -> {
-                                    updateSyncStatusConfirmed(chunk)
+                                    acknowledgedCount += chunkDtos.size
+                                    updateSyncStatusConfirmed(chunk, chunk.filter { item -> chunkDtos.any { it.benId == item.benId } }.map { it.id }.toSet())
                                     successCount += chunk.size
                                 }
 
@@ -1437,26 +1659,34 @@ class TBRepo @Inject constructor(
                                     if (userRepo.refreshTokenTmc(user.userName, user.password)) {
                                         Timber.d("Token refreshed, TB Confirmed chunk will retry next cycle")
                                     }
+                                    SyncDailyStore.response("TB_CONFIRMED", chunk.map { it.id }, statusCode, responseString)
                                     failCount += chunk.size
                                 }
 
                                 else -> {
                                     Timber.e("TB Confirmed chunk failed with statusCode: $responseStatusCode")
+                                    SyncDailyStore.response("TB_CONFIRMED", chunk.map { it.id }, statusCode, responseString)
                                     failCount += chunk.size
                                 }
                             }
                         }
                     } else {
                         Timber.e("TB Confirmed chunk HTTP error: $statusCode")
+                        SyncDailyStore.response("TB_CONFIRMED", chunk.map { it.id }, statusCode, null)
                         failCount += chunk.size
                     }
                 } catch (e: Exception) {
                     Timber.e(e, "TB Confirmed chunk push failed: ${chunk.size} records")
+                    SyncDailyStore.record("TB_CONFIRMED", chunk.map { it.id }, "PUSH", "FAILURE", "EXCEPTION_${e.javaClass.simpleName}")
                     failCount += chunk.size
                 }
             }
 
             Timber.d("TB Confirmed push complete: $successCount succeeded, $failCount failed out of ${tbspList.size}")
+            logSyncModule("TB_CONFIRMED", "PUSH", syncPushOutcome(tbspList.size, minOf(successCount, acknowledgedCount)),
+                "pending" to tbspList.size, "sent" to sentCount,
+                "acknowledgedBatchItems" to acknowledgedCount, "locallyMarkedSynced" to successCount,
+                "remaining" to tbspList.size - successCount)
             return@withContext 1
         }
     }
@@ -1466,10 +1696,13 @@ class TBRepo @Inject constructor(
         tbsnList.forEach {
             it.syncState = SyncState.SYNCED
             tbDao.saveTbScreening(it)
+            SyncDailyStore.record("TB_SCREENING", listOf(it.id), "PUSH", "SUCCESS")
         }
     }
 
-    private suspend fun updateSyncStatusGeneralOpd(opdList: List<Pair<GeneralOpdCache, GeneralOpdSaveRequest>>) {
+    private suspend fun updateSyncStatusGeneralOpd(opdList: List<Pair<GeneralOpdCache, GeneralOpdSaveRequest>>): Int {
+        var marked = 0
+        val markedIds = mutableListOf<Int>()
         database.withTransaction {
             opdList.forEach { (pushed, request) ->
                 val current = tbDao.getGeneralOpdById(pushed.id)
@@ -1478,10 +1711,16 @@ class TBRepo @Inject constructor(
                         GeneralOpdSaveRequest.from(current, tbDao.getGeneralOpdPrescriptions(current.id),
                             request.beneficiaryRegID, request.providerServiceMapID, request.createdBy)
                     }.getOrNull()
-                    if (currentPayload == request) tbDao.updateGeneralOpd(current.copy(syncState = SyncState.SYNCED))
+                    if (currentPayload == request) {
+                        tbDao.updateGeneralOpd(current.copy(syncState = SyncState.SYNCED))
+                        marked++
+                        markedIds.add(current.id)
+                    }
                 }
             }
         }
+        SyncDailyStore.record("GENERAL_OPD", markedIds, "PUSH", "SUCCESS")
+        return marked
     }
 
     // pushUnSyncedRecordsTBDiagnostics() snapshots UNSYNCED rows once, then pushes them over the
@@ -1491,35 +1730,44 @@ class TBRepo @Inject constructor(
     // hiding it from future push cycles. Re-read fresh under the row's lock and only flip
     // syncState if nothing else changed since the snapshot was pushed; otherwise leave it
     // UNSYNCED so the next sync cycle picks up and pushes the newer state instead.
-    private suspend fun updateSyncStatusDiagnostics(diagnosticsList: List<TBDiagnosticsCache>) {
+    private suspend fun updateSyncStatusDiagnostics(diagnosticsList: List<TBDiagnosticsCache>, sentIds: Set<Int>): Int {
+        var marked = 0
         diagnosticsList.forEach { pushed ->
             withBenIdLock(pushed.benId) {
                 val fresh = tbDao.getTbDiagnosticsByBenId(pushed.benId) ?: return@withBenIdLock
                 val unchanged = fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)
                 if (unchanged) {
                     tbDao.saveTbDiagnostics(fresh.copy(syncState = SyncState.SYNCED))
+                    if (fresh.id in sentIds) SyncDailyStore.record("TB_DIAGNOSTICS", listOf(fresh.id), "PUSH", "SUCCESS")
+                    marked++
                 }
             }
         }
+        return marked
     }
 
     // Same stale-snapshot race as updateSyncStatusDiagnostics() above, for TB_SUSPECTED.
-    private suspend fun updateSyncStatusSuspected(tbspList: List<TBSuspectedCache>) {
+    private suspend fun updateSyncStatusSuspected(tbspList: List<TBSuspectedCache>, sentIds: Set<Int>): Int {
+        var marked = 0
         tbspList.forEach { pushed ->
             withBenIdLock(pushed.benId) {
                 val fresh = tbDao.getTbSuspected(pushed.benId) ?: return@withBenIdLock
                 val unchanged = fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)
                 if (unchanged) {
                     tbDao.saveTbSuspected(fresh.copy(syncState = SyncState.SYNCED))
+                    if (fresh.id in sentIds) SyncDailyStore.record("TB_SUSPECTED", listOf(fresh.id), "PUSH", "SUCCESS")
+                    marked++
                 }
             }
         }
+        return marked
     }
 
-    private suspend fun updateSyncStatusConfirmed(tbspList: List<TBConfirmedTreatmentCache>) {
+    private suspend fun updateSyncStatusConfirmed(tbspList: List<TBConfirmedTreatmentCache>, sentIds: Set<Int>) {
         tbspList.forEach {
             it.syncState = SyncState.SYNCED
             tbDao.saveTbConfirmed(it)
+            if (it.id in sentIds) SyncDailyStore.record("TB_CONFIRMED", listOf(it.id), "PUSH", "SUCCESS")
         }
     }
 

@@ -1,5 +1,8 @@
 package org.piramalswasthya.stoptb.repositories
 
+import org.piramalswasthya.stoptb.helpers.logSyncSkip
+import org.piramalswasthya.stoptb.helpers.SyncDailyStore
+
 import android.app.Application
 import android.net.Uri
 import android.widget.Toast
@@ -24,6 +27,8 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.FormRespons
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.helpers.Konstants
+import org.piramalswasthya.stoptb.helpers.logSyncModule
+import org.piramalswasthya.stoptb.helpers.syncPushOutcome
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.helpers.dynamicMapper.PayloadBuilder
 import org.piramalswasthya.stoptb.model.*
@@ -398,6 +403,7 @@ class BenRepo @Inject constructor(
                 benDao.upsert(ben)
                 Timber.d("IMAGE_DEBUG Saved in DB benId=${ben.beneficiaryId} image=${ben.userImage}")
             }
+            if (!ben.isDraft) SyncDailyStore.record("BENEFICIARY", listOf(ben.beneficiaryId), "SAVE", "SUCCESS")
         }
     }
 
@@ -405,6 +411,7 @@ class BenRepo @Inject constructor(
     suspend fun updateRecord(ben: BenRegCache) {
         withContext(Dispatchers.IO) {
             benDao.updateBen(ben)
+            if (!ben.isDraft) SyncDailyStore.record("BENEFICIARY", listOf(ben.beneficiaryId), "SAVE", "SUCCESS")
         }
     }
 
@@ -465,6 +472,8 @@ class BenRepo @Inject constructor(
     private suspend fun createBenIdAtServerByBeneficiarySending(
         ben: BenRegCache, user: User, locationRecord: LocationRecord
     ): Boolean {
+        val oldDiagnosticId = ben.beneficiaryId
+        var failureRecorded = false
         val household = if (ben.householdId != null && ben.householdId!! > 0L) householdDao.getHousehold(ben.householdId!!) else null
         val sendingData = ben.asNetworkSendingModel(user, locationRecord, context, household)
         Timber.d("Amrit push beneficiary registration: benId=${ben.beneficiaryId}, hhId=${ben.householdId}")
@@ -473,6 +482,7 @@ class BenRepo @Inject constructor(
             val statusCode = response.code()
             val responseString = response.body()?.string()
             Timber.d("Amrit push beneficiary registration response: httpStatus=$statusCode, benId=${ben.beneficiaryId}")
+            failureRecorded = SyncDailyStore.response("BENEFICIARY", listOf(oldDiagnosticId), statusCode, responseString, "REGISTER")
             if (responseString != null) {
                 val jsonObj = JSONObject(responseString)
                 val errorMessage = jsonObj.optString("errorMessage", "")
@@ -503,6 +513,9 @@ class BenRepo @Inject constructor(
                     }
                     ben.beneficiaryId = newBenId
                     ben.benRegId = newBenRegId
+                    SyncDailyStore.alias("BENEFICIARY", oldDiagnosticId, newBenId)
+                    SyncDailyStore.alias("GENERAL_EXAMINATION", oldDiagnosticId, newBenId)
+                    SyncDailyStore.record("BENEFICIARY", listOf(newBenId), "REGISTER", "SUCCESS")
                     return true
                 }
                 Timber.e("Amrit push beneficiary registration failed: statusCode=$responseStatusCode, error=$errorMessage, benId=${ben.beneficiaryId}")
@@ -521,10 +534,12 @@ class BenRepo @Inject constructor(
                 return createBenIdAtServerByBeneficiarySending(ben, user, locationRecord)
             }
             Timber.e("Amrit push beneficiary registration timeout: benId=${ben.beneficiaryId}, error=$se")
+            if (!failureRecorded) SyncDailyStore.record("BENEFICIARY", listOf(oldDiagnosticId), "REGISTER", "FAILURE", "TIMEOUT")
             return false
         } catch (e: java.lang.Exception) {
             benDao.setSyncState(ben.householdId, ben.beneficiaryId, SyncState.UNSYNCED)
             Timber.e("Amrit push beneficiary registration error: benId=${ben.beneficiaryId}, error=$e")
+            if (!failureRecorded) SyncDailyStore.record("BENEFICIARY", listOf(oldDiagnosticId), "REGISTER", "FAILURE", "EXCEPTION_${e.javaClass.simpleName}")
             return false
         }
     }
@@ -538,6 +553,7 @@ class BenRepo @Inject constructor(
             benDao.requeueTempBeneficiariesForRegistration()
 
             val benList = benDao.getAllUnprocessedBen()
+            var registered = 0
             Timber.d("YTR 419 $benList")
 
             val benNetworkPostList = mutableSetOf<BenPost>()
@@ -546,6 +562,7 @@ class BenRepo @Inject constructor(
 
             benList.forEach {
                 val idGenerated = createBenIdAtServerByBeneficiarySending(it, user, it.locationRecord)
+                if (idGenerated) registered++
                 if (!idGenerated) {
                     Timber.w("Amrit push beneficiary registration pending retry: benId=${it.beneficiaryId}, benRegId=${it.benRegId}, hhId=${it.householdId}")
                 }
@@ -553,8 +570,12 @@ class BenRepo @Inject constructor(
             }
 
             val updateBenList = benDao.getAllBenForSyncWithServer()
+            logSyncModule("BENEFICIARY_REGISTRATION", "PUSH", syncPushOutcome(benList.size, registered),
+                "pending" to benList.size, "registered" to registered, "remaining" to benList.size - registered)
             updateBenList.forEach {
                 if (it.beneficiaryId <= 0L || it.benRegId <= 0L) {
+                    logSyncSkip("BENEFICIARY", "PUSH", "SERVER_REGISTRATION_ID_NOT_AVAILABLE",
+                        "benId" to it.beneficiaryId, "benRegId" to it.benRegId, "householdId" to it.householdId)
                     benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.UNSYNCED)
                     Timber.w("Skipping beneficiary final sync until real IDs are available: benId=${it.beneficiaryId}, benRegId=${it.benRegId}, hhId=${it.householdId}")
                     return@forEach
@@ -575,6 +596,17 @@ class BenRepo @Inject constructor(
             }
 
             val uploadDone = postDataToAmritServer(benNetworkPostList, householdNetworkPostList, kidNetworkPostList)
+            logSyncModule("BENEFICIARY", "PUSH",
+                syncPushOutcome(updateBenList.size, if (uploadDone) benNetworkPostList.size else 0),
+                "pending" to updateBenList.size, "submitted" to benNetworkPostList.size,
+                "batchAcknowledged" to if (benNetworkPostList.isEmpty() && householdNetworkPostList.isEmpty()) null else uploadDone, "accepted" to null,
+                "locallyMarkedSynced" to if (uploadDone) benNetworkPostList.size else 0,
+                "remaining" to updateBenList.size - if (uploadDone) benNetworkPostList.size else 0)
+            logSyncModule("HOUSEHOLD", "PUSH",
+                syncPushOutcome(householdNetworkPostList.size, if (uploadDone) householdNetworkPostList.size else 0),
+                "selectedForBatch" to householdNetworkPostList.size, "submitted" to householdNetworkPostList.size,
+                "batchAcknowledged" to if (householdNetworkPostList.isEmpty()) null else uploadDone, "accepted" to null,
+                "locallyMarkedSynced" to if (uploadDone) householdNetworkPostList.size else 0)
             if (!uploadDone) {
                 benNetworkPostList.takeIf { it.isNotEmpty() }?.map { it.benId }?.let {
                     benDao.benSyncWithServerFailed(*it.toLongArray())
@@ -597,6 +629,7 @@ class BenRepo @Inject constructor(
         if (benNetworkPostSet.isEmpty() && householdNetworkPostSet.isEmpty() && kidNetworkPostSet.isEmpty()) return true
         val benIds = benNetworkPostSet.map { it.benId }
         val hhIds = householdNetworkPostSet.map { it.householdId }
+        var failureRecorded = false
         Timber.d("Amrit push syncDataToAmrit: sending ${benNetworkPostSet.size} ben(s) $benIds, ${householdNetworkPostSet.size} hh(s) $hhIds, ${kidNetworkPostSet.size} kid(s)")
 
         val rmnchData = SendingRMNCHData(
@@ -621,6 +654,8 @@ class BenRepo @Inject constructor(
             if (statusCode == 200) {
 
                 val responseString: String? = response.body()?.string()
+                failureRecorded = SyncDailyStore.response("BENEFICIARY", benIds, statusCode, responseString)
+                SyncDailyStore.response("HOUSEHOLD", hhIds, statusCode, responseString)
                 if (responseString != null) {
                     val jsonObj = JSONObject(responseString)
                     val responseStatusCode = jsonObj.getInt("statusCode")
@@ -638,6 +673,8 @@ class BenRepo @Inject constructor(
                             Timber.d("Amrit push syncDataToAmrit DB updated: benIds=${it.toList()}")
                         }
                         hhToUpdateList?.let { householdDao.householdSyncedWithServer(*it) }
+                        SyncDailyStore.record("BENEFICIARY", benIds, "PUSH", "SUCCESS")
+                        SyncDailyStore.record("HOUSEHOLD", hhIds, "PUSH", "SUCCESS")
                         
                         return true
                     } else if (responseStatusCode == 5002 || responseStatusCode == 401) {
@@ -655,9 +692,15 @@ class BenRepo @Inject constructor(
                 }
             }
             Timber.w("Amrit push syncDataToAmrit bad response: httpStatus=$statusCode, benIds=$benIds")
+            if (!failureRecorded) {
+                SyncDailyStore.response("BENEFICIARY", benIds, statusCode, null)
+                SyncDailyStore.response("HOUSEHOLD", hhIds, statusCode, null)
+            }
             return false
         } catch (e: SocketTimeoutException) {
             Timber.e("Amrit push syncDataToAmrit timeout: benIds=$benIds, error=$e")
+            SyncDailyStore.record("BENEFICIARY", benIds, "PUSH", "FAILURE", "TIMEOUT")
+            SyncDailyStore.record("HOUSEHOLD", hhIds, "PUSH", "FAILURE", "TIMEOUT")
             if (retryCount > 0) return postDataToAmritServer(
                 benNetworkPostSet, householdNetworkPostSet, kidNetworkPostSet, retryCount - 1
             )
@@ -665,9 +708,15 @@ class BenRepo @Inject constructor(
             return false
         } catch (e: JSONException) {
             Timber.e("Amrit push syncDataToAmrit JSON error: benIds=$benIds, error=$e")
+            SyncDailyStore.record("BENEFICIARY", benIds, "PUSH", "FAILURE", "MALFORMED_RESPONSE")
+            SyncDailyStore.record("HOUSEHOLD", hhIds, "PUSH", "FAILURE", "MALFORMED_RESPONSE")
             return false
         } catch (e: java.lang.Exception) {
             Timber.e("Amrit push syncDataToAmrit error: benIds=$benIds, error=$e")
+            if (!failureRecorded) {
+                SyncDailyStore.record("BENEFICIARY", benIds, "PUSH", "FAILURE", "EXCEPTION_${e.javaClass.simpleName}")
+                SyncDailyStore.record("HOUSEHOLD", hhIds, "PUSH", "FAILURE", "EXCEPTION_${e.javaClass.simpleName}")
+            }
             return false
         }
     }
@@ -854,19 +903,26 @@ class BenRepo @Inject constructor(
                                 try {
 
 
-                                    householdDao.upsert(
-                                        *getHouseholdCacheFromServerResponse(
-                                            responseString
-                                        ).toTypedArray()
-                                    )
+                                    val households = getHouseholdCacheFromServerResponse(responseString)
+                                    householdDao.upsert(*households.toTypedArray())
+                                    SyncDailyStore.record("HOUSEHOLD", households.map { it.householdId }, "PULL", "SUCCESS")
+                                    logSyncModule("HOUSEHOLD", "PULL", "SUCCESS",
+                                        "parsed" to households.size, "saved" to households.size, "page" to pageNumber)
                                 } catch (e: Exception) {
                                     Timber.d("HouseHold entries not synced $e")
+                                    logSyncModule("HOUSEHOLD", "PULL", "FAILURE",
+                                        "saved" to null, "page" to pageNumber, "reason" to e.javaClass.simpleName)
                                 }
 
                                 val benCacheList =
                                     getBenCacheFromServerResponse(responseString)
 
                                 upsertServerBeneficiariesSafely(benCacheList)
+                                logSyncModule("BENEFICIARY", "PULL", "SUCCESS",
+                                    "uniqueTracking" to "ENABLED",
+                                    "parsed" to benCacheList.size, "saved" to benCacheList.size,
+                                    "page" to pageNumber, "villageId" to request.villageID,
+                                    "serviceMapId" to request.providerServiceMapID)
 
                                 Timber.d("GeTBenDataList: $pageSize")
 
@@ -891,6 +947,12 @@ class BenRepo @Inject constructor(
                             5000 -> {
 
                                 if (errorMessage == "No record found") {
+                                    logSyncModule("BENEFICIARY", "PULL", "NO_RECORDS_RETURNED",
+                                        "received" to 0, "saved" to 0, "page" to pageNumber,
+                                        "villageId" to request.villageID, "serviceMapId" to request.providerServiceMapID,
+                                        "httpCode" to statusCode, "backendStatus" to responseStatusCode)
+                                    logSyncModule("HOUSEHOLD", "PULL", "NO_RECORDS_RETURNED",
+                                        "received" to 0, "saved" to 0, "page" to pageNumber)
                                     return@withContext 0
                                 }
                             }
@@ -907,6 +969,8 @@ class BenRepo @Inject constructor(
             } catch (e: SocketTimeoutException) {
 
                 Timber.e("get_ben error : $e")
+                logSyncModule("BENEFICIARY", "PULL", "RETRY",
+                    "page" to pageNumber, "reason" to e.javaClass.simpleName)
                 return@withContext -2
 
             } catch (e: CancellationException) {
@@ -932,6 +996,7 @@ class BenRepo @Inject constructor(
             } else {
                 benDao.upsert(serverBen)
             }
+            SyncDailyStore.record("BENEFICIARY", listOf(serverBen.beneficiaryId), "PULL", "SUCCESS")
         }
     }
 
@@ -1789,7 +1854,10 @@ class BenRepo @Inject constructor(
                         if (jsonObject.has("benficieryid")) jsonObject.getLong("benficieryid")
                         else -1L
 
-                    if (benId == -1L) continue
+                    if (benId == -1L) {
+                        logSyncSkip("BENEFICIARY", "PULL", "BENEFICIARY_ID_MISSING", "recordIndex" to i)
+                        continue
+                    }
 
                     val existingBen = benDao.getBen(benId)
 
@@ -2285,6 +2353,7 @@ class BenRepo @Inject constructor(
                                     serverBen.contactNumber != existingBen.contactNumber
 
                             if (existingBen.syncState == SyncState.UNSYNCED) {
+                                logSyncSkip("BENEFICIARY", "PULL", "LOCAL_UNSYNCED_EDITS_PROTECTED", "benId" to benId)
                                 // Local has unpushed edits — don't overwrite with server data
                                 nikshayIdValue?.takeIf { it.isNotBlank() && it != existingBen.nikshayId }?.let {
                                     benDao.updateNikshayId(benId, it)
@@ -2293,6 +2362,9 @@ class BenRepo @Inject constructor(
                             }
 
                             if (!hasNewerServerDate && !hasFieldDiff) {
+                                logSyncSkip("BENEFICIARY", "PULL", "SERVER_VERSION_NOT_NEWER_AND_FIELDS_UNCHANGED",
+                                    "benId" to benId, "localUpdatedAt" to savedServerUpdatedDate,
+                                    "serverUpdatedAt" to serverUpdatedDate)
                                 nikshayIdValue?.takeIf { it.isNotBlank() && it != existingBen.nikshayId }?.let {
                                     benDao.updateNikshayId(benId, it)
                                 }
@@ -2314,8 +2386,12 @@ class BenRepo @Inject constructor(
                             )
                         }
                     } catch (e: JSONException) {
+                        logSyncSkip("BENEFICIARY", "PULL", "INVALID_RECORD", "recordIndex" to i,
+                            "benId" to jsonObject.optLong("benficieryid", -1L), "errorType" to e.javaClass.simpleName)
                         Timber.e("Beneficiary skipped: ${jsonObject.optLong("benficieryid", -1L)} with error $e")
                     } catch (e: NumberFormatException) {
+                        logSyncSkip("BENEFICIARY", "PULL", "INVALID_NUMBER", "recordIndex" to i,
+                            "benId" to jsonObject.optLong("benficieryid", -1L), "errorType" to e.javaClass.simpleName)
                         Timber.e("Beneficiary skipped: ${jsonObject.optLong("benficieryid", -1L)} with error $e")
                     }
                 }
@@ -2343,7 +2419,11 @@ class BenRepo @Inject constructor(
                         val fromCorrect = if (jsonObject.has("householdId")) jsonObject.getLong("householdId").takeIf { it > 0L } else null
                         fromTypo ?: fromCorrect ?: -1L
                     }
-                    if (benId == -1L || hhId == -1L) continue
+                    if (benId == -1L || hhId == -1L) {
+                        logSyncSkip("HOUSEHOLD", "PULL", "BENEFICIARY_OR_HOUSEHOLD_ID_MISSING",
+                            "recordIndex" to i, "benId" to benId, "householdId" to hhId)
+                        continue
+                    }
                     val houseDataObj = jsonObject.getJSONObject("householdDetails")
                     val benDataObj = jsonObject.getJSONObject("beneficiaryDetails")
 
@@ -2351,6 +2431,8 @@ class BenRepo @Inject constructor(
                     val resultContains = result.map { it.householdId }.contains(hhId)
 
                     if (resultContains) {
+                        logSyncSkip("HOUSEHOLD", "PULL", "DUPLICATE_HOUSEHOLD_IN_RESPONSE",
+                            "recordIndex" to i, "householdId" to hhId, "benId" to benId)
                         continue
                     }
                     Timber.d("HouseHoldList $result")
@@ -2485,9 +2567,15 @@ class BenRepo @Inject constructor(
                         } else {
                             if (existingHh.processed == "P") {
                                 result.add(serverHh)
+                            } else {
+                                logSyncSkip("HOUSEHOLD", "PULL", "LOCAL_PENDING_EDITS_PROTECTED",
+                                    "recordIndex" to i, "householdId" to hhId, "benId" to benId,
+                                    "localProcessed" to existingHh.processed)
                             }
                         }
                     } catch (e: JSONException) {
+                        logSyncSkip("HOUSEHOLD", "PULL", "INVALID_RECORD", "recordIndex" to i,
+                            "householdId" to hhId, "benId" to benId, "errorType" to e.javaClass.simpleName)
                         Timber.e("Household skipped: ${jsonObject.getLong("houseoldId")} with error $e")
                     }
 

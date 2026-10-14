@@ -4,8 +4,6 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
 import android.view.ViewGroup
-import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import org.piramalswasthya.stoptb.databinding.RvItemSyncLogBinding
 import org.piramalswasthya.stoptb.model.LogLevel
@@ -15,18 +13,22 @@ import java.util.Date
 import java.util.Locale
 
 class SyncLogAdapter :
-    ListAdapter<SyncLogEntry, SyncLogAdapter.ViewHolder>(DiffCallback) {
+    RecyclerView.Adapter<SyncLogAdapter.ViewHolder>() {
+
+    private var entries: List<SyncLogEntry> = emptyList()
+
+    fun showSnapshot(logs: List<SyncLogEntry>) {
+        if (entries == logs) return
+        entries = logs
+        // Rolling log windows can generate hundreds of queued remove animations.
+        // A bounded, animation-free snapshot avoids that AdapterHelper backlog.
+        notifyDataSetChanged()
+    }
+
+    override fun getItemCount(): Int = entries.size
 
     companion object {
         private const val MAX_DISPLAY_LENGTH = 500
-    }
-
-    private object DiffCallback : DiffUtil.ItemCallback<SyncLogEntry>() {
-        override fun areItemsTheSame(oldItem: SyncLogEntry, newItem: SyncLogEntry) =
-            oldItem.id == newItem.id
-
-        override fun areContentsTheSame(oldItem: SyncLogEntry, newItem: SyncLogEntry) =
-            oldItem == newItem
     }
 
     private val timeFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
@@ -68,6 +70,6 @@ class SyncLogAdapter :
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(getItem(position), timeFormat)
+        holder.bind(entries[position], timeFormat)
     }
 }
