@@ -94,7 +94,9 @@ class TBScreeningFormFragment : Fragment() {
                 val adapter = FormInputAdapter(
                     formValueListener = FormInputAdapter.FormValueListener { formId, index ->
                         viewModel.updateListOnValueChanged(formId, index)
-                        hardCodedListUpdate(16)
+                        // Text edits already update the FormElement; rebinding on each
+                        // keystroke would interrupt typing in Other symptoms.
+                        if (formId != 27) hardCodedListUpdate(16)
                     }, isEnabled = !(recordExists || viewModel.viewOnly)
                 )
                 binding.btnSubmit.isEnabled = !(recordExists || viewModel.viewOnly)

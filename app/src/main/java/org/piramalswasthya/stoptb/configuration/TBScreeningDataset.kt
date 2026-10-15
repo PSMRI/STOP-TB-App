@@ -154,6 +154,16 @@ class TBScreeningDataset(
         hasDependants = true
     )
 
+    private val otherSymptomsDetails = FormElement(
+        id = 27,
+        inputType = InputType.EDIT_TEXT,
+        title = resources.getString(R.string.other_symptoms),
+        required = false,
+        isEnabled = false,
+        etMaxLength = 200,
+        isAlphanumeric = true
+    )
+
     private val otherDetailsHeading = FormElement(
         id = 20,
         inputType = InputType.HEADLINE,
@@ -368,6 +378,7 @@ class TBScreeningDataset(
         hivStatus.entries = hivStatusOptions.map { it.label }.toTypedArray()
 
         if (saved == null) {
+            otherSymptomsDetails.value = null
             dateOfVisit.value = getDateFromLong(System.currentTimeMillis())
             val selectedIndexes = mutableSetOf<Int>()
             val pregnancyIndex = riskFactorOptions.indexOfFirst { it.code == "PREGNANCY" }
@@ -393,6 +404,7 @@ class TBScreeningDataset(
             failureToGainWeightInChildren.value = boolToYesNo(saved.failureToGainWeightInChildren)
             decreasedActivityOrPlayfulnessInChildren.value = boolToYesNo(saved.decreasedActivityOrPlayfulnessInChildren)
             others.value              = boolToYesNo(saved.otherSymptoms)
+            otherSymptomsDetails.value = saved.otherSymptomsDetails
             historyOfTB.value        = boolToYesNo(saved.historyOfTb)
             currentlyTakingDrugs.value = boolToYesNo(saved.takingAntiTBDrugs)
             familyHistoryTB.value    = boolToYesNo(saved.familySufferingFromTB)
@@ -416,6 +428,7 @@ class TBScreeningDataset(
             }?.label
         }
 
+        updateOtherSymptomsDetailsState()
         setUpPage(buildFormList())
         formReady = true
     }
@@ -456,7 +469,11 @@ class TBScreeningDataset(
             fatigue.id              -> fatigue.value              = yesNoFromIndex(index)
             failureToGainWeightInChildren.id -> failureToGainWeightInChildren.value = yesNoFromIndex(index)
             decreasedActivityOrPlayfulnessInChildren.id -> decreasedActivityOrPlayfulnessInChildren.value = yesNoFromIndex(index)
-            others.id               -> others.value               = yesNoFromIndex(index)
+            others.id -> {
+                others.value = yesNoFromIndex(index)
+                updateOtherSymptomsDetailsState()
+                triggerDependants(others, index, 0, listOf(otherSymptomsDetails))
+            }
             historyOfTB.id          -> historyOfTB.value          = yesNoFromIndex(index)
             currentlyTakingDrugs.id -> currentlyTakingDrugs.value = yesNoFromIndex(index)
             familyHistoryTB.id      -> familyHistoryTB.value      = yesNoFromIndex(index)
@@ -472,6 +489,16 @@ class TBScreeningDataset(
             Log.d("ASYM_TEST", "Computed = ${isAsymptomatic.value}")
             listFlow.value.indexOf(isAsymptomatic).takeIf { it >= 0 } ?: -1
         } else -1
+    }
+
+    private fun updateOtherSymptomsDetailsState() {
+        val enabled = isYes(others)
+        otherSymptomsDetails.isEnabled = enabled
+        otherSymptomsDetails.required = enabled
+        if (!enabled) {
+            otherSymptomsDetails.value = null
+            otherSymptomsDetails.errorText = null
+        }
     }
 
     private fun applyAutoSelectedRiskFactors(
@@ -587,6 +614,7 @@ class TBScreeningDataset(
             form.failureToGainWeightInChildren = if (isChildBeneficiary) isYes(failureToGainWeightInChildren) else null
             form.decreasedActivityOrPlayfulnessInChildren = if (isChildBeneficiary) isYes(decreasedActivityOrPlayfulnessInChildren) else null
             form.otherSymptoms         = others.value?.takeIf { it.isNotBlank() }?.let { isYes(others) }
+            form.otherSymptomsDetails = if (isYes(others)) otherSymptomsDetails.value?.trim() else null
             form.historyOfTb           = isYes(historyOfTB)
             form.takingAntiTBDrugs     = isYes(currentlyTakingDrugs)
             form.familySufferingFromTB = isYes(familyHistoryTB)
@@ -698,6 +726,7 @@ class TBScreeningDataset(
             add(decreasedActivityOrPlayfulnessInChildren)
         }
         add(others)
+        if (isYes(others)) add(otherSymptomsDetails)
         add(isAsymptomatic)
         addAll(listOf(
             otherDetailsHeading,

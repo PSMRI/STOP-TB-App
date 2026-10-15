@@ -219,6 +219,9 @@ class FormInputAdapter(
             // ALWAYS rebuild from a clean baseline — don't append onto whatever filters
             // the previously-bound field left behind on this recycled view.
             val baseFilters = mutableListOf<InputFilter>()
+            if (item.isAlphanumeric) {
+                baseFilters.add(org.piramalswasthya.stoptb.configuration.AlphanumericInputFilter)
+            }
             if (item.etMaxLength > 0) baseFilters.add(InputFilter.LengthFilter(item.etMaxLength))
             if (item.allCaps) baseFilters.add(AllCaps())
             binding.et.filters = baseFilters.toTypedArray()
