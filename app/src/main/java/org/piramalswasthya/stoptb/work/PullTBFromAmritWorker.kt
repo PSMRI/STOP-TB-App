@@ -24,6 +24,7 @@ import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.repositories.TBRepo
+import org.piramalswasthya.stoptb.repositories.DrugMasterRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
 import org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository
 import timber.log.Timber
@@ -34,6 +35,7 @@ class PullTBFromAmritWorker @AssistedInject constructor(
     @Assisted private val appContext: Context,
     @Assisted params: WorkerParameters,
     private val tbRepo: TBRepo,
+    private val drugMasterRepo: DrugMasterRepo,
     private val vitalRepo: VitalRepo,
     private val counsellingRepository: ICounsellingRepository,
     private val preferenceDao: PreferenceDao,
@@ -160,6 +162,7 @@ class PullTBFromAmritWorker @AssistedInject constructor(
     private suspend fun refreshVisitCategories(): Boolean {
         tbRepo.refreshVisitCategories()
         tbRepo.refreshChiefComplaintMasters()
+        drugMasterRepo.refreshMasters()
         // A failed master refresh must not block the core beneficiary/form pull.
         return true
     }
@@ -181,10 +184,12 @@ class PullTBFromAmritWorker @AssistedInject constructor(
             try {
                 val res = tbRepo.getGeneralOpdDetailsFromServer()
                 return@withContext res == 1 || res == 0
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
             }
-            true
+            false
         }
     }
 
