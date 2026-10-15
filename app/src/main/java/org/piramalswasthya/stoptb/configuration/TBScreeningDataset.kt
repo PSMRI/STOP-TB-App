@@ -221,6 +221,7 @@ class TBScreeningDataset(
     private var residentialAreaId: Int? = null
     private var editingExistingScreening: Boolean = false
     private var formReady: Boolean = false
+    private var isContactOfKnownTbPatient: Boolean = false
     private val autoSelectSession = KeyPopulationRiskFactorAutoSelect.Session()
     private var lastCommittedRiskFactorIndexes: Set<Int> = emptySet()
 
@@ -375,6 +376,7 @@ class TBScreeningDataset(
                 selectedIndexes.add(pregnancyIndex)
             }
             applyAutoSelectedRiskFactors(ben, selectedIndexes)
+            applyContactOfKnownTb(selectedIndexes)
             keyPopulationRiskFactors.value = selectedIndexes.toRiskFactorValue()
             lastCommittedRiskFactorIndexes = selectedIndexes
             hivStatus.value = null
@@ -404,10 +406,10 @@ class TBScreeningDataset(
                 val matches = savedIds.contains(option.id) ||
                         savedCodes.any { it.equals(option.code, true) || it.equals(option.label, true) }
                 if (matches) index else null
-            }
-            keyPopulationRiskFactors.value =
-                if (selectedIndexes.isEmpty()) null else selectedIndexes.sorted().joinToString("|")
-            lastCommittedRiskFactorIndexes = selectedIndexes.toSet()
+            }.toMutableSet()
+            applyContactOfKnownTb(selectedIndexes)
+            keyPopulationRiskFactors.value = selectedIndexes.toRiskFactorValue()
+            lastCommittedRiskFactorIndexes = selectedIndexes
 
             hivStatus.value = hivStatusOptions.firstOrNull {
                 it.id == saved.hivStatusId ||
@@ -420,8 +422,14 @@ class TBScreeningDataset(
         formReady = true
     }
 
+    fun setContactOfKnownTbPatient(isContact: Boolean) {
+        isContactOfKnownTbPatient = isContact
+    }
+
     /**
-     * Re-reads age and residential area for a screening that has not been saved yet.
+     * Re-reads age, residential area, and household TB contact.
+     * Elderly and Urban Slum stay as saved on an existing screening.
+     * Contact of Known TB Patients is applied to new and existing screenings.
      * Returns true when the Key Population selection changed.
      */
     fun refreshAutoSelectedRiskFactors(
@@ -429,11 +437,15 @@ class TBScreeningDataset(
         residentialArea: String?,
         residentialAreaId: Int?
     ): Boolean {
-        if (!formReady || editingExistingScreening || ben == null) return false
-        residentialAreaLabel = residentialArea
-        this.residentialAreaId = residentialAreaId
+        if (!formReady || ben == null) return false
         val selectedIndexes = currentRiskFactorIndexes().toMutableSet()
-        val changed = applyAutoSelectedRiskFactors(ben, selectedIndexes)
+        var changed = false
+        if (!editingExistingScreening) {
+            residentialAreaLabel = residentialArea
+            this.residentialAreaId = residentialAreaId
+            changed = applyAutoSelectedRiskFactors(ben, selectedIndexes)
+        }
+        if (applyContactOfKnownTb(selectedIndexes)) changed = true
         if (changed) {
             keyPopulationRiskFactors.value = selectedIndexes.toRiskFactorValue()
         }
@@ -462,6 +474,10 @@ class TBScreeningDataset(
             familyHistoryTB.id      -> familyHistoryTB.value      = yesNoFromIndex(index)
             keyPopulationRiskFactors.id -> {
                 enforceNotApplicableExclusivity()
+                val selectedIndexes = currentRiskFactorIndexes().toMutableSet()
+                if (applyContactOfKnownTb(selectedIndexes)) {
+                    keyPopulationRiskFactors.value = selectedIndexes.toRiskFactorValue()
+                }
                 recordRiskFactorUserEdit()
             }
         }
@@ -502,6 +518,19 @@ class TBScreeningDataset(
                 acceptedLabels
             ),
             session = autoSelectSession
+        )
+    }
+
+    private fun applyContactOfKnownTb(selectedIndexes: MutableSet<Int>): Boolean {
+        if (!isContactOfKnownTbPatient) return false
+        return KeyPopulationRiskFactorAutoSelect.selectContactOfKnownTb(
+            selected = selectedIndexes,
+            contactIndex = riskFactorOptions.indexOfFirst {
+                it.code == KeyPopulationRiskFactorAutoSelect.CONTACT_OF_KNOWN_TB_CODE
+            },
+            notApplicableIndex = riskFactorOptions.indexOfFirst {
+                it.code == KeyPopulationRiskFactorAutoSelect.NOT_APPLICABLE_CODE
+            }
         )
     }
 
@@ -600,8 +629,15 @@ class TBScreeningDataset(
                 ?.split("|")?.mapNotNull { it.toIntOrNull() }
                 ?.mapNotNull { riskFactorOptions.getOrNull(it) }
                 .orEmpty()
-            form.keyPopulationRiskFactorIds = selectedRiskFactors.map { it.id }.takeIf { it.isNotEmpty() }
-            form.keyPopulationRiskFactors = selectedRiskFactors.map { it.code }.takeIf { it.isNotEmpty() }
+            val selectedIds = selectedRiskFactors.map { it.id }
+            val selectedCodes = selectedRiskFactors.map { it.code }
+            val withContact = if (isContactOfKnownTbPatient) {
+                KeyPopulationRiskFactorAutoSelect.addContactOfKnownTb(selectedIds, selectedCodes)
+            } else {
+                null
+            }
+            form.keyPopulationRiskFactorIds = (withContact?.ids ?: selectedIds).takeIf { it.isNotEmpty() }
+            form.keyPopulationRiskFactors = (withContact?.codes ?: selectedCodes).takeIf { it.isNotEmpty() }
 
             val selectedHiv = hivStatusOptions.firstOrNull { it.label == hivStatus.value }
             form.hivStatusId = selectedHiv?.id

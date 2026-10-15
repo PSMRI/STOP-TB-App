@@ -1,6 +1,7 @@
 package org.piramalswasthya.stoptb.configuration
 
 import org.piramalswasthya.stoptb.model.AgeUnit
+import org.piramalswasthya.stoptb.utils.CommonConstants
 import java.util.Calendar
 
 /**
@@ -9,14 +10,75 @@ import java.util.Calendar
  * "Elderly" follows age >= 60. "Urban Slum" follows Type of Residential Area.
  * A user can clear either value. The choice stays cleared until that source
  * (age band, or whether the area is Urban Slum) actually changes.
+ *
+ * "Contact of Known TB Patients" follows a confirmed TB case in the same household.
+ * That includes a confirmation recorded after this person was registered or screened.
  */
 object KeyPopulationRiskFactorAutoSelect {
 
     const val ELDERLY_CODE = "ELDERLY"
     const val URBAN_SLUM_CODE = "URBAN_SLUM"
     const val NOT_APPLICABLE_CODE = "NOT_APPLICABLE"
+    const val CONTACT_OF_KNOWN_TB_CODE = "CONTACT_OF_KNOWN_TB_PATIENTS"
+    const val CONTACT_OF_KNOWN_TB_LABEL = "Contact of Known TB Patients"
+    const val NOT_APPLICABLE_LABEL = "Not Applicable"
     const val ELDERLY_MIN_AGE_YEARS = 60
     const val URBAN_SLUM_AREA_LABEL = "Urban Slum"
+
+    data class RiskFactorSelection(val ids: List<Int>, val codes: List<String>)
+
+    /** Master-list id used by TB screening. Matches `CodedOption(index + 1, code, label)`. */
+    fun optionId(code: String): Int {
+        val index = CommonConstants.RISK_FACTOR_CODES.indexOf(code)
+        return if (index >= 0) index + 1 else -1
+    }
+
+    /**
+     * Adds Contact of Known TB Patients and drops Not Applicable.
+     * Returns null when the stored selection already has that result.
+     */
+    fun addContactOfKnownTb(ids: List<Int>?, codes: List<String>?): RiskFactorSelection? {
+        val contactId = optionId(CONTACT_OF_KNOWN_TB_CODE)
+        val notApplicableId = optionId(NOT_APPLICABLE_CODE)
+        val newIds = ids.orEmpty().filter { it != notApplicableId }.toMutableList()
+        if (contactId > 0 && contactId !in newIds) newIds.add(contactId)
+        val newCodes = codes.orEmpty()
+            .filterNot { isNotApplicableValue(it) }
+            .map { if (isContactValue(it)) CONTACT_OF_KNOWN_TB_CODE else it }
+            .distinct()
+            .toMutableList()
+        if (newCodes.none { it.equals(CONTACT_OF_KNOWN_TB_CODE, ignoreCase = true) }) {
+            newCodes.add(CONTACT_OF_KNOWN_TB_CODE)
+        }
+        val unchanged = ids.orEmpty() == newIds && codes.orEmpty() == newCodes
+        return if (unchanged) null else RiskFactorSelection(newIds, newCodes)
+    }
+
+    /**
+     * Selects the contact option in the on-screen checkbox indexes.
+     * Returns true when [selected] changes.
+     */
+    fun selectContactOfKnownTb(
+        selected: MutableSet<Int>,
+        contactIndex: Int,
+        notApplicableIndex: Int
+    ): Boolean {
+        if (contactIndex < 0) return false
+        val before = selected.toSet()
+        selected.add(contactIndex)
+        if (notApplicableIndex >= 0 && selected.size > 1 && selected.contains(notApplicableIndex)) {
+            selected.remove(notApplicableIndex)
+        }
+        return selected != before
+    }
+
+    private fun isContactValue(value: String): Boolean =
+        value.equals(CONTACT_OF_KNOWN_TB_CODE, ignoreCase = true) ||
+            value.equals(CONTACT_OF_KNOWN_TB_LABEL, ignoreCase = true)
+
+    private fun isNotApplicableValue(value: String): Boolean =
+        value.equals(NOT_APPLICABLE_CODE, ignoreCase = true) ||
+            value.equals(NOT_APPLICABLE_LABEL, ignoreCase = true)
 
     class Session {
         var elderlySuppressedByUser: Boolean = false

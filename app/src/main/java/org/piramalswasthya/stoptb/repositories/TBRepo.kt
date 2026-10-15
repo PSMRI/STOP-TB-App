@@ -14,6 +14,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.configuration.KeyPopulationRiskFactorAutoSelect
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
@@ -218,6 +219,7 @@ class TBRepo @Inject constructor(
                 ben.gpsLatitude?.let { tbDiagnosticsCache.latitude = it }
                 ben.gpsLongitude?.let { tbDiagnosticsCache.longitude = it }
             }
+            var knownTbHouseholdId: Long? = null
             withBenIdLock(tbDiagnosticsCache.benId) {
                 val fresh = tbDao.getTbDiagnosticsByBenId(tbDiagnosticsCache.benId)
                 // id is a val (Room primary key) — .copy() to retarget the existing row instead
@@ -239,7 +241,11 @@ class TBRepo @Inject constructor(
                     }
                 }
                 tbDao.saveTbDiagnostics(cache)
+                if (cache.isKnownTbCase()) {
+                    knownTbHouseholdId = benDao.getBen(cache.benId)?.householdId
+                }
             }
+            knownTbHouseholdId?.takeIf { it > 0L }?.let { applyKnownTbContactRiskFactors(it) }
             if (tbDiagnosticsCache.isChestXRayDone == true) benDao.updateScreeningStatus(tbDiagnosticsCache.benId,"SCREENED")   // NEW
 
             if (tbDiagnosticsCache.isNaatConducted == true) benDao.updateScreeningStatus(tbDiagnosticsCache.benId,"SCREENED")   // NEW
@@ -259,6 +265,11 @@ class TBRepo @Inject constructor(
                 ben.gpsLongitude?.let { tbSuspectedCache.longitude = it }
             }
             tbDao.saveTbSuspected(tbSuspectedCache)
+            if (tbSuspectedCache.isTBConfirmed == true || tbSuspectedCache.isConfirmed) {
+                benDao.getBen(tbSuspectedCache.benId)?.householdId
+                    ?.takeIf { it > 0L }
+                    ?.let { applyKnownTbContactRiskFactors(it) }
+            }
         }
     }
 
@@ -272,7 +283,50 @@ class TBRepo @Inject constructor(
         withContext(Dispatchers.IO)
         {
             tbDao.saveTbConfirmed(tbConfirmedTreatmentCache)
+            benDao.getBen(tbConfirmedTreatmentCache.benId)?.householdId
+                ?.takeIf { it > 0L }
+                ?.let { applyKnownTbContactRiskFactors(it) }
         }
+    }
+
+    suspend fun isContactOfKnownTbPatient(benId: Long, householdId: Long?): Boolean {
+        val hhId = householdId?.takeIf { it > 0L } ?: return false
+        return withContext(Dispatchers.IO) {
+            tbDao.householdHasOtherConfirmedTbCase(hhId, benId)
+        }
+    }
+
+    /**
+     * Writes "Contact of Known TB Patients" onto household members' saved screenings.
+     * A null or non-positive [householdId] updates every household that has a confirmed case.
+     * Members who were screened before the confirmation are included.
+     */
+    suspend fun applyKnownTbContactRiskFactors(householdId: Long? = null) {
+        withContext(Dispatchers.IO) {
+            val screenings = tbDao.getScreeningsForKnownTbContacts(householdId?.takeIf { it > 0L } ?: 0L)
+            var updated = 0
+            for (screening in screenings) {
+                val selection = KeyPopulationRiskFactorAutoSelect.addContactOfKnownTb(
+                    screening.keyPopulationRiskFactorIds,
+                    screening.keyPopulationRiskFactors
+                ) ?: continue
+                screening.keyPopulationRiskFactorIds = selection.ids
+                screening.keyPopulationRiskFactors = selection.codes
+                screening.syncState = SyncState.UNSYNCED
+                tbDao.saveTbScreening(screening)
+                updated++
+            }
+            if (updated > 0) {
+                Timber.d("Selected Contact of Known TB Patients on $updated screening record(s)")
+            }
+        }
+    }
+
+    private fun TBDiagnosticsCache.isKnownTbCase(): Boolean {
+        if (isTBConfirmed == true || isConfirmed) return true
+        val naat = naatResult?.trim()?.uppercase().orEmpty()
+        if (naat == "POSITIVE" || naat == "MTB DETECTED" || naat == "TB POSITIVE") return true
+        return liquidCultureResult?.trim()?.equals("POSITIVE", ignoreCase = true) == true
     }
 
     suspend fun getAllFollowUpsForBeneficiary(benId: Long): List<TBConfirmedTreatmentCache> {
