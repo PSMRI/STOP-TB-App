@@ -73,15 +73,18 @@
         <item>হয়</item>
         <item>নহয়</item>
     </string-array>
-    <string name="nhhr_fuel_cooking">ৰন্ধা-বঢ়াৰ বাবে ব্যৱহাৰ কৰা ইন্ধনৰ প্ৰকাৰ *</string>
-    <string name="nhhr_fuel_cooking_1">খৰি</string>
-    <string name="nhhr_fuel_cooking_2">শস্যৰ অৱশিষ্টাংশ</string>
-    <string name="nhhr_fuel_cooking_3">গৰুৰ গোবৰৰ পিঠা</string>
-    <string name="nhhr_fuel_cooking_4">কয়লা</string>
-    <string name="nhhr_fuel_cooking_5">কেৰাচিন</string>
-    <string name="nhhr_fuel_cooking_6">এলপিজি</string>
-    <string name="nhhr_fuel_cooking_7">প্ৰৰোচনা</string>
-    <string name="nhhr_fuel_cooking_8">অন্য</string>
+    <string name="nhhr_fuel_cooking">ৰন্ধা-বঢ়াৰ বাবে ব্যৱহাৰ কৰা ইন্ধনৰ প্ৰধান উৎস</string>
+    <string name="nhhr_fuel_cooking_1">খৰি (কাঠ)</string>
+    <string name="nhhr_fuel_cooking_2">শস্যৰ অৱশিষ্ট</string>
+    <string name="nhhr_fuel_cooking_3">গোবৰ শুকুৱাই তৈয়াৰ কৰা উপলা</string>
+    <string name="nhhr_fuel_cooking_4">পাইপযোগে যোগান ধৰা প্ৰাকৃতিক গেছ (PNG)</string>
+    <string name="nhhr_fuel_cooking_5">জৈৱ গেছ (গোবৰ গেছ)</string>
+    <string name="nhhr_fuel_cooking_6">কয়লা</string>
+    <string name="nhhr_fuel_cooking_7">কেৰাচিন</string>
+    <string name="nhhr_fuel_cooking_8">তৰলীকৃত পেট্ৰলিয়াম গেছ (LPG)</string>
+    <string name="nhhr_fuel_cooking_9">ইণ্ডাকচন (বিদ্যুৎ)</string>
+    <string name="nhhr_fuel_cooking_10">অন্যান্য</string>
+
     <string-array name="nhhr_fuel_cooking_array">
         <item>@string/nhhr_fuel_cooking_1</item>
         <item>@string/nhhr_fuel_cooking_2</item>
@@ -91,6 +94,8 @@
         <item>@string/nhhr_fuel_cooking_6</item>
         <item>@string/nhhr_fuel_cooking_7</item>
         <item>@string/nhhr_fuel_cooking_8</item>
+        <item>@string/nhhr_fuel_cooking_9</item>
+        <item>@string/nhhr_fuel_cooking_10</item>
     </string-array>
     <string name="nhhr_primary_water">পানীৰ প্ৰাথমিক উৎস</string>
     <string name="nhhr_primary_water_1">টেপৰ পানী</string>
