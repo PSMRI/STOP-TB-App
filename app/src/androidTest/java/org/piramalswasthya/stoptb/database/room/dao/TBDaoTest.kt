@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.database.room.dao
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
@@ -25,6 +26,63 @@ class TBDaoTest {
 
     private val villageId = 123
     private val assignedVillages = listOf(villageId)
+
+    @Test
+    fun submissionIdIsPersistentAcrossRetriesAndParentUpdates() = runBlocking {
+        insertBeneficiary(8005L)
+        val record = GeneralOpdCache(benId = 8005L, chiefComplaints = listOf("Fever"), chiefComplaintIds = listOf(167))
+        val id = tbDao.saveGeneralOpd(record).toInt()
+        val first = tbDao.ensureGeneralOpdSubmissionId(id)
+        java.util.UUID.fromString(first)
+        assertEquals(first, tbDao.ensureGeneralOpdSubmissionId(id))
+        tbDao.saveGeneralOpd(record.copy(id = id, syncState = SyncState.SYNCED))
+        assertEquals(first, tbDao.getGeneralOpdById(id)?.submissionId)
+        assertEquals(listOf(167), tbDao.getGeneralOpdById(id)?.chiefComplaintIds)
+        val otherId = tbDao.saveGeneralOpd(GeneralOpdCache(benId = 8005L)).toInt()
+        org.junit.Assert.assertNotEquals(first, tbDao.ensureGeneralOpdSubmissionId(otherId))
+    }
+
+    @Test
+    fun legacyMultipleChiefComplaints_areReadWithoutDroppingValues() = runBlocking {
+        insertBeneficiary(8004L)
+        val complaints = listOf("Fever", "Mild to moderate body pain", "Headache")
+        tbDao.saveGeneralOpd(GeneralOpdCache(benId = 8004L, chiefComplaints = complaints))
+        val saved = tbDao.getGeneralOpd(8004L)
+        assertEquals(complaints, saved?.chiefComplaints)
+        assertEquals("Fever, Mild to moderate body pain, Headache",
+            saved?.chiefComplaints.orEmpty().joinToString(", "))
+    }
+
+    @Test
+    fun prescriptionDetails_surviveParentSyncUpdate() = runBlocking {
+        insertBeneficiary(8001L)
+        val opd = GeneralOpdCache(benId = 8001L, medications = listOf("Medicine A", "Medicine B"))
+        val id = tbDao.saveGeneralOpd(opd).toInt()
+        val rows = listOf(
+            GeneralOpdPrescription(id, 0, "Medicine A", "Once daily", 2, "Day(s)", "After food"),
+            GeneralOpdPrescription(id, 1, "Medicine B", "Twice daily", 1, "Week(s)", "Before food")
+        )
+        tbDao.insertGeneralOpdPrescriptions(rows)
+        tbDao.saveGeneralOpd(opd.copy(id = id, syncState = SyncState.SYNCED))
+        assertEquals(rows, tbDao.getGeneralOpdPrescriptions(id))
+    }
+
+    @Test
+    fun prescriptionRemoval_replacesOnlySelectedOpdRows() = runBlocking {
+        insertBeneficiary(8002L)
+        insertBeneficiary(8003L)
+        val firstId = tbDao.saveGeneralOpd(GeneralOpdCache(benId = 8002L)).toInt()
+        val secondId = tbDao.saveGeneralOpd(GeneralOpdCache(benId = 8003L)).toInt()
+        val first = GeneralOpdPrescription(firstId, 0, "A", "Once daily", 1, "Day(s)", "After food")
+        val second = first.copy(opdId = secondId, medicine = "B")
+        tbDao.insertGeneralOpdPrescriptions(listOf(first, first.copy(position = 1), second))
+        db.withTransaction {
+            tbDao.deleteGeneralOpdPrescriptions(firstId)
+            tbDao.insertGeneralOpdPrescriptions(listOf(first))
+        }
+        assertEquals(listOf(first), tbDao.getGeneralOpdPrescriptions(firstId))
+        assertEquals(listOf(second), tbDao.getGeneralOpdPrescriptions(secondId))
+    }
 
     @Before
     fun createDb() {

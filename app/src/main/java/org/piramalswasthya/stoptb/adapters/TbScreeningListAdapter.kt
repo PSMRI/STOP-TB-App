@@ -18,7 +18,11 @@ import org.piramalswasthya.stoptb.model.BenWithTbScreeningDomain
 
 class TbScreeningListAdapter(
     private val clickListener: ClickListener? = null,
-    private val pref: PreferenceDao? = null
+    private val pref: PreferenceDao? = null,
+    // Whether this account can fill a brand-new (unfilled) TB Screening record. A role without
+    // FULL access can still open an already-filled record to view it — only the "Screening"
+    // (fill) action on an unfilled row is gated by this.
+    private val canFill: Boolean = true
 ) :
     ListAdapter<BenWithTbScreeningDomain, TbScreeningListAdapter.BenViewHolder>
         (BenDiffUtilCallBack) {
@@ -49,6 +53,7 @@ class TbScreeningListAdapter(
             item: BenWithTbScreeningDomain,
             pref : PreferenceDao?,
             clickListener: ClickListener?,
+            canFill: Boolean,
         ) {
             binding.benWithTb = item
             binding.cvContent.visibility = View.VISIBLE
@@ -93,7 +98,13 @@ class TbScreeningListAdapter(
             binding.btnFormTb.setBackgroundColor(
                 ContextCompat.getColor(
                     binding.root.context,
-                    if (isScreened) android.R.color.holo_green_dark else android.R.color.holo_red_dark
+                    when {
+                        isScreened -> android.R.color.holo_green_dark
+                        canFill -> android.R.color.holo_red_dark
+                        // Grey — already-filled records stay viewable regardless of permission,
+                        // but this role can't fill a brand-new one.
+                        else -> android.R.color.darker_gray
+                    }
                 )
             )
             binding.clickListener = clickListener
@@ -152,16 +163,24 @@ class TbScreeningListAdapter(
         BenViewHolder.from(parent)
 
     override fun onBindViewHolder(holder: BenViewHolder, position: Int) {
-        holder.bind(getItem(position),pref, clickListener)
+        holder.bind(getItem(position), pref, clickListener, canFill)
     }
 
 
     class ClickListener(
-        private val clickedForm: ((hhId: Long, benId: Long, viewOnly: Boolean) -> Unit)? = null
-
+        private val clickedForm: ((hhId: Long, benId: Long, viewOnly: Boolean) -> Unit)? = null,
+        private val onAccessDenied: (() -> Unit)? = null,
+        // Same meaning as TbScreeningListAdapter.canFill above.
+        private val canFill: Boolean = true
     ) {
-        fun onClickForm(item: BenWithTbScreeningDomain) =
-            clickedForm?.let { it(item.ben.hhId, item.ben.benId, item.tb != null) }
+        fun onClickForm(item: BenWithTbScreeningDomain) {
+            val isScreened = item.tb != null
+            if (!isScreened && !canFill) {
+                onAccessDenied?.invoke()
+                return
+            }
+            clickedForm?.let { it(item.ben.hhId, item.ben.benId, isScreened) }
+        }
     }
 
 }
