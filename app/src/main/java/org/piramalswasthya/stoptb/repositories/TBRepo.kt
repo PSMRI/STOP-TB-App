@@ -604,6 +604,13 @@ class TBRepo @Inject constructor(
                 failureToGainWeightInChildren = item.optNullableBoolean("failureToGainWeightInChildren") ?: existing?.failureToGainWeightInChildren,
                 decreasedActivityOrPlayfulnessInChildren = item.optNullableBoolean("decreasedActivityOrPlayfulnessInChildren") ?: existing?.decreasedActivityOrPlayfulnessInChildren,
                 otherSymptoms = item.optNullableBoolean("otherSymptoms") ?: existing?.otherSymptoms,
+                otherSymptomsDetails = if (item.has("otherSymptomsDetails")) {
+                    item.optStringOrNull("otherSymptomsDetails")
+                } else if (item.optNullableBoolean("otherSymptoms") == false) {
+                    null
+                } else {
+                    existing?.otherSymptomsDetails
+                },
                 referredForDigitalChestXray = item.optNullableBoolean("referredForDigitalChestXray"),
                 referredForSputumCollection = item.optNullableBoolean("referredForSputumCollection"),
                 sputumSampleSubmittedAt = item.optStringOrNull("sputumSampleSubmittedAt"),

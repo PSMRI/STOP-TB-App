@@ -103,7 +103,9 @@ class TBScreeningFormFragment : Fragment() {
                             }
                         } else {
                             viewModel.updateListOnValueChanged(formId, index)
+                            if (formId != 27)
                             hardCodedListUpdate(16)
+
                         }
                     }, isEnabled = !(recordExists || viewModel.viewOnly)
                 )
