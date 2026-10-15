@@ -15,6 +15,7 @@ import org.piramalswasthya.stoptb.configuration.IconDataset
 import org.piramalswasthya.stoptb.databinding.RvIconGridBinding
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.utils.navigateSafe
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -40,7 +41,7 @@ class ReferralIconsFragment : Fragment() {
             requireContext().resources.getInteger(R.integer.icon_grid_span)
         )
         binding.rvIconGrid.adapter = IconGridAdapter(
-            IconGridAdapter.GridIconClickListener { findNavController().navigate(it) },
+            IconGridAdapter.GridIconClickListener { findNavController().navigateSafe(it) },
             viewLifecycleOwner.lifecycleScope
         ).also {
             it.submitList(iconDataset.getReferralDataset(resources))

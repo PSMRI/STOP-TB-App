@@ -42,6 +42,8 @@ class VitalScreenFragment : Fragment() {
     private var referralAlert: AlertDialog? = null
     private var riskFactorOptions: List<CodedOption> = emptyList()
     private var selectedRiskFactors = BooleanArray(0)
+    private val openedFromHousehold: Boolean
+        get() = arguments?.getBoolean("openedFromHousehold", false) == true
 
     private data class CodedOption(
         val id: Int,
@@ -61,7 +63,7 @@ class VitalScreenFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setupInputLimits()
-        setupDropdowns()
+      //  setupDropdowns()
         setupValidationClearers()
         observeUi()
         binding.btnSubmit.setOnClickListener {
@@ -174,10 +176,11 @@ class VitalScreenFragment : Fragment() {
             // benCache is set before existingVitals is posted, so isMale / isPregnant are
             // reliable here. Re-build the options list (may filter PREGNANCY / LACTATING_MOTHER
             // for male beneficiaries) and reset the selection array.
-            riskFactorOptions = getRiskFactorOptions()
-            selectedRiskFactors = BooleanArray(riskFactorOptions.size)
+           // riskFactorOptions = getRiskFactorOptions()
+            //selectedRiskFactors = BooleanArray(riskFactorOptions.size)
 
             if (vital == null) {
+                autoSelectNotApplicableIfApplicable()
                 // New form — auto-select Pregnancy when ben registration says "Yes"
                 autoSelectPregnancyIfApplicable()
                 return@observe
@@ -192,8 +195,8 @@ class VitalScreenFragment : Fragment() {
             setPresentAbsentRadioGroupValue(binding.rgClubbing, vital.clubbingId, vital.clubbing)
             setPresentAbsentRadioGroupValue(binding.rgLymphadenopathy, vital.lymphadenopathyId, vital.lymphadenopathy)
             setPresentAbsentRadioGroupValue(binding.rgOedema, vital.oedemaId, vital.oedema)
-            applyRiskFactorSelection(vital.keyPopulationRiskFactorIds.orEmpty(), vital.keyPopulationRiskFactors.orEmpty())
-            setHivStatusValue(vital.hivStatusId, vital.hivStatus)
+          //  applyRiskFactorSelection(vital.keyPopulationRiskFactorIds.orEmpty(), vital.keyPopulationRiskFactors.orEmpty())
+           // setHivStatusValue(vital.hivStatusId, vital.hivStatus)
         }
         viewModel.state.observe(viewLifecycleOwner) { state ->
             when (state) {
@@ -294,8 +297,8 @@ class VitalScreenFragment : Fragment() {
         val clubbing = getPresentAbsentSelection(binding.rgClubbing)
         val lymphadenopathy = getPresentAbsentSelection(binding.rgLymphadenopathy)
         val oedema = getPresentAbsentSelection(binding.rgOedema)
-        val riskFactors = getSelectedRiskFactorOptions()
-        val hivStatus = getHivStatusSelection()
+       // val riskFactors = getSelectedRiskFactorOptions()
+        //val hivStatus = getHivStatusSelection()
         viewModel.saveVitals(
             temperatureOption = null,
             pulseRateOption = binding.etPulseRate.text?.toString(),
@@ -317,21 +320,24 @@ class VitalScreenFragment : Fragment() {
             lymphadenopathy = lymphadenopathy?.code,
             oedemaId = oedema?.id,
             oedema = oedema?.code,
-            keyPopulationRiskFactorIds = riskFactors.map { it.id },
-            keyPopulationRiskFactors = riskFactors.map { it.code },
-            hivStatusId = hivStatus?.id,
-            hivStatus = hivStatus?.code
+            keyPopulationRiskFactorIds = listOf(NOT_APPLICABLE_RISK_FACTOR_ID),
+            keyPopulationRiskFactors = listOf("NOT_APPLICABLE"),
+            hivStatusId = UNKNOWN_HIV_STATUS_ID,
+            hivStatus = "UNKNOWN"
+
         )
     }
 
+    companion object {
+        // Matches the "Not Applicable" / "Unknown" defaults used in TB Screening's
+        // risk-factor and HIV-status fields, so the two forms report the same
+        // fallback code/id when these fields aren't collected on this screen.
+        private const val NOT_APPLICABLE_RISK_FACTOR_ID = 38 // index of NOT_APPLICABLE in riskFactorCodes + 1
+        private const val UNKNOWN_HIV_STATUS_ID = 4
+    }
+
     private fun navigateAfterVitals() {
-        if (!viewModel.autoFlow) {
-            findNavController().navigateUp()
-            return
-        }
-        // Examine flow — return to AllBenFragment so user picks the next form
-        val popped = findNavController().popBackStack(R.id.allBenFragment, false)
-        if (!popped) findNavController().navigate(R.id.allBenFragment, bundleOf("source" to 0))
+        findNavController().navigateUp()
     }
 
     private fun validateFields(): Boolean {
@@ -392,15 +398,15 @@ class VitalScreenFragment : Fragment() {
             isValid = false
         }
 
-        if (getSelectedRiskFactors().isEmpty()) {
-            binding.tilRiskFactors.error = getString(R.string.risk_factor_required)
-            isValid = false
-        }
-
-        if (binding.etHivStatus.text?.toString()?.trim().isNullOrEmpty()) {
-            binding.tilHivStatus.error = getString(R.string.hiv_status_required)
-            isValid = false
-        }
+//        if (getSelectedRiskFactors().isEmpty()) {
+//            binding.tilRiskFactors.error = getString(R.string.risk_factor_required)
+//            isValid = false
+//        }
+//
+//        if (binding.etHivStatus.text?.toString()?.trim().isNullOrEmpty()) {
+//            binding.tilHivStatus.error = getString(R.string.hiv_status_required)
+//            isValid = false
+//        }
 
         if (!isValid) {
             scrollToFirstFieldWithError()
@@ -541,7 +547,20 @@ class VitalScreenFragment : Fragment() {
         if (!viewModel.isPregnant) return
         val pregnancyIndex = riskFactorOptions.indexOfFirst { it.code == "PREGNANCY" }
         if (pregnancyIndex >= 0) {
+            val notApplicableIndex = riskFactorOptions.indexOfFirst { it.code == "NOT_APPLICABLE" }
+            if (notApplicableIndex >= 0) {
+                selectedRiskFactors[notApplicableIndex] = false
+            }
             selectedRiskFactors[pregnancyIndex] = true
+            refreshRiskFactorText()
+        }
+    }
+
+    private fun autoSelectNotApplicableIfApplicable() {
+        if (viewModel.isPregnant) return
+        val notApplicableIndex = riskFactorOptions.indexOfFirst { it.code == "NOT_APPLICABLE" }
+        if (notApplicableIndex >= 0) {
+            selectedRiskFactors[notApplicableIndex] = true
             refreshRiskFactorText()
         }
     }

@@ -16,12 +16,17 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.TbScreeningListAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchRvButtonBinding
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class TBScreeningListFragment : Fragment() {
+
+    @Inject
+    lateinit var pref: PreferenceDao
     private var _binding: FragmentDisplaySearchRvButtonBinding? = null
     private val binding: FragmentDisplaySearchRvButtonBinding
         get() = _binding!!
@@ -56,7 +61,8 @@ class TBScreeningListFragment : Fragment() {
                         syncImmediately = !viewOnly
                     )
                 )
-            }
+            },
+            pref = pref
         )
         binding.rvAny.adapter = benAdapter
 

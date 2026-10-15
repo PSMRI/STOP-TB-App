@@ -1,0 +1,648 @@
+package org.piramalswasthya.stoptb.ui.counselling_activity
+
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.launch
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.Languages
+import org.piramalswasthya.stoptb.helpers.NetworkResponse
+import org.piramalswasthya.stoptb.model.CounsellingOverviewData
+import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingFormSchemaDto
+import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingQuestionDto
+import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingSectionDto
+import org.piramalswasthya.stoptb.repositories.CounsellingRepo
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import javax.inject.Inject
+
+@HiltViewModel
+class CounsellingViewModel @Inject constructor(
+    private val savedStateHandle: SavedStateHandle,
+    private val counsellingRepo: CounsellingRepo,
+    val prefDao: PreferenceDao
+) : ViewModel() {
+
+    companion object {
+        const val EXTRA_BEN_ID = "extra_ben_id"
+    }
+
+    val benId: Long = savedStateHandle.get<Long>(EXTRA_BEN_ID) ?: -1L
+
+    private val _currentStep = MutableLiveData(0)
+    val currentStep: LiveData<Int> get() = _currentStep
+
+    private val _overview = MutableLiveData<NetworkResponse<CounsellingOverviewData>>(NetworkResponse.Idle())
+    val overview: LiveData<NetworkResponse<CounsellingOverviewData>> get() = _overview
+    private val _formSchema = MutableLiveData<NetworkResponse<CounsellingFormSchemaDto>>(NetworkResponse.Idle())
+    val formSchema: LiveData<NetworkResponse<CounsellingFormSchemaDto>> get() = _formSchema
+
+    private val _activeQuestions = MutableLiveData<List<CounsellingQuestionDto>>()
+    val activeQuestions: LiveData<List<CounsellingQuestionDto>> get() = _activeQuestions
+
+    private val _formSubmitted = MutableLiveData<Boolean>()
+    val formSubmitted: LiveData<Boolean> get() = _formSubmitted
+
+    private val _saveError = MutableLiveData<String?>()
+    val saveError: LiveData<String?> get() = _saveError
+
+    private val _isFormEditable = MutableLiveData<Boolean>(true)
+    val isFormEditable: LiveData<Boolean> get() = _isFormEditable
+
+    fun isSectionEditable(section: CounsellingSectionDto?): Boolean {
+        // Backend's isEditable=true (only the last section) is an unconditional override — that
+        // section stays editable forever regardless of submitted/completed/refused state.
+        if (section?.isEditable == true) return true
+        if (section?.isSubmitted == true) return false
+        return _isFormEditable.value != false
+    }
+
+    private val _isGeneralInfoToggleOn = MutableLiveData(true)
+    val isGeneralInfoToggleOn: LiveData<Boolean> get() = _isGeneralInfoToggleOn
+
+    private var generalInfoSection: CounsellingSectionDto? = null
+    private var generalInfoFormId: Int = 2
+    private var generalInfoFormVersionNumber: Int = 1
+    private val _generalInfoQuestions = MutableLiveData<List<CounsellingQuestionDto>>(emptyList())
+    val generalInfoQuestions: LiveData<List<CounsellingQuestionDto>> get() = _generalInfoQuestions
+
+    private val _generalInfoRefusalSubmitted = MutableLiveData<Boolean>()
+    val generalInfoRefusalSubmitted: LiveData<Boolean> get() = _generalInfoRefusalSubmitted
+
+
+    private val _generalInfoQuestionUpdated = MutableLiveData<Int>()
+    val generalInfoQuestionUpdated: LiveData<Int> get() = _generalInfoQuestionUpdated
+
+    enum class CounsellingEntryMode {
+        COUNSELLING,
+        FOLLOW_UP
+    }
+
+    private var lastEntryMode: CounsellingEntryMode = CounsellingEntryMode.COUNSELLING
+    private var lastRequestedPhase: SectionPhase = SectionPhase.PRE_SUBMIT
+
+    // Tracks whether General Info has been submitted to the backend during the current counselling attempt.
+    private var generalInfoSubmittedThisSession = false
+
+    var schemaData: CounsellingFormSchemaDto? = null
+    private val disabledValidationSections = mutableSetOf<String>()
+
+    init {
+        loadOverview()
+        loadGeneralInfoSection()
+    }
+
+    fun loadOverview() {
+        viewModelScope.launch {
+            _overview.value = NetworkResponse.Loading()
+            val response = counsellingRepo.getCounsellingOverview(benId)
+            if (response is NetworkResponse.Success) {
+                _isFormEditable.value = response.data?.preSubmitSubmitted != true
+            }
+            _overview.value = response
+        }
+    }
+
+    fun loadGeneralInfoSection() {
+        viewModelScope.launch {
+            val response = counsellingRepo.getFormSchema(benId, SectionPhase.GENERAL_INFO)
+            val schemaDto = response.data
+            if (response is NetworkResponse.Success && schemaDto != null) {
+                generalInfoFormId = schemaDto.formId
+                generalInfoFormVersionNumber = schemaDto.versionNumber
+                val section = schemaDto.sections.firstOrNull()
+                generalInfoSection = section
+                section?.questions?.forEach { q ->
+                    q.visible = q.visibleByDefault
+                    if ((q.questionUuid == "TB2_GI_Q1" || q.questionUuid == "TB_A_Q1") && q.value == null) {
+                        q.value = "YES"
+                    }
+                }
+                section?.let { evaluateAllConditions(it) }
+                _generalInfoQuestions.value = section?.questions?.toList().orEmpty()
+            } else {
+                generalInfoSection = null
+                _generalInfoQuestions.value = emptyList()
+            }
+        }
+    }
+
+    fun setGeneralInfoToggle(checked: Boolean) {
+        _isGeneralInfoToggleOn.value = checked
+    }
+
+    fun setConsentToggleValue(checked: Boolean) {
+        val questions = _generalInfoQuestions.value.orEmpty()
+        val consentQuestion = questions.firstOrNull { it.questionUuid == "TB2_GI_Q1" || it.questionUuid == "TB_A_Q1" }
+        if (consentQuestion != null) {
+            val valueToSet = if (checked) {
+                if (consentQuestion.questionType == "CHECKBOX" || consentQuestion.questionType == "MCQ") {
+                    listOf("YES")
+                } else {
+                    "YES"
+                }
+            } else {
+                if (consentQuestion.questionType == "CHECKBOX" || consentQuestion.questionType == "MCQ") {
+                    listOf("NO")
+                } else {
+                    "NO"
+                }
+            }
+            consentQuestion.value = valueToSet
+            evaluateGeneralInfoConditions(consentQuestion)
+        }
+    }
+
+//    fun updateCounsellingDate(dateMillis: Long) {
+//        viewModelScope.launch {
+//            counsellingRepo.updateCounsellingDate(benId, dateMillis)
+//            loadOverview()
+//        }
+//    }
+
+    fun evaluateGeneralInfoConditions(q: CounsellingQuestionDto) {
+        val section = generalInfoSection ?: return
+
+        val beforeStates = section.questions.associate {
+            it.questionId to Triple(it.visible, it.isMandatory, it.errorMessage)
+        }
+
+        evaluateAllConditions(section)
+
+        // Re-evaluate validation state for visible questions to clear or update errors in real-time
+        section.questions.filter { it.visible }.forEach { activeQ ->
+            val qError = validateQuestion(activeQ, section)
+            if (activeQ.errorMessage != qError) {
+                if (activeQ.errorMessage != null || qError == null) {
+                    activeQ.errorMessage = qError
+                }
+            }
+        }
+
+        val afterStates = section.questions.associate {
+            it.questionId to Triple(it.visible, it.isMandatory, it.errorMessage)
+        }
+
+        val changedIds = afterStates.filterKeys { id -> beforeStates[id] != afterStates[id] }.keys
+        if (changedIds.isEmpty()) return
+
+
+        val onlySelfChanged = changedIds.size == 1 && changedIds.first() == q.questionId &&
+            beforeStates[q.questionId]?.first == afterStates[q.questionId]?.first &&
+            beforeStates[q.questionId]?.second == afterStates[q.questionId]?.second
+
+        if (onlySelfChanged) {
+            _generalInfoQuestionUpdated.value = q.questionId
+        } else {
+            _generalInfoQuestions.value = section.questions.toList()
+        }
+    }
+
+    fun submitGeneralInfoRefusal() {
+        val section = generalInfoSection ?: return
+        if (!validateSection(section)) {
+            _generalInfoQuestions.value = section.questions.toList()
+            return
+        }
+        viewModelScope.launch {
+            val success = counsellingRepo.submitGeneralInfoAnswers(
+                benId, generalInfoFormId, section, generalInfoFormVersionNumber
+            )
+            if (success) {
+                _generalInfoRefusalSubmitted.value = true
+            } else {
+                _saveError.value = "Failed to submit. Please try again."
+            }
+        }
+    }
+
+    fun loadFormSchema(phase: SectionPhase) {
+        lastRequestedPhase = phase
+        viewModelScope.launch {
+            _formSchema.value = NetworkResponse.Loading()
+            val response = counsellingRepo.getFormSchema(benId, phase)
+            if (response is NetworkResponse.Success) {
+                schemaData = response.data
+
+                // Gson's unsafe deserializer bypasses Kotlin default values, so set runtime
+                // visibility explicitly from the backend's visibleByDefault field.
+                schemaData?.sections?.forEach { sec ->
+                    sec.questions.forEach { q ->
+                        q.visible = q.visibleByDefault
+                        q.originalIsMandatory = q.isMandatory
+                    }
+                }
+
+                // Check for last visited section in saved response
+                val draft = counsellingRepo.getDraftResponse(benId)
+                var startIndex = 0
+                if (draft != null) {
+                    val lastVisitedId = draft.formResponse.lastVisitedSectionId
+                    if (lastVisitedId != null) {
+                        val idx = schemaData?.sections?.indexOfFirst { it.sectionId == lastVisitedId } ?: -1
+                        if (idx != -1) {
+                            startIndex = idx
+                        }
+                    }
+                }
+
+                _formSchema.value = response
+                loadSection(startIndex)
+            } else {
+                _formSchema.value = response
+            }
+        }
+    }
+
+    fun retryLoadFormSchema() {
+        when (lastEntryMode) {
+            CounsellingEntryMode.COUNSELLING -> startCounselling()
+            CounsellingEntryMode.FOLLOW_UP -> startFollowUp()
+        }
+    }
+
+    fun resetSaveError() {
+        _saveError.value = null
+    }
+
+    fun startCounselling() {
+        lastEntryMode = CounsellingEntryMode.COUNSELLING
+        generalInfoSubmittedThisSession = false
+        viewModelScope.launch {
+            val currentResponse = counsellingRepo.getDraftResponse(benId)
+            if (currentResponse != null) {
+                if (currentResponse.formResponse.status == "REFUSED") {
+                    counsellingRepo.revertFormStatus(currentResponse.formResponse.responseId, "DRAFT")
+                }
+                counsellingRepo.resetLastVisitedSection(currentResponse.formResponse.responseId)
+            }
+            generalInfoSection?.let { sec ->
+                counsellingRepo.saveGeneralInfoDraftLocal(benId, generalInfoFormId, sec, generalInfoFormVersionNumber)
+            }
+            _isFormEditable.value = !counsellingRepo.hasPreSubmitBeenSubmitted(benId)
+            loadFormSchema(SectionPhase.PRE_SUBMIT)
+        }
+    }
+
+    fun startFollowUp() {
+        lastEntryMode = CounsellingEntryMode.FOLLOW_UP
+        viewModelScope.launch {
+            _formSchema.value = NetworkResponse.Loading()
+            val response = counsellingRepo.getFormSchema(benId, SectionPhase.POST_SUBMIT)
+            if (response is NetworkResponse.Success) {
+                schemaData = response.data
+                val formId = schemaData?.formId ?: 2
+                val statusInfo = counsellingRepo.getFollowUpStatus(benId, formId)
+
+
+                val editable = if (statusInfo.syncedAt == null) {
+                    true // Not yet synced, remains editable
+                } else {
+                    val currentTime = System.currentTimeMillis()
+                    val diffInMillis = currentTime - statusInfo.syncedAt
+                    val daysDiff = diffInMillis / (1000 * 60 * 60 * 24)
+                    daysDiff <= statusInfo.followUpDelayDays
+                }
+
+                _isFormEditable.value = editable
+
+                schemaData?.sections?.forEach { sec ->
+                    sec.questions.forEach { q -> q.visible = q.visibleByDefault }
+                }
+
+                val draft = counsellingRepo.getDraftResponse(benId)
+                var startIndex = 0
+                if (draft != null) {
+                    val lastVisitedId = draft.formResponse.lastVisitedSectionId
+                    if (lastVisitedId != null) {
+                        val idx = schemaData?.sections?.indexOfFirst { it.sectionId == lastVisitedId } ?: -1
+                        if (idx != -1) {
+                            startIndex = idx
+                        }
+                    }
+                }
+
+                _formSchema.value = response
+                loadSection(startIndex)
+            } else {
+                _formSchema.value = response
+            }
+        }
+    }
+
+    fun resetFormSubmitted() {
+        _formSubmitted.value = false
+    }
+
+    fun loadSection(index: Int) {
+        val section = schemaData?.sections?.getOrNull(index) ?: return
+        _currentStep.value = index
+
+        evaluateAllConditions(section)
+
+        _activeQuestions.value = section.questions.toList()
+    }
+
+    fun evaluateConditions(q: CounsellingQuestionDto) {
+        val activeSection =
+            schemaData?.sections?.getOrNull(_currentStep.value ?: 0)
+                ?: return
+
+        val beforeStates = activeSection.questions.map {
+            Triple(it.questionId, it.visible, it.isMandatory) to it.errorMessage
+        }
+
+        evaluateAllConditions(activeSection)
+
+        // Re-evaluate validation state for visible questions to clear or update errors in real-time
+        activeSection.questions.filter { it.visible }.forEach { activeQ ->
+            val qError = validateQuestion(activeQ, activeSection)
+            if (activeQ.errorMessage != qError) {
+                if (activeQ.errorMessage != null || qError == null) {
+                    activeQ.errorMessage = qError
+                }
+            }
+        }
+
+        val afterStates = activeSection.questions.map {
+            Triple(it.questionId, it.visible, it.isMandatory) to it.errorMessage
+        }
+
+        if (beforeStates != afterStates) {
+            _activeQuestions.value = activeSection.questions.toList()
+        }
+    }
+
+    fun evaluateAllConditions(activeSection: CounsellingSectionDto) {
+        // Ensure originalIsMandatory is initialized
+        activeSection.questions.forEach { q ->
+            if (q.originalIsMandatory == null) {
+                q.originalIsMandatory = q.isMandatory
+            }
+        }
+
+        // Initialize states
+        disabledValidationSections.clear()
+        activeSection.questions.forEach { q ->
+            q.visible = q.visibleByDefault
+            q.isMandatory = q.originalIsMandatory ?: false
+        }
+
+        var changed = true
+        var passes = 0
+        while (changed && passes < 10) {
+            changed = false
+            passes++
+
+            for (q in activeSection.questions) {
+                if (!q.visible) continue
+
+                val selectedValues = when (val v = q.value) {
+                    is List<*> -> v.filterIsInstance<String>()
+                    is String -> listOf(v)
+                    else -> emptyList()
+                }
+
+                q.options?.forEach { opt ->
+                    val isSelected = selectedValues.contains(opt.optionValue)
+                    if (isSelected) {
+                        opt.conditions?.forEach { cond ->
+                            val targetId = cond.targetQuestionId ?: return@forEach
+                            val targetQ = activeSection.questions.find { it.questionId == targetId } ?: return@forEach
+
+                            when (val actionType = ActionType.from(cond.actionType)) {
+                                ActionType.SHOW,
+                                ActionType.SHOW_QUESTION -> {
+                                    if (!targetQ.visible) {
+                                        targetQ.visible = true
+                                        changed = true
+                                    }
+
+                                    if (actionType == ActionType.SHOW_QUESTION && !targetQ.isMandatory) {
+                                        targetQ.isMandatory = true
+                                        changed = true
+                                    }
+                                }
+
+                                ActionType.MANDATORY -> {
+                                    if (!targetQ.isMandatory) {
+                                        targetQ.isMandatory = true
+                                        changed = true
+                                    }
+                                }
+
+                                ActionType.DISABLE_SECTION_VALIDATION -> {
+                                    val targetCode = cond.targetSectionUuid ?: return@forEach
+                                    if (!disabledValidationSections.contains(targetCode)) {
+                                        disabledValidationSections.add(targetCode)
+                                        changed = true
+                                    }
+                                }
+
+                                else -> Unit
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Post-evaluation cleanup for hidden questions
+        activeSection.questions.forEach { q ->
+            if (!q.visible) {
+                q.value = null
+                q.errorMessage = null
+                q.isMandatory = q.originalIsMandatory ?: false
+            }
+        }
+    }
+
+    private fun getMandatoryError(q: CounsellingQuestionDto, section: CounsellingSectionDto): String? {
+        val isHindi = prefDao.getCurrentLanguage() == Languages.HINDI
+        if (q.isMandatory && q.visible) {
+            return if (isHindi) {
+                "यह जानकारी अनिवार्य है।"
+            } else {
+                "This field is required"
+            }
+        }
+        val mandatoryIf = q.validations?.firstOrNull { it.validationType == "MANDATORY_IF" } ?: return null
+        val parts = mandatoryIf.validationParam.split("=")
+        if (parts.size != 2) return null
+        val refQuestion = section.questions.find { it.questionUuid == parts[0] } ?: return null
+        return if (refQuestion.value?.toString() == parts[1]) mandatoryIf.errorMessage else null
+    }
+
+    private fun validateQuestion(q: CounsellingQuestionDto, section: CounsellingSectionDto): String? {
+        val isEmpty = q.value == null
+                || q.value.toString().isBlank()
+                || (q.value as? List<*>)?.isEmpty() == true
+
+        var qError: String? = null
+
+        if (isEmpty) {
+            qError = getMandatoryError(q, section)
+        } else {
+            q.validations?.forEach { valDto ->
+                if (qError == null) {
+                    when (valDto.validationType) {
+                        "MAX_LENGTH" -> {
+                            val maxLen = valDto.validationParam.toIntOrNull()
+                            if (maxLen != null && q.value.toString().length > maxLen) {
+                                qError = valDto.errorMessage
+                            }
+                        }
+                        "REGEX" -> {
+                            val regexStr = valDto.validationParam
+                            try {
+                                val regex = regexStr.toRegex()
+                                if (!regex.matches(q.value.toString())) {
+                                    qError = valDto.errorMessage
+                                }
+                            } catch (e: Exception) {
+                                // Ignore invalid regex pattern
+                            }
+                        }
+                        "MIN_DATE", "MAX_DATE" -> {
+                            val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
+                            try {
+                                val dateVal = sdf.parse(q.value.toString())
+                                if (dateVal != null) {
+                                    val param = valDto.validationParam
+                                    val targetDate: java.util.Date? = if (param.equals("TODAY", ignoreCase = true)) {
+                                        Calendar.getInstance().apply {
+                                            set(Calendar.HOUR_OF_DAY, 0)
+                                            set(Calendar.MINUTE, 0)
+                                            set(Calendar.SECOND, 0)
+                                            set(Calendar.MILLISECOND, 0)
+                                        }.time
+                                    } else {
+                                        SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).parse(param)
+                                    }
+                                    if (targetDate != null) {
+                                        if (valDto.validationType == "MIN_DATE") {
+                                            if (dateVal.before(targetDate)) {
+                                                qError = valDto.errorMessage
+                                            }
+                                        } else {
+                                            if (dateVal.after(targetDate)) {
+                                                qError = valDto.errorMessage
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                // ignore date parse issues
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return qError
+    }
+
+    // Shared by validateCurrentSection() (stepped PRE_SUBMIT/POST_SUBMIT flow) and
+    // submitGeneralInfoRefusal() (GENERAL_INFO gate) — validates every visible question in
+    // the given section, setting/clearing errorMessage on each. Caller re-publishes whichever
+    // LiveData backs that section's rendering.
+    private fun validateSection(section: CounsellingSectionDto): Boolean {
+        if (disabledValidationSections.contains(section.sectionUuid)) return true
+
+        var isValid = true
+        for (q in section.questions.filter { it.visible }) {
+            val qError = validateQuestion(q, section)
+            if (qError != null) {
+                q.errorMessage = qError
+                isValid = false
+            } else {
+                q.errorMessage = null
+            }
+        }
+        return isValid
+    }
+
+    fun validateCurrentSection(): Boolean {
+        val activeSection = schemaData?.sections?.getOrNull(_currentStep.value ?: 0) ?: return true
+        val isValid = validateSection(activeSection)
+        if (!isValid) {
+            _activeQuestions.value = activeSection.questions.toList()
+        }
+        return isValid
+    }
+
+    fun nextSection() {
+        if (!validateCurrentSection()) return
+        val current = _currentStep.value ?: 0
+        val section = schemaData?.sections?.getOrNull(current) ?: return
+        val formId = schemaData?.formId ?: 2
+        val versionNumber = schemaData?.versionNumber ?: 1
+
+        if (!isSectionEditable(section)) {
+            if (current < (schemaData?.sections?.size ?: 1) - 1) {
+                loadSection(current + 1)
+            } else {
+                _formSubmitted.value = true
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            if (current == 0 && lastEntryMode == CounsellingEntryMode.COUNSELLING && !generalInfoSubmittedThisSession) {
+                generalInfoSection?.let { giSection ->
+                    val submitted = counsellingRepo.saveGeneralInfoDraft(
+                        benId, generalInfoFormId, giSection, generalInfoFormVersionNumber
+                    )
+                    if (submitted) generalInfoSubmittedThisSession = true
+                }
+            }
+            val success = counsellingRepo.saveSectionAnswers(benId, formId, section, versionNumber)
+            if (success) {
+                val persistedSection = counsellingRepo.getDraftResponse(benId)
+                    ?.sectionResponses?.find { it.sectionResponse.sectionId == section.sectionId }
+                if (persistedSection?.sectionResponse?.completedAt != null) {
+                    section.isSubmitted = true
+                }
+                if (current < (schemaData?.sections?.size ?: 1) - 1) {
+                    loadSection(current + 1)
+                } else {
+                    _formSubmitted.value = true
+                }
+            } else {
+                _saveError.value = "Failed to save section answers. Please try again."
+            }
+        }
+    }
+
+    fun previousSection() {
+        val current = _currentStep.value ?: 0
+        if (current > 0) {
+            val section = schemaData?.sections?.getOrNull(current) ?: return
+
+            // In read-only mode skip the save and navigate directly.
+            if (!isSectionEditable(section)) {
+                loadSection(current - 1)
+                return
+            }
+            val formId = schemaData?.formId ?: 2
+            val versionNumber = schemaData?.versionNumber ?: 1
+            val previousSectionId = schemaData?.sections?.getOrNull(current - 1)?.sectionId
+            viewModelScope.launch {
+                val success = counsellingRepo.saveSectionAnswers(
+                    benId, formId, section, versionNumber,
+                    overrideTargetSectionId = previousSectionId,
+                    isBackNavigation = true
+                )
+                if (success) {
+                    loadSection(current - 1)
+                } else {
+                    _saveError.value = "Failed to save section answers. Please try again."
+                }
+            }
+        }
+    }
+}

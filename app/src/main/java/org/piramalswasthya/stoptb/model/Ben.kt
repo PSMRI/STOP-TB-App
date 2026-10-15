@@ -17,6 +17,7 @@ import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.model.BenBasicCache.Companion.getAgeFromDob
 import org.piramalswasthya.stoptb.model.BenBasicCache.Companion.getAgeUnitFromDob
 import org.piramalswasthya.stoptb.utils.HelperUtil.getDateStringFromLong
+import org.piramalswasthya.stoptb.utils.toGpsTimestampLong
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -81,6 +82,10 @@ enum class BenStatus {
             ", NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState" +
             ", 0 as isDelivered, 0 as pwHrp" +
             ", 0 as irFilled, 0 as crFilled, 0 as doFilled" +
+            ", b.isNonHH" +
+            ", b.placeOfCurrentLiving" +
+            ", b.otherPlaceOfCurrentLiving" +
+            ", b.institutionName" +
             " FROM BENEFICIARY b " +
             "LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId " +
             "LEFT OUTER JOIN CBAC cbac ON b.beneficiaryId = cbac.benId " +
@@ -92,7 +97,7 @@ enum class BenStatus {
 data class BenBasicCache(
     @ColumnInfo
     val benId: Long,
-    val hhId: Long,
+    val hhId: Long? = null,
     val regDate: Long,
     var isDeath: Boolean = false,
     var isDeathValue: String? = null,
@@ -171,7 +176,11 @@ data class BenBasicCache(
     var doYouHavechildren: Boolean = false,
     var noOfChildren: Int = 0,
     var noOfAliveChildren: Int = 0,
-    var isDeactivate: Boolean =false
+    var isDeactivate: Boolean =false,
+    val isNonHH: Boolean = false,
+    val placeOfCurrentLiving: Int? = null,
+    val otherPlaceOfCurrentLiving: String? = null,
+    val institutionName: String? = null
 ) : Parcelable {
     companion object {
         val dateFormat = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
@@ -251,7 +260,7 @@ data class BenBasicCache(
     fun asBasicDomainModel(): BenBasicDomain {
         return BenBasicDomain(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             isDeath = isDeath,
             isDeathValue = isDeathValue,
             dateOfDeath = dateOfDeath,
@@ -288,8 +297,11 @@ data class BenBasicCache(
             noOfAliveChildren = noOfAliveChildren,
             noOfChildren = noOfChildren,
             doYouHavechildren = doYouHavechildren,
-            isDeactivate = isDeactivate
-
+            isDeactivate = isDeactivate,
+            isNonHH = isNonHH,
+            placeOfCurrentLiving = placeOfCurrentLiving,
+            otherPlaceOfCurrentLiving = otherPlaceOfCurrentLiving,
+            institutionName = institutionName
 
 
         )
@@ -298,7 +310,7 @@ data class BenBasicCache(
     fun asBasicDomainModelCHO(): BenBasicDomain {
         return BenBasicDomain(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             regDate = dateFormat.format(Date(regDate)),
             benName = benName.orEmpty(),
             benSurname = benSurname ?: "",
@@ -321,7 +333,11 @@ data class BenBasicCache(
             noOfAliveChildren = noOfAliveChildren,
             noOfChildren = noOfChildren,
             doYouHavechildren = doYouHavechildren,
-            reproductiveStatusId = reproductiveStatusId
+            reproductiveStatusId = reproductiveStatusId,
+            isNonHH = isNonHH,
+            placeOfCurrentLiving = placeOfCurrentLiving,
+            otherPlaceOfCurrentLiving = otherPlaceOfCurrentLiving,
+            institutionName = institutionName
         )
     }
 
@@ -329,7 +345,7 @@ data class BenBasicCache(
     fun asBenBasicDomainModelForTbsnForm(): BenBasicDomainForForm {
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             regDate = dateFormat.format(Date(regDate)),
             benName = benName.orEmpty(),
             benSurname = benSurname ?: "Not Available",
@@ -351,7 +367,7 @@ data class BenBasicCache(
     fun asBenBasicDomainModelForTbspForm(): BenBasicDomainForForm {
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             regDate = dateFormat.format(Date(regDate)),
             benName = benName.orEmpty(),
             benSurname = benSurname ?: "Not Available",
@@ -373,7 +389,7 @@ data class BenBasicCache(
     fun asBenBasicDomainModelForCdrForm(): BenBasicDomainForForm {
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             isDeath = isDeath,
             isDeathValue = isDeathValue,
             dateOfDeath = dateOfDeath,
@@ -404,7 +420,7 @@ data class BenBasicCache(
     fun asBenBasicDomainModelForMdsrForm(): BenBasicDomainForForm {
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             isDeath = isDeath,
             isDeathValue = isDeathValue,
             dateOfDeath = dateOfDeath,
@@ -435,7 +451,7 @@ data class BenBasicCache(
     fun asBenBasicDomainModelForPmsmaForm(): BenBasicDomainForForm {
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             regDate = dateFormat.format(Date(regDate)),
             benName = benName.orEmpty(),
             benSurname = benSurname ?: "Not Available",
@@ -456,7 +472,7 @@ data class BenBasicCache(
     fun asBenBasicDomainModelECTForm(): BenBasicDomainForForm {
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             regDate = dateFormat.format(Date(regDate)),
             benName = benName.orEmpty(),
             benSurname = benSurname ?: "Not Available",
@@ -477,7 +493,7 @@ data class BenBasicCache(
     fun asBasicDomainModelForPmjayForm(): BenBasicDomainForForm {
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             regDate = dateFormat.format(Date(regDate)),
             benName = benName.orEmpty(),
             benSurname = benSurname ?: "Not Available",
@@ -498,7 +514,7 @@ data class BenBasicCache(
     fun asBenBasicDomainModelForHbncForm(): BenBasicDomainForForm {
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             regDate = dateFormat.format(Date(regDate)),
             benName = benName.orEmpty(),
             benSurname = benSurname ?: "Not Available",
@@ -522,7 +538,7 @@ data class BenBasicCache(
     fun asBenBasicDomainModelForHbycForm(): BenBasicDomainForForm {
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             regDate = dateFormat.format(Date(regDate)),
             benName = benName.orEmpty(),
             benSurname = benSurname ?: "Not Available",
@@ -546,7 +562,7 @@ data class BenBasicCache(
     fun asBenBasicDomainModelForPregnantWomanRegistrationForm(): BenBasicDomainForForm {
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             regDate = dateFormat.format(Date(regDate)),
             benName = benName.orEmpty(),
             benSurname = benSurname ?: "Not Available",
@@ -568,7 +584,7 @@ data class BenBasicCache(
 
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             regDate = dateFormat.format(Date(regDate)),
             benName = benName.orEmpty(),
             benSurname = benSurname ?: "",
@@ -594,7 +610,7 @@ data class BenBasicCache(
     fun asBenBasicDomainModelForHRPNonPregAssessmentForm(): BenBasicDomainForForm {
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             regDate = dateFormat.format(Date(regDate)),
             benName = benName.orEmpty(),
             benSurname = benSurname ?: "",
@@ -616,7 +632,7 @@ data class BenBasicCache(
     fun asBenBasicDomainModelForHRPNonPregTrackForm(): BenBasicDomainForForm {
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             regDate = dateFormat.format(Date(regDate)),
             benName = benName.orEmpty(),
             benSurname = benSurname ?: "",
@@ -641,7 +657,7 @@ data class BenBasicCache(
     fun asBenBasicDomainModelForHRPPregTrackForm(): BenBasicDomainForForm {
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             regDate = dateFormat.format(Date(regDate)),
             benName = benName.orEmpty(),
             benSurname = benSurname ?: "",
@@ -668,7 +684,7 @@ data class BenBasicCache(
     fun asBenBasicDomainModelForInfantRegistrationForm(): BenBasicDomainForForm {
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             regDate = dateFormat.format(Date(regDate)),
             benName = benName.orEmpty(),
             benSurname = benSurname ?: "Not Available",
@@ -689,7 +705,7 @@ data class BenBasicCache(
     fun asBenBasicDomainModelForChildRegistrationForm(): BenBasicDomainForForm {
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             regDate = dateFormat.format(Date(regDate)),
             benName = benName.orEmpty(),
             benSurname = benSurname ?: "Not Available",
@@ -710,7 +726,7 @@ data class BenBasicCache(
     fun asBenBasicDomainModelForDeliveryOutcomeForm(): BenBasicDomainForForm {
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             regDate = dateFormat.format(Date(regDate)),
             benName = benName.orEmpty(),
             benSurname = benSurname ?: "Not Available",
@@ -731,7 +747,7 @@ data class BenBasicCache(
     fun asBenBasicDomainModelForEligibleCoupleRegistrationForm(): BenBasicDomainForForm {
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             regDate = dateFormat.format(Date(regDate)),
             benName = benName.orEmpty(),
             benSurname = benSurname ?: "Not Available",
@@ -752,7 +768,7 @@ data class BenBasicCache(
     fun asBasicDomainModelForFpotForm(): BenBasicDomainForForm {
         return BenBasicDomainForForm(
             benId = benId,
-            hhId = hhId,
+            hhId = hhId ?: 0L,
             regDate = dateFormat.format(Date(regDate)),
             benName = benName.orEmpty(),
             benSurname = benSurname ?: "Not Available",
@@ -773,6 +789,8 @@ data class BenBasicCache(
 }
 
 fun getAgeDisplayString(dob: Long): String {
+    if (dob <= 0L) return "N/A"
+
     val calDob = Calendar.getInstance().apply { timeInMillis = dob }
     val calNow = Calendar.getInstance()
 
@@ -824,6 +842,28 @@ fun getAgeDisplayString(dob: Long): String {
     }
 }
 
+fun BenRegCache.getAgeGenderDisplayString(): String {
+    val ageText = if (dob > 0L) {
+        getAgeDisplayString(dob)
+    } else {
+        when (ageUnit) {
+            AgeUnit.YEARS -> "$age Years"
+            AgeUnit.MONTHS -> "$age Months"
+            AgeUnit.DAYS -> "$age Days"
+            else -> "N/A"
+        }
+    }
+
+    val genderText = gender?.name
+        ?.replace('_', ' ')
+        ?.lowercase()
+        ?.split(' ')
+        ?.joinToString(" ") { part -> part.replaceFirstChar { ch -> ch.titlecase() } }
+        ?: "N/A"
+
+    return "$ageText | $genderText"
+}
+
 
 
 @Parcelize
@@ -872,7 +912,11 @@ data class BenBasicDomain(
     var doYouHavechildren: Boolean = false,
     var noOfChildren: Int = 0,
     var noOfAliveChildren: Int = 0,
-    var isDeactivate: Boolean =false
+    var isDeactivate: Boolean =false,
+    val isNonHH: Boolean = false,
+    val placeOfCurrentLiving: Int? = null,
+    val otherPlaceOfCurrentLiving: String? = null,
+    val institutionName: String? = null
 
 ) : Parcelable{
     val dobString: String
@@ -882,11 +926,14 @@ data class BenBasicDomain(
     val nikshayIdDisplay: String
         get() = nikshayId?.takeIf { it.isNotBlank() } ?: "N/A"
 
+    val isPlaceholderMobileNo: Boolean
+        get() = mobileNo == "9999999999"
+
     val hasCallableMobileNo: Boolean
-        get() = mobileNo.isNotBlank() && mobileNo != "9999999999"
+        get() = mobileNo.isNotBlank() && !isPlaceholderMobileNo
 
     val mobileNoDisplay: String
-        get() = if (hasCallableMobileNo) mobileNo else "N/A"
+        get() = mobileNo.ifBlank { "N/A" }
 }
 
 
@@ -1159,7 +1206,7 @@ data class BenRegGen(
 data class BenRegCache(
 
     @ColumnInfo(index = true)
-    var householdId: Long,
+    var householdId: Long? = null,
 
     var beneficiaryId: Long,
 
@@ -1250,6 +1297,14 @@ data class BenRegCache(
     var latitude: Double = 0.0,
 
     var longitude: Double = 0.0,
+
+    // GPS location captured at registration time (standalone beneficiary only)
+    var gpsLatitude: Double? = null,
+    var gpsLongitude: Double? = null,
+    var digipin: String? = null,
+    var gpsTimestamp: String? = null,
+    @ColumnInfo(defaultValue = "0") var isGpsUnavailable: Boolean = false,
+    var gpsUnavailableReason: String? = null,
 
     ///////////////////////////Bank details Start///////////////////////////
     var hasAadhar: Boolean? = false,
@@ -1369,19 +1424,22 @@ data class BenRegCache(
     var typeOfCaseFindingId: Int? = null,
     var mobileNumberAvailable: Boolean? = null,
     var address: String? = null,
+    var pinCode: String? = null,
     var height: Double? = null,
     var weight: Double? = null,
     var bmi: Double? = null,
     var temperature: Double? = null,
     var nikshayId: String? = null,
-
-
+    var isNonHH: Boolean = false,
+    var placeOfCurrentLiving: Int? = null,
+    var otherPlaceOfCurrentLiving: String? = null,
+    var institutionName: String? = null
 
 )  : FormDataModel {
 
-    fun asNetworkPostModel(context: Context, user: User): BenPost {
+    fun asNetworkPostModel(context: Context, user: User, household: HouseholdCache? = null): BenPost {
         return BenPost(
-            householdId = householdId.toString(),
+            householdId = householdId?.toString(),
             benRegId = benRegId,
             countyid = locationRecord.country.id,
             processed = processed,
@@ -1557,13 +1615,18 @@ data class BenRegCache(
                 addressLine2 = "",
                 addressLine3 = "",
                 occupation = occupation ?: "unknown",
+                pinCode = pinCode,
                 economicStatus = economicStatus,
                 economicStatusId = economicStatusId,
                 residentialArea = residentialArea,
                 residentialAreaId = residentialAreaId,
                 otherResidentialArea = otherResidentialArea,
-                latitude = latitude,
-                longitude = longitude,
+                latitude = gpsLatitude ?: household?.gpsLatitude ?: latitude,
+                longitude = gpsLongitude ?: household?.gpsLongitude ?: longitude,
+                digipin = digipin ?: household?.digipin,
+                gpsTimestamp = (gpsTimestamp ?: household?.gpsTimestamp).toGpsTimestampLong(),
+                isGpsUnavailable = if (gpsLatitude != null || household?.gpsLatitude != null || gpsLongitude != null || household?.gpsLongitude != null) false else (isGpsUnavailable || (household?.isGpsUnavailable ?: false)),
+                gpsUnavailableReason = gpsUnavailableReason ?: household?.gpsUnavailableReason,
                 createdBy = user.userName,
             ),
             benPhoneMaps = arrayOf(
@@ -1593,7 +1656,10 @@ data class BenRegCache(
             doYouHavechildren = doYouHavechildren,
             isSpouseAdded = isSpouseAdded,
             isDeactivate = isDeactivate,
-
+            isNonHH = isNonHH,
+            placeOfCurrentLiving = getPlaceOfCurrentLivingCode(placeOfCurrentLiving),
+            otherPlaceOfCurrentLiving = otherPlaceOfCurrentLiving,
+            institutionName = institutionName
         )
     }
 
@@ -1689,6 +1755,52 @@ fun getDateTimeStringFromLong(dateLong: Long?): String? {
         return null
     }
 
+}
+
+fun getPlaceOfCurrentLivingCode(index: Int?): String? {
+    return when (index) {
+        1 -> "FOOTPATH"
+        2 -> "RAILWAY_PLATFORM"
+        3 -> "BUS_STATION"
+        4 -> "UNDER_TREE"
+        5 -> "TEMPLE"
+        6 -> "MOSQUE"
+        7 -> "CHURCH"
+        8 -> "OTHER_PRAYING_PLACE"
+        9 -> "EDUCATIONAL_INSTITUTION"
+        10 -> "EKALAVYA_SCHOOL"
+        11 -> "REHABILITATION_CENTRE"
+        12 -> "ORPHANAGE"
+        13 -> "OLD_AGE_HOME"
+        14 -> "PRIVATE_HOSTEL"
+        15 -> "GOVT_HOSTEL"
+        16 -> "NGO_HOSTEL"
+        17 -> "OTHER"
+        else -> null
+    }
+}
+
+fun getPlaceOfCurrentLivingIndex(code: String?): Int? {
+    return when (code?.uppercase()) {
+        "FOOTPATH" -> 1
+        "RAILWAY_PLATFORM" -> 2
+        "BUS_STATION" -> 3
+        "UNDER_TREE" -> 4
+        "TEMPLE" -> 5
+        "MOSQUE" -> 6
+        "CHURCH" -> 7
+        "OTHER_PRAYING_PLACE" -> 8
+        "EDUCATIONAL_INSTITUTION" -> 9
+        "EKALAVYA_SCHOOL" -> 10
+        "REHABILITATION_CENTRE" -> 11
+        "ORPHANAGE" -> 12
+        "OLD_AGE_HOME" -> 13
+        "PRIVATE_HOSTEL" -> 14
+        "GOVT_HOSTEL" -> 15
+        "NGO_HOSTEL" -> 16
+        "OTHER" -> 17
+        else -> null
+    }
 }
 /*
 

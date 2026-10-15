@@ -10,6 +10,7 @@
     <string name="rv_item_hh_ph_3">Surname : </string>
     <string name="hh_members_text">Members : %1d</string>
     <string name="btn_rv_item_hh_add_ben">Add Beneficiary</string>
+    <string name="btn_Add_beneficiary_nonHH">Add Beneficiary</string>
     <string name="str_duplicate_record">Deleted Record</string>
     <string name="add_mda">Add MDA</string>
 
@@ -25,7 +26,7 @@
     <string name="nhhr_house_no">House No</string>
     <string name="nhhr_ward_no">Ward No</string>
     <string name="nhhr_ward_name">Ward Name</string>
-    <string name="nhhr_mohalla_name">Mohalla Name</string>
+    <string name="nhhr_mohalla_name">Mohalla / Street</string>
     <string name="nhhr_poverty_line">Socioeconomic Status</string>
     <string-array name="nhhr_poverty_line_array">
         <item>APL</item>
@@ -146,5 +147,19 @@
     <string name="add_asha_head">ASHA Household Registration</string>
     <string name="hh_no_members">Household EMPTY!</string>
     <string name="add_head_of_family_message">Would you like to add <b>%1s</b> as a HoF Beneficiary ?</string>
+
+    <string name="nhhr_total_members_hh">Total number of members living in the HH</string>
+    <string name="nhhr_registered_camp_site">Registration done at camp site</string>
+
+    <string-array name="nhhr_yes_no_array">
+        <item>Yes</item>
+        <item>No</item>
+    </string-array>
+    <!-- NON HOUSEHOLD CURRENT LIVING INFO -->
+    <string name="title_current_living_info">Current Living Information</string>
+    <string name="sub_title_current_living_info">Please provide the beneficiary\'s current living place details.</string>
+    <string name="hint_place_of_current_living">Place of Current Living *</string>
+    <string name="hint_other_place">Other Place *</string>
+    <string name="hint_institution_name">Name of Institution *</string>
 
 </resources>

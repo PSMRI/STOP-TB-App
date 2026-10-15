@@ -52,6 +52,10 @@
             android:name="source"
             android:defaultValue="0"
             app:argType="integer" />
+        <argument
+            android:name="showContactTracingForms"
+            android:defaultValue="false"
+            app:argType="boolean" />
     </fragment>
 
     <fragment
@@ -62,6 +66,10 @@
             android:name="source"
             android:defaultValue="0"
             app:argType="integer" />
+        <argument
+            android:name="showContactTracingForms"
+            android:defaultValue="false"
+            app:argType="boolean" />
     </fragment>
 
     <fragment
@@ -80,6 +88,10 @@
             android:name="source"
             android:defaultValue="0"
             app:argType="integer" />
+        <argument
+            android:name="showContactTracingForms"
+            android:defaultValue="false"
+            app:argType="boolean" />
     </fragment>
 
     <fragment

@@ -50,12 +50,26 @@ data class TBDiagnosticsCache(
     // ── Outcome ─────────────────────────────────────────────────────────────
     var isTBConfirmed: Boolean? = null,
     var isConfirmed: Boolean = false,
+    // ── Device Orders / Integration ─────────────────────────────────────────
+    var xrayOrderId: String? = null,
+    var xrayOrderStatus: String? = null,
+    var trueNatOrderId: String? = null,
+    var trueNatOrderStatus: String? = null,
+    var trueNatRifResult: String? = null,
+    var rifOrderId: String? = null,
+    var rifOrderStatus: String? = null,
     // ── Meta ─────────────────────────────────────────────────────────────────
     var latitude: Double? = null,
     var longitude: Double? = null,
     var address: String? = null,
     var serverUpdatedDate: Long? = null,
-    var syncState: SyncState = SyncState.UNSYNCED
+    var syncState: SyncState = SyncState.UNSYNCED,
+
+    // ── Error Msg ─────────────────────────────────────────────────────────────────
+    var errorMsgXray: String? = null,
+    var errorMsgTrueNat : String? = null,
+    var errorMsgRif : String? = null
+
 ) : FormDataModel {
     fun toDTO(): TBDiagnosticsDTO = TBDiagnosticsDTO(
         id = id.toLong(),
@@ -82,6 +96,13 @@ data class TBDiagnosticsCache(
         liquidCultureResult = liquidCultureResult,
         isTBConfirmed = isTBConfirmed,
         isConfirmed = isConfirmed,
+        xrayOrderId = xrayOrderId,
+        xrayOrderStatus = xrayOrderStatus,
+        trueNatOrderId = trueNatOrderId,
+        trueNatOrderStatus = trueNatOrderStatus,
+        trueNatRifResult = trueNatRifResult,
+        rifOrderId = rifOrderId,
+        rifOrderStatus = rifOrderStatus,
         latitude = latitude,
         longitude = longitude,
         address = address

@@ -49,6 +49,22 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         return pref.getString(prefKey, null)
     }
 
+    fun getDiagPollStartTime(benId: Long, orderType: String): Long {
+        return pref.getLong("diag_poll_start_${benId}_${orderType}", 0L)
+    }
+
+    fun setDiagPollStartTime(benId: Long, orderType: String, time: Long) {
+        pref.edit().putLong("diag_poll_start_${benId}_${orderType}", time).apply()
+    }
+
+    fun getDiagPollActualStartTime(benId: Long, orderType: String): Long {
+        return pref.getLong("diag_poll_actual_start_${benId}_${orderType}", 0L)
+    }
+
+    fun setDiagPollActualStartTime(benId: Long, orderType: String, time: Long) {
+        pref.edit().putLong("diag_poll_actual_start_${benId}_${orderType}", time).apply()
+    }
+
     fun registerJWTAmritToken(token: String) {
         val editor = pref.edit()
         val prefKey = context.getString(R.string.PREF_primary_JWT_API_KEY)
@@ -223,6 +239,11 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         return pref.getString(key, null) ?: "http://192.168.137.1:8080/"
     }
 
+    fun getStoredCampHubUrl(): String? {
+        val key = context.getString(R.string.PREF_camp_hub_url)
+        return pref.getString(key, null)
+    }
+
     fun setCampHubConnected(connected: Boolean) {
         val key = context.getString(R.string.PREF_camp_hub_connected)
         pref.edit().putBoolean(key, connected).commit()
@@ -316,4 +337,43 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
             pref.edit().putLong("last quick refresh timestamp", value).apply()
         }
 
+    fun setXrayIntegrated(integrated: Boolean) {
+        pref.edit().putBoolean("xray_integrated", integrated).apply()
+    }
+
+    fun getXrayIntegrated(): Boolean {
+        return pref.getBoolean("xray_integrated", true)
+    }
+
+    fun setTruenatIntegrated(integrated: Boolean) {
+        pref.edit().putBoolean("truenat_integrated", integrated).apply()
+    }
+
+    fun getTruenatIntegrated(): Boolean {
+        return pref.getBoolean("truenat_integrated", true)
+    }
+
+    fun getTrackSubmitTime(benId: Long, orderType: String): Long {
+        return pref.getLong("track_submit_time_${benId}_${orderType}", 0L)
+    }
+
+    fun setTrackSubmitTime(benId: Long, orderType: String, time: Long) {
+        pref.edit().putLong("track_submit_time_${benId}_${orderType}", time).apply()
+    }
+
+    fun getLastCheckedTime(benId: Long, orderType: String): Long {
+        return pref.getLong("last_checked_time_${benId}_${orderType}", 0L)
+    }
+
+    fun setLastCheckedTime(benId: Long, orderType: String, time: Long) {
+        pref.edit().putLong("last_checked_time_${benId}_${orderType}", time).apply()
+    }
+
+    fun getRifNotConductedReason(benId: Long): String? {
+        return pref.getString("rif_not_conducted_reason_$benId", null)
+    }
+
+    fun setRifNotConductedReason(benId: Long, reason: String) {
+        pref.edit().putString("rif_not_conducted_reason_$benId", reason).apply()
+    }
 }

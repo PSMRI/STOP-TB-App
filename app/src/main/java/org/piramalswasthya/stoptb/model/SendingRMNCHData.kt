@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.model
 
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
+import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingSyncRequest
 
 @JsonClass(generateAdapter = true)
 data class SendingRMNCHData(
@@ -16,4 +17,7 @@ data class SendingRMNCHData(
 
     @Json(name = "bornBirthDeatils")
     var birthDetails: List<BenRegKidNetwork>? = null,
+
+    @Json(name = "counsellingDetails")
+    var counsellingDetails: List<CounsellingSyncRequest>? = null,
 )

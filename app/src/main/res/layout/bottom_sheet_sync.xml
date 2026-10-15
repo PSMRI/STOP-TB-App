@@ -99,32 +99,14 @@
 
 
     </LinearLayout>
-    <androidx.core.widget.NestedScrollView
-        android:id="@+id/nsv"
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rv_sync"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        app:layout_behavior="android.support.design.widget.BottomSheetBehavior"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:scrollbars="vertical"
-        >
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rv_sync"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                tools:itemCount="5"
-                tools:listitem="@layout/rv_item_sync_status" />
-        </LinearLayout>
-
-
-    </androidx.core.widget.NestedScrollView>
-
-
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+        tools:itemCount="5"
+        tools:listitem="@layout/rv_item_sync_status" />
 
 </LinearLayout>

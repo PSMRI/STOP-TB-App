@@ -106,4 +106,8 @@
     <string name="data_saved_successfully">डेटा सफलतापूर्वक सहेजा गया।</string>
     <string name="data_already_exist">डेटा पहले से मौजूद है।</string>
     <string name="search_ben">लाभार्थी खोजें</string>
+
+    <string name="error_message">त्रुटि संदेश : </string>
+    <string name="see_more">और देखें</string>
+    <string name="see_less">कम देखें</string>
 </resources>

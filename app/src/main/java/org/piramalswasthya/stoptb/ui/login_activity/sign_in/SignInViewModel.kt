@@ -125,7 +125,11 @@ class SignInViewModel @Inject constructor(
                 _campHubStatus.value = CampHubStatus.IDLE
                 return@launch
             }
-            pref.setCampModeEnabled(connected)
+            // Deliberately does NOT touch campModeEnabled. That flag is the user's configuration,
+            // owned by the Camp Mode checkbox and the connect screen; campHubConnected is the
+            // transient reachability signal. Clearing camp mode here on a failed ping would also
+            // disable VolunteerActivity's Wi-Fi reconnect poll, which is the only thing that can
+            // bring campHubConnected back up unattended.
             pref.setCampHubConnected(connected)
             _campHubStatus.value =
                 if (connected) CampHubStatus.CONNECTED else CampHubStatus.NOT_CONNECTED
@@ -229,17 +233,6 @@ class SignInViewModel @Inject constructor(
 
     fun updateState(state: NetworkResponse<User?>) {
         _state.value = state
-    }
-
-    /**
-     * Used ONLY for legacy JWT migration.
-     * No LiveData, no UI side effects.
-     */
-    suspend fun authenticateForMigration(
-        username: String,
-        password: String
-    ): NetworkResponse<User?> {
-        return userRepo.authenticateUser(username, password)
     }
 
 }

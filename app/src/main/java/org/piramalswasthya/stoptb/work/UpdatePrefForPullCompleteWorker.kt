@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.work
 import android.content.Context
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
@@ -12,6 +13,8 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import timber.log.Timber
+import java.util.concurrent.TimeUnit
 
 @HiltWorker
 class UpdatePrefForPullCompleteWorker @AssistedInject constructor(
@@ -31,6 +34,10 @@ class UpdatePrefForPullCompleteWorker @AssistedInject constructor(
         setForeground(getForegroundInfo())
 
         preferenceDao.isFullPullComplete = true
+        val triggerSource = inputData.getString(WorkerUtils.pullTriggerSourceKey) ?: "DIRECT"
+        val startedAt = inputData.getLong(WorkerUtils.pullStartedAtKey, SystemClock.elapsedRealtime())
+        val durationSeconds = TimeUnit.MILLISECONDS.toSeconds(SystemClock.elapsedRealtime() - startedAt)
+        Timber.i("Pull [$triggerSource] completed in $durationSeconds seconds")
         return Result.success()
     }
 

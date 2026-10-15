@@ -59,12 +59,42 @@ class TBSuspectedQuickFragment : Fragment() {
         binding.form.rvInputForm.adapter = adapter
         binding.btnCancel.visibility = View.GONE
         binding.fabEdit.visibility = View.GONE
-        binding.btnSubmit.visibility = View.VISIBLE
+        binding.btnSubmit.visibility = if (viewModel.viewOnly) View.GONE else View.VISIBLE
 
         lifecycleScope.launch {
             viewModel.formList.collect {
                 if (it.isNotEmpty()) {
                     adapter.submitList(it)
+                    
+                    if (viewModel.viewOnly && viewModel.referralType == 7) {
+                        val naatRes = viewModel.getNaatResult()
+                        val rifRes = viewModel.getTrueNatRifResult()
+                        if (naatRes != null && naatRes.equals("Invalid", ignoreCase = true)) {
+                            androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                                .setTitle("Invalid Test Result")
+                                .setMessage("The test results are invalid, repeat the test")
+                                .setPositiveButton("REPEAT TEST") { d, _ ->
+                                    viewModel.repeatTest("SPUTUM_TRUENAT")
+                                    Toast.makeText(requireContext(), "Repeat test order created. Please mark test complete on the listing page.", Toast.LENGTH_LONG).show()
+                                    d.dismiss()
+                                    findNavController().popBackStack()
+                                }
+                                .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
+                                .show()
+                        } else if (rifRes != null && rifRes.equals("Indeterminate", ignoreCase = true)) {
+                            androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                                .setTitle("Indeterminate Test Result")
+                                .setMessage("The test results are indeterminate, repeat the test")
+                                .setPositiveButton("REPEAT TEST") { d, _ ->
+                                    viewModel.repeatTest("MDR_RIF")
+                                    Toast.makeText(requireContext(), "Repeat test order created. Please mark test complete on the listing page.", Toast.LENGTH_LONG).show()
+                                    d.dismiss()
+                                    findNavController().popBackStack()
+                                }
+                                .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
+                                .show()
+                        }
+                    }
                 }
             }
         }
@@ -76,10 +106,21 @@ class TBSuspectedQuickFragment : Fragment() {
             binding.tvAgeGender.text = it
         }
         viewModel.showSubmit.observe(viewLifecycleOwner) {
-            binding.btnSubmit.visibility = if (it) View.VISIBLE else View.GONE
+            val isXrayDone = viewModel.viewOnly && viewModel.referralType == 6 && viewModel.getIsChestXRayDone() == true
+            val isNaatDone = viewModel.viewOnly && viewModel.referralType == 7 && viewModel.getIsNaatConducted() == true
+            if (!(isXrayDone || isNaatDone)) {
+                binding.btnSubmit.visibility = if (it) View.VISIBLE else View.GONE
+                if (!viewModel.viewOnly && (viewModel.referralType == 6 || viewModel.referralType == 7)) {
+                    binding.btnSubmit.text = "SUBMIT REFERRAL"
+                }
+            }
         }
-        binding.btnSubmit.setOnClickListener {
-            submitForm()
+        val isXrayDone = viewModel.viewOnly && viewModel.referralType == 6 && viewModel.getIsChestXRayDone() == true
+        val isNaatDone = viewModel.viewOnly && viewModel.referralType == 7 && viewModel.getIsNaatConducted() == true
+        if (!(isXrayDone || isNaatDone)) {
+            binding.btnSubmit.setOnClickListener {
+                submitForm()
+            }
         }
         viewModel.state.observe(viewLifecycleOwner) {
             when (it) {
@@ -89,35 +130,16 @@ class TBSuspectedQuickFragment : Fragment() {
                         getString(R.string.diagnostics_submitted),
                         Toast.LENGTH_SHORT
                     ).show()
-                    if (!viewModel.viewOnly) {
-                        WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
-                    }
-                    if (viewModel.viewOnly) {
-                        findNavController().navigateUp()
-                    } else {
-                        // Signal AllBenFragment to clear pendingExamineBenId so the
-                        // BottomSheet does NOT re-open after the flow is complete.
-                        try {
-                            findNavController()
-                                .getBackStackEntry(R.id.allBenFragment)
-                                .savedStateHandle["examine_flow_done"] = true
-                        } catch (_: Exception) { /* AllBenFragment not in stack — edge case */ }
-
-                        // Pop all examine-flow forms off the back stack and return to the
-                        // existing AllBenFragment instance (not a new one).
-                        val returnedToList = findNavController().popBackStack(R.id.allBenFragment, false)
-                        if (!returnedToList) {
-                            // AllBenFragment not found in back stack (rare edge case)
-                            findNavController().navigate(R.id.allBenFragment, null)
-                        }
-                    }
+                    WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
+                    findNavController().navigateUp()
                 }
 
                 TBSuspectedQuickViewModel.State.SAVE_FAILED -> {
+                    val msg = viewModel.errorMessage.value ?: getString(R.string.tb_suspected_quick_save_failed)
                     Toast.makeText(
                         requireContext(),
-                        getString(R.string.tb_suspected_quick_save_failed),
-                        Toast.LENGTH_SHORT
+                        msg,
+                        Toast.LENGTH_LONG
                     ).show()
                     viewModel.resetState()
                 }

@@ -27,6 +27,8 @@ class AgePickerDialog(context: Context) : AlertDialog(context) {
     private var monthsMax: Int = 0
     private var daysMin: Int = 0
     private var daysMax: Int = 0
+    private var selectionConfirmed: Boolean = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         _binding = AlertAgePickerBinding.inflate(layoutInflater, null, false)
         setContentView(binding.root)
@@ -59,6 +61,7 @@ class AgePickerDialog(context: Context) : AlertDialog(context) {
 
     fun show(ageUnitDTO: AgeUnitDTO, isOk: Boolean) {
         Handler(Looper.getMainLooper()).post {
+            selectionConfirmed = false
             super.show()
             val safeYearsMin = yearsMin.coerceAtLeast(0)
             val safeYearsMax = yearsMax.coerceAtLeast(safeYearsMin)
@@ -84,11 +87,33 @@ class AgePickerDialog(context: Context) : AlertDialog(context) {
             }
 
             binding.dialogNumberPickerDays.apply {
-                minValue = safeDaysMin
                 maxValue = safeDaysMax
-                value = ageUnitDTO.days.coerceIn(safeDaysMin, safeDaysMax)
+                minValue = resolveDaysMin(
+                    years = ageUnitDTO.years.coerceIn(safeYearsMin, safeYearsMax),
+                    months = ageUnitDTO.months.coerceIn(safeMonthsMin, safeMonthsMax),
+                    defaultDaysMin = safeDaysMin
+                )
+                value = ageUnitDTO.days.coerceIn(minValue, safeDaysMax)
                 forceLatinDigits(this)
             }
+
+            val syncDaysMin: () -> Unit = {
+                val resolvedDaysMin = resolveDaysMin(
+                    years = binding.dialogNumberPickerYears.value,
+                    months = binding.dialogNumberPickerMonths.value,
+                    defaultDaysMin = safeDaysMin
+                )
+                if (binding.dialogNumberPickerDays.minValue != resolvedDaysMin) {
+                    binding.dialogNumberPickerDays.minValue = resolvedDaysMin
+                    if (binding.dialogNumberPickerDays.value < resolvedDaysMin) {
+                        binding.dialogNumberPickerDays.value = resolvedDaysMin
+                    }
+                    forceLatinDigits(binding.dialogNumberPickerDays)
+                }
+            }
+
+            binding.dialogNumberPickerYears.setOnValueChangedListener { _, _, _ -> syncDaysMin() }
+            binding.dialogNumberPickerMonths.setOnValueChangedListener { _, _, _ -> syncDaysMin() }
 
             binding.btnOk.setOnClickListener {
                 val mInputTextYears: EditText = binding.dialogNumberPickerYears.findViewById(
@@ -105,6 +130,7 @@ class AgePickerDialog(context: Context) : AlertDialog(context) {
                     Resources.getSystem().getIdentifier("numberpicker_input", "id", "android")
                 )
                 ageUnitDTO.days = mInputTextDays.text.toString().toInt()
+                selectionConfirmed = true
                 dismiss()
             }
 
@@ -128,6 +154,20 @@ class AgePickerDialog(context: Context) : AlertDialog(context) {
             isFocusableInTouchMode = true
             isCursorVisible = true
         }
+    }
+
+    private fun resolveDaysMin(years: Int, months: Int, defaultDaysMin: Int): Int {
+        return if (years == 0 && months == 0) {
+            defaultDaysMin.coerceAtLeast(1)
+        } else {
+            defaultDaysMin.coerceAtLeast(0)
+        }
+    }
+
+    fun consumeSelectionConfirmed(): Boolean {
+        val wasConfirmed = selectionConfirmed
+        selectionConfirmed = false
+        return wasConfirmed
     }
 
 

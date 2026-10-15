@@ -18,16 +18,17 @@ import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.HouseHoldListAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertNewBenBinding
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchRvButtonBinding
-import org.piramalswasthya.stoptb.helpers.isNurseRole
-import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.HouseHoldBasicDomain
+import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import javax.inject.Inject
 
@@ -36,6 +37,9 @@ class AllHouseholdFragment : Fragment() {
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private var _binding: FragmentDisplaySearchRvButtonBinding? = null
     private val binding: FragmentDisplaySearchRvButtonBinding get() = _binding!!
@@ -91,11 +95,17 @@ class AllHouseholdFragment : Fragment() {
 
         binding.tvEmptyContent.text = getString(R.string.no_records_found_hh)
 
-        val isNurse = prefDao.getLoggedInUser()?.role.isNurseRole()
+        // val role = prefDao.getLoggedInUser()?.role
+        // val isNurse = prefDao.getLoggedInUser()?.role.isNurseRole()
+        // val isCounsellorOfficer = role.isCounsellingOfficerRole()
 
-        // Nurse role: hide New Household Registration button
+        val privilege = roleManager.privilegesUnion()
+        val canAddHousehold = privilege.householdPermission == Permission.FULL
+        val canAddBeneficiary = privilege.beneficiaryPermission == Permission.FULL
+        Timber.d("RoleManager: householdPermission=${privilege.householdPermission}, beneficiaryPermission=${privilege.beneficiaryPermission}")
+
         binding.btnNextPage.text = getString(R.string.btn_text_frag_home_nhhr)
-        binding.btnNextPage.visibility = if (isNurse) View.GONE else View.VISIBLE
+        binding.btnNextPage.visibility = if (canAddHousehold) View.VISIBLE else View.GONE
 
         val householdAdapter = HouseHoldListAdapter(
             diseaseType = "",
@@ -105,14 +115,12 @@ class AllHouseholdFragment : Fragment() {
             clickListener = HouseHoldListAdapter.HouseholdClickListener(
                 hhDetails = { household -> openHouseholdDetails(household) },
                 showMember = { household -> openHouseholdMembers(household) },
-                // Nurse role: Add Member click does nothing (button hidden via adapter)
-                newBen = { household -> if (!isNurse) addMemberToHousehold(household) },
+                newBen = { household -> addMemberToHousehold(household) },
                 addMDA = {},
                 softDeleteHh = {}
             )
         )
-        // Nurse: hide Add Member button on household cards
-        householdAdapter.setAddMemberVisible(!isNurse)
+        householdAdapter.setAddMemberVisible(canAddBeneficiary)
         binding.rvAny.adapter = householdAdapter
 
         viewLifecycleOwner.lifecycleScope.launch {

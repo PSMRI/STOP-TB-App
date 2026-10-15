@@ -54,11 +54,11 @@ class TBSuspectedListFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         binding.btnNextPage.visibility = View.GONE
         val benAdapter = TbSuspectedListAdapter(
-            TbSuspectedListAdapter.ClickListener { hhId, benId, viewOnly ->
+            TbSuspectedListAdapter.ClickListener { hhId, benId, _ ->
                 findNavController().navigate(
                     TBSuspectedListFragmentDirections.actionTBSuspectedListFragmentToTBSuspectedFragment(
                         benId = benId,
-                        viewOnly = viewOnly
+                        viewOnly = true
                     )
                 )
             }, pref = prefDao

@@ -48,13 +48,13 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 
      companion object {
         fun getLongFromDate(dateString: String?): Long {
-            if (dateString.isNullOrEmpty()) return 0L
-            val f = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
-            return try {
-                f.parse(dateString)?.time ?: 0L
-            } catch (e: java.text.ParseException) {
-                0L
-            }
+            return dateString
+                ?.takeIf { it.isNotBlank() }
+                ?.let {
+                    runCatching {
+                        SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).parse(it)?.time ?: 0L
+                    }.getOrDefault(0L)
+                } ?: 0L
         }
 
 
@@ -116,13 +116,19 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 
         fun getMinDateOfReg(): Long {
             return Calendar.getInstance().apply {
-                set(Calendar.YEAR, 2020)
-                set(Calendar.MONTH, 0)
+                set(Calendar.YEAR, 2026)
+                set(Calendar.MONTH, Calendar.JANUARY)
                 set(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
             }.timeInMillis
 
         }
     }
+
+
 
 
     private val listMutex = Mutex()
@@ -606,6 +612,8 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
         return -1
     }
 
+
+
     protected fun validateAllCapsOrSpaceOnEditTextWithHindiEnabled(formElement: FormElement): Int {
         val value = formElement.value.orEmpty().trim()
 
@@ -913,6 +921,26 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
                 || it == 9999999999L
             ) resources.getString(R.string.form_input_error_invalid_mobile) else null
         }
+        return -1
+    }
+
+    protected fun validatePincodeOnEditText(formElement: FormElement): Int {
+        val value = formElement.value?.trim()
+
+        formElement.errorText = when {
+            value.isNullOrEmpty() -> if (formElement.required) {
+                resources.getString(R.string.form_input_empty_error)
+            } else {
+                null
+            }
+            value.any { !it.isDigit() } -> resources.getString(R.string.form_input_digit_only_error)
+            value.length != formElement.etMaxLength -> resources.getString(
+                R.string.form_input_missing_entry_error,
+                formElement.etMaxLength
+            )
+            else -> null
+        }
+
         return -1
     }
 

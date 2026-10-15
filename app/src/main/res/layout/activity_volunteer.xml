@@ -64,7 +64,7 @@
                 android:id="@+id/tv_camp_hub_offline"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@android:color/holo_orange_dark"
+                android:background="@android:color/holo_red_dark"
                 android:gravity="center"
                 android:paddingStart="12dp"
                 android:paddingTop="6dp"
@@ -76,19 +76,51 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground"
+                android:visibility="visible"
+                tools:visibility="visible" />
+
+            <ProgressBar
+                android:id="@+id/pb_quick_refresh_top"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="3dp"
+                android:max="100"
+                android:progress="0"
+                android:progressTint="@color/md_theme_light_primary"
+                android:progressBackgroundTint="@color/md_theme_light_primaryContainer"
                 android:visibility="gone"
+                tools:progress="35"
                 tools:visibility="visible" />
 
         </com.google.android.material.appbar.AppBarLayout>
 
-        <androidx.fragment.app.FragmentContainerView
-            android:id="@+id/nav_host_fragment_volunteer"
-            android:name="androidx.navigation.fragment.NavHostFragment"
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            app:layout_behavior="@string/appbar_scrolling_view_behavior"
-            app:defaultNavHost="true"
-            app:navGraph="@navigation/nav_volunteer" />
+            app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+            <androidx.fragment.app.FragmentContainerView
+                android:id="@+id/nav_host_fragment_volunteer"
+                android:name="androidx.navigation.fragment.NavHostFragment"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                app:defaultNavHost="true"
+                app:navGraph="@navigation/nav_volunteer"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toTopOf="@id/bottom_nav_role" />
+
+            <com.google.android.material.bottomnavigation.BottomNavigationView
+                android:id="@+id/bottom_nav_role"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:menu="@menu/bottom_nav_role"
+                app:layout_constraintBottom_toBottomOf="parent"
+                android:background="@color/sakhi_toolbar_surface"
+                app:itemTextColor="@android:color/white"
+                app:itemIconTint="@color/bottom_nav_icon_tint" />
+
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 

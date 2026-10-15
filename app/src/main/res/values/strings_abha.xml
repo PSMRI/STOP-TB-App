@@ -31,6 +31,7 @@
     <string name="abha_number">ABHA Number :</string>
     <string name="abha_id">ABHA ID</string>
     <string name="linked_toO_beneficiary">Linked to Beneficiary</string>
+    <string name="view_members"> View Members</string>
     <string name="linked_to_beneficiary">This ABHA is successfully linked to the record of</string>
     <string name="not_linked_to_beneficiary">This ABHA No is already linked to some one, please try again using correct Aadhaar No</string>
     <string name="do_you_want_to_download_the_abha_card">Do you want to download the ABHA card?</string>
@@ -107,7 +108,8 @@
 
     <string name="str_aadhaar_consent_5">I consent to the anonymization and subsequent use of my government health records for public health purposes.</string>
     <string name="str_aadhaar_consent_6">I, @ashaName, confirm that I have duly informed and explained the beneficiary of the
- contents of consent for aforementioned purposes.</string>
+ contents of consent for aforementioned purposes.
+    </string>
     <string name="str_aadhaar_consent_7">I, @beneficiaryName, have been explained about the consent as stated above and hereby provide my consent for the aforementioned purposes.</string>
     <string name="str_seconds">" seconds"</string>
     <string name="str_aadhaar_otp_number">"OTP sent to Aadhaar registered mobile number ending with @mobileNumber"</string>

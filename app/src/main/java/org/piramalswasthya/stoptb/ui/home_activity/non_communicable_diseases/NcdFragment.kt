@@ -15,6 +15,7 @@ import org.piramalswasthya.stoptb.configuration.IconDataset
 import org.piramalswasthya.stoptb.databinding.RvIconGridBinding
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.utils.navigateSafe
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -51,7 +52,7 @@ class NcdFragment : Fragment() {
         binding.rvIconGrid.layoutManager = rvLayoutManager
         val iconAdapter = IconGridAdapter(
             IconGridAdapter.GridIconClickListener {
-                findNavController().navigate(it)
+                findNavController().navigateSafe(it)
             },
             viewModel.scope
         )

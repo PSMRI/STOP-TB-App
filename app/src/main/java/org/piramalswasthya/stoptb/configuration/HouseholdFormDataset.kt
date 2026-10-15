@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.configuration
 
 import android.content.Context
 import android.text.InputType
+import com.google.gson.Gson
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.model.FormElement
@@ -15,6 +16,7 @@ import org.piramalswasthya.stoptb.model.InputType.EDIT_TEXT
 import org.piramalswasthya.stoptb.model.InputType.HEADLINE
 import org.piramalswasthya.stoptb.model.InputType.RADIO
 import org.piramalswasthya.stoptb.model.InputType.TEXT_VIEW
+import org.piramalswasthya.stoptb.model.LocationEntity
 import timber.log.Timber
 import java.text.DateFormat
 import java.text.SimpleDateFormat
@@ -43,6 +45,9 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         }
     }
 
+
+    private var villageEntities: List<LocationEntity> = emptyList()
+
     //////////////////////////////// First Page /////////////////////////////////////////
 
     private val familyHeading = FormElement(
@@ -52,6 +57,27 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         required = false,
         headingLine = false
 
+    )
+
+    private val totalMembersInHousehold = FormElement(
+        id = 21,
+        inputType = EDIT_TEXT,
+        title = resources.getString(R.string.nhhr_total_members_hh),
+        arrayId = -1,
+        required = true,
+        etInputType = InputType.TYPE_CLASS_NUMBER, // whole numbers only, no decimal flag
+        etMaxLength = 2,
+        max = 99,
+        min = 1
+    )
+
+    private val registeredAtCampSite = FormElement(
+        id = 22,
+        inputType = RADIO,
+        title = resources.getString(R.string.nhhr_registered_camp_site),
+        arrayId = R.array.nhhr_yes_no_array,
+        entries = resources.getStringArray(R.array.nhhr_yes_no_array),
+        required = true
     )
 
     private val firstNameHeadOfFamily = FormElement(
@@ -70,11 +96,20 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         inputType = EDIT_TEXT,
         title = resources.getString(R.string.nhhr_last_name_hof),
         arrayId = -1,
-        required = false,
+        required = true,
         allCaps = true,
         hasSpeechToText = true,
         etInputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
     )
+    private val mobileNotAvailable = FormElement(
+        id = 1002,
+        inputType = org.piramalswasthya.stoptb.model.InputType.CHECKBOXES,
+        title = resources.getString(R.string.mobile_number_not_available),
+        arrayId = R.array.mobile_not_available_array,
+        entries = resources.getStringArray(R.array.mobile_not_available_array),
+        required = false, hasDependants = true
+    )
+
     private val mobileNoHeadOfFamily = FormElement(
         id = 2,
         inputType = EDIT_TEXT,
@@ -87,6 +122,17 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         max = 9999999999,
         min = 6000000000
     )
+
+    private fun isMobileNotAvailableChecked(): Boolean {
+        val normalizedIndexes = getCheckboxIndexesFromValues(
+            mobileNotAvailable.arrayId,
+            mobileNotAvailable.value
+        )
+        return normalizedIndexes
+            ?.split("|")
+            ?.mapNotNull { it.trim().toIntOrNull() }
+            ?.contains(0) == true
+    }
     private val houseNo = FormElement(
         id = 3,
         inputType = EDIT_TEXT,
@@ -128,27 +174,83 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         required = true
     )
 
-    suspend fun setupPage(hh: HouseholdCache?) {
+
+    private val address = FormElement(
+        id = 24, inputType = EDIT_TEXT,
+        title = resources.getString(R.string.ben_reg_address),
+        arrayId = -1, required = true, etMaxLength = 2000
+    )
+//    private val pinCode = FormElement(
+//        id = 22, inputType = EDIT_TEXT,
+//        title = resources.getString(R.string.str_pincode),
+//        arrayId = -1, required = true,
+//        etInputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL,
+//        etMaxLength = 6, min = 100000, max = 999999
+//    )
+    private val villageHamlet = FormElement(
+        id = 23, inputType = DROPDOWN,
+        title = resources.getString(R.string.nbr_village),
+        arrayId = -1, required = true
+    )
+
+    private fun setDefaultPovertyLineIfNeeded() {
+        if (povertyLine.value.isNullOrBlank()) {
+            povertyLine.value = povertyLine.entries?.lastOrNull()
+        }
+    }
+
+    private fun setDefaultRegisteredAtCampSiteIfNeeded() {
+        if (registeredAtCampSite.value.isNullOrBlank()) {
+            // entries = ["Yes", "No"] — default to "No"
+            registeredAtCampSite.value = registeredAtCampSite.entries?.getOrNull(1)
+        }
+    }
+
+    suspend fun setupPage(hh: HouseholdCache?,
+                              villageNames: Array<String>? = null,
+                              villageEntityList: List<LocationEntity> = emptyList()
+    ) {
 
         val list = mutableListOf<FormElement>()
         val firstPage by lazy {
             listOf(
                 familyHeading,
+                totalMembersInHousehold,
+                registeredAtCampSite,
                 firstNameHeadOfFamily,
                 lastNameHeadOfFamily,
+                mobileNotAvailable,
                 mobileNoHeadOfFamily,
                 houseNo,
                 wardNo,
                 wardName,
                 mohallaName,
-                povertyLine
+                povertyLine,
+                address,
+            //    pinCode,
+                villageHamlet,
+                residentialArea
             )
         }
         list.addAll(firstPage)
+
+
+        this.villageEntities = villageEntityList
+        villageNames?.let { villageHamlet.entries = it }
+        villageHamlet.value = hh?.locationRecord?.village?.name ?: villageNames?.firstOrNull() ?: ""
+        if (address.value.isNullOrBlank()) {
+            address.value = villageHamlet.value
+        }
+
         hh?.family?.let { saved ->
+            totalMembersInHousehold.value = saved.totalHhMembers?.toString()
+            registeredAtCampSite.value = registeredAtCampSite.getStringFromPosition(saved.isRegisteredAtCampSiteId)
             firstNameHeadOfFamily.value = saved.familyHeadName
             lastNameHeadOfFamily.value = saved.familyName
-            mobileNoHeadOfFamily.value = saved.familyHeadPhoneNo.toString()
+            val isPlaceholderPhone = saved.familyHeadPhoneNo == 9999999999L
+            mobileNoHeadOfFamily.value = saved.familyHeadPhoneNo?.toString()?.takeIf { !isPlaceholderPhone }
+            mobileNotAvailable.value = if (isPlaceholderPhone) "0" else null
+            mobileNotAvailable.isEnabled = false
             saved.familyHeadName?.takeIf { it.isNotEmpty() }?.let { firstNameHeadOfFamily.inputType = TEXT_VIEW }
             saved.familyName?.takeIf { it.isNotEmpty() }?.let { lastNameHeadOfFamily.inputType = TEXT_VIEW }
             saved.familyHeadPhoneNo.takeIf { it != null }?.let { mobileNoHeadOfFamily.inputType = TEXT_VIEW }
@@ -157,12 +259,16 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             wardName.value = saved.wardName
             mohallaName.value = saved.mohallaName
             povertyLine.value = povertyLine.getStringFromPosition(saved.povertyLineId)
+            address.value = saved.address?.takeIf { it.isNotBlank() } ?: villageHamlet.value
+           // pinCode.value = saved.pinCode
         }
+        setDefaultPovertyLineIfNeeded()
+        setDefaultRegisteredAtCampSiteIfNeeded()
 
 
         val secondPage =
             listOf(
-                houseHoldDetails, residentialArea, typeOfHouse, houseOwnership
+                houseHoldDetails, typeOfHouse, houseOwnership
             )
         list.addAll(secondPage)
         hh?.details?.let { saved ->
@@ -216,6 +322,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             listOf(
                 firstNameHeadOfFamily,
                 lastNameHeadOfFamily,
+                mobileNotAvailable,
                 mobileNoHeadOfFamily,
                 houseNo,
                 wardNo,
@@ -228,13 +335,16 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         family?.let { saved ->
             firstNameHeadOfFamily.value = saved.familyHeadName
             lastNameHeadOfFamily.value = saved.familyName
-            mobileNoHeadOfFamily.value = saved.familyHeadPhoneNo.toString()
+            val isPlaceholderPhone = saved.familyHeadPhoneNo == 9999999999L
+            mobileNoHeadOfFamily.value = saved.familyHeadPhoneNo?.toString()?.takeIf { !isPlaceholderPhone }
+            mobileNotAvailable.value = if (isPlaceholderPhone) "0" else null
             houseNo.value = saved.houseNo
             wardNo.value = saved.wardNo
             wardName.value = saved.wardName
             mohallaName.value = saved.mohallaName
             povertyLine.value = povertyLine.getStringFromPosition(saved.povertyLineId)
         }
+        setDefaultPovertyLineIfNeeded()
     }
 
 //////////////////////////////// Second Page /////////////////////////////////////////
@@ -250,8 +360,8 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         id = 8,
         inputType = DROPDOWN,
         title = resources.getString(R.string.nhhr_type_residential_area),
-        arrayId = R.array.nhhr_type_residential_area_array,
-        entries = resources.getStringArray(R.array.nhhr_type_residential_area_array),
+        arrayId = R.array.nbr_residential_area_array,
+        entries = resources.getStringArray(R.array.nbr_residential_area_array),
         required = false,
         hasDependants = true
     )
@@ -280,7 +390,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_house_own),
         arrayId = R.array.nhhr_house_own_array,
         entries = resources.getStringArray(R.array.nhhr_house_own_array),
-        required = true
+        required = false
     )
 
 
@@ -319,7 +429,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_separate_kitchen),
         arrayId = R.array.nhhr_separate_kitchen_array,
         entries = resources.getStringArray(R.array.nhhr_separate_kitchen_array),
-        required = true
+        required = false
     )
 
     private val fuelForCooking = FormElement(
@@ -438,6 +548,10 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
 
     override suspend fun handleListOnValueChanged(formId: Int, index: Int): Int {
         return when (formId) {
+            totalMembersInHousehold.id -> {
+                validateEmptyOnEditText(totalMembersInHousehold)
+                validateIntMinMax(totalMembersInHousehold)
+            }
             firstNameHeadOfFamily.id -> {
                 validateEmptyOnEditText(firstNameHeadOfFamily)
                  //  validateAllCapsOrSpaceOnEditText(firstNameHeadOfFamily)
@@ -451,11 +565,33 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
                 validateEmptyOnEditText(lastNameHeadOfFamily)
             // validateAllCapsOrSpaceOnEditText(lastNameHeadOfFamily)
                 validateAllCapsOrSpaceOnEditTextWithHindiEnabled(lastNameHeadOfFamily)
-            
+
             }
             mobileNoHeadOfFamily.id -> {
+                if (isMobileNotAvailableChecked()) {
+                    mobileNoHeadOfFamily.errorText = null
+                    return -1
+                }
                 validateEmptyOnEditText(mobileNoHeadOfFamily)
                 validateMobileNumberOnEditText(mobileNoHeadOfFamily)
+            }
+
+            mobileNotAvailable.id -> {
+                val isChecked = index >= 0
+                if (isChecked) {
+                    mobileNotAvailable.value = "0"
+                    mobileNoHeadOfFamily.required = false
+                    mobileNoHeadOfFamily.value = null
+                    mobileNoHeadOfFamily.errorText = null
+                    mobileNoHeadOfFamily.isEnabled = false
+                } else {
+                    mobileNotAvailable.value = null
+                    mobileNoHeadOfFamily.required = true
+                    mobileNoHeadOfFamily.isEnabled = true
+                    mobileNoHeadOfFamily.value = null
+                    mobileNoHeadOfFamily.errorText = null
+                }
+                return 1
             }
 
             residentialArea.id -> triggerDependants(
@@ -518,6 +654,17 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
                 // validateAllAlphabetsSpaceOnEditText(otherAvailOfToilet)
             }
 
+            address.id -> validateEmptyOnEditText(address)
+           // pinCode.id -> validatePincodeOnEditText(pinCode)
+            villageHamlet.id -> {
+                Timber.d("Selected village = ${villageHamlet.value}")
+
+                address.value = villageHamlet.value
+                validateEmptyOnEditText(address)
+
+                return getIndexOfElement(address)
+            }
+
             else -> -1
         }
     }
@@ -541,10 +688,14 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
 
     private fun mapValuesForPage1(cacheModel: FormDataModel) {
         val family = HouseholdFamily()
+
         family.let { family ->
             family.familyHeadName = firstNameHeadOfFamily.value
+            family.totalHhMembers = totalMembersInHousehold.value?.toIntOrNull()
+            family.isRegisteredAtCampSiteId = registeredAtCampSite.getPosition()
+            family.isRegisteredAtCampSite = registeredAtCampSite.getEnglishStringFromPosition(family.isRegisteredAtCampSiteId)
             family.familyName = lastNameHeadOfFamily.value
-            family.familyHeadPhoneNo = mobileNoHeadOfFamily.value?.toLong()
+            family.familyHeadPhoneNo =  mobileNoHeadOfFamily.value?.toLongOrNull() ?: 9999999999L
             family.houseNo = houseNo.value
             family.wardNo = wardNo.value
             family.wardName = wardName.value
@@ -552,8 +703,21 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             family.povertyLineId = povertyLine.getPosition()
             family.povertyLine =
                 povertyLine.getEnglishStringFromPosition(family.povertyLineId)
+            family.address = address.value              // ADD
+           // family.pinCode = pinCode.value               // ADD
         }
         (cacheModel as HouseholdCache).family = family
+
+        Timber.d("===== PAGE 1 MAPPED =====")
+        Timber.d("family = ${Gson().toJson(family)}")
+
+        // ADD — resolve village name back to its entity, update locationRecord
+        villageHamlet.value?.let { selectedName ->
+            val selectedVillage = villageEntities.find { it.name == selectedName }
+            selectedVillage?.let {
+                cacheModel.locationRecord = cacheModel.locationRecord.copy(village = it)
+            }
+        }
     }
 
     private fun mapValuesForPage2(cacheModel: FormDataModel) {
@@ -608,5 +772,11 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         household.householdId = getHHidFromUserId(userId)
     }
 
-
+    fun enableEditMode() {
+        if (firstNameHeadOfFamily.inputType == TEXT_VIEW) firstNameHeadOfFamily.inputType = EDIT_TEXT
+        if (lastNameHeadOfFamily.inputType == TEXT_VIEW) lastNameHeadOfFamily.inputType = EDIT_TEXT
+        if (mobileNoHeadOfFamily.inputType == TEXT_VIEW) mobileNoHeadOfFamily.inputType = EDIT_TEXT
+        mobileNotAvailable.isEnabled = true
+        mobileNoHeadOfFamily.isEnabled = !isMobileNotAvailableChecked()
+    }
 }

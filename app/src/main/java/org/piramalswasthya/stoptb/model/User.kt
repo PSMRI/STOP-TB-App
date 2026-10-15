@@ -268,7 +268,8 @@ data class User(
     val tus: List<LocationEntity>? = emptyList(),
     val healthFacilities: List<LocationEntity>? = emptyList(),
     val villages: List<LocationEntity>,
-    val subCentre: String? = null
+    val subCentre: String? = null,
+    val assignedRoleScreenNames: List<String> = emptyList()
 )
 
 

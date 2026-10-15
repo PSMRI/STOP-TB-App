@@ -20,6 +20,7 @@ import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.text.HtmlCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.MenuProvider
@@ -42,7 +43,10 @@ import org.piramalswasthya.stoptb.helpers.AutoFlowBackNavigationHost
 import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.helpers.TapjackingProtectionHelper
+import org.piramalswasthya.stoptb.model.AppRole
+import timber.log.Timber
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.sync.SyncBottomSheetFragment
 import org.piramalswasthya.stoptb.ui.login_activity.LoginActivity
@@ -52,6 +56,9 @@ import org.piramalswasthya.stoptb.work.WorkerUtils
 import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
@@ -76,6 +83,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     // ── WiFi / NetworkCallback ────────────────────────────────────────────────
 
     private var isNetworkCallbackRegistered = false
+    private var campHubReconnectJob: Job? = null
 
     private val connectivityManager: ConnectivityManager by lazy {
         getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -90,6 +98,8 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
      */
     private val wifiNetworkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onLost(network: Network) {
+            campHubReconnectJob?.cancel()
+            campHubReconnectJob = null
             // WiFi dropped — if camp mode was active, mark disconnected at once
             if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
                 pref.setCampHubConnected(false)
@@ -98,15 +108,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         }
 
         override fun onAvailable(network: Network) {
-            // WiFi came back — only try to reconnect if we're not already connected
-            if (!pref.isCampModeEnabled() || pref.isCampHubConnected()) return
-            lifecycleScope.launch(Dispatchers.IO) {
-                val reached = pingCampHub()
-                if (pref.isCampModeEnabled()) {           // double-check after IO
-                    pref.setCampHubConnected(reached)
-                    runOnUiThread { refreshCampHubOfflineBanner() }
-                }
-            }
+            startCampHubReconnect()
         }
     }
 
@@ -119,6 +121,9 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     @Inject
     lateinit var pref: PreferenceDao
 
+    @Inject
+    lateinit var roleManager: RoleManager
+
     private var _binding: ActivityVolunteerBinding? = null
     private val binding: ActivityVolunteerBinding
         get() = _binding!!
@@ -130,6 +135,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     }
 
     var lastClickTime: Long = 0L
+    private var campAutoPullJob: Job? = null
     private val onClickTitleBar = android.view.View.OnClickListener {
         finishAndStartServiceLocationActivity()
     }
@@ -212,12 +218,16 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     override fun onCreate(savedInstanceState: Bundle?) {
         TapjackingProtectionHelper.applyWindowSecurity(this)
         super.onCreate(savedInstanceState)
+        // Resolve assigned/active role for this cold start. Always resets to the first
+        // assigned role — no persistence across app restarts, by design.
+        roleManager.initializeFromLoggedInUser()
         _binding = ActivityVolunteerBinding.inflate(layoutInflater)
         setContentView(binding.root)
         TapjackingProtectionHelper.enableTouchFiltering(this)
         setUpActionBar()
         setUpNavHeader()
         setUpMenu()
+        setUpRoleBottomNav()
         askForPermissions()
         binding.tvCampHubOffline.setOnClickListener {
             openCampHubConnect()
@@ -249,6 +259,59 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             WorkerUtils.triggerAmritPullWorker(this)
         }
         WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
+    }
+
+    /**
+     * Wires the role-switcher bottom nav: one tab per role actually assigned to this user
+     * (Registrar/Nurse/Counseling only — VOLUNTEER intentionally has no tab, see below),
+     * tapping a tab updates [RoleManager.activeRole], which every migrated screen already
+     * reads via [RoleManager.privilegesForActiveRole].
+     *
+     * Only shown on the Home screen (volunteerHomeFragment) — role switching only affects
+     * Home-screen content, and most other screens read [RoleManager.privilegesForActiveRole]
+     * once at build time rather than reactively, so leaving the bar visible elsewhere would
+     * let a role switch silently go stale on whatever screen the user is looking at.
+     */
+    private fun setUpRoleBottomNav() {
+        val roleToItemId = mapOf(
+            AppRole.REGISTRAR to R.id.roleTabRegistrar,
+            AppRole.NURSE to R.id.roleTabNurse,
+            AppRole.COUNSELING to R.id.roleTabCounseling
+        )
+        val itemIdToRole = roleToItemId.entries.associate { (role, id) -> id to role }
+        val visibleRoles = roleManager.assignedRoles.filter { it in roleToItemId }
+        Timber.d("RoleManager: bottomNav visibleTabs=$visibleRoles, activeRole=${roleManager.activeRole.value}")
+
+        binding.bottomNavRole.menu.let { menu ->
+            roleToItemId.forEach { (role, id) ->
+                menu.findItem(id)?.isVisible = role in visibleRoles
+            }
+        }
+        if (visibleRoles.isEmpty()) {
+            binding.bottomNavRole.visibility = View.GONE
+            return
+        }
+
+        val initialRole = if (roleManager.activeRole.value in visibleRoles) {
+            roleManager.activeRole.value
+        } else {
+            visibleRoles.firstOrNull() ?: AppRole.VOLUNTEER
+        }
+        roleToItemId[initialRole]?.let { itemId ->
+            binding.bottomNavRole.selectedItemId = itemId
+        }
+
+        binding.bottomNavRole.setOnItemSelectedListener { item ->
+            itemIdToRole[item.itemId]?.let { roleManager.setActiveRole(it) }
+            true
+        }
+
+        // Visible on Home only; addOnDestinationChangedListener fires immediately with the
+        // current destination, so this also sets the correct initial state.
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            binding.bottomNavRole.visibility =
+                if (destination.id == R.id.volunteerHomeFragment) View.VISIBLE else View.GONE
+        }
     }
 
     private fun askForPermissions() {
@@ -357,6 +420,12 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             true
         }
 
+        binding.navView.menu.findItem(R.id.syncDashboardFragment)?.setOnMenuItemClickListener {
+            navController.navigate(R.id.syncDashboardFragment)
+            binding.drawerLayout.close()
+            true
+        }
+
         // ── Create ABHA ID ───────────────────────────────────────────────
         refreshCampHubDrawerItem()
 
@@ -451,6 +520,10 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     override fun onPause() {
         super.onPause()
         pref.removeOnPreferenceChangeListener(campHubPrefListener)
+        campHubReconnectJob?.cancel()
+        campHubReconnectJob = null
+        campAutoPullJob?.cancel()
+        campAutoPullJob = null
         if (isNetworkCallbackRegistered) {
             try {
                 connectivityManager.unregisterNetworkCallback(wifiNetworkCallback)
@@ -483,20 +556,81 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             isNetworkCallbackRegistered = true
         }
 
+        // A WiFi restore while the activity was paused does not produce a callback,
+        // so retry the saved Camp Hub URL when the user returns to the app.
+        if (pref.isCampModeEnabled() && !pref.isCampHubConnected() && isWifiAvailable()) {
+            startCampHubReconnect()
+        }
+
         window.decorView.alpha = 1f
         refreshCampHubOfflineBanner()
         refreshCampHubDrawerItem()
         WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
+        startCampAutoPullLoop()
+    }
+
+    private fun startCampAutoPullLoop() {
+        if (campAutoPullJob?.isActive == true) return
+        campAutoPullJob = lifecycleScope.launch {
+            while (isActive) {
+                WorkerUtils.triggerCampQuickPullIfConnected(applicationContext, pref)
+                delay(WorkerUtils.campAutoPullIntervalMs)
+            }
+        }
+    }
+
+    private fun isWifiAvailable(): Boolean = connectivityManager.activeNetwork?.let {
+        connectivityManager.getNetworkCapabilities(it)
+            ?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+    } ?: false
+
+    private fun startCampHubReconnect() {
+        if (!pref.isCampModeEnabled() || pref.isCampHubConnected() ||
+            campHubReconnectJob?.isActive == true
+        ) return
+
+        campHubReconnectJob = lifecycleScope.launch(Dispatchers.IO) {
+            while (isActive && pref.isCampModeEnabled() && !pref.isCampHubConnected()) {
+                if (isWifiAvailable() && pingCampHub()) {
+                    pref.setCampHubConnected(true)
+                    WorkerUtils.triggerDiagnosticResultPollWorker(applicationContext)
+                    runOnUiThread { refreshCampHubOfflineBanner() }
+                    return@launch
+                }
+                delay(3_000L)
+            }
+        }
     }
 
     private fun refreshCampHubOfflineBanner() {
-        binding.tvCampHubOffline.visibility =
-            if (pref.isCampModeEnabled() && !pref.isCampHubConnected()) View.VISIBLE else View.GONE
+        val isConnected = pref.isCampHubConnected()
+        binding.tvCampHubOffline.visibility = View.VISIBLE
+        binding.tvCampHubOffline.text =
+            if (isConnected) getString(R.string.camp_hub_connected)
+            else getString(R.string.camp_hub_offline)
+        binding.tvCampHubOffline.setBackgroundColor(
+            ContextCompat.getColor(
+                this,
+                if (isConnected) android.R.color.holo_green_dark else android.R.color.holo_red_dark
+            )
+        )
+        binding.tvCampHubOffline.isClickable = !isConnected
+        binding.tvCampHubOffline.isFocusable = !isConnected
     }
 
     private fun refreshCampHubDrawerItem() {
-        binding.navView.menu.findItem(R.id.menu_connect_camp_hub)?.isVisible =
-            pref.isCampModeEnabled()
+        binding.navView.menu.findItem(R.id.menu_connect_camp_hub)?.isVisible = true
+    }
+
+    fun setQuickRefreshProgressVisible(visible: Boolean) {
+        binding.pbQuickRefreshTop.visibility = if (visible) View.VISIBLE else View.GONE
+        if (!visible) {
+            binding.pbQuickRefreshTop.progress = 0
+        }
+    }
+
+    fun updateQuickRefreshProgress(progress: Int) {
+        binding.pbQuickRefreshTop.progress = progress.coerceIn(0, 100)
     }
 
     private fun openCampHubConnect() {

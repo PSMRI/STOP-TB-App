@@ -4,7 +4,9 @@ import android.view.ViewGroup
 import androidx.fragment.app.FragmentActivity
 import androidx.paging.PagingDataAdapter
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.BenBasicDomain
+import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 
 class BenPagingAdapter(
     private val clickListener: BenListAdapter.BenClickListener? = null,
@@ -16,11 +18,14 @@ class BenPagingAdapter(
     private val role: Int? = 0,
     private val pref: PreferenceDao? = null,
     var context: FragmentActivity,
+    private val roleManager: RoleManager? = null,
     private val isSoftDeleteEnabled: Boolean = false,
     private val showActionButtons: Boolean = false,
     private val showResultButton: Boolean = false,
     private val showAnthropometryButton: Boolean = false,
     private val showExamineButton: Boolean = true,
+    private val source: Int = 0,
+    private val showContactTracingForms: Boolean = false
 ) :
     PagingDataAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenListAdapter.BenDiffUtilCallBack) {
 
@@ -28,8 +33,19 @@ class BenPagingAdapter(
     private val tbScreeningBenIds = mutableListOf<Long>()
     private val generalOpdBenIds = mutableListOf<Long>()
     private val anthropometryBenIds = mutableListOf<Long>()
+    private val unsyncedVitalBenIds = mutableListOf<Long>()
+    private val unsyncedTbScreeningBenIds = mutableListOf<Long>()
+    private val unsyncedGeneralOpdBenIds = mutableListOf<Long>()
+    private val syncingVitalBenIds = mutableListOf<Long>()
+    private val syncingTbScreeningBenIds = mutableListOf<Long>()
+    private val syncingGeneralOpdBenIds = mutableListOf<Long>()
     private val diagnosisIds = mutableListOf<Long>()
+    private val contactFollowUpDoneIds = mutableListOf<Long>()
+    private val tptFollowUpDoneIds = mutableListOf<Long>()
+    private val tptEligibleIds = mutableListOf<Long>()
     private val childCountMap = mutableMapOf<Long, Int>()
+    private val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
+    private val retryingBenIds = mutableListOf<Long>()
 
     override fun onCreateViewHolder(
         parent: ViewGroup, viewType: Int
@@ -53,13 +69,47 @@ class BenPagingAdapter(
             tbScreeningBenIds,
             generalOpdBenIds,
             anthropometryBenIds,
+            unsyncedVitalBenIds,
+            unsyncedTbScreeningBenIds,
+            unsyncedGeneralOpdBenIds,
+            syncingVitalBenIds,
+            syncingTbScreeningBenIds,
+            syncingGeneralOpdBenIds,
             diagnosisIds,
+            contactFollowUpDoneIds,
+            tptFollowUpDoneIds,
+            tptEligibleIds,
             childCountMap,
             showActionButtons = showActionButtons,
             showResultButton = showResultButton,
             showAnthropometryButton = showAnthropometryButton,
-            showExamineButton = showExamineButton
+            showExamineButton = showExamineButton,
+            tbDiagnosticsList = tbDiagnosticsList,
+            source = source,
+            retryingBenIds = retryingBenIds,
+            showContactTracingForms = showContactTracingForms,
+            roleManager = roleManager
         )
+    }
+
+    fun submitTBDiagnostics(list: List<TBDiagnosticsCache>) {
+        // Diff instead of notifyDataSetChanged(), same pattern as the submit*() functions below
+        // — a blanket refresh here rebinds every visible row on every emission, which was the
+        // root cause of cards needing multiple taps to register.
+        val oldByBenId = tbDiagnosticsList.associateBy { it.benId }
+        val newByBenId = list.associateBy { it.benId }
+        tbDiagnosticsList.clear()
+        tbDiagnosticsList.addAll(list)
+        val changedBenIds = (oldByBenId.keys + newByBenId.keys)
+            .filterTo(mutableSetOf()) { benId -> oldByBenId[benId] != newByBenId[benId] }
+        if (changedBenIds.isNotEmpty()) {
+            val items = snapshot()
+            items.forEachIndexed { index, item ->
+                if (item != null && item.benId in changedBenIds) {
+                    notifyItemChanged(index)
+                }
+            }
+        }
     }
 
     fun submitBenIds(list: List<Long>) {
@@ -99,11 +149,40 @@ class BenPagingAdapter(
         notifyChangedIds(oldIds, anthropometryBenIds.toSet())
     }
 
+    fun submitUnsyncedVitalBenIds(list: List<Long>) = submitStatusIds(unsyncedVitalBenIds, list)
+    fun submitUnsyncedTbScreeningBenIds(list: List<Long>) = submitStatusIds(unsyncedTbScreeningBenIds, list)
+    fun submitUnsyncedGeneralOpdBenIds(list: List<Long>) = submitStatusIds(unsyncedGeneralOpdBenIds, list)
+    fun submitSyncingVitalBenIds(list: List<Long>) = submitStatusIds(syncingVitalBenIds, list)
+    fun submitSyncingTbScreeningBenIds(list: List<Long>) = submitStatusIds(syncingTbScreeningBenIds, list)
+    fun submitSyncingGeneralOpdBenIds(list: List<Long>) = submitStatusIds(syncingGeneralOpdBenIds, list)
+    fun submitRetryingBenIds(list: List<Long>) = submitStatusIds(retryingBenIds, list)
+
     fun submitDiagnosisBenIds(list: List<Long>) {
         val oldIds = diagnosisIds.toSet()
         diagnosisIds.clear()
         diagnosisIds.addAll(list)
         notifyChangedIds(oldIds, diagnosisIds.toSet())
+    }
+
+    fun submitContactFollowUpDoneBenIds(list: List<Long>) {
+        val oldIds = contactFollowUpDoneIds.toSet()
+        contactFollowUpDoneIds.clear()
+        contactFollowUpDoneIds.addAll(list)
+        notifyChangedIds(oldIds, contactFollowUpDoneIds.toSet())
+    }
+
+    fun submitTptFollowUpDoneBenIds(list: List<Long>) {
+        val oldIds = tptFollowUpDoneIds.toSet()
+        tptFollowUpDoneIds.clear()
+        tptFollowUpDoneIds.addAll(list)
+        notifyChangedIds(oldIds, tptFollowUpDoneIds.toSet())
+    }
+
+    fun submitTptEligibleBenIds(list: List<Long>) {
+        val oldIds = tptEligibleIds.toSet()
+        tptEligibleIds.clear()
+        tptEligibleIds.addAll(list)
+        notifyChangedIds(oldIds, tptEligibleIds.toSet())
     }
 
     private fun notifyChangedIds(oldIds: Set<Long>, newIds: Set<Long>) {
@@ -116,6 +195,13 @@ class BenPagingAdapter(
                 }
             }
         }
+    }
+
+    private fun submitStatusIds(target: MutableList<Long>, list: List<Long>) {
+        val oldIds = target.toSet()
+        target.clear()
+        target.addAll(list)
+        notifyChangedIds(oldIds, target.toSet())
     }
 
     fun submitChildCounts(map: Map<Long, Int>) {

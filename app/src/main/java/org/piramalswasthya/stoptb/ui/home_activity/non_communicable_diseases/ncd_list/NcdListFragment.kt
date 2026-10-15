@@ -20,6 +20,7 @@ import org.piramalswasthya.stoptb.adapters.BenListAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchRvButtonBinding
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
@@ -31,6 +32,9 @@ class NcdListFragment : Fragment() {
 
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
 
     private var _binding: FragmentDisplaySearchRvButtonBinding? = null
 
@@ -99,7 +103,8 @@ class NcdListFragment : Fragment() {
             showAbha = true,
             showCall = true,
             pref = prefDao,
-            context = requireActivity()
+            context = requireActivity(),
+            roleManager = roleManager
 
         )
         binding.rvAny.adapter = benAdapter

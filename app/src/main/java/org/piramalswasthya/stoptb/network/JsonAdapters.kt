@@ -62,7 +62,12 @@ data class TmcGenerateBenIdsRequest(val benIDRequired: Int, val vanID: Int)
 
 @JsonClass(generateAdapter = true)
 data class GetDataPaginatedRequest(
-    val ashaId: Int, val pageNo: Int, val fromDate: String, val toDate: String
+    val ashaId: Int,
+    val pageNo: Int,
+    val fromDate: String,
+    val toDate: String,
+    val providerServiceMapID: Int? = null,
+    val villageID: Int? = null
 )
 @JsonClass(generateAdapter = true)
 data class GetDataPaginatedRequests(
@@ -364,6 +369,12 @@ data class TBScreeningSaveRequest(
     val familySufferingFromTB: Boolean?,
     val riseOfFever: Boolean?,
     val lossOfAppetite: Boolean?,
+    val chestPain: Boolean?,
+    val shortnessOfBreath: Boolean?,
+    val fatigue: Boolean?,
+    val failureToGainWeightInChildren: Boolean?,
+    val decreasedActivityOrPlayfulnessInChildren: Boolean?,
+    val otherSymptoms: Boolean?,
     val contactWithTBPatient: Boolean?,
     val symptomatic: String?,
     val referredForDigitalChestXray: Boolean?,
@@ -372,7 +383,11 @@ data class TBScreeningSaveRequest(
     val recommendedForTruenat: Boolean?,
     val recommendedForLiquidCulture: Boolean?,
     val testDenialReasons: Any?,
-    val createdBy: String?
+    val createdBy: String?,
+    val keyPopulationRiskFactorIds: List<Int>? = null,
+    val keyPopulationRiskFactors: List<String>? = null,
+    val hivStatusId: Int? = null,
+    val hivStatus: String? = null
 ) {
     companion object {
         fun from(cache: TBScreeningCache, beneficiaryRegID: Long, providerServiceMapID: Int, createdBy: String?): TBScreeningSaveRequest {
@@ -390,6 +405,12 @@ data class TBScreeningSaveRequest(
                 familySufferingFromTB = cache.familySufferingFromTB,
                 riseOfFever = cache.riseOfFever,
                 lossOfAppetite = cache.lossOfAppetite,
+                chestPain = cache.chestPain,
+                shortnessOfBreath = cache.shortnessOfBreath,
+                fatigue = cache.fatigue,
+                failureToGainWeightInChildren = cache.failureToGainWeightInChildren,
+                decreasedActivityOrPlayfulnessInChildren = cache.decreasedActivityOrPlayfulnessInChildren,
+                otherSymptoms = cache.otherSymptoms,
                 contactWithTBPatient = cache.contactWithTBPatient,
                 symptomatic = cache.sympotomatic ?: cache.asymptomatic,
                 referredForDigitalChestXray = cache.referredForDigitalChestXray,
@@ -400,7 +421,11 @@ data class TBScreeningSaveRequest(
                 testDenialReasons = cache.reasonForDenialForGettingTested?.let {
                     if (it.size == 1) it.first() else it
                 },
-                createdBy = createdBy
+                createdBy = createdBy,
+                keyPopulationRiskFactorIds = cache.keyPopulationRiskFactorIds,
+                keyPopulationRiskFactors = cache.keyPopulationRiskFactors,
+                hivStatusId = cache.hivStatusId,
+                hivStatus = cache.hivStatus
             )
         }
     }
@@ -434,6 +459,48 @@ data class GeneralOpdSaveRequest(
         }
     }
 }
+data class PatientRequest(
+    val firstName: String,
+    val lastName: String,
+    val dateOfBirth: String,
+    val sex: String
+)
+
+data class DiagnosticOrderPushRequest(
+    @com.squareup.moshi.Json(name = "beneficiaryId")
+    @com.google.gson.annotations.SerializedName("beneficiaryId")
+    val benRegID: Long,
+    val visitCode: Int,
+    val providerServiceMapID: Int,
+    val orderType: String,
+    val orderEvent: String = "STOP_TB_REFERRAL",
+    val reasonForRefusal: String? = null,
+    val patient: PatientRequest
+)
+
+data class DiagnosticManualResultRequest(
+    val beneficiaryId: Long,
+    val orderType: String,
+    val resultSummary: String
+)
+
+data class DiagnosticBeneficiaryStatusData(
+    val awaitingTestCompletion: List<Long>? = emptyList(),
+    val awaitingProviderResult: List<Long>? = emptyList(),
+    val completed: List<Long>? = emptyList(),
+    val pollingTimedOut: List<Long>? = emptyList(),
+    val failed: List<Long>? = emptyList(),
+    val refused: List<Long>? = emptyList(),
+    val awaitingManualEntry: List<Long>? = emptyList()
+)
+
+data class DiagnosticBeneficiariesStatusResponse(
+    val success: Boolean? = true,
+    val message: String? = null,
+    val statusCode: Int? = null,
+    val data: DiagnosticBeneficiaryStatusData? = null
+)
+
 data class TBDiagnosticsSaveRequest(
     val benRegID: Long,
     val providerServiceMapID: Int,
@@ -460,7 +527,13 @@ data class TBDiagnosticsSaveRequest(
     // Liquid Culture
     val recommendedForLiquidCulture: Boolean?,
     val liquidCultureResult: String?,
-    val createdBy: String?
+    val createdBy: String?,
+    // Device Orders
+    val xrayOrderId: String? = null,
+    val xrayOrderStatus: String? = null,
+    val trueNatOrderId: String? = null,
+    val trueNatOrderStatus: String? = null,
+    val trueNatRifResult: String? = null
 ) {
     companion object {
         fun from(cache: TBDiagnosticsCache, benRegID: Long, providerServiceMapID: Int, createdBy: String?): TBDiagnosticsSaveRequest {
@@ -486,7 +559,12 @@ data class TBDiagnosticsSaveRequest(
                 truenatResult = cache.naatResult,
                 recommendedForLiquidCulture = cache.recommendedForLiquidCultureTest,
                 liquidCultureResult = cache.liquidCultureResult,
-                createdBy = createdBy
+                createdBy = createdBy,
+                xrayOrderId = cache.xrayOrderId,
+                xrayOrderStatus = cache.xrayOrderStatus,
+                trueNatOrderId = cache.trueNatOrderId,
+                trueNatOrderStatus = cache.trueNatOrderStatus,
+                trueNatRifResult = cache.trueNatRifResult
             )
         }
     }
@@ -522,6 +600,12 @@ data class TBScreeningDTO(
     var nightSweats: Boolean?, var historyOfTb: Boolean?,
     var takingAntiTBDrugs: Boolean?, var familySufferingFromTB: Boolean?,
     var riseOfFever: Boolean? = null, var lossOfAppetite: Boolean? = null,
+    var chestPain: Boolean? = null,
+    var shortnessOfBreath: Boolean? = null,
+    var fatigue: Boolean? = null,
+    var failureToGainWeightInChildren: Boolean? = null,
+    var decreasedActivityOrPlayfulnessInChildren: Boolean? = null,
+    var otherSymptoms: Boolean? = null,
     var age: Boolean? = null, var diabetic: Boolean? = null,
     var tobaccoUser: Boolean? = null, var bmi: Boolean? = null,
     var contactWithTBPatient: Boolean? = null, var historyOfTBInLastFiveYrs: Boolean? = null,
@@ -540,7 +624,11 @@ data class TBScreeningDTO(
         feverMoreThan2Weeks = feverMoreThan2Weeks, lossOfWeight = lossOfWeight,
         nightSweats = nightSweats, historyOfTb = historyOfTb,
         takingAntiTBDrugs = takingAntiTBDrugs, familySufferingFromTB = familySufferingFromTB,
-        riseOfFever = riseOfFever, lossOfAppetite = lossOfAppetite, age = age,
+        riseOfFever = riseOfFever, lossOfAppetite = lossOfAppetite,
+        chestPain = chestPain, shortnessOfBreath = shortnessOfBreath, fatigue = fatigue,
+        failureToGainWeightInChildren = failureToGainWeightInChildren,
+        decreasedActivityOrPlayfulnessInChildren = decreasedActivityOrPlayfulnessInChildren,
+        otherSymptoms = otherSymptoms, age = age,
         diabetic = diabetic, tobaccoUser = tobaccoUser, bmi = bmi,
         contactWithTBPatient = contactWithTBPatient, historyOfTBInLastFiveYrs = historyOfTBInLastFiveYrs,
         referredForDigitalChestXray = referredForDigitalChestXray,
@@ -598,6 +686,11 @@ data class TBSuspectedDTO(
     var isDRTBConfirmed: Boolean? = null, var isConfirmed: Boolean = false,
     var otherReasonForSuspicion: String? = null,
     var latitude: Double? = null, var longitude: Double? = null, var address: String? = null,
+    var reasonForRefusalXray: String? = null,
+    var reasonForRefusalMTB: String? = null,
+    var reasonForRefusalMDRRIF: String? = null,
+    var reasonForRefusalSputum: String? = null,
+    var mdrRifResult: String? = null,
     var updateDate: String? = null,
 ) {
     fun toCache(): TBSuspectedCache = TBSuspectedCache(
@@ -622,6 +715,11 @@ data class TBSuspectedDTO(
         latitude = latitude,
         longitude = longitude,
         address = address,
+        reasonForRefusalXray = reasonForRefusalXray,
+        reasonForRefusalMTB = reasonForRefusalMTB,
+        reasonForRefusalMDRRIF = reasonForRefusalMDRRIF,
+        reasonForRefusalSputum = reasonForRefusalSputum,
+        mdrRifResult = mdrRifResult,
         serverUpdatedDate = getLongFromDateMultipleSupport(updateDate),
         syncState = SyncState.SYNCED
     )
@@ -658,7 +756,7 @@ data class TBConfirmedRequestDTO(
     @SerializedName("tbConfirmedCases") val tbConfirmedList: List<TBConfirmedTreatmentDTO>
 )
 
-data class TBSuspectedRequestDTO(val userId: Int, val tbSuspectedList: List<TBSuspectedDTO>)
+data class TBSuspectedRequestDTO(val userId: Int, val fromStopTB: Boolean = true, val tbSuspectedList: List<TBSuspectedDTO>)
 
 data class TBDiagnosticsDTO(
     val id: Long,
@@ -693,7 +791,15 @@ data class TBDiagnosticsDTO(
     val latitude: Double? = null,
     val longitude: Double? = null,
     val address: String? = null,
-    val updateDate: String? = null
+    val updateDate: String? = null,
+    // Device integration
+    val xrayOrderId: String? = null,
+    val xrayOrderStatus: String? = null,
+    val trueNatOrderId: String? = null,
+    val trueNatOrderStatus: String? = null,
+    val trueNatRifResult: String? = null,
+    val rifOrderId: String? = null,
+    val rifOrderStatus: String? = null
 ) {
     fun toCache(): TBDiagnosticsCache = TBDiagnosticsCache(
         benId = benId,
@@ -719,6 +825,13 @@ data class TBDiagnosticsDTO(
         liquidCultureResult = liquidCultureResult,
         isTBConfirmed = isTBConfirmed,
         isConfirmed = isConfirmed,
+        xrayOrderId = xrayOrderId,
+        xrayOrderStatus = xrayOrderStatus,
+        trueNatOrderId = trueNatOrderId,
+        trueNatOrderStatus = trueNatOrderStatus,
+        trueNatRifResult = trueNatRifResult,
+        rifOrderId = rifOrderId,
+        rifOrderStatus = rifOrderStatus,
         latitude = latitude,
         longitude = longitude,
         address = address,

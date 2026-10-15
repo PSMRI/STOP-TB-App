@@ -103,7 +103,19 @@ data class BenPost(
     @Json(name = "guidelineId")
     val guidelineId: String,
     @Json(name = "houseoldId")
-    val householdId: String,
+    val householdId: String? = null,
+    
+    @Json(name = "isNonHH")
+    val isNonHH: Boolean = false,
+
+    @Json(name = "placeOfCurrentLiving")
+    val placeOfCurrentLiving: String? = null,
+
+    @Json(name = "otherPlaceOfCurrentLiving")
+    val otherPlaceOfCurrentLiving: String? = null,
+
+    @Json(name = "institutionName")
+    val institutionName: String? = null,
     @Json(name = "hrpStatus")
     val isHrpStatus: Boolean,
     @Json(name = "id")

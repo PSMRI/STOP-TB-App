@@ -10,6 +10,20 @@ import org.piramalswasthya.stoptb.configuration.FormDataModel
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.network.TBSuspectedDTO
 import kotlin.Boolean
+import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingFormResponseView
+
+// Scoped to TB_SUSPECTED only — do not reuse the shared getDateTimeStringFromLong() helper here.
+// That helper renders in the device's local timezone but appends a literal "Z" (UTC) suffix,
+// so the server ends up storing an instant shifted by the local UTC offset (e.g. +5:30 for IST)
+// on every push, which drifted visitDate further on each sync cycle. This copy actually renders
+// in UTC so the "Z" suffix is honest, without touching the shared helper other modules depend on.
+private fun tbSuspectedVisitDateToUtcIso(dateLong: Long?): String? {
+    dateLong ?: return null
+    val utc = java.util.TimeZone.getTimeZone("UTC")
+    val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ENGLISH).apply { timeZone = utc }
+    val timeFormat = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.ENGLISH).apply { timeZone = utc }
+    return "${dateFormat.format(dateLong)}T${timeFormat.format(dateLong)}.000Z"
+}
 
 @Entity(
     tableName = "TB_SUSPECTED",
@@ -55,6 +69,11 @@ data class TBSuspectedCache(
     var address: String? = null,
     var referred: Boolean? = null,
     var followUps: String? = null,
+    var reasonForRefusalXray: String? = null,
+    var reasonForRefusalMTB: String? = null,
+    var reasonForRefusalMDRRIF: String? = null, // spelling matches backend field name exactly
+    var reasonForRefusalSputum: String? = null,
+    var mdrRifResult: String? = null,
     var serverUpdatedDate: Long? = null,
     var syncState: SyncState = SyncState.UNSYNCED,
 ) : FormDataModel {
@@ -62,7 +81,7 @@ data class TBSuspectedCache(
         return TBSuspectedDTO(
             id = 0,
             benId = benId,
-            visitDate = getDateTimeStringFromLong(visitDate),
+            visitDate = tbSuspectedVisitDateToUtcIso(visitDate),
             isSputumCollected = isSputumCollected,
             sputumSubmittedAt = sputumSubmittedAt,
             nikshayId = nikshayId,
@@ -90,7 +109,11 @@ data class TBSuspectedCache(
             latitude = latitude,
             longitude = longitude,
             address = address,
-
+            reasonForRefusalXray = reasonForRefusalXray,
+            reasonForRefusalMTB = reasonForRefusalMTB,
+            reasonForRefusalMDRRIF = reasonForRefusalMDRRIF,
+            reasonForRefusalSputum = reasonForRefusalSputum,
+            mdrRifResult = mdrRifResult,
         )
     }
 }
@@ -109,14 +132,21 @@ data class BenWithTbSuspectedCache(
         parentColumn = "benId",
         entityColumn = "benId"
     )
-    val tbConfirmedList: List<TBConfirmedTreatmentCache>
+    val tbConfirmedList: List<TBConfirmedTreatmentCache>,
+
+    @Relation(
+        parentColumn = "benId",
+        entityColumn = "beneficiaryId"
+    )
+    val formResponse: CounsellingFormResponseView?
 )
 {
     fun asTbSuspectedDomainModel(): BenWithTbSuspectedDomain {
         return BenWithTbSuspectedDomain(
             ben = ben.asBasicDomainModel(),
             tbSuspected = tbSuspected,
-            tbConfirmedList = tbConfirmedList
+            tbConfirmedList = tbConfirmedList,
+            formResponse = formResponse
         )
     }
 
@@ -125,10 +155,14 @@ data class BenWithTbSuspectedCache(
 data class BenWithTbSuspectedDomain(
     val ben: BenBasicDomain,
     val tbSuspected: TBSuspectedCache?,
-    val tbConfirmedList: List<TBConfirmedTreatmentCache>
+    val tbConfirmedList: List<TBConfirmedTreatmentCache>,
+    val formResponse: CounsellingFormResponseView? = null
 ) {
     val latestTbSyncState: SyncState?
         get() = tbConfirmedList
             .maxByOrNull { it.followUpDate ?: 0L }
             ?.syncState
+
+    val isCounselled: Boolean
+        get() = formResponse?.status == "COMPLETE" || formResponse?.status == "COMPLETED" || formResponse?.status == "SUBMITTED" || formResponse?.status == "REFUSED"
 }

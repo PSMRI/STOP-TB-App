@@ -22,4 +22,7 @@ interface VitalDao {
 
     @Query("SELECT benId FROM BEN_VITALS")
     fun getAllVitalBenIds(): Flow<List<Long>>
+
+    @Query("SELECT benId FROM BEN_VITALS WHERE syncState = :syncState")
+    fun getVitalBenIdsBySyncState(syncState: SyncState): Flow<List<Long>>
 }

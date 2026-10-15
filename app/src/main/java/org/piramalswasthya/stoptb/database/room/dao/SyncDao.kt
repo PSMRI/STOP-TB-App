@@ -59,9 +59,12 @@ interface SyncDao {
                 "    INNER JOIN beneficiary b ON b.beneficiaryId = tbsn.benId AND b.loc_village_id = :selectedVillage " +
 
                 "    UNION ALL " +
-                "    SELECT 12 as id, 'TB Suspected' as name, tbsp.syncState as syncState " +
-                "    FROM TB_SUSPECTED tbsp " +
-                "    INNER JOIN beneficiary b ON b.beneficiaryId = tbsp.benId AND b.loc_village_id = :selectedVillage " +
+                "    SELECT 12 as id, 'TB Suspected' as name, suspected.syncState as syncState " +
+                "    FROM ( " +
+                "        SELECT DISTINCT tbsp.benId, tbsp.syncState " +
+                "        FROM TB_SUSPECTED tbsp " +
+                "        INNER JOIN beneficiary b ON b.beneficiaryId = tbsp.benId AND b.loc_village_id = :selectedVillage " +
+                "    ) suspected " +
 
                 "    UNION ALL " +
                 "    SELECT 20 as id, 'Anthropometric' as name, b2.syncState as syncState " +
@@ -83,6 +86,23 @@ interface SyncDao {
                 "    SELECT 23 as id, 'Diagnosis' as name, diag.syncState as syncState " +
                 "    FROM TB_DIAGNOSTICS diag " +
                 "    INNER JOIN beneficiary b ON b.beneficiaryId = diag.benId AND b.loc_village_id = :selectedVillage " +
+
+                "    UNION ALL " +
+                "    SELECT 23 as id, 'TB Confirmed' as name, confirmed.syncState as syncState " +
+                "    FROM ( " +
+                "        SELECT confirmed.benId, MIN(confirmed.syncState) as syncState " +
+                "        FROM TB_CONFIRMED_TREATMENT confirmed " +
+                "        INNER JOIN beneficiary b ON b.beneficiaryId = confirmed.benId AND b.loc_village_id = :selectedVillage " +
+                "        GROUP BY confirmed.benId " +
+                "    ) confirmed " +
+
+                "    UNION ALL " +
+                "    SELECT 24 as id, 'Counselling' as name, " +
+                "           CASE WHEN fr.syncStatus = 'SYNCED' THEN 2 " +
+                "                WHEN fr.syncStatus = 'SYNCING' THEN 1 " +
+                "                ELSE 0 END as syncState " +
+                "    FROM t_form_response fr " +
+                "    INNER JOIN beneficiary b ON b.beneficiaryId = fr.beneficiaryId AND b.loc_village_id = :selectedVillage " +
 
                 // ❌ NCD Refer removed
 //            "    UNION ALL " +

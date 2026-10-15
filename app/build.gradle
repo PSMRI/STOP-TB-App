@@ -21,28 +21,22 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace 'org.piramalswasthya.stoptb'
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId "org.piramalswasthya.stoptb"
         minSdk 25
-        targetSdk 35
+        targetSdk 36
         versionCode buildVersionCode()
         versionName buildVersionName()
         resourceConfigurations += ['en', 'hi', 'as']
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-
-    }
-
-    splits {
-        abi {
-            enable true
-            reset()
-            include 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
-            universalApk true
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
         }
     }
 
+    // Single fat APK from assemble. Play still ABI-splits the AAB at delivery time.
     bundle {
         language {
             enableSplit = false
@@ -55,6 +49,9 @@ android {
             keyPassword keystoreProperties['keyPassword']
             storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
             storePassword keystoreProperties['storePassword']
+            enableV1Signing true
+            enableV2Signing true
+            enableV3Signing true
         }
     }
 
@@ -78,12 +75,12 @@ android {
 
         stoptb {
             applicationId "org.piramalswasthya.stoptb"
-            resValue "string", "app_native_name", "StopTB"
+            resValue "string", "app_native_name", "TBMJA"
         }
 
         stoptbUat {
             applicationId "org.piramalswasthya.stoptb.uat"
-            resValue "string", "app_native_name", "StopTB-UAT"
+            resValue "string", "app_native_name", "TBMJA-UAT"
         }
 
     }
@@ -93,7 +90,7 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
     kapt {
-        correctErrorTypes true 
+        correctErrorTypes true
     }
 
     kotlinOptions {
@@ -226,6 +223,8 @@ dependencies {
     implementation("com.google.firebase:firebase-messaging:24.0.0")
 
     testImplementation 'com.google.truth:truth:1.4.4'
+    testImplementation 'org.mockito:mockito-core:5.11.0'
+    testImplementation 'org.mockito.kotlin:mockito-kotlin:5.2.1'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
 
@@ -239,6 +238,8 @@ dependencies {
     //In App Update
     //implementation 'com.google.android.play:core:1.10.3'
     implementation 'com.google.android.play:app-update:2.1.0'
+
+    implementation 'com.google.android.gms:play-services-location:21.3.0'
 
     implementation "net.zetetic:sqlcipher-android:4.13.0"
     implementation "androidx.sqlite:sqlite:2.4.0"

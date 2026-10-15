@@ -14,6 +14,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.database.shared_preferences.ReferralStatusManager
 import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.ReferalCache
+import org.piramalswasthya.stoptb.model.getAgeGenderDisplayString
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.NcdReferalRepo
 import timber.log.Timber
@@ -55,7 +56,7 @@ class AnthropometryViewModel @Inject constructor(
             benRepo.getBenFromId(benId)?.let { ben ->
                 benCache = ben
                 _benName.value = listOfNotNull(ben.firstName, ben.lastName).joinToString(" ")
-                _benAgeGender.value = "${ben.age} ${ben.ageUnit?.name} | ${ben.gender?.name}"
+                _benAgeGender.value = ben.getAgeGenderDisplayString()
                 _existingAnthropometry.value = ben
 
             }
@@ -98,7 +99,7 @@ class AnthropometryViewModel @Inject constructor(
                     ben.updatedBy = preferenceDao.getLoggedInUser()?.userName
 
                     benRepo.updateRecord(ben)
-                    if (temperature != null && temperature >= 100.0) {
+                    if (temperature != null && temperature > 99.0) {
                         buildHwcReferral(ben)?.let {
                             ncdReferalRepo.saveReferedNCD(it)
                             referralStatusManager.markAsReferred(benId, "TB")
@@ -130,7 +131,7 @@ class AnthropometryViewModel @Inject constructor(
             referredToInstituteID = 2,
             refrredToAdditionalServiceList = listOf("Health and Wellness Centre"),
             referredToInstituteName = "HWC",
-            referralReason = "Temperature >= 100 F",
+            referralReason = "Temperature > 99 F",
             revisitDate = System.currentTimeMillis(),
             vanID = user.vanId,
             parkingPlaceID = user.serviceMapId,

@@ -24,12 +24,15 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.SyncLogExporter
 import org.piramalswasthya.stoptb.helpers.SyncLogManager
+//import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.FailedWorkerInfo
 import org.piramalswasthya.stoptb.model.SyncLogEntry
 import org.piramalswasthya.stoptb.model.SyncStatusCache
 import org.piramalswasthya.stoptb.utils.HelperUtil.getLocalizedResources
 import org.piramalswasthya.stoptb.work.BasePushWorker
 import org.piramalswasthya.stoptb.work.WorkerUtils
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -38,6 +41,7 @@ class SyncDashboardViewModel @Inject constructor(
     private val preferenceDao: PreferenceDao,
     private val syncLogManager: SyncLogManager,
     private val syncLogExporter: SyncLogExporter,
+    private val roleManager: RoleManager,
     application: Application
 ) : AndroidViewModel(application) {
 
@@ -63,7 +67,7 @@ class SyncDashboardViewModel @Inject constructor(
                 val outputError = workInfo.outputData.getString(BasePushWorker.KEY_ERROR)
                 // Fallback: extract class name from tags if outputData wasn't set
                 val name = outputName ?: workInfo.tags
-                    .firstOrNull { it.startsWith("org.piramalswasthya.sakhi.work.") }
+                    .firstOrNull { it.startsWith("org.piramalswasthya.stoptb.work.") }
                     ?.substringAfterLast(".")
                     ?: "Unknown Worker"
                 // Cascade detection: when WorkManager auto-fails a downstream worker
@@ -96,6 +100,16 @@ class SyncDashboardViewModel @Inject constructor(
 
     fun getEnglishNames(context: Context): Array<String> {
         return getLocalizedResources(context, Languages.ENGLISH).getStringArray(R.array.sync_records)
+    }
+
+    // Legacy, kept for reference:
+//    fun isCounsellingOfficerRole():Boolean{
+//        return preferenceDao.getLoggedInUser()?.role.isCounsellingOfficerRole()
+//    }
+    fun isCounsellingOfficerRole(): Boolean {
+        val result = roleManager.privilegesUnion().syncShowCounsellingStatusRow
+        Timber.d("RoleManager: syncShowCounsellingStatusRow=$result")
+        return result
     }
 
     // Tab 2: Log export

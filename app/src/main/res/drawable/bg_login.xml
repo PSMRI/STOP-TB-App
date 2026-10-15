@@ -16,20 +16,11 @@
     </item>
     <item android:gravity="bottom">
         <shape android:shape="rectangle">
-            <solid android:color="@color/sakhi_login_wave" />
-            <corners
-                android:topLeftRadius="56dp"
-                android:topRightRadius="56dp" />
-            <size android:height="160dp" />
-        </shape>
-    </item>
-    <item android:gravity="bottom">
-        <shape android:shape="rectangle">
             <solid android:color="@color/sakhi_login_wave_deep" />
             <corners
                 android:topLeftRadius="88dp"
                 android:topRightRadius="88dp" />
-            <size android:height="92dp" />
+            <size android:height="120dp" />
         </shape>
     </item>
 </layer-list>

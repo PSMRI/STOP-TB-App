@@ -7,10 +7,12 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.FormSchemaDto
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormSubmitRequest
 import org.piramalswasthya.stoptb.model.dynamicEntity.NCDFollowUpResponse
 import org.piramalswasthya.stoptb.model.dynamicModel.ApiResponse
-import org.piramalswasthya.stoptb.model.dynamicModel.HBNCVisitListResponse
 import org.piramalswasthya.stoptb.model.dynamicModel.HBNCVisitRequest
 import retrofit2.Response
 import retrofit2.http.*
+
+import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingBulkSubmitRequest
+import org.piramalswasthya.stoptb.model.dynamicEntity.ServerCounsellingResponseDto
 
 interface AmritApiService {
 
@@ -172,10 +174,49 @@ interface AmritApiService {
         @Query("lang") lang: String
     ): Response<ApiResponse<FormSchemaDto>>
 
+
+    @GET("flw-api/dynamicForm/getAllForms")
+    suspend fun getAllForms(
+        @Header("Authorization") authHeader: String,
+    ): Response<ApiResponse<List<FormSchemaDto>>>
+
     @POST("flw-api/child-care/hbncVisit/saveAll")
     suspend fun submitForm(
         @Body request: List<FormSubmitRequest>
     ): Response<Unit>
+
+//    @POST("flw-api/counselling/save")
+//    suspend fun submitCounselling(
+//        @Body request: CounsellingSyncRequest
+//    ): Response<okhttp3.ResponseBody>
+
+    @POST("flw-api/dynamicForm/response/submitBulk")
+    suspend fun submitBulkCounselling(
+        @Header("Authorization") authHeader: String,
+        @Body request: List<CounsellingBulkSubmitRequest>
+    ): Response<ResponseBody>
+    @POST("flw-api/dynamicForm/response/complete")
+    suspend fun completeCounselling(
+        @Header("Authorization") authHeader: String,
+        @Body request: CounsellingBulkSubmitRequest
+    ): Response<okhttp3.ResponseBody>
+    @GET("flw-api/dynamicForm/response/getByBeneficiary")
+    suspend fun getBeneficiaryFormResponses(
+        @Header("Authorization") jwtToken: String,
+        @Query("beneficiaryId") beneficiaryId: Long?,
+        @Query("formUuid") formUuid: String,
+        @Query("villageId") villageId: Int?,
+        @Query("providerServiceMapId") providerServiceMapId: Int?
+    ): Response<ApiResponse<List<ServerCounsellingResponseDto>>>
+
+    @GET("flw-api/dynamicForm/response/getCompletedBeneficiaries")
+    suspend fun getCompletedBeneficiaries(
+        @Header("Authorization") authHeader: String,
+        @Query("formType") formType: String,
+        @Query("villageId") villageId: Int,
+        @Query("providerServiceMapId") providerServiceMapId: Int
+    ): Response<ApiResponse<List<org.piramalswasthya.stoptb.model.dynamicEntity.CompletedBeneficiaryStatus>>>
+
 
     @POST("flw-api/disease/cdtfVisit/saveAll")
     suspend fun submitNCDFollowUp(
@@ -199,5 +240,43 @@ interface AmritApiService {
 //        @Path("formName") formName: String,
 //        @Body request: HBNCVisitRequest
 //    ): Response<HBNCVisitListResponse>
+    @POST("flw-api/diagnostic/order/push")
+    suspend fun pushDiagnosticOrder(
+        @Body request: DiagnosticOrderPushRequest
+    ): Response<OrderPushedResponse>
 
+    @POST("flw-api/diagnostic/order/testCompleted")
+    suspend fun markTestCompleted(
+        @Query("benRegID") benRegID: Long,
+        @Query("orderType") orderType: String
+    ): Response<ResponseBody>
+
+    @POST("flw-api/diagnostic/order/result")
+    suspend fun fetchOrderResult(
+        @Query("beneficiaryId") benId: Long,
+        @Query("orderType") orderType: String
+    ): Response<OrderResultResponse>
+
+    @POST("flw-api/diagnostic/order/retry")
+    suspend fun retryOrder(
+        @Query("beneficiaryId") benId: Long,
+        @Query("orderType") orderType: String
+    ): Response<OrderResultResponse>
+
+    @GET("flw-api/diagnostic/order/getBeneficiariesByStatus")
+    suspend fun getBeneficiariesByStatus(
+        @Query("orderType") orderType: String,
+        @Query("villageId") villageId: Int,
+        @Query("providerServiceMapId") providerServiceMapId: Int
+    ): Response<ResponseBody>
+
+    @POST("flw-api/diagnostic/order/manualResult")
+    suspend fun submitManualResult(
+        @Body request: DiagnosticManualResultRequest
+    ): Response<OrderResultResponse>
+
+    @GET("flw-api/diagnostic/vendor/health")
+    suspend fun getVendorHealth(
+        @Query("orderType") orderType: String
+    ): Response<ResponseBody>
 }

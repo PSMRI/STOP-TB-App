@@ -1,20 +1,32 @@
 ext {
     buildVersionCode = {
-
         def props = new Properties()
-        rootProject.file("version/version.properties").withInputStream { props.load(it) }
-        return props.getProperty("VERSIONCODE").toInteger()
-
-
-     /*   def versionName = buildVersionName()
-        def (major, minor, patch) = versionName.toLowerCase().tokenize('.')
-//        (major, minor, patch) = [major, minor, patch].collect { it.toInteger() }
-//        (major * 10000) + (minor * 100) + patch
-        major.toInteger()*/
+        def versionFile = rootProject.file("version/version.properties")
+        if (!versionFile.exists()) {
+            throw new GradleException("Missing ${versionFile}")
+        }
+        versionFile.withInputStream { props.load(it) }
+        def raw = props.getProperty("VERSIONCODE")?.trim()
+        if (raw == null || !(raw ==~ /^[0-9]+$/)) {
+            throw new GradleException("VERSIONCODE must be a positive integer in version/version.properties, got '${raw}'.")
+        }
+        def code = raw.toInteger()
+        if (code < 1) {
+            throw new GradleException("VERSIONCODE must be a positive integer (Android rejects 0). Check the workflow versionCode input.")
+        }
+        return code
     }
     buildVersionName = {
         def props = new Properties()
-        rootProject.file("version/version.properties").withInputStream { props.load(it) }
-        return props.getProperty("VERSION")
+        def versionFile = rootProject.file("version/version.properties")
+        if (!versionFile.exists()) {
+            throw new GradleException("Missing ${versionFile}")
+        }
+        versionFile.withInputStream { props.load(it) }
+        def name = props.getProperty("VERSION")?.trim()
+        if (name == null || name.isEmpty()) {
+            throw new GradleException("VERSION is missing in version/version.properties.")
+        }
+        return name
     }
 }

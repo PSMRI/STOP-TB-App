@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.tb_confirmed.list
 
+import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -11,6 +12,7 @@ import android.widget.EditText
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import androidx.navigation.fragment.navArgs
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
@@ -18,8 +20,14 @@ import org.piramalswasthya.stoptb.adapters.TbConfirmedListAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchRvButtonBinding
+import org.piramalswasthya.stoptb.ui.contact_tracing.ContactTracingTypeBottomSheetFragment
+import org.piramalswasthya.stoptb.ui.counselling_activity.CounsellingActivity
+import org.piramalswasthya.stoptb.ui.counselling_activity.CounsellingViewModel
+import org.piramalswasthya.stoptb.model.BenWithTbSuspectedDomain
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
+import org.piramalswasthya.stoptb.model.AppRole
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.helpers.RoleManager
 import javax.inject.Inject
 import kotlin.getValue
 
@@ -27,15 +35,24 @@ import kotlin.getValue
 @AndroidEntryPoint
 class TBConfirmedListFragment : Fragment() {
 
-
     @Inject
     lateinit var prefDao: PreferenceDao
+
+    @Inject
+    lateinit var roleManager: RoleManager
+    private val args: TBConfirmedListFragmentArgs by navArgs()
+
+    private val restrictToAction: TbConfirmedListAdapter.Action?
+        get() = args.restrictToAction?.let { TbConfirmedListAdapter.Action.valueOf(it) }
 
     private var _binding: FragmentDisplaySearchRvButtonBinding? = null
     private val binding: FragmentDisplaySearchRvButtonBinding
         get() = _binding!!
 
     private val viewModel: TBConfirmedListViewModel by viewModels()
+
+    private lateinit var benAdapter: TbConfirmedListAdapter
+    private var currentBenList: List<BenWithTbSuspectedDomain> = emptyList()
 
     private val sttContract = registerForActivityResult(SpeechToTextContract()) { value ->
         val lowerValue = value.lowercase()
@@ -55,17 +72,50 @@ class TBConfirmedListFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        viewModel.fetchCompletedBeneficiaries()
         binding.btnNextPage.visibility = View.GONE
-        val benAdapter = TbConfirmedListAdapter(
-            TbConfirmedListAdapter.ClickListener { hhId, benId ->
-                findNavController().navigate(
-                    TBConfirmedListFragmentDirections.actionTBConfirmedListFragmentToTBConfirmedFormFragment(
-                    benId
+        benAdapter = TbConfirmedListAdapter(
+            TbConfirmedListAdapter.ClickListener(
+                clickedForm = { hhId, benId ->
+                    findNavController().navigate(
+                        TBConfirmedListFragmentDirections
+                            .actionTBConfirmedListFragmentToTBConfirmedFormFragment(benId)
                     )
-                )
-
-            },
-            pref = prefDao
+                },
+                clickedCounselling = { item ->
+                    startActivity(
+                        Intent(requireContext(), CounsellingActivity::class.java)
+                            .putExtra(CounsellingViewModel.EXTRA_BEN_ID, item.ben.benId)
+                    )
+                },
+                clickedCounselled = { item ->
+                    // Counselled state: open Counselling Overview — Pre-Submit will be read-only,
+                    // Post-Submit remains accessible per existing editable-window logic.
+                    startActivity(
+                        Intent(requireContext(), CounsellingActivity::class.java)
+                            .putExtra(CounsellingViewModel.EXTRA_BEN_ID, item.ben.benId)
+                    )
+                },
+                clickedViewMember = { item ->
+                    val isCounsellingWorkflow = roleManager.activeRole.value == AppRole.COUNSELING ||
+                            restrictToAction == TbConfirmedListAdapter.Action.CONTACT_TRACING ||
+                            restrictToAction == TbConfirmedListAdapter.Action.COUNSELLING
+                    findNavController().navigate(
+                        TBConfirmedListFragmentDirections
+                            .actionTBConfirmedListFragmentToHouseholdMembersFragment(
+                                hhId = item.ben.hhId ?: 0L,
+                                fromContactTracing = isCounsellingWorkflow
+                            )
+                    )
+                },
+                clickedContactTracing = { item ->
+                    ContactTracingTypeBottomSheetFragment.newInstance(item.ben.benId)
+                        .show(childFragmentManager, ContactTracingTypeBottomSheetFragment.TAG)
+                }
+            ),
+            pref = prefDao,
+            roleManager = roleManager,
+            restrictToAction = restrictToAction
         )
         binding.rvAny.adapter = benAdapter
 
@@ -75,8 +125,18 @@ class TBConfirmedListFragment : Fragment() {
                     binding.flEmpty.visibility = View.VISIBLE
                 else
                     binding.flEmpty.visibility = View.GONE
+                currentBenList = it
                 benAdapter.submitList(it)
             }
+        }
+        viewModel.beneficiaryIdArray.observe(viewLifecycleOwner,{ benids ->
+            benAdapter.submitBenIds(benids)
+        })
+        viewModel.totalSectionsFallback.observe(viewLifecycleOwner) { totalSections ->
+            benAdapter.submitTotalSectionsFallback(totalSections)
+        }
+        viewModel.localFilledCounts.observe(viewLifecycleOwner) { counts ->
+            benAdapter.submitLocalFilledCounts(counts)
         }
 
         binding.ibSearch.setOnClickListener { sttContract.launch(Unit) }
@@ -103,12 +163,26 @@ class TBConfirmedListFragment : Fragment() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::benAdapter.isInitialized) {
+            benAdapter.submitList(currentBenList)
+        }
+        viewModel.fetchCompletedBeneficiaries()
+    }
+
     override fun onStart() {
         super.onStart()
+        val title = when (restrictToAction) {
+            TbConfirmedListAdapter.Action.COUNSELLING -> getString(R.string.counselling_menu_title)
+            TbConfirmedListAdapter.Action.CONTACT_TRACING -> getString(R.string.contact_tracing)
+            TbConfirmedListAdapter.Action.FOLLOW_UP -> getString(R.string.follow_up)
+            TbConfirmedListAdapter.Action.VIEW_ONLY, null -> getString(R.string.tb_confirmed_list)
+        }
         activity?.let {
             when (it) {
-                is HomeActivity -> it.updateActionBar(R.drawable.ic__ncd, getString(R.string.tb_confirmed_list))
-                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ncd, getString(R.string.tb_confirmed_list))
+                is HomeActivity -> it.updateActionBar(R.drawable.ic__ncd, title)
+                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ncd, title)
             }
         }
     }

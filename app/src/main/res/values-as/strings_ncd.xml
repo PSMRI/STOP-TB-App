@@ -95,6 +95,12 @@
     <string name="cbac_feverwks">জ্বৰ 2 সপ্তাহৰ বাবে</string>
     <string name="cbac_lsweight">ওজন হ্ৰাস</string>
     <string name="cbac_ntswets">নিশাৰ ঘাম</string>
+    <string name="chest_pain">বুকৰ বিষ</string>
+    <string name="shortness_of_breath">উশাহ লোৱাত অসুবিধা</string>
+    <string name="fatique">ভাগৰ</string>
+    <string name="failure_to_gain_weight_children">শিশুৰ ওজন বৃদ্ধি নোহোৱা</string>
+    <string name="decreased_activity_or_playfulness_children">শিশুৰ কাৰ্যকলাপ বা খেলাৰ আগ্ৰহ হ্ৰাস</string>
+    <string name="others">অন্যান্য</string>
     <string name="cbac_recurrent_ulceration">বৰহিত বা পাৰমলৰ উপৰত পুনৰাবৃত্তি</string>
     <string name="cbac_recurrent_tingling">হাতৰ বা পাৰমলৰ উপৰত পুনৰাবৃত্তি</string>
     <string name="cbac_recurrent_cloudy">মেঘপৰা অথবা মিহিলৰ দৃষ্টি পৰা সমস্যা</string>
@@ -270,5 +276,19 @@
     <string name="none_of">এইবোৰৰ কোনোটোৱেই নহয়</string>
     <string name="cbac_is_leprosy_suspected">কুষ্ঠ ৰোগৰ কোনো লক্ষণ আছে নেকি?</string>
     <string name="refer_to_hwc_facility_alert">আপুনি HWC সুবিধালৈ ৰেফাৰ কৰিব বিচাৰে নেকি?</string>
+    <string-array name="tb_truenat_mtb_result">
+        <item>MTB not detected</item>
+        <item>MTB detected</item>
+        <item>Invalid</item>
+    </string-array>
+    <string-array name="tb_truenat_rif_result">
+        <item>Rif Resistance Detected</item>
+        <item>Rif Resistance Not Detected</item>
+        <item>Indeterminate</item>
+    </string-array>
+    <string-array name="tb_digital_xray_result">
+        <item>Normal</item>
+        <item>TB Presumptive</item>
+    </string-array>
 </resources>
 

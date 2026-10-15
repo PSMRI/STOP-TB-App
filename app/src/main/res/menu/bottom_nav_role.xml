@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/roleTabRegistrar"
+        android:icon="@drawable/ic_role_registrar"
+        android:title="@string/role_tab_registrar" />
+    <item
+        android:id="@+id/roleTabNurse"
+        android:icon="@drawable/ic_role_nurse"
+        android:title="@string/role_tab_nurse" />
+    <item
+        android:id="@+id/roleTabCounseling"
+        android:icon="@drawable/ic_role_counseling"
+        android:title="@string/role_tab_counseling" />
+</menu>

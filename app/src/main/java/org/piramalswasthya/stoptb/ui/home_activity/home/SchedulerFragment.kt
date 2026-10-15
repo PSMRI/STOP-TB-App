@@ -16,11 +16,17 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentSchedulerBinding
 import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 import org.piramalswasthya.stoptb.helpers.isNurseRole
+import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.ui.setCountBadgeText
 import org.piramalswasthya.stoptb.ui.home_activity.home.SchedulerViewModel.State.LOADED
 import org.piramalswasthya.stoptb.ui.home_activity.home.SchedulerViewModel.State.LOADING
 import javax.inject.Inject
 
+// NOTE: SchedulerFragment/HomeActivity is confirmed dead code — HomeActivity is never
+// launched from anywhere reachable in the app (the only reference is a commented-out line
+// in FBMessaging.kt). Left on the ORIGINAL legacy RoleUtils-based role check rather than
+// migrated to RoleManager: modeling behavior for an unreachable screen in the new
+// role/privilege system would only add confusion with no observable benefit.
 @AndroidEntryPoint
 class SchedulerFragment : Fragment() {
 
@@ -98,6 +104,11 @@ class SchedulerFragment : Fragment() {
             }
         }
         lifecycleScope.launch {
+            viewModel.nonHHCount.collect {
+                binding.tvNonHHCount.setCountBadgeText(it)
+            }
+        }
+        lifecycleScope.launch {
             viewModel.ncdCount.collect {
                 binding.tvNcdCount.setCountBadgeText(it)
             }
@@ -107,6 +118,9 @@ class SchedulerFragment : Fragment() {
         }
         binding.cvHousehold.setOnClickListener {
             findNavController().navigate(HomeFragmentDirections.actionHomeFragmentToAllHouseholdFragment())
+        }
+        binding.cvNonHH.setOnClickListener {
+            findNavController().navigate(HomeFragmentDirections.actionHomeFragmentToNonHHFragment())
         }
         binding.cvTb.setOnClickListener {
             findNavController().navigate(HomeFragmentDirections.actionHomeFragmentToCdFragment())
@@ -130,6 +144,7 @@ class SchedulerFragment : Fragment() {
     private fun applyRoleVisibility() {
         val role = prefDao.getLoggedInUser()?.role
         binding.cvHousehold.visibility = View.VISIBLE
+        binding.cvNonHH.visibility = if (role.isRegistrationOfficerRole()) View.VISIBLE else View.GONE
         when {
             role.isNullOrBlank() || (!role.isNurseRole() && !role.isCounsellingOfficerRole()) -> {
                 binding.cvAllBen.visibility = View.VISIBLE

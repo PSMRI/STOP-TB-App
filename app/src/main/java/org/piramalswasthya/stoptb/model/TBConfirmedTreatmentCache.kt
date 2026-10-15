@@ -25,6 +25,7 @@ data class TBConfirmedTreatmentCache(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     val benId: Long,
+
     var regimenType: String? = null,
     var treatmentStartDate: Long = System.currentTimeMillis(),
     var expectedTreatmentCompletionDate: Long? = null,
