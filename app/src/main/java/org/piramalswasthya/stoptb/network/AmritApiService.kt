@@ -31,14 +31,23 @@ interface AmritApiService {
         @Query("userId") userId: Int
     ): UserNetworkResponse
 
-    @GET("hwc-api/master/get/visitReasonAndCategories")
+    @GET("mmu-api/master/get/visitReasonAndCategories")
     suspend fun getVisitReasonAndCategories(): Response<HwcMasterResponse<VisitReasonAndCategoriesResponse>>
 
-    @GET("hwc-api/master/nurse/masterData/{visitCategoryId}/{providerServiceMapId}")
+    @GET("mmu-api/master/nurse/masterData/{visitCategoryId}/{providerServiceMapId}/Male")
     suspend fun getChiefComplaintMaster(
         @Path("visitCategoryId") visitCategoryId: Int,
         @Path("providerServiceMapId") providerServiceMapId: Int
     ): Response<HwcMasterResponse<NurseMasterDataResponse>>
+
+    @GET("tm-api/master/doctor/masterData/{visitCategoryId}/{providerServiceMapId}/{gender}/{vanId}/{facilityId}")
+    suspend fun getDrugMaster(
+        @Path("visitCategoryId") visitCategoryId: Int,
+        @Path("providerServiceMapId") providerServiceMapId: Int,
+        @Path("gender") gender: String,
+        @Path("vanId") vanId: Int,
+        @Path("facilityId") facilityId: Int
+    ): Response<HwcMasterResponse<DoctorDrugMasterData>>
 
     @POST("common-api/firebaseNotification/userToken")
     suspend fun saveFirebaseToken(@Body json: Map<String, Any>): Response<ResponseBody>
