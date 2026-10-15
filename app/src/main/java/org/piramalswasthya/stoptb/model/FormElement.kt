@@ -46,6 +46,7 @@ data class FormElement(
     val enableSearchInMultiSelect: Boolean = false,
     var exclusiveOptionIndices: Set<Int>? = null,
     var boldTitleOnYes: Boolean = false,
+    val showAsSingleSelectDialog: Boolean = false,
     val isAlphanumeric: Boolean = false,
 
 )
