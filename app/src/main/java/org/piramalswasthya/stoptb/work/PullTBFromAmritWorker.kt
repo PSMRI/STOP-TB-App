@@ -79,6 +79,12 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                             async { refreshVisitCategories() }
                         )
 
+                    try {
+                        tbRepo.applyKnownTbContactRiskFactors()
+                    } catch (e: Exception) {
+                        Timber.e(e, "Could not select Contact of Known TB Patients for household members")
+                    }
+
                     val endTime = System.currentTimeMillis()
                     val timeTaken = TimeUnit.MILLISECONDS.toSeconds(endTime - startTime)
                     Timber.d(
