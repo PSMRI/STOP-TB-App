@@ -1717,7 +1717,7 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_57_58 = object : Migration(53, 54) {
+        private val MIGRATION_57_58 = object : Migration(57, 58) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE `TB_SCREENING` ADD COLUMN `otherSymptomsDetails` TEXT")
             }

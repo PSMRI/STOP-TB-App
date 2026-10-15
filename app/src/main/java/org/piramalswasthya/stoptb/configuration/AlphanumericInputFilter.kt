@@ -3,8 +3,9 @@ package org.piramalswasthya.stoptb.configuration
 import android.text.InputFilter
 import android.text.Spanned
 
-/** Allows letters, digits and spaces, including when pasting into the field. */
+/** Allows Unicode letters, digits, combining marks and spaces. */
 object AlphanumericInputFilter : InputFilter {
+
     override fun filter(
         source: CharSequence,
         start: Int,
@@ -13,8 +14,16 @@ object AlphanumericInputFilter : InputFilter {
         dstart: Int,
         dend: Int
     ): CharSequence? {
+
         val input = source.subSequence(start, end).toString()
-        val filtered = input.filter { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == ' ' }
+        val filtered = input.filter {
+            it.isLetterOrDigit() ||
+                    it == ' ' ||
+                    Character.getType(it) == Character.NON_SPACING_MARK.toInt() ||
+                    Character.getType(it) == Character.COMBINING_SPACING_MARK.toInt() ||
+                    Character.getType(it) == Character.ENCLOSING_MARK.toInt()
+        }
+
         return if (filtered == input) null else filtered
     }
 }
