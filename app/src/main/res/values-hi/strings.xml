@@ -1009,6 +1009,8 @@
     <string name="tb_reason_for_denial_sputum">थूक संग्रह से इनकार का कारण</string>
     <string name="tb_reason_for_denial_sputum_other">इनकार का अन्य कारण बताएं (थूक)</string>
     <string name="tb_sputum_submitted_at">थूक सैंपल जमा करने का केंद्र</string>
+    <string name="tb_sputum_sample_collection_date">थूक सैंपल संग्रह की तारीख</string>
+    <string name="tb_sputum_collection_date_range_error">केवल आज या कल की तारीख चुनें</string>
     <string name="tb_reason_not_conducted_naat">True NAT न होने का कारण</string>
     <string name="tb_reason_not_conducted_naat_other">अन्य कारण बताएं (True NAT नहीं हुआ)</string>
 

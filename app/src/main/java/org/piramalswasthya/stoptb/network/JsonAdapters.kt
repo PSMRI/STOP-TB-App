@@ -525,6 +525,7 @@ data class TBDiagnosticsSaveRequest(
     val reasonForDenialSputum: String?,
     val reasonForDenialSputumOther: String?,
     val sputumSubmittedAt: String?,
+    val sputumCollectionDate: Long? = null,
     // NAAT / TrueNAT
     val isTruenatConducted: Boolean?,
     val reasonNotConductedNaat: String?,
@@ -559,6 +560,7 @@ data class TBDiagnosticsSaveRequest(
                 reasonForDenialSputum = cache.reasonForDenialSputum,
                 reasonForDenialSputumOther = cache.reasonForDenialSputumOther,
                 sputumSubmittedAt = cache.sputumSubmittedAt,
+                sputumCollectionDate = cache.sputumCollectionDate,
                 isTruenatConducted = cache.isNaatConducted,
                 reasonNotConductedNaat = cache.reasonNotConductedNaat,
                 reasonNotConductedNaatOther = cache.reasonNotConductedNaatOther,
@@ -782,6 +784,7 @@ data class TBDiagnosticsDTO(
     val reasonForDenialSputum: String? = null,
     val reasonForDenialSputumOther: String? = null,
     val sputumSubmittedAt: String? = null,
+    val sputumCollectionDate: Long? = null,
     // NAAT / TrueNAT
     val isNaatConducted: Boolean? = null,
     val reasonNotConductedNaat: String? = null,
@@ -822,6 +825,7 @@ data class TBDiagnosticsDTO(
         reasonForDenialSputum = reasonForDenialSputum,
         reasonForDenialSputumOther = reasonForDenialSputumOther,
         sputumSubmittedAt = sputumSubmittedAt,
+        sputumCollectionDate = sputumCollectionDate,
         isNaatConducted = isNaatConducted,
         reasonNotConductedNaat = reasonNotConductedNaat,
         reasonNotConductedNaatOther = reasonNotConductedNaatOther,

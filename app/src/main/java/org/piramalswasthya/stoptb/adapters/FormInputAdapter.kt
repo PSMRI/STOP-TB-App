@@ -1109,6 +1109,25 @@ class FormInputAdapter(
                     thisMonth = selectedDate.get(Calendar.MONTH)
                     thisDay = selectedDate.get(Calendar.DAY_OF_MONTH)
                 }
+                val initial = Calendar.getInstance().apply {
+                    set(Calendar.YEAR, thisYear)
+                    set(Calendar.MONTH, thisMonth)
+                    set(Calendar.DAY_OF_MONTH, thisDay)
+                }
+                val minCal = item.min?.let { Calendar.getInstance().apply { timeInMillis = it } }
+                val maxCal = item.max?.let { Calendar.getInstance().apply { timeInMillis = it } }
+                when {
+                    minCal != null && initial.before(minCal) -> {
+                        thisYear = minCal.get(Calendar.YEAR)
+                        thisMonth = minCal.get(Calendar.MONTH)
+                        thisDay = minCal.get(Calendar.DAY_OF_MONTH)
+                    }
+                    maxCal != null && initial.after(maxCal) -> {
+                        thisYear = maxCal.get(Calendar.YEAR)
+                        thisMonth = maxCal.get(Calendar.MONTH)
+                        thisDay = maxCal.get(Calendar.DAY_OF_MONTH)
+                    }
+                }
                 val datePickerDialog = DatePickerDialog(
                     it.context, R.style.AppSpinnerDatePickerDialog, { _, year, month, day ->
                         val millis = Calendar.getInstance().apply {
