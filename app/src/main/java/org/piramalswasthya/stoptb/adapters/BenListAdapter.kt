@@ -833,9 +833,12 @@ class BenListAdapter(
                             }
                         }
                         8 -> {
-                            binding.btnVitalScreen.visibility = View.GONE
-                            binding.btnVitalScreenSecondary.visibility = View.GONE
-                            ButtonConfig("", android.R.color.holo_green_dark, "NONE", "LIQUID_CULTURE")
+                            val hasLc = !tbDiag?.liquidCultureResult.isNullOrBlank()
+                            if (hasLc) {
+                                ButtonConfig("VIEW/EDIT RESULT", android.R.color.holo_green_dark, "VIEW_LC", "LIQUID_CULTURE")
+                            } else {
+                                ButtonConfig("ENTER RESULT", android.R.color.holo_red_dark, "ENTER_LC", "LIQUID_CULTURE")
+                            }
                         }
                         else -> ButtonConfig("RESULT", android.R.color.holo_green_dark, "VIEW", "")
                     }

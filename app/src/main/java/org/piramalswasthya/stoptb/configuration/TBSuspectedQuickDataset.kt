@@ -403,10 +403,13 @@ class TBSuspectedQuickDataset(
         }
 
         // ── Liquid Culture ────────────────────────────────────────────────
-        liquidCultureConducted.value = conductedFromSaved(
-            savedValue = saved?.recommendedForLiquidCultureTest ?: saved?.isLiquidCultureConducted,
-            shouldShow = shouldShowLiquidCultureConducted()
-        )
+        val lcConductedSaved = saved?.recommendedForLiquidCultureTest ?: saved?.isLiquidCultureConducted
+        liquidCultureConducted.value = when {
+            !shouldShowLiquidCultureConducted() -> ""
+            lcConductedSaved != null -> boolToYesNo(lcConductedSaved)
+            referralType == 8 -> yesValue
+            else -> ""
+        }
         liquidCultureResult.value = getLocalValueInArray(
             R.array.tb_test_result, saved?.liquidCultureResult
         )
@@ -1438,7 +1441,7 @@ class TBSuspectedQuickDataset(
 
         // Liquid Culture
         liquidCultureConducted.isEnabled =
-            shouldShowLiquidCultureConducted() && !lockLiquidCulture
+            shouldShowLiquidCultureConducted() && !lockLiquidCulture && referralType != 8
         liquidCultureConducted.required =
             shouldShowLiquidCultureConducted() && !lockLiquidCulture
         if (!shouldShowLiquidCultureConducted()) resetField(liquidCultureConducted)
@@ -1532,11 +1535,6 @@ class TBSuspectedQuickDataset(
         true -> yesValue
         false -> noValue
         null -> ""
-    }
-
-    private fun conductedFromSaved(savedValue: Boolean?, shouldShow: Boolean): String {
-        if (!shouldShow) return ""
-        return boolToYesNo(savedValue)
     }
 
     private fun resetField(formElement: FormElement) {
