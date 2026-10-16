@@ -1655,8 +1655,7 @@ abstract class InAppDb : RoomDatabase() {
 
         private val MIGRATION_53_54 = object : Migration(53, 54) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                if (!columnExists(database, "TB_DIAGNOSTICS", "sputumCollectionDate") &&
-                    !columnExists(database, "TB_DIAGNOSTICS", "sputumSampleCollectionDate")
+                if (!columnExists(database, "TB_DIAGNOSTICS", "sputumCollectionDate")
                 ) {
                     database.execSQL(
                         "ALTER TABLE TB_DIAGNOSTICS ADD COLUMN sputumCollectionDate INTEGER"
