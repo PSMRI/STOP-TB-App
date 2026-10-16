@@ -230,6 +230,10 @@ class NewBenRegFragment : Fragment() {
             sendOtpClickListener = FormInputAdapter.SendOtpClickListener { _, _, _, _, _, _, _ -> },
             selectImageClickListener = FormInputAdapter.SelectUploadImageClickListener { },
             viewDocumentListner = FormInputAdapter.ViewDocumentOnClick { },
+            pencilEditClickListener = FormInputAdapter.PencilEditClickListener { formId ->
+                val idx = viewModel.enableFieldEditAndGetIndex(formId)
+                if (idx >= 0) binding.form.rvInputForm.adapter?.notifyItemChanged(idx)
+            },
             isEnabled = true,
         )
         binding.form.rvInputForm.adapter = adapter
@@ -280,7 +284,7 @@ class NewBenRegFragment : Fragment() {
                 State.SAVE_SUCCESS -> {
                     binding.llContent.visibility = View.VISIBLE
                     binding.pbForm.visibility = View.GONE
-                    Toast.makeText(context, resources.getString(R.string.save_successful), Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, resources.getString(R.string.registration_successful), Toast.LENGTH_LONG).show()
                     try {
                         WorkerUtils.triggerAmritPushWorker(requireContext())
                         if (viewModel.isNonHHArg) {

@@ -14,6 +14,7 @@ data class FormElement(
     var doubleStar: Boolean = false,
     val hasDependants: Boolean = false,
     val hasAlertError: Boolean = false,
+    var hasPencilEdit: Boolean = false,
     var value: String? = null,
     val regex: String? = null,
     var allCaps: Boolean = false,

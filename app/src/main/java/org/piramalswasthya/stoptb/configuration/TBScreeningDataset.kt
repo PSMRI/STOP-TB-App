@@ -285,7 +285,7 @@ class TBScreeningDataset(
         val fields = requiredSymptomFields()
         return when {
             fields.any { isYes(it) } || isYes(others)  -> noValue   // any Yes  → Not asymptomatic
-            fields.all { it.value == noValue }         -> yesValue  // all No   → Asymptomatic
+            (fields + others).all { it.value == noValue } -> yesValue  // all No   → Asymptomatic
             else                                        -> null      // still answering → blank
         }
     }

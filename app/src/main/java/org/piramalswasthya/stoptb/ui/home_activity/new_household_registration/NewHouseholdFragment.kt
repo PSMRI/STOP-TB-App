@@ -139,6 +139,11 @@ class NewHouseholdFragment : Fragment() {
         }
     }
 
+    private fun updateSubmitButtonState() {
+        val isEditOrNew = viewModel.readRecord.value == false
+        binding.btnSubmit.isEnabled = isEditOrNew && viewModel.isTotalMembersValid()
+    }
+
     private fun setupFormAdapter() {
         val adapter = FormInputAdapter(
             formValueListener = FormInputAdapter.FormValueListener { formId, index ->
@@ -150,7 +155,7 @@ class NewHouseholdFragment : Fragment() {
                     else -> {
                         viewModel.updateListOnValueChanged(formId, index)
                         hardCodedListUpdate(formId)
-
+                        updateSubmitButtonState()
                     }
                 }
             },
@@ -159,7 +164,10 @@ class NewHouseholdFragment : Fragment() {
         binding.form.rvInputForm.adapter = adapter
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.formList.collect { list ->
-                if (list.isNotEmpty()) adapter.submitList(list)
+                if (list.isNotEmpty()) {
+                    adapter.submitList(list)
+                    updateSubmitButtonState()
+                }
             }
         }
     }
@@ -211,6 +219,7 @@ class NewHouseholdFragment : Fragment() {
             val canEditHousehold = roleManager.privilegesUnion().householdPermission == Permission.FULL
             binding.fabEdit.visibility = if (recordExists && canEditHousehold) View.VISIBLE else View.GONE
             binding.btnSubmit.visibility = if (!recordExists) View.VISIBLE else View.GONE
+            updateSubmitButtonState()
             binding.btnCancel.visibility = if (!recordExists) View.VISIBLE else View.GONE
             binding.btnRefreshLocation.isEnabled = !recordExists
             binding.cbGpsUnavailable.isEnabled = !recordExists
@@ -235,7 +244,11 @@ class NewHouseholdFragment : Fragment() {
                 State.SAVE_SUCCESS -> {
                     binding.llContent.visibility = View.VISIBLE
                     binding.pbForm.visibility = View.GONE
-                    Toast.makeText(context, getString(R.string.save_successful), Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        context,
+                        getString(if (!editMode) R.string.registration_successful else R.string.save_successful),
+                        Toast.LENGTH_LONG
+                    ).show()
                     if (!editMode) {
                         viewModel.setRecordExists(true)
                         showNextScreenAlert()
@@ -714,6 +727,7 @@ class NewHouseholdFragment : Fragment() {
 
     private fun submitForm() {
         activity?.currentFocus?.clearFocus()
+        if (!viewModel.isTotalMembersValid()) return
         if (!validateCurrentPage()) return
         if (!validateLocationSection()) return
         if (!viewModel.getIsConsentAgreed()) {
@@ -805,41 +819,32 @@ class NewHouseholdFragment : Fragment() {
 
     private fun showNextScreenAlert() {
         if (!isAdded) return
-        MaterialAlertDialogBuilder(requireContext())
-            .setMessage(getString(R.string.patient_registered_successfully))
-            .setCancelable(false)
-            .setPositiveButton(getString(R.string.ok)) { successDialog, _ ->
-                successDialog.dismiss()
-                if (isAdded) {
-                    if (viewModel.linkBenId != 0L) {
-                        android.widget.Toast.makeText(requireContext(), "Beneficiary linked as Head of Family successfully", android.widget.Toast.LENGTH_SHORT).show()
-                        org.piramalswasthya.stoptb.work.WorkerUtils.triggerAmritPushWorker(requireContext())
-                        val popped = findNavController().popBackStack(R.id.nonHHFragment, false)
-                        if (!popped) findNavController().navigateUp()
-                    } else {
-                        MaterialAlertDialogBuilder(requireContext())
-                            .setMessage(getString(R.string.proceed_to_register_hof))
-                            .setCancelable(false)
-                            .setPositiveButton(getString(R.string.yes)) { dialog, _ ->
-                                dialog.dismiss()
-                                if (isAdded) {
-                                    findNavController().navigate(
-                                        NewHouseholdFragmentDirections.actionNewHouseholdFragmentToNewBenRegFragment(
-                                            hhId = viewModel.getHHId(),
-                                            relToHeadId = 18
-                                        )
-                                    )
-                                }
-                            }
-                            .setNegativeButton(getString(R.string.no)) { dialog, _ ->
-                                dialog.dismiss()
-                                if (isAdded) findNavController().navigateUp()
-                            }
-                            .show()
+        if (viewModel.linkBenId != 0L) {
+            android.widget.Toast.makeText(requireContext(), "Beneficiary linked as Head of Family successfully", android.widget.Toast.LENGTH_SHORT).show()
+            org.piramalswasthya.stoptb.work.WorkerUtils.triggerAmritPushWorker(requireContext())
+            val popped = findNavController().popBackStack(R.id.nonHHFragment, false)
+            if (!popped) findNavController().navigateUp()
+        } else {
+            MaterialAlertDialogBuilder(requireContext())
+                .setMessage(getString(R.string.proceed_to_register_hof))
+                .setCancelable(false)
+                .setPositiveButton(getString(R.string.yes)) { dialog, _ ->
+                    dialog.dismiss()
+                    if (isAdded) {
+                        findNavController().navigate(
+                            NewHouseholdFragmentDirections.actionNewHouseholdFragmentToNewBenRegFragment(
+                                hhId = viewModel.getHHId(),
+                                relToHeadId = 18
+                            )
+                        )
                     }
                 }
-            }
-            .show()
+                .setNegativeButton(getString(R.string.no)) { dialog, _ ->
+                    dialog.dismiss()
+                    if (isAdded) findNavController().navigateUp()
+                }
+                .show()
+        }
     }
 
 

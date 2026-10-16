@@ -43,28 +43,38 @@ class IconDataset @Inject constructor(
         // Legacy, kept for reference:
 //        val role = preferenceDao.getLoggedInUser()?.role
         val homeModules = roleManager.privilegesForActiveRole().homeModules
-        val iconList = mutableListOf(
-            Icon(
-                R.drawable.ic__hh,
-                resources.getString(R.string.icon_title_household),
-                resources.getString(R.string.home_card_household_subtitle),
-                recordsRepo.hhListCount,
-                VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllHouseholdFragment()
-            ),
-            Icon(
-                R.drawable.ic__ben,
-                resources.getString(R.string.icon_title_ben),
-                resources.getString(R.string.home_card_all_ben_subtitle),
-                recordsRepo.allBenListCount,
-                VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment()
+        // Household/Beneficiaries used to be unconditional here — every existing role
+        // (Registrar/Nurse/Counsellor) always had both. Lab Technician is the first role
+        // without Household access, so both are now gated on homeModules like everything else.
+        val iconList = mutableListOf<Icon>()
+        if (AppModule.HOUSEHOLD in homeModules) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic_health_home,
+                    resources.getString(R.string.icon_title_household),
+                    resources.getString(R.string.home_card_household_subtitle),
+                    recordsRepo.hhListCount,
+                    VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllHouseholdFragment()
+                )
             )
-        )
+        }
+        if (AppModule.BENEFICIARIES in homeModules) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic_health_person,
+                    resources.getString(R.string.icon_title_ben),
+                    resources.getString(R.string.home_card_all_ben_subtitle),
+                    recordsRepo.allBenListCount,
+                    VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment()
+                )
+            )
+        }
 
 //        if (role.isRegistrationOfficerRole() || role.isCounsellingOfficerRole() || role.isNurseRole()) {
         if (AppModule.NON_HOUSEHOLD in homeModules) {
             iconList.add(
                 Icon(
-                    R.drawable.ic__ben,
+                    R.drawable.ic_health_person,
                     resources.getString(R.string.icon_title_non_hh),
                     resources.getString(R.string.home_card_non_hh_subtitle),
                     recordsRepo.nonHHListCount,
@@ -72,14 +82,16 @@ class IconDataset @Inject constructor(
                         .actionVolunteerHomeFragmentToNonHHFragment()
                 )
             )
+
         }
+
 
 //        if (role.isNurseRole() || role.isCounsellingOfficerRole()) {
         if (AppModule.TUBERCULOSIS in homeModules || AppModule.REFERRAL in homeModules) {
             if (AppModule.TUBERCULOSIS in homeModules) {
                 iconList.add(
                     Icon(
-                        R.drawable.ic__ncd,
+                        R.drawable.ic_health_tuberculosis,
                         resources.getString(R.string.tuberculosis),
                         resources.getString(R.string.home_card_tb_subtitle),
                         null,
@@ -92,7 +104,7 @@ class IconDataset @Inject constructor(
             if (AppModule.REFERRAL in homeModules) {
                 iconList.add(
                     Icon(
-                        R.drawable.ic_ncd_noneligible,
+                        R.drawable.ic_health_rural_post,
                         resources.getString(R.string.ncd_refer_list),
                         resources.getString(R.string.home_card_referral_subtitle),
                         null,
@@ -183,7 +195,7 @@ class IconDataset @Inject constructor(
         if (AppModule.HOUSEHOLD in modules) {
             iconList.add(
                 Icon(
-                    R.drawable.ic__hh,
+                    R.drawable.ic_health_home,
                     resources.getString(R.string.icon_title_household),
                     resources.getString(R.string.home_card_household_subtitle),
                     recordsRepo.hhListCount,
@@ -194,7 +206,7 @@ class IconDataset @Inject constructor(
         if (AppModule.BENEFICIARIES in modules) {
             iconList.add(
                 Icon(
-                    R.drawable.ic__ben,
+                    R.drawable.ic_health_person,
                     resources.getString(R.string.icon_title_ben),
                     resources.getString(R.string.home_card_all_ben_subtitle),
                     recordsRepo.allBenListCount,
@@ -205,7 +217,7 @@ class IconDataset @Inject constructor(
         if (AppModule.NON_HOUSEHOLD in modules) {
             iconList.add(
                 Icon(
-                    R.drawable.ic__ben,
+                    R.drawable.ic_health_person,
                     resources.getString(R.string.icon_title_non_hh),
                     resources.getString(R.string.home_card_non_hh_subtitle),
                     recordsRepo.nonHHListCount,
@@ -216,7 +228,7 @@ class IconDataset @Inject constructor(
         if (AppModule.TUBERCULOSIS in modules) {
             iconList.add(
                 Icon(
-                    R.drawable.ic__ncd,
+                    R.drawable.ic_health_tuberculosis,
                     resources.getString(R.string.tuberculosis),
                     resources.getString(R.string.home_card_tb_subtitle),
                     null,
@@ -227,7 +239,7 @@ class IconDataset @Inject constructor(
         if (AppModule.REFERRAL in modules) {
             iconList.add(
                 Icon(
-                    R.drawable.ic_ncd_noneligible,
+                    R.drawable.ic_health_rural_post,
                     resources.getString(R.string.ncd_refer_list),
                     resources.getString(R.string.home_card_referral_subtitle),
                     null,

@@ -61,15 +61,18 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
 
     private val totalMembersInHousehold = FormElement(
         id = 21,
-        inputType = EDIT_TEXT,
+        inputType = org.piramalswasthya.stoptb.model.InputType.NUMBER_PICKER,
         title = resources.getString(R.string.nhhr_total_members_hh),
         arrayId = -1,
         required = true,
+        value = "0",
         etInputType = InputType.TYPE_CLASS_NUMBER, // whole numbers only, no decimal flag
         etMaxLength = 2,
         max = 99,
-        min = 1
+        min = 0
     )
+
+    private var minRequiredMembers: Long = 1
 
     private val registeredAtCampSite = FormElement(
         id = 22,
@@ -208,7 +211,8 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
 
     suspend fun setupPage(hh: HouseholdCache?,
                               villageNames: Array<String>? = null,
-                              villageEntityList: List<LocationEntity> = emptyList()
+                              villageEntityList: List<LocationEntity> = emptyList(),
+                              registeredMemberCount: Int = 0
     ) {
 
         val list = mutableListOf<FormElement>()
@@ -243,7 +247,11 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         }
 
         hh?.family?.let { saved ->
-            totalMembersInHousehold.value = saved.totalHhMembers?.toString()
+            // Total can never be edited below the members already registered — see isMemberLimitReached.
+            minRequiredMembers = maxOf(1, registeredMemberCount.toLong())
+            totalMembersInHousehold.min = minRequiredMembers
+            totalMembersInHousehold.value =
+                maxOf(saved.totalHhMembers ?: 0, minRequiredMembers.toInt()).toString()
             registeredAtCampSite.value = registeredAtCampSite.getStringFromPosition(saved.isRegisteredAtCampSiteId)
             firstNameHeadOfFamily.value = saved.familyHeadName
             lastNameHeadOfFamily.value = saved.familyName
@@ -771,6 +779,10 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
     fun freezeHouseholdId(household: HouseholdCache, userId: Int) {
         household.householdId = getHHidFromUserId(userId)
     }
+
+    fun getTotalMembers(): Int = totalMembersInHousehold.value?.toIntOrNull() ?: 0
+
+    fun isTotalMembersValid(): Boolean = getTotalMembers() >= minRequiredMembers
 
     fun enableEditMode() {
         if (firstNameHeadOfFamily.inputType == TEXT_VIEW) firstNameHeadOfFamily.inputType = EDIT_TEXT

@@ -87,6 +87,21 @@ class RoleModuleConfigTest {
     }
 
     @Test
+    fun `lab technician gets view-only beneficiaries and tuberculosis, full CRUD on referral`() {
+        val p = RoleModuleConfig.privilegeFor(AppRole.LAB_TECHNICIAN)
+        assertThat(p.homeModules).containsExactly(
+            AppModule.BENEFICIARIES, AppModule.REFERRAL, AppModule.TUBERCULOSIS
+        )
+        assertThat(p.canActOnReferral).isTrue()
+        assertThat(p.beneficiaryPermission).isEqualTo(Permission.VIEW)
+        // No Household/Non-Household access at all — not granted by the acceptance criteria.
+        assertThat(p.householdPermission).isEqualTo(Permission.NONE)
+        assertThat(p.nonHouseholdPermission).isEqualTo(Permission.NONE)
+        assertThat(p.anthropometryPermission).isEqualTo(Permission.NONE)
+        assertThat(p.tbScreeningPermission).isEqualTo(Permission.NONE)
+    }
+
+    @Test
     fun `registrar plus nurse union grants full CRUD everywhere either role does`() {
         val union = ModulePrivilege.union(
             listOf(RoleModuleConfig.privilegeFor(AppRole.REGISTRAR), RoleModuleConfig.privilegeFor(AppRole.NURSE))
@@ -108,6 +123,22 @@ class RoleModuleConfigTest {
         assertThat(union.nonHouseholdPermission).isEqualTo(Permission.FULL)
         assertThat(union.anthropometryPermission).isEqualTo(Permission.FULL)
         assertThat(union.tbScreeningPermission).isEqualTo(Permission.FULL)
+    }
+
+    @Test
+    fun `registrar plus lab technician union keeps registrar's full CRUD and gains referral action`() {
+        // The only two supported real-world combinations for this role today: Lab Technician
+        // alone, and Lab Technician + Registrar.
+        val union = ModulePrivilege.union(
+            listOf(RoleModuleConfig.privilegeFor(AppRole.REGISTRAR), RoleModuleConfig.privilegeFor(AppRole.LAB_TECHNICIAN))
+        )
+        assertThat(union.householdPermission).isEqualTo(Permission.FULL)
+        assertThat(union.beneficiaryPermission).isEqualTo(Permission.FULL)
+        assertThat(union.nonHouseholdPermission).isEqualTo(Permission.FULL)
+        assertThat(union.anthropometryPermission).isEqualTo(Permission.FULL)
+        assertThat(union.tbScreeningPermission).isEqualTo(Permission.FULL)
+        // Registrar alone can't act on Referral; Lab Technician's grant must survive the union.
+        assertThat(union.canActOnReferral).isTrue()
     }
 
     @Test

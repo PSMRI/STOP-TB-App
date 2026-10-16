@@ -115,7 +115,7 @@ class NcdRefferedList : Fragment() {
             }
 
             override fun afterTextChanged(p0: Editable?) {
-                viewModel.filterText(p0?.toString() ?: "")
+                viewModel.filterText(p0?.toString()?.trim() ?: "")
             }
 
         }

@@ -170,6 +170,17 @@
         tools:itemCount="2"
         tools:listitem="@layout/rv_item_household" />
 
+    <ProgressBar
+        android:id="@+id/pb_search_loading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/btn_next_page"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/ll_quick_refresh"
+        tools:visibility="visible" />
+
     <FrameLayout
         android:id="@+id/fl_empty"
         android:layout_width="match_parent"
@@ -177,14 +188,30 @@
         app:layout_constraintBottom_toTopOf="@id/btn_next_page"
         app:layout_constraintTop_toBottomOf="@+id/ll_quick_refresh">
 
-        <TextView
-            android:id="@+id/tv_empty_content"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:padding="@dimen/padding_normal"
-            android:text="@string/no_records_found"
-            android:textAppearance="@style/TextAppearance.Material3.TitleLarge" />
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_empty_content"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="@dimen/padding_normal"
+                android:text="@string/no_records_found"
+                android:textAppearance="@style/TextAppearance.Material3.TitleLarge" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_expand_search_block"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/search_other_villages"
+                android:visibility="gone"
+                tools:visibility="visible" />
+        </LinearLayout>
     </FrameLayout>
 
 

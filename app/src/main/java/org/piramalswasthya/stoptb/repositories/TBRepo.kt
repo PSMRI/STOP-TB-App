@@ -71,6 +71,7 @@ class TBRepo @Inject constructor(
                 ben.gpsLongitude?.let { tbScreeningCache.longitude = it }
             }
             tbDao.saveTbScreening(tbScreeningCache)
+            benDao.updateScreeningStatus(tbScreeningCache.benId,"SCREENED")   // NEW
         }
     }
 
@@ -119,6 +120,9 @@ class TBRepo @Inject constructor(
                 ben.gpsLongitude?.let { tbDiagnosticsCache.longitude = it }
             }
             tbDao.saveTbDiagnostics(tbDiagnosticsCache)
+            if (tbDiagnosticsCache.isChestXRayDone == true) benDao.updateScreeningStatus(tbDiagnosticsCache.benId,"SCREENED")   // NEW
+
+            if (tbDiagnosticsCache.isNaatConducted == true) benDao.updateScreeningStatus(tbDiagnosticsCache.benId,"SCREENED")   // NEW
         }
     }
 
@@ -397,11 +401,26 @@ class TBRepo @Inject constructor(
             }
             val cache = (existing ?: GeneralOpdCache(benId = ben.beneficiaryId)).copy(
                 chiefComplaints = item.optStringListOrNull("chiefComplaint"),
-                medications = item.optStringOrNull("medication")?.let { listOf(it) },
-                dosage = item.optStringOrNull("dosage"),
-                frequency = item.optStringOrNull("frequency"),
-                duration = item.optStringOrNull("duration"),
-                notes = item.optStringOrNull("notes"),
+
+                // Keep existing medication if server does not return it
+                medications = item.optStringOrNull("medication")
+                    ?.split(",")
+                    ?.map { it.trim() }
+                    ?.filter { it.isNotBlank() },
+
+
+                dosage = item.optStringOrNull("dosage")
+                    ?: existing?.dosage,
+
+                frequency = item.optStringOrNull("frequency")
+                    ?: existing?.frequency,
+
+                duration = item.optStringOrNull("duration")
+                    ?: existing?.duration,
+
+                notes = item.optStringOrNull("notes")
+                    ?: existing?.notes,
+
                 serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
                 syncState = SyncState.SYNCED
             )
@@ -651,16 +670,19 @@ class TBRepo @Inject constructor(
                         syncState = SyncState.SYNCED
                     ) ?: incoming
                 }
-                if (shouldApplyServerRecord(
-                        tbSuspectedCache?.syncState,
-                        tbSuspectedCache?.serverUpdatedDate,
-                        cache.serverUpdatedDate ?: 0L
-                    )
-                ) {
+                val shouldApply = shouldApplyServerRecord(
+                    tbSuspectedCache?.syncState,
+                    tbSuspectedCache?.serverUpdatedDate,
+                    cache.serverUpdatedDate ?: 0L
+                )
+                Timber.d("SYNC_DIAG TB Suspected pull: benId=${tbSuspectedDTO.benId} serverId=${tbSuspectedDTO.id} matchedLocalId=${tbSuspectedCache?.id} localSyncState=${tbSuspectedCache?.syncState} localServerUpdatedDate=${tbSuspectedCache?.serverUpdatedDate} incomingServerUpdatedDate=${cache.serverUpdatedDate} shouldApply=$shouldApply")
+                if (shouldApply) {
                     benDao.getBen(tbSuspectedDTO.benId)?.let {
                         tbDao.saveTbSuspected(cache)
                         tbSuspectedList.add(cache)
                     }
+                } else if (tbSuspectedCache != null && tbSuspectedCache.syncState != SyncState.SYNCED) {
+                    Timber.w("SYNC_DIAG TB Suspected pull: benId=${tbSuspectedDTO.benId} server already has this record (serverId=${tbSuspectedDTO.id}) but local id=${tbSuspectedCache.id} is stuck at syncState=${tbSuspectedCache.syncState} — reconciliation SKIPPED, will remain unsynced until a push of this local row succeeds")
                 }
             }
         }
@@ -1043,6 +1065,9 @@ class TBRepo @Inject constructor(
 
             if (tbspList.isEmpty()) return@withContext 1
 
+            val callTag = java.util.UUID.randomUUID().toString().take(6)
+            Timber.d("SYNC_DIAG[$callTag] TB Suspected push: ${tbspList.size} unsynced records, benIds=${tbspList.map { it.benId }}")
+
             val CHUNK_SIZE = 20
             val chunks = tbspList.chunked(CHUNK_SIZE)
             var successCount = 0
@@ -1050,14 +1075,21 @@ class TBRepo @Inject constructor(
 
             for (chunk in chunks) {
                 try {
+                    val excludedBenIds = mutableListOf<Long>()
                     val chunkDtos = chunk.mapNotNull { suspected ->
                         val ben = benDao.getBen(suspected.benId)
+                        if (ben == null) {
+                            excludedBenIds += suspected.benId
+                            Timber.w("SYNC_DIAG[$callTag] TB Suspected push: benId=${suspected.benId} (local id=${suspected.id}, visitDate=${suspected.visitDate}) has NO matching BENEFICIARY row locally — excluded from push payload")
+                        }
                         ben?.let {
                             suspected.toDTO()
                         }
                     }
+                    Timber.d("SYNC_DIAG[$callTag] TB Suspected push: chunk benIds=${chunk.map { it.benId }} -> ${chunkDtos.size}/${chunk.size} resolved for sending")
                     if (chunkDtos.isEmpty()) {
                         failCount += chunk.size
+                        Timber.w("SYNC_DIAG[$callTag] TB Suspected push: entire chunk skipped (no resolvable records), benIds=${chunk.map { it.benId }}")
                         continue
                     }
 
@@ -1073,11 +1105,15 @@ class TBRepo @Inject constructor(
                         if (responseString != null) {
                             val jsonObj = JSONObject(responseString)
                             val responseStatusCode = jsonObj.getInt("statusCode")
-                            Timber.d("Push to Amrit TB Suspected chunk: $responseStatusCode")
+                            Timber.d("Push to Amrit TB Suspected chunk: $responseStatusCode, callTag=$callTag, benIds=${chunk.map { it.benId }}")
                             when (responseStatusCode) {
                                 200 -> {
+                                    if (excludedBenIds.isNotEmpty()) {
+                                        Timber.w("SYNC_DIAG[$callTag] TB Suspected push: marking benIds=$excludedBenIds SYNCED even though they were NOT sent (benId resolution failed above) — this hides a real failure for those records")
+                                    }
                                     updateSyncStatusSuspected(chunk)
                                     successCount += chunk.size
+                                    Timber.d("SYNC_DIAG[$callTag] TB Suspected push: chunk marked SYNCED, benIds=${chunk.map { it.benId }}")
                                 }
 
                                 401, 5002 -> {
@@ -1085,25 +1121,26 @@ class TBRepo @Inject constructor(
                                         Timber.d("Token refreshed, TB Suspected chunk will retry next cycle")
                                     }
                                     failCount += chunk.size
+                                    Timber.w("SYNC_DIAG[$callTag] TB Suspected push: token issue, benIds=${chunk.map { it.benId }}")
                                 }
 
                                 else -> {
-                                    Timber.e("TB Suspected chunk failed with statusCode: $responseStatusCode")
+                                    Timber.e("SYNC_DIAG[$callTag] TB Suspected chunk failed with statusCode: $responseStatusCode, benIds=${chunk.map { it.benId }}, body=$responseString")
                                     failCount += chunk.size
                                 }
                             }
                         }
                     } else {
-                        Timber.e("TB Suspected chunk HTTP error: $statusCode")
+                        Timber.e("SYNC_DIAG[$callTag] TB Suspected chunk HTTP error: $statusCode, benIds=${chunk.map { it.benId }}")
                         failCount += chunk.size
                     }
                 } catch (e: Exception) {
-                    Timber.e(e, "TB Suspected chunk push failed: ${chunk.size} records")
+                    Timber.e(e, "SYNC_DIAG[$callTag] TB Suspected chunk push failed: ${chunk.size} records, benIds=${chunk.map { it.benId }}")
                     failCount += chunk.size
                 }
             }
 
-            Timber.d("TB Suspected push complete: $successCount succeeded, $failCount failed out of ${tbspList.size}")
+            Timber.d("SYNC_DIAG[$callTag] TB Suspected push complete: $successCount succeeded, $failCount failed out of ${tbspList.size}")
             return@withContext 1
         }
     }
@@ -1530,7 +1567,7 @@ class TBRepo @Inject constructor(
                 saveFailedOrderStatus(benId, testType, "HTTP Error $statusCode")
                 NetworkResponse.Error("HTTP Error $statusCode")
             } catch (e: Exception) {
-                Timber.e(e, "createProdigiOrder failed")
+                Timber.e(e, "createOrder failed")
                 // Keep errorMessage null on timeout/connect failure to flag the request for reconciliation.
                 saveFailedOrderStatus(benId, testType)
                 NetworkResponse.Error(e.message ?: "Unknown error")
@@ -1610,7 +1647,7 @@ class TBRepo @Inject constructor(
                 }
                 return@withContext NetworkResponse.Error("HTTP Error $statusCode")
             } catch (e: Exception) {
-                Timber.e(e, "retryProdigiOrder failed")
+                Timber.e(e, "retryOrder failed")
                 return@withContext NetworkResponse.Error(e.message ?: "Unknown error")
             }
         }
@@ -2110,7 +2147,7 @@ class TBRepo @Inject constructor(
                                                         }
                                                     }
                                                 } catch (e: Exception) {
-                                                    Timber.e(e, "Auto createProdigiOrder for MDR_RIF failed, attempt=${rifAttempt}")
+                                                    Timber.e(e, "Auto createOrder for MDR_RIF failed, attempt=${rifAttempt}")
                                                     rifAttempt++
                                                     if (rifAttempt <= maxRifRetries) {
                                                         kotlinx.coroutines.delay(5000L)
@@ -2167,7 +2204,12 @@ class TBRepo @Inject constructor(
                             } catch (e: Exception) {
                                 Timber.e(e, "Failed to sync diagnostic results into tb_suspected table")
                             }
-                            
+                            try {
+                                pushUnSyncedRecordsTBSuspected()
+                            } catch (e: Exception) {
+                                Timber.e(e, "Failed to call pushUnSyncedRecordsTBSuspected after fetchOrderResult")
+                            }
+
                             return@withContext NetworkResponse.Success(status)
                         } else {
                             val errorMsg = responseBody.errorMessage ?: "Failed to fetch result"
@@ -2632,7 +2674,6 @@ class TBRepo @Inject constructor(
     fun isXrayIntegrated(): Boolean {
         return preferenceDao.getXrayIntegrated()
     }
-
     fun isTruenatIntegrated(): Boolean {
         return preferenceDao.getTruenatIntegrated()
     }

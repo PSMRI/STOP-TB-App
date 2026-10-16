@@ -11,6 +11,11 @@ class AppRoleTest {
         assertThat(AppRole.fromScreenName("nurse")).isEqualTo(AppRole.NURSE)
         assertThat(AppRole.fromScreenName("COUNSELING")).isEqualTo(AppRole.COUNSELING)
         assertThat(AppRole.fromScreenName(" Registrar ")).isEqualTo(AppRole.REGISTRAR)
+        assertThat(AppRole.fromScreenName("LabTechnician")).isEqualTo(AppRole.LAB_TECHNICIAN)
+        assertThat(AppRole.fromScreenName("labtechnician")).isEqualTo(AppRole.LAB_TECHNICIAN)
+        // Confirmed via a live login failure that the backend actually sends "Lab Technician"
+        // with a space — must resolve too.
+        assertThat(AppRole.fromScreenName("Lab Technician")).isEqualTo(AppRole.LAB_TECHNICIAN)
     }
 
     @Test
@@ -36,6 +41,12 @@ class AppRoleTest {
             screenNames = listOf("Counseling", "Nurse")
         )
         assertThat(nurseCounseling).containsExactly(AppRole.NURSE, AppRole.COUNSELING).inOrder()
+
+        // Lab Technician sorts last regardless of backend order.
+        val withLabTechnician = AppRole.resolveAssignedRoles(
+            screenNames = listOf("LabTechnician", "Registrar")
+        )
+        assertThat(withLabTechnician).containsExactly(AppRole.REGISTRAR, AppRole.LAB_TECHNICIAN).inOrder()
     }
 
     @Test

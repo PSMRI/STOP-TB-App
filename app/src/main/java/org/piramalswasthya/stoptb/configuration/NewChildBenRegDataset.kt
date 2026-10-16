@@ -20,6 +20,7 @@ import org.piramalswasthya.stoptb.model.InputType.HEADLINE
 import org.piramalswasthya.stoptb.model.InputType.RADIO
 import org.piramalswasthya.stoptb.model.InputType.TEXT_VIEW
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel.Companion.isOtpVerified
+import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.new_child_ben.NewChildBenViewModel.Companion.isConsentAgreed
 import org.piramalswasthya.stoptb.utils.HelperUtil.getDiffYears
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -1156,7 +1157,7 @@ class NewChildBenRegDataset(context: Context, language: Languages) : Dataset(con
         ben.contactNumber = selectedBen!!.contactNumber
         ben.mobileNoOfRelationId = 5
         ben.isDraft = false
-        ben.isConsent = isOtpVerified
+        ben.isConsent = isConsentAgreed
         ben.isSpouseAdded = false
         ben.isChildrenAdded = false
         ben.isMarried = false

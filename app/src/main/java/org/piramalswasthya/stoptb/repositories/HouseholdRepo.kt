@@ -48,4 +48,15 @@ class HouseholdRepo @Inject constructor(
     suspend fun getDigipinForHousehold(householdId: Long): String? = withContext(Dispatchers.IO) {
         dao.getHousehold(householdId)?.digipin
     }
+
+    /** Total family members declared at HH registration; null for legacy households with no cap. */
+    suspend fun getTotalHhMembers(householdId: Long): Int? = withContext(Dispatchers.IO) {
+        dao.getHousehold(householdId)?.family?.totalHhMembers
+    }
+
+    /** True once registered members reach the declared total — blocks adding further members. */
+    suspend fun isMemberLimitReached(householdId: Long): Boolean = withContext(Dispatchers.IO) {
+        val total = dao.getHousehold(householdId)?.family?.totalHhMembers ?: return@withContext false
+        benDao.getAllBenForHousehold(householdId).size >= total
+    }
 }

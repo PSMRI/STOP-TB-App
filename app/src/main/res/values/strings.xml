@@ -306,6 +306,7 @@
     <string name="delivery_outcome_list">Delivery Outcome List</string>
     <string name="communicable_diseases">Communicable Diseases</string>
     <string name="dashboard">Dashboard</string>
+    <string name="total_unscreened">Unscreened Population</string>
     <string name="abha_ids">ABHA IDs</string>
     <string name="pending_sync">Pending Sync</string>
     <string name="loading_form">Loading form...</string>
@@ -396,7 +397,7 @@
     <string name="child_immunization">Child Immunization</string>
     <string name="relation_with_hof">Relation with HOF</string>
     <string name="add_family_member">Add Family Member</string>
-    <string name="add_household_member">Add HoF Member</string>
+    <string name="add_household_member">Register HoF member</string>
     <string name="app_native_name">TBMJA</string>
     <string name="non_pregnant_women_eligible_couple_section">Non-Pregnant Women (Eligible Couple) section</string>
     <string name="time_of_death">Time of Death</string>
@@ -922,6 +923,7 @@
     <string name="tb_asymptomatic_screening">Asymptomatic Screening</string>
     <string name="tb_is_beneficiary_asymptomatic">Beneficiary is Asymptomatic</string>
     <string name="risk_factors">Risk Factors</string>
+    <string name="other_details">Other Details</string>
     <string name="tb_rise_of_fever">Rise of fever in evening</string>
     <string name="tb_loss_of_appetite">Loss of Appetite</string>
     <string name="tb_age_more_than_60">Age more than 60 years</string>
@@ -1232,6 +1234,10 @@
     </string-array>
 
     <!-- Examine flow -->
+    <string name="ben_card_tb_symptoms">TB Symptoms</string>
+    <string name="ben_card_chest_xray">Chest X-Ray</string>
+    <string name="ben_card_truenat">TrueNat</string>
+    <string name="ben_card_result">Result: %1$s</string>
     <string name="btn_examine">Examine</string>
     <string name="btn_examine_count">Examine %1$d/4</string>
     <string name="btn_examine_count_of">Examine %1$d/%2$d</string>
@@ -1378,6 +1384,7 @@
     <string name="counselling_consent">Counselling Consent</string>
 
     <string name="dialog_no">No</string>
+    <string name="registration_successful">Registration Successful</string>
     <string name="patient_registered_successfully">Patient Registered Successfully</string>
     <string name="proceed_to_register_hof">Do you want to proceed with registration of Head of the Family?</string>
     <string name="refused">Refused</string>
@@ -1387,6 +1394,7 @@
     <string name="role_tab_registrar">Registration</string>
     <string name="role_tab_nurse">Treatment</string>
     <string name="role_tab_counseling">Counselling</string>
+    <string name="role_tab_lab_technician">Diagnostics</string>
 
     <!-- Multi-role Home screen — Counselling tab "Coming soon" placeholder cards -->
     <string name="home_card_counselling_title">Counselling</string>
@@ -1394,5 +1402,7 @@
     <string name="home_card_tb_treatment_followup_title">TB Treatment Follow-up</string>
     <string name="home_card_tpt_title">TPT</string>
     <string name="home_card_coming_soon_subtitle">Coming soon</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
 </resources>
 

@@ -30,7 +30,6 @@
     <string name="failure_to_gain_weight_children">Failure to gain weight (in Children)</string>
     <string name="decreased_activity_or_playfulness_children">Decreased activity or Playfulness (in Children)</string>
     <string name="others">Others</string>
-    <string name="other_details">Other details</string>
 
 
     <string name="cbac_recurrent_ulceration">Recurrent ulceration on palm or sole</string>
@@ -206,6 +205,9 @@
     <string name="sputum_test_result">Sputum Test Result</string>
     <string name="referred_to_facility">Referred to Facility</string>
     <string name="facility_referral_follow_ups">Facility Referral follow-ups</string>
+
+
+    <string name="unscreened_population_title">Unscreened Population</string>
 
     <string-array name="tb_submitted_yet">
         <item>DMC</item>
