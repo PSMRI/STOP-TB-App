@@ -379,11 +379,20 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                                 )
                             )
                         }
-                        "ENTER_LC", "VIEW_LC" -> {
+                        "ENTER_LC" -> {
                             findNavController().navigate(
                                 AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
                                     benId = item.benId,
                                     viewOnly = false,
+                                    referralType = 8
+                                )
+                            )
+                        }
+                        "VIEW_LC" -> {
+                            findNavController().navigate(
+                                AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                    benId = item.benId,
+                                    viewOnly = true,
                                     referralType = 8
                                 )
                             )
