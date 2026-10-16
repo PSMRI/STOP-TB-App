@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.configuration
 
 import android.content.Context
 import android.widget.LinearLayout
+import java.util.Calendar
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.model.AgeUnit
@@ -181,6 +182,18 @@ class TBSuspectedQuickDataset(
         hasDependants = true
     )
 
+    // Shown only when "Is sputum collected?" is Yes. Today by default; yesterday is the
+    // earliest allowed day and today is the latest.
+    private val sputumCollectionDate = FormElement(
+        id = 25,
+        inputType = InputType.DATE_PICKER,
+        title = resources.getString(R.string.tb_sputum_sample_collection_date),
+        required = true,
+        min = startOfDay(-1),
+        max = endOfDay(0),
+        hasDependants = true
+    )
+
     // ── NAAT / TrueNAT block ──────────────────────────────────────────────────
 
     val trueNatConducted = FormElement(
@@ -353,6 +366,9 @@ class TBSuspectedQuickDataset(
         sputumSampleSubmittedAt.value = getLocalValueInArray(
             R.array.tb_diagnostics_sputum_submitted_at, saved?.sputumSubmittedAt
         )
+        sputumCollectionDate.value = saved?.sputumCollectionDate
+            ?.takeIf { it > 0L }
+            ?.let { getDateFromLong(it) }
 
         // ── TrueNAT ───────────────────────────────────────────────────────
         val isTrueNatDone = saved?.isNaatConducted == true || !saved?.naatResult.isNullOrBlank()
@@ -565,6 +581,8 @@ class TBSuspectedQuickDataset(
                                 sputumSampleSubmittedAt.value = sputumSampleSubmittedAt.entries?.firstOrNull()
                             }
                             addItems.add(sputumSampleSubmittedAt)
+                            ensureSputumCollectionDateDefault()
+                            addItems.add(sputumCollectionDate)
                         } else {
                             if (reasonForDenialSputum.value.isNullOrBlank()) {
                                 reasonForDenialSputum.value = "0"
@@ -590,7 +608,8 @@ class TBSuspectedQuickDataset(
                         isSputumCollectedField,
                         reasonForDenialSputum,
                         reasonForDenialSputumOther,
-                        sputumSampleSubmittedAt
+                        sputumSampleSubmittedAt,
+                        sputumCollectionDate
                     ))
                 }
 
@@ -635,6 +654,8 @@ class TBSuspectedQuickDataset(
                             sputumSampleSubmittedAt.value = sputumSampleSubmittedAt.entries?.firstOrNull()
                         }
                         addItems.add(sputumSampleSubmittedAt)
+                        ensureSputumCollectionDateDefault()
+                        addItems.add(sputumCollectionDate)
                         if (shouldShowTrueNatConducted()) {
                             addItems.add(trueNatConducted)
                             if (isYes(trueNatConducted)) {
@@ -671,6 +692,7 @@ class TBSuspectedQuickDataset(
                         removeItems = listOf(
                             isSputumCollectedField,
                             sputumSampleSubmittedAt,
+                            sputumCollectionDate,
                             trueNatConducted,
                             reasonNotConductedNaat,
                             reasonNotConductedNaatOther,
@@ -690,7 +712,11 @@ class TBSuspectedQuickDataset(
                     if (sputumSampleSubmittedAt.value.isNullOrBlank()) {
                         sputumSampleSubmittedAt.value = sputumSampleSubmittedAt.entries?.firstOrNull()
                     }
-                    val addItems = mutableListOf<FormElement>(sputumSampleSubmittedAt)
+                    ensureSputumCollectionDateDefault()
+                    val addItems = mutableListOf<FormElement>(
+                        sputumSampleSubmittedAt,
+                        sputumCollectionDate
+                    )
                     if (shouldShowTrueNatConducted()) {
                         addItems.add(trueNatConducted)
                         if (isYes(trueNatConducted)) {
@@ -717,6 +743,7 @@ class TBSuspectedQuickDataset(
                         source = isSputumCollectedField,
                         removeItems = listOf(
                             sputumSampleSubmittedAt,
+                            sputumCollectionDate,
                             trueNatConducted,
                             reasonNotConductedNaat,
                             reasonNotConductedNaatOther,
@@ -737,6 +764,11 @@ class TBSuspectedQuickDataset(
                 )
             }
 
+            sputumCollectionDate.id -> {
+                applySputumCollectionDateError()
+                getIndexOfElement(sputumCollectionDate).coerceAtLeast(0)
+            }
+
             sputumSampleSubmittedAt.id -> {
                 sputumSampleSubmittedAt.value =
                     sputumSampleSubmittedAt.entries?.getOrNull(index)
@@ -744,6 +776,10 @@ class TBSuspectedQuickDataset(
                 // Show TrueNAT if applicable after sputum submission
                 val addItems = mutableListOf<FormElement>()
                 val removeItems = mutableListOf<FormElement>()
+                if (isYes(isSputumCollectedField)) {
+                    ensureSputumCollectionDateDefault()
+                    addItems.add(sputumCollectionDate)
+                }
                 if (shouldShowTrueNatConducted()) {
                     addItems.add(trueNatConducted)
                 } else {
@@ -941,6 +977,10 @@ class TBSuspectedQuickDataset(
                     if (sputumVisible && isSputumCollectedNow)
                         getEnglishValueInArray(R.array.tb_diagnostics_sputum_submitted_at, sputumSampleSubmittedAt.value)
                     else null
+                form.sputumCollectionDate =
+                    if (sputumVisible && isSputumCollectedNow)
+                        getLongFromDate(sputumCollectionDate.value).takeIf { it > 0L }
+                    else null
 
                 form.isNaatConducted =
                     if (shouldShowTrueNatConducted()) isYes(trueNatConducted) else null
@@ -1051,6 +1091,7 @@ class TBSuspectedQuickDataset(
                     add(isSputumCollectedField)
                     if (isYes(isSputumCollectedField)) {
                         add(sputumSampleSubmittedAt)
+                        add(sputumCollectionDate)
                         if (referralMode || referralType == 0 || referralType == 7) {
                             add(trueNatConducted)
                             if (isYes(trueNatConducted)) {
@@ -1267,6 +1308,15 @@ class TBSuspectedQuickDataset(
         val sputumDenied = isNo(referredForSputumCollection) ||
                 (isYes(referredForSputumCollection) && isNo(isSputumCollectedField))
         sputumSampleSubmittedAt.isEnabled = !referralMode  // not editable when Submit is hidden (view mode)
+        val showCollectionDate = shouldShowIsSputumCollected() && isYes(isSputumCollectedField)
+        refreshSputumCollectionDateBounds()
+        sputumCollectionDate.isEnabled = showCollectionDate && !referralMode
+        sputumCollectionDate.required = showCollectionDate && !referralMode
+        if (showCollectionDate && !referralMode) {
+            ensureSputumCollectionDateDefault()
+            applySputumCollectionDateError()
+        }
+        if (!showCollectionDate) resetField(sputumCollectionDate)
         reasonForDenialSputum.isEnabled = true
         reasonForDenialSputum.required = true
 
@@ -1540,6 +1590,52 @@ class TBSuspectedQuickDataset(
     private fun resetField(formElement: FormElement) {
         formElement.value = null
         formElement.errorText = null
+    }
+
+    private fun startOfDay(dayOffset: Int): Long = Calendar.getInstance().apply {
+        add(Calendar.DAY_OF_YEAR, dayOffset)
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+
+    private fun endOfDay(dayOffset: Int): Long = Calendar.getInstance().apply {
+        add(Calendar.DAY_OF_YEAR, dayOffset)
+        set(Calendar.HOUR_OF_DAY, 23)
+        set(Calendar.MINUTE, 59)
+        set(Calendar.SECOND, 59)
+        set(Calendar.MILLISECOND, 999)
+    }.timeInMillis
+
+    private fun refreshSputumCollectionDateBounds() {
+        sputumCollectionDate.min = startOfDay(-1)
+        sputumCollectionDate.max = endOfDay(0)
+    }
+
+    private fun ensureSputumCollectionDateDefault() {
+        refreshSputumCollectionDateBounds()
+        if (sputumCollectionDate.value.isNullOrBlank()) {
+            sputumCollectionDate.value = getDateFromLong(System.currentTimeMillis())
+        }
+    }
+
+    private fun applySputumCollectionDateError() {
+        val value = sputumCollectionDate.value
+        val emptyError = resources.getString(R.string.form_input_empty_error)
+        if (value.isNullOrBlank()) {
+            if (sputumCollectionDate.errorText != emptyError) {
+                sputumCollectionDate.errorText = null
+            }
+            return
+        }
+        val selected = getLongFromDate(value)
+        val inRange = selected in startOfDay(-1)..endOfDay(0)
+        sputumCollectionDate.errorText = if (inRange) {
+            null
+        } else {
+            resources.getString(R.string.tb_sputum_collection_date_range_error)
+        }
     }
 
     /**

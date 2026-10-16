@@ -1455,6 +1455,8 @@
     <string name="tb_reason_for_denial_sputum">Reason for Denial of Sputum Collection</string>
     <string name="tb_reason_for_denial_sputum_other">Specify other reason for denial (Sputum)</string>
     <string name="tb_sputum_submitted_at">Sputum Sample Submission Center</string>
+    <string name="tb_sputum_sample_collection_date">Sputum Sample Collection date</string>
+    <string name="tb_sputum_collection_date_range_error">Select today or yesterday only</string>
     <string name="sputum_sample_submitted_at_screening_camp">Sputum Sample Submitted at TB Screening Camp</string>
     <string name="tb_reason_not_conducted_naat">Reason True NAT not conducted</string>
     <string name="tb_reason_not_conducted_naat_other">Specify other reason (True NAT not conducted)</string>

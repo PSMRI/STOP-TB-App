@@ -122,7 +122,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 58, exportSchema = false
+    version = 59, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -1723,6 +1723,17 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_58_59 = object : Migration(58, 59) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "TB_DIAGNOSTICS", "sputumCollectionDate")
+                ) {
+                    database.execSQL(
+                        "ALTER TABLE TB_DIAGNOSTICS ADD COLUMN sputumCollectionDate INTEGER"
+                    )
+                }
+            }
+        }
+
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(
@@ -2008,6 +2019,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_55_56)
                         .addMigrations(MIGRATION_56_57)
                         .addMigrations(MIGRATION_57_58)
+                        .addMigrations(MIGRATION_58_59)
                         .fallbackToDestructiveMigration()
                         .build()
 
