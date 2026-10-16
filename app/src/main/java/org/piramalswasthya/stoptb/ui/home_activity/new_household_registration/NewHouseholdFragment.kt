@@ -827,7 +827,7 @@ class NewHouseholdFragment : Fragment() {
         if (!isAdded) return
         if (viewModel.linkBenId != 0L) {
             android.widget.Toast.makeText(requireContext(), "Beneficiary linked as Head of Family successfully", android.widget.Toast.LENGTH_SHORT).show()
-            org.piramalswasthya.stoptb.work.WorkerUtils.triggerAmritPushWorker(requireContext())
+            org.piramalswasthya.stoptb.work.WorkerUtils.triggerAmritPushWorker(requireContext(), "DIRECT_SAVE")
             val popped = findNavController().popBackStack(R.id.nonHHFragment, false)
             if (!popped) findNavController().navigateUp()
         } else {

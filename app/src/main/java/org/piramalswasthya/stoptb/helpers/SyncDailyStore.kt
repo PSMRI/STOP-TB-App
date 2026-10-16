@@ -37,6 +37,9 @@ internal object SyncDailyStore {
                 val day = syncDay(at)
                 val keys = ids.map { it.toString() }.filter { it.isNotBlank() && it != "0" }.distinct()
                 if (keys.isEmpty()) return@withContext
+                if (action == "SAVE" && trace == null) runCatching {
+                    timber.log.Timber.tag("SyncTrace").i("LOCAL SAVE | module=%s | records=%d | outcome=%s", module, keys.size, outcome)
+                }
                 db.beginTransaction()
                 try {
                     db.execSQL("INSERT OR IGNORE INTO metadata(scope,started_at) VALUES(?,?)", arrayOf(scope, at))

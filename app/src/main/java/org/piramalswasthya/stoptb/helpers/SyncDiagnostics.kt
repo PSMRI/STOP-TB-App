@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.asContextElement
 import org.piramalswasthya.stoptb.BuildConfig
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.AppRole
@@ -106,7 +107,9 @@ object SyncDiagnostics {
                                 attempt: Int, direction: String,
                                 block: suspend () -> ListenableWorker.Result): ListenableWorker.Result {
         val runId = input.getString(RUN_ID) ?: workId.toString()
-        return withContext(SyncTrace(runId, direction, SyncDailyStore.accountScope(context))) {
+        val origin = SyncHttpOrigin(runId, direction, input.getString(TRIGGER) ?: "DIRECT")
+        return withContext(SyncTrace(runId, direction, SyncDailyStore.accountScope(context)) +
+            SyncHttpOrigins.current.asContextElement(origin)) {
             emit("SYNC WORKER START | runId=$runId | direction=$direction | worker=$name | workId=$workId | attempt=$attempt" +
                 " | trigger=${input.getString(TRIGGER) ?: "DIRECT"} | ${identity(context)}")
             try {

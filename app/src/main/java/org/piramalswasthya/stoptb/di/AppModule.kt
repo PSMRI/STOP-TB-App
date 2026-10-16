@@ -29,6 +29,8 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.FormRespons
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.AnalyticsHelper
 import org.piramalswasthya.stoptb.helpers.ApiAnalyticsInterceptor
+import org.piramalswasthya.stoptb.helpers.SyncApiPayloadInterceptor
+import org.piramalswasthya.stoptb.helpers.SyncHttpCallFactory
 import org.piramalswasthya.stoptb.helpers.TokenExpiryManager
 import org.piramalswasthya.stoptb.network.AbhaApiService
 import org.piramalswasthya.stoptb.network.AmritApiService
@@ -97,6 +99,7 @@ object AppModule {
     @Provides
     @Named(UAT_CLIENT)
     fun provideUatHttpClient(
+        syncApiPayloadInterceptor: SyncApiPayloadInterceptor,
         apiAnalyticsInterceptor: ApiAnalyticsInterceptor,
         tokenInsertTmcInterceptor: TokenInsertTmcInterceptor,
         tokenAuthenticator: TokenAuthenticator,
@@ -109,6 +112,7 @@ object AppModule {
             .addInterceptor(tokenInsertTmcInterceptor)
             .addInterceptor(apiAnalyticsInterceptor)
             .addInterceptor(campModeUrlInterceptor)
+            .addInterceptor(syncApiPayloadInterceptor)
             .addInterceptor(loggingInterceptor)
             .addInterceptor(accountDeactivationInterceptor)
             .authenticator(tokenAuthenticator) // attach authenticator for 401 handling
@@ -124,7 +128,7 @@ object AppModule {
         return Retrofit.Builder()
             .baseUrl(KeyUtils.baseTMCUrl())
             .addConverterFactory(MoshiConverterFactory.create(moshi))
-            .client(httpClient)
+            .callFactory(SyncHttpCallFactory(httpClient))
             .build()
             .create(AmritApiService::class.java)
     }
@@ -210,7 +214,7 @@ object AppModule {
         return Retrofit.Builder()
             .addConverterFactory(GsonConverterFactory.create()) // ✅ Only for this API
             .baseUrl(KeyUtils.baseTMCUrl())
-            .client(httpClient)
+            .callFactory(SyncHttpCallFactory(httpClient))
             .build()
             .create(AmritApiService::class.java)
     }

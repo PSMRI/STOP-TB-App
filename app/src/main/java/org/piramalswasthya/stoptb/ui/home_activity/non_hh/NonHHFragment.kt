@@ -401,7 +401,7 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     }
                     viewModel.linkBenToHousehold(benId, hhId, relationPos, relationName)
                     Toast.makeText(requireContext(), "Linked to household successfully", Toast.LENGTH_SHORT).show()
-                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerAmritPushWorker(requireContext())
+                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerAmritPushWorker(requireContext(), "DIRECT_SAVE")
                 }
                 .show()
         }

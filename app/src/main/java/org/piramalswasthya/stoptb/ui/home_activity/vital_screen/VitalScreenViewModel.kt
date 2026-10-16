@@ -191,7 +191,7 @@ class VitalScreenViewModel @Inject constructor(
                         referralTriggers = thresholdEvaluation.triggers,
                         syncState = SyncState.UNSYNCED
                     )
-                    vitalRepo.saveVitalsAndSync(cache)
+                    org.piramalswasthya.stoptb.helpers.withDirectSaveHttpOrigin { vitalRepo.saveVitalsAndSync(cache) }
                     if (thresholdEvaluation.shouldRefer) {
                         buildAutoReferral(thresholdEvaluation.referredFor)?.let {
                             ncdReferalRepo.saveReferedNCD(it)

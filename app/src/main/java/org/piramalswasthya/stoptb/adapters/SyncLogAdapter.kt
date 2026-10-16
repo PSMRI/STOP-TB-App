@@ -12,7 +12,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class SyncLogAdapter :
+class SyncLogAdapter(private val open: (SyncLogEntry) -> Unit = {}) :
     RecyclerView.Adapter<SyncLogAdapter.ViewHolder>() {
 
     private var entries: List<SyncLogEntry> = emptyList()
@@ -34,10 +34,12 @@ class SyncLogAdapter :
     private val timeFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
 
     class ViewHolder(
-        private val binding: RvItemSyncLogBinding
+        private val binding: RvItemSyncLogBinding,
+        private val open: (SyncLogEntry) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(item: SyncLogEntry, timeFormat: SimpleDateFormat) {
+            binding.root.setOnClickListener { open(item) }
             val (label, bgColor, textColor) = when (item.level) {
                 LogLevel.ERROR -> Triple("E", Color.parseColor("#D32F2F"), Color.parseColor("#D32F2F"))
                 LogLevel.WARN -> Triple("W", Color.parseColor("#F57C00"), Color.parseColor("#F57C00"))
@@ -66,7 +68,7 @@ class SyncLogAdapter :
         val binding = RvItemSyncLogBinding.inflate(
             LayoutInflater.from(parent.context), parent, false
         )
-        return ViewHolder(binding)
+        return ViewHolder(binding, open)
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {

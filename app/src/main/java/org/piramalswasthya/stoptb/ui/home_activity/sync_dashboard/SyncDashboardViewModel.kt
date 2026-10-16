@@ -87,7 +87,7 @@ class SyncDashboardViewModel @Inject constructor(
     }
 
     // Tab 2: Logs
-    val syncLogs: StateFlow<List<SyncLogEntry>> = syncLogManager.logs
+    val syncLogs: StateFlow<List<SyncLogEntry>> = syncLogManager.interactiveLogs
 
     fun clearLogs() = syncLogManager.clearLogs()
 

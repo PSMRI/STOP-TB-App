@@ -211,9 +211,9 @@ object WorkerUtils {
         return ids
     }
 
-    /** Convenience alias — camp check is already inside [triggerAmritPushWorker]. */
+    /** Form-save alias; source is diagnostic metadata, not a scheduling change. */
     fun triggerCampAwarePushWorker(context: Context, preferenceDao: PreferenceDao) {
-        triggerAmritPushWorker(context)
+        triggerAmritPushWorker(context, "DIRECT_SAVE")
     }
 
     /**

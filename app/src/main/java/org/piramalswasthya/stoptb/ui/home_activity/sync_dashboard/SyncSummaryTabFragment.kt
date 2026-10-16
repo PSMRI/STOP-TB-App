@@ -21,6 +21,11 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import java.text.DateFormat
 import java.util.Date
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
+import org.piramalswasthya.stoptb.database.room.InAppDb
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.helpers.SyncSummaryRun
 import org.piramalswasthya.stoptb.helpers.SyncSummaryStore
@@ -34,7 +39,10 @@ import org.piramalswasthya.stoptb.helpers.SyncDailyModule
 import org.piramalswasthya.stoptb.helpers.selectedSyncDay
 import org.piramalswasthya.stoptb.helpers.syncDay
 
+@AndroidEntryPoint
 class SyncSummaryTabFragment : Fragment(R.layout.fragment_sync_summary_tab) {
+    @Inject lateinit var database: InAppDb
+    @Inject lateinit var preferences: PreferenceDao
     private data class Row(val title: String, val body: String, val attention: Boolean = false,
         val action: String? = null, val details: String? = null, val chart: List<SyncDailyModule>? = null)
     private var dayFilter = SyncDayFilter.TODAY
@@ -81,6 +89,15 @@ class SyncSummaryTabFragment : Fragment(R.layout.fragment_sync_summary_tab) {
             val run = runs.firstOrNull { it.direction == direction }
             val rows = mutableListOf<Row>()
             if (direction == "PUSH") {
+            val village = withContext(Dispatchers.IO) { preferences.getLocationRecord()?.village }
+            val available = if (village == null || village.id <= 0) null else try {
+                database.syncVillageCountsDao().counts(village.id).associate { it.module to it.count }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { null }
+            rows.add(Row("Available in village DB (all dates)",
+                if (available == null) "Current village counts unavailable; not assumed to be zero." else
+                    "Village: ${village?.name} (${village?.id})\nModule records available: ${available.values.sum()}\n" +
+                        "Includes existing/downloaded and newly saved data. Independent of Today/Yesterday/All; this is the current DB total, not today's saves or unique patients. Drafts/deactivated records are excluded."))
             val daily = SyncDailyStore.snapshot(requestedFilter)
             if (!daily.available) rows.add(Row("Daily tracking unavailable", "No account or diagnostic history could be read. Counts are not assumed to be zero.", true))
             else {
@@ -92,7 +109,8 @@ class SyncSummaryTabFragment : Fragment(R.layout.fragment_sync_summary_tab) {
                     "\nOpen View Failures on the affected module for record IDs, time and reason."))
                 for (module in daily.modules) rows.add(Row(
                     module.name.replace('_', ' '),
-                    if (module.unidentifiedFailure) "Additional failure reported without record IDs; see Logs. Known-ID counts are shown below." else "",
+                    "Available in village DB (all dates): ${available?.get(module.name)?.toString() ?: "Not available"}\n" +
+                        if (module.unidentifiedFailure) "Additional failure reported without record IDs; see Logs. Known-ID counts are shown below." else "",
                     attention = module.failed > 0 || module.unidentifiedFailure,
                     action = if (module.failures.isNotEmpty()) "View Failures (${module.failed})" else null,
                     details = module.failures.joinToString("\n\n") {

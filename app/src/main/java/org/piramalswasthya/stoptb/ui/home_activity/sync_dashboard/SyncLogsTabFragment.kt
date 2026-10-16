@@ -1,6 +1,9 @@
 package org.piramalswasthya.stoptb.ui.home_activity.sync_dashboard
 
 import android.content.Intent
+import android.app.AlertDialog
+import android.widget.ScrollView
+import android.widget.TextView
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -52,13 +55,35 @@ class SyncLogsTabFragment : Fragment() {
             val identity = withContext(Dispatchers.IO) {
                 org.piramalswasthya.stoptb.helpers.SyncDiagnostics.identity(appContext)
             }
-            viewBinding.tvSyncIdentity.text = "$identity\nLive view: latest 200 entries, refreshed once per second. Export includes stored logs."
+            viewBinding.tvSyncIdentity.text = "$identity\nManual/direct events and masked API request/response previews. Tap a log for details. Capture limit: 32 KiB/body; larger or non-JSON bodies are explicitly omitted. View: 200; share: 500 retained entries/session. Auto-sync excluded."
         }
 
-        val adapter = SyncLogAdapter()
+        val adapter = SyncLogAdapter { entry ->
+            viewLifecycleOwner.lifecycleScope.launch {
+                val original = withContext(Dispatchers.Default) { viewModel.syncLogs.value.find { it.id == entry.id } }
+                val text = original?.message ?: "Full entry is no longer retained. Preview:\n${entry.message}"
+                val label = TextView(requireContext()).apply {
+                    setPadding(24, 16, 24, 16)
+                    this.text = text
+                    setTextIsSelectable(true)
+                }
+                AlertDialog.Builder(requireContext()).setTitle("${entry.tag} details")
+                    .setView(ScrollView(requireContext()).apply { addView(label) })
+                    .setPositiveButton("Close", null).show()
+            }
+        }
         val layoutManager = binding.rvSyncLogs.layoutManager as LinearLayoutManager
         binding.rvSyncLogs.adapter = adapter
         binding.rvSyncLogs.itemAnimator = null
+
+        fun showLogs(logs: List<org.piramalswasthya.stoptb.model.SyncLogEntry>) {
+            if (isPaused) return
+            val wasAtBottom = !viewBinding.rvSyncLogs.canScrollVertically(1)
+            viewBinding.tvEmpty.visibility = if (logs.isEmpty()) View.VISIBLE else View.GONE
+            viewBinding.rvSyncLogs.visibility = if (logs.isEmpty()) View.GONE else View.VISIBLE
+            adapter.showSnapshot(logs)
+            if (wasAtBottom && logs.isNotEmpty()) layoutManager.scrollToPosition(logs.size - 1)
+        }
 
         binding.fabClear.setOnClickListener {
             viewModel.clearLogs()
@@ -70,6 +95,10 @@ class SyncLogsTabFragment : Fragment() {
                 if (isPaused) android.R.drawable.ic_media_play
                 else android.R.drawable.ic_media_pause
             )
+            if (!isPaused) viewLifecycleOwner.lifecycleScope.launch {
+                val logs = withContext(Dispatchers.Default) { syncLogDisplaySnapshot(viewModel.syncLogs.value) }
+                if (logs.lastOrNull()?.id == viewModel.syncLogs.value.lastOrNull()?.id) showLogs(logs)
+            }
         }
 
         binding.fabExport.setOnClickListener {
@@ -91,19 +120,14 @@ class SyncLogsTabFragment : Fragment() {
                     viewModel.exportEmpty.collect { empty ->
                         if (empty) {
                             viewModel.onExportEmptyHandled()
-                            Toast.makeText(requireContext(), R.string.sync_dashboard_no_log_files, Toast.LENGTH_SHORT).show()
+                            Toast.makeText(requireContext(), R.string.sync_dashboard_no_manual_logs, Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
                 launch {
                     viewModel.syncLogs.sample(SYNC_LOG_DISPLAY_INTERVAL_MS)
                         .map(::syncLogDisplaySnapshot).flowOn(Dispatchers.Default).collect { logs ->
-                            if (isPaused) return@collect
-                            val wasAtBottom = !viewBinding.rvSyncLogs.canScrollVertically(1)
-                            viewBinding.tvEmpty.visibility = if (logs.isEmpty()) View.VISIBLE else View.GONE
-                            viewBinding.rvSyncLogs.visibility = if (logs.isEmpty()) View.GONE else View.VISIBLE
-                            adapter.showSnapshot(logs)
-                            if (wasAtBottom && logs.isNotEmpty()) layoutManager.scrollToPosition(logs.size - 1)
+                            showLogs(logs)
                         }
                 }
             }

@@ -3,49 +3,32 @@ package org.piramalswasthya.stoptb.helpers
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
-import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class SyncLogExporter @Inject constructor(
-    private val fileWriter: SyncLogFileWriter
+    private val logManager: SyncLogManager
 ) {
 
     /**
-     * Creates an [Intent.ACTION_SEND] for sharing sync log files as a zip.
+     * Shares only the retained manual/direct live snapshot, never raw diagnostic files.
      * Must be called from a background thread (performs file I/O).
-     * Returns `null` if no log files exist.
+     * Returns `null` if there are no retained manual/direct entries.
      */
     fun createShareIntent(context: Context): Intent? {
-        val logDir = fileWriter.getLogDirectory()
-        val logFiles = logDir.listFiles { f ->
-            f.name.startsWith("sync-log-") && f.name.endsWith(".log")
-        }
+        val logs = logManager.interactiveSnapshot()
+        if (logs.isEmpty()) return null
 
-        if (logFiles.isNullOrEmpty()) return null
-
-        val zipFile = File(context.cacheDir, "sync-logs-${System.currentTimeMillis()}.zip")
-        ZipOutputStream(BufferedOutputStream(FileOutputStream(zipFile))).use { zos ->
-            zos.putNextEntry(ZipEntry("sync-context.txt"))
+        val zipFile = File(context.cacheDir, "manual-direct-sync-logs-${System.currentTimeMillis()}.zip")
+        BufferedOutputStream(FileOutputStream(zipFile)).use { output ->
             val exportContext = "EXPORT CONTEXT (current installation, not historical record context)\n" +
                 "exportedAtEpochMs=${System.currentTimeMillis()}\n" +
                 "timezone=${java.util.TimeZone.getDefault().id}\n" + SyncDiagnostics.identity(context) + "\n"
-            zos.write(exportContext.toByteArray(Charsets.UTF_8))
-            zos.closeEntry()
-            for (file in logFiles.sortedBy { it.name }) {
-                zos.putNextEntry(ZipEntry(file.name))
-                BufferedInputStream(FileInputStream(file)).use { bis ->
-                    bis.copyTo(zos)
-                }
-                zos.closeEntry()
-            }
+            writeInteractiveLogArchive(output, logs, exportContext)
         }
 
         val uri = FileProvider.getUriForFile(
@@ -57,7 +40,7 @@ class SyncLogExporter @Inject constructor(
         return Intent(Intent.ACTION_SEND).apply {
             type = "application/zip"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "Sync Logs")
+            putExtra(Intent.EXTRA_SUBJECT, "Manual and Direct Save Sync Logs")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
     }

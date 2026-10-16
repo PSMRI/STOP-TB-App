@@ -293,7 +293,7 @@ class NewBenRegFragment : Fragment() {
                     binding.pbForm.visibility = View.GONE
                     Toast.makeText(context, resources.getString(R.string.registration_successful), Toast.LENGTH_LONG).show()
                     try {
-                        WorkerUtils.triggerAmritPushWorker(requireContext())
+                        WorkerUtils.triggerAmritPushWorker(requireContext(), "DIRECT_SAVE")
                         if (viewModel.isNonHHArg) {
                             val popped = findNavController().popBackStack(R.id.nonHHFragment, false)
                             if (!popped) findNavController().navigateUp()
@@ -1289,7 +1289,7 @@ class NewBenRegFragment : Fragment() {
                     }
                     viewModel.linkBenToHousehold(hhId, relationPos, relationName)
                     Toast.makeText(requireContext(), "Linked to household successfully", Toast.LENGTH_SHORT).show()
-                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerAmritPushWorker(requireContext())
+                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerAmritPushWorker(requireContext(), "DIRECT_SAVE")
                     findNavController().navigateUp()
                 })
                 .show()

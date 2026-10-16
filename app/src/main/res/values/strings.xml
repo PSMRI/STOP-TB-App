@@ -1,4 +1,5 @@
 <resources>
+    <string name="sync_dashboard_no_manual_logs">No manual-refresh or direct-save logs to share in this session.</string>
 
     <!--    Pref-->
     <string name="PREF_NAME" translatable="false">Sakhi-pref-1</string>
