@@ -379,11 +379,20 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                                 )
                             )
                         }
-                        "ENTER_LC", "VIEW_LC" -> {
+                        "ENTER_LC" -> {
                             findNavController().navigate(
                                 AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
                                     benId = item.benId,
                                     viewOnly = false,
+                                    referralType = 8
+                                )
+                            )
+                        }
+                        "VIEW_LC" -> {
+                            findNavController().navigate(
+                                AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                    benId = item.benId,
+                                    viewOnly = true,
                                     referralType = 8
                                 )
                             )
@@ -931,10 +940,16 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 getString(R.string.icon_title_ben)
             }
 
-            val icon = if (args.source == 6) {
+            val icon = if (args.source == 5) {
+                R.drawable.ic_health_rural_post
+            } else if (args.source == 6) {
                 R.drawable.ic_health_xray
             } else if (args.source == 7) {
                 R.drawable.ic_truenat_device
+            } else if (args.source == 8) {
+                R.drawable.ic_health_test_tubes
+            } else if (args.source == 10) {
+                R.drawable.ic_clinical_assessment
             } else {
                 R.drawable.ic__ben
             }

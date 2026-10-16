@@ -403,10 +403,13 @@ class TBSuspectedQuickDataset(
         }
 
         // ── Liquid Culture ────────────────────────────────────────────────
-        liquidCultureConducted.value = conductedFromSaved(
-            savedValue = saved?.recommendedForLiquidCultureTest ?: saved?.isLiquidCultureConducted,
-            shouldShow = shouldShowLiquidCultureConducted()
-        )
+        val lcConductedSaved = saved?.recommendedForLiquidCultureTest ?: saved?.isLiquidCultureConducted
+        liquidCultureConducted.value = when {
+            !shouldShowLiquidCultureConducted() -> ""
+            lcConductedSaved != null -> boolToYesNo(lcConductedSaved)
+            referralType == 8 -> yesValue
+            else -> ""
+        }
         liquidCultureResult.value = getLocalValueInArray(
             R.array.tb_test_result, saved?.liquidCultureResult
         )
@@ -1438,7 +1441,7 @@ class TBSuspectedQuickDataset(
 
         // Liquid Culture
         liquidCultureConducted.isEnabled =
-            shouldShowLiquidCultureConducted() && !lockLiquidCulture
+            shouldShowLiquidCultureConducted() && !lockLiquidCulture && referralType != 8
         liquidCultureConducted.required =
             shouldShowLiquidCultureConducted() && !lockLiquidCulture
         if (!shouldShowLiquidCultureConducted()) resetField(liquidCultureConducted)
@@ -1485,9 +1488,14 @@ class TBSuspectedQuickDataset(
     private fun shouldShowTrueNatConducted(): Boolean =
         shouldShowIsSputumCollected() && isYes(isSputumCollectedField)
 
-    /** Liquid Culture shown when both history of TB AND taking anti-TB drugs */
+    /**
+     * Liquid Culture shown when any one of the three "Other Details" questions is Yes:
+     * History of TB, currently taking anti-TB drugs, or family history of TB.
+     */
     private fun shouldShowLiquidCultureConducted(): Boolean =
-        screeningCache?.historyOfTb == true && screeningCache?.takingAntiTBDrugs == true
+        screeningCache?.historyOfTb == true ||
+            screeningCache?.takingAntiTBDrugs == true ||
+            screeningCache?.familySufferingFromTB == true
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -1527,11 +1535,6 @@ class TBSuspectedQuickDataset(
         true -> yesValue
         false -> noValue
         null -> ""
-    }
-
-    private fun conductedFromSaved(savedValue: Boolean?, shouldShow: Boolean): String {
-        if (!shouldShow) return ""
-        return boolToYesNo(savedValue)
     }
 
     private fun resetField(formElement: FormElement) {

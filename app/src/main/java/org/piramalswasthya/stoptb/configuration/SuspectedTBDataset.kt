@@ -503,8 +503,13 @@ class SuspectedTBDataset(
             diagnosticsCache?.isNaatConducted != null ||
             savedCache?.isNaatConducted != null
 
+    // Liquid Culture is enabled when any one of the three "Other Details" questions is Yes:
+    // History of TB, currently taking anti-TB drugs, or family history of TB — matching
+    // TBSuspectedQuickDataset.shouldShowLiquidCultureConducted().
     private fun isLiquidCultureReferralEnabled(): Boolean =
-        (screeningCache?.historyOfTb == true && screeningCache?.takingAntiTBDrugs == true) ||
+        screeningCache?.historyOfTb == true ||
+            screeningCache?.takingAntiTBDrugs == true ||
+            screeningCache?.familySufferingFromTB == true ||
             diagnosticsCache?.isLiquidCultureConducted != null ||
             savedCache?.isLiquidCultureConducted != null
 

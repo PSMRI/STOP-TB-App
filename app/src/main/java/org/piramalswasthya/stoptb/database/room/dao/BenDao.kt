@@ -316,6 +316,9 @@ interface BenDao {
                 OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
                     WHERE tbs.recommendedForLiquidCultureTest = 1
+                       OR tbs.historyOfTb = 1
+                       OR tbs.takingAntiTBDrugs = 1
+                       OR tbs.familySufferingFromTB = 1
                 )
             ))
             OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
@@ -488,6 +491,9 @@ interface BenDao {
                 OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
                     WHERE tbs.recommendedForLiquidCultureTest = 1
+                       OR tbs.historyOfTb = 1
+                       OR tbs.takingAntiTBDrugs = 1
+                       OR tbs.familySufferingFromTB = 1
                 )
             ))
             OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
@@ -703,6 +709,9 @@ interface BenDao {
                 OR benId IN (
                     SELECT tbs.benId FROM TB_SCREENING tbs
                     WHERE tbs.recommendedForLiquidCultureTest = 1
+                       OR tbs.historyOfTb = 1
+                       OR tbs.takingAntiTBDrugs = 1
+                       OR tbs.familySufferingFromTB = 1
                 )
             ))
             OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
@@ -1220,6 +1229,9 @@ interface BenDao {
             OR benId IN (
               SELECT tbs.benId FROM TB_SCREENING tbs
               WHERE tbs.recommendedForLiquidCultureTest = 1
+                 OR tbs.historyOfTb = 1
+                 OR tbs.takingAntiTBDrugs = 1
+                 OR tbs.familySufferingFromTB = 1
             )
           )
     """)

@@ -143,14 +143,10 @@ class TBSuspectedQuickFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
-        // Title/icon now match the specific test this screen is for (same icons the dashboard
-        // uses for its Chest X-Ray / TrueNat tiles) instead of a generic "Diagnostics" label —
-        // RIF shares the TrueNat icon/title since it's the same referralType (7) and the same
-        // order family as TrueNat, just a follow-on sub-test.
-        val (icon, title) = if (viewModel.referralType == 6) {
-            R.drawable.ic_health_xray to getString(R.string.ben_card_chest_xray)
-        } else {
-            R.drawable.ic_truenat_device to getString(R.string.ben_card_truenat)
+        val (icon, title) = when (viewModel.referralType) {
+            6 -> R.drawable.ic_health_xray to getString(R.string.ben_card_chest_xray)
+            8 -> R.drawable.ic_health_test_tubes to getString(R.string.referral_liquid_culture)
+            else -> R.drawable.ic_truenat_device to getString(R.string.ben_card_truenat)
         }
         activity?.let {
             when (it) {

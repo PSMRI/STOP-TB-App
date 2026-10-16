@@ -2400,7 +2400,14 @@ class TBRepo @Inject constructor(
                 isDRTBConfirmed = mappedIsDRTBConfirmed,
                 isTBConfirmed = mappedSputumTestResult == "TB Positive",
                 isConfirmed = mappedSputumTestResult == "TB Positive",
-                sputumTestResult = mappedSputumTestResult
+                sputumTestResult = mappedSputumTestResult,
+                // Previously missing entirely — TB_SUSPECTED's own copy of these fields stayed
+                // null forever for any beneficiary referred via the quick-entry screen (which only
+                // writes them onto TB_DIAGNOSTICS), even though TB_SUSPECTED has its own push to
+                // the backend (saveTBSuspectedData) that would otherwise send stale/incomplete data.
+                recommendedForLiquidCultureTest = diag.recommendedForLiquidCultureTest ?: existing?.recommendedForLiquidCultureTest,
+                isLiquidCultureConducted = diag.isLiquidCultureConducted ?: existing?.isLiquidCultureConducted,
+                liquidCultureResult = diag.liquidCultureResult ?: existing?.liquidCultureResult
             )
 
             // hasSymptoms is deliberately always forced true above (this function only runs off
@@ -2417,20 +2424,23 @@ class TBRepo @Inject constructor(
                 val diffs = buildList {
                     if (existing.hasSymptoms != provisionalCache.hasSymptoms) add("hasSymptoms: ${existing.hasSymptoms} -> ${provisionalCache.hasSymptoms}")
                     if (existing.isChestXRayDone != provisionalCache.isChestXRayDone) add("isChestXRayDone: ${existing.isChestXRayDone} -> ${provisionalCache.isChestXRayDone}")
-                    if (existing.chestXRayResult != provisionalCache.chestXRayResult) add("chestXRayResult: ${existing.chestXRayResult} -> ${provisionalCache.chestXRayResult}")
+                    if (existing.chestXRayResult != provisionalCache.chestXRayResult) add("chestXRayResult: changed")
                     if (existing.isSputumCollected != provisionalCache.isSputumCollected) add("isSputumCollected: ${existing.isSputumCollected} -> ${provisionalCache.isSputumCollected}")
                     if (existing.sputumSubmittedAt != provisionalCache.sputumSubmittedAt) add("sputumSubmittedAt: ${existing.sputumSubmittedAt} -> ${provisionalCache.sputumSubmittedAt}")
                     if (existing.isNaatConducted != provisionalCache.isNaatConducted) add("isNaatConducted: ${existing.isNaatConducted} -> ${provisionalCache.isNaatConducted}")
-                    if (existing.naatResult != provisionalCache.naatResult) add("naatResult: ${existing.naatResult} -> ${provisionalCache.naatResult}")
+                    if (existing.naatResult != provisionalCache.naatResult) add("naatResult: changed")
                     if (existing.reasonForRefusalXray != provisionalCache.reasonForRefusalXray) add("reasonForRefusalXray: ${existing.reasonForRefusalXray} -> ${provisionalCache.reasonForRefusalXray}")
                     if (existing.reasonForRefusalSputum != provisionalCache.reasonForRefusalSputum) add("reasonForRefusalSputum: ${existing.reasonForRefusalSputum} -> ${provisionalCache.reasonForRefusalSputum}")
                     if (existing.reasonForRefusalMTB != provisionalCache.reasonForRefusalMTB) add("reasonForRefusalMTB: ${existing.reasonForRefusalMTB} -> ${provisionalCache.reasonForRefusalMTB}")
                     if (existing.reasonForRefusalMDRRIF != provisionalCache.reasonForRefusalMDRRIF) add("reasonForRefusalMDRRIF: ${existing.reasonForRefusalMDRRIF} -> ${provisionalCache.reasonForRefusalMDRRIF}")
-                    if (existing.mdrRifResult != provisionalCache.mdrRifResult) add("mdrRifResult: ${existing.mdrRifResult} -> ${provisionalCache.mdrRifResult}")
+                    if (existing.mdrRifResult != provisionalCache.mdrRifResult) add("mdrRifResult: changed")
                     if (existing.isDRTBConfirmed != provisionalCache.isDRTBConfirmed) add("isDRTBConfirmed: ${existing.isDRTBConfirmed} -> ${provisionalCache.isDRTBConfirmed}")
                     if (existing.isTBConfirmed != provisionalCache.isTBConfirmed) add("isTBConfirmed: ${existing.isTBConfirmed} -> ${provisionalCache.isTBConfirmed}")
                     if (existing.isConfirmed != provisionalCache.isConfirmed) add("isConfirmed: ${existing.isConfirmed} -> ${provisionalCache.isConfirmed}")
-                    if (existing.sputumTestResult != provisionalCache.sputumTestResult) add("sputumTestResult: ${existing.sputumTestResult} -> ${provisionalCache.sputumTestResult}")
+                    if (existing.sputumTestResult != provisionalCache.sputumTestResult) add("sputumTestResult: changed")
+                    if (existing.recommendedForLiquidCultureTest != provisionalCache.recommendedForLiquidCultureTest) add("recommendedForLiquidCultureTest: ${existing.recommendedForLiquidCultureTest} -> ${provisionalCache.recommendedForLiquidCultureTest}")
+                    if (existing.isLiquidCultureConducted != provisionalCache.isLiquidCultureConducted) add("isLiquidCultureConducted: ${existing.isLiquidCultureConducted} -> ${provisionalCache.isLiquidCultureConducted}")
+                    if (existing.liquidCultureResult != provisionalCache.liquidCultureResult) add("liquidCultureResult: changed")
                 }
                 Timber.w("TB_SUSPECTED_DIRTY: benId=$benId marking UNSYNCED (was ${existing.syncState}), diag.xrayOrderStatus=${diag.xrayOrderStatus} trueNatOrderStatus=${diag.trueNatOrderStatus} rifOrderStatus=${diag.rifOrderStatus}, changes=$diffs")
             } else {
