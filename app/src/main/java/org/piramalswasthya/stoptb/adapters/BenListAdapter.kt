@@ -833,9 +833,11 @@ class BenListAdapter(
                             }
                         }
                         8 -> {
+                            // Once submitted, this is view-only — results take 40-45 days and
+                            // aren't meant to be re-edited from here, so no "/EDIT" in the label.
                             val hasLc = !tbDiag?.liquidCultureResult.isNullOrBlank()
                             if (hasLc) {
-                                ButtonConfig("VIEW/EDIT RESULT", android.R.color.holo_green_dark, "VIEW_LC", "LIQUID_CULTURE")
+                                ButtonConfig("VIEW RESULT", android.R.color.holo_green_dark, "VIEW_LC", "LIQUID_CULTURE")
                             } else {
                                 ButtonConfig("ENTER RESULT", android.R.color.holo_red_dark, "ENTER_LC", "LIQUID_CULTURE")
                             }

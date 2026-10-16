@@ -993,6 +993,7 @@
     <string name="diagnosis_locked_msg">कृपया पहले टीबी स्क्रीनिंग फॉर्म भरें</string>
     <string name="tb_screening_locked_msg">कृपया पहले टीबी स्क्रीनिंग फॉर्म भरें</string>
     <string name="examine_form_view_only_msg">आपके पास इस फॉर्म को केवल देखने की अनुमति है</string>
+    <string name="tb_screening_no_permission_msg">आपके पास टीबी स्क्रीनिंग तक पहुँचने की अनुमति नहीं है</string>
     <string name="contact_tracing_load_error">यह फॉर्म लोड नहीं हो सका।</string>
     <string name="examine_btn_history">पिछला रिकॉर्ड</string>
     <string name="tb_screening_legend_xray_sputum">* डिजिटल छाती एक्स-रे या थूक संग्रह के लिए रेफर करें</string>

@@ -375,6 +375,7 @@ data class TBScreeningSaveRequest(
     val failureToGainWeightInChildren: Boolean?,
     val decreasedActivityOrPlayfulnessInChildren: Boolean?,
     val otherSymptoms: Boolean?,
+    val otherSymptomsDetails: String? = null,
     val contactWithTBPatient: Boolean?,
     val symptomatic: String?,
     val referredForDigitalChestXray: Boolean?,
@@ -411,6 +412,7 @@ data class TBScreeningSaveRequest(
                 failureToGainWeightInChildren = cache.failureToGainWeightInChildren,
                 decreasedActivityOrPlayfulnessInChildren = cache.decreasedActivityOrPlayfulnessInChildren,
                 otherSymptoms = cache.otherSymptoms,
+                otherSymptomsDetails = cache.otherSymptomsDetails,
                 contactWithTBPatient = cache.contactWithTBPatient,
                 symptomatic = cache.sympotomatic ?: cache.asymptomatic,
                 referredForDigitalChestXray = cache.referredForDigitalChestXray,
@@ -432,33 +434,6 @@ data class TBScreeningSaveRequest(
 }
 data class TBDiagnosticsRequestDTO(val userId: Int, val tbDiagnosticsList: List<TBDiagnosticsDTO>)
 data class GeneralOpdRequestDTO(val userId: Int, val generalOpdList: List<GeneralOpdDTO>)
-data class GeneralOpdSaveRequest(
-    val beneficiaryRegID: Long,
-    val providerServiceMapID: Int,
-    val chiefComplaint: List<String>?,
-    val medication: String?,
-    val dosage: String?,
-    val frequency: String?,
-    val duration: String?,
-    val notes: String?,
-    val createdBy: String?
-) {
-    companion object {
-        fun from(cache: GeneralOpdCache, beneficiaryRegID: Long, providerServiceMapID: Int, createdBy: String?): GeneralOpdSaveRequest {
-            return GeneralOpdSaveRequest(
-                beneficiaryRegID = beneficiaryRegID,
-                providerServiceMapID = providerServiceMapID,
-                chiefComplaint = cache.chiefComplaints,
-                medication = cache.medications?.joinToString(", "),
-                dosage = cache.dosage,
-                frequency = cache.frequency,
-                duration = cache.duration,
-                notes = cache.notes,
-                createdBy = createdBy
-            )
-        }
-    }
-}
 data class PatientRequest(
     val firstName: String,
     val lastName: String,
@@ -614,6 +589,7 @@ data class TBScreeningDTO(
     var failureToGainWeightInChildren: Boolean? = null,
     var decreasedActivityOrPlayfulnessInChildren: Boolean? = null,
     var otherSymptoms: Boolean? = null,
+    var otherSymptomsDetails: String? = null,
     var age: Boolean? = null, var diabetic: Boolean? = null,
     var tobaccoUser: Boolean? = null, var bmi: Boolean? = null,
     var contactWithTBPatient: Boolean? = null, var historyOfTBInLastFiveYrs: Boolean? = null,
@@ -637,6 +613,7 @@ data class TBScreeningDTO(
         failureToGainWeightInChildren = failureToGainWeightInChildren,
         decreasedActivityOrPlayfulnessInChildren = decreasedActivityOrPlayfulnessInChildren,
         otherSymptoms = otherSymptoms, age = age,
+        otherSymptomsDetails = otherSymptomsDetails,
         diabetic = diabetic, tobaccoUser = tobaccoUser, bmi = bmi,
         contactWithTBPatient = contactWithTBPatient, historyOfTBInLastFiveYrs = historyOfTBInLastFiveYrs,
         referredForDigitalChestXray = referredForDigitalChestXray,

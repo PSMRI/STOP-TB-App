@@ -289,6 +289,11 @@ class TBScreeningFormViewModel @Inject constructor(
             if (refersXray && !hasXrayOrder) ordersToPush.add("XRAY_CHEST")
             if (refersTruenat && !hasTruenatOrder) ordersToPush.add("SPUTUM_TRUENAT")
             if (ordersToPush.isNotEmpty()) {
+                try {
+                    tbRepo.pushUnSyncedTBScreeningRecords()
+                } catch (e: Exception) {
+                    Timber.e(e, "TB Screening pre-order-push sync failed; proceeding with order push anyway")
+                }
                 WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, ordersToPush)
             }
         } catch (e: java.lang.Exception) {
