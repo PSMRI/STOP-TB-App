@@ -839,6 +839,12 @@ class TBRepo @Inject constructor(
                     trueNatRifResult = item.optStringOrNull("trueNatRifResult") ?: existing?.trueNatRifResult,
                     rifOrderId = item.optStringOrNull("rifOrderId") ?: existing?.rifOrderId,
                     rifOrderStatus = item.optStringOrNull("rifOrderStatus") ?: existing?.rifOrderStatus,
+                    sputumCollectionDate = item.optLong("sputumCollectionDate")
+                        .takeIf { it > 0L }
+                        ?: item.optStringOrNull("sputumCollectionDate")?.toLongOrNull()?.takeIf { it > 0L }
+                        ?: item.optStringOrNull("sputumCollectionDate")
+                            ?.let { getLongFromDateMultipleSupport(it).takeIf { parsed -> parsed > 0L } }
+                        ?: existing?.sputumCollectionDate,
                     serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
                     syncState = SyncState.SYNCED
                 )

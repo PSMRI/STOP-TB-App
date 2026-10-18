@@ -736,6 +736,8 @@
     <string name="tb_reason_for_denial_sputum">থুকনি সংগ্ৰহ অস্বীকাৰৰ কাৰণ</string>
     <string name="tb_reason_for_denial_sputum_other">অস্বীকাৰৰ অন্য কাৰণ উল্লেখ কৰক (থুকনি)</string>
     <string name="tb_sputum_submitted_at">থুকনিৰ নমুনা দিয়া স্থান</string>
+    <string name="tb_sputum_sample_collection_date">থুকনিৰ নমুনা সংগ্ৰহৰ তাৰিখ</string>
+    <string name="tb_sputum_collection_date_range_error">কেৱল আজি বা কালিৰ তাৰিখ বাছনি কৰক</string>
     <string name="tb_reason_not_conducted_naat">True NAT নোহোৱাৰ কাৰণ</string>
     <string name="tb_reason_not_conducted_naat_other">অন্য কাৰণ উল্লেখ কৰক (True NAT নহ\'ল)</string>
 
