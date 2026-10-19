@@ -52,15 +52,19 @@
         <item>@string/nhhr_type_residential_area_5</item>
     </string-array>
     <string name="nhhr_type_of_house">Type of house</string>
-    <string name="nhhr_type_of_house_1">None</string>
-    <string name="nhhr_type_of_house_2">Kuchha</string>
-    <string name="nhhr_type_of_house_3">Pucca</string>
-    <string name="nhhr_type_of_house_4">Other</string>
+    <string name="nhhr_type_of_house_1">Kuchha/ kacha (Hut)</string>
+    <string name="nhhr_type_of_house_2">Pucca with stone and mortar</string>
+    <string name="nhhr_type_of_house_3">Pucca with bricks and concrete</string>
+    <string name="nhhr_type_of_house_4">No House</string>
+    <string name="nhhr_type_of_house_5">Other</string>
+    <string name="nhhr_type_of_house_other">Other type of house</string>
+
     <string-array name="nhhr_type_of_house_array">
         <item>@string/nhhr_type_of_house_1</item>
         <item>@string/nhhr_type_of_house_2</item>
         <item>@string/nhhr_type_of_house_3</item>
         <item>@string/nhhr_type_of_house_4</item>
+        <item>@string/nhhr_type_of_house_5</item>
     </string-array>
     <string name="nhhr_house_own">House ownership</string>
     <string-array name="nhhr_house_own_array">

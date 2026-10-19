@@ -54,17 +54,23 @@
         <item>@string/nhhr_type_residential_area_5</item>
 
     </string-array>
+
     <string name="nhhr_type_of_house">घर का प्रकार</string>
-    <string name="nhhr_type_of_house_1">कोई नहीं</string>
-    <string name="nhhr_type_of_house_2">कच्चा घर</string>
-    <string name="nhhr_type_of_house_3">पक्का घर</string>
-    <string name="nhhr_type_of_house_4">अन्य</string>
+    <string name="nhhr_type_of_house_1">कच्चा घर (झोपड़ी)</string>
+    <string name="nhhr_type_of_house_2">पत्थर और गारे से बना पक्का घर</string>
+    <string name="nhhr_type_of_house_3">ईंट और कंक्रीट से बना पक्का घर</string>
+    <string name="nhhr_type_of_house_4">कोई घर नहीं</string>
+    <string name="nhhr_type_of_house_5">अन्य</string>
+    <string name="nhhr_type_of_house_other">घर का अन्य प्रकार</string>
+
     <string-array name="nhhr_type_of_house_array">
         <item>@string/nhhr_type_of_house_1</item>
         <item>@string/nhhr_type_of_house_2</item>
         <item>@string/nhhr_type_of_house_3</item>
         <item>@string/nhhr_type_of_house_4</item>
+        <item>@string/nhhr_type_of_house_5</item>
     </string-array>
+
     <string name="nhhr_house_own">घर का स्वामित्व</string>
     <string-array name="nhhr_house_own_array">
         <item>किराए पर</item>

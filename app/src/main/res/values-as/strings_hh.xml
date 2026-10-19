@@ -52,17 +52,23 @@
         <item>@string/nhhr_type_residential_area_4</item>
         <item>@string/nhhr_type_residential_area_5</item>
     </string-array>
-    <string name="nhhr_type_of_house">ঘৰৰ প্ৰকাৰ নিৰ্বাচন কৰক</string>
-    <string name="nhhr_type_of_house_1">একো নহয়</string>
-    <string name="nhhr_type_of_house_2">কুচ্চা</string>
-    <string name="nhhr_type_of_house_3">পকী ঘৰ</string>
-    <string name="nhhr_type_of_house_4">অন্যান্য</string>
+
+    <string name="nhhr_type_of_house">ঘৰৰ প্ৰকাৰ</string>
+    <string name="nhhr_type_of_house_1">কেঁচা ঘৰ (জুপুৰি)</string>
+    <string name="nhhr_type_of_house_2">শিল আৰু গাৰেৰে নিৰ্মিত পকী ঘৰ</string>
+    <string name="nhhr_type_of_house_3">ইটা আৰু কংক্ৰিটেৰে নিৰ্মিত পকী ঘৰ</string>
+    <string name="nhhr_type_of_house_4">কোনো ঘৰ নাই</string>
+    <string name="nhhr_type_of_house_5">অন্যান্য</string>
+    <string name="nhhr_type_of_house_other">ঘৰৰ অন্য প্ৰকাৰ</string>
+
     <string-array name="nhhr_type_of_house_array">
         <item>@string/nhhr_type_of_house_1</item>
         <item>@string/nhhr_type_of_house_2</item>
         <item>@string/nhhr_type_of_house_3</item>
         <item>@string/nhhr_type_of_house_4</item>
+        <item>@string/nhhr_type_of_house_5</item>
     </string-array>
+
     <string name="nhhr_house_own">ঘৰৰ মালিকীস্বত্ব</string>
     <string-array name="nhhr_house_own_array">
         <item>ভাড়াৰ বাবে</item>
