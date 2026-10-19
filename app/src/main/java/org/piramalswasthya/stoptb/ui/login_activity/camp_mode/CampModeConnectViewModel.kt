@@ -88,8 +88,11 @@ class CampModeConnectViewModel @Inject constructor(
             connection?.useCaches = false
             val responseCode = connection?.responseCode ?: return@runCatching false
             Log.d(TAG, "Health check response. url=$healthUrl, code=$responseCode")
+            org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.observe(context, rawUrl,
+                responseCode in 200..299, "HTTP_$responseCode", "CONNECT_HEALTH")
             responseCode in 200..299
         }.onFailure { error ->
+            org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.failure(context, rawUrl, error, "CONNECT_HEALTH")
             Log.e(TAG, "Health check failed. url=$healthUrl, error=${error.javaClass.simpleName}: ${error.message}", error)
         }.also {
             connection?.disconnect()

@@ -1009,7 +1009,10 @@
     <string name="sync_dashboard_worker_failed">Failed: %1$d worker(s) - tap to see details</string>
     <string name="sync_dashboard_no_logs">No sync logs yet. Trigger a sync to see activity.</string>
     <string name="sync_dashboard_clear_logs">Clear Logs</string>
-    <string name="sync_dashboard_export_logs">Export Logs</string>
+    <string name="sync_dashboard_export_logs">Share sync diagnostics</string>
+    <string name="sync_share_title">Share Logs / Summary</string>
+    <string name="sync_share_send">Share</string>
+    <string name="sync_share_unavailable">Unable to share diagnostics. Logs may be empty. Please refresh Summary or try again.</string>
     <string name="sync_dashboard_no_log_files">No log files to export</string>
     <string name="form_name">Form Name</string>
     <string name="no_records_found_hh">No Household records found.</string>

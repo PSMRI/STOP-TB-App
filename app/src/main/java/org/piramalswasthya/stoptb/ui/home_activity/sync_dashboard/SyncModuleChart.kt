@@ -28,9 +28,9 @@ internal class SyncModuleChart(context: Context, private val modules: List<SyncD
                 paint.color = Color.DKGRAY; paint.textSize = 11 * resources.displayMetrics.scaledDensity
                 canvas.drawText(labels[metric], 0f, y + 10 * density, paint)
                 paint.color = Color.rgb(237, 243, 242)
-                canvas.drawRect(barStart, y, barStart + usable, y + 11 * density, paint)
+                canvas.drawRoundRect(barStart, y, barStart + usable, y + 11 * density, 4 * density, 4 * density, paint)
                 paint.color = colors[metric]
-                canvas.drawRect(barStart, y, barStart + usable * values[metric] / maximum, y + 11 * density, paint)
+                canvas.drawRoundRect(barStart, y, barStart + usable * values[metric] / maximum, y + 11 * density, 4 * density, 4 * density, paint)
                 canvas.drawText(values[metric].toString(), barStart + usable + 5 * density, y + 10 * density, paint)
             }
         }

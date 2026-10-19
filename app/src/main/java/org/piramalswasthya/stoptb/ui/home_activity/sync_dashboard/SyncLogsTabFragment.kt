@@ -1,6 +1,5 @@
 package org.piramalswasthya.stoptb.ui.home_activity.sync_dashboard
 
-import android.content.Intent
 import android.app.AlertDialog
 import android.widget.ScrollView
 import android.widget.TextView
@@ -8,7 +7,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -55,7 +53,7 @@ class SyncLogsTabFragment : Fragment() {
             val identity = withContext(Dispatchers.IO) {
                 org.piramalswasthya.stoptb.helpers.SyncDiagnostics.identity(appContext)
             }
-            viewBinding.tvSyncIdentity.text = "$identity\nManual/direct events and masked API request/response previews. Tap a log for details. Capture limit: 32 KiB/body; larger or non-JSON bodies are explicitly omitted. View: 200; share: 500 retained entries/session. Auto-sync excluded."
+            viewBinding.tvSyncIdentity.text = identity
         }
 
         val adapter = SyncLogAdapter { entry ->
@@ -102,28 +100,12 @@ class SyncLogsTabFragment : Fragment() {
         }
 
         binding.fabExport.setOnClickListener {
-            viewModel.exportLogs()
+            showSyncShareDialog(viewModel, fromSummary = false)
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             // ViewPager off-screen tabs stay STARTED. Only the visible tab is RESUMED.
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                launch {
-                    viewModel.exportIntent.collect { intent ->
-                        if (intent != null) {
-                            viewModel.onExportHandled()
-                            startActivity(Intent.createChooser(intent, getString(R.string.sync_dashboard_export_logs)))
-                        }
-                    }
-                }
-                launch {
-                    viewModel.exportEmpty.collect { empty ->
-                        if (empty) {
-                            viewModel.onExportEmptyHandled()
-                            Toast.makeText(requireContext(), R.string.sync_dashboard_no_manual_logs, Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
                 launch {
                     viewModel.syncLogs.sample(SYNC_LOG_DISPLAY_INTERVAL_MS)
                         .map(::syncLogDisplaySnapshot).flowOn(Dispatchers.Default).collect { logs ->

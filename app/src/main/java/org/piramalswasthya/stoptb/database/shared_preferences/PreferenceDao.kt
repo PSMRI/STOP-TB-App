@@ -231,7 +231,10 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
 
     fun setCampHubUrl(url: String) {
         val key = context.getString(R.string.PREF_camp_hub_url)
-        pref.edit().putString(key, url).commit()
+        val previous = runCatching { pref.getString(key, null) }.getOrNull()
+        if (pref.edit().putString(key, url).commit()) {
+            org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.addressChanged(context, previous, url)
+        }
     }
 
     fun getCampHubUrl(): String {

@@ -19,6 +19,24 @@ internal data class SyncDailyEvent(val module: String, val recordId: String, val
 internal data class SyncDailyModule(val name: String, val registered: Int, val saved: Int,
     val synced: Int, val failed: Int, val failures: List<SyncDailyEvent>, val unidentifiedFailure: Boolean = false,
     val pending: Int = 0)
+
+/** Resolve registration aliases before checking actual local village ownership. */
+internal fun villageDailyEvents(events: List<SyncDailyEvent>, records: Set<Pair<String, String>>,
+                                aliases: Map<Pair<String, String>, String>): List<SyncDailyEvent> =
+    events.mapNotNull { event ->
+        var id = event.recordId
+        val visited = mutableSetOf<String>()
+        while (visited.add(id)) id = aliases[event.module to id] ?: break
+        if ((event.module to id) in records) event.copy(recordId = id) else null
+    }
+
+internal fun villageLastFailure(events: List<SyncDailyEvent>, records: Set<Pair<String, String>>,
+                                aliases: Map<Pair<String, String>, String>): SyncDailyEvent? {
+    val individual = events.filter { it.outcome == "FAILURE" }.flatMap { event ->
+        event.recordId.split(',').map { event.copy(recordId = it.trim()) }
+    }
+    return villageDailyEvents(individual, records, aliases).maxByOrNull { it.at }
+}
 internal val SYNC_DAILY_MODULES = listOf("BENEFICIARY", "HOUSEHOLD", "TB_SCREENING", "GENERAL_OPD",
     "TB_DIAGNOSTICS", "TB_SUSPECTED", "TB_CONFIRMED", "GENERAL_EXAMINATION", "COUNSELLING")
 

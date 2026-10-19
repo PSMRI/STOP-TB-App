@@ -15,20 +15,21 @@ class SyncLogExporter @Inject constructor(
 ) {
 
     /**
-     * Shares only the retained manual/direct live snapshot, never raw diagnostic files.
+     * Shares selected sections: retained manual/direct logs and/or the rendered summary.
+     * Never reads raw diagnostic files.
      * Must be called from a background thread (performs file I/O).
-     * Returns `null` if there are no retained manual/direct entries.
+     * Returns `null` if neither selected section has content.
      */
-    fun createShareIntent(context: Context): Intent? {
-        val logs = logManager.interactiveSnapshot()
-        if (logs.isEmpty()) return null
+    fun createShareIntent(context: Context, includeLogs: Boolean = true, summary: String? = null): Intent? {
+        val logs = if (includeLogs) logManager.interactiveSnapshot() else emptyList()
+        if (logs.isEmpty() && summary == null) return null
 
-        val zipFile = File(context.cacheDir, "manual-direct-sync-logs-${System.currentTimeMillis()}.zip")
+        val zipFile = File(context.cacheDir, "sync-diagnostics-${System.currentTimeMillis()}.zip")
         BufferedOutputStream(FileOutputStream(zipFile)).use { output ->
             val exportContext = "EXPORT CONTEXT (current installation, not historical record context)\n" +
                 "exportedAtEpochMs=${System.currentTimeMillis()}\n" +
                 "timezone=${java.util.TimeZone.getDefault().id}\n" + SyncDiagnostics.identity(context) + "\n"
-            writeInteractiveLogArchive(output, logs, exportContext)
+            writeInteractiveLogArchive(output, logs, exportContext, includeLogs, summary)
         }
 
         val uri = FileProvider.getUriForFile(
@@ -40,7 +41,7 @@ class SyncLogExporter @Inject constructor(
         return Intent(Intent.ACTION_SEND).apply {
             type = "application/zip"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "Manual and Direct Save Sync Logs")
+            putExtra(Intent.EXTRA_SUBJECT, "Sync Diagnostics")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
     }

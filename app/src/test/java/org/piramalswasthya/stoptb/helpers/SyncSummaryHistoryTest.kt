@@ -4,6 +4,29 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SyncSummaryHistoryTest {
+    @Test fun pullAndPushReportsAreRestrictedToSelectedVillageAccountAndDay() {
+        val history = SyncSummaryHistory()
+        history.record("SYNC START | runId=a | direction=PULL | userId=7 | serviceMapId=8 | villageId=10", 1000)
+        history.record("SYNC START | runId=b | direction=PULL | userId=7 | serviceMapId=8 | villageId=20", 2000)
+        history.record("SYNC START | runId=c | direction=PUSH | userId=9 | serviceMapId=8 | villageId=10", 3000)
+        history.record("SYNC START | runId=d | direction=PUSH | userId=7 | serviceMapId=9 | villageId=10", 4000)
+        history.record("SYNC START | runId=unknown | direction=PULL", 5000)
+        assertEquals(listOf("a"), villageSummaryRuns(history.snapshot(), "7", "8", 10, null).map { it.runId })
+        assertEquals(listOf("b"), villageSummaryRuns(history.snapshot(), "7", "8", 20, null).map { it.runId })
+        assertTrue(villageSummaryRuns(history.snapshot(), "7", "8", 30, null).isEmpty())
+        assertTrue(villageSummaryRuns(history.snapshot(), "7", "8", null, null).isEmpty())
+        assertTrue(villageSummaryRuns(history.snapshot(), null, "8", 10, null).isEmpty())
+        assertTrue(villageSummaryRuns(history.snapshot(), "7", "8", 10, "2026-10-19").isEmpty())
+        assertEquals(1, villageSummaryRuns(history.snapshot(), "7", "8", 10, syncDay(1000)).size)
+    }
+
+    @Test fun runWithChangingVillageIdentityIsNotAttributedToEitherVillage() {
+        val history = SyncSummaryHistory()
+        history.record("SYNC START | runId=a | direction=PULL | userId=7 | serviceMapId=8 | villageId=10")
+        history.record("SYNC WORKER START | runId=a | direction=PULL | userId=7 | serviceMapId=8 | villageId=20")
+        assertTrue(villageSummaryRuns(history.snapshot(), "7", "8", 10, null).isEmpty())
+        assertTrue(villageSummaryRuns(history.snapshot(), "7", "8", 20, null).isEmpty())
+    }
     @Test fun timestampsEveryReportAndTracksRunCompletion() {
         val history = SyncSummaryHistory()
         history.record("SYNC START | runId=a | direction=PULL", 1000L)

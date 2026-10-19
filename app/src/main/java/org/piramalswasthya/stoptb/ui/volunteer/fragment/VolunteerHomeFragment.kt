@@ -281,8 +281,10 @@ class VolunteerHomeFragment : Fragment() {
     }
 
     private fun pingCampHub(): Boolean {
+        val rawHub = pref.getCampHubUrl()
+        val appContext = context?.applicationContext
         return try {
-            val url = java.net.URL(pref.getCampHubUrl())
+            val url = java.net.URL(rawHub)
             val conn = url.openConnection() as java.net.HttpURLConnection
             conn.connectTimeout = 3000
             conn.readTimeout = 3000
@@ -290,8 +292,11 @@ class VolunteerHomeFragment : Fragment() {
             conn.connect()
             val code = conn.responseCode
             conn.disconnect()
+            appContext?.let { org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.observe(it, rawHub,
+                code in 100..499, "HTTP_$code", "MANUAL_REFRESH_CHECK") }
             code in 100..499
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            appContext?.let { org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.failure(it, rawHub, error, "MANUAL_REFRESH_CHECK") }
             false
         }
     }

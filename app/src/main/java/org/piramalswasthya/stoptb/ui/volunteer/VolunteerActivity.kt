@@ -105,6 +105,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             campHubReconnectJob = null
             // WiFi dropped — if camp mode was active, mark disconnected at once
             if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
+                org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.observe(applicationContext, pref.getCampHubUrl(), false, "WIFI_UNAVAILABLE", "WIFI_CALLBACK")
                 pref.setCampHubConnected(false)
                 runOnUiThread { refreshCampHubOfflineBanner() }
             }
@@ -574,7 +575,10 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
                 connectivityManager.getNetworkCapabilities(it)
                     ?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
             } ?: false
-            if (!hasWifi) pref.setCampHubConnected(false)
+            if (!hasWifi) {
+                org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.observe(applicationContext, pref.getCampHubUrl(), false, "WIFI_UNAVAILABLE", "RESUME_NETWORK_CHECK")
+                pref.setCampHubConnected(false)
+            }
         }
 
         // Register WiFi callback (guard against double-registration)
@@ -693,8 +697,9 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
      * Must be called from a background thread.
      */
     private fun pingCampHub(): Boolean {
+        val rawHub = pref.getCampHubUrl()
         return try {
-            val url = java.net.URL(pref.getCampHubUrl())
+            val url = java.net.URL(rawHub)
             val conn = url.openConnection() as java.net.HttpURLConnection
             conn.connectTimeout = 3000
             conn.readTimeout = 3000
@@ -702,8 +707,11 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             conn.connect()
             val code = conn.responseCode
             conn.disconnect()
+            org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.observe(applicationContext, rawHub,
+                code in 100..499, "HTTP_$code", "RECONNECT_CHECK")
             code in 100..499
         } catch (e: Exception) {
+            org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.failure(applicationContext, rawHub, e, "RECONNECT_CHECK")
             false
         }
     }

@@ -5,6 +5,40 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SyncDailyMetricsTest {
+    @Test fun villageSwitchDoesNotCarryAnotherVillagesSavesOrAcknowledgements() {
+        val events = listOf(event("a", "SAVE", "SUCCESS", 1), event("a", "PUSH", "SUCCESS", 2),
+            event("b", "SAVE", "SUCCESS", 1), event("b", "PUSH", "FAILURE", 2))
+        fun counts(ids: Set<Pair<String, String>>, day: String? = null) =
+            syncDailyModules(villageDailyEvents(events, ids, emptyMap()), day).single { it.name == "GENERAL_OPD" }
+        assertEquals(1, counts(setOf("GENERAL_OPD" to "a")).synced)
+        assertEquals(0, counts(setOf("GENERAL_OPD" to "a")).failed)
+        assertEquals(1, counts(setOf("GENERAL_OPD" to "b")).failed)
+        assertEquals(0, counts(setOf("GENERAL_OPD" to "b")).synced)
+        assertEquals(0, counts(emptySet()).saved)
+        assertEquals(0, counts(emptySet()).synced)
+        assertEquals(0, counts(setOf("GENERAL_OPD" to "a"), "2026-10-13").saved)
+    }
+
+    @Test fun legacyEventsAreMatchedByActualRecordAndModuleAfterRegistrationAliases() {
+        val rows = listOf(event("old", "SAVE", "SUCCESS", 1), event("new", "PUSH", "SUCCESS", 2),
+            event("missing", "SAVE", "SUCCESS", 3), event("UNKNOWN", "PUSH", "FAILURE", 4))
+        val aliases = mapOf(("GENERAL_OPD" to "old") to "middle", ("GENERAL_OPD" to "middle") to "new")
+        val selected = villageDailyEvents(rows, setOf("GENERAL_OPD" to "new"), aliases)
+        val module = syncDailyModules(selected, null).single { it.name == "GENERAL_OPD" }
+        assertEquals(1, module.saved)
+        assertEquals(1, module.synced)
+        assertFalse(module.unidentifiedFailure)
+        assertTrue(villageDailyEvents(rows, setOf("TB_SCREENING" to "new"), aliases).isEmpty())
+    }
+
+    @Test fun lastFailureOnlyContainsSelectedVillageIdsEvenForLegacyMixedBatch() {
+        val rows = listOf(event("a,b", "PUSH", "FAILURE", 3), event("b", "PUSH", "FAILURE", 4))
+        assertEquals("a", villageLastFailure(rows, setOf("GENERAL_OPD" to "a"), emptyMap())?.recordId)
+        assertEquals(3L, villageLastFailure(rows, setOf("GENERAL_OPD" to "a"), emptyMap())?.at)
+        assertEquals(4L, villageLastFailure(rows, setOf("GENERAL_OPD" to "b"), emptyMap())?.at)
+        assertNull(villageLastFailure(rows, emptySet(), emptyMap()))
+    }
+
     @Test fun pendingRetryDoesNotClearAnUnresolvedFailureAndUnknownIdsAreNotInventedRecords() {
         val module = syncDailyModules(listOf(event("1", "SAVE", "SUCCESS", 0), event("1", "PUSH", "FAILURE", 1), event("1", "PUSH", "PENDING", 2), event("UNKNOWN", "PUSH", "FAILURE", 3)), null)
             .single { it.name == "GENERAL_OPD" }

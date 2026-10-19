@@ -54,6 +54,9 @@ internal object SyncDailyStore {
                             // Preserve successful observations when a later edit/retry fails on the same day.
                             check(db.insertWithOnConflict("successes", null, values, SQLiteDatabase.CONFLICT_REPLACE) >= 0)
                         }
+                        if (outcome == "FAILURE") {
+                            check(db.insertWithOnConflict("record_failures", null, values, SQLiteDatabase.CONFLICT_REPLACE) >= 0)
+                        }
                         if (outcome == "FAILURE" && id == keys.first()) {
                             check(db.insertWithOnConflict("last_failure", null, ContentValues(values).apply { put("record_id", keys.take(20).joinToString(",")) }, SQLiteDatabase.CONFLICT_REPLACE) >= 0)
                         }
@@ -99,7 +102,7 @@ internal object SyncDailyStore {
     }
 
     data class Snapshot(val modules: List<SyncDailyModule>, val lastFailure: SyncDailyEvent?, val trackingSince: Long?, val available: Boolean)
-    suspend fun snapshot(filter: SyncDayFilter): Snapshot = withContext(Dispatchers.IO) {
+    suspend fun snapshot(filter: SyncDayFilter, records: Set<Pair<String, String>>): Snapshot = withContext(Dispatchers.IO) {
         try {
             if (writeFailed) return@withContext Snapshot(emptyList(), null, null, false)
             val scope = scope() ?: return@withContext Snapshot(emptyList(), null, null, false)
@@ -112,8 +115,9 @@ internal object SyncDailyStore {
             for (table in listOf("successes", "events")) db.query(table, null, where, args, null, null, "at ASC").use { cursor ->
                 while (cursor.moveToNext()) events.add(cursorEvent(cursor))
             }
-            val last = db.query("last_failure", null, "scope=?", arrayOf(scope), null, null, "at DESC", "1").use {
-                if (it.moveToFirst()) cursorEvent(it) else null
+            val failures = mutableListOf<SyncDailyEvent>()
+            for (table in listOf("last_failure", "record_failures")) db.query(table, null, "scope=?", arrayOf(scope), null, null, null).use {
+                while (it.moveToNext()) failures.add(cursorEvent(it))
             }
             val since = db.query("metadata", arrayOf("started_at"), "scope=?", arrayOf(scope), null, null, null).use {
                 if (it.moveToFirst()) it.getLong(0) else null
@@ -122,15 +126,20 @@ internal object SyncDailyStore {
             db.query("aliases", null, "scope=?", arrayOf(scope), null, null, null).use {
                 while (it.moveToNext()) aliases[it.getString(1) to it.getString(2)] = it.getString(3)
             }
-            Snapshot(syncDailyModules(events.map { event -> event.copy(recordId = aliases[event.module to event.recordId] ?: event.recordId) }, day), last, since, true)
-        } catch (_: Exception) { Snapshot(emptyList(), null, null, false) }
+            Snapshot(syncDailyModules(villageDailyEvents(events, records, aliases), day),
+                villageLastFailure(failures + events, records, aliases), since, true)
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { Snapshot(emptyList(), null, null, false) }
     }
     private fun cursorEvent(c: android.database.Cursor) = SyncDailyEvent(
         c.getString(c.getColumnIndexOrThrow("module")), c.getString(c.getColumnIndexOrThrow("record_id")),
         c.getString(c.getColumnIndexOrThrow("action")), c.getString(c.getColumnIndexOrThrow("outcome")),
         c.getString(c.getColumnIndexOrThrow("reason")), c.getString(c.getColumnIndexOrThrow("run_id")),
         c.getLong(c.getColumnIndexOrThrow("at")), c.getString(c.getColumnIndexOrThrow("day")))
-    private class Journal(context: Context) : SQLiteOpenHelper(context, "sync-daily-diagnostics.db", null, 1) {
+    private class Journal(context: Context) : SQLiteOpenHelper(context, "sync-daily-diagnostics.db", null, 2) {
+        private fun createFailureHistory(db: SQLiteDatabase) {
+            db.execSQL("CREATE TABLE IF NOT EXISTS record_failures (scope TEXT NOT NULL,day TEXT NOT NULL,module TEXT NOT NULL,record_id TEXT NOT NULL,action TEXT NOT NULL,outcome TEXT NOT NULL,reason TEXT NOT NULL,run_id TEXT NOT NULL,at INTEGER NOT NULL,PRIMARY KEY(scope,module,record_id))")
+        }
         override fun onCreate(db: SQLiteDatabase) {
             val columns = "scope TEXT NOT NULL,day TEXT NOT NULL,module TEXT NOT NULL,record_id TEXT NOT NULL,action TEXT NOT NULL,outcome TEXT NOT NULL,reason TEXT NOT NULL,run_id TEXT NOT NULL,at INTEGER NOT NULL"
             for (table in listOf("events", "successes")) {
@@ -140,7 +149,10 @@ internal object SyncDailyStore {
             db.execSQL("CREATE TABLE last_failure ($columns,PRIMARY KEY(scope,day))")
             db.execSQL("CREATE TABLE metadata(scope TEXT PRIMARY KEY,started_at INTEGER NOT NULL)")
             db.execSQL("CREATE TABLE aliases(scope TEXT NOT NULL,module TEXT NOT NULL,old_id TEXT NOT NULL,new_id TEXT NOT NULL,PRIMARY KEY(scope,module,old_id))")
+            createFailureHistory(db)
         }
-        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+            if (oldVersion < 2) createFailureHistory(db)
+        }
     }
 }

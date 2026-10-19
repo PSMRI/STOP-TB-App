@@ -9,6 +9,16 @@ data class SyncSummaryRun(
     val skippedReports: List<String> = emptyList()
 )
 
+internal fun villageSummaryRuns(runs: List<SyncSummaryRun>, userId: String?, serviceMapId: String?,
+                                villageId: Int?, day: String?): List<SyncSummaryRun> {
+    if (userId.isNullOrBlank() || serviceMapId.isNullOrBlank() || villageId == null || villageId <= 0) return emptyList()
+    return runs.filter {
+        it.details["userId"] == userId && it.details["serviceMapId"] == serviceMapId &&
+            it.details["villageId"] == villageId.toString() && it.details["scopeMixed"] != "true" &&
+            (day == null || syncDay(it.startedAt) == day)
+    }.sortedByDescending { it.startedAt }
+}
+
 /** Bounded process-session history, independent of the noisy raw-log buffer. */
 class SyncSummaryHistory(private val capacity: Int = 100) {
     private val runs = linkedMapOf<String, SyncSummaryRun>()
@@ -42,7 +52,13 @@ class SyncSummaryHistory(private val capacity: Int = 100) {
         } else fields
         val timedReport = report?.let { "eventTime=$timestamp | $it" }
         val endTime = if (message.startsWith("SYNC END |")) mapOf("endedAt" to timestamp.toString()) else emptyMap()
-        runs[key] = old.copy(details = old.details + metadata + endTime,
+        val mixedScope = listOf("userId", "serviceMapId", "villageId").any { field ->
+            val before = old.details[field]?.takeUnless { it == "UNKNOWN" }
+            val after = metadata[field]?.takeUnless { it == "UNKNOWN" }
+            before != null && after != null && before != after
+        }
+        runs[key] = old.copy(details = old.details + metadata + endTime +
+            if (mixedScope) mapOf("scopeMixed" to "true") else emptyMap(),
             reports = if (timedReport == null || isSkip) old.reports else (old.reports + timedReport).takeLast(100),
             skippedReports = if (timedReport == null || !isSkip) old.skippedReports else
                 (old.skippedReports + timedReport).takeLast(100))

@@ -4,10 +4,45 @@ import androidx.room.Dao
 import androidx.room.Query
 
 data class SyncVillageCount(val module: String, val count: Long)
+data class SyncVillageRecord(val module: String, val recordId: String)
 
 /** Current inventory, independent of the daily diagnostic event journal. */
 @Dao
 interface SyncVillageCountsDao {
+    @Query("""
+        WITH village_beneficiaries AS (
+            SELECT beneficiaryId FROM BENEFICIARY WHERE loc_village_id = :villageId
+        )
+        SELECT 'BENEFICIARY' AS module, CAST(beneficiaryId AS TEXT) AS recordId FROM village_beneficiaries
+        UNION ALL
+        SELECT 'HOUSEHOLD', CAST(householdId AS TEXT) FROM HOUSEHOLD WHERE loc_village_id = :villageId
+        UNION ALL
+        SELECT 'TB_SCREENING', CAST(id AS TEXT) FROM TB_SCREENING
+        WHERE benId IN (SELECT beneficiaryId FROM village_beneficiaries)
+        UNION ALL
+        SELECT 'GENERAL_OPD', CAST(id AS TEXT) FROM GENERAL_OPD
+        WHERE benId IN (SELECT beneficiaryId FROM village_beneficiaries)
+        UNION ALL
+        SELECT 'TB_DIAGNOSTICS', CAST(id AS TEXT) FROM TB_DIAGNOSTICS
+        WHERE benId IN (SELECT beneficiaryId FROM village_beneficiaries)
+        UNION ALL
+        SELECT 'TB_SUSPECTED', CAST(id AS TEXT) FROM TB_SUSPECTED
+        WHERE benId IN (SELECT beneficiaryId FROM village_beneficiaries)
+        UNION ALL
+        SELECT 'TB_CONFIRMED', CAST(id AS TEXT) FROM TB_CONFIRMED_TREATMENT
+        WHERE benId IN (SELECT beneficiaryId FROM village_beneficiaries)
+        UNION ALL
+        SELECT 'GENERAL_EXAMINATION', CAST(benId AS TEXT) FROM BEN_VITALS
+        WHERE benId IN (SELECT beneficiaryId FROM village_beneficiaries)
+        UNION ALL
+        SELECT 'COUNSELLING', CAST(r.responseId AS TEXT) FROM t_form_response r
+        JOIN t_form_version v ON r.formVersionId = v.versionId
+        JOIN t_dynamic_form f ON v.formId = f.formId
+        WHERE r.beneficiaryId IN (SELECT beneficiaryId FROM village_beneficiaries)
+          AND f.formType IN ('TB_COUNSELLING', 'TB_COUNSELLING_V2')
+    """)
+    suspend fun records(villageId: Int): List<SyncVillageRecord>
+
     @Query("""
         WITH village_beneficiaries AS (
             SELECT beneficiaryId FROM BENEFICIARY

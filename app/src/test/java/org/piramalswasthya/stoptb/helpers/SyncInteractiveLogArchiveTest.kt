@@ -9,6 +9,33 @@ import org.piramalswasthya.stoptb.model.LogLevel
 import org.piramalswasthya.stoptb.model.SyncLogEntry
 
 class SyncInteractiveLogArchiveTest {
+    @Test fun summaryOnlyArchiveExcludesLogSection() {
+        val output = ByteArrayOutputStream()
+        writeInteractiveLogArchive(output, listOf(SyncLogEntry(1, 1, LogLevel.INFO,
+            "SyncTrace", "LOG_NOT_SELECTED")), "village=42", includeLogs = false,
+            summary = "PULL | TODAY\nSaved to DB: 2\nBlocked: 1\nReason: BENEFICIARY NOT FOUND LOCALLY")
+        val files = contents(output.toByteArray())
+        assertEquals(setOf("sync-context.txt", "sync-summary.txt"), files.keys)
+        assertTrue(files.getValue("sync-summary.txt").contains("BENEFICIARY NOT FOUND LOCALLY"))
+        assertTrue(files.getValue("sync-context.txt").contains("village=42"))
+        assertFalse(files.values.any { it.contains("LOG_NOT_SELECTED") })
+    }
+
+    @Test fun combinedArchiveIncludesBothSelectedSections() {
+        val output = ByteArrayOutputStream()
+        writeInteractiveLogArchive(output, listOf(SyncLogEntry(1, 1, LogLevel.INFO,
+            "SyncTrace", "LOCAL SAVE | module=GENERAL_OPD")), "test", summary = "PUSH | YESTERDAY\nFailed: 1")
+        val files = contents(output.toByteArray())
+        assertEquals(setOf("sync-context.txt", "manual-direct-sync.log", "sync-summary.txt"), files.keys)
+        assertTrue(files.getValue("manual-direct-sync.log").contains("GENERAL_OPD"))
+        assertTrue(files.getValue("sync-summary.txt").contains("YESTERDAY"))
+    }
+
+    @Test fun summaryCanBeSharedAlongsideAnEmptyLogSection() {
+        val output = ByteArrayOutputStream()
+        writeInteractiveLogArchive(output, emptyList(), "test", summary = "No sync reports yet")
+        assertTrue(contents(output.toByteArray()).containsKey("sync-summary.txt"))
+    }
     private fun contents(bytes: ByteArray): Map<String, String> {
         val result = linkedMapOf<String, String>()
         ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->

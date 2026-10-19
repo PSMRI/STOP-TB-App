@@ -106,6 +106,7 @@ class SignInViewModel @Inject constructor(
         if (enabled) {
             checkCampHubConnection()
         } else {
+            org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.observe(context, pref.getCampHubUrl(), false, "USER_DISABLED", "USER_ACTION")
             pref.setCampHubConnected(false)
             _campHubStatus.value = CampHubStatus.IDLE
         }
@@ -169,8 +170,11 @@ class SignInViewModel @Inject constructor(
             connection?.useCaches = false
             val responseCode = connection?.responseCode ?: return@runCatching false
             Log.d(TAG, "Login health check response. url=$healthUrl, code=$responseCode")
+            org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.observe(context, rawUrl,
+                responseCode in 200..299, "HTTP_$responseCode", "LOGIN_HEALTH")
             responseCode in 200..299
         }.onFailure { error ->
+            org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.failure(context, rawUrl, error, "LOGIN_HEALTH")
             Log.e(TAG, "Login health check failed. url=$healthUrl, error=${error.javaClass.simpleName}: ${error.message}", error)
         }.also {
             connection?.disconnect()
