@@ -296,10 +296,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             residentialArea.value = residentialArea.getStringFromPosition(saved.residentialAreaId)
             otherResidentialArea.value = saved.otherResidentialArea
             typeOfHouse.value = typeOfHouse.getStringFromPosition(saved.houseTypeId)
-            otherTypeOfHouse.value =
-                if (typeOfHouse.value == typeOfHouse.entries!!.last())
-                    saved.houseType?.takeIf { !it.equals("Other", ignoreCase = true) }
-                else null
+            otherTypeOfHouse.value = saved.otherHouseType
             houseOwnership.value = houseOwnership.getStringFromPosition(saved.isHouseOwnedId)
         }
         if (residentialArea.value == residentialArea.entries!!.last()) {
@@ -451,6 +448,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             residentialArea.value = residentialArea.getStringFromPosition(saved.residentialAreaId)
             otherResidentialArea.value = saved.otherResidentialArea
             typeOfHouse.value = typeOfHouse.getStringFromPosition(saved.houseTypeId)
+            otherTypeOfHouse.value = saved.otherHouseType
             houseOwnership.value = houseOwnership.getStringFromPosition(saved.isHouseOwnedId)
         }
         if (residentialArea.value == residentialArea.entries!!.last()) {
@@ -793,11 +791,11 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
                 residentialArea.getEnglishStringFromPosition(details.residentialAreaId)
             details.otherResidentialArea = otherResidentialArea.value
             details.houseTypeId = typeOfHouse.getPosition()
-            details.houseType =
+            details.houseType = typeOfHouse.getEnglishStringFromPosition(details.houseTypeId)
+            details.otherHouseType =
                 if (typeOfHouse.value == typeOfHouse.entries!!.last())
                     otherTypeOfHouse.value?.trim()
-                else
-                    typeOfHouse.getEnglishStringFromPosition(details.houseTypeId)
+                else null
             details.isHouseOwnedId = houseOwnership.getPosition()
             details.isHouseOwned =
                 houseOwnership.getEnglishStringFromPosition(details.isHouseOwnedId)
