@@ -48,6 +48,9 @@ data class ButtonConfig(
     val type: String
 )
 
+private fun String?.isMissingOrderId(): Boolean =
+    isNullOrBlank() || equals("N/A", ignoreCase = true)
+
 class BenListAdapter(
     private val clickListener: BenClickListener? = null,
     private val showBeneficiaries: Boolean = false,
@@ -220,7 +223,7 @@ class BenListAdapter(
                     lastCheckedCaption.visibility = View.GONE
                     pollingStoppedCaption.visibility = View.GONE
                 }
-                status.equals(OrderStatus.PENDING.name, ignoreCase = true) && orderId.isNullOrBlank() -> {
+                status.equals(OrderStatus.PENDING.name, ignoreCase = true) && orderId.isMissingOrderId() -> {
                     pillContainer.visibility = View.VISIBLE
                     setPillIcon(spinning = false, staticRes = R.drawable.ic_exclamation_circle, tintRes = R.color.md_theme_light_error)
                     pillText.text = ctx.getString(R.string.order_status_order_not_created)
@@ -357,7 +360,7 @@ class BenListAdapter(
                         clickListener?.onClickOrderAction(item, "REORDER", "MDR_RIF")
                     }
                 }
-                tbDiag?.rifOrderId.isNullOrBlank() -> {
+                tbDiag?.rifOrderId.isMissingOrderId() -> {
                     clickListener?.onClickOrderAction(item, "CHECK_PUSH_ACTIVE", "MDR_RIF")
                     if (!tbDiag?.errorMsgRif.isNullOrBlank()) {
                         binding.tvRifErrorMsg.visibility = View.VISIBLE
@@ -772,7 +775,7 @@ class BenListAdapter(
                                 status.equals(OrderStatus.CLOSED.name, ignoreCase = true) -> {
                                     ButtonConfig("Create New X-Ray Order", android.R.color.holo_blue_dark, "REORDER", "XRAY_CHEST")
                                 }
-                                tbDiag?.xrayOrderId.isNullOrBlank() -> {
+                                tbDiag?.xrayOrderId.isMissingOrderId() -> {
                                     clickListener?.onClickOrderAction(item, "CHECK_PUSH_ACTIVE", "XRAY_CHEST")
                                     bindErrorMsg(tbDiag?.errorMsgXray)
                                     ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, "RETRY_PUSH", "XRAY_CHEST")
@@ -819,7 +822,7 @@ class BenListAdapter(
                                 status.equals(OrderStatus.CLOSED.name, ignoreCase = true) -> {
                                     ButtonConfig("Create New Order", android.R.color.holo_blue_dark, "REORDER", "SPUTUM_TRUENAT")
                                 }
-                                tbDiag?.trueNatOrderId.isNullOrBlank() -> {
+                                tbDiag?.trueNatOrderId.isMissingOrderId() -> {
                                     clickListener?.onClickOrderAction(item, "CHECK_PUSH_ACTIVE", "SPUTUM_TRUENAT")
                                     bindErrorMsg(tbDiag?.errorMsgTrueNat)
                                     ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, "RETRY_PUSH", "SPUTUM_TRUENAT")

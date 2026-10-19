@@ -84,16 +84,19 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 // reconciles it (and FAILED) every time this worker runs.
                 data class PendingOrder(val benId: Long, val xray: Boolean, val trueNat: Boolean, val rif: Boolean)
 
+                fun hasRealOrderId(orderId: String?) =
+                    !orderId.isNullOrBlank() && !orderId.equals("N/A", ignoreCase = true)
+
                 val pendingOrders = activeList.mapNotNull { diag ->
                     val xrayInProgress = tbRepo.isXrayIntegrated() &&
                             diag.xrayOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) &&
-                            !diag.xrayOrderId.isNullOrBlank()
+                            hasRealOrderId(diag.xrayOrderId)
                     val trueNatInProgress = tbRepo.isTruenatIntegrated() &&
                             diag.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) &&
-                            !diag.trueNatOrderId.isNullOrBlank()
+                            hasRealOrderId(diag.trueNatOrderId)
                     val rifInProgress = tbRepo.isTruenatIntegrated() &&
                             diag.rifOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) &&
-                            !diag.rifOrderId.isNullOrBlank()
+                            hasRealOrderId(diag.rifOrderId)
                     if (xrayInProgress || trueNatInProgress || rifInProgress) {
                         PendingOrder(diag.benId, xrayInProgress, trueNatInProgress, rifInProgress)
                     } else null
