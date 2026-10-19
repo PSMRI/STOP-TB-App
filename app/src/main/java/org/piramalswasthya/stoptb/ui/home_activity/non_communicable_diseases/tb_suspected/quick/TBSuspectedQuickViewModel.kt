@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.configuration.TBSuspectedQuickDataset
@@ -575,6 +576,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
 
                         // Enqueued only now that the save has landed — see ordersToPushAfterSave above.
                         if (ordersToPushAfterSave.isNotEmpty()) {
+                            delay(300L)
                             WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, ordersToPushAfterSave)
                         }
 

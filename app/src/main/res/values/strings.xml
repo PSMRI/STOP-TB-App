@@ -1385,6 +1385,7 @@
     <!-- TrueNat & RIF order lifecycle redesign — Order Status area pill/caption/button copy,
          reused identically by Chest X-Ray's own retrofit of the same design language. -->
     <string name="order_status_fetching_from_device">Fetching result from device…</string>
+    <string name="order_status_order_not_created">Referral order not created — tap Retry Referral</string>
     <string name="order_status_manual_action_required">Manual Action Required</string>
     <string name="order_status_polling_stopped">Device polling has stopped — results won\'t be fetched automatically.</string>
     <string name="order_status_manual_unavailable">Automatic device result is unavailable. Please record the test result manually.</string>
@@ -1397,13 +1398,9 @@
     <string name="order_status_hub_disconnected_title">Camp Hub is disconnected.</string>
     <string name="order_status_hub_disconnected_desc">Not polling for result — please connect to Camp Hub.</string>
     <string name="order_status_last_checked_caption">Last checked %1$s ago · Auto-refresh every %2$d seconds</string>
-    <!-- Deliberately vague rather than an exact elapsed-seconds count — when a poll cycle runs
-         long, showing e.g. "84s ago" next to "every 60 seconds" looks broken even though it
-         isn't. -->
+
     <string name="order_status_few_seconds">a few seconds</string>
-    <!-- Kept short deliberately: these sit side-by-side in two half-width buttons with an
-         icon, and "Enter Result Manually"/"Mark Test Not Conducted" truncate on narrower
-         phone widths. -->
+
     <string name="order_status_enter_result">Enter Result</string>
     <string name="order_status_not_conducted">Not Conducted</string>
     <string name="order_status_view_mtb_result">View MTB Result</string>

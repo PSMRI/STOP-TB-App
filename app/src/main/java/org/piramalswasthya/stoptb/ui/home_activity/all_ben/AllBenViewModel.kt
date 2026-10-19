@@ -475,49 +475,62 @@ class AllBenViewModel @Inject constructor(
         }
     }
 
+    private fun hasRealOrderId(orderId: String?) =
+        !orderId.isNullOrBlank() && !orderId.equals("N/A", ignoreCase = true)
+
     fun retryTest(benId: Long, orderType: String, context: Context) {
         if (_retryingBenIds.value.contains(benId)) return
+        _retryingBenIds.value += benId
         viewModelScope.launch {
-            val existingBeforePush = tbRepo.getTBDiagnosticsById(benId)
-            val statusBeforePush = if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
-                existingBeforePush?.xrayOrderStatus
-            } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
-                existingBeforePush?.rifOrderStatus
-            } else {
-                existingBeforePush?.trueNatOrderStatus
-            }
-            if (statusBeforePush.equals("PENDING", ignoreCase = true)) {
-                return@launch
-            }
-            val pushActive = withContext(Dispatchers.IO) {
-                WorkerUtils.isDiagnosticOrderPushActive(context, benId)
-            }
-            if (pushActive) {
-                _orderActionState.value = OrderActionResult.Error(
-                    "An order push is already in progress for this beneficiary. Please wait a moment and try again."
-                )
-                return@launch
-            }
-            _orderActionState.value = OrderActionResult.Loading
-            _retryingBenIds.value += benId
-            val response = try {
-                tbRepo.createOrder(benId, orderType)
+            try {
+                val existingBeforePush = tbRepo.getTBDiagnosticsById(benId)
+                val statusBeforePush = if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
+                    existingBeforePush?.xrayOrderStatus
+                } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
+                    existingBeforePush?.rifOrderStatus
+                } else {
+                    existingBeforePush?.trueNatOrderStatus
+                }
+                val orderIdBeforePush = if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
+                    existingBeforePush?.xrayOrderId
+                } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
+                    existingBeforePush?.rifOrderId
+                } else {
+                    existingBeforePush?.trueNatOrderId
+                }
+                if (statusBeforePush.equals("PENDING", ignoreCase = true) && hasRealOrderId(orderIdBeforePush)) {
+                    _orderActionState.value = OrderActionResult.Success(
+                        "Order already created for this beneficiary — refreshing.", orderType
+                    )
+                    return@launch
+                }
+                val pushActive = withContext(Dispatchers.IO) {
+                    WorkerUtils.isDiagnosticOrderPushActive(context, benId)
+                }
+                if (pushActive) {
+                    _orderActionState.value = OrderActionResult.Error(
+                        "An order push is already in progress for this beneficiary. Please wait a moment and try again."
+                    )
+                    return@launch
+                }
+                _orderActionState.value = OrderActionResult.Loading
+                val response = tbRepo.createOrder(benId, orderType)
+                if (response is NetworkResponse.Success) {
+                    if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
+                        WorkerUtils.triggerDiagnosticResultPollWorker(context)
+                    } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
+                        WorkerUtils.triggerRifDiagnosticResultPollWorker(context)
+                    } else {
+                        WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context)
+                    }
+
+                    _orderActionState.value = OrderActionResult.Success("New order created and workflow restarted.", orderType)
+                } else {
+                    val errorMsg = (response as? NetworkResponse.Error)?.message ?: "Failed to create new order"
+                    _orderActionState.value = OrderActionResult.Error(errorMsg)
+                }
             } finally {
                 _retryingBenIds.value -= benId
-            }
-            if (response is NetworkResponse.Success) {
-                if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
-                    WorkerUtils.triggerDiagnosticResultPollWorker(context)
-                } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
-                    WorkerUtils.triggerRifDiagnosticResultPollWorker(context)
-                } else {
-                    WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context)
-                }
-                
-                _orderActionState.value = OrderActionResult.Success("New order created and workflow restarted.", orderType)
-            } else {
-                val errorMsg = (response as? NetworkResponse.Error)?.message ?: "Failed to create new order"
-                _orderActionState.value = OrderActionResult.Error(errorMsg)
             }
         }
     }
