@@ -329,11 +329,10 @@ class TBRepo @Inject constructor(
                         cache.rifOrderStatus = fresh.rifOrderStatus
                     }
                 }
-                tbDao.saveTbDiagnostics(cache)
+                val savedId = tbDao.saveTbDiagnostics(cache)
                 if (cache.isKnownTbCase()) {
                     knownTbHouseholdId = benDao.getBen(cache.benId)?.householdId
                 }
-                val savedId = tbDao.saveTbDiagnostics(cache)
                 SyncDailyStore.record("TB_DIAGNOSTICS", listOf(savedId), "SAVE", "SUCCESS")
             }
             knownTbHouseholdId?.takeIf { it > 0L }?.let { applyKnownTbContactRiskFactors(it) }
@@ -357,7 +356,6 @@ class TBRepo @Inject constructor(
             }
             val savedId = tbDao.saveTbSuspected(tbSuspectedCache)
             SyncDailyStore.record("TB_SUSPECTED", listOf(savedId), "SAVE", "SUCCESS")
-            tbDao.saveTbSuspected(tbSuspectedCache)
             if (tbSuspectedCache.isTBConfirmed == true || tbSuspectedCache.isConfirmed) {
                 benDao.getBen(tbSuspectedCache.benId)?.householdId
                     ?.takeIf { it > 0L }
@@ -377,7 +375,6 @@ class TBRepo @Inject constructor(
         {
             val savedId = tbDao.saveTbConfirmed(tbConfirmedTreatmentCache)
             SyncDailyStore.record("TB_CONFIRMED", listOf(savedId), "SAVE", "SUCCESS")
-            tbDao.saveTbConfirmed(tbConfirmedTreatmentCache)
             benDao.getBen(tbConfirmedTreatmentCache.benId)?.householdId
                 ?.takeIf { it > 0L }
                 ?.let { applyKnownTbContactRiskFactors(it) }
