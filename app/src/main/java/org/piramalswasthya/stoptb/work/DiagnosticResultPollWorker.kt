@@ -86,11 +86,14 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
 
                 val pendingOrders = activeList.mapNotNull { diag ->
                     val xrayInProgress = tbRepo.isXrayIntegrated() &&
-                            diag.xrayOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true)
+                            diag.xrayOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) &&
+                            !diag.xrayOrderId.isNullOrBlank()
                     val trueNatInProgress = tbRepo.isTruenatIntegrated() &&
-                            diag.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true)
+                            diag.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) &&
+                            !diag.trueNatOrderId.isNullOrBlank()
                     val rifInProgress = tbRepo.isTruenatIntegrated() &&
-                            diag.rifOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true)
+                            diag.rifOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) &&
+                            !diag.rifOrderId.isNullOrBlank()
                     if (xrayInProgress || trueNatInProgress || rifInProgress) {
                         PendingOrder(diag.benId, xrayInProgress, trueNatInProgress, rifInProgress)
                     } else null

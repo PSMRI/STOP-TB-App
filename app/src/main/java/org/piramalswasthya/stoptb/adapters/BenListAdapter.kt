@@ -177,6 +177,7 @@ class BenListAdapter(
 
         private fun bindPillAndCaptions(
             status: String?,
+            orderId: String?,
             benId: Long,
             testType: String,
             pref: PreferenceDao?,
@@ -215,6 +216,15 @@ class BenListAdapter(
                     setPillIcon(spinning = false, staticRes = R.drawable.ic_cloud_off_bottom_sheet, tintRes = android.R.color.darker_gray)
                     pillText.text = ctx.getString(R.string.order_status_saved_locally_syncing)
                     pillText.setTextColor(ContextCompat.getColor(ctx, android.R.color.darker_gray))
+                    statusDivider.visibility = View.GONE
+                    lastCheckedCaption.visibility = View.GONE
+                    pollingStoppedCaption.visibility = View.GONE
+                }
+                status.equals(OrderStatus.PENDING.name, ignoreCase = true) && orderId.isNullOrBlank() -> {
+                    pillContainer.visibility = View.VISIBLE
+                    setPillIcon(spinning = false, staticRes = R.drawable.ic_exclamation_circle, tintRes = R.color.md_theme_light_error)
+                    pillText.text = ctx.getString(R.string.order_status_order_not_created)
+                    pillText.setTextColor(ContextCompat.getColor(ctx, R.color.md_theme_light_error))
                     statusDivider.visibility = View.GONE
                     lastCheckedCaption.visibility = View.GONE
                     pollingStoppedCaption.visibility = View.GONE
@@ -299,7 +309,7 @@ class BenListAdapter(
                 tbDiag?.rifManualResultPendingSync == true -> {
                     binding.tvRifOrderStatus.visibility = View.GONE
                     bindPillAndCaptions(
-                        status, item.benId, "MDR_RIF", pref, true,
+                        status, tbDiag?.rifOrderId, item.benId, "MDR_RIF", pref, true,
                         binding.llRifOrderStatusPill, binding.ivRifOrderStatusPillIcon, binding.tvRifOrderStatusPillText,
                         binding.viewRifOrderStatusDivider, binding.tvRifLastCheckedCaption, binding.llRifPollingStoppedCaption,
                         binding.tvRifPollingStoppedCaptionTitle, binding.tvRifPollingStoppedCaptionText
@@ -366,7 +376,7 @@ class BenListAdapter(
                 else -> {
                     binding.tvRifOrderStatus.visibility = View.GONE
                     bindPillAndCaptions(
-                        status, item.benId, "MDR_RIF", pref, tbDiag?.rifManualResultPendingSync == true,
+                        status, tbDiag?.rifOrderId, item.benId, "MDR_RIF", pref, tbDiag?.rifManualResultPendingSync == true,
                         binding.llRifOrderStatusPill, binding.ivRifOrderStatusPillIcon, binding.tvRifOrderStatusPillText,
                         binding.viewRifOrderStatusDivider, binding.tvRifLastCheckedCaption, binding.llRifPollingStoppedCaption,
                         binding.tvRifPollingStoppedCaptionTitle, binding.tvRifPollingStoppedCaptionText
@@ -417,7 +427,7 @@ class BenListAdapter(
                 6 -> {
                     val status = tbDiag?.xrayOrderStatus
                     bindPillAndCaptions(
-                        status, item.benId, "XRAY_CHEST", pref, tbDiag?.xrayManualResultPendingSync == true,
+                        status, tbDiag?.xrayOrderId, item.benId, "XRAY_CHEST", pref, tbDiag?.xrayManualResultPendingSync == true,
                         binding.llOrderStatusPill, binding.ivOrderStatusPillIcon, binding.tvOrderStatusPillText,
                         binding.viewOrderStatusDivider, binding.tvLastCheckedCaption, binding.llPollingStoppedCaption,
                         binding.tvPollingStoppedCaptionTitle, binding.tvPollingStoppedCaptionText
@@ -435,7 +445,7 @@ class BenListAdapter(
                         }
                     } else {
                         bindPillAndCaptions(
-                            status, item.benId, "SPUTUM_TRUENAT", pref, isPendingTrueNatSync,
+                            status, tbDiag?.trueNatOrderId, item.benId, "SPUTUM_TRUENAT", pref, isPendingTrueNatSync,
                             binding.llOrderStatusPill, binding.ivOrderStatusPillIcon, binding.tvOrderStatusPillText,
                             binding.viewOrderStatusDivider, binding.tvLastCheckedCaption, binding.llPollingStoppedCaption,
                             binding.tvPollingStoppedCaptionTitle, binding.tvPollingStoppedCaptionText

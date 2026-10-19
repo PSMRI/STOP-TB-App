@@ -486,7 +486,14 @@ class AllBenViewModel @Inject constructor(
             } else {
                 existingBeforePush?.trueNatOrderStatus
             }
-            if (statusBeforePush.equals("PENDING", ignoreCase = true)) {
+            val orderIdBeforePush = if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
+                existingBeforePush?.xrayOrderId
+            } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
+                existingBeforePush?.rifOrderId
+            } else {
+                existingBeforePush?.trueNatOrderId
+            }
+            if (statusBeforePush.equals("PENDING", ignoreCase = true) && !orderIdBeforePush.isNullOrBlank()) {
                 return@launch
             }
             val pushActive = withContext(Dispatchers.IO) {
