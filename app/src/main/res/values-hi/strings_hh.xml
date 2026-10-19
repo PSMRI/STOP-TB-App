@@ -75,15 +75,18 @@
         <item>हाँ</item>
         <item>नहीं</item>
     </string-array>
-    <string name="nhhr_fuel_cooking">खाना पकाने के लिए किस प्रकार के ईंधन का उपयोग किया जाता है ?</string>
+    <string name="nhhr_fuel_cooking">खाना पकाने के लिए उपयोग किए जाने वाले ईंधन का मुख्य स्रोत</string>
     <string name="nhhr_fuel_cooking_1">लकड़ी</string>
     <string name="nhhr_fuel_cooking_2">फसल अवशेष</string>
     <string name="nhhr_fuel_cooking_3">गोबर के उपले</string>
     <string name="nhhr_fuel_cooking_4">कोयला</string>
     <string name="nhhr_fuel_cooking_5">मिट्टी का तेल (केरोसिन)</string>
-    <string name="nhhr_fuel_cooking_6">एलपीजी</string>
-    <string name="nhhr_fuel_cooking_7">इंडक्शन</string>
+    <string name="nhhr_fuel_cooking_6">तरलीकृत पेट्रोलियम गैस (LPG)</string>
+    <string name="nhhr_fuel_cooking_7">इंडक्शन (बिजली)</string>
     <string name="nhhr_fuel_cooking_8">अन्य</string>
+    <string name="nhhr_fuel_cooking_9">पाइप द्वारा प्राकृतिक गैस (PNG)</string>
+    <string name="nhhr_fuel_cooking_10">बायोगैस (गोबर गैस)</string>
+
     <string-array name="nhhr_fuel_cooking_array">
         <item>@string/nhhr_fuel_cooking_1</item>
         <item>@string/nhhr_fuel_cooking_2</item>
@@ -93,7 +96,11 @@
         <item>@string/nhhr_fuel_cooking_6</item>
         <item>@string/nhhr_fuel_cooking_7</item>
         <item>@string/nhhr_fuel_cooking_8</item>
+        <item>@string/nhhr_fuel_cooking_9</item>
+        <item>@string/nhhr_fuel_cooking_10</item>
     </string-array>
+
+
     <string name="nhhr_primary_water">पानी का प्राथमिक स्रोत</string>
     <string name="nhhr_primary_water_1">नल का पानी</string>
     <string name="nhhr_primary_water_2">घर के भीतर हैंडपंप</string>

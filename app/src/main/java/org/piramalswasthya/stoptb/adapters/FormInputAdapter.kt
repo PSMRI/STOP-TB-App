@@ -219,6 +219,9 @@ class FormInputAdapter(
             // ALWAYS rebuild from a clean baseline — don't append onto whatever filters
             // the previously-bound field left behind on this recycled view.
             val baseFilters = mutableListOf<InputFilter>()
+            if (item.isAlphanumeric) {
+                baseFilters.add(org.piramalswasthya.stoptb.configuration.AlphanumericInputFilter)
+            }
             if (item.etMaxLength > 0) baseFilters.add(InputFilter.LengthFilter(item.etMaxLength))
             if (item.allCaps) baseFilters.add(AllCaps())
             binding.et.filters = baseFilters.toTypedArray()
@@ -1232,6 +1235,25 @@ class FormInputAdapter(
                     thisYear = selectedDate.get(Calendar.YEAR)
                     thisMonth = selectedDate.get(Calendar.MONTH)
                     thisDay = selectedDate.get(Calendar.DAY_OF_MONTH)
+                }
+                val initial = Calendar.getInstance().apply {
+                    set(Calendar.YEAR, thisYear)
+                    set(Calendar.MONTH, thisMonth)
+                    set(Calendar.DAY_OF_MONTH, thisDay)
+                }
+                val minCal = item.min?.let { Calendar.getInstance().apply { timeInMillis = it } }
+                val maxCal = item.max?.let { Calendar.getInstance().apply { timeInMillis = it } }
+                when {
+                    minCal != null && initial.before(minCal) -> {
+                        thisYear = minCal.get(Calendar.YEAR)
+                        thisMonth = minCal.get(Calendar.MONTH)
+                        thisDay = minCal.get(Calendar.DAY_OF_MONTH)
+                    }
+                    maxCal != null && initial.after(maxCal) -> {
+                        thisYear = maxCal.get(Calendar.YEAR)
+                        thisMonth = maxCal.get(Calendar.MONTH)
+                        thisDay = maxCal.get(Calendar.DAY_OF_MONTH)
+                    }
                 }
                 val datePickerDialog = DatePickerDialog(
                     it.context, R.style.AppSpinnerDatePickerDialog, { _, year, month, day ->

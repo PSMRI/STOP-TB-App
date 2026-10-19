@@ -273,6 +273,7 @@
     <string name="contact_tracing_load_error">Could not load this form.</string>
     <string name="community_contact_tracing">Community Contacts</string>
     <string name="occupational_contact_tracing">Occupational Contacts</string>
+    <string name="household_contact_tracing">Household Contacts</string>
     <string name="contact_tracing_section_progress">Section %1$d of %2$d</string>
     <string name="contact_tracing_number_picker_decrement">Decrease</string>
     <string name="contact_tracing_number_picker_increment">Increase</string>
@@ -1458,6 +1459,8 @@
     <string name="tb_reason_for_denial_sputum">Reason for Denial of Sputum Collection</string>
     <string name="tb_reason_for_denial_sputum_other">Specify other reason for denial (Sputum)</string>
     <string name="tb_sputum_submitted_at">Sputum Sample Submission Center</string>
+    <string name="tb_sputum_sample_collection_date">Sputum Sample Collection date</string>
+    <string name="tb_sputum_collection_date_range_error">Select today or yesterday only</string>
     <string name="sputum_sample_submitted_at_screening_camp">Sputum Sample Submitted at TB Screening Camp</string>
     <string name="tb_reason_not_conducted_naat">Reason True NAT not conducted</string>
     <string name="tb_reason_not_conducted_naat_other">Specify other reason (True NAT not conducted)</string>
@@ -1532,6 +1535,8 @@
     </string-array>
     <string name="counselling_date_hint">Date</string>
     <!-- Location Details Section -->
+    <string name="loc_gps_not_captured">(GPS not captured)</string>
+    <string name="loc_camp_site_msg">Registration done at camp site</string>
     <string name="loc_section_title">Location Details</string>
     <string name="loc_btn_refresh">Refresh</string>
     <string name="loc_status_fetching">Fetching Location…</string>
@@ -1606,7 +1611,7 @@
     <string name="sync_counselling">Counselling</string>
 
 
-
+    <string name="loc_cb_update_location">Do you want to update the location details?</string>
 
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>

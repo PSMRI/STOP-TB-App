@@ -109,8 +109,10 @@ class TBConfirmedListFragment : Fragment() {
                     )
                 },
                 clickedContactTracing = { item ->
-                    ContactTracingTypeBottomSheetFragment.newInstance(item.ben.benId)
-                        .show(childFragmentManager, ContactTracingTypeBottomSheetFragment.TAG)
+                    ContactTracingTypeBottomSheetFragment.newInstance(
+                        indexCaseBenId = item.ben.benId,
+                        hhId = item.ben.hhId
+                    ).show(childFragmentManager, ContactTracingTypeBottomSheetFragment.TAG)
                 }
             ),
             pref = prefDao,

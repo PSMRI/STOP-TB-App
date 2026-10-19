@@ -72,15 +72,18 @@
         <item>Yes</item>
         <item>No</item>
     </string-array>
-    <string name="nhhr_fuel_cooking">Type of fuel used for Cooking</string>
-    <string name="nhhr_fuel_cooking_1">Firewood</string>
+    <string name="nhhr_fuel_cooking">Primary source of Fuel used for Cooking</string>
+    <string name="nhhr_fuel_cooking_1">Firewood (Wood)</string>
     <string name="nhhr_fuel_cooking_2">Crop Residue</string>
     <string name="nhhr_fuel_cooking_3">Cow dung cake</string>
     <string name="nhhr_fuel_cooking_4">Coal</string>
     <string name="nhhr_fuel_cooking_5">Kerosene</string>
-    <string name="nhhr_fuel_cooking_6">LPG</string>
-    <string name="nhhr_fuel_cooking_7">Induction</string>
+    <string name="nhhr_fuel_cooking_6">Liquefied Petroleum Gas (LPG)</string>
+    <string name="nhhr_fuel_cooking_7">Induction (Electricity)</string>
     <string name="nhhr_fuel_cooking_8">Other</string>
+    <string name="nhhr_fuel_cooking_9">Piped Natural Gas (PNG)</string>
+    <string name="nhhr_fuel_cooking_10">Biogas (Gobar Gas)</string>
+
     <string-array name="nhhr_fuel_cooking_array">
         <item>@string/nhhr_fuel_cooking_1</item>
         <item>@string/nhhr_fuel_cooking_2</item>
@@ -90,6 +93,8 @@
         <item>@string/nhhr_fuel_cooking_6</item>
         <item>@string/nhhr_fuel_cooking_7</item>
         <item>@string/nhhr_fuel_cooking_8</item>
+        <item>@string/nhhr_fuel_cooking_9</item>
+        <item>@string/nhhr_fuel_cooking_10</item>
     </string-array>
     <string name="nhhr_primary_water">Primary Source of Water</string>
     <string name="nhhr_primary_water_1">Tap Water</string>

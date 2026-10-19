@@ -508,5 +508,76 @@ interface TBDao {
         gender: String,
         isChild: Int
     ): Flow<Int>
+
+    /**
+     * True when another living household member is a confirmed TB case.
+     * Pass householdId 0 or the person's own id to get false.
+     */
+    @Query("""
+        SELECT EXISTS(
+            SELECT 1
+            FROM BENEFICIARY other
+            LEFT JOIN TB_SUSPECTED ts ON other.beneficiaryId = ts.benId
+            LEFT JOIN TB_DIAGNOSTICS td ON other.beneficiaryId = td.benId
+            WHERE other.householdId = :householdId
+              AND :householdId > 0
+              AND other.beneficiaryId != :benId
+              AND IFNULL(other.isDeactivate, 0) = 0
+              AND IFNULL(other.isDeath, 0) = 0
+              AND IFNULL(other.isDraft, 0) = 0
+              AND (
+                    IFNULL(ts.isTBConfirmed, 0) = 1
+                    OR IFNULL(ts.isConfirmed, 0) = 1
+                    OR IFNULL(td.isTBConfirmed, 0) = 1
+                    OR IFNULL(td.isConfirmed, 0) = 1
+                    OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                    OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                    OR EXISTS (
+                        SELECT 1 FROM TB_CONFIRMED_TREATMENT tc
+                        WHERE tc.benId = other.beneficiaryId
+                    )
+              )
+        )
+    """)
+    suspend fun householdHasOtherConfirmedTbCase(householdId: Long, benId: Long): Boolean
+
+    /**
+     * Screenings for household members who are contacts of a confirmed TB case.
+     * householdId 0 returns every such screening.
+     */
+    @Query("""
+        SELECT t.*
+        FROM TB_SCREENING t
+        INNER JOIN BENEFICIARY self ON self.beneficiaryId = t.benId
+        WHERE IFNULL(self.householdId, 0) > 0
+          AND (:householdId = 0 OR self.householdId = :householdId)
+          AND IFNULL(self.isDeactivate, 0) = 0
+          AND IFNULL(self.isDeath, 0) = 0
+          AND IFNULL(self.isDraft, 0) = 0
+          AND EXISTS (
+                SELECT 1
+                FROM BENEFICIARY other
+                LEFT JOIN TB_SUSPECTED ts ON other.beneficiaryId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON other.beneficiaryId = td.benId
+                WHERE other.householdId = self.householdId
+                  AND other.beneficiaryId != self.beneficiaryId
+                  AND IFNULL(other.isDeactivate, 0) = 0
+                  AND IFNULL(other.isDeath, 0) = 0
+                  AND IFNULL(other.isDraft, 0) = 0
+                  AND (
+                        IFNULL(ts.isTBConfirmed, 0) = 1
+                        OR IFNULL(ts.isConfirmed, 0) = 1
+                        OR IFNULL(td.isTBConfirmed, 0) = 1
+                        OR IFNULL(td.isConfirmed, 0) = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                        OR EXISTS (
+                            SELECT 1 FROM TB_CONFIRMED_TREATMENT tc
+                            WHERE tc.benId = other.beneficiaryId
+                        )
+                  )
+          )
+    """)
+    suspend fun getScreeningsForKnownTbContacts(householdId: Long): List<TBScreeningCache>
 }
 

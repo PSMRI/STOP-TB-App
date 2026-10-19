@@ -100,6 +100,17 @@ class TBScreeningFormViewModel @Inject constructor(
                 _recordExists.value = false
             }
 
+            val isContact = ben?.let {
+                tbRepo.isContactOfKnownTbPatient(it.beneficiaryId, it.householdId)
+            } == true
+            dataset.setContactOfKnownTbPatient(isContact)
+            if (isContact && ben != null) {
+                tbRepo.applyKnownTbContactRiskFactors(ben.householdId)
+                if (_recordExists.value == true) {
+                    tbRepo.getTBScreening(benId)?.let { tbScreeningCache = it }
+                }
+            }
+
             val residentialArea = ben?.let { resolveResidentialArea(it) }
             dataset.setUpPage(
                 ben,
@@ -111,19 +122,32 @@ class TBScreeningFormViewModel @Inject constructor(
     }
 
     /**
-     * Picks up an age or residential-area edit made before this screening is saved.
-     * Returns true when Elderly or Urban Slum was added or removed.
+     * Picks up an age, residential-area, or household TB-confirmation change.
+     * Returns true when the Key Population selection changed.
      */
     suspend fun refreshAutoSelectedRiskFactors(): Boolean {
-        if (_recordExists.value == true) return false
         val ben = benRepo.getBenFromId(benId) ?: return false
-        _benAgeGender.postValue(ben.getAgeGenderDisplayString())
+        val isContact = tbRepo.isContactOfKnownTbPatient(ben.beneficiaryId, ben.householdId)
+        dataset.setContactOfKnownTbPatient(isContact)
+        if (isContact) {
+            tbRepo.applyKnownTbContactRiskFactors(ben.householdId)
+            if (_recordExists.value == true) {
+                tbRepo.getTBScreening(benId)?.let { tbScreeningCache = it }
+            }
+        }
+        if (_recordExists.value != true) {
+            _benAgeGender.postValue(ben.getAgeGenderDisplayString())
+        }
         val residentialArea = resolveResidentialArea(ben)
         return dataset.refreshAutoSelectedRiskFactors(
             ben,
             residentialArea.label,
             residentialArea.id
         )
+    }
+
+    suspend fun applyFormValueChange(formId: Int, index: Int) {
+        dataset.updateList(formId, index)
     }
 
     private suspend fun resolveResidentialArea(ben: BenRegCache): KeyPopulationRiskFactorAutoSelect.ResidentialArea {
@@ -265,6 +289,11 @@ class TBScreeningFormViewModel @Inject constructor(
             if (refersXray && !hasXrayOrder) ordersToPush.add("XRAY_CHEST")
             if (refersTruenat && !hasTruenatOrder) ordersToPush.add("SPUTUM_TRUENAT")
             if (ordersToPush.isNotEmpty()) {
+                try {
+                    tbRepo.pushUnSyncedTBScreeningRecords()
+                } catch (e: Exception) {
+                    Timber.e(e, "TB Screening pre-order-push sync failed; proceeding with order push anyway")
+                }
                 WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, ordersToPush)
             }
         } catch (e: java.lang.Exception) {

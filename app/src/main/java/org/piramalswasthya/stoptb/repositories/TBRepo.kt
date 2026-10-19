@@ -14,6 +14,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.configuration.KeyPopulationRiskFactorAutoSelect
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
@@ -307,6 +308,7 @@ class TBRepo @Inject constructor(
                 ben.gpsLatitude?.let { tbDiagnosticsCache.latitude = it }
                 ben.gpsLongitude?.let { tbDiagnosticsCache.longitude = it }
             }
+            var knownTbHouseholdId: Long? = null
             withBenIdLock(tbDiagnosticsCache.benId) {
                 val fresh = tbDao.getTbDiagnosticsByBenId(tbDiagnosticsCache.benId)
                 // id is a val (Room primary key) — .copy() to retarget the existing row instead
@@ -327,9 +329,14 @@ class TBRepo @Inject constructor(
                         cache.rifOrderStatus = fresh.rifOrderStatus
                     }
                 }
+                tbDao.saveTbDiagnostics(cache)
+                if (cache.isKnownTbCase()) {
+                    knownTbHouseholdId = benDao.getBen(cache.benId)?.householdId
+                }
                 val savedId = tbDao.saveTbDiagnostics(cache)
                 SyncDailyStore.record("TB_DIAGNOSTICS", listOf(savedId), "SAVE", "SUCCESS")
             }
+            knownTbHouseholdId?.takeIf { it > 0L }?.let { applyKnownTbContactRiskFactors(it) }
             if (tbDiagnosticsCache.isChestXRayDone == true) benDao.updateScreeningStatus(tbDiagnosticsCache.benId,"SCREENED")   // NEW
 
             if (tbDiagnosticsCache.isNaatConducted == true) benDao.updateScreeningStatus(tbDiagnosticsCache.benId,"SCREENED")   // NEW
@@ -350,6 +357,12 @@ class TBRepo @Inject constructor(
             }
             val savedId = tbDao.saveTbSuspected(tbSuspectedCache)
             SyncDailyStore.record("TB_SUSPECTED", listOf(savedId), "SAVE", "SUCCESS")
+            tbDao.saveTbSuspected(tbSuspectedCache)
+            if (tbSuspectedCache.isTBConfirmed == true || tbSuspectedCache.isConfirmed) {
+                benDao.getBen(tbSuspectedCache.benId)?.householdId
+                    ?.takeIf { it > 0L }
+                    ?.let { applyKnownTbContactRiskFactors(it) }
+            }
         }
     }
 
@@ -364,7 +377,51 @@ class TBRepo @Inject constructor(
         {
             val savedId = tbDao.saveTbConfirmed(tbConfirmedTreatmentCache)
             SyncDailyStore.record("TB_CONFIRMED", listOf(savedId), "SAVE", "SUCCESS")
+            tbDao.saveTbConfirmed(tbConfirmedTreatmentCache)
+            benDao.getBen(tbConfirmedTreatmentCache.benId)?.householdId
+                ?.takeIf { it > 0L }
+                ?.let { applyKnownTbContactRiskFactors(it) }
         }
+    }
+
+    suspend fun isContactOfKnownTbPatient(benId: Long, householdId: Long?): Boolean {
+        val hhId = householdId?.takeIf { it > 0L } ?: return false
+        return withContext(Dispatchers.IO) {
+            tbDao.householdHasOtherConfirmedTbCase(hhId, benId)
+        }
+    }
+
+    /**
+     * Writes "Contact of Known TB Patients" onto household members' saved screenings.
+     * A null or non-positive [householdId] updates every household that has a confirmed case.
+     * Members who were screened before the confirmation are included.
+     */
+    suspend fun applyKnownTbContactRiskFactors(householdId: Long? = null) {
+        withContext(Dispatchers.IO) {
+            val screenings = tbDao.getScreeningsForKnownTbContacts(householdId?.takeIf { it > 0L } ?: 0L)
+            var updated = 0
+            for (screening in screenings) {
+                val selection = KeyPopulationRiskFactorAutoSelect.addContactOfKnownTb(
+                    screening.keyPopulationRiskFactorIds,
+                    screening.keyPopulationRiskFactors
+                ) ?: continue
+                screening.keyPopulationRiskFactorIds = selection.ids
+                screening.keyPopulationRiskFactors = selection.codes
+                screening.syncState = SyncState.UNSYNCED
+                tbDao.saveTbScreening(screening)
+                updated++
+            }
+            if (updated > 0) {
+                Timber.d("Selected Contact of Known TB Patients on $updated screening record(s)")
+            }
+        }
+    }
+
+    private fun TBDiagnosticsCache.isKnownTbCase(): Boolean {
+        if (isTBConfirmed == true || isConfirmed) return true
+        val naat = naatResult?.trim()?.uppercase().orEmpty()
+        if (naat == "POSITIVE" || naat == "MTB DETECTED" || naat == "TB POSITIVE") return true
+        return liquidCultureResult?.trim()?.equals("POSITIVE", ignoreCase = true) == true
     }
 
     suspend fun getAllFollowUpsForBeneficiary(benId: Long): List<TBConfirmedTreatmentCache> {
@@ -605,6 +662,13 @@ class TBRepo @Inject constructor(
                 failureToGainWeightInChildren = item.optNullableBoolean("failureToGainWeightInChildren") ?: existing?.failureToGainWeightInChildren,
                 decreasedActivityOrPlayfulnessInChildren = item.optNullableBoolean("decreasedActivityOrPlayfulnessInChildren") ?: existing?.decreasedActivityOrPlayfulnessInChildren,
                 otherSymptoms = item.optNullableBoolean("otherSymptoms") ?: existing?.otherSymptoms,
+                otherSymptomsDetails = if (item.has("otherSymptomsDetails")) {
+                    item.optStringOrNull("otherSymptomsDetails")
+                } else if (item.optNullableBoolean("otherSymptoms") == false) {
+                    null
+                } else {
+                    existing?.otherSymptomsDetails
+                },
                 referredForDigitalChestXray = item.optNullableBoolean("referredForDigitalChestXray"),
                 referredForSputumCollection = item.optNullableBoolean("referredForSputumCollection"),
                 sputumSampleSubmittedAt = item.optStringOrNull("sputumSampleSubmittedAt"),
@@ -892,6 +956,12 @@ class TBRepo @Inject constructor(
                     trueNatRifResult = item.optStringOrNull("trueNatRifResult") ?: existing?.trueNatRifResult,
                     rifOrderId = item.optStringOrNull("rifOrderId") ?: existing?.rifOrderId,
                     rifOrderStatus = item.optStringOrNull("rifOrderStatus") ?: existing?.rifOrderStatus,
+                    sputumCollectionDate = item.optLong("sputumCollectionDate")
+                        .takeIf { it > 0L }
+                        ?: item.optStringOrNull("sputumCollectionDate")?.toLongOrNull()?.takeIf { it > 0L }
+                        ?: item.optStringOrNull("sputumCollectionDate")
+                            ?.let { getLongFromDateMultipleSupport(it).takeIf { parsed -> parsed > 0L } }
+                        ?: existing?.sputumCollectionDate,
                     serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
                     syncState = SyncState.SYNCED
                 )
@@ -2587,7 +2657,14 @@ class TBRepo @Inject constructor(
                 isDRTBConfirmed = mappedIsDRTBConfirmed,
                 isTBConfirmed = mappedSputumTestResult == "TB Positive",
                 isConfirmed = mappedSputumTestResult == "TB Positive",
-                sputumTestResult = mappedSputumTestResult
+                sputumTestResult = mappedSputumTestResult,
+                // Previously missing entirely — TB_SUSPECTED's own copy of these fields stayed
+                // null forever for any beneficiary referred via the quick-entry screen (which only
+                // writes them onto TB_DIAGNOSTICS), even though TB_SUSPECTED has its own push to
+                // the backend (saveTBSuspectedData) that would otherwise send stale/incomplete data.
+                recommendedForLiquidCultureTest = diag.recommendedForLiquidCultureTest ?: existing?.recommendedForLiquidCultureTest,
+                isLiquidCultureConducted = diag.isLiquidCultureConducted ?: existing?.isLiquidCultureConducted,
+                liquidCultureResult = diag.liquidCultureResult ?: existing?.liquidCultureResult
             )
 
             // hasSymptoms is deliberately always forced true above (this function only runs off
@@ -2604,20 +2681,23 @@ class TBRepo @Inject constructor(
                 val diffs = buildList {
                     if (existing.hasSymptoms != provisionalCache.hasSymptoms) add("hasSymptoms: ${existing.hasSymptoms} -> ${provisionalCache.hasSymptoms}")
                     if (existing.isChestXRayDone != provisionalCache.isChestXRayDone) add("isChestXRayDone: ${existing.isChestXRayDone} -> ${provisionalCache.isChestXRayDone}")
-                    if (existing.chestXRayResult != provisionalCache.chestXRayResult) add("chestXRayResult: ${existing.chestXRayResult} -> ${provisionalCache.chestXRayResult}")
+                    if (existing.chestXRayResult != provisionalCache.chestXRayResult) add("chestXRayResult: changed")
                     if (existing.isSputumCollected != provisionalCache.isSputumCollected) add("isSputumCollected: ${existing.isSputumCollected} -> ${provisionalCache.isSputumCollected}")
                     if (existing.sputumSubmittedAt != provisionalCache.sputumSubmittedAt) add("sputumSubmittedAt: ${existing.sputumSubmittedAt} -> ${provisionalCache.sputumSubmittedAt}")
                     if (existing.isNaatConducted != provisionalCache.isNaatConducted) add("isNaatConducted: ${existing.isNaatConducted} -> ${provisionalCache.isNaatConducted}")
-                    if (existing.naatResult != provisionalCache.naatResult) add("naatResult: ${existing.naatResult} -> ${provisionalCache.naatResult}")
+                    if (existing.naatResult != provisionalCache.naatResult) add("naatResult: changed")
                     if (existing.reasonForRefusalXray != provisionalCache.reasonForRefusalXray) add("reasonForRefusalXray: ${existing.reasonForRefusalXray} -> ${provisionalCache.reasonForRefusalXray}")
                     if (existing.reasonForRefusalSputum != provisionalCache.reasonForRefusalSputum) add("reasonForRefusalSputum: ${existing.reasonForRefusalSputum} -> ${provisionalCache.reasonForRefusalSputum}")
                     if (existing.reasonForRefusalMTB != provisionalCache.reasonForRefusalMTB) add("reasonForRefusalMTB: ${existing.reasonForRefusalMTB} -> ${provisionalCache.reasonForRefusalMTB}")
                     if (existing.reasonForRefusalMDRRIF != provisionalCache.reasonForRefusalMDRRIF) add("reasonForRefusalMDRRIF: ${existing.reasonForRefusalMDRRIF} -> ${provisionalCache.reasonForRefusalMDRRIF}")
-                    if (existing.mdrRifResult != provisionalCache.mdrRifResult) add("mdrRifResult: ${existing.mdrRifResult} -> ${provisionalCache.mdrRifResult}")
+                    if (existing.mdrRifResult != provisionalCache.mdrRifResult) add("mdrRifResult: changed")
                     if (existing.isDRTBConfirmed != provisionalCache.isDRTBConfirmed) add("isDRTBConfirmed: ${existing.isDRTBConfirmed} -> ${provisionalCache.isDRTBConfirmed}")
                     if (existing.isTBConfirmed != provisionalCache.isTBConfirmed) add("isTBConfirmed: ${existing.isTBConfirmed} -> ${provisionalCache.isTBConfirmed}")
                     if (existing.isConfirmed != provisionalCache.isConfirmed) add("isConfirmed: ${existing.isConfirmed} -> ${provisionalCache.isConfirmed}")
-                    if (existing.sputumTestResult != provisionalCache.sputumTestResult) add("sputumTestResult: ${existing.sputumTestResult} -> ${provisionalCache.sputumTestResult}")
+                    if (existing.sputumTestResult != provisionalCache.sputumTestResult) add("sputumTestResult: changed")
+                    if (existing.recommendedForLiquidCultureTest != provisionalCache.recommendedForLiquidCultureTest) add("recommendedForLiquidCultureTest: ${existing.recommendedForLiquidCultureTest} -> ${provisionalCache.recommendedForLiquidCultureTest}")
+                    if (existing.isLiquidCultureConducted != provisionalCache.isLiquidCultureConducted) add("isLiquidCultureConducted: ${existing.isLiquidCultureConducted} -> ${provisionalCache.isLiquidCultureConducted}")
+                    if (existing.liquidCultureResult != provisionalCache.liquidCultureResult) add("liquidCultureResult: changed")
                 }
                 Timber.w("TB_SUSPECTED_DIRTY: benId=$benId marking UNSYNCED (was ${existing.syncState}), diag.xrayOrderStatus=${diag.xrayOrderStatus} trueNatOrderStatus=${diag.trueNatOrderStatus} rifOrderStatus=${diag.rifOrderStatus}, changes=$diffs")
             } else {
