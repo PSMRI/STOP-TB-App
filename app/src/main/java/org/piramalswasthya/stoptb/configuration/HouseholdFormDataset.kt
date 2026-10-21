@@ -296,10 +296,14 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             residentialArea.value = residentialArea.getStringFromPosition(saved.residentialAreaId)
             otherResidentialArea.value = saved.otherResidentialArea
             typeOfHouse.value = typeOfHouse.getStringFromPosition(saved.houseTypeId)
+            otherTypeOfHouse.value = saved.otherHouseType
             houseOwnership.value = houseOwnership.getStringFromPosition(saved.isHouseOwnedId)
         }
         if (residentialArea.value == residentialArea.entries!!.last()) {
             list.add(list.indexOf(residentialArea) + 1, otherResidentialArea)
+        }
+        if (typeOfHouse.value == typeOfHouse.entries!!.last()) {
+            list.add(list.indexOf(typeOfHouse) + 1, otherTypeOfHouse)
         }
         val thirdPage =
             listOf(
@@ -410,8 +414,21 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_type_of_house),
         arrayId = R.array.nhhr_type_of_house_array,
         entries = resources.getStringArray(R.array.nhhr_type_of_house_array),
-        required = true
+        required = true,
+        hasDependants = true
     )
+
+    private val otherTypeOfHouse = FormElement(
+        id = 1061,
+        inputType = EDIT_TEXT,
+        title = resources.getString(R.string.nhhr_type_of_house_other),
+        arrayId = -1,
+        required = true,
+        hasSpeechToText = true,
+        etMaxLength = 50,
+        etInputType = InputType.TYPE_CLASS_TEXT
+    )
+
     private val houseOwnership = FormElement(
         id = 11,
         inputType = RADIO,
@@ -433,6 +450,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             residentialArea.value = residentialArea.getStringFromPosition(saved.residentialAreaId)
             otherResidentialArea.value = saved.otherResidentialArea
             typeOfHouse.value = typeOfHouse.getStringFromPosition(saved.houseTypeId)
+            otherTypeOfHouse.value = saved.otherHouseType
             houseOwnership.value = houseOwnership.getStringFromPosition(saved.isHouseOwnedId)
         }
         if (residentialArea.value == residentialArea.entries!!.last()) {
@@ -738,6 +756,25 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
                 return getIndexOfElement(address)
             }
 
+            typeOfHouse.id -> triggerDependants(
+                source = typeOfHouse,
+                passedIndex = index,
+                triggerIndex = typeOfHouse.entries!!.size - 1,
+                target = otherTypeOfHouse
+            )
+
+            otherTypeOfHouse.id -> {
+                validateEmptyOnEditText(otherTypeOfHouse)
+                val text = otherTypeOfHouse.value.orEmpty()
+                if (text.isNotEmpty() && !Regex("^[\\p{L}\\p{M} ]+$").matches(text)) {
+                    otherTypeOfHouse.errorText = resources.getString(R.string.form_input_alphabet_space_only_error) // use your existing error string
+                    -1
+                } else {
+                    otherTypeOfHouse.errorText = null
+                    -1
+                }
+            }
+
             else -> -1
         }
     }
@@ -802,6 +839,10 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             details.otherResidentialArea = otherResidentialArea.value
             details.houseTypeId = typeOfHouse.getPosition()
             details.houseType = typeOfHouse.getEnglishStringFromPosition(details.houseTypeId)
+            details.otherHouseType =
+                if (typeOfHouse.value == typeOfHouse.entries!!.last())
+                    otherTypeOfHouse.value?.trim()
+                else null
             details.isHouseOwnedId = houseOwnership.getPosition()
             details.isHouseOwned =
                 houseOwnership.getEnglishStringFromPosition(details.isHouseOwnedId)
