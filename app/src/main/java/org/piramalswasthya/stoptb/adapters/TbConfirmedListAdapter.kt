@@ -96,6 +96,13 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 //            binding.counsellingSectionProgress.visibility = if(role.isCounsellingOfficerRole()) View.VISIBLE else View.INVISIBLE
 //            binding.btnContactTracing.visibility = if(role.isCounsellingOfficerRole()) View.VISIBLE else View.GONE
             binding.counsellingSectionProgress.visibility = if (showCounsellingUi) View.VISIBLE else View.INVISIBLE
+            binding.tvCounsellingSectionsCompleted.text = binding.root.context.getString(
+                R.string.counselling_sections_completed,
+                sectionsFilled.coerceAtMost(totalSections),
+                totalSections
+            )
+            binding.tvCounsellingSectionsCompleted.visibility =
+                if (showCounsellingUi && totalSections > 0) View.VISIBLE else View.GONE
             binding.btnContactTracing.visibility = if (showCounsellingUi) View.VISIBLE else View.GONE
 
             if (isRefused) {
@@ -145,6 +152,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
                     binding.btnCounselling.visibility = View.GONE
                     binding.btnCounselled.visibility = View.GONE
                     binding.counsellingSectionProgress.visibility = View.GONE
+                    binding.tvCounsellingSectionsCompleted.visibility = View.GONE
                 }
             }
             if (item.ben.spouseName == "Not Available" && item.ben.fatherName == "Not Available") {

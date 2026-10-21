@@ -55,6 +55,7 @@
 
     <string name="counselling_data_load_error">We\'re unable to fetch data.\nPlease try again later.</string>
     <string name="counselling_select_all">Select All</string>
+    <string name="counselling_sections_completed">%1$d of %2$d sections completed</string>
 
     <!-- Home cards for the four independent Counsellor modules (module separation) -->
     <string name="icon_title_counselling_module">Counselling</string>
