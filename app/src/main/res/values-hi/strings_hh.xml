@@ -70,7 +70,7 @@
         <item>किराए पर</item>
         <item>अपना</item>
     </string-array>
-    <string name="nhhr_separate_kitchen">अलग रसोई घर</string>
+    <string name="nhhr_separate_kitchen">क्या अलग रसोईघर है?</string>
     <string-array name="nhhr_separate_kitchen_array">
         <item>हाँ</item>
         <item>नहीं</item>
@@ -121,20 +121,22 @@
         <item>@string/nhhr_primary_water_8</item>
     </string-array>
 
-    <string name="nhhr_avail_electricity">बिजली की उपलब्धता</string>
+    <string name="nhhr_avail_electricity">प्रकाश का प्राथमिक स्रोत</string>
     <string name="nhhr_avail_electricity_1">बिजली की आपूर्ति</string>
     <string name="nhhr_avail_electricity_2">विद्युत जनरेटर</string>
     <string name="nhhr_avail_electricity_3">सौर ऊर्जा</string>
     <string name="nhhr_avail_electricity_4">मिट्टी तेल का लैंप/चिमनी/लालटेन</string>
+    <string name="nhhr_avail_electricity_solar">सौर लैंप</string>
     <string name="nhhr_avail_electricity_5">अन्य</string>
     <string-array name="nhhr_avail_electricity_array">
         <item>@string/nhhr_avail_electricity_1</item>
         <item>@string/nhhr_avail_electricity_2</item>
         <item>@string/nhhr_avail_electricity_3</item>
         <item>@string/nhhr_avail_electricity_4</item>
+        <item>@string/nhhr_avail_electricity_solar</item>
         <item>@string/nhhr_avail_electricity_5</item>
     </string-array>
-    <string name="nhhr_avail_toilet">शौचालय की उपलब्धता</string>
+    <string name="nhhr_avail_toilet">शौचालय की उपलब्धता (शौचालय का प्रकार)</string>
     <string name="nhhr_avail_toilet_1">बहते पानी के साथ फ्लश शौचालय</string>
     <string name="nhhr_avail_toilet_2">पानी के बिना फ्लश शौचालय</string>
     <string name="nhhr_avail_toilet_3">पानी की आपूर्ति के साथ गड्ढा शौचालय</string>
@@ -146,14 +148,14 @@
         <item>@string/nhhr_avail_toilet_2</item>
         <item>@string/nhhr_avail_toilet_3</item>
         <item>@string/nhhr_avail_toilet_4</item>
-        <item>@string/nhhr_avail_toilet_5</item>
         <item>@string/nhhr_avail_toilet_6</item>
+        <item>@string/nhhr_avail_toilet_5</item>
     </string-array>
     <string name="nhhr_type_residential_area_other">कृपया आवासीय क्षेत्र का प्रकार दर्ज करें</string>
     <string name="nhhr_fuel_cooking_other">खाना पकाने के लिए किस प्रकार के ईंधन का उपयोग किया जाता है ?</string>
-    <string name="nhhr_primary_water_other">पीने के पानी के स्रोत में प्रवेश करें</string>
-    <string name="nhhr_avail_electricity_other">बिजली की उपलब्धता दर्ज करें</string>
-    <string name="nhhr_avail_toilet_other">शौचालय की उपलब्धता दर्ज करें</string>
+    <string name="nhhr_primary_water_other">पानी का अन्य स्रोत</string>
+    <string name="nhhr_avail_electricity_other">प्रकाश का अन्य प्राथमिक स्रोत</string>
+    <string name="nhhr_avail_toilet_other">अन्य प्रकार का शौचालय</string>
     <string name="btn_frag_nhhr_to_ben">लाभार्थी रजिस्टर करने के लिए जारी रखें</string>
     <string name="consent_alert_title">कृपया सहमति फॉर्म की जांच करें</string>
     <string name="add_head_of_family">परिवार के मुखिया को जोड़ें </string>
