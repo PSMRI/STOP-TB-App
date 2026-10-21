@@ -297,7 +297,6 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             otherResidentialArea.value = saved.otherResidentialArea
             typeOfHouse.value = typeOfHouse.getStringFromPosition(saved.houseTypeId)
             otherTypeOfHouse.value = saved.otherHouseType
-            houseOwnership.value = houseOwnership.getStringFromPosition(saved.isHouseOwnedId)
         }
         if (residentialArea.value == residentialArea.entries!!.last()) {
             list.add(list.indexOf(residentialArea) + 1, otherResidentialArea)
