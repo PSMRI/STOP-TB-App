@@ -222,6 +222,9 @@ class FormInputAdapter(
             if (item.isAlphanumeric) {
                 baseFilters.add(org.piramalswasthya.stoptb.configuration.AlphanumericInputFilter)
             }
+            if (item.isAlphabetsOnly) {
+                baseFilters.add(org.piramalswasthya.stoptb.configuration.AlphabetInputFilter)
+            }
             if (item.etMaxLength > 0) baseFilters.add(InputFilter.LengthFilter(item.etMaxLength))
             if (item.allCaps) baseFilters.add(AllCaps())
             binding.et.filters = baseFilters.toTypedArray()

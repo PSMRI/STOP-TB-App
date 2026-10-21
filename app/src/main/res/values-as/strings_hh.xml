@@ -68,7 +68,7 @@
         <item>ভাড়াৰ বাবে</item>
         <item>নিজৰ</item>
     </string-array>
-    <string name="nhhr_separate_kitchen">পৃথক পাকঘৰ</string>
+    <string name="nhhr_separate_kitchen">পৃথক পাকঘৰ আছে নেকি?</string>
     <string-array name="nhhr_separate_kitchen_array">
         <item>হয়</item>
         <item>নহয়</item>
@@ -120,20 +120,22 @@
         <item>@string/nhhr_primary_water_8</item>
     </string-array>
 
-    <string name="nhhr_avail_electricity">বিদ্যুতৰ উপলব্ধতা</string>
+    <string name="nhhr_avail_electricity">পোহৰৰ প্ৰাথমিক উৎস</string>
     <string name="nhhr_avail_electricity_1">বিদ্যুৎ যোগান</string>
     <string name="nhhr_avail_electricity_2">জেনেৰেটৰ</string>
     <string name="nhhr_avail_electricity_3">সৌৰশক্তি</string>
     <string name="nhhr_avail_electricity_4">কেৰাচিনৰ চাকি</string>
+    <string name="nhhr_avail_electricity_solar">সৌৰ বাতি</string>
     <string name="nhhr_avail_electricity_5">অন্য</string>
     <string-array name="nhhr_avail_electricity_array">
         <item>@string/nhhr_avail_electricity_1</item>
         <item>@string/nhhr_avail_electricity_2</item>
         <item>@string/nhhr_avail_electricity_3</item>
         <item>@string/nhhr_avail_electricity_4</item>
+        <item>@string/nhhr_avail_electricity_solar</item>
         <item>@string/nhhr_avail_electricity_5</item>
     </string-array>
-    <string name="nhhr_avail_toilet">শৌচাগাৰৰ উপলব্ধতা</string>
+    <string name="nhhr_avail_toilet">শৌচাগাৰৰ উপলব্ধতা (শৌচাগাৰৰ প্ৰকাৰ)</string>
     <string name="nhhr_avail_toilet_1">বৈ যোৱা পানীৰ যোগান থকা শৌচাগাৰ</string>
     <string name="nhhr_avail_toilet_2">বৈ যোৱা পানীৰ যোগান নথকা শৌচাগাৰ</string>
     <string name="nhhr_avail_toilet_3">চলি থকা পানীৰ যোগান থকা কেছা শৌচাগাৰ</string>
@@ -146,14 +148,14 @@
         <item>@string/nhhr_avail_toilet_2</item>
         <item>@string/nhhr_avail_toilet_3</item>
         <item>@string/nhhr_avail_toilet_4</item>
-        <item>@string/nhhr_avail_toilet_5</item>
         <item>@string/nhhr_avail_toilet_6</item>
+        <item>@string/nhhr_avail_toilet_5</item>
     </string-array>
     <string name="nhhr_type_residential_area_other">আৱাসিক এলেকাৰ প্ৰকাৰ দাখিল কৰক</string>
     <string name="nhhr_fuel_cooking_other">অন্যান্য ৰন্ধা-বঢ়াৰ বাবে ব্যৱহাৰ কৰা ইন্ধনৰ প্ৰকাৰ</string>
-    <string name="nhhr_primary_water_other">পানীৰ অন্যান্য প্ৰাথমিক উৎস</string>
-    <string name="nhhr_avail_electricity_other">বিদ্যুতৰ অন্যান্য উপলব্ধতা</string>
-    <string name="nhhr_avail_toilet_other">শৌচাগাৰৰ অন্যান্য উপলব্ধতা</string>
+    <string name="nhhr_primary_water_other">পানীৰ অন্য উৎস</string>
+    <string name="nhhr_avail_electricity_other">পোহৰৰ অন্য প্ৰাথমিক উৎস</string>
+    <string name="nhhr_avail_toilet_other">অন্য প্ৰকাৰৰ শৌচাগাৰ</string>
     <string name="btn_frag_nhhr_to_ben">হিতাধিকাৰীলৈ আগবাঢ়ি যাওক</string>
     <string name="consent_alert_title">সন্মতি প্ৰ-পত্ৰ</string>
     <string name="add_head_of_family">এডিডি পৰিয়ালৰ মুৰব্বী</string>

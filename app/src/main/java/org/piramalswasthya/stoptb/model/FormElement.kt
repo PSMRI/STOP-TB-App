@@ -48,5 +48,6 @@ data class FormElement(
     var boldTitleOnYes: Boolean = false,
     val showAsSingleSelectDialog: Boolean = false,
     val isAlphanumeric: Boolean = false,
+    val isAlphabetsOnly: Boolean = false,
 
 )
