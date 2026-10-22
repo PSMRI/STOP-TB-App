@@ -1819,7 +1819,7 @@ class FormInputAdapter(
             binding.tvStatusValue.setTextColor(onBanner)
             binding.tvStatusValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
             binding.tvStatusValue.setTypeface(binding.tvStatusValue.typeface, Typeface.BOLD)
-            binding.tvStatusDetail.visibility = View.VISIBLE
+            binding.tvStatusDetail.visibility = View.GONE
             binding.tvStatusDetail.text = detail
             binding.tvStatusDetail.setTextColor(onBanner)
             binding.llStatusBanner.contentDescription = "${binding.tvStatusLabel.text}: $label. $detail"
