@@ -295,7 +295,12 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         hh?.details?.let { saved ->
             residentialArea.value = residentialArea.getStringFromPosition(saved.residentialAreaId)
             otherResidentialArea.value = saved.otherResidentialArea
-            typeOfHouse.value = typeOfHouse.getStringFromPosition(saved.houseTypeId)
+            // Legacy: pehle index 3 = "Other". Ab 3 = Pucca Stone and Mortar, Other = index 4.
+            val isLegacyOther = saved.houseTypeId == 3 &&
+                    saved.houseType.equals("Other", ignoreCase = true)
+            typeOfHouse.value =
+                if (isLegacyOther) typeOfHouse.entries?.last()
+                else typeOfHouse.getStringFromPosition(saved.houseTypeId)
             otherTypeOfHouse.value = saved.otherHouseType
             houseOwnership.value = houseOwnership.getStringFromPosition(saved.isHouseOwnedId)
         }
@@ -449,12 +454,20 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         details?.let { saved ->
             residentialArea.value = residentialArea.getStringFromPosition(saved.residentialAreaId)
             otherResidentialArea.value = saved.otherResidentialArea
-            typeOfHouse.value = typeOfHouse.getStringFromPosition(saved.houseTypeId)
+            // Legacy: pehle index 3 = "Other". Ab 3 = Pucca Stone and Mortar, Other = index 4.
+            val isLegacyOther = saved.houseTypeId == 3 &&
+                    saved.houseType.equals("Other", ignoreCase = true)
+            typeOfHouse.value =
+                if (isLegacyOther) typeOfHouse.entries?.last()
+                else typeOfHouse.getStringFromPosition(saved.houseTypeId)
             otherTypeOfHouse.value = saved.otherHouseType
             houseOwnership.value = houseOwnership.getStringFromPosition(saved.isHouseOwnedId)
         }
         if (residentialArea.value == residentialArea.entries!!.last()) {
             list.add(list.indexOf(residentialArea) + 1, otherResidentialArea)
+        }
+        if (typeOfHouse.value == typeOfHouse.entries!!.last()) {
+            list.add(list.indexOf(typeOfHouse) + 1, otherTypeOfHouse)
         }
         setUpPage(list)
     }
@@ -767,7 +780,8 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
                 validateEmptyOnEditText(otherTypeOfHouse)
                 val text = otherTypeOfHouse.value.orEmpty()
                 if (text.isNotEmpty() && !Regex("^[\\p{L}\\p{M} ]+$").matches(text)) {
-                    otherTypeOfHouse.errorText = resources.getString(R.string.form_input_alphabet_space_only_error) // use your existing error string
+                    otherTypeOfHouse.errorText =
+                        resources.getString(R.string.form_input_alphabet_space_only_error)
                     -1
                 } else {
                     otherTypeOfHouse.errorText = null
