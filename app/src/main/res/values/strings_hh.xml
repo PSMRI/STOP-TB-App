@@ -173,7 +173,7 @@
     <string name="sub_title_current_living_info">Please provide the beneficiary\'s current living place details.</string>
     <string name="hint_place_of_current_living">Place of Current Living *</string>
     <string name="hint_other_place">Other Place *</string>
-    <string name="hint_institution_name">Name of Institution *</string>
+    <string name="hint_institution_name">Name of the Institution *</string>
 
     <string name="all_non_household_beneficiaries">All Non Household Beneficiaries</string>
 

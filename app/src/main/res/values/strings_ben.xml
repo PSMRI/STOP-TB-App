@@ -530,18 +530,18 @@ personal health profile.</string>
         <item>Railway Platform</item>
         <item>Bus Station</item>
         <item>Under a Tree</item>
-        <item>Temple</item>
-        <item>Mosque</item>
-        <item>Church</item>
-        <item>Other Praying Place</item>
+        <item>In a Temple</item>
+        <item>In a Mosque</item>
+        <item>In a Church</item>
+        <item>Any Other Praying Place</item>
         <item>Educational Institution</item>
         <item>Ekalavya School</item>
         <item>Rehabilitation Centre</item>
-        <item>Orphanage</item>
+        <item>Orphanage Home</item>
         <item>Old Age Home</item>
         <item>Private Hostel</item>
         <item>Govt Hostel</item>
-        <item>NGO Hostel</item>
+        <item>NGO\'s Hostel</item>
         <item>Other</item>
     </string-array>
 
