@@ -1,5 +1,5 @@
 name: StopTB Build & Distribute
-run-name: STOP TB ${{ inputs.environment }} ${{ inputs.signing }} - ${{ inputs.versionName }} (${{ inputs.versionCode }}) [${{ inputs.branch }}]
+run-name: STOP TB ${{ inputs.environment }} ${{ inputs.signing }} - ${{ inputs.versionName }} (${{ inputs.versionCode }}) [${{ inputs.branch }}]${{ inputs.distributeIntune && format(' -> {0}', inputs.deployTo) || '' }}
 
 on:
   workflow_dispatch:
@@ -56,12 +56,14 @@ on:
         type: string
         default: '4'
       deployTo:
-        description: 'Select QA device for Intune deployment'
+        description: 'Intune MDM target group, only used when Intune is ticked. Must match Target environment: UAT - ... for uat, PROD - ... for prod. PROD - Field only after QA approves the build.'
         required: true
         type: choice
         options:
-          - QA-Group-1
-          - QA-Group-2
+          - UAT - QA-Group-1
+          - UAT - QA-Group-2
+          - PROD - QA
+          - PROD - Field
 
 permissions:
   contents: read
@@ -126,7 +128,8 @@ jobs:
           INTUNE_GROUP_ID_UAT: ${{ secrets.INTUNE_GROUP_ID_UAT }}
           INTUNE_GROUP_QA_1: ${{ secrets.INTUNE_GROUP_QA_1 }}
           INTUNE_GROUP_QA_2: ${{ secrets.INTUNE_GROUP_QA_2 }}
-          INTUNE_GROUP_ID_PROD: ${{ secrets.INTUNE_GROUP_ID_PROD }}
+          INTUNE_GROUP_PROD_QA: ${{ secrets.INTUNE_GROUP_PROD_QA }}
+          INTUNE_GROUP_PROD_FIELD: ${{ secrets.INTUNE_GROUP_PROD_FIELD }}
           INTUNE_APP_ID: ${{ secrets.INTUNE_APP_ID }}
           INTUNE_APP_ID_PROD: ${{ secrets.INTUNE_APP_ID_PROD }}
         run: |
@@ -198,20 +201,25 @@ jobs:
           fi
 
           if [ "$DO_INTUNE" = true ]; then
-
-            if [ "$TARGET_ENV" = uat ]; then
-              case "$DEPLOY_TO" in
-                QA-Group-1) INTUNE_GROUP_ID="$INTUNE_GROUP_QA_1"; QA_SUFFIX=QA1 ;;
-                QA-Group-2) INTUNE_GROUP_ID="$INTUNE_GROUP_QA_2"; QA_SUFFIX=QA2 ;;
-                *)
-                  echo "ERROR: Unknown Intune deployment target: '$DEPLOY_TO'"
-                  exit 1
-                  ;;
-              esac
-              INTUNE_DISPLAY_NAME="StopTB_Internal_Testing_UAT_${QA_SUFFIX}"
-            else
-              INTUNE_GROUP_ID="$INTUNE_GROUP_ID_PROD"
+            # One Intune app per target group. A run only updates the app of the
+            # selected group, so other groups' devices are never touched.
+            case "$TARGET_ENV:$DEPLOY_TO" in
+              'uat:UAT - QA-Group-1') GROUP_SECRET=INTUNE_GROUP_QA_1;       INTUNE_DISPLAY_NAME=StopTB_Internal_Testing_UAT_QA1 ;;
+              'uat:UAT - QA-Group-2') GROUP_SECRET=INTUNE_GROUP_QA_2;       INTUNE_DISPLAY_NAME=StopTB_Internal_Testing_UAT_QA2 ;;
+              'prod:PROD - QA')       GROUP_SECRET=INTUNE_GROUP_PROD_QA;    INTUNE_DISPLAY_NAME=TBMJA_Internal_Testing_Prod_QA ;;
+              'prod:PROD - Field')    GROUP_SECRET=INTUNE_GROUP_PROD_FIELD; INTUNE_DISPLAY_NAME=TBMJA_Field_Prod ;;
+              *)
+                echo "ERROR: '$DEPLOY_TO' is not an Intune target for $TARGET_ENV."
+                echo "Pick a 'UAT - ...' target for uat, or a 'PROD - ...' target for prod."
+                exit 1
+                ;;
+            esac
+            INTUNE_GROUP_ID="${!GROUP_SECRET:-}"
+            if [ -z "$INTUNE_GROUP_ID" ]; then
+              echo "ERROR: Repository secret $GROUP_SECRET is empty or missing (needed for $DEPLOY_TO)."
+              exit 1
             fi
+            echo "Intune target: $DEPLOY_TO -> app $INTUNE_DISPLAY_NAME (group from $GROUP_SECRET)"
           fi
 
           {
@@ -569,9 +577,8 @@ jobs:
           if [ -n "${INTUNE_APP_ID:-}" ]; then
             EXTRA_ARGS+=(--app-id "${INTUNE_APP_ID}")
           fi
-          if [ "${{ inputs.environment }}" = uat ]; then
-            EXTRA_ARGS+=(--exclusive --create-if-missing)
-          fi
+          # Every Intune target has its own app, assigned only to its own group.
+          EXTRA_ARGS+=(--exclusive --create-if-missing)
           python3 "$RUNNER_TEMP/upload_intune_android_lob.py" \
             --apk "${{ steps.apk.outputs.apk_path }}" \
             --package-id "${{ steps.plan.outputs.package_id }}" \
@@ -580,6 +587,7 @@ jobs:
             --group-id "${INTUNE_GROUP_ID}" \
             --display-name "${{ steps.plan.outputs.intune_display_name }}" \
             --publisher "Piramal Swasthya" \
+            --commit "$(git rev-parse --short HEAD)" \
             --description "${{ steps.plan.outputs.firebase_label }} signed build updated to ${{ inputs.versionName }} (${{ inputs.versionCode }})" \
             "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"
 
