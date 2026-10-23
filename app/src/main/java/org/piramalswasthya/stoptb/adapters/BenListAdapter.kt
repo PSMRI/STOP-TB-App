@@ -599,7 +599,6 @@ class BenListAdapter(
                 binding.tvRedesignMobileNumber.text = if (item.isPlaceholderMobileNo) "N/A" else item.mobileNoDisplay
                 binding.llRedesignVillage.visibility = if (showVillageName) View.VISIBLE else View.GONE
                 if (showVillageName) {
-                    Log.i("BenListAdapterOne", "bind: ${item.villageName}")
                     binding.tvRedesignVillageName.text = item.villageName?.takeIf { it.isNotBlank() } ?: "N/A"
                 }
             }
