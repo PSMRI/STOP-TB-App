@@ -16,6 +16,7 @@ import org.piramalswasthya.stoptb.helpers.Languages.ENGLISH
 import org.piramalswasthya.stoptb.model.LocationEntity
 import org.piramalswasthya.stoptb.model.LocationRecord
 import org.piramalswasthya.stoptb.model.User
+import org.piramalswasthya.stoptb.model.VillageDefaults
 import javax.inject.Inject
 
 @HiltViewModel
@@ -74,6 +75,12 @@ class ServiceTypeViewModel @Inject constructor(
         get() = selectedHealthFacility?.localizedName()
 
 
+    // Pincode / Residential Area remembered for the selected village (shown pre-filled, still editable here).
+    // TODO: once getUserDetailsById returns a pincode per village, prefer that master value.
+    private var _selectedVillageDefaults: VillageDefaults? = null
+    val selectedVillageDefaults: VillageDefaults?
+        get() = _selectedVillageDefaults
+
     private val _state = MutableLiveData(State.LOADING)
     val state: LiveData<State>
         get() = _state
@@ -93,6 +100,7 @@ class ServiceTypeViewModel @Inject constructor(
                 _userName = user.name
                 currentLocation = pref.getLocationRecord()
                 _selectedVillage = currentLocation?.village
+                _selectedVillageDefaults = _selectedVillage?.let { pref.getVillageDefaults(it.id) }
                 _selectedTu = currentLocation?.tu
                 _selectedHealthFacility = currentLocation?.healthFacility
                 when (pref.getCurrentLanguage()) {
@@ -148,11 +156,12 @@ class ServiceTypeViewModel @Inject constructor(
         return if (state.value == State.LOADING)
             false
         else
-            currentLocation != null
+            currentLocation?.let { pref.getVillageDefaults(it.village.id)?.isComplete == true } == true
     }
 
     fun setVillage(i: Int) {
         _selectedVillage = user.villages[i]
+        _selectedVillageDefaults = pref.getVillageDefaults(user.villages[i].id)
 
     }
 
@@ -168,7 +177,7 @@ class ServiceTypeViewModel @Inject constructor(
 
     fun isHealthFacilityRequired(): Boolean = healthFacilities.isNotEmpty()
 
-    fun saveCurrentLocation() {
+    fun saveCurrentLocation(pinCode: String, residentialAreaId: Int) {
         val locationRecord = LocationRecord(
             country = LocationEntity(1, "India"),
             state = user.state,
@@ -179,6 +188,10 @@ class ServiceTypeViewModel @Inject constructor(
             village = selectedVillage!!
         )
         pref.saveLocationRecord(locationRecord)
+        pref.saveVillageDefaults(
+            locationRecord.village.id,
+            VillageDefaults(pinCode = pinCode, residentialAreaId = residentialAreaId)
+        )
     }
 
     private fun LocationEntity.localizedName(): String {

@@ -3,18 +3,24 @@ package org.piramalswasthya.stoptb.database.shared_preferences
 import android.content.Context
 import android.net.Uri
 import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.model.LocationRecord
 import org.piramalswasthya.stoptb.model.User
+import org.piramalswasthya.stoptb.model.VillageDefaults
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class PreferenceDao @Inject constructor(@ApplicationContext private val context: Context) {
+
+    private companion object {
+        const val VILLAGE_DEFAULTS_KEY = "village_defaults_by_village_id"
+    }
 
     private val pref = PreferenceManager.getInstance(context)
     fun deleteAmritToken() {
@@ -160,6 +166,41 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         val prefKey = context.getString(R.string.PREF_location_record_entry)
         val json = pref.getString(prefKey, null)
         return Gson().fromJson(json, LocationRecord::class.java)
+    }
+
+    fun getVillageDefaults(villageId: Int): VillageDefaults? =
+        getVillageDefaultsByVillageId()[villageId.toString()]
+
+    fun saveVillageDefaults(villageId: Int, villageDefaults: VillageDefaults) {
+        val defaultsByVillageId = getVillageDefaultsByVillageId().toMutableMap()
+        defaultsByVillageId[villageId.toString()] = villageDefaults
+        pref.edit().putString(VILLAGE_DEFAULTS_KEY, Gson().toJson(defaultsByVillageId)).apply()
+    }
+
+    /**
+     * Remembers values captured in a registration form for a village that had none saved yet.
+     * Never overwrites a value already saved for the village.
+     */
+    fun saveVillageDefaultsIfMissing(villageId: Int, capturedDefaults: VillageDefaults) {
+        if (villageId <= 0) return
+        val savedDefaults = getVillageDefaults(villageId)
+        val mergedDefaults = VillageDefaults(
+            pinCode = savedDefaults?.pinCode?.takeIf { savedDefaults.hasPinCode }
+                ?: capturedDefaults.pinCode?.trim()?.takeIf { it.isNotEmpty() },
+            residentialAreaId = savedDefaults?.residentialAreaId?.takeIf { savedDefaults.hasResidentialArea }
+                ?: capturedDefaults.residentialAreaId
+        )
+        if (mergedDefaults != savedDefaults) saveVillageDefaults(villageId, mergedDefaults)
+    }
+
+    private fun getVillageDefaultsByVillageId(): Map<String, VillageDefaults> {
+        val json = pref.getString(VILLAGE_DEFAULTS_KEY, null) ?: return emptyMap()
+        return runCatching {
+            Gson().fromJson<Map<String, VillageDefaults>>(
+                json,
+                object : TypeToken<Map<String, VillageDefaults>>() {}.type
+            )
+        }.getOrNull() ?: emptyMap()
     }
 
     fun setLastSyncedTimeStamp(lastSaved: Long) {

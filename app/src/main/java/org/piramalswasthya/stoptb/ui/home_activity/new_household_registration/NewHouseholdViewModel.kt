@@ -33,7 +33,7 @@ import javax.inject.Inject
 @HiltViewModel
 class NewHouseholdViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    preferenceDao: PreferenceDao,
+    private val preferenceDao: PreferenceDao,
     @ApplicationContext context: Context,
     private val benRepo: BenRepo,
     private val householdRepo: HouseholdRepo
@@ -117,7 +117,9 @@ class NewHouseholdViewModel @Inject constructor(
                     householdRepo.getAllBenOfHousehold(household.householdId).size
                 } else 0
 
-                dataset.setupPage(household, villageNames, user.villages, registeredMemberCount)
+                // New or edit: the village's saved Residential Area fills and locks the field
+                val villageDefaults = preferenceDao.getVillageDefaults(household.locationRecord.village.id)
+                dataset.setupPage(household, villageNames, user.villages, registeredMemberCount, villageDefaults)
                 _isCampSite.value = dataset.isRegisteredAtCampSite()
 
                 // Restore previously saved location state if editing an existing record
@@ -276,6 +278,9 @@ class NewHouseholdViewModel @Inject constructor(
                         household.benId = linkBenId
                     }
                     householdRepo.persistRecord(household)
+                    dataset.getCapturedVillageDefaults()?.let { capturedDefaults ->
+                        preferenceDao.saveVillageDefaultsIfMissing(household.locationRecord.village.id, capturedDefaults)
+                    }
                     benRepo.updateBenToSync(household.householdId, SyncState.UNSYNCED)
                     if (linkBenId != 0L) {
                         benRepo.linkBenToHousehold(linkBenId, household.householdId, 19, "Self")

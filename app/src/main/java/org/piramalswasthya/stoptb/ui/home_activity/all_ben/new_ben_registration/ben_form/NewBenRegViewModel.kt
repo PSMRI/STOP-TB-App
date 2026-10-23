@@ -217,7 +217,9 @@ class NewBenRegViewModel @Inject constructor(
                 isNonHH = ben.isNonHH,
                 hofForDobRules = hofBen,
                 hofSpouseForDobRules = hofSpouse,
-                showUpdateLocation = isStandalone
+                showUpdateLocation = isStandalone,
+                // Same village shown in the form above — its saved Pincode / Residential Area lock the fields
+                villageDefaults = preferenceDao.getVillageDefaults(locationRecord.village.id)
             )
         } else {
             val villageNames = user.villages.map { it.name }.toTypedArray()
@@ -297,7 +299,8 @@ class NewBenRegViewModel @Inject constructor(
                 isNonHH = isNonHHArg,
                 hofForDobRules = hofBen,
                 hofSpouseForDobRules = hofSpouse,
-                selectedMemberForDobRules = selectedSpouseMember
+                selectedMemberForDobRules = selectedSpouseMember,
+                villageDefaults = preferenceDao.getVillageDefaults(prefillLocation.village.id)
             )
         }
         // Restore/Inherit Location details
@@ -604,6 +607,9 @@ class NewBenRegViewModel @Inject constructor(
                     }
 
                     benRepo.persistRecord(ben, updateIfExists = benIdFromArgs != 0L)
+                    dataset.getCapturedVillageDefaults()?.let { capturedDefaults ->
+                        preferenceDao.saveVillageDefaultsIfMissing(ben.locationRecord.village.id, capturedDefaults)
+                    }
 
                     // Mark both members' isSpouseAdded = true (hides "Register Wife/Husband" on both cards)
                     if (isAddSpouseFromArgs == 1 && selectedBenIdFromArgs != 0L && hhId > 0L) {

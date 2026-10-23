@@ -7,6 +7,7 @@ import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.model.LocationEntity
+import org.piramalswasthya.stoptb.model.VillageDefaults
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.model.AgeUnit
 import org.piramalswasthya.stoptb.model.BenBasicCache.Companion.getAgeFromDob
@@ -481,7 +482,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         hofForDobRules: BenRegCache? = null,
         hofSpouseForDobRules: BenRegCache? = null,
         selectedMemberForDobRules: BenRegCache? = null,
-        showUpdateLocation: Boolean = false
+        showUpdateLocation: Boolean = false,
+        villageDefaults: VillageDefaults? = null
     ) {
         val list = mutableListOf(
             pic,
@@ -732,6 +734,13 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             }
         }
 
+        // HoF / Non-HH (new or edit): Pincode & Residential Area come from the village (captured once on the
+        // location screen) and are locked. Runs after the saved record is restored so it isn't overwritten.
+        // Members other than HoF hide these fields and inherit from the HoF as before.
+        if (villageDefaults != null && (relToHeadId == 18 || isNonHH)) {
+            applyVillageDefaults(villageDefaults, includePinCode = !isNonHH)
+        }
+
         addMaritalStatusIfApplicable(list)
 
         // Add spouse name field if married
@@ -901,7 +910,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         hofForDobRules: BenRegCache? = null,
         hofSpouseForDobRules: BenRegCache? = null,
         selectedMemberForDobRules: BenRegCache? = null,
-        showUpdateLocation: Boolean = false
+        showUpdateLocation: Boolean = false,
+        villageDefaults: VillageDefaults? = null
     ) = setUpPage(
         ben,
         familyHeadPhoneNo,
@@ -916,13 +926,44 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         hofForDobRules = hofForDobRules,
         hofSpouseForDobRules = hofSpouseForDobRules,
         selectedMemberForDobRules = selectedMemberForDobRules,
-        showUpdateLocation = showUpdateLocation
-
+        showUpdateLocation = showUpdateLocation,
+        villageDefaults = villageDefaults
     )
 
 
     private var familyHeadPhoneNo: String? = null
     private var villageEntities: List<LocationEntity> = emptyList()
+    // True when the selected village had no saved Pincode / Residential Area, so the user typed them in
+    private var isCapturingVillageDefaults = false
+
+    /**
+     * Fills Pincode / Residential Area from the village's saved values and locks them. A value the village
+     * doesn't have yet is left blank and editable so the user can capture it (remembered for the village on save).
+     */
+    private fun applyVillageDefaults(villageDefaults: VillageDefaults?, includePinCode: Boolean) {
+        if (includePinCode) {
+            val savedPinCode = villageDefaults?.pinCode?.takeIf { villageDefaults.hasPinCode }
+            pinCode.value = savedPinCode
+            pinCode.errorText = null
+            pinCode.inputType = if (savedPinCode != null) TEXT_VIEW else EDIT_TEXT
+        }
+        val savedResidentialArea =
+            villageDefaults?.residentialAreaId?.let { residentialAreaType.getStringFromPosition(it) }
+        residentialAreaType.value = savedResidentialArea
+        residentialAreaType.errorText = null
+        residentialAreaType.inputType = if (savedResidentialArea != null) TEXT_VIEW else DROPDOWN
+        isCapturingVillageDefaults = (includePinCode && pinCode.inputType != TEXT_VIEW) ||
+                residentialAreaType.inputType != TEXT_VIEW
+    }
+
+    /** Values the user captured for a village that had none saved; null when nothing new was captured. */
+    fun getCapturedVillageDefaults(): VillageDefaults? {
+        if (!isCapturingVillageDefaults) return null
+        return VillageDefaults(
+            pinCode = pinCode.value?.trim()?.takeIf { it.isNotEmpty() && getIndexOfElement(pinCode) >= 0 },
+            residentialAreaId = if (getIndexOfElement(residentialAreaType) >= 0) residentialAreaType.getPosition() else 0
+        )
+    }
     private var isHeadOfFamilyRegistration: Boolean = false
 
 
@@ -1263,6 +1304,19 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             residentialAreaType.id -> {
                 otherResidentialAreaType.value = null
                 return -1
+            }
+
+            villageHamlet.id -> {
+                // Village changed: Pincode & Residential Area belong to the village, so reset and refill
+                // from the new village's saved values (or leave blank for the user to capture).
+                val isPinCodeShown = getIndexOfElement(pinCode) >= 0
+                if (!isPinCodeShown && getIndexOfElement(residentialAreaType) < 0) return -1
+                val selectedVillage = villageEntities.find { it.name == villageHamlet.value }
+                applyVillageDefaults(
+                    selectedVillage?.let { preferenceDao.getVillageDefaults(it.id) },
+                    includePinCode = isPinCodeShown
+                )
+                return getIndexOfElement(villageHamlet)
             }
 
             contactNumber.id -> {

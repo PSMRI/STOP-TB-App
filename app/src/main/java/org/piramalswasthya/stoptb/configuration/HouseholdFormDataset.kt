@@ -6,6 +6,7 @@ import android.text.InputType
 import com.google.gson.Gson
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.helpers.Languages
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.FormElement
 import org.piramalswasthya.stoptb.model.HouseholdAmenities
 import org.piramalswasthya.stoptb.model.HouseholdCache
@@ -17,6 +18,7 @@ import org.piramalswasthya.stoptb.model.InputType.HEADLINE
 import org.piramalswasthya.stoptb.model.InputType.RADIO
 import org.piramalswasthya.stoptb.model.InputType.TEXT_VIEW
 import org.piramalswasthya.stoptb.model.LocationEntity
+import org.piramalswasthya.stoptb.model.VillageDefaults
 import timber.log.Timber
 import java.text.DateFormat
 import java.text.SimpleDateFormat
@@ -25,6 +27,10 @@ import java.util.Date
 import java.util.Locale
 
 class HouseholdFormDataset(context: Context, language: Languages) : Dataset(context, language) {
+
+    private val preferenceDao = PreferenceDao(context)
+    // True when the selected village had no saved Residential Area, so the user picked one here
+    private var isCapturingVillageDefaults = false
     companion object {
         private fun getCurrentDate(): String {
             val calendar = Calendar.getInstance()
@@ -225,7 +231,8 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
     suspend fun setupPage(hh: HouseholdCache?,
                               villageNames: Array<String>? = null,
                               villageEntityList: List<LocationEntity> = emptyList(),
-                              registeredMemberCount: Int = 0
+                              registeredMemberCount: Int = 0,
+                              villageDefaults: VillageDefaults? = null
     ) {
 
         val list = mutableListOf<FormElement>()
@@ -299,6 +306,8 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             otherTypeOfHouse.value = saved.otherHouseType
             houseOwnership.value = houseOwnership.getStringFromPosition(saved.isHouseOwnedId)
         }
+        // New household: Residential Area comes from the village (captured once on the location screen)
+        villageDefaults?.let { applyVillageDefaults(it) }
         if (residentialArea.value == residentialArea.entries!!.last()) {
             list.add(list.indexOf(residentialArea) + 1, otherResidentialArea)
         }
@@ -753,6 +762,17 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
                 address.value = villageHamlet.value
                 validateEmptyOnEditText(address)
 
+                // Residential Area belongs to the village: reset and refill from the new village's saved
+                // value, or leave blank for the user to capture.
+                val selectedVillage = villageEntities.find { it.name == villageHamlet.value }
+                applyVillageDefaults(selectedVillage?.let { preferenceDao.getVillageDefaults(it.id) })
+                triggerDependants(
+                    source = residentialArea,
+                    passedIndex = residentialArea.entries!!.indexOf(residentialArea.value),
+                    triggerIndex = residentialArea.entries!!.size - 1,
+                    target = otherResidentialArea
+                )
+
                 return getIndexOfElement(address)
             }
 
@@ -828,6 +848,27 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
                 cacheModel.locationRecord = cacheModel.locationRecord.copy(village = it)
             }
         }
+    }
+
+    /**
+     * Fills Residential Area from the village's saved value and locks it; when the village has none
+     * it's left blank, editable and required (remembered for the village on save).
+     */
+    private fun applyVillageDefaults(villageDefaults: VillageDefaults?) {
+        val savedResidentialArea =
+            villageDefaults?.residentialAreaId?.let { residentialArea.getStringFromPosition(it) }
+        residentialArea.value = savedResidentialArea
+        residentialArea.errorText = null
+        residentialArea.inputType = if (savedResidentialArea != null) TEXT_VIEW else DROPDOWN
+        residentialArea.required = true
+        otherResidentialArea.value = null
+        isCapturingVillageDefaults = savedResidentialArea == null
+    }
+
+    /** Residential Area the user captured for a village that had none saved; null when nothing new was captured. */
+    fun getCapturedVillageDefaults(): VillageDefaults? {
+        if (!isCapturingVillageDefaults) return null
+        return VillageDefaults(residentialAreaId = residentialArea.getPosition())
     }
 
     private fun mapValuesForPage2(cacheModel: FormDataModel) {
