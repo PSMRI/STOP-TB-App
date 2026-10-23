@@ -1026,7 +1026,7 @@
     <string name="check_if_the_person_has_any_of_these_symptoms">Check if the person has any of these Symptoms:</string>
     <string name="tb_asymptomatic_screening">Asymptomatic Screening</string>
     <string name="tb_is_beneficiary_asymptomatic">Beneficiary is Asymptomatic</string>
-    <string name="tb_symptom_status">Symptom status</string>
+    <string name="tb_symptom_status">Screening Status</string>
     <string name="tb_status_asymptomatic">Asymptomatic</string>
     <string name="tb_status_symptomatic">Symptomatic</string>
     <string name="tb_status_asymptomatic_detail">No TB-related symptoms were identified</string>

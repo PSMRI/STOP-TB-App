@@ -763,7 +763,6 @@ class TBScreeningDataset(
         }
         add(others)
         if (isYes(others)) add(otherSymptomsDetails)
-        add(isAsymptomatic)
         addAll(listOf(
             otherDetailsHeading,
             historyOfTB,
@@ -773,6 +772,7 @@ class TBScreeningDataset(
             keyPopulationRiskFactors,
             hivStatus
         ))
+        add(isAsymptomatic)
     }
 
     private fun yesNoFromIndex(index: Int): String? = if (index == 0) yesValue else noValue
