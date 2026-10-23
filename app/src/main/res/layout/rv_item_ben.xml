@@ -589,6 +589,32 @@
                                     android:textColor="?attr/colorOnPrimary"
                                     android:textStyle="bold" />
                             </LinearLayout>
+
+                            <LinearLayout
+                                android:id="@+id/ll_redesign_village"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/padding_small"
+                                android:orientation="vertical"
+                                android:visibility="gone">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/filter_village_name"
+                                    android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                                    android:textColor="?attr/colorOnPrimary" />
+
+                                <TextView
+                                    android:id="@+id/tv_redesign_village_name"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:maxLines="2"
+                                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                    android:textColor="?attr/colorOnPrimary"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
                         </LinearLayout>
 
                         <View

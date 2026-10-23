@@ -71,7 +71,7 @@ enum class ScreeningStatus {
     value = "SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId" +
             ", b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod" +
             ", b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus" +
-            ", b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId" +
+            ", b.loc_village_id as villageId, b.loc_village_name as villageName, b.abha_healthIdNumber as abhaId" +
             ", b.isNewAbha" +
             ", IFNULL(cbac.benId IS NOT NULL, 0) as cbacFilled, cbac.syncState as cbacSyncState" +
             ", 0 as cdrFilled, NULL as cdrSyncState" +
@@ -203,7 +203,8 @@ data class BenBasicCache(
     val chestXrayDoneDate: Long? = null,
     val trunatTestDoneDate: Long? = null,
     val otherPlaceOfCurrentLiving: String? = null,
-    val institutionName: String? = null
+    val institutionName: String? = null,
+    val villageName: String? = null
 ) : Parcelable {
     companion object {
         val dateFormat = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
@@ -328,7 +329,8 @@ data class BenBasicCache(
             screeningStatus = screeningStatus,
             symptomsScreenedDate = symptomsScreenedDate,
             chestXrayDoneDate = chestXrayDoneDate,
-            trunatTestDoneDate = trunatTestDoneDate
+            trunatTestDoneDate = trunatTestDoneDate,
+            villageName = villageName?.takeIf { it.isNotBlank() }
         )
     }
 
@@ -369,7 +371,8 @@ data class BenBasicCache(
             trunatTestDoneDate = trunatTestDoneDate,
             placeOfCurrentLiving = placeOfCurrentLiving,
             otherPlaceOfCurrentLiving = otherPlaceOfCurrentLiving,
-            institutionName = institutionName
+            institutionName = institutionName,
+            villageName = villageName?.takeIf { it.isNotBlank() }
         )
     }
 
@@ -961,7 +964,8 @@ data class BenBasicDomain(
     val trunatTestDoneDate: Long? = null,
     val placeOfCurrentLiving: Int? = null,
     val otherPlaceOfCurrentLiving: String? = null,
-    val institutionName: String? = null
+    val institutionName: String? = null,
+    val villageName: String? = null
 
 ) : Parcelable{
     val dobString: String
