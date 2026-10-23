@@ -449,7 +449,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             showRedesignedCard = true,
             source = args.source,
             showContactTracingForms = args.showContactTracingForms,
-            showAddMemberButton = !isReadOnlyReferralList
+            showAddMemberButton = !isReadOnlyReferralList,
+            showVillageName = true
 
         )
 

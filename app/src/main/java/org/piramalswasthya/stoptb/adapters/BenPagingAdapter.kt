@@ -29,7 +29,8 @@ class BenPagingAdapter(
     private val showRedesignedCard: Boolean = false,
     private val source: Int = 0,
     private val showContactTracingForms: Boolean = false,
-    private val showAddMemberButton: Boolean = false
+    private val showAddMemberButton: Boolean = false,
+    private val showVillageName: Boolean = false
 
 ) :
     PagingDataAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenListAdapter.BenDiffUtilCallBack) {
@@ -102,7 +103,8 @@ class BenPagingAdapter(
             retryingBenIds = retryingBenIds,
             showContactTracingForms = showContactTracingForms,
             roleManager = roleManager,
-            showAddMemberButton = showAddMemberButton
+            showAddMemberButton = showAddMemberButton,
+            showVillageName = showVillageName
         )
     }
 

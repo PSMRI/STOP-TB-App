@@ -122,7 +122,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 59, exportSchema = false
+    version = 60, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -1734,13 +1734,19 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_59_60 = object : Migration(59, 60) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                recreateBenBasicCacheView(database)
+            }
+        }
+
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(
                 "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId" +
                         ", b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod" +
                         ", b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus" +
-                        ", b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId" +
+                        ", b.loc_village_id as villageId, b.loc_village_name as villageName, b.abha_healthIdNumber as abhaId" +
                         ", b.isNewAbha" +
                         ", IFNULL(cbac.benId IS NOT NULL, 0) as cbacFilled, cbac.syncState as cbacSyncState" +
                         ", 0 as cdrFilled, NULL as cdrSyncState" +
@@ -2020,6 +2026,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_56_57)
                         .addMigrations(MIGRATION_57_58)
                         .addMigrations(MIGRATION_58_59)
+                        .addMigrations(MIGRATION_59_60)
                         .fallbackToDestructiveMigration()
                         .build()
 

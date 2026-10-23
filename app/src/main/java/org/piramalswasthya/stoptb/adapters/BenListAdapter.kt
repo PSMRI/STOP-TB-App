@@ -10,6 +10,7 @@ import android.text.style.ClickableSpan
 import android.text.style.ForegroundColorSpan
 import android.text.style.StyleSpan
 import android.content.res.ColorStateList
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -492,7 +493,8 @@ class BenListAdapter(
             showRedesignedCard: Boolean = false,
             householdMemberCountMap: Map<Long, Int> = emptyMap(),
             householdHeadNameMap: Map<Long, String> = emptyMap(),
-            showAddMemberButton: Boolean = false
+            showAddMemberButton: Boolean = false,
+            showVillageName: Boolean = false
         ) {
             binding.btnAbha.visibility = View.VISIBLE
             if (!showSyncIcon) item.syncState = null
@@ -595,6 +597,11 @@ class BenListAdapter(
                 binding.tvRedesignBeneficiaryId.text = item.benId.toString()
                 binding.tvRedesignNikshayId.text = item.nikshayIdDisplay
                 binding.tvRedesignMobileNumber.text = if (item.isPlaceholderMobileNo) "N/A" else item.mobileNoDisplay
+                binding.llRedesignVillage.visibility = if (showVillageName) View.VISIBLE else View.GONE
+                if (showVillageName) {
+                    Log.i("BenListAdapterOne", "bind: ${item.villageName}")
+                    binding.tvRedesignVillageName.text = item.villageName?.takeIf { it.isNotBlank() } ?: "N/A"
+                }
             }
             binding.HOF.visibility = View.GONE
             if (isNonHH) {
@@ -1144,7 +1151,7 @@ class BenListAdapter(
             val isRegistrar = AppRole.REGISTRAR in assignedRoles
             val isNurse = AppRole.NURSE in assignedRoles
             val isCounsellingOfficer = AppRole.COUNSELING in assignedRoles
-            // examinePrivilegesFor() switches to Counselling's own denominator rule when this is
+            // examinePrivilegesFor() switches to Counseling's own denominator rule when this is
             // the TPT-module card (showContactTracingForms), regardless of other assigned roles.
             val examineDenominatorRule = roleManager?.examinePrivilegesFor(showContactTracingForms)?.examineDenominatorRule
                 ?: ExamineDenominatorRule.GENERIC_FOUR
