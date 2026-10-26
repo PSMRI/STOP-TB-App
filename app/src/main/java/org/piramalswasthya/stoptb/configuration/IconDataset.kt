@@ -14,6 +14,7 @@ import org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.Ncd
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.AppModule
 import org.piramalswasthya.stoptb.model.AppRole
+import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.volunteer.fragment.VolunteerHomeFragmentDirections
 import javax.inject.Inject
 @ActivityRetainedScoped
@@ -30,6 +31,9 @@ class IconDataset @Inject constructor(
      * users see a narrower, role-exclusive set per active tab ([getMultiRoleIconDataset]) —
      * these are deliberately different card sets, not two views of the same data.
      */
+    private fun canRegisterHousehold(): Boolean =
+        roleManager.privilegesForActiveRole().householdPermission == Permission.FULL
+
     private fun doorLockIcon(resources: Resources) = Icon(
         R.drawable.ic_door_lock,
         resources.getString(R.string.icon_title_door_lock),
@@ -67,7 +71,7 @@ class IconDataset @Inject constructor(
                     VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllHouseholdFragment()
                 )
             )
-            iconList.add(doorLockIcon(resources))
+            if (canRegisterHousehold()) iconList.add(doorLockIcon(resources))
         }
         if (AppModule.BENEFICIARIES in homeModules) {
             iconList.add(
@@ -213,7 +217,7 @@ class IconDataset @Inject constructor(
                     VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllHouseholdFragment()
                 )
             )
-            iconList.add(doorLockIcon(resources))
+            if (canRegisterHousehold()) iconList.add(doorLockIcon(resources))
         }
         if (AppModule.BENEFICIARIES in modules) {
             iconList.add(
