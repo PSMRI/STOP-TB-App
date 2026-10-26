@@ -47,6 +47,7 @@ import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.home_activity.new_household_registration.NewHouseholdViewModel.State
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.utils.scrollToFormValidationError
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -143,9 +144,10 @@ class NewHouseholdFragment : Fragment() {
 
     private fun updateSubmitButtonState() {
         val isEditOrNew = viewModel.readRecord.value == false
-        binding.btnSubmit.isEnabled = isEditOrNew
-                && viewModel.isTotalMembersValid()
-                && viewModel.isLocationValid()
+        val doorLocked = viewModel.isDoorLocked.value
+        binding.btnSubmit.isEnabled = isEditOrNew && (
+                doorLocked || (viewModel.isTotalMembersValid() && viewModel.isLocationValid())
+                )
     }
 
     private fun setupFormAdapter() {
@@ -189,6 +191,11 @@ class NewHouseholdFragment : Fragment() {
             submitForm()
         }
 
+        binding.cbDoorLocked.setOnCheckedChangeListener { _, checked ->
+            viewModel.onDoorLockedToggled(checked)
+            updateSubmitButtonState()
+        }
+
         // Refresh location
         binding.btnRefreshLocation.setOnClickListener {
             refreshLocation()
@@ -218,15 +225,21 @@ class NewHouseholdFragment : Fragment() {
             binding.btnSubmit.visibility = if (!recordExists) View.VISIBLE else View.GONE
             updateSubmitButtonState()
             binding.btnCancel.visibility = if (!recordExists) View.VISIBLE else View.GONE
+            binding.cbDoorLocked.isEnabled = !recordExists
             updateLocationControls()
 
 
             val adapter = binding.form.rvInputForm.adapter as? FormInputAdapter
             adapter?.isEnabled = !recordExists
             adapter?.notifyDataSetChanged()
+        }
 
-            if (!recordExists && !viewModel.getIsConsentAgreed()) {
-                consentAlert.show()
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.isDoorLocked.collect { checked ->
+                if (binding.cbDoorLocked.isChecked != checked) {
+                    binding.cbDoorLocked.isChecked = checked
+                }
+                updateSubmitButtonState()
             }
         }
 
@@ -251,17 +264,26 @@ class NewHouseholdFragment : Fragment() {
                 State.SAVE_SUCCESS -> {
                     binding.llContent.visibility = View.VISIBLE
                     binding.pbForm.visibility = View.GONE
+                    val (doorLockSave, promptMembers) = viewModel.consumeSaveNavigation()
                     Toast.makeText(
                         context,
-                        getString(if (!editMode) R.string.registration_successful else R.string.save_successful),
+                        getString(
+                            when {
+                                doorLockSave -> R.string.door_lock_saved
+                                !editMode -> R.string.registration_successful
+                                else -> R.string.save_successful
+                            }
+                        ),
                         Toast.LENGTH_LONG
                     ).show()
-                    if (!editMode) {
-                        viewModel.setRecordExists(true)
-                        showNextScreenAlert()
-                        viewModel.resetState()
-                    } else {
-                        findNavController().navigateUp()
+                    viewModel.resetState()
+                    when {
+                        doorLockSave -> findNavController().navigateUp()
+                        promptMembers -> {
+                            if (!editMode) viewModel.setRecordExists(true)
+                            showNextScreenAlert()
+                        }
+                        else -> findNavController().navigateUp()
                     }
                 }
                 State.SAVE_FAILED -> {
@@ -692,14 +714,38 @@ class NewHouseholdFragment : Fragment() {
 
     private fun submitForm() {
         activity?.currentFocus?.clearFocus()
-        if (!viewModel.isTotalMembersValid()) return
-        if (!validateCurrentPage()) return
-        if (!validateLocationSection()) return
-        if (!viewModel.getIsConsentAgreed()) {
-            consentAlert.show()
-            return
+        val adapter = binding.form.rvInputForm.adapter as? FormInputAdapter
+        val emptyError = getString(R.string.form_input_empty_error)
+        val formatError = adapter?.firstFormatErrorIndex(emptyError) ?: -1
+        val mandatoryComplete = viewModel.isTotalMembersValid()
+                && viewModel.isLocationValid()
+                && adapter?.hasEmptyRequired() != true
+                && formatError == -1
+        when (DoorLockSubmit.resolve(viewModel.isDoorLocked.value, mandatoryComplete)) {
+            DoorLockSubmit.Result.DOOR_LOCK -> {
+                if (formatError != -1) {
+                    adapter?.notifyItemChanged(formatError)
+                    binding.form.rvInputForm.scrollToFormValidationError(formatError)
+                    return
+                }
+                viewModel.saveForm(asDoorLock = true)
+            }
+            DoorLockSubmit.Result.BLOCKED -> {
+                if (!viewModel.isTotalMembersValid()) return
+                if (!validateCurrentPage()) return
+                if (!validateLocationSection()) return
+            }
+            DoorLockSubmit.Result.COMPLETE -> {
+                if (!viewModel.isTotalMembersValid()) return
+                if (!validateCurrentPage()) return
+                if (!validateLocationSection()) return
+                if (!viewModel.getIsConsentAgreed()) {
+                    consentAlert.show()
+                    return
+                }
+                viewModel.saveForm(asDoorLock = false)
+            }
         }
-        viewModel.saveForm()
     }
 
     private val consentAlert by lazy {
@@ -718,7 +764,6 @@ class NewHouseholdFragment : Fragment() {
         }
         alertBinding.btnNegative.setOnClickListener {
             alertDialog.dismiss()
-            findNavController().navigateUp()
         }
         alertBinding.btnPositive.setOnClickListener {
             if (alertBinding.checkBox.isChecked) {

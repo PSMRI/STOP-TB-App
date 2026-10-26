@@ -106,7 +106,7 @@ enum class ScreeningStatus {
             "LEFT OUTER JOIN CBAC cbac ON b.beneficiaryId = cbac.benId " +
             "LEFT OUTER JOIN TB_SCREENING tbsn ON b.beneficiaryId = tbsn.benId " +
             "LEFT OUTER JOIN TB_SUSPECTED tbsp ON b.beneficiaryId = tbsp.benId " +
-            "WHERE b.isDraft = 0 GROUP BY b.beneficiaryId ORDER BY b.updatedDate DESC"
+            "WHERE b.isDraft = 0 AND IFNULL(h.isDoorLocked, 0) = 0 GROUP BY b.beneficiaryId ORDER BY b.updatedDate DESC"
 )
 @Parcelize
 data class BenBasicCache(

@@ -79,6 +79,12 @@ class NewHouseholdViewModel @Inject constructor(
     private val _isCampSite = MutableStateFlow(false)
     val isCampSite: StateFlow<Boolean> = _isCampSite.asStateFlow()
 
+    private val _isDoorLocked = MutableStateFlow(false)
+    val isDoorLocked: StateFlow<Boolean> = _isDoorLocked.asStateFlow()
+
+    private var savedAsDoorLock = false
+    private var promptMemberRegistration = false
+
 
     private val _locationState = MutableStateFlow<LocationState>(LocationState.Idle)
     val locationState: StateFlow<LocationState> = _locationState.asStateFlow()
@@ -119,6 +125,11 @@ class NewHouseholdViewModel @Inject constructor(
 
                 dataset.setupPage(household, villageNames, user.villages, registeredMemberCount)
                 _isCampSite.value = dataset.isRegisteredAtCampSite()
+                _isDoorLocked.value = household.isDoorLocked
+                if (household.isDoorLocked) {
+                    dataset.enableEditMode()
+                    _readRecord.postValue(false)
+                }
 
                 // Restore previously saved location state if editing an existing record
                 household.let { hh ->
@@ -198,6 +209,17 @@ class NewHouseholdViewModel @Inject constructor(
     }
 
 
+    fun onDoorLockedToggled(checked: Boolean) {
+        _isDoorLocked.value = checked
+    }
+
+    fun consumeSaveNavigation(): Pair<Boolean, Boolean> {
+        val result = savedAsDoorLock to promptMemberRegistration
+        savedAsDoorLock = false
+        promptMemberRegistration = false
+        return result
+    }
+
     fun onCampSiteChanged(camp: Boolean) {
         _isCampSite.value = camp
         if (camp) {
@@ -221,7 +243,7 @@ class NewHouseholdViewModel @Inject constructor(
 
     // ─── Save ─────────────────────────────────────────────────────────────────
 
-    fun saveForm() {
+    fun saveForm(asDoorLock: Boolean) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 try {
@@ -230,62 +252,104 @@ class NewHouseholdViewModel @Inject constructor(
                     dataset.mapValues(household, 2)
                     dataset.mapValues(household, 3)
 
-                    // Map location fields onto entity
-                    val locState = locationState.value
-                    if (_isCampSite.value) {
-                        household.gpsLatitude = null
-                        household.gpsLongitude = null
-                        household.digipin = null
-                        household.gpsTimestamp = null
-                        household.isGpsUnavailable = true
-                        household.gpsUnavailableReason = CAMP_SITE_REASON
-                    } else if (locState is LocationState.Captured) {
-                        household.gpsLatitude = locState.lat
-                        household.gpsLongitude = locState.lon
-                        household.digipin = locState.digipin
-                        household.gpsTimestamp = locState.timestamp
-                        household.isGpsUnavailable = false
-                        household.gpsUnavailableReason = null
-                    } else if (isGpsUnavailable.value) {
-                        household.gpsLatitude = null
-                        household.gpsLongitude = null
-                        household.digipin = null
-                        household.gpsTimestamp = null
-                        household.isGpsUnavailable = true
-                        household.gpsUnavailableReason = gpsUnavailableReason.value
-                    }
-
-                    household.apply {
-                        if (householdId == 0L) {
-                            householdId = System.currentTimeMillis()
-                            householdRepo.substituteHouseholdIdForDraft(this)
-                            serverUpdatedStatus = 1
-                            processed = "N"
-                        } else {
-                            serverUpdatedStatus = 2
-                            processed = "U"
-                        }
-                        if (createdTimeStamp == null) {
-                            createdTimeStamp = System.currentTimeMillis()
-                            createdBy = user.userName
-                        }
-                        updatedTimeStamp = System.currentTimeMillis()
-                        updatedBy = user.userName
-                    }
-                    if (linkBenId != 0L) {
-                        household.benId = linkBenId
-                    }
-                    householdRepo.persistRecord(household)
-                    benRepo.updateBenToSync(household.householdId, SyncState.UNSYNCED)
-                    if (linkBenId != 0L) {
-                        benRepo.linkBenToHousehold(linkBenId, household.householdId, 19, "Self")
+                    if (asDoorLock) {
+                        persistDoorLockVisit()
+                    } else {
+                        persistCompletedHousehold()
                     }
                     _state.postValue(State.SAVE_SUCCESS)
                 } catch (e: Exception) {
                     Timber.e(e, "saving HH data failed")
+                    savedAsDoorLock = false
+                    promptMemberRegistration = false
                     _state.postValue(State.SAVE_FAILED)
                 }
             }
+        }
+    }
+
+    /**
+     * Locked visit. The beneficiary row is not updated: no household link and no sync flag.
+     * [HouseholdCache.benId] only remembers who to link once the registration is completed.
+     */
+    private suspend fun persistDoorLockVisit() {
+        val alreadyOnServer = household.processed == "P"
+        household.isDoorLocked = true
+        household.doorLockVisitDate = System.currentTimeMillis()
+        savedAsDoorLock = true
+        promptMemberRegistration = false
+        if (linkBenId != 0L) household.benId = linkBenId
+        writeHousehold(alreadyOnServer = alreadyOnServer, asDoorLock = true)
+        householdRepo.persistRecord(household)
+    }
+
+    /** Finished registration. Linking and beneficiary sync happen only on this path. */
+    private suspend fun persistCompletedHousehold() {
+        val wasDoorLocked = household.isDoorLocked
+        val isFirstRegistration = household.householdId == 0L
+        val alreadyOnServer = household.processed == "P"
+        val pendingLinkId = if (linkBenId != 0L) linkBenId else household.benId ?: 0L
+        household.isDoorLocked = false
+        savedAsDoorLock = false
+        promptMemberRegistration = linkBenId != 0L ||
+            (pendingLinkId == 0L && (wasDoorLocked || isFirstRegistration))
+        if (pendingLinkId != 0L) household.benId = pendingLinkId
+        writeHousehold(alreadyOnServer = alreadyOnServer, asDoorLock = false)
+        householdRepo.persistRecord(household)
+        linkBeneficiaryIfStillUnassigned(pendingLinkId)
+        benRepo.updateBenToSync(household.householdId, SyncState.UNSYNCED)
+    }
+
+    private suspend fun linkBeneficiaryIfStillUnassigned(pendingLinkId: Long) {
+        if (!DoorLockSubmit.shouldLinkBeneficiary(asDoorLock = false, benId = pendingLinkId)) return
+        val ben = benRepo.getBenFromId(pendingLinkId) ?: return
+        if (!ben.isNonHH && ben.householdId == household.householdId) return
+        benRepo.linkBenToHousehold(pendingLinkId, household.householdId, 19, "Self")
+    }
+
+    private suspend fun writeHousehold(alreadyOnServer: Boolean, asDoorLock: Boolean) {
+        applyLocationToHousehold()
+        household.apply {
+            if (householdId == 0L) {
+                householdId = System.currentTimeMillis()
+                householdRepo.substituteHouseholdIdForDraft(this)
+            }
+            DoorLockSubmit.syncMarker(alreadyOnServer, asDoorLock)?.let { marker ->
+                serverUpdatedStatus = marker.serverUpdatedStatus
+                processed = marker.processed
+            }
+            if (createdTimeStamp == null) {
+                createdTimeStamp = System.currentTimeMillis()
+                createdBy = user.userName
+            }
+            updatedTimeStamp = System.currentTimeMillis()
+            updatedBy = user.userName
+        }
+    }
+
+    private fun applyLocationToHousehold() {
+        val locState = locationState.value
+        if (_isCampSite.value) {
+            household.gpsLatitude = null
+            household.gpsLongitude = null
+            household.digipin = null
+            household.gpsTimestamp = null
+            household.isGpsUnavailable = true
+            household.gpsUnavailableReason = CAMP_SITE_REASON
+        } else if (locState is LocationState.Captured) {
+            household.gpsLatitude = locState.lat
+            household.gpsLongitude = locState.lon
+            household.digipin = locState.digipin
+            household.gpsTimestamp = locState.timestamp
+            household.isGpsUnavailable = false
+            household.gpsUnavailableReason = null
+        } else if (isGpsUnavailable.value) {
+            household.gpsLatitude = null
+            household.gpsLongitude = null
+            household.digipin = null
+            household.gpsTimestamp = null
+            household.isGpsUnavailable = true
+            household.gpsUnavailableReason = gpsUnavailableReason.value
         }
     }
 

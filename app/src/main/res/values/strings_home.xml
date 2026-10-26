@@ -24,6 +24,14 @@
     <string name="menu_home_scheduler">Dashboard</string>
     <string name="til_hint_selected_village">Selected Village</string>
     <string name="icon_title_household">All Household</string>
+    <string name="icon_title_door_lock">Door Lock</string>
+    <string name="home_card_door_lock_subtitle">Houses locked at the last visit</string>
+    <string name="hh_door_locked_label">Door locked</string>
+    <string name="hh_door_locked_hint">The house was locked. Save whatever the neighbours can tell you, and finish the registration when the family is home.</string>
+    <string name="door_lock_badge">Door lock</string>
+    <string name="door_lock_visit_date">Door lock · %1$s</string>
+    <string name="no_records_found_door_lock">No door lock households.</string>
+    <string name="door_lock_saved">Saved to the door lock list</string>
     <string name="icon_title_ben">All Beneficiaries</string>
     <string name="icon_title_non_hh">Non-Household</string>
     <string name="icon_title_unscreened">Unscreened Population</string>

@@ -122,7 +122,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 60, exportSchema = false
+    version = 61, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -1740,7 +1740,26 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
-        private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
+        private val MIGRATION_60_61 = object : Migration(60, 61) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "HOUSEHOLD", "isDoorLocked")) {
+                    database.execSQL(
+                        "ALTER TABLE HOUSEHOLD ADD COLUMN isDoorLocked INTEGER NOT NULL DEFAULT 0"
+                    )
+                }
+                if (!columnExists(database, "HOUSEHOLD", "doorLockVisitDate")) {
+                    database.execSQL(
+                        "ALTER TABLE HOUSEHOLD ADD COLUMN doorLockVisitDate INTEGER"
+                    )
+                }
+                recreateBenBasicCacheView(database, excludeDoorLocked = true)
+            }
+        }
+
+        private fun recreateBenBasicCacheView(
+            database: SupportSQLiteDatabase,
+            excludeDoorLocked: Boolean = false
+        ) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(
                 "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId" +
@@ -1781,7 +1800,11 @@ abstract class InAppDb : RoomDatabase() {
                         "LEFT OUTER JOIN CBAC cbac ON b.beneficiaryId = cbac.benId " +
                         "LEFT OUTER JOIN TB_SCREENING tbsn ON b.beneficiaryId = tbsn.benId " +
                         "LEFT OUTER JOIN TB_SUSPECTED tbsp ON b.beneficiaryId = tbsp.benId " +
-                        "WHERE b.isDraft = 0 GROUP BY b.beneficiaryId ORDER BY b.updatedDate DESC"
+                        (if (excludeDoorLocked) {
+                            "WHERE b.isDraft = 0 AND IFNULL(h.isDoorLocked, 0) = 0 GROUP BY b.beneficiaryId ORDER BY b.updatedDate DESC"
+                        } else {
+                            "WHERE b.isDraft = 0 GROUP BY b.beneficiaryId ORDER BY b.updatedDate DESC"
+                        })
             )
         }
 
@@ -2027,6 +2050,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_57_58)
                         .addMigrations(MIGRATION_58_59)
                         .addMigrations(MIGRATION_59_60)
+                        .addMigrations(MIGRATION_60_61)
                         .fallbackToDestructiveMigration()
                         .build()
 

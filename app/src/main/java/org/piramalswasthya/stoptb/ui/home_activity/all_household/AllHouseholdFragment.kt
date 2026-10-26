@@ -85,8 +85,8 @@ class AllHouseholdFragment : Fragment() {
     override fun onStart() {
         super.onStart()
         (activity as? VolunteerActivity)?.updateActionBar(
-            R.drawable.ic__hh,
-            getString(R.string.icon_title_household)
+            if (viewModel.doorLockList) R.drawable.ic_door_lock else R.drawable.ic__hh,
+            getString(if (viewModel.doorLockList) R.string.icon_title_door_lock else R.string.icon_title_household)
         )
     }
 
@@ -94,7 +94,9 @@ class AllHouseholdFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         buildAddBenDialog()
 
-        binding.tvEmptyContent.text = getString(R.string.no_records_found_hh)
+        binding.tvEmptyContent.text = getString(
+            if (viewModel.doorLockList) R.string.no_records_found_door_lock else R.string.no_records_found_hh
+        )
 
         // val role = prefDao.getLoggedInUser()?.role
         // val isNurse = prefDao.getLoggedInUser()?.role.isNurseRole()
@@ -107,7 +109,8 @@ class AllHouseholdFragment : Fragment() {
 
 //        binding.btnNextPage.text = getString(R.string.btn_text_frag_home_nhhr)
         binding.btnNextPage.contentDescription = getString(R.string.btn_text_frag_home_nhhr)
-        binding.btnNextPage.visibility = if (canAddHousehold) View.VISIBLE else View.GONE
+        binding.btnNextPage.visibility =
+            if (canAddHousehold && !viewModel.doorLockList) View.VISIBLE else View.GONE
 
         val householdAdapter = HouseHoldListAdapter(
             diseaseType = "",

@@ -91,7 +91,11 @@ data class HouseholdCache(
     var updatedTimeStamp: Long? = null,
     var processed: String,
     var isDraft: Boolean,
-    var isDeactivate: Boolean =false
+    var isDeactivate: Boolean =false,
+    /** Partial registration: the house was locked and mandatory fields may be empty. */
+    @ColumnInfo(defaultValue = "0") var isDoorLocked: Boolean = false,
+    /** Latest visit while the house was still locked. */
+    var doorLockVisitDate: Long? = null
 ) : FormDataModel {
 
 
@@ -314,7 +318,9 @@ data class HouseholdBasicCache(
             numMembers = numMembers,
             totalHhMembers = household.family?.totalHhMembers,
             isDeactivate = household.isDeactivate,
-            createdTimeStamp = household.createdTimeStamp
+            createdTimeStamp = household.createdTimeStamp,
+            isDoorLocked = household.isDoorLocked,
+            doorLockVisitDate = household.doorLockVisitDate
 
         )
     }
@@ -330,6 +336,8 @@ data class HouseHoldBasicDomain(
     val totalHhMembers: Int? = null,
     var isDeactivate: Boolean =false,
     var createdTimeStamp: Long? = null,
+    val isDoorLocked: Boolean = false,
+    val doorLockVisitDate: Long? = null,
 
     ) {
     val isPlaceholderMobileNo: Boolean
