@@ -31,14 +31,20 @@ interface HouseholdDao {
     @Query("SELECT * FROM HOUSEHOLD WHERE isDraft = 0 and loc_village_Id = :selectedVillage")
     fun getAllHouseholds(selectedVillage: Int): Flow<List<HouseholdCache>>
 
-    @Query("SELECT h.*, count(b.householdId) as numMembers FROM HOUSEHOLD as h left outer join BENEFICIARY b on b.householdId = h.householdId WHERE h.isDraft = 0 and h.loc_village_Id = :selectedVillage group by h.householdId")
+    @Query("SELECT h.*, count(b.householdId) as numMembers FROM HOUSEHOLD as h left outer join BENEFICIARY b on b.householdId = h.householdId WHERE h.isDraft = 0 and h.loc_village_Id = :selectedVillage and ifnull(h.isDoorLocked, 0) = 0 group by h.householdId")
     fun getAllHouseholdWithNumMembers(selectedVillage: Int): Flow<List<HouseholdBasicCache>>
 
-    @Query("SELECT h.*, count(b.householdId) as numMembers FROM HOUSEHOLD as h left outer join BENEFICIARY b on b.householdId = h.householdId WHERE h.isDraft = 0 and h.loc_village_Id = :selectedVillage AND h.registrationType = 'Yes' group by h.householdId")
+    @Query("SELECT h.*, count(b.householdId) as numMembers FROM HOUSEHOLD as h left outer join BENEFICIARY b on b.householdId = h.householdId WHERE h.isDraft = 0 and h.loc_village_Id = :selectedVillage and h.isDoorLocked = 1 group by h.householdId")
+    fun getDoorLockHouseholds(selectedVillage: Int): Flow<List<HouseholdBasicCache>>
+
+    @Query("SELECT h.*, count(b.householdId) as numMembers FROM HOUSEHOLD as h left outer join BENEFICIARY b on b.householdId = h.householdId WHERE h.isDraft = 0 and h.loc_village_Id = :selectedVillage AND h.registrationType = 'Yes' and ifnull(h.isDoorLocked, 0) = 0 group by h.householdId")
     fun getAllHouseholdForAshaFamilyMembers(selectedVillage: Int): Flow<List<HouseholdBasicCache>>
 
-    @Query("SELECT COUNT(*) FROM HOUSEHOLD WHERE isDraft = 0 and loc_village_Id = :selectedVillage and isDeactivate =0")
+    @Query("SELECT COUNT(*) FROM HOUSEHOLD WHERE isDraft = 0 and loc_village_Id = :selectedVillage and isDeactivate =0 and ifnull(isDoorLocked, 0) = 0")
     fun getAllHouseholdsCount(selectedVillage: Int): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM HOUSEHOLD WHERE isDraft = 0 and loc_village_Id = :selectedVillage and isDeactivate = 0 and isDoorLocked = 1")
+    fun getDoorLockHouseholdsCount(selectedVillage: Int): Flow<Int>
 
     @Query("SELECT * FROM HOUSEHOLD WHERE householdId =:hhId LIMIT 1")
     suspend fun getHousehold(hhId: Long): HouseholdCache?
@@ -52,7 +58,7 @@ interface HouseholdDao {
     @Query("UPDATE HOUSEHOLD SET householdId  = :newId WHERE householdId = :oldId ")
     suspend fun substituteHouseholdId(oldId: Long, newId: Long)
 
-    @Query("SELECT * FROM household WHERE isDraft = 0 AND processed = 'N'")
+    @Query("SELECT * FROM household WHERE isDraft = 0 AND processed = 'N' AND ifnull(isDoorLocked, 0) = 0")
     suspend fun getAllUnprocessedHousehold(): List<HouseholdCache>
 
 }

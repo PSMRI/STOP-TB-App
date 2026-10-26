@@ -30,6 +30,16 @@ class IconDataset @Inject constructor(
      * users see a narrower, role-exclusive set per active tab ([getMultiRoleIconDataset]) —
      * these are deliberately different card sets, not two views of the same data.
      */
+    private fun doorLockIcon(resources: Resources) = Icon(
+        R.drawable.ic_door_lock,
+        resources.getString(R.string.icon_title_door_lock),
+        resources.getString(R.string.home_card_door_lock_subtitle),
+        recordsRepo.doorLockListCount,
+        VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllHouseholdFragment(
+            doorLockList = true
+        )
+    )
+
     fun getVolunteerIconDataset(resources: Resources): List<Icon> {
         val isMultiRole = roleManager.assignedRoles.size > 1
         return if (isMultiRole) {
@@ -57,6 +67,7 @@ class IconDataset @Inject constructor(
                     VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllHouseholdFragment()
                 )
             )
+            iconList.add(doorLockIcon(resources))
         }
         if (AppModule.BENEFICIARIES in homeModules) {
             iconList.add(
@@ -202,6 +213,7 @@ class IconDataset @Inject constructor(
                     VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllHouseholdFragment()
                 )
             )
+            iconList.add(doorLockIcon(resources))
         }
         if (AppModule.BENEFICIARIES in modules) {
             iconList.add(

@@ -528,6 +528,11 @@ class BenRepo @Inject constructor(
             return false
         }
     }
+    private suspend fun isDoorLockedHousehold(hhId: Long?): Boolean {
+        if (hhId == null || hhId <= 0L) return false
+        return householdDao.getHousehold(hhId)?.isDoorLocked == true
+    }
+
     suspend fun processNewBen(): Boolean = processNewBenMutex.withLock {
         withContext(Dispatchers.IO) {
             val user =
@@ -545,6 +550,7 @@ class BenRepo @Inject constructor(
             val kidNetworkPostList = mutableSetOf<BenRegKidNetwork>()
 
             benList.forEach {
+                if (isDoorLockedHousehold(it.householdId)) return@forEach
                 val idGenerated = createBenIdAtServerByBeneficiarySending(it, user, it.locationRecord)
                 if (!idGenerated) {
                     Timber.w("Amrit push beneficiary registration pending retry: benId=${it.beneficiaryId}, benRegId=${it.benRegId}, hhId=${it.householdId}")
@@ -554,6 +560,7 @@ class BenRepo @Inject constructor(
 
             val updateBenList = benDao.getAllBenForSyncWithServer()
             updateBenList.forEach {
+                if (isDoorLockedHousehold(it.householdId)) return@forEach
                 if (it.beneficiaryId <= 0L || it.benRegId <= 0L) {
                     benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.UNSYNCED)
                     Timber.w("Skipping beneficiary final sync until real IDs are available: benId=${it.beneficiaryId}, benRegId=${it.benRegId}, hhId=${it.householdId}")

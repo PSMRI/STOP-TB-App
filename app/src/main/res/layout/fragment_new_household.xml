@@ -61,6 +61,25 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
+                    <com.google.android.material.checkbox.MaterialCheckBox
+                        android:id="@+id/cb_door_locked"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/padding_normal"
+                        android:layout_marginTop="4dp"
+                        android:layout_marginEnd="@dimen/padding_normal"
+                        android:text="@string/hh_door_locked_label" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/padding_normal"
+                        android:layout_marginEnd="@dimen/padding_normal"
+                        android:layout_marginBottom="8dp"
+                        android:text="@string/hh_door_locked_hint"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="13sp" />
+
                     <!-- Household form RecyclerView (Family + Details + Amenities) -->
                     <include
                         android:id="@+id/form"

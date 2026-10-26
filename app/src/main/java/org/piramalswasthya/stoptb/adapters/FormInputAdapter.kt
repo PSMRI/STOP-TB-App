@@ -2064,6 +2064,23 @@ class FormInputAdapter(
         return -1
     }
 
+    fun hasEmptyRequired(): Boolean {
+        if (!isEnabled) return false
+        return currentList.any { it.inputType != TEXT_VIEW && it.required && it.value.isNullOrBlank() }
+    }
+
+    /** Format errors on values the user did enter. Empty-required errors are ignored. */
+    fun firstFormatErrorIndex(emptyError: String): Int {
+        if (!isEnabled) return -1
+        currentList.forEachIndexed { index, it ->
+            if (it.inputType == TEXT_VIEW) return@forEachIndexed
+            val error = it.errorText ?: return@forEachIndexed
+            if (error == emptyError || it.value.isNullOrBlank()) return@forEachIndexed
+            return index
+        }
+        return -1
+    }
+
 
 
 }

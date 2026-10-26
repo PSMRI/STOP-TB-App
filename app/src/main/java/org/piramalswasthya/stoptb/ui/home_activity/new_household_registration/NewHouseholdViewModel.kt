@@ -79,6 +79,12 @@ class NewHouseholdViewModel @Inject constructor(
     private val _isCampSite = MutableStateFlow(false)
     val isCampSite: StateFlow<Boolean> = _isCampSite.asStateFlow()
 
+    private val _isDoorLocked = MutableStateFlow(false)
+    val isDoorLocked: StateFlow<Boolean> = _isDoorLocked.asStateFlow()
+
+    private var savedAsDoorLock = false
+    private var promptMemberRegistration = false
+
 
     private val _locationState = MutableStateFlow<LocationState>(LocationState.Idle)
     val locationState: StateFlow<LocationState> = _locationState.asStateFlow()
@@ -119,6 +125,11 @@ class NewHouseholdViewModel @Inject constructor(
 
                 dataset.setupPage(household, villageNames, user.villages, registeredMemberCount)
                 _isCampSite.value = dataset.isRegisteredAtCampSite()
+                _isDoorLocked.value = household.isDoorLocked
+                if (household.isDoorLocked) {
+                    dataset.enableEditMode()
+                    _readRecord.postValue(false)
+                }
 
                 // Restore previously saved location state if editing an existing record
                 household.let { hh ->
@@ -198,6 +209,17 @@ class NewHouseholdViewModel @Inject constructor(
     }
 
 
+    fun onDoorLockedToggled(checked: Boolean) {
+        _isDoorLocked.value = checked
+    }
+
+    fun consumeSaveNavigation(): Pair<Boolean, Boolean> {
+        val result = savedAsDoorLock to promptMemberRegistration
+        savedAsDoorLock = false
+        promptMemberRegistration = false
+        return result
+    }
+
     fun onCampSiteChanged(camp: Boolean) {
         _isCampSite.value = camp
         if (camp) {
@@ -221,7 +243,7 @@ class NewHouseholdViewModel @Inject constructor(
 
     // ─── Save ─────────────────────────────────────────────────────────────────
 
-    fun saveForm() {
+    fun saveForm(asDoorLock: Boolean) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 try {
@@ -229,6 +251,18 @@ class NewHouseholdViewModel @Inject constructor(
                     dataset.mapValues(household, 1)
                     dataset.mapValues(household, 2)
                     dataset.mapValues(household, 3)
+
+                    val wasDoorLocked = household.isDoorLocked
+                    if (asDoorLock) {
+                        household.isDoorLocked = true
+                        household.doorLockVisitDate = System.currentTimeMillis()
+                        savedAsDoorLock = true
+                        promptMemberRegistration = false
+                    } else {
+                        household.isDoorLocked = false
+                        savedAsDoorLock = false
+                        promptMemberRegistration = wasDoorLocked
+                    }
 
                     // Map location fields onto entity
                     val locState = locationState.value
@@ -283,6 +317,8 @@ class NewHouseholdViewModel @Inject constructor(
                     _state.postValue(State.SAVE_SUCCESS)
                 } catch (e: Exception) {
                     Timber.e(e, "saving HH data failed")
+                    savedAsDoorLock = false
+                    promptMemberRegistration = false
                     _state.postValue(State.SAVE_FAILED)
                 }
             }

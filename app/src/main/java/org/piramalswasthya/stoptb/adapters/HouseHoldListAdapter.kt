@@ -14,6 +14,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.RvItemHouseholdBinding
 import org.piramalswasthya.stoptb.model.HouseHoldBasicDomain
 import org.piramalswasthya.stoptb.ui.getTitle
+import org.piramalswasthya.stoptb.ui.home_activity.new_household_registration.DoorLockSubmit
 
 
 class HouseHoldListAdapter(private val diseaseType: String, private var isDisease: Boolean, val pref: PreferenceDao,private val isSoftDeleteEnabled:Boolean = false, private val clickListener: HouseholdClickListener) :
@@ -125,6 +126,19 @@ class HouseHoldListAdapter(private val diseaseType: String, private var isDiseas
 
             binding.clickListener = clickListener
             binding.executePendingBindings()
+
+            if (item.isDoorLocked) {
+                binding.llDoorLock.visibility = View.VISIBLE
+                binding.button4.visibility = View.GONE
+                val visitDate = DoorLockSubmit.formatVisitDate(item.doorLockVisitDate)
+                binding.tvDoorLockVisit.text = if (visitDate.isBlank()) {
+                    binding.root.context.getString(R.string.door_lock_badge)
+                } else {
+                    binding.root.context.getString(R.string.door_lock_visit_date, visitDate)
+                }
+            } else {
+                binding.llDoorLock.visibility = View.GONE
+            }
         }
 
     }

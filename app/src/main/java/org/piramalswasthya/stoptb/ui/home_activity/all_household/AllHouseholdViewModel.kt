@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.ui.home_activity.all_household
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,10 +21,13 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AllHouseholdViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
     private val householdRepo: HouseholdRepo,
     recordsRepo: RecordsRepo,
     private val preferenceDao: PreferenceDao
 ) : ViewModel() {
+
+    val doorLockList: Boolean = savedStateHandle.get<Boolean>("doorLockList") ?: false
 
     private val filter = MutableStateFlow("")
 
@@ -34,9 +38,10 @@ class AllHouseholdViewModel @Inject constructor(
     val navigateToNewHouseholdRegistration: LiveData<Boolean>
         get() = _navigateToNewHouseholdRegistration
 
-    val householdList = recordsRepo.hhList.combine(filter) { list, text ->
-        filterHouseholds(list, text)
-    }
+    val householdList = (if (doorLockList) recordsRepo.doorLockList else recordsRepo.hhList)
+        .combine(filter) { list, text ->
+            filterHouseholds(list, text)
+        }
 
     private var _selectedHouseholdId: Long = 0L
     val selectedHouseholdId: Long get() = _selectedHouseholdId

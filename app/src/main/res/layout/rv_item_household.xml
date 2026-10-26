@@ -49,6 +49,39 @@
                 app:layout_constraintTop_toTopOf="parent"
                 tools:text="Hello Meister" />
 
+            <LinearLayout
+                android:id="@+id/ll_door_lock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/padding_normal"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_status_chip"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
+                android:visibility="gone"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/tv_hh_id"
+                tools:visibility="visible">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:contentDescription="@string/door_lock_badge"
+                    android:src="@drawable/ic_door_lock"
+                    app:tint="#1B5E20" />
+
+                <TextView
+                    android:id="@+id/tv_door_lock_visit"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+                    android:textColor="#1B5E20"
+                    tools:text="Door lock · 26 Oct 2026" />
+            </LinearLayout>
+
             <ImageView
                 android:id="@+id/ivSoftDelete"
                 android:layout_width="wrap_content"
@@ -68,7 +101,7 @@
                 android:layout_height="wrap_content"
                 android:baselineAligned="false"
                 android:padding="@dimen/padding_normal"
-                app:layout_constraintTop_toBottomOf="@id/tv_hh_id">
+                app:layout_constraintTop_toBottomOf="@id/ll_door_lock">
 
                 <LinearLayout
                     android:layout_width="0dp"
