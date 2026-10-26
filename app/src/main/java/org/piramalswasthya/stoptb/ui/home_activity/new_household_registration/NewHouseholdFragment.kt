@@ -279,7 +279,7 @@ class NewHouseholdFragment : Fragment() {
                     viewModel.resetState()
                     when {
                         doorLockSave -> findNavController().navigateUp()
-                        !editMode || promptMembers -> {
+                        promptMembers -> {
                             if (!editMode) viewModel.setRecordExists(true)
                             showNextScreenAlert()
                         }

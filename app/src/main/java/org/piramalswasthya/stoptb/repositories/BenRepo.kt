@@ -558,6 +558,10 @@ class BenRepo @Inject constructor(
                 Timber.d("YTR 429 $it")
             }
 
+            householdDao.getAllUnprocessedHousehold().forEach { hh ->
+                householdNetworkPostList.add(hh.asNetworkModel(user))
+            }
+
             val updateBenList = benDao.getAllBenForSyncWithServer()
             updateBenList.forEach {
                 if (isDoorLockedHousehold(it.householdId)) return@forEach

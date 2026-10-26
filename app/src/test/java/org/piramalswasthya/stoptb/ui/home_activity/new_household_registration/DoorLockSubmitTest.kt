@@ -41,4 +41,31 @@ class DoorLockSubmitTest {
         val stillLocked = DoorLockSubmit.resolve(doorLockChecked = true, mandatoryComplete = false)
         assertTrue(DoorLockSubmit.recordsVisitDate(stillLocked))
     }
+
+    @Test
+    fun doorLockSaveDoesNotLinkTheBeneficiary() {
+        assertFalse(DoorLockSubmit.shouldLinkBeneficiary(asDoorLock = true, benId = 42L))
+        assertTrue(DoorLockSubmit.shouldLinkBeneficiary(asDoorLock = false, benId = 42L))
+    }
+
+    @Test
+    fun completingANeverSyncedDoorLockStaysAPendingNewHousehold() {
+        assertEquals(
+            DoorLockSubmit.HouseholdSyncMarker(serverUpdatedStatus = 1, processed = "N"),
+            DoorLockSubmit.syncMarker(alreadyOnServer = false, asDoorLock = false)
+        )
+    }
+
+    @Test
+    fun lockedVisitOfASyncedHouseholdIsNotMarkedForUpload() {
+        assertEquals(null, DoorLockSubmit.syncMarker(alreadyOnServer = true, asDoorLock = true))
+    }
+
+    @Test
+    fun completingASyncedHouseholdIsAnUpdate() {
+        assertEquals(
+            DoorLockSubmit.HouseholdSyncMarker(serverUpdatedStatus = 2, processed = "U"),
+            DoorLockSubmit.syncMarker(alreadyOnServer = true, asDoorLock = false)
+        )
+    }
 }

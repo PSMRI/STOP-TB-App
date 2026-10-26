@@ -253,6 +253,9 @@ class NewHouseholdViewModel @Inject constructor(
                     dataset.mapValues(household, 3)
 
                     val wasDoorLocked = household.isDoorLocked
+                    val isFirstRegistration = household.householdId == 0L
+                    val alreadyOnServer = household.processed == "P"
+                    val pendingLinkId = if (linkBenId != 0L) linkBenId else household.benId ?: 0L
                     if (asDoorLock) {
                         household.isDoorLocked = true
                         household.doorLockVisitDate = System.currentTimeMillis()
@@ -261,7 +264,8 @@ class NewHouseholdViewModel @Inject constructor(
                     } else {
                         household.isDoorLocked = false
                         savedAsDoorLock = false
-                        promptMemberRegistration = wasDoorLocked
+                        promptMemberRegistration = linkBenId != 0L ||
+                            (pendingLinkId == 0L && (wasDoorLocked || isFirstRegistration))
                     }
 
                     // Map location fields onto entity
@@ -293,11 +297,10 @@ class NewHouseholdViewModel @Inject constructor(
                         if (householdId == 0L) {
                             householdId = System.currentTimeMillis()
                             householdRepo.substituteHouseholdIdForDraft(this)
-                            serverUpdatedStatus = 1
-                            processed = "N"
-                        } else {
-                            serverUpdatedStatus = 2
-                            processed = "U"
+                        }
+                        DoorLockSubmit.syncMarker(alreadyOnServer, asDoorLock)?.let { marker ->
+                            serverUpdatedStatus = marker.serverUpdatedStatus
+                            processed = marker.processed
                         }
                         if (createdTimeStamp == null) {
                             createdTimeStamp = System.currentTimeMillis()
@@ -306,13 +309,26 @@ class NewHouseholdViewModel @Inject constructor(
                         updatedTimeStamp = System.currentTimeMillis()
                         updatedBy = user.userName
                     }
-                    if (linkBenId != 0L) {
-                        household.benId = linkBenId
-                    }
-                    householdRepo.persistRecord(household)
-                    benRepo.updateBenToSync(household.householdId, SyncState.UNSYNCED)
-                    if (linkBenId != 0L) {
-                        benRepo.linkBenToHousehold(linkBenId, household.householdId, 19, "Self")
+                    if (asDoorLock) {
+                        if (linkBenId != 0L) household.benId = linkBenId
+                        householdRepo.persistRecord(household)
+                    } else {
+                        if (pendingLinkId != 0L) household.benId = pendingLinkId
+                        householdRepo.persistRecord(household)
+                        if (DoorLockSubmit.shouldLinkBeneficiary(asDoorLock = false, pendingLinkId)) {
+                            val ben = benRepo.getBenFromId(pendingLinkId)
+                            val needsLink = ben != null &&
+                                (ben.isNonHH || ben.householdId != household.householdId)
+                            if (needsLink) {
+                                benRepo.linkBenToHousehold(
+                                    pendingLinkId,
+                                    household.householdId,
+                                    19,
+                                    "Self"
+                                )
+                            }
+                        }
+                        benRepo.updateBenToSync(household.householdId, SyncState.UNSYNCED)
                     }
                     _state.postValue(State.SAVE_SUCCESS)
                 } catch (e: Exception) {
