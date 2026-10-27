@@ -60,7 +60,7 @@ class RecordsRepo @Inject constructor(
             .map { list -> list.associate { it.hhId to it.fullName } }
 
     val anthropometryFilledBenIds: Flow<List<Long>> get() =
-        benDao.getAnthropometryFilledBenIds(selectedVillage)
+        benDao.getAnthropometryFilledBenIds()
 
     fun searchBen(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false): Flow<List<BenBasicDomain>> =
         benDao.searchBen(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query)
