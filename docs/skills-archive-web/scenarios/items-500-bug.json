@@ -1,0 +1,18 @@
+{
+  "id": "items-500-bug",
+  "prompt": "Items list returns 500",
+  "expect_skills": [
+    "route-task",
+    "resolve-skills",
+    "fix-feature",
+    "add-test",
+    "review-work",
+    "verify-feature"
+  ],
+  "forbid_skills": [],
+  "expect_hard_stop": false,
+  "expect_matrix": {
+    "Tests (API TDD)": "add-test"
+  },
+  "notes": "Plan file optional; skill resolve + TDD still required"
+}

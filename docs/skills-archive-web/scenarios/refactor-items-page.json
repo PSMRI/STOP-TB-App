@@ -1,0 +1,20 @@
+{
+  "id": "refactor-items-page",
+  "prompt": "Refactor ItemsPage for clarity without changing behavior",
+  "expect_skills": [
+    "route-task",
+    "resolve-skills",
+    "refactor-code",
+    "web-state",
+    "web-ui",
+    "review-work",
+    "verify-feature"
+  ],
+  "forbid_skills": [],
+  "expect_hard_stop": false,
+  "expect_matrix": {
+    "Refactor": "refactor-code",
+    "Client state": "web-state",
+    "UI": "web-ui"
+  }
+}

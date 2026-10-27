@@ -1,0 +1,14 @@
+---
+description: Factory in-app LLM runtime musts (auto when editing llm package)
+globs: apps/api/src/api/llm/**/*
+alwaysApply: false
+---
+
+# Factory LLM rules
+
+Detail: `knowledge/factory-llm.md`. Why: ADR-0020, ADR-0028.
+
+- Extend graphs/skills/knowledge under `api/llm/` — do not freestyle provider clients in `routes/`.
+- Discovery War Room control flow lives in LangGraph (`graphs/discovery_war_room.py`); SSE façade stays thin.
+- Pydantic I/O for graph inputs/outputs; live War Room nodes are LangChain agents (`create_agent` + local tools + structured envelope); mock LLM in tests.
+- Cursor work uses skill `factory-llm` (parent only).

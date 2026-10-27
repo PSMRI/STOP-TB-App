@@ -2860,6 +2860,16 @@ class TBRepo @Inject constructor(
         }
     }
 
+    /**
+     * Status sweeps rewrite every beneficiary in every bucket on each poll. Writing a row that is
+     * identical to the stored one still invalidates every list/badge query observing
+     * TB_DIAGNOSTICS (REPLACE = delete + insert), so skip those no-op writes.
+     */
+    private suspend fun saveTbDiagnosticsIfChanged(stored: TBDiagnosticsCache?, updated: TBDiagnosticsCache) {
+        if (stored == updated) return
+        tbDao.saveTbDiagnostics(updated)
+    }
+
     suspend fun fetchBeneficiariesByStatus(orderType: String, fetchResult: Boolean = true): NetworkResponse<DiagnosticBeneficiaryStatusData> {
         return withContext(Dispatchers.IO) {
             val user = preferenceDao.getLoggedInUser()
@@ -2914,12 +2924,16 @@ class TBRepo @Inject constructor(
                                 }
                             }
                             dataObj?.optJSONArray("failed")?.let { arr ->
+                                // Read TB_DIAGNOSTICS once for the whole bucket instead of a
+                                // full-table read per failed item (O(n^2) at 1000+ rows).
+                                val diagnosticsById = if (arr.length() > 0) {
+                                    tbDao.getDiagnosticsList().associateBy { it.id.toLong() }
+                                } else emptyMap()
                                 for (i in 0 until arr.length()) {
                                     isAwaitingReconciliation(
                                         arr.getLong(i),
                                         apiOrderType,
-                                        tbDao.getDiagnosticsList()
-                                            .firstOrNull { it.id.toLong() == arr.getLong(i) }
+                                        diagnosticsById[arr.getLong(i)]
                                             ?.let { bens ->
                                                 when {
                                                     orderType.equals("XRAY_CHEST", ignoreCase = true) ->
@@ -2996,7 +3010,7 @@ class TBRepo @Inject constructor(
                                                     )
                                                 }
                                             }
-                                            tbDao.saveTbDiagnostics(cache)
+                                            saveTbDiagnosticsIfChanged(fresh, cache)
                                         }
                                     }
                                 }
@@ -3079,7 +3093,7 @@ class TBRepo @Inject constructor(
                                                 )
                                             }
                                         }
-                                        tbDao.saveTbDiagnostics(cache)
+                                        saveTbDiagnosticsIfChanged(fresh, cache)
                                         }
                                     }
                                 }
@@ -3122,7 +3136,7 @@ class TBRepo @Inject constructor(
                                                     )
                                                 }
                                             }
-                                            tbDao.saveTbDiagnostics(cache)
+                                            saveTbDiagnosticsIfChanged(fresh, cache)
                                         }
                                     }
                                 }
@@ -3164,7 +3178,7 @@ class TBRepo @Inject constructor(
                                                     )
                                                 }
                                             }
-                                            tbDao.saveTbDiagnostics(cache)
+                                            saveTbDiagnosticsIfChanged(fresh, cache)
                                         }
                                     }
                                 }
@@ -3209,7 +3223,7 @@ class TBRepo @Inject constructor(
                                                     )
                                                 }
                                             }
-                                            tbDao.saveTbDiagnostics(cache)
+                                            saveTbDiagnosticsIfChanged(fresh, cache)
                                         }
                                     }
                                 }

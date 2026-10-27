@@ -1,0 +1,16 @@
+{
+  "id": "write-new-skill",
+  "prompt": "Create a skill for changelog generation",
+  "expect_skills": [
+    "route-task",
+    "resolve-skills",
+    "write-a-skill",
+    "review-skill",
+    "update-skill",
+    "review-work",
+    "verify-feature"
+  ],
+  "forbid_skills": [],
+  "expect_hard_stop": false,
+  "expect_matrix": {}
+}

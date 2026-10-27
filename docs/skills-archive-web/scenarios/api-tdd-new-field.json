@@ -1,0 +1,22 @@
+{
+  "id": "api-tdd-new-field",
+  "prompt": "Add a completed boolean field to Items API with TDD",
+  "expect_skills": [
+    "route-task",
+    "resolve-skills",
+    "plan-feature",
+    "implement-feature",
+    "add-test",
+    "add-migration",
+    "add-api-endpoint",
+    "review-work",
+    "verify-feature"
+  ],
+  "forbid_skills": [],
+  "expect_hard_stop": false,
+  "expect_matrix": {
+    "Tests (API TDD)": "add-test",
+    "DB / migration": "add-migration",
+    "API CRUD": "add-api-endpoint"
+  }
+}

@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.repositories
 import android.app.Application
 import android.net.Uri
 import android.widget.Toast
+import androidx.room.withTransaction
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CancellationException
@@ -553,6 +554,9 @@ class BenRepo @Inject constructor(
             }
 
             val updateBenList = benDao.getAllBenForSyncWithServer()
+            // DB-only loop (no network): mark the whole batch in one transaction so the list
+            // re-queries once instead of once per beneficiary.
+            db.withTransaction {
             updateBenList.forEach {
                 if (it.beneficiaryId <= 0L || it.benRegId <= 0L) {
                     benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.UNSYNCED)
@@ -572,6 +576,7 @@ class BenRepo @Inject constructor(
                 } catch (e: Exception) {
                     Timber.e("caught error in adding kidDetails : $e")
                 }
+            }
             }
 
             val uploadDone = postDataToAmritServer(benNetworkPostList, householdNetworkPostList, kidNetworkPostList)
@@ -925,12 +930,17 @@ class BenRepo @Inject constructor(
     }
 
     private suspend fun upsertServerBeneficiariesSafely(benCacheList: List<BenRegCache>) {
-        benCacheList.forEach { serverBen ->
-            val existingBen = benDao.getBen(serverBen.beneficiaryId)
-            if (existingBen != null) {
-                benDao.updateBen(serverBen)
-            } else {
-                benDao.upsert(serverBen)
+        // One transaction per pulled page: every observing list/badge query is invalidated once,
+        // not once per beneficiary. Identical rows are skipped so a re-pull of unchanged data
+        // causes no invalidation at all.
+        db.withTransaction {
+            benCacheList.forEach { serverBen ->
+                val existingBen = benDao.getBen(serverBen.beneficiaryId)
+                if (existingBen != null) {
+                    if (existingBen != serverBen) benDao.updateBen(serverBen)
+                } else {
+                    benDao.upsert(serverBen)
+                }
             }
         }
     }

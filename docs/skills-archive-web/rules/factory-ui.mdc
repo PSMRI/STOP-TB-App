@@ -1,0 +1,17 @@
+---
+description: Project Factory wizard visual musts (auto when editing factory UI)
+globs: src/{pages/FactoryPage.tsx,pages/LandingPage.tsx,pages/*.module.css,components/factory/**,factory/**,auth/FactoryAuthControls.*,api/projects.ts,index.css}
+alwaysApply: false
+---
+
+# Factory UI rules
+
+Musts while editing Project Factory chrome. Detail: `knowledge/factory-ui.md`. Why: ADR-0016.
+
+- Use Factory CSS tokens from `factory/tokens.css` (`--factory-*`, `--stage-*`) — do not invent a second palette or redefine tokens in component modules.
+- Colocate Factory styles in `*.module.css` next to the page/component; shared chrome via `factory/Shell.module.css`.
+- Match `agents_flow` shell language: dark zinc panels, indigo accent, Pipeline left rail, per-stage colors.
+- Items / CRUD pages stay on default `web-ui` / cream classes — do not force Factory dark theme onto Items.
+- Use Ant Design for Factory form controls (themed via `factory/antd-theme.ts`, ADR-0018).
+- Use Phosphor icons (`@phosphor-icons/react`) for Pipeline stage marks and landing CTA — map via `factory/icons.ts`.
+- Ideation enhance: `Enhance with AI` → compare → use/keep (`factory-ui` + remote `POST /ideas/refine`).

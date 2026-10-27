@@ -1,0 +1,33 @@
+{
+  "id": "user-crud-no-auth",
+  "prompt": "Add user management CRUD with email and name fields (no login)",
+  "expect_skills": [
+    "route-task",
+    "resolve-skills",
+    "plan-feature",
+    "grill-me",
+    "implement-feature",
+    "add-test",
+    "add-crud-resource",
+    "add-migration",
+    "add-api-endpoint",
+    "add-page",
+    "web-state",
+    "web-ui",
+    "review-work",
+    "verify-feature"
+  ],
+  "forbid_skills": [
+    "api-auth"
+  ],
+  "expect_hard_stop": false,
+  "expect_matrix": {
+    "Tests (API TDD)": "add-test",
+    "Tests (Web TDD)": "add-test",
+    "DB / migration": "add-migration",
+    "API CRUD": "add-crud-resource",
+    "Web shell / route": "add-page",
+    "Client state": "web-state",
+    "UI": "web-ui"
+  }
+}

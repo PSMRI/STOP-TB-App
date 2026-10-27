@@ -1,0 +1,19 @@
+{
+  "id": "jwt-login",
+  "prompt": "Add JWT login and protect API routes",
+  "expect_skills": [
+    "route-task",
+    "resolve-skills",
+    "api-auth",
+    "plan-feature",
+    "write-adr",
+    "review-work",
+    "verify-feature"
+  ],
+  "forbid_skills": [],
+  "expect_hard_stop": true,
+  "hard_stop_skill": "api-auth",
+  "expect_matrix": {
+    "Auth": "api-auth"
+  }
+}

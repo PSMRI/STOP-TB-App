@@ -1,0 +1,19 @@
+{
+  "id": "add-playwright-tests",
+  "prompt": "Add Playwright e2e tests for Items",
+  "expect_skills": [
+    "route-task",
+    "resolve-skills",
+    "add-test",
+    "write-adr",
+    "find-skills",
+    "review-work",
+    "verify-feature"
+  ],
+  "forbid_skills": [],
+  "expect_hard_stop": true,
+  "hard_stop_skill": "add-test",
+  "expect_matrix": {
+    "Tests": "add-test"
+  }
+}

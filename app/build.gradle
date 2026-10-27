@@ -225,6 +225,8 @@ dependencies {
     testImplementation 'com.google.truth:truth:1.4.4'
     testImplementation 'org.mockito:mockito-core:5.11.0'
     testImplementation 'org.mockito.kotlin:mockito-kotlin:5.2.1'
+    // Real org.json for JVM tests (android.jar's JSONObject is a stub that throws).
+    testImplementation 'org.json:json:20240303'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
 

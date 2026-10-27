@@ -1,0 +1,22 @@
+{
+  "id": "factory-shell-design",
+  "prompt": "Restyle Project Factory wizard shell to match agents_flow dark Pipeline UI",
+  "expect_skills": [
+    "route-task",
+    "resolve-skills",
+    "plan-feature",
+    "implement-feature",
+    "factory-ui",
+    "write-adr",
+    "update-docs",
+    "review-work",
+    "verify-feature"
+  ],
+  "forbid_skills": [],
+  "expect_hard_stop": false,
+  "expect_matrix": {
+    "UI (Project Factory chrome)": "factory-ui",
+    "Lasting why": "write-adr",
+    "Docs / rules / knowledge": "update-docs"
+  }
+}

@@ -46,6 +46,7 @@ import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.utils.callPhoneNumber
+import org.piramalswasthya.stoptb.utils.launchOnView
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
 import javax.inject.Inject
@@ -468,7 +469,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // flatMapLatest bumps the generation before building the new Pager, so the value read here belongs to `it`.
         var submittedGeneration = -1
 
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.benList.collectLatest {
                 submittedGeneration = viewModel.searchGeneration.value
                 benAdapter.submitData(it)
@@ -490,7 +491,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             viewModel.expandSearchToBlock()
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             // Settles only once the expanded search's PagingData is submitted and its refresh has completed,
             // so page updates from the previous search can't end the loading state early.
             benAdapter.onPagesUpdatedFlow.collect {
@@ -507,7 +508,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             }
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             // A failed refresh never produces a page update, so settle the expanded search's error here
             // instead of leaving the loader up; Retry re-runs the same refresh via benAdapter.retry().
             benAdapter.loadStateFlow.collect { loadStates ->
@@ -530,7 +531,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             }
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             combine(
                 benAdapter.loadStateFlow.map { it.refresh is LoadState.Loading },
                 benAdapter.loadStateFlow.map { loadStates ->
@@ -586,123 +587,122 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 }
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.childCounts.collectLatest { countMap ->
                 benAdapter.submitChildCounts(countMap)
             }
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.householdMemberCounts.collectLatest { countMap ->
                 benAdapter.submitHouseholdMemberCounts(countMap)
             }
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.householdHeadNames.collectLatest { nameMap ->
                 benAdapter.submitHouseholdHeadNames(nameMap)
             }
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.vitalBenIds.collectLatest { benIds ->
                 benAdapter.submitBenIds(benIds)
             }
         }
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.unsyncedVitalBenIds.collectLatest { benIds ->
                 benAdapter.submitUnsyncedVitalBenIds(benIds)
             }
         }
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.syncingVitalBenIds.collectLatest { benIds ->
                 benAdapter.submitSyncingVitalBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.tbScreeningBenIds.collectLatest { benIds ->
-                Timber.e("TB Screening IDs: $benIds")
                 benAdapter.submitTbScreeningBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.unsyncedTbScreeningBenIds.collectLatest { benIds ->
                 benAdapter.submitUnsyncedTbScreeningBenIds(benIds)
             }
         }
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.syncingTbScreeningBenIds.collectLatest { benIds ->
                 benAdapter.submitSyncingTbScreeningBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.generalOpdBenIds.collectLatest { benIds ->
                 benAdapter.submitGeneralOpdBenIds(benIds)
             }
         }
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.unsyncedGeneralOpdBenIds.collectLatest { benIds ->
                 benAdapter.submitUnsyncedGeneralOpdBenIds(benIds)
             }
         }
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.syncingGeneralOpdBenIds.collectLatest { benIds ->
                 benAdapter.submitSyncingGeneralOpdBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.anthropometryFilledBenIds.collectLatest { benIds ->
                 benAdapter.submitAnthropometryBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.diagnosisBenIds.collectLatest { benIds ->
                 benAdapter.submitDiagnosisBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.contactFollowUpDoneBenIds.collectLatest { benIds ->
                 benAdapter.submitContactFollowUpDoneBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.tptFollowUpDoneBenIds.collectLatest { benIds ->
                 benAdapter.submitTptFollowUpDoneBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.tptEligibleBenIds.collectLatest { benIds ->
                 benAdapter.submitTptEligibleBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.allTbDiagnostics.collectLatest { diagnosticsList ->
                 benAdapter.submitTBDiagnostics(diagnosticsList)
             }
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.allTbScreening.collectLatest { screeningList ->
                 benAdapter.submitTbScreeningList(screeningList)
             }
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.retryingBenIds.collectLatest { benIds ->
                 benAdapter.submitRetryingBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        launchOnView {
             viewModel.orderActionState.collectLatest { state ->
                 when (state) {
                     is AllBenViewModel.OrderActionResult.Idle -> {}
@@ -739,9 +739,9 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             }
         }
 
-        WorkerUtils.triggerDiagnosticResultPollWorker(requireContext())
-        WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext())
-        WorkerUtils.triggerRifDiagnosticResultPollWorker(requireContext())
+        // All three helpers enqueue the same unique worker; one KEEP enqueue is enough and does not
+        // cancel/restart an already-scheduled poll on every view creation.
+        WorkerUtils.ensureDiagnosticResultPollWorker(requireContext())
 
         binding.ibSearch.visibility = View.VISIBLE
         binding.ibSearch.setOnClickListener { sttContract.launch(Unit) }
@@ -790,7 +790,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     }
 
     private fun checkAndGenerateABHA(benId: Long) {
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             if (viewModel.getBenFromId(benId) == 0L) {
                 androidx.appcompat.app.AlertDialog.Builder(requireContext())
                     .setTitle("Alert!")
@@ -894,7 +894,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         super.onResume()
         updateToolbarTitle()
         viewModel.invalidateCheckedNoPushBenIds()
-        viewModel.fetchBeneficiaryStatuses()
+        viewModel.refreshBeneficiaryStatusesThrottled()
         
         val sh = findNavController().currentBackStackEntry?.savedStateHandle
         if (sh?.remove<Boolean>("examine_flow_done") == true) {
@@ -1101,11 +1101,13 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
+    override fun onDestroyView() {
+        // The dialog and adapter are recreated in onViewCreated; release them with the view.
         addMemberAlert?.dismiss()
         addMemberAlert = null
         addMemberAlertBinding = null
+        _binding?.rvAny?.adapter = null
         _binding = null
+        super.onDestroyView()
     }
 }

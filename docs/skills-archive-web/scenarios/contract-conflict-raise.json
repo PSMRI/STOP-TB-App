@@ -1,0 +1,20 @@
+{
+  "id": "contract-conflict-raise",
+  "prompt": "Change Postgres host port to 5432 in docker-compose while knowledge/stack.md still says 5433",
+  "expect_skills": [
+    "route-task",
+    "resolve-skills",
+    "manage-infra",
+    "update-docs",
+    "review-work",
+    "verify-feature"
+  ],
+  "forbid_skills": [],
+  "expect_hard_stop": true,
+  "hard_stop_skill": "manage-infra",
+  "expect_matrix": {
+    "Infra / CI / Make": "manage-infra",
+    "Docs / rules / knowledge": "update-docs"
+  },
+  "notes": "Must raise Contract conflict and hard-stop before silently changing ports; align docs via update-docs first"
+}

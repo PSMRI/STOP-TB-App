@@ -1,0 +1,18 @@
+---
+description: FastAPI layering and routing musts (auto when editing API)
+globs: apps/api/**/*
+alwaysApply: false
+---
+
+# API rules
+
+Musts while editing `apps/api/**`. Detail/checklists: `knowledge/api-conventions.md`. Why: ADR-0004.
+
+- Layering: route → schema → model. No business logic in `main.py`.
+- Mount on `/api/v1` via `routes/__init__.py`. Plural resource prefixes.
+- Schemas: `Create` / `Update` / `Read`. Delete → 204 empty body.
+- 404 detail: `"<Resource> not found"`. Validation → Pydantic 422.
+- Register new models in `models/__init__.py` for Alembic.
+- Mirror `items` for CRUD. Non-CRUD / services → `api-patterns` skill.
+- Auth → `api-auth` skill (never invent here).
+- Structural work via stack skills (`add-api-endpoint`, `add-migration`, …).

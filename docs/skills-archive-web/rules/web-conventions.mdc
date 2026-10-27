@@ -1,0 +1,19 @@
+---
+description: Vite React web musts (auto when editing web)
+globs: src/**/*,index.html,vite.config.ts
+alwaysApply: false
+---
+
+# Web rules
+
+Musts while editing the Vite app. Detail/checklists: `knowledge/web-conventions.md`. Why: ADR-0004 · ADR-0040.
+
+- Pages use `src/api/client.ts` + resource helpers — **no raw `fetch` in pages**.
+- Pages under `src/pages/`; register in `App.tsx`; types next to resource client.
+- Env: `VITE_*` from root `.env` (`envDir: "."`; ADR-0040). Docker: same vars at runtime (ADR-0041).
+- Client state → `web-state` skill (Items local state default).
+- Markup/styles → `web-ui` skill (Items / `index.css` default); Project Factory chrome → `factory-ui` skill.
+- TDD for new client/page behavior → Vitest (`src/**/*.test.ts`, `make test`) via `add-test` / `knowledge/tdd.md`.
+- Mirror `ItemsPage` + `api/items.ts` (+ `api/items.test.ts`) for CRUD UI.
+- Structural work via `add-page` + craft skills — do not freestyle a second style.
+- API/server work belongs in the **separate API repo** — not this tree.

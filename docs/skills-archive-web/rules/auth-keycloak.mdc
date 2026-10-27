@@ -1,0 +1,13 @@
+---
+description: Keycloak auth musts (auto when editing auth packages)
+globs: src/auth/**/*
+alwaysApply: false
+---
+
+# Keycloak auth rules
+
+Detail: `knowledge/auth-keycloak.md`. Why: ADR-0021 · ADR-0040.
+
+- Use skill `keycloak-auth` for **client** SSO — do not freestyle password/JWT stacks in the UI.
+- Soft-bypass only when Keycloak triad (`VITE_KEYCLOAK_*`) incomplete.
+- Server-side JWT verify / `owner_id` scoping live in the **separate API repo**.

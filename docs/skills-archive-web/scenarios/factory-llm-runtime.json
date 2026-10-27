@@ -1,0 +1,31 @@
+{
+  "id": "factory-llm-runtime",
+  "prompt": "Add Factory LLM runtime with LangGraph and migrate idea refine",
+  "expect_skills": [
+    "route-task",
+    "resolve-skills",
+    "plan-feature",
+    "implement-feature",
+    "add-test",
+    "factory-llm",
+    "api-patterns",
+    "manage-infra",
+    "refactor-code",
+    "write-adr",
+    "write-a-skill",
+    "review-skill",
+    "update-docs",
+    "review-work",
+    "verify-feature"
+  ],
+  "forbid_skills": [],
+  "expect_hard_stop": false,
+  "expect_matrix": {
+    "Factory LLM runtime": "factory-llm",
+    "API beyond CRUD": "api-patterns",
+    "Infra / CI / Make": "manage-infra",
+    "Refactor": "refactor-code",
+    "Lasting why": "write-adr",
+    "Tests (API TDD)": "add-test"
+  }
+}

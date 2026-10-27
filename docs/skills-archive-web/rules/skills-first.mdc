@@ -1,0 +1,25 @@
+---
+description: Skills-first UI repo — always apply; detail in knowledge/workflow.md
+globs:
+alwaysApply: true
+---
+
+# Skills-first development
+
+Thin React/Vite Project Factory UI. **API is a separate repo.** **Do not freestyle structure.**
+
+## Mandate
+
+For every **mutating development task** (feature, bug, refactor, infra, docs, skills — not only CRUD), follow the shared playbooks — do **not** copy them into skills:
+
+1. **Workflow** — [`knowledge/workflow.md`](../../knowledge/workflow.md) (pipeline for *any* mutating work; classify → resolve → plan? → execute → review → verify)
+2. **Execute** — [`knowledge/execution.md`](../../knowledge/execution.md) (conflict raise, TDD, review→verify)
+3. **TDD** — [`knowledge/tdd.md`](../../knowledge/tdd.md) (red→green→refactor for web behavior)
+
+Entry skill: `.cursor/skills/route-task/SKILL.md` → then `resolve-skills` → … per workflow.md.
+
+Concerned skills **declare and link** those knowledge files; they keep only skill-specific steps.
+
+## Paths (summary)
+
+See [workflow.md §7](../../knowledge/workflow.md). Web `src/` · Skills `.cursor/skills/` · Knowledge `knowledge/` · ADRs `docs/adr/`. API → separate repository ([ADR-0040](../../docs/adr/0040-ui-only-repo.md)).

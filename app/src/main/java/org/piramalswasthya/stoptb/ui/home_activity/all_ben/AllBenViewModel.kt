@@ -107,7 +107,8 @@ class AllBenViewModel @Inject constructor(
     val searchGeneration: StateFlow<Int> = _searchGeneration.asStateFlow()
 
     init {
-        fetchBeneficiaryStatuses()
+        // Status refresh runs from the fragment's onResume only (throttled below) — calling it
+        // here as well duplicated the network sweep and its DB writes on every screen open.
         viewModelScope.launch {
             tbRepo.refreshDeviceIntegrationConfig()
         }
@@ -279,6 +280,17 @@ class AllBenViewModel @Inject constructor(
                 else -> {}
             }
         }
+    }
+
+    private var lastScreenStatusRefreshAt = 0L
+
+    /** Screen-level refresh (onResume): at most once per [STATUS_REFRESH_MIN_INTERVAL_MS]. */
+    fun refreshBeneficiaryStatusesThrottled() {
+        if (sourceFromArgs != 6 && sourceFromArgs != 7) return
+        val now = System.currentTimeMillis()
+        if (now - lastScreenStatusRefreshAt < STATUS_REFRESH_MIN_INTERVAL_MS) return
+        lastScreenStatusRefreshAt = now
+        fetchBeneficiaryStatuses()
     }
 
     fun fetchBeneficiaryStatuses(orderType: String? = null) {
@@ -591,5 +603,9 @@ class AllBenViewModel @Inject constructor(
                 checkingBenIds.remove(benId)
             }
         }
+    }
+
+    private companion object {
+        const val STATUS_REFRESH_MIN_INTERVAL_MS = 30_000L
     }
 }

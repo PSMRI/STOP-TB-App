@@ -297,6 +297,19 @@ object WorkerUtils {
         )
     }
 
+    /**
+     * For screen open/resume. KEEP leaves an already-scheduled poll (the worker reschedules
+     * itself every 60 s while orders are pending) alone instead of cancelling and re-running it
+     * immediately, so opening a list does not cause an extra status sweep + DB write burst.
+     * User actions that need an immediate poll keep using [triggerDiagnosticResultPollWorker].
+     */
+    fun ensureDiagnosticResultPollWorker(context: Context) {
+        val workRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>().build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            DiagnosticResultPollWorker.name, ExistingWorkPolicy.KEEP, workRequest
+        )
+    }
+
     fun triggerTrueNatDiagnosticResultPollWorker(context: Context) {
         triggerDiagnosticResultPollWorker(context)
     }

@@ -1,0 +1,35 @@
+{
+  "id": "keycloak-project-auth",
+  "prompt": "Integrate Keycloak and map users with projects",
+  "expect_skills": [
+    "route-task",
+    "resolve-skills",
+    "plan-feature",
+    "implement-feature",
+    "add-test",
+    "api-auth",
+    "keycloak-auth",
+    "add-migration",
+    "api-patterns",
+    "add-page",
+    "factory-ui",
+    "web-state",
+    "manage-infra",
+    "write-adr",
+    "write-a-skill",
+    "review-skill",
+    "update-docs",
+    "review-work",
+    "verify-feature"
+  ],
+  "forbid_skills": [],
+  "expect_hard_stop": false,
+  "expect_matrix": {
+    "Auth": "keycloak-auth",
+    "DB / migration": "add-migration",
+    "API beyond CRUD": "api-patterns",
+    "Lasting why": "write-adr",
+    "Tests (API TDD)": "add-test",
+    "Tests (Web TDD)": "add-test"
+  }
+}

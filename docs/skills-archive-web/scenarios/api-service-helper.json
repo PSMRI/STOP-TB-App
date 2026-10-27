@@ -1,0 +1,16 @@
+{
+  "id": "api-service-helper",
+  "prompt": "Extract shared validation helper used by multiple API routes",
+  "expect_skills": [
+    "route-task",
+    "resolve-skills",
+    "api-patterns",
+    "review-work",
+    "verify-feature"
+  ],
+  "forbid_skills": [],
+  "expect_hard_stop": false,
+  "expect_matrix": {
+    "API beyond CRUD": "api-patterns"
+  }
+}

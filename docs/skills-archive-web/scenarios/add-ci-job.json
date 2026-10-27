@@ -1,0 +1,18 @@
+{
+  "id": "add-ci-job",
+  "prompt": "Add a CI job to run lint",
+  "expect_skills": [
+    "route-task",
+    "resolve-skills",
+    "manage-infra",
+    "update-docs",
+    "review-work",
+    "verify-feature"
+  ],
+  "forbid_skills": [],
+  "expect_hard_stop": false,
+  "expect_matrix": {
+    "Infra / CI / Make": "manage-infra",
+    "Docs / rules / knowledge": "update-docs"
+  }
+}

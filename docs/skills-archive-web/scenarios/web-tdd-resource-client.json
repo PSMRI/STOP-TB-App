@@ -1,0 +1,19 @@
+{
+  "id": "web-tdd-resource-client",
+  "prompt": "Add a notesApi client helper on the web with TDD",
+  "expect_skills": [
+    "route-task",
+    "resolve-skills",
+    "implement-feature",
+    "add-test",
+    "add-page",
+    "review-work",
+    "verify-feature"
+  ],
+  "forbid_skills": [],
+  "expect_hard_stop": false,
+  "expect_matrix": {
+    "Tests (Web TDD)": "add-test",
+    "Web shell / route": "add-page"
+  }
+}
