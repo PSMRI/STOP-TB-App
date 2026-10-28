@@ -1419,7 +1419,7 @@ class TBRepo @Inject constructor(
                                 }
 
                                 else -> {
-                                    Timber.e("SYNC_DIAG[$callTag] TB Suspected chunk failed with statusCode: $responseStatusCode, benIds=${chunk.map { it.benId }}")
+                                    Timber.e("SYNC_DIAG[$callTag] TB Suspected chunk failed with statusCode: $responseStatusCode, benIds=${chunk.map { it.benId }}, body=$responseString")
                                     lastError = "statusCode=$responseStatusCode"
                                     failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                                 }

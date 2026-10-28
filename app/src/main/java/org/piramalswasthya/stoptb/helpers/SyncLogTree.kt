@@ -45,8 +45,6 @@ class SyncLogTree(
     }
 
     override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
-        // HTTP logging lines can carry request/response bodies with personal data.
-        if (tag == "OkHttp") return
         if (!isSyncRelated(tag, message)) return
 
         // Write sync-related logs to logcat via DebugTree.log().

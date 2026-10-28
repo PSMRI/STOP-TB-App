@@ -92,7 +92,7 @@ class LeprosyRepo @Inject constructor(
 
                         val errorMessage = jsonObj.optString("errorMessage", "")
                         if (!jsonObj.has("statusCode")) {
-                            Timber.e("Leprosy screening response missing statusCode")
+                            Timber.e("Leprosy screening response missing statusCode. Raw response: $responseString")
                             return@withContext -1
                         }
                         val responseStatusCode = jsonObj.optInt("statusCode", -1)
@@ -123,7 +123,7 @@ class LeprosyRepo @Inject constructor(
                             }
 
                             else -> {
-                                Timber.e("Leprosy screening unexpected statusCode: $responseStatusCode")
+                                Timber.e("Leprosy screening unexpected statusCode: $responseStatusCode, response: $responseString")
                                 throw IllegalStateException("$responseStatusCode received, dont know what todo!?")
                             }
                         }
@@ -344,11 +344,12 @@ class LeprosyRepo @Inject constructor(
                 if (statusCode == 200) {
                     val responseString = response.body()?.string()
                     if (responseString != null) {
+                        Timber.d("Raw leprosy response: $responseString")
 
                         val jsonObj = JSONObject(responseString)
 
                         if (!jsonObj.has("statusCode")) {
-                            Timber.e("Leprosy data response missing statusCode")
+                            Timber.e("Leprosy data response missing statusCode. Raw response: $responseString")
                             return@withContext -1
                         }
                         val statusCodeFromResponse = jsonObj.optInt("statusCode", -1)
@@ -379,7 +380,7 @@ class LeprosyRepo @Inject constructor(
                             }
 
                             else -> {
-                                Timber.e("Leprosy data unexpected statusCode: $statusCodeFromResponse")
+                                Timber.e("Leprosy data unexpected statusCode: $statusCodeFromResponse, response: $responseString")
                                 throw IllegalStateException("$statusCodeFromResponse received, dont know what todo!?")
                             }
                         }
@@ -423,11 +424,12 @@ class LeprosyRepo @Inject constructor(
                 if (statusCode == 200) {
                     val responseString = response.body()?.string()
                     if (responseString != null) {
+                        Timber.d("Raw leprosy followup response: $responseString")
 
                         val jsonObj = JSONObject(responseString)
 
                         if (!jsonObj.has("statusCode")) {
-                            Timber.e("Leprosy followup response missing statusCode")
+                            Timber.e("Leprosy followup response missing statusCode. Raw response: $responseString")
                             return@withContext -1
                         }
                         val statusCodeFromResponse = jsonObj.optInt("statusCode", -1)
@@ -458,7 +460,7 @@ class LeprosyRepo @Inject constructor(
                             }
 
                             else -> {
-                                Timber.e("Leprosy followup unexpected statusCode: $statusCodeFromResponse")
+                                Timber.e("Leprosy followup unexpected statusCode: $statusCodeFromResponse, response: $responseString")
                                 throw IllegalStateException("$statusCodeFromResponse received, dont know what todo!?")
                             }
                         }
