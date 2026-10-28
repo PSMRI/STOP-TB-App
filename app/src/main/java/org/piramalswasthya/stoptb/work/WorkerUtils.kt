@@ -85,19 +85,26 @@ object WorkerUtils {
         }
     }
 
-    private fun canPush(context: Context): Boolean {
+    // Whether a push may be requested at all: a user is logged in and camp mode
+    // is on. Whether the hub is reachable is checked later by SyncGateWorker.
+    private fun canTriggerPush(context: Context): Boolean {
         if (!hasLoggedInUser(context)) {
             Timber.w("Push worker skipped: no logged-in user is stored yet")
             return false
         }
-
-        // Block all data push until camp mode is active AND hub is connected
         val prefs = PreferenceManager.getInstance(context)
         val campKey = context.getString(R.string.PREF_camp_mode_enabled)
         if (!prefs.getBoolean(campKey, false)) {
             Timber.d("Push worker skipped: camp mode is disabled")
             return false
         }
+        return true
+    }
+
+    private fun canPush(context: Context): Boolean {
+        // Block all data push until camp mode is active AND hub is connected
+        if (!canTriggerPush(context)) return false
+        val prefs = PreferenceManager.getInstance(context)
         val hubConnectedKey = context.getString(R.string.PREF_camp_hub_connected)
         if (!prefs.getBoolean(hubConnectedKey, false)) {
             Timber.d("Push worker skipped: camp hub is disconnected")
@@ -110,7 +117,7 @@ object WorkerUtils {
     // bursts of saves into one push cycle and, if a cycle is already running,
     // starts a follow-up cycle after it ends instead of dropping the save.
     fun triggerAmritPushWorker(context: Context) {
-        if (!canPush(context)) return
+        if (!canTriggerPush(context)) return
         val gate = OneTimeWorkRequestBuilder<SyncGateWorker>()
             .setInitialDelay(SyncGateWorker.DEBOUNCE_SECONDS, TimeUnit.SECONDS)
             .build()

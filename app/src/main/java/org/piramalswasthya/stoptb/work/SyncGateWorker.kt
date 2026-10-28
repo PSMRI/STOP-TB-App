@@ -13,6 +13,9 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
+import org.piramalswasthya.stoptb.utils.sync.CampHubReachability
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
 
@@ -37,6 +40,8 @@ import java.util.concurrent.TimeUnit
 class SyncGateWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted params: WorkerParameters,
+    private val preferenceDao: PreferenceDao,
+    private val syncRetryStore: SyncRetryStore,
 ) : CoroutineWorker(appContext, params) {
 
     companion object {
@@ -56,6 +61,8 @@ class SyncGateWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
+            if (!ensureCampHubConnected()) return Result.success()
+
             val workManager = WorkManager.getInstance(applicationContext)
 
             val chainRunning = withContext(Dispatchers.IO) {
@@ -89,5 +96,22 @@ class SyncGateWorker @AssistedInject constructor(
             Timber.e(e, "SyncGate: gate check failed")
             Result.success()
         }
+    }
+
+    // The hub-connected flag is cleared after a failed request and used to be
+    // set again only by an open screen. If it is cleared, check the hub here so
+    // pushes from saves and the heartbeat resume in the background.
+    private suspend fun ensureCampHubConnected(): Boolean {
+        if (!preferenceDao.isCampModeEnabled() || preferenceDao.isCampHubConnected()) return true
+        val url = preferenceDao.getStoredCampHubUrl()?.takeIf { it.isNotBlank() } ?: return false
+        val reachable = withContext(Dispatchers.IO) { CampHubReachability.isReachable(url) }
+        if (!reachable) {
+            Timber.d("SyncGate: camp hub unreachable, push waits for the next save or heartbeat")
+            return false
+        }
+        Timber.i("SyncGate: camp hub reachable again")
+        preferenceDao.setCampHubConnected(true)
+        syncRetryStore.resetBackoff()
+        return true
     }
 }
