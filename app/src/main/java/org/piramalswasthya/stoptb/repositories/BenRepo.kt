@@ -38,6 +38,7 @@ import timber.log.Timber
 import java.io.File
 import java.lang.Long.min
 import java.net.SocketTimeoutException
+import java.util.concurrent.ConcurrentHashMap
 import java.text.SimpleDateFormat
 import java.util.Locale
 import javax.inject.Inject
@@ -59,6 +60,11 @@ class BenRepo @Inject constructor(
 
     companion object {
         private const val DEFAULT_OFFICER_ID = 501L
+
+        // Temp (negative) benId -> server benId, recorded when the push(server) replaces the temp ID.
+        // Screens opened before that (form/Examine sheet nav args) still hold the temp ID,
+        // which no longer exists in BENEFICIARY — see resolveCurrentBenId().
+        private val finalBenIdByTempBenId = ConcurrentHashMap<Long, Long>()
         private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
         private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.ENGLISH)
         fun getCurrentDate(millis: Long = System.currentTimeMillis()): String {
@@ -227,6 +233,18 @@ class BenRepo @Inject constructor(
     suspend fun getBenFromId(benId: Long): BenRegCache? {
         return withContext(Dispatchers.IO) {
             benDao.getBen(benId)
+        }
+    }
+
+    /**
+     * Returns the server benId if [benId] is a temp ID the push has since replaced
+     * (Camp Mode pushes within seconds, often while a form for the temp ID is open);
+     * otherwise returns [benId] unchanged.
+     */
+    suspend fun resolveCurrentBenId(benId: Long): Long {
+        return withContext(Dispatchers.IO) {
+            if (benDao.getBen(benId) != null) benId
+            else finalBenIdByTempBenId[benId] ?: benId
         }
     }
 
@@ -490,6 +508,7 @@ class BenRepo @Inject constructor(
                         newId = newBenId,
                         imageUri = photoUri
                     )
+                    finalBenIdByTempBenId[ben.beneficiaryId] = newBenId
                     formResponseJsonDao.updateVisitBenId(
                         oldBenId = ben.beneficiaryId,
                         newBenId = newBenId

@@ -47,7 +47,9 @@ class VitalScreenViewModel @Inject constructor(
         IDLE, SAVING, SAVE_SUCCESS, SAVE_FAILED
     }
 
-    val benId = VitalScreenFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
+    // Re-resolved in init and before saving: the nav arg can be a temp ID the push has replaced.
+    var benId = VitalScreenFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
+        private set
     val benRegId = VitalScreenFragmentArgs.fromSavedStateHandle(savedStateHandle).benRegId
     val autoFlow = VitalScreenFragmentArgs.fromSavedStateHandle(savedStateHandle).autoFlow
 
@@ -75,6 +77,8 @@ class VitalScreenViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            //Resolve the current beneficiary ID to load the correct beneficiary's data when the form opens.
+            benId = benRepo.resolveCurrentBenId(benId)
             benRepo.getBenFromId(benId)?.let { ben ->
                 benCache = ben
                 _benName.value = listOfNotNull(ben.firstName, ben.lastName).joinToString(" ")
@@ -152,6 +156,8 @@ class VitalScreenViewModel @Inject constructor(
                         return@withContext
                     }
                     _state.postValue(State.SAVING)
+                    // Re-resolve the current beneficiary ID before submitting to ensure data is saved against the correct beneficiary.
+                    benId = benRepo.resolveCurrentBenId(benId)
                     val thresholdEvaluation = evaluateThresholds(
                         temperatureOption = temperatureOption,
                         pulseRateOption = pulseRateOption,
@@ -160,6 +166,7 @@ class VitalScreenViewModel @Inject constructor(
                         rbs = rbs
                     )
                     val cache = (_existingVitals.value ?: VitalCache(benId = benId,benRegId = benRegId)).copy(
+                        benId = benId,
                         capturedAt = System.currentTimeMillis(),
                         temperature = mapTemperatureOptionToValue(temperatureOption),
                         pulseRate = mapPulseOptionToValue(pulseRateOption),

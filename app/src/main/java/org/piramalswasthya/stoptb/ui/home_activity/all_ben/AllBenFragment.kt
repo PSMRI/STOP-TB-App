@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.helpers.RoleManager
+import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.adapters.BenListAdapter
 import org.piramalswasthya.stoptb.adapters.BenPagingAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
@@ -78,6 +79,9 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     @Inject
     lateinit var roleManager: RoleManager
+
+    @Inject
+    lateinit var benRepo: BenRepo
 
     private var _binding: FragmentDisplaySearchAndToggleRvButtonBinding? = null
 
@@ -814,8 +818,17 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // Always show without autoFlow — user decides whether to continue or close.
         // autoFlow=true caused the form to re-open automatically when back was pressed.
 
-        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false, showContactTracingForms = args.showContactTracingForms)
-            .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
+        viewLifecycleOwner.lifecycleScope.launch {
+            // In Camp Mode the push can replace a temp benId after this screen captured it;
+            // open the sheet (and the forms it launches) with the current ID.
+            val currentBenId = benRepo.resolveCurrentBenId(benId)
+            if (pendingExamineBenId == benId) pendingExamineBenId = currentBenId
+            if (childFragmentManager.isStateSaved ||
+                childFragmentManager.findFragmentByTag(ExamineBottomSheetFragment.TAG) != null
+            ) return@launch
+            ExamineBottomSheetFragment.newInstance(currentBenId, autoFlow = false, showContactTracingForms = args.showContactTracingForms)
+                .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
+        }
     }
 
     /** Navigate to the correct form based on [formIndex]. */

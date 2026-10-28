@@ -36,7 +36,9 @@ class GeneralOpdFormViewModel @Inject constructor(
     private val drugMasterRepo: DrugMasterRepo
 ) : ViewModel() {
 
-    val benId = GeneralOpdFormFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
+    // Re-resolved in init and before saving: the nav arg can be a temp ID the push has replaced.
+    var benId = GeneralOpdFormFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
+        private set
     val viewOnly = GeneralOpdFormFragmentArgs.fromSavedStateHandle(savedStateHandle).viewOnly
     val autoFlow = GeneralOpdFormFragmentArgs.fromSavedStateHandle(savedStateHandle).autoFlow
     val generalOpdFlow = GeneralOpdFormFragmentArgs.fromSavedStateHandle(savedStateHandle).generalOpdFlow
@@ -96,6 +98,8 @@ class GeneralOpdFormViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+                // Resolve the current beneficiary ID to load the correct beneficiary's data when the form opens.
+                benId = benRepo.resolveCurrentBenId(benId)
                 val ben = benRepo.getBenFromId(benId)
                 ben?.let {
                     _benName.value = "${it.firstName} ${it.lastName.orEmpty()}".trim()
@@ -186,8 +190,11 @@ class GeneralOpdFormViewModel @Inject constructor(
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 try {
-                    if (!cache.chiefComplaints.isNullOrEmpty() || rows.isNotEmpty() || !cache.notes.isNullOrBlank()) {
-                        tbRepo.saveGeneralOpdWithPrescriptions(cache, rows)
+                    // Re-resolve the current beneficiary ID before submitting to ensure data is saved against the correct beneficiary.
+                    benId = benRepo.resolveCurrentBenId(benId)
+                    val toSave = if (cache.benId != benId) cache.copy(benId = benId) else cache
+                    if (!toSave.chiefComplaints.isNullOrEmpty() || rows.isNotEmpty() || !toSave.notes.isNullOrBlank()) {
+                        tbRepo.saveGeneralOpdWithPrescriptions(toSave, rows)
                     }
                     _state.postValue(State.SAVE_SUCCESS)
                 } catch (e: CancellationException) {
