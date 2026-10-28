@@ -428,23 +428,25 @@ class TBRepo @Inject constructor(
     private suspend fun saveTBScreeningCacheFromResponse(dataObj: String): MutableList<TBScreeningCache> {
         val tbScreeningList = mutableListOf<TBScreeningCache>()
         var requestDTO = Gson().fromJson(dataObj, TBScreeningRequestDTO::class.java)
-        requestDTO?.tbScreeningList?.forEach { tbScreeningDTO ->
-            tbScreeningDTO.visitDate?.let {
-                var tbScreeningCache: TBScreeningCache? =
-                    tbDao.getTbScreening(
-                        tbScreeningDTO.benId,
-                        getLongFromDate(tbScreeningDTO.visitDate),
-                        getLongFromDate(tbScreeningDTO.visitDate) - 19_800_000
-                    )
-                val cache = tbScreeningDTO.toCache()
-                if (shouldApplyServerRecord(
-                        tbScreeningCache?.syncState,
-                        tbScreeningCache?.serverUpdatedDate,
-                        cache.serverUpdatedDate ?: 0L
-                    )
-                ) {
-                    benDao.getBen(tbScreeningDTO.benId)?.let {
-                        tbDao.saveTbScreening(cache)
+        database.withTransaction {
+            requestDTO?.tbScreeningList?.forEach { tbScreeningDTO ->
+                tbScreeningDTO.visitDate?.let {
+                    var tbScreeningCache: TBScreeningCache? =
+                        tbDao.getTbScreening(
+                            tbScreeningDTO.benId,
+                            getLongFromDate(tbScreeningDTO.visitDate),
+                            getLongFromDate(tbScreeningDTO.visitDate) - 19_800_000
+                        )
+                    val cache = tbScreeningDTO.toCache()
+                    if (shouldApplyServerRecord(
+                            tbScreeningCache?.syncState,
+                            tbScreeningCache?.serverUpdatedDate,
+                            cache.serverUpdatedDate ?: 0L
+                        )
+                    ) {
+                        benDao.getBen(tbScreeningDTO.benId)?.let {
+                            tbDao.saveTbScreening(cache)
+                        }
                     }
                 }
             }
@@ -521,50 +523,52 @@ class TBRepo @Inject constructor(
             is JSONObject -> data.optJSONArray("data") ?: org.json.JSONArray()
             else -> org.json.JSONArray()
         }
-        for (index in 0 until records.length()) {
-            val item = records.optJSONObject(index) ?: continue
-            val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { it > 0 } ?: continue
-            val ben = benDao.getBenByRegId(benRegId) ?: continue
-            val visitDate = getLongFromDateMultipleSupport(item.optString("visitDate"))
-            val existing = tbDao.getTbScreening(ben.beneficiaryId)
-            val serverUpdatedDate = getServerUpdatedDate(item)
-            if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
-                continue
-            }
-            val cache = (existing ?: TBScreeningCache(benId = ben.beneficiaryId)).copy(
-                visitDate = visitDate,
-                coughMoreThan2Weeks = item.optNullableBoolean("coughMoreThan2Weeks"),
-                bloodInSputum = item.optNullableBoolean("bloodInSputum"),
-                feverMoreThan2Weeks = item.optNullableBoolean("feverMoreThan2Weeks"),
-                lossOfWeight = item.optNullableBoolean("lossOfWeight"),
-                nightSweats = item.optNullableBoolean("nightSweats"),
-                historyOfTb = item.optNullableBoolean("historyOfTb"),
-                takingAntiTBDrugs = item.optNullableBoolean("takingAntiTBDrugs"),
-                familySufferingFromTB = item.optNullableBoolean("familySufferingFromTB"),
-                riseOfFever = item.optNullableBoolean("riseOfFever"),
-                lossOfAppetite = item.optNullableBoolean("lossOfAppetite"),
+        database.withTransaction {
+            for (index in 0 until records.length()) {
+                val item = records.optJSONObject(index) ?: continue
+                val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { it > 0 } ?: continue
+                val ben = benDao.getBenByRegId(benRegId) ?: continue
+                val visitDate = getLongFromDateMultipleSupport(item.optString("visitDate"))
+                val existing = tbDao.getTbScreening(ben.beneficiaryId)
+                val serverUpdatedDate = getServerUpdatedDate(item)
+                if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
+                    continue
+                }
+                val cache = (existing ?: TBScreeningCache(benId = ben.beneficiaryId)).copy(
+                    visitDate = visitDate,
+                    coughMoreThan2Weeks = item.optNullableBoolean("coughMoreThan2Weeks"),
+                    bloodInSputum = item.optNullableBoolean("bloodInSputum"),
+                    feverMoreThan2Weeks = item.optNullableBoolean("feverMoreThan2Weeks"),
+                    lossOfWeight = item.optNullableBoolean("lossOfWeight"),
+                    nightSweats = item.optNullableBoolean("nightSweats"),
+                    historyOfTb = item.optNullableBoolean("historyOfTb"),
+                    takingAntiTBDrugs = item.optNullableBoolean("takingAntiTBDrugs"),
+                    familySufferingFromTB = item.optNullableBoolean("familySufferingFromTB"),
+                    riseOfFever = item.optNullableBoolean("riseOfFever"),
+                    lossOfAppetite = item.optNullableBoolean("lossOfAppetite"),
 
-                chestPain = item.optNullableBoolean("chestPain") ?: existing?.chestPain,
-                shortnessOfBreath = item.optNullableBoolean("shortnessOfBreath") ?: existing?.shortnessOfBreath,
-                fatigue = item.optNullableBoolean("fatigue") ?: existing?.fatigue,
-                failureToGainWeightInChildren = item.optNullableBoolean("failureToGainWeightInChildren") ?: existing?.failureToGainWeightInChildren,
-                decreasedActivityOrPlayfulnessInChildren = item.optNullableBoolean("decreasedActivityOrPlayfulnessInChildren") ?: existing?.decreasedActivityOrPlayfulnessInChildren,
-                otherSymptoms = item.optNullableBoolean("otherSymptoms") ?: existing?.otherSymptoms,
-                referredForDigitalChestXray = item.optNullableBoolean("referredForDigitalChestXray"),
-                referredForSputumCollection = item.optNullableBoolean("referredForSputumCollection"),
-                sputumSampleSubmittedAt = item.optStringOrNull("sputumSampleSubmittedAt"),
-                recommendedForTruenatTest = item.optNullableBoolean("recommendedForTruenat"),
-                recommendedForLiquidCultureTest = item.optNullableBoolean("recommendedForLiquidCulture"),
-                reasonForDenialForGettingTested = item.optStringListOrNull("testDenialReasons"),
-                keyPopulationRiskFactorIds = item.optIntListOrNull("keyPopulationRiskFactorIds"),
-                keyPopulationRiskFactors = item.optStringListOrNull("keyPopulationRiskFactors"),
-                hivStatusId = item.optIntOrNull("hivStatusId"),
-                hivStatus = item.optStringOrNull("hivStatus"),
-                serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
-                syncState = SyncState.SYNCED
-            )
-            tbDao.saveTbScreening(cache)
-            tbScreeningList.add(cache)
+                    chestPain = item.optNullableBoolean("chestPain") ?: existing?.chestPain,
+                    shortnessOfBreath = item.optNullableBoolean("shortnessOfBreath") ?: existing?.shortnessOfBreath,
+                    fatigue = item.optNullableBoolean("fatigue") ?: existing?.fatigue,
+                    failureToGainWeightInChildren = item.optNullableBoolean("failureToGainWeightInChildren") ?: existing?.failureToGainWeightInChildren,
+                    decreasedActivityOrPlayfulnessInChildren = item.optNullableBoolean("decreasedActivityOrPlayfulnessInChildren") ?: existing?.decreasedActivityOrPlayfulnessInChildren,
+                    otherSymptoms = item.optNullableBoolean("otherSymptoms") ?: existing?.otherSymptoms,
+                    referredForDigitalChestXray = item.optNullableBoolean("referredForDigitalChestXray"),
+                    referredForSputumCollection = item.optNullableBoolean("referredForSputumCollection"),
+                    sputumSampleSubmittedAt = item.optStringOrNull("sputumSampleSubmittedAt"),
+                    recommendedForTruenatTest = item.optNullableBoolean("recommendedForTruenat"),
+                    recommendedForLiquidCultureTest = item.optNullableBoolean("recommendedForLiquidCulture"),
+                    reasonForDenialForGettingTested = item.optStringListOrNull("testDenialReasons"),
+                    keyPopulationRiskFactorIds = item.optIntListOrNull("keyPopulationRiskFactorIds"),
+                    keyPopulationRiskFactors = item.optStringListOrNull("keyPopulationRiskFactors"),
+                    hivStatusId = item.optIntOrNull("hivStatusId"),
+                    hivStatus = item.optStringOrNull("hivStatus"),
+                    serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
+                    syncState = SyncState.SYNCED
+                )
+                tbDao.saveTbScreening(cache)
+                tbScreeningList.add(cache)
+            }
         }
         return tbScreeningList
     }
@@ -572,18 +576,20 @@ class TBRepo @Inject constructor(
     private suspend fun saveGeneralOpdCacheFromResponse(dataObj: String): MutableList<GeneralOpdCache> {
         val generalOpdList = mutableListOf<GeneralOpdCache>()
         val requestDTO = Gson().fromJson(dataObj, GeneralOpdRequestDTO::class.java)
-        requestDTO?.generalOpdList?.forEach { generalOpdDTO ->
-            val existing = tbDao.getGeneralOpd(generalOpdDTO.benId)
-            val cache = generalOpdDTO.toCache()
-            if (shouldApplyServerRecord(
-                    existing?.syncState,
-                    existing?.serverUpdatedDate,
-                    cache.serverUpdatedDate ?: 0L
-                )
-            ) {
-                benDao.getBen(generalOpdDTO.benId)?.let {
-                    tbDao.saveGeneralOpd(cache)
-                    generalOpdList.add(cache)
+        database.withTransaction {
+            requestDTO?.generalOpdList?.forEach { generalOpdDTO ->
+                val existing = tbDao.getGeneralOpd(generalOpdDTO.benId)
+                val cache = generalOpdDTO.toCache()
+                if (shouldApplyServerRecord(
+                        existing?.syncState,
+                        existing?.serverUpdatedDate,
+                        cache.serverUpdatedDate ?: 0L
+                    )
+                ) {
+                    benDao.getBen(generalOpdDTO.benId)?.let {
+                        tbDao.saveGeneralOpd(cache)
+                        generalOpdList.add(cache)
+                    }
                 }
             }
         }
@@ -716,24 +722,26 @@ class TBRepo @Inject constructor(
     private suspend fun saveTBDiagnosticsCacheFromResponse(dataObj: String): MutableList<TBDiagnosticsCache> {
         val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
         val requestDTO = Gson().fromJson(dataObj, TBDiagnosticsRequestDTO::class.java)
-        requestDTO?.tbDiagnosticsList?.forEach { tbDiagnosticsDTO ->
-            tbDiagnosticsDTO.visitDate?.let {
-                val tbDiagnosticsCache: TBDiagnosticsCache? =
-                    tbDao.getTbDiagnostics(
-                        tbDiagnosticsDTO.benId,
-                        getLongFromDate(tbDiagnosticsDTO.visitDate),
-                        getLongFromDate(tbDiagnosticsDTO.visitDate) - 19_800_000
-                    )
-                val cache = tbDiagnosticsDTO.toCache()
-                if (shouldApplyServerRecord(
-                        tbDiagnosticsCache?.syncState,
-                        tbDiagnosticsCache?.serverUpdatedDate,
-                        cache.serverUpdatedDate ?: 0L
-                    )
-                ) {
-                    benDao.getBen(tbDiagnosticsDTO.benId)?.let {
-                        tbDao.saveTbDiagnostics(cache)
-                        tbDiagnosticsList.add(cache)
+        database.withTransaction {
+            requestDTO?.tbDiagnosticsList?.forEach { tbDiagnosticsDTO ->
+                tbDiagnosticsDTO.visitDate?.let {
+                    val tbDiagnosticsCache: TBDiagnosticsCache? =
+                        tbDao.getTbDiagnostics(
+                            tbDiagnosticsDTO.benId,
+                            getLongFromDate(tbDiagnosticsDTO.visitDate),
+                            getLongFromDate(tbDiagnosticsDTO.visitDate) - 19_800_000
+                        )
+                    val cache = tbDiagnosticsDTO.toCache()
+                    if (shouldApplyServerRecord(
+                            tbDiagnosticsCache?.syncState,
+                            tbDiagnosticsCache?.serverUpdatedDate,
+                            cache.serverUpdatedDate ?: 0L
+                        )
+                    ) {
+                        benDao.getBen(tbDiagnosticsDTO.benId)?.let {
+                            tbDao.saveTbDiagnostics(cache)
+                            tbDiagnosticsList.add(cache)
+                        }
                     }
                 }
             }
@@ -862,62 +870,64 @@ class TBRepo @Inject constructor(
     private suspend fun saveTBSuspectedCacheFromResponse(dataObj: String): MutableList<TBSuspectedCache> {
         val tbSuspectedList = mutableListOf<TBSuspectedCache>()
         val requestDTO = Gson().fromJson(dataObj, TBSuspectedRequestDTO::class.java)
-        requestDTO?.tbSuspectedList?.forEach { tbSuspectedDTO ->
-            tbSuspectedDTO.visitDate?.let {
-                val matchedByVisitDate: TBSuspectedCache? =
-                    tbDao.getTbSuspected(
-                        tbSuspectedDTO.benId,
-                        getLongFromDate(tbSuspectedDTO.visitDate),
-                        getLongFromDate(tbSuspectedDTO.visitDate) - 19_800_000
-                    )
-                val tbSuspectedCache = matchedByVisitDate ?: tbDao.getTbSuspected(tbSuspectedDTO.benId)
-                val cache = tbSuspectedDTO.toCache().let { incoming ->
-                    tbSuspectedCache?.copy(
-                        visitDate = incoming.visitDate,
-                        visitLabel = incoming.visitLabel,
-                        typeOfTBCase = incoming.typeOfTBCase,
-                        reasonForSuspicion = incoming.reasonForSuspicion,
-                        hasSymptoms = incoming.hasSymptoms,
-                        isSputumCollected = incoming.isSputumCollected,
-                        sputumSubmittedAt = incoming.sputumSubmittedAt,
-                        nikshayId = incoming.nikshayId,
-                        sputumTestResult = incoming.sputumTestResult,
-                        isChestXRayDone = incoming.isChestXRayDone,
-                        chestXRayResult = incoming.chestXRayResult,
-                        isAICoughAssessmentDone = incoming.isAICoughAssessmentDone,
-                        aiCoughAssessmentResult = incoming.aiCoughAssessmentResult,
-                        isNaatConducted = incoming.isNaatConducted,
-                        naatResult = incoming.naatResult,
-                        recommendedForLiquidCultureTest = incoming.recommendedForLiquidCultureTest,
-                        isLiquidCultureConducted = incoming.isLiquidCultureConducted,
-                        liquidCultureResult = incoming.liquidCultureResult,
-                        referralFacility = incoming.referralFacility,
-                        isTBConfirmed = incoming.isTBConfirmed,
-                        isDRTBConfirmed = incoming.isDRTBConfirmed,
-                        otherReasonForSuspicion = incoming.otherReasonForSuspicion,
-                        isConfirmed = incoming.isConfirmed,
-                        latitude = incoming.latitude,
-                        longitude = incoming.longitude,
-                        address = incoming.address,
-                        referred = incoming.referred,
-                        followUps = incoming.followUps,
-                        serverUpdatedDate = incoming.serverUpdatedDate,
-                        syncState = SyncState.SYNCED
-                    ) ?: incoming
-                }
-                val shouldApply = shouldApplyServerRecord(
-                    tbSuspectedCache?.syncState,
-                    tbSuspectedCache?.serverUpdatedDate,
-                    cache.serverUpdatedDate ?: 0L
-                )
-                Timber.d("SYNC_DIAG TB Suspected pull: benId=${tbSuspectedDTO.benId} serverId=${tbSuspectedDTO.id} matchedLocalId=${tbSuspectedCache?.id} localSyncState=${tbSuspectedCache?.syncState} localServerUpdatedDate=${tbSuspectedCache?.serverUpdatedDate} incomingServerUpdatedDate=${cache.serverUpdatedDate} shouldApply=$shouldApply")
-                if (shouldApply) {
-                    benDao.getBen(tbSuspectedDTO.benId)?.let {
-                        tbDao.saveTbSuspected(cache)
-                        tbSuspectedList.add(cache)
+        database.withTransaction {
+            requestDTO?.tbSuspectedList?.forEach { tbSuspectedDTO ->
+                tbSuspectedDTO.visitDate?.let {
+                    val matchedByVisitDate: TBSuspectedCache? =
+                        tbDao.getTbSuspected(
+                            tbSuspectedDTO.benId,
+                            getLongFromDate(tbSuspectedDTO.visitDate),
+                            getLongFromDate(tbSuspectedDTO.visitDate) - 19_800_000
+                        )
+                    val tbSuspectedCache = matchedByVisitDate ?: tbDao.getTbSuspected(tbSuspectedDTO.benId)
+                    val cache = tbSuspectedDTO.toCache().let { incoming ->
+                        tbSuspectedCache?.copy(
+                            visitDate = incoming.visitDate,
+                            visitLabel = incoming.visitLabel,
+                            typeOfTBCase = incoming.typeOfTBCase,
+                            reasonForSuspicion = incoming.reasonForSuspicion,
+                            hasSymptoms = incoming.hasSymptoms,
+                            isSputumCollected = incoming.isSputumCollected,
+                            sputumSubmittedAt = incoming.sputumSubmittedAt,
+                            nikshayId = incoming.nikshayId,
+                            sputumTestResult = incoming.sputumTestResult,
+                            isChestXRayDone = incoming.isChestXRayDone,
+                            chestXRayResult = incoming.chestXRayResult,
+                            isAICoughAssessmentDone = incoming.isAICoughAssessmentDone,
+                            aiCoughAssessmentResult = incoming.aiCoughAssessmentResult,
+                            isNaatConducted = incoming.isNaatConducted,
+                            naatResult = incoming.naatResult,
+                            recommendedForLiquidCultureTest = incoming.recommendedForLiquidCultureTest,
+                            isLiquidCultureConducted = incoming.isLiquidCultureConducted,
+                            liquidCultureResult = incoming.liquidCultureResult,
+                            referralFacility = incoming.referralFacility,
+                            isTBConfirmed = incoming.isTBConfirmed,
+                            isDRTBConfirmed = incoming.isDRTBConfirmed,
+                            otherReasonForSuspicion = incoming.otherReasonForSuspicion,
+                            isConfirmed = incoming.isConfirmed,
+                            latitude = incoming.latitude,
+                            longitude = incoming.longitude,
+                            address = incoming.address,
+                            referred = incoming.referred,
+                            followUps = incoming.followUps,
+                            serverUpdatedDate = incoming.serverUpdatedDate,
+                            syncState = SyncState.SYNCED
+                        ) ?: incoming
                     }
-                } else if (tbSuspectedCache != null && tbSuspectedCache.syncState != SyncState.SYNCED) {
-                    Timber.w("SYNC_DIAG TB Suspected pull: benId=${tbSuspectedDTO.benId} server already has this record (serverId=${tbSuspectedDTO.id}) but local id=${tbSuspectedCache.id} is stuck at syncState=${tbSuspectedCache.syncState} — reconciliation SKIPPED, will remain unsynced until a push of this local row succeeds")
+                    val shouldApply = shouldApplyServerRecord(
+                        tbSuspectedCache?.syncState,
+                        tbSuspectedCache?.serverUpdatedDate,
+                        cache.serverUpdatedDate ?: 0L
+                    )
+                    Timber.d("SYNC_DIAG TB Suspected pull: benId=${tbSuspectedDTO.benId} serverId=${tbSuspectedDTO.id} matchedLocalId=${tbSuspectedCache?.id} localSyncState=${tbSuspectedCache?.syncState} localServerUpdatedDate=${tbSuspectedCache?.serverUpdatedDate} incomingServerUpdatedDate=${cache.serverUpdatedDate} shouldApply=$shouldApply")
+                    if (shouldApply) {
+                        benDao.getBen(tbSuspectedDTO.benId)?.let {
+                            tbDao.saveTbSuspected(cache)
+                            tbSuspectedList.add(cache)
+                        }
+                    } else if (tbSuspectedCache != null && tbSuspectedCache.syncState != SyncState.SYNCED) {
+                        Timber.w("SYNC_DIAG TB Suspected pull: benId=${tbSuspectedDTO.benId} server already has this record (serverId=${tbSuspectedDTO.id}) but local id=${tbSuspectedCache.id} is stuck at syncState=${tbSuspectedCache.syncState} — reconciliation SKIPPED, will remain unsynced until a push of this local row succeeds")
+                    }
                 }
             }
         }
@@ -1006,31 +1016,33 @@ class TBRepo @Inject constructor(
             val requestDTO = Gson().fromJson(dataObj, TBConfirmedRequestDTO::class.java)
 
 
-            requestDTO?.tbConfirmedList?.forEachIndexed { index, tbConfirmedDTO ->
+            database.withTransaction {
+                requestDTO?.tbConfirmedList?.forEachIndexed { index, tbConfirmedDTO ->
 
 
-                try {
-                    val cache = tbConfirmedDTO.toCache()
-                    // Get all existing follow-ups for this ben
-                    val allExisting = tbDao.getAllFollowUpsForBeneficiary(cache.benId)
-                    // Find exact match by followUpDate
-                    val existing = allExisting.find {
-                        it.followUpDate != null &&
-                                cache.followUpDate != null &&
-                                it.followUpDate == cache.followUpDate
+                    try {
+                        val cache = tbConfirmedDTO.toCache()
+                        // Get all existing follow-ups for this ben
+                        val allExisting = tbDao.getAllFollowUpsForBeneficiary(cache.benId)
+                        // Find exact match by followUpDate
+                        val existing = allExisting.find {
+                            it.followUpDate != null &&
+                                    cache.followUpDate != null &&
+                                    it.followUpDate == cache.followUpDate
+                        }
+                        if (shouldApplyServerRecord(
+                                existing?.syncState,
+                                existing?.serverUpdatedDate,
+                                cache.serverUpdatedDate ?: 0L
+                            )
+                        ) {
+                            val cacheToSave = if (existing != null) cache.copy(id = existing.id) else cache
+                            tbDao.saveTbConfirmed(cacheToSave)
+                            tbConfirmedList.add(cacheToSave)
+                        }
+
+                    } catch (e: Exception) {
                     }
-                    if (shouldApplyServerRecord(
-                            existing?.syncState,
-                            existing?.serverUpdatedDate,
-                            cache.serverUpdatedDate ?: 0L
-                        )
-                    ) {
-                        val cacheToSave = if (existing != null) cache.copy(id = existing.id) else cache
-                        tbDao.saveTbConfirmed(cacheToSave)
-                        tbConfirmedList.add(cacheToSave)
-                    }
-
-                } catch (e: Exception) {
                 }
             }
 
