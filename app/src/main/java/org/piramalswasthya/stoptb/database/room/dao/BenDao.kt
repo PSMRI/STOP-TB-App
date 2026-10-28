@@ -1075,10 +1075,12 @@ interface BenDao {
     @Query("SELECT * FROM BENEFICIARY WHERE isDraft = 0 AND processed = 'U' AND syncState =:unsynced")
     suspend fun getAllBenForSyncWithServer(unsynced: SyncState = SyncState.UNSYNCED): List<BenRegCache>
 
-    @Query("UPDATE BENEFICIARY SET processed = 'P' , syncState = 2 WHERE beneficiaryId in (:benId)")
+    // Only rows still SYNCING are touched: a row edited while its upload was in
+    // flight is back to UNSYNCED and must stay queued for the next push.
+    @Query("UPDATE BENEFICIARY SET processed = 'P' , syncState = 2 WHERE beneficiaryId in (:benId) AND syncState = 1")
     suspend fun benSyncedWithServer(vararg benId: Long)
 
-    @Query("UPDATE BENEFICIARY SET processed = 'U' , syncState = 0 WHERE beneficiaryId in (:benId)")
+    @Query("UPDATE BENEFICIARY SET processed = 'U' , syncState = 0 WHERE beneficiaryId in (:benId) AND syncState = 1")
     suspend fun benSyncWithServerFailed(vararg benId: Long)
 
     @Query("SELECT beneficiaryId FROM BENEFICIARY WHERE beneficiaryId IN (:list)")
