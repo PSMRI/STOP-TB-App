@@ -221,6 +221,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     override fun onCreate(savedInstanceState: Bundle?) {
         TapjackingProtectionHelper.applyWindowSecurity(this)
         super.onCreate(savedInstanceState)
+        WorkerUtils.scheduleSyncHeartbeat(applicationContext)
         // Resolve assigned/active role for this cold start. Always resets to the first
         // assigned role — no persistence across app restarts, by design.
         roleManager.initializeFromLoggedInUser()

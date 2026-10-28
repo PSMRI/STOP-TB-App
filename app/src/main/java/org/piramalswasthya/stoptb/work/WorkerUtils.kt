@@ -7,11 +7,13 @@ import androidx.lifecycle.MutableLiveData
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.Data
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.Operation
 import androidx.work.OutOfQuotaPolicy
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkContinuation
 import androidx.work.WorkManager
@@ -29,6 +31,8 @@ object WorkerUtils {
     const val pushWorkerUniqueName = "PUSH-TO-AMRIT"
     const val pullWorkerUniqueName = "PULL-FROM-AMRIT"
     const val syncGateUniqueName = "SYNC-GATE"
+    const val syncHeartbeatUniqueName = "SYNC-HEARTBEAT"
+    private const val syncHeartbeatIntervalMinutes = 15L
     const val pullTriggerSourceKey = "pull_trigger_source"
     const val pullStartedAtKey = "pull_started_at"
     const val campAutoPullIntervalMs = 10_000L
@@ -114,6 +118,21 @@ object WorkerUtils {
             syncGateUniqueName,
             ExistingWorkPolicy.REPLACE,
             gate
+        )
+    }
+
+    // Schedules SyncHeartbeatWorker every 15 minutes (the WorkManager minimum) so
+    // unsynced records keep being retried without user action. KEEP makes repeat
+    // calls cheap; logout cancels all work and the next app start or login
+    // screen schedules it again.
+    fun scheduleSyncHeartbeat(context: Context) {
+        val request = PeriodicWorkRequestBuilder<SyncHeartbeatWorker>(
+            syncHeartbeatIntervalMinutes, TimeUnit.MINUTES
+        ).setConstraints(networkOnlyConstraint).build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            syncHeartbeatUniqueName,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
         )
     }
 

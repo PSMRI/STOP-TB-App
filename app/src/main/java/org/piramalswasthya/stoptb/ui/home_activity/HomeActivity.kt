@@ -265,6 +265,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
 //        FirebaseMessaging.getInstance().subscribeToTopic("ANC${pref.getLoggedInUser()?.userId}")
 //        FirebaseMessaging.getInstance().subscribeToTopic("Immunization${pref.getLoggedInUser()?.userId}")
         super.onCreate(savedInstanceState)
+        WorkerUtils.scheduleSyncHeartbeat(applicationContext)
         _binding = ActivityHomeBinding.inflate(layoutInflater)
 
         TapjackingProtectionHelper.enableTouchFiltering(this)
