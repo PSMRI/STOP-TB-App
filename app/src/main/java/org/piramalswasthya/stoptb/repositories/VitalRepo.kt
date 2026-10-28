@@ -15,6 +15,7 @@ import org.piramalswasthya.stoptb.network.GeneralExaminationGetRequest
 import org.piramalswasthya.stoptb.network.GeneralExaminationRecord
 import org.piramalswasthya.stoptb.network.GeneralExaminationSaveRequest
 import timber.log.Timber
+import java.io.IOException
 import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -50,7 +51,13 @@ class VitalRepo @Inject constructor(
 
             vitalDao.saveVitals(localData)
 
-            val synced = pushSingleVital(localData)
+            // Network failures leave the record UNSYNCED for the background push.
+            val synced = try {
+                pushSingleVital(localData)
+            } catch (e: IOException) {
+                Timber.w(e, "Vital push deferred to background sync for benId=%s", localData.benId)
+                false
+            }
 
             if (synced) {
                 vitalDao.markSyncedIfUnchanged(localData)
@@ -196,7 +203,9 @@ class VitalRepo @Inject constructor(
         }
     }
 
-    private suspend fun pushSingleVital(vitalCache: VitalCache): Boolean {
+    // Network failures (IOException) propagate so the push worker retries with
+    // backoff. A token refresh is retried at most once.
+    private suspend fun pushSingleVital(vitalCache: VitalCache, retriedAfterRefresh: Boolean = false): Boolean {
         val user = preferenceDao.getLoggedInUser() ?: return false
 
         return try {
@@ -216,8 +225,8 @@ class VitalRepo @Inject constructor(
                 200 -> true
 
                 401, 5002 -> {
-                    if (userRepo.refreshTokenTmc(user.userName, user.password)) {
-                        pushSingleVital(vitalCache)
+                    if (!retriedAfterRefresh && userRepo.refreshTokenTmc(user.userName, user.password)) {
+                        pushSingleVital(vitalCache, retriedAfterRefresh = true)
                     } else {
                         false
                     }
@@ -226,16 +235,11 @@ class VitalRepo @Inject constructor(
                 else -> false
             }
 
-        } catch (e: SocketTimeoutException) {
-            if (e.message == "Refreshed Token") {
-                pushSingleVital(vitalCache)
-            } else {
-                false
-            }
-
+        } catch (e: IOException) {
+            throw e
         } catch (e: Exception) {
-            if (shouldRetryWithRefresh(e, user.userName, user.password)) {
-                pushSingleVital(vitalCache)
+            if (!retriedAfterRefresh && shouldRetryWithRefresh(e, user.userName, user.password)) {
+                pushSingleVital(vitalCache, retriedAfterRefresh = true)
             } else {
                 Timber.e(e, "Vital sync failed for benId=%s", vitalCache.benId)
                 false
