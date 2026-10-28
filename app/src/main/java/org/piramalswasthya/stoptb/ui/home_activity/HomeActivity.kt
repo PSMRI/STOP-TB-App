@@ -198,17 +198,20 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
     }
 
 
-    private val logoutAlert by lazy {
+    // Built each time it is shown so the unsynced count is current (it used to be
+    // fixed at the value from the first time the dialog was opened).
+    private fun buildLogoutAlert(): androidx.appcompat.app.AlertDialog {
         var str = ""
-        if (viewModel.unprocessedRecordsCount.value!! > 0) {
-            str += viewModel.unprocessedRecordsCount.value!!
+        val unprocessed = viewModel.unprocessedRecordsCount.value ?: 0
+        if (unprocessed > 0) {
+            str += unprocessed
             str += resources.getString(R.string.not_processed)
         } else {
             str += resources.getString(R.string.all_records_synced)
         }
         str += resources.getString(R.string.are_you_sure_to_logout)
 
-        MaterialAlertDialogBuilder(this).setTitle(resources.getString(R.string.logout))
+        return MaterialAlertDialogBuilder(this).setTitle(resources.getString(R.string.logout))
             .setMessage(str)
             .setPositiveButton(resources.getString(R.string.yes)) { dialog, _ ->
                 viewModel.logout()
@@ -783,7 +786,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
 
         }
         binding.navView.menu.findItem(R.id.menu_logout).setOnMenuItemClickListener {
-            logoutAlert.show()
+            buildLogoutAlert().show()
             true
 
         }
