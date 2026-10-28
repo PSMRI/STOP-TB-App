@@ -3,6 +3,8 @@ package org.piramalswasthya.stoptb.repositories.dynamicRepo
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.room.withTransaction
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.model.dynamicEntity.*
 import org.piramalswasthya.stoptb.network.AmritApiService
@@ -374,7 +376,15 @@ class CounsellingRepositoryImpl @Inject constructor(
         return SectionClassification(finalSectionId, nonFinalSectionIdsInOrder)
     }
 
-    override suspend fun syncUnsyncedRecords(): Boolean {
+    // Serializes syncUnsyncedRecords(): it runs from CounsellingSyncWorker (on save)
+    // and from the push chain, and overlapping runs would POST the same responses twice.
+    private val syncMutex = Mutex()
+
+    override suspend fun syncUnsyncedRecords(): Boolean = syncMutex.withLock {
+        syncUnsyncedRecordsLocked()
+    }
+
+    private suspend fun syncUnsyncedRecordsLocked(): Boolean {
         Timber.d("syncUnsyncedRecords: querying all local form responses for debugging...")
         val allResponses = responseDao.getAllFormResponses()
         val allDetails = allResponses.map {
