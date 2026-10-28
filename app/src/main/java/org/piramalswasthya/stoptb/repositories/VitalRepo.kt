@@ -53,7 +53,7 @@ class VitalRepo @Inject constructor(
             val synced = pushSingleVital(localData)
 
             if (synced) {
-                vitalDao.saveVitals(localData.copy(syncState = SyncState.SYNCED))
+                vitalDao.markSyncedIfUnchanged(localData)
             }
 
             synced
@@ -71,7 +71,7 @@ class VitalRepo @Inject constructor(
             vitals.forEach { vital ->
                 val synced = pushSingleVital(vital)
                 if (synced) {
-                    vitalDao.saveVitals(vital.copy(syncState = SyncState.SYNCED))
+                    vitalDao.markSyncedIfUnchanged(vital)
                     successCount += 1
                 } else {
                     failCount += 1
