@@ -294,17 +294,21 @@ class TBConfirmedDataset(
 
                     if (saved.treatmentOutcome != null) {
                         baseList.add(treatmentOutcome)
-                        baseList.add(remarks)
+                    }
 
-                        if (treatmentOutcome.value == treatmentOutcome.entries!![1]) {
-                            baseList.addAll(
-                                listOf(
-                                    dateOfDeath,
-                                    placeOfDeath,
-                                    reasonForDeath
-                                )
+                    // Remarks is independent of the outcome, so it is always shown
+                    baseList.add(remarks)
+
+                    if (saved.treatmentOutcome != null &&
+                        treatmentOutcome.value == treatmentOutcome.entries!![1]
+                    ) {
+                        baseList.addAll(
+                            listOf(
+                                dateOfDeath,
+                                placeOfDeath,
+                                reasonForDeath
                             )
-                        }
+                        )
                     }
                 } else {
                     baseList.add(reasonForNotCompleting)
