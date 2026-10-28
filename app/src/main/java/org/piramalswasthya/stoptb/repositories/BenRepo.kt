@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.repositories
 import android.app.Application
 import android.net.Uri
 import android.widget.Toast
+import androidx.room.withTransaction
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CancellationException
@@ -862,22 +863,17 @@ class BenRepo @Inject constructor(
 
                                 val pageSize = getResponseTotalPage(jsonObj)
 
-                                try {
-
-
-                                    householdDao.upsert(
-                                        *getHouseholdCacheFromServerResponse(
-                                            responseString
-                                        ).toTypedArray()
-                                    )
+                                val householdCacheList = try {
+                                    getHouseholdCacheFromServerResponse(responseString)
                                 } catch (e: Exception) {
-                                    Timber.d("HouseHold entries not synced $e")
+                                    Timber.e(e, "Pull page $pageNumber: household entries not parsed")
+                                    emptyList()
                                 }
 
                                 val benCacheList =
                                     getBenCacheFromServerResponse(responseString)
 
-                                upsertServerBeneficiariesSafely(benCacheList)
+                                saveServerPage(householdCacheList, benCacheList)
 
                                 Timber.d("GeTBenDataList: $pageSize")
 
@@ -935,13 +931,37 @@ class BenRepo @Inject constructor(
         }
     }
 
-    private suspend fun upsertServerBeneficiariesSafely(benCacheList: List<BenRegCache>) {
-        benCacheList.forEach { serverBen ->
-            val existingBen = benDao.getBen(serverBen.beneficiaryId)
-            if (existingBen != null) {
-                benDao.updateBen(serverBen)
-            } else {
-                benDao.upsert(serverBen)
+    // Saves one pulled page. Rows are re-checked inside the transaction because
+    // a push or a user edit can change them between parsing and writing: a
+    // beneficiary that is not SYNCED, or a household that is not processed or
+    // has any member not SYNCED, has local work and is left untouched.
+    private suspend fun saveServerPage(
+        householdCacheList: List<HouseholdCache>,
+        benCacheList: List<BenRegCache>
+    ) {
+        db.withTransaction {
+            householdCacheList.forEach { serverHh ->
+                val existingHh = householdDao.getHousehold(serverHh.householdId)
+                val hasLocalWork = existingHh != null && (existingHh.processed != "P" ||
+                        benDao.countNotSyncedInHousehold(serverHh.householdId) > 0)
+                if (hasLocalWork) {
+                    Timber.d("Pull: household ${serverHh.householdId} has local changes, not overwritten")
+                } else {
+                    try {
+                        householdDao.upsert(serverHh)
+                    } catch (e: Exception) {
+                        Timber.e(e, "Pull: household ${serverHh.householdId} not saved")
+                    }
+                }
+            }
+            benCacheList.forEach { serverBen ->
+                val existingBen = benDao.getBen(serverBen.beneficiaryId)
+                when {
+                    existingBen == null -> benDao.upsert(serverBen)
+                    existingBen.syncState != SyncState.SYNCED ->
+                        Timber.d("Pull: beneficiary ${serverBen.beneficiaryId} has local changes, not overwritten")
+                    else -> benDao.updateBen(serverBen)
+                }
             }
         }
     }
@@ -2295,8 +2315,8 @@ class BenRepo @Inject constructor(
                                     serverBen.isDeath != existingBen.isDeath ||
                                     serverBen.contactNumber != existingBen.contactNumber
 
-                            if (existingBen.syncState == SyncState.UNSYNCED) {
-                                // Local has unpushed edits — don't overwrite with server data
+                            if (existingBen.syncState != SyncState.SYNCED) {
+                                // Local has unpushed edits or is mid-push: don't overwrite with server data
                                 nikshayIdValue?.takeIf { it.isNotBlank() && it != existingBen.nikshayId }?.let {
                                     benDao.updateNikshayId(benId, it)
                                 }

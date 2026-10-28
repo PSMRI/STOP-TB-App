@@ -1573,6 +1573,9 @@ interface BenDao {
     @Query("UPDATE BENEFICIARY SET syncState = 0 WHERE syncState = 1")
     suspend fun resetSyncingToUnsynced()
 
+    @Query("SELECT COUNT(*) FROM BENEFICIARY WHERE householdId = :hhId AND syncState != 2")
+    suspend fun countNotSyncedInHousehold(hhId: Long): Int
+
     @Query("UPDATE BENEFICIARY SET processed = 'N', syncState = 0 WHERE isDraft = 0 AND syncState != 2 AND (beneficiaryId <= 0 OR benRegId <= 0)")
     suspend fun requeueTempBeneficiariesForRegistration()
 
