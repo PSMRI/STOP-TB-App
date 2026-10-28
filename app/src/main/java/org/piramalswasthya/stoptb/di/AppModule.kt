@@ -10,6 +10,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import org.piramalswasthya.stoptb.BuildConfig
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.NcdReferalDao
 import org.piramalswasthya.stoptb.database.room.dao.ABHAGenratedDao
@@ -133,11 +134,10 @@ object AppModule {
     @Provides
     fun provideHttpLoggingInterceptor(): HttpLoggingInterceptor {
         val loggingInterceptor = HttpLoggingInterceptor(LoggingInterceptor()).apply {
-            level =
-                    //if (BuildConfig.DEBUG)
-                HttpLoggingInterceptor.Level.BODY
-            //else
-            //HttpLoggingInterceptor.Level.NONE
+            // Bodies carry beneficiary data; never log them in release builds,
+            // where SyncLogTree would send them to logcat and the exported sync log.
+            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
+            else HttpLoggingInterceptor.Level.NONE
         }
         return loggingInterceptor
     }

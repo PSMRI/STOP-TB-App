@@ -385,12 +385,6 @@ class CounsellingRepositoryImpl @Inject constructor(
     }
 
     private suspend fun syncUnsyncedRecordsLocked(): Boolean {
-        Timber.d("syncUnsyncedRecords: querying all local form responses for debugging...")
-        val allResponses = responseDao.getAllFormResponses()
-        val allDetails = allResponses.map {
-            "Response[id=${it.formResponse.responseId}, benId=${it.formResponse.beneficiaryId}, status=${it.formResponse.status}, syncStatus=${it.formResponse.syncStatus}, sectionsCount=${it.sectionResponses.size}]"
-        }
-        Timber.d("syncUnsyncedRecords: ALL records currently in DB: $allDetails")
 
         Timber.d("syncUnsyncedRecords: querying unsynced records...")
         val unsynced = responseDao.getUnsyncedFormResponsesForTypes(
@@ -496,12 +490,6 @@ class CounsellingRepositoryImpl @Inject constructor(
         logLabel: String
     ): Boolean {
         return try {
-            try {
-                val jsonPayload = com.google.gson.Gson().toJson(payload)
-                Timber.d("Amrit push complete payload ($logLabel): $jsonPayload")
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to serialize complete payload to JSON for logging ($logLabel)")
-            }
 
             val apiResponse = amritApiService.completeCounselling(authHeader, payload)
             val statusCode = apiResponse.code()

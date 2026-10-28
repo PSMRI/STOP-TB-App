@@ -700,14 +700,7 @@ class BenRepo @Inject constructor(
             counsellingDetails = null
         )
         try {
-            val jsonPayload = Gson().toJson(rmnchData)
-            Timber.d("Amrit push syncDataToAmrit payload JSON: $jsonPayload")
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to serialize rmnchData to JSON for logging")
-        }
-        try {
             val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
-            Log.d("Response final",response.toString())
             val statusCode = response.code()
             Timber.d("Amrit push syncDataToAmrit response: httpStatus=$statusCode")
 
@@ -719,7 +712,7 @@ class BenRepo @Inject constructor(
                     val responseStatusCode = jsonObj.getInt("statusCode")
                     val errorMessage = jsonObj.optString("errorMessage", "")
                     if (responseStatusCode == 200) {
-                        Timber.d("Amrit push syncDataToAmrit success: $jsonObj")
+                        Timber.d("Amrit push syncDataToAmrit success: benIds=$benIds")
                         val benToUpdateList =
                             benNetworkPostSet.takeIf { it.isNotEmpty() }?.map { it.benId }
                                 ?.toTypedArray()?.toLongArray()
@@ -799,12 +792,6 @@ class BenRepo @Inject constructor(
             benNetworkPostList
         )
         try {
-            val jsonPayload = Gson().toJson(rmnchData)
-            Timber.d("deactivateHouseHold syncDataToAmrit payload JSON: $jsonPayload")
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to serialize deactivateHouseHold payload to JSON")
-        }
-        try {
             val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
             val statusCode = response.code()
 
@@ -816,7 +803,7 @@ class BenRepo @Inject constructor(
                     val responseStatusCode = jsonObj.getInt("statusCode")
                     val errorMessage = jsonObj.optString("errorMessage", "")
                     if (responseStatusCode == 200) {
-                        Timber.d("response : $jsonObj")
+                        Timber.d("response statusCode: $responseStatusCode")
                         WorkerUtils.triggerAmritPullWorker(context)
                         return true
                     } else if (responseStatusCode == 5002) {
@@ -865,12 +852,6 @@ class BenRepo @Inject constructor(
             benficieryRegistrationData= benNetworkPostList
         )
         try {
-            val jsonPayload = Gson().toJson(rmnchData)
-            Timber.d("deactivateBeneficiary syncDataToAmrit payload JSON: $jsonPayload")
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to serialize deactivateBeneficiary payload to JSON")
-        }
-        try {
             val response = tmcNetworkApiService.submitRmnchDataAmrit(rmnchData)
             val statusCode = response.code()
 
@@ -882,7 +863,7 @@ class BenRepo @Inject constructor(
                     val responseStatusCode = jsonObj.getInt("statusCode")
                     val errorMessage = jsonObj.optString("errorMessage", "")
                     if (responseStatusCode == 200) {
-                        Timber.d("response : $jsonObj")
+                        Timber.d("response statusCode: $responseStatusCode")
                         WorkerUtils.triggerAmritPullWorker(context)
                         return true
                     } else if (responseStatusCode == 5002) {
@@ -939,7 +920,6 @@ class BenRepo @Inject constructor(
 
                 if (statusCode == 200) {
                     val responseString = response.body()?.string()
-                    Timber.d("PULL_HH_DEBUG: $responseString")
 
                     if (responseString != null) {
                         val jsonObj = JSONObject(responseString)
