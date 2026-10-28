@@ -23,6 +23,7 @@ import org.piramalswasthya.stoptb.database.room.dao.BeneficiaryIdsAvailDao
 import org.piramalswasthya.stoptb.database.room.dao.HouseholdDao
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.FormResponseJsonDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
 import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.database.room.InAppDb
@@ -32,6 +33,7 @@ import org.piramalswasthya.stoptb.model.getPlaceOfCurrentLivingIndex
 import org.piramalswasthya.stoptb.model.getPlaceOfCurrentLivingCode
 import org.piramalswasthya.stoptb.network.*
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel
+import org.piramalswasthya.stoptb.utils.sync.BatchIsolation
 import org.piramalswasthya.stoptb.utils.Log
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
@@ -52,10 +54,15 @@ class BenRepo @Inject constructor(
     private val userRepo: UserRepo,
     private val tmcNetworkApiService: AmritApiService,
     private val formResponseJsonDao: FormResponseJsonDao,
-    private val db: InAppDb
+    private val db: InAppDb,
+    private val syncRetryStore: SyncRetryStore
 ) {
 
     private val processNewBenMutex = Mutex()
+
+    // Last server rejection message from the beneficiary push, kept for the
+    // retry store. Only written under processNewBenMutex.
+    private var lastBenUploadError: String? = null
 
     companion object {
         private const val DEFAULT_OFFICER_ID = 501L
@@ -520,6 +527,7 @@ class BenRepo @Inject constructor(
                     return true
                 }
                 Timber.e("Amrit push beneficiary registration failed: statusCode=$responseStatusCode, error=$errorMessage, benId=${ben.beneficiaryId}")
+                lastBenUploadError = "statusCode=$responseStatusCode: $errorMessage"
                 if (responseStatusCode == 5002 || responseStatusCode == 401) {
                     if (userRepo.refreshTokenTmc(
                             user.userName, user.password
@@ -528,6 +536,7 @@ class BenRepo @Inject constructor(
                 }
             } else {
                 Timber.e("Amrit push beneficiary registration failed: response body is null, httpStatus=$statusCode, benId=${ben.beneficiaryId}")
+                lastBenUploadError = "HTTP $statusCode, empty response"
             }
             throw IllegalStateException("Response undesired!")
         } catch (se: SocketTimeoutException) {
@@ -557,52 +566,111 @@ class BenRepo @Inject constructor(
             val benList = benDao.getAllUnprocessedBen()
             Timber.d("YTR 419 $benList")
 
-            val benNetworkPostList = mutableSetOf<BenPost>()
-            val householdNetworkPostList = mutableSetOf<HouseholdNetwork>()
-            val kidNetworkPostList = mutableSetOf<BenRegKidNetwork>()
-
+            // Registration is already one request per beneficiary, so a rejected
+            // one never blocks the others; failures are recorded for visibility.
+            var registered = 0
             benList.forEach {
+                val tempId = it.beneficiaryId
+                lastBenUploadError = null
                 val idGenerated = createBenIdAtServerByBeneficiarySending(it, user, it.locationRecord)
-                if (!idGenerated) {
+                if (idGenerated) {
+                    registered++
+                    syncRetryStore.clear(SyncRetryStore.ENTITY_REGISTRATION, listOf(tempId))
+                } else {
+                    syncRetryStore.recordFailure(
+                        SyncRetryStore.ENTITY_REGISTRATION, tempId,
+                        lastBenUploadError ?: "Registration rejected by server", backoff = false
+                    )
                     Timber.w("Amrit push beneficiary registration pending retry: benId=${it.beneficiaryId}, benRegId=${it.benRegId}, hhId=${it.householdId}")
                 }
-                Timber.d("YTR 429 $it")
             }
 
-            val updateBenList = benDao.getAllBenForSyncWithServer()
-            updateBenList.forEach {
+            val readyBens = benDao.getAllBenForSyncWithServer().filter {
                 if (it.beneficiaryId <= 0L || it.benRegId <= 0L) {
                     benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.UNSYNCED)
                     Timber.w("Skipping beneficiary final sync until real IDs are available: benId=${it.beneficiaryId}, benRegId=${it.benRegId}, hhId=${it.householdId}")
-                    return@forEach
-                }
-                benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.SYNCING)
-                val household = it.householdId?.let { hhId -> if (hhId > 0L) householdDao.getHousehold(hhId) else null }
-                benNetworkPostList.add(it.asNetworkPostModel(context, user, household))
-                household?.let { hh ->
-                    householdNetworkPostList.add(hh.asNetworkModel(user))
-                }
-                try {
-                    if (it.ageUnitId != 3 || it.age < 15) kidNetworkPostList.add(
-                        it.asKidNetworkModel(user)
-                    )
-                } catch (e: Exception) {
-                    Timber.e("caught error in adding kidDetails : $e")
-                }
+                    false
+                } else true
             }
 
-            val uploadDone = postDataToAmritServer(benNetworkPostList, householdNetworkPostList, kidNetworkPostList)
-            if (!uploadDone) {
-                benNetworkPostList.takeIf { it.isNotEmpty() }?.map { it.benId }?.let {
-                    benDao.benSyncWithServerFailed(*it.toLongArray())
-                }
-                Timber.e("Beneficiary batch push FAILED: ${benNetworkPostList.size} ben records, ${householdNetworkPostList.size} household records")
-            } else {
-                Timber.d("Beneficiary batch push succeeded: ${benNetworkPostList.size} ben records, ${householdNetworkPostList.size} household records")
+            // A beneficiary is sent together with its household and kid record;
+            // a household's members form one group, which is accepted or
+            // rejected as a unit. Groups with a rejected member that is still
+            // waiting out its retry delay sit this cycle out (they stay UNSYNCED).
+            val groups = readyBens.groupBy { it.householdId?.takeIf { hh -> hh > 0L } ?: -it.beneficiaryId }
+                .values.map { members -> buildUploadGroup(members, user) }
+            val (waiting, due) = groups.partition { g ->
+                g.benIds.any { syncRetryStore.isWaiting(SyncRetryStore.ENTITY_BENEFICIARY, it) }
             }
-            return@withContext uploadDone
+            if (waiting.isNotEmpty()) {
+                Timber.w("Beneficiary push: ${waiting.size} group(s) waiting to retry: ${waiting.flatMap { it.benIds }}")
+            }
+            due.forEach { g -> g.members.forEach { benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.SYNCING) } }
+
+            // New records go as one batch; records that were rejected before are
+            // retried one group at a time so they can't hold the batch back.
+            val (retrying, fresh) = due.partition { g ->
+                g.benIds.any { syncRetryStore.contains(SyncRetryStore.ENTITY_BENEFICIARY, it) }
+            }
+            val outcomes = listOf(BatchIsolation.send(fresh) { postUploadGroups(it) }) +
+                    retrying.map { g -> BatchIsolation.send(listOf(g)) { postUploadGroups(it) } }
+            val sent = outcomes.flatMap { it.sent }
+            val rejected = outcomes.flatMap { it.rejected }
+
+            sent.forEach { syncRetryStore.clear(SyncRetryStore.ENTITY_BENEFICIARY, it.benIds) }
+            if (sent.isNotEmpty() || registered > 0) {
+                // The server is accepting data: make every waiting record due again.
+                syncRetryStore.resetBackoff()
+            }
+            if (rejected.isNotEmpty()) {
+                val serverWide = sent.isEmpty()
+                val ids = rejected.flatMap { it.benIds }
+                benDao.benSyncWithServerFailed(*ids.toLongArray())
+                ids.forEach {
+                    syncRetryStore.recordFailure(
+                        SyncRetryStore.ENTITY_BENEFICIARY, it,
+                        lastBenUploadError ?: "Rejected by server", backoff = !serverWide
+                    )
+                }
+                Timber.e("Beneficiary push: ${rejected.size} group(s) rejected${if (serverWide) " (server rejected everything)" else ""}: $ids")
+            }
+            Timber.d("Beneficiary push: ${sent.size} group(s) sent, ${rejected.size} rejected, ${waiting.size} waiting")
+            return@withContext rejected.isEmpty()
         }
     }
+
+    private class UploadGroup(
+        val members: List<BenRegCache>,
+        val bens: List<BenPost>,
+        val households: List<HouseholdNetwork>,
+        val kids: List<BenRegKidNetwork>,
+    ) {
+        val benIds: List<Long> get() = members.map { it.beneficiaryId }
+    }
+
+    private suspend fun buildUploadGroup(members: List<BenRegCache>, user: User): UploadGroup {
+        val bens = mutableListOf<BenPost>()
+        val households = mutableSetOf<HouseholdNetwork>()
+        val kids = mutableListOf<BenRegKidNetwork>()
+        members.forEach {
+            val household = it.householdId?.let { hhId -> if (hhId > 0L) householdDao.getHousehold(hhId) else null }
+            bens.add(it.asNetworkPostModel(context, user, household))
+            household?.let { hh -> households.add(hh.asNetworkModel(user)) }
+            try {
+                if (it.ageUnitId != 3 || it.age < 15) kids.add(it.asKidNetworkModel(user))
+            } catch (e: Exception) {
+                Timber.e("caught error in adding kidDetails : $e")
+            }
+        }
+        return UploadGroup(members, bens, households.toList(), kids)
+    }
+
+    private suspend fun postUploadGroups(groups: List<UploadGroup>): Boolean =
+        postDataToAmritServer(
+            groups.flatMap { it.bens }.toMutableSet(),
+            groups.flatMap { it.households }.toMutableSet(),
+            groups.flatMap { it.kids }.toMutableSet(),
+        )
 
     private suspend fun postDataToAmritServer(
         benNetworkPostSet: MutableSet<BenPost>,
@@ -666,11 +734,14 @@ class BenRepo @Inject constructor(
                         else throw IllegalStateException("User seems to be logged out and refresh token not working!!!!")
                     }
                     Timber.e("Amrit push syncDataToAmrit failed: statusCode=$responseStatusCode, error=$errorMessage")
+                    lastBenUploadError = "statusCode=$responseStatusCode: $errorMessage"
                 } else {
                     Timber.e("Amrit push syncDataToAmrit failed: response body is null, httpStatus=$statusCode")
+                    lastBenUploadError = "HTTP $statusCode, empty response"
                 }
             }
             Timber.w("Amrit push syncDataToAmrit bad response: httpStatus=$statusCode, benIds=$benIds")
+            if (statusCode != 200) lastBenUploadError = "HTTP $statusCode"
             return false
         } catch (e: SocketTimeoutException) {
             // "Refreshed Token!" is thrown above after a successful token refresh;
@@ -686,9 +757,16 @@ class BenRepo @Inject constructor(
             throw e
         } catch (e: JSONException) {
             Timber.e("Amrit push syncDataToAmrit JSON error: benIds=$benIds, error=$e")
+            lastBenUploadError = "Unreadable server response"
             return false
         } catch (e: java.lang.Exception) {
+            if (e is IllegalStateException && e.message?.contains("logged out") == true) {
+                // Authentication failure, not a problem with these records: let the
+                // worker handle it instead of splitting the batch into more requests.
+                throw e
+            }
             Timber.e("Amrit push syncDataToAmrit error: benIds=$benIds, error=$e")
+            lastBenUploadError = e.message ?: e.javaClass.simpleName
             return false
         }
     }

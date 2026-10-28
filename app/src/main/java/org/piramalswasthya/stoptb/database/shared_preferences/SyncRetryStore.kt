@@ -56,8 +56,19 @@ class SyncRetryStore @Inject constructor(
 
     private val prefs get() = PreferenceManager.getInstance(context)
 
+    /**
+     * Records a rejection. With [backoff] false the record stays due on the next
+     * cycle; used when the server rejected everything, which points to a
+     * server-side problem rather than this record.
+     */
     @Synchronized
-    fun recordFailure(entity: String, id: Long, error: String, now: Long = System.currentTimeMillis()) {
+    fun recordFailure(
+        entity: String,
+        id: Long,
+        error: String,
+        backoff: Boolean = true,
+        now: Long = System.currentTimeMillis()
+    ) {
         val entries = load()
         val existing = entries[key(entity, id)]
         val attempts = (existing?.attempts ?: 0) + 1
@@ -67,7 +78,7 @@ class SyncRetryStore @Inject constructor(
             attempts = attempts,
             lastError = error.take(MAX_ERROR_LENGTH),
             firstFailedAt = existing?.firstFailedAt ?: now,
-            nextRetryAt = now + backoffMillis(attempts),
+            nextRetryAt = if (backoff) now + backoffMillis(attempts) else 0L,
             lastReportedAt = existing?.lastReportedAt ?: 0L,
         )
         save(entries)
