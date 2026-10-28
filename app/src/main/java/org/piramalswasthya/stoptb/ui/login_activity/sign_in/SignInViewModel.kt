@@ -19,8 +19,7 @@ import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.User
 import org.piramalswasthya.stoptb.repositories.UserRepo
 import org.piramalswasthya.stoptb.work.WorkerUtils
-import java.net.HttpURLConnection
-import java.net.URL
+import org.piramalswasthya.stoptb.utils.sync.CampHubReachability
 import javax.inject.Inject
 
 @HiltViewModel
@@ -157,24 +156,7 @@ class SignInViewModel @Inject constructor(
     }
 
     private suspend fun pingCampHub(rawUrl: String): Boolean = withContext(Dispatchers.IO) {
-        val baseUrl = rawUrl.trim().trimEnd('/')
-        val healthUrl = "$baseUrl/common-api/health"
-        var connection: HttpURLConnection? = null
-        runCatching {
-            Log.d(TAG, "Login health check started. url=$healthUrl")
-            connection = URL(healthUrl).openConnection() as HttpURLConnection
-            connection?.connectTimeout = 3000
-            connection?.readTimeout = 3000
-            connection?.requestMethod = "GET"
-            connection?.useCaches = false
-            val responseCode = connection?.responseCode ?: return@runCatching false
-            Log.d(TAG, "Login health check response. url=$healthUrl, code=$responseCode")
-            responseCode in 200..299
-        }.onFailure { error ->
-            Log.e(TAG, "Login health check failed. url=$healthUrl, error=${error.javaClass.simpleName}: ${error.message}", error)
-        }.also {
-            connection?.disconnect()
-        }.getOrDefault(false)
+        CampHubReachability.isReachable(rawUrl)
     }
 
     /**
