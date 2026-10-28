@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.map
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
@@ -19,8 +20,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.dao.SyncDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.SyncLogExporter
 import org.piramalswasthya.stoptb.helpers.SyncLogManager
@@ -42,6 +45,8 @@ class SyncDashboardViewModel @Inject constructor(
     private val syncLogManager: SyncLogManager,
     private val syncLogExporter: SyncLogExporter,
     private val roleManager: RoleManager,
+    private val syncRetryStore: SyncRetryStore,
+    private val database: InAppDb,
     application: Application
 ) : AndroidViewModel(application) {
 
@@ -84,6 +89,58 @@ class SyncDashboardViewModel @Inject constructor(
                     error = error
                 )
             }
+    }
+
+    // Records the server has not accepted yet. They stay UNSYNCED and are
+    // retried automatically; listed here so they are not invisible.
+    private val _needsAttention = MutableLiveData<List<FailedWorkerInfo>>(emptyList())
+    val needsAttention: LiveData<List<FailedWorkerInfo>> = _needsAttention
+
+    fun refreshNeedsAttention(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val now = System.currentTimeMillis()
+            val items = syncRetryStore.entries().map { e ->
+                FailedWorkerInfo(
+                    workerName = "${entityLabel(context, e.entity)} #${e.id}",
+                    error = context.getString(
+                        R.string.sync_dashboard_retry_detail,
+                        formatAge(context, now - e.firstFailedAt), e.attempts, e.lastError
+                    )
+                )
+            }.toMutableList()
+            val orphaned = database.counsellingFormResponseDao().countOrphanedTempIdResponses()
+            if (orphaned > 0) {
+                items += FailedWorkerInfo(
+                    workerName = context.getString(R.string.sync_dashboard_orphan_responses_title),
+                    error = context.getString(R.string.sync_dashboard_orphan_responses_detail, orphaned)
+                )
+            }
+            _needsAttention.postValue(items)
+        }
+    }
+
+    /** Makes every waiting record due now and starts a push. */
+    fun retryNow(context: Context) {
+        syncRetryStore.resetBackoff()
+        WorkerUtils.triggerAmritPushWorker(context.applicationContext)
+    }
+
+    private fun entityLabel(context: Context, entity: String): String = when (entity) {
+        SyncRetryStore.ENTITY_BENEFICIARY -> context.getString(R.string.sync_entity_beneficiary)
+        SyncRetryStore.ENTITY_REGISTRATION -> context.getString(R.string.sync_entity_registration)
+        SyncRetryStore.ENTITY_TB_DIAGNOSTICS -> context.getString(R.string.sync_entity_tb_diagnostics)
+        SyncRetryStore.ENTITY_TB_SUSPECTED -> context.getString(R.string.sync_entity_tb_suspected)
+        SyncRetryStore.ENTITY_TB_CONFIRMED -> context.getString(R.string.sync_entity_tb_confirmed)
+        else -> entity
+    }
+
+    private fun formatAge(context: Context, millis: Long): String {
+        val minutes = (millis / 60_000L).toInt().coerceAtLeast(0)
+        return when {
+            minutes < 60 -> context.getString(R.string.sync_dashboard_age_minutes, minutes)
+            minutes < 48 * 60 -> context.getString(R.string.sync_dashboard_age_hours, minutes / 60)
+            else -> context.getString(R.string.sync_dashboard_age_days, minutes / (24 * 60))
+        }
     }
 
     // Tab 2: Logs
