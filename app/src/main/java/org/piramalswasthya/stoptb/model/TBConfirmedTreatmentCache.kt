@@ -36,6 +36,7 @@ data class TBConfirmedTreatmentCache(
     var treatmentCompleted: Boolean? = null,
     var actualTreatmentCompletionDate: Long? = null,
     var treatmentOutcome: String? = null,
+    var remarks: String? = null,
     var dateOfDeath: Long? = null,
     var placeOfDeath: String? = null,
     var reasonForDeath: String = "Tuberculosis",
@@ -47,6 +48,7 @@ data class TBConfirmedTreatmentCache(
 ) : FormDataModel {
 
     fun toDTO(): TBConfirmedTreatmentDTO {
+        val isDied = treatmentOutcome == "Died" || treatmentOutcome == "Death"
         return TBConfirmedTreatmentDTO(
             id = 0,
             benId = benId,
@@ -60,9 +62,10 @@ data class TBConfirmedTreatmentCache(
             treatmentCompleted = treatmentCompleted,
             actualTreatmentCompletionDate = getDateTimeStringFromLong(actualTreatmentCompletionDate),
             treatmentOutcome = treatmentOutcome,
-            dateOfDeath = getDateTimeStringFromLong(dateOfDeath),
-            placeOfDeath = placeOfDeath,
-            reasonForDeath = reasonForDeath,
+            remarks = remarks,
+            dateOfDeath = if (isDied) getDateTimeStringFromLong(dateOfDeath) else null,
+            placeOfDeath = if (isDied) placeOfDeath else null,
+            reasonForDeath = if (isDied) reasonForDeath else null,
             reasonForNotCompleting = reasonForNotCompleting
         )
     }
