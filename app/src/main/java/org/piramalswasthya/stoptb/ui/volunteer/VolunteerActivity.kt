@@ -38,6 +38,7 @@ import dagger.hilt.components.SingletonComponent
 import org.piramalswasthya.stoptb.BuildConfig
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
 import org.piramalswasthya.stoptb.databinding.ActivityVolunteerBinding
 import org.piramalswasthya.stoptb.helpers.AutoFlowBackNavigationHost
 import org.piramalswasthya.stoptb.helpers.ImageUtils
@@ -76,6 +77,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
                 runOnUiThread {
                     refreshCampHubOfflineBanner()
                     if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
+                        syncRetryStore.resetBackoff()
                         WorkerUtils.triggerAmritPushWorker(applicationContext)
                         WorkerUtils.triggerCampQuickPullIfConnected(applicationContext, pref, force = true)
                     }
@@ -123,6 +125,9 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
 
     @Inject
     lateinit var pref: PreferenceDao
+
+    @Inject
+    lateinit var syncRetryStore: SyncRetryStore
 
     @Inject
     lateinit var roleManager: RoleManager
@@ -222,6 +227,8 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         TapjackingProtectionHelper.applyWindowSecurity(this)
         super.onCreate(savedInstanceState)
         WorkerUtils.scheduleSyncHeartbeat(applicationContext)
+        // Opening the app (including right after login) retries waiting records now.
+        syncRetryStore.resetBackoff()
         // Resolve assigned/active role for this cold start. Always resets to the first
         // assigned role — no persistence across app restarts, by design.
         roleManager.initializeFromLoggedInUser()

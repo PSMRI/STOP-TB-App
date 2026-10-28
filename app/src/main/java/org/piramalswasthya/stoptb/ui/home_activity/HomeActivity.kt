@@ -60,6 +60,7 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.BuildConfig
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
 import org.piramalswasthya.stoptb.helpers.AccountDeactivationManager
 import org.piramalswasthya.stoptb.helpers.TokenExpiryManager
 import org.piramalswasthya.stoptb.databinding.ActivityHomeBinding
@@ -102,6 +103,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
                 runOnUiThread {
                     refreshCampHubOfflineBanner()
                     if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
+                        syncRetryStore.resetBackoff()
                         WorkerUtils.triggerAmritPushWorker(applicationContext)
                         WorkerUtils.triggerCampQuickPullIfConnected(applicationContext, pref, force = true)
                     }
@@ -136,6 +138,9 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
 
     @Inject
     lateinit var pref: PreferenceDao
+
+    @Inject
+    lateinit var syncRetryStore: SyncRetryStore
 
     @Inject
     lateinit var accountDeactivationManager: AccountDeactivationManager
@@ -266,6 +271,8 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
 //        FirebaseMessaging.getInstance().subscribeToTopic("Immunization${pref.getLoggedInUser()?.userId}")
         super.onCreate(savedInstanceState)
         WorkerUtils.scheduleSyncHeartbeat(applicationContext)
+        // Opening the app (including right after login) retries waiting records now.
+        syncRetryStore.resetBackoff()
         _binding = ActivityHomeBinding.inflate(layoutInflater)
 
         TapjackingProtectionHelper.enableTouchFiltering(this)
