@@ -38,6 +38,7 @@ import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
 import java.io.File
 import java.lang.Long.min
+import java.io.IOException
 import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -474,8 +475,11 @@ class BenRepo @Inject constructor(
         benIdGenDao.insert(*benIdList.toTypedArray())
     }
 
+    // Network failures (IOException) propagate so the push worker retries with
+    // backoff. A token refresh is retried at most once.
     private suspend fun createBenIdAtServerByBeneficiarySending(
-        ben: BenRegCache, user: User, locationRecord: LocationRecord
+        ben: BenRegCache, user: User, locationRecord: LocationRecord,
+        retriedAfterRefresh: Boolean = false
     ): Boolean {
         val household = if (ben.householdId != null && ben.householdId!! > 0L) householdDao.getHousehold(ben.householdId!!) else null
         val sendingData = ben.asNetworkSendingModel(user, locationRecord, context, household)
@@ -529,11 +533,14 @@ class BenRepo @Inject constructor(
             }
             throw IllegalStateException("Response undesired!")
         } catch (se: SocketTimeoutException) {
-            if (se.message == "Refreshed Token") {
-                return createBenIdAtServerByBeneficiarySending(ben, user, locationRecord)
+            if (se.message == "Refreshed Token" && !retriedAfterRefresh) {
+                return createBenIdAtServerByBeneficiarySending(ben, user, locationRecord, retriedAfterRefresh = true)
             }
             Timber.e("Amrit push beneficiary registration timeout: benId=${ben.beneficiaryId}, error=$se")
-            return false
+            throw se
+        } catch (e: IOException) {
+            Timber.e("Amrit push beneficiary registration network error: benId=${ben.beneficiaryId}, error=$e")
+            throw e
         } catch (e: java.lang.Exception) {
             benDao.setSyncState(ben.householdId, ben.beneficiaryId, SyncState.UNSYNCED)
             Timber.e("Amrit push beneficiary registration error: benId=${ben.beneficiaryId}, error=$e")
@@ -669,12 +676,17 @@ class BenRepo @Inject constructor(
             Timber.w("Amrit push syncDataToAmrit bad response: httpStatus=$statusCode, benIds=$benIds")
             return false
         } catch (e: SocketTimeoutException) {
-            Timber.e("Amrit push syncDataToAmrit timeout: benIds=$benIds, error=$e")
-            if (retryCount > 0) return postDataToAmritServer(
-                benNetworkPostSet, householdNetworkPostSet, kidNetworkPostSet, retryCount - 1
+            // "Refreshed Token!" is thrown above after a successful token refresh;
+            // resend once. A real timeout propagates so the worker retries with
+            // backoff (resending the batch here could duplicate it on the server).
+            if (e.message == "Refreshed Token!" && retryCount > 0) return postDataToAmritServer(
+                benNetworkPostSet, householdNetworkPostSet, kidNetworkPostSet, retryCount = 0
             )
-            Timber.e("Amrit push syncDataToAmrit: max retries exhausted")
-            return false
+            Timber.e("Amrit push syncDataToAmrit timeout: benIds=$benIds, error=$e")
+            throw e
+        } catch (e: IOException) {
+            Timber.e("Amrit push syncDataToAmrit network error: benIds=$benIds, error=$e")
+            throw e
         } catch (e: JSONException) {
             Timber.e("Amrit push syncDataToAmrit JSON error: benIds=$benIds, error=$e")
             return false
