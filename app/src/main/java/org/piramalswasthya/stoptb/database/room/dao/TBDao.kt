@@ -153,6 +153,12 @@ interface TBDao {
     @Query("SELECT * FROM TB_SCREENING WHERE  syncState = :syncState")
     suspend fun getTBScreening(syncState: SyncState): List<TBScreeningCache>
 
+    @Query("SELECT * FROM TB_SCREENING WHERE id = :id")
+    suspend fun getTbScreeningById(id: Int): TBScreeningCache?
+
+    @Query("SELECT * FROM TB_CONFIRMED_TREATMENT WHERE id = :id")
+    suspend fun getTbConfirmedById(id: Int): TBConfirmedTreatmentCache?
+
     @Query("SELECT * FROM GENERAL_OPD WHERE syncState = :syncState")
     suspend fun getGeneralOpd(syncState: SyncState): List<GeneralOpdCache>
 

@@ -1462,10 +1462,17 @@ class TBRepo @Inject constructor(
     }
 
 
+    // Same stale-snapshot race as updateSyncStatusDiagnostics() below: re-read the
+    // row and only mark it SYNCED if nothing changed since it was pushed.
     private suspend fun updateSyncStatusScreening(tbsnList: List<TBScreeningCache>) {
-        tbsnList.forEach {
-            it.syncState = SyncState.SYNCED
-            tbDao.saveTbScreening(it)
+        tbsnList.forEach { pushed ->
+            withBenIdLock(pushed.benId) {
+                val fresh = tbDao.getTbScreeningById(pushed.id) ?: return@withBenIdLock
+                val unchanged = fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)
+                if (unchanged) {
+                    tbDao.saveTbScreening(fresh.copy(syncState = SyncState.SYNCED))
+                }
+            }
         }
     }
 
@@ -1516,10 +1523,16 @@ class TBRepo @Inject constructor(
         }
     }
 
-    private suspend fun updateSyncStatusConfirmed(tbspList: List<TBConfirmedTreatmentCache>) {
-        tbspList.forEach {
-            it.syncState = SyncState.SYNCED
-            tbDao.saveTbConfirmed(it)
+    // Same stale-snapshot race as updateSyncStatusDiagnostics() above.
+    private suspend fun updateSyncStatusConfirmed(tbcList: List<TBConfirmedTreatmentCache>) {
+        tbcList.forEach { pushed ->
+            withBenIdLock(pushed.benId) {
+                val fresh = tbDao.getTbConfirmedById(pushed.id) ?: return@withBenIdLock
+                val unchanged = fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)
+                if (unchanged) {
+                    tbDao.saveTbConfirmed(fresh.copy(syncState = SyncState.SYNCED))
+                }
+            }
         }
     }
 
