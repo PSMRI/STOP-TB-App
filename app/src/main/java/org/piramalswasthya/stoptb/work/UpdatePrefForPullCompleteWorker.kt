@@ -32,6 +32,10 @@ class UpdatePrefForPullCompleteWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         preferenceDao.isFullPullComplete = true
+        // The resume page is only for continuing an interrupted first pull. Left
+        // at its last value, later DIRECT pulls started there and skipped the
+        // earlier pages.
+        preferenceDao.setFirstSyncLastSyncedPage(0)
         val triggerSource = inputData.getString(WorkerUtils.pullTriggerSourceKey) ?: "DIRECT"
         val startedAt = inputData.getLong(WorkerUtils.pullStartedAtKey, SystemClock.elapsedRealtime())
         val durationSeconds = TimeUnit.MILLISECONDS.toSeconds(SystemClock.elapsedRealtime() - startedAt)
