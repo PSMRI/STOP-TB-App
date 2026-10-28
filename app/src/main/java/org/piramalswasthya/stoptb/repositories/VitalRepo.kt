@@ -208,9 +208,18 @@ class VitalRepo @Inject constructor(
     private suspend fun pushSingleVital(vitalCache: VitalCache, retriedAfterRefresh: Boolean = false): Boolean {
         val user = preferenceDao.getLoggedInUser() ?: return false
 
+        // The benRegId stored with the vital is the one known when the form was
+        // opened, which is 0 for a beneficiary not yet registered on the server.
+        // Use the current one, and wait until registration has assigned it.
+        val benRegId = benDao.getBen(vitalCache.benId)?.benRegId?.takeIf { it > 0L }
+        if (benRegId == null) {
+            Timber.d("Vital push waiting for beneficiary registration: benId=%s", vitalCache.benId)
+            return false
+        }
+
         return try {
             val response = tmcNetworkApiService.saveGeneralExamination(
-                listOf(GeneralExaminationSaveRequest.from(vitalCache, user))
+                listOf(GeneralExaminationSaveRequest.from(vitalCache.copy(benRegId = benRegId), user))
             )
 
             val responseBody = response.body()?.string()
