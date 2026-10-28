@@ -23,6 +23,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import timber.log.Timber
+import java.io.IOException
 import java.lang.Integer.min
 import java.util.concurrent.TimeUnit
 
@@ -39,6 +40,8 @@ class PullFromAmritWorker @AssistedInject constructor(
         const val Progress = "Progress"
         const val NumPages = "Total Pages"
         const val n = 4 // Number of threads!
+        private const val MAX_PAGE_ATTEMPTS = 3
+        private const val MAX_RUN_ATTEMPTS = 5
     }
 
     private var page1: Int = 0
@@ -73,9 +76,17 @@ class PullFromAmritWorker @AssistedInject constructor(
                 }
 
                 try {
+                    // -2 means a timeout or a just-refreshed token: try the first
+                    // page a few times, then let WorkManager retry with backoff.
+                    var attempts = 0
                     do {
                         numPages = benRepo.getBeneficiariesFromServerForWorker(startPage)
-                    } while (numPages == -2)
+                        attempts++
+                    } while (numPages == -2 && attempts < MAX_PAGE_ATTEMPTS)
+                    if (numPages == -2)
+                        return@withContext Result.retry()
+                    if (numPages == -1)
+                        return@withContext Result.failure(workDataOf("worker_name" to "PullFromAmritWorker", "error" to "First page request failed"))
                     if (numPages == 0)
                         return@withContext Result.success()
                     val result1 = supervisorScope {
@@ -107,6 +118,10 @@ class PullFromAmritWorker @AssistedInject constructor(
         } catch (e: CancellationException) {
             Timber.w("PullFromAmritFullLoadWorker cancelled: $e")
             throw e
+        } catch (e: IOException) {
+            Timber.e("Pull [$triggerSource] network error: $e")
+            if (runAttemptCount < MAX_RUN_ATTEMPTS) Result.retry()
+            else Result.failure(workDataOf("worker_name" to "PullFromAmritWorker", "error" to "Network error: ${e.message}"))
         } catch (e: java.lang.Exception) {
             Timber.e("Error occurred in PullFromAmritFullLoadWorker $e ${e.stackTrace}")
 
@@ -135,17 +150,33 @@ class PullFromAmritWorker @AssistedInject constructor(
     }
 
 
+    // Returns false if any page could not be saved, so the run is not reported
+    // as complete. Repeated timeouts on a page surface as IOException.
     private suspend fun getBenForPage(numPages: Int, rem: Int, startPage: Int): Boolean {
         return withContext(Dispatchers.IO) {
             var page: Int = startPage + rem
+            var complete = true
+            var pageAttempts = 0
 
             try {
                 while (page <= numPages) {
-                    val ret = benRepo.getBeneficiariesFromServerForWorker(page)
+                    val ret = try {
+                        benRepo.getBeneficiariesFromServerForWorker(page)
+                    } catch (e: SQLiteConstraintException) {
+                        // The page's transaction rolled back; skip it and keep going.
+                        Timber.e("Pull page $page not saved: $e")
+                        complete = false
+                        page += n
+                        continue
+                    }
 
                     if (ret == -1)
                         throw IllegalStateException("benRepo.getBeneficiariesFromServerForWorker(page) returned -1 ")
-                    if (ret != -2) {
+                    if (ret == -2) {
+                        pageAttempts++
+                        if (pageAttempts >= MAX_PAGE_ATTEMPTS) throw IOException("Pull page $page timed out $pageAttempts times")
+                    } else {
+                        pageAttempts = 0
                         val finalPage = (page1 + page2 + page3 + page4) / 4
                         val minPageSynced = min(min(page1, page2), min(page3, page4))
                         preferenceDao.setFirstSyncLastSyncedPage(minPageSynced)
@@ -163,10 +194,8 @@ class PullFromAmritWorker @AssistedInject constructor(
             } catch (e: CancellationException) {
                 Timber.w("Page pull cancelled for rem=$rem page=$page: $e")
                 throw e
-            } catch (e: SQLiteConstraintException) {
-                Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
             }
-            true
+            complete
         }
     }
 
