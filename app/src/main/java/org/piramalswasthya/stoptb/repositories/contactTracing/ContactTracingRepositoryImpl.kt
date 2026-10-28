@@ -381,6 +381,12 @@ class ContactTracingRepositoryImpl @Inject constructor(
 
     override suspend fun submitResponseBulk(responseId: Long, phaseFilter: String?): Boolean {
         val resp = responseDao.getFormResponseById(responseId) ?: return true
+        if (resp.formResponse.beneficiaryId <= 0L) {
+            // Saved before the beneficiary was registered; sent once registration
+            // re-points it to the real ID. Stays UNSYNCED until then.
+            Timber.d("submitResponseBulk: responseId=$responseId waiting for beneficiary registration")
+            return false
+        }
 
         val formDef = metadataDao.getFormDefinitionByVersionId(resp.formResponse.formVersionId)
         val officerId = preferenceDao.getLoggedInUser()?.userId?.toLong() ?: DEFAULT_OFFICER_ID

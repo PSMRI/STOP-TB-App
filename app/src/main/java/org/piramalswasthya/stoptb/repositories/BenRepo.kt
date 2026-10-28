@@ -504,23 +504,32 @@ class BenRepo @Inject constructor(
                     val newBenRegId = jsonObjectData.getString("benRegId").toLong()
                     Timber.d("Amrit push beneficiary registration success: oldBenId=${ben.beneficiaryId}, newBenId=$newBenId, benRegId=$newBenRegId")
                     val photoUri = ImageUtils.renameImage(context, ben.beneficiaryId, newBenId)
-                    benDao.updateToFinalBenId(
-                        hhId = ben.householdId,
-                        oldId = ben.beneficiaryId,
-                        newBenRegId = newBenRegId,
-                        newId = newBenId,
-                        imageUri = photoUri
-                    )
-                    formResponseJsonDao.updateVisitBenId(
-                        oldBenId = ben.beneficiaryId,
-                        newBenId = newBenId
-                    )
-                    ben.householdId?.let { hhId ->
-                        householdDao.getHousehold(hhId)
-                            ?.takeIf { it.benId == ben.beneficiaryId }?.let {
-                                it.benId = newBenId
-                                householdDao.update(it)
-                            }
+                    // All references to the temporary ID move to the real one together,
+                    // so a crash midway can't leave records pointing at an ID that no
+                    // longer exists.
+                    db.withTransaction {
+                        benDao.updateToFinalBenId(
+                            hhId = ben.householdId,
+                            oldId = ben.beneficiaryId,
+                            newBenRegId = newBenRegId,
+                            newId = newBenId,
+                            imageUri = photoUri
+                        )
+                        formResponseJsonDao.updateVisitBenId(
+                            oldBenId = ben.beneficiaryId,
+                            newBenId = newBenId
+                        )
+                        db.counsellingFormResponseDao().updateBeneficiaryId(
+                            oldBenId = ben.beneficiaryId,
+                            newBenId = newBenId
+                        )
+                        ben.householdId?.let { hhId ->
+                            householdDao.getHousehold(hhId)
+                                ?.takeIf { it.benId == ben.beneficiaryId }?.let {
+                                    it.benId = newBenId
+                                    householdDao.update(it)
+                                }
+                        }
                     }
                     ben.beneficiaryId = newBenId
                     ben.benRegId = newBenRegId

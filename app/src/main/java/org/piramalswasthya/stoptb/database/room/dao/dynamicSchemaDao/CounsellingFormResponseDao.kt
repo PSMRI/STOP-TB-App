@@ -24,6 +24,12 @@ interface CounsellingFormResponseDao {
     @Update
     suspend fun updateFormResponse(response: FormResponseEntity)
 
+    // Re-points responses saved against a temporary beneficiary ID once the
+    // server has assigned the real one (t_form_response has no foreign key to
+    // BENEFICIARY, so the ID change does not cascade).
+    @Query("UPDATE t_form_response SET beneficiaryId = :newBenId WHERE beneficiaryId = :oldBenId")
+    suspend fun updateBeneficiaryId(oldBenId: Long, newBenId: Long)
+
     // Marks a pushed response SYNCED only if it wasn't edited during the upload
     // (every edit bumps updatedAt). Touches only the sync columns, so fields set
     // during the push (e.g. backendResponseId) are kept.

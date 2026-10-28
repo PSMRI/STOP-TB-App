@@ -412,6 +412,12 @@ class CounsellingRepositoryImpl @Inject constructor(
 
         for (resp in unsynced) {
             val responseId = resp.formResponse.responseId
+            if (resp.formResponse.beneficiaryId <= 0L) {
+                // Saved before the beneficiary was registered; it goes out once the
+                // registration re-points it to the real ID.
+                Timber.d("syncUnsyncedRecords: responseId=$responseId waiting for beneficiary registration")
+                continue
+            }
             val formDef = metadataDao.getFormDefinitionByVersionId(resp.formResponse.formVersionId)
 
             // General Info refusal now pushes via submitBulk (not complete), reusing the same
