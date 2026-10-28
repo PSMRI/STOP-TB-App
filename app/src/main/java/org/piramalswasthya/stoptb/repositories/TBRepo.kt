@@ -19,6 +19,7 @@ import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.TBDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.GeneralOpdCache
@@ -69,6 +70,7 @@ class TBRepo @Inject constructor(
     private val tmcNetworkApiService: AmritApiService,
     private val database: InAppDb,
     private val drugMasterRepo: DrugMasterRepo,
+    private val syncRetryStore: SyncRetryStore,
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context
 ) {
     private val orderCreatedTimestamps = java.util.concurrent.ConcurrentHashMap<String, Long>()
@@ -1259,12 +1261,15 @@ class TBRepo @Inject constructor(
                 tbDao.getTbDiagnostics(SyncState.UNSYNCED)
             if (diagnosticsList.isEmpty()) return@withContext 1
 
-            val chunks = diagnosticsList.chunked(20)
+            val queue = tbUploadQueue(diagnosticsList, 20, SyncRetryStore.ENTITY_TB_DIAGNOSTICS) { it.id.toLong() }
+            val rejectedSingles = mutableListOf<TBDiagnosticsCache>()
+            var lastError = ""
             var successCount = 0
             var failCount = 0
             var networkFailed = false
 
-            for (chunk in chunks) {
+            while (queue.isNotEmpty()) {
+                val chunk = queue.removeFirst()
                 try {
                     val request = chunk.mapNotNull { diagnostics ->
                         val benRegId = benDao.getBen(diagnostics.benId)?.benRegId?.takeIf { it > 0L }
@@ -1292,6 +1297,7 @@ class TBRepo @Inject constructor(
                             when (val responseStatusCode = jsonObj.getInt("statusCode")) {
                                 200 -> {
                                     updateSyncStatusDiagnostics(chunk)
+                                    syncRetryStore.clear(SyncRetryStore.ENTITY_TB_DIAGNOSTICS, chunk.map { it.id.toLong() })
                                     successCount += chunk.size
                                 }
 
@@ -1304,13 +1310,15 @@ class TBRepo @Inject constructor(
 
                                 else -> {
                                     Timber.e("TB Diagnostics chunk failed with statusCode: $responseStatusCode")
-                                    failCount += chunk.size
+                                    lastError = "statusCode=$responseStatusCode"
+                                    failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                                 }
                             }
                         }
                     } else {
                         Timber.e("TB Diagnostics chunk HTTP error: $statusCode")
-                        failCount += chunk.size
+                        lastError = "HTTP $statusCode"
+                        failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                     }
                 } catch (e: IOException) {
                     // Hub unreachable: stop this run and let the push worker retry with backoff.
@@ -1319,10 +1327,12 @@ class TBRepo @Inject constructor(
                     break
                 } catch (e: Exception) {
                     Timber.e(e, "TB Diagnostics chunk push failed: ${chunk.size} records")
-                    failCount += chunk.size
+                    lastError = e.message ?: e.javaClass.simpleName
+                    failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                 }
             }
 
+            recordTbRejections(SyncRetryStore.ENTITY_TB_DIAGNOSTICS, rejectedSingles, successCount > 0, lastError) { it.id.toLong() }
             Timber.d("TB Diagnostics push complete: $successCount succeeded, $failCount failed out of ${diagnosticsList.size}")
             return@withContext if (networkFailed) PUSH_NETWORK_ERROR else 1
         }
@@ -1344,12 +1354,15 @@ class TBRepo @Inject constructor(
             Timber.d("SYNC_DIAG[$callTag] TB Suspected push: ${tbspList.size} unsynced records, benIds=${tbspList.map { it.benId }}")
 
             val CHUNK_SIZE = 20
-            val chunks = tbspList.chunked(CHUNK_SIZE)
+            val queue = tbUploadQueue(tbspList, CHUNK_SIZE, SyncRetryStore.ENTITY_TB_SUSPECTED) { it.id.toLong() }
+            val rejectedSingles = mutableListOf<TBSuspectedCache>()
+            var lastError = ""
             var successCount = 0
             var failCount = 0
             var networkFailed = false
 
-            for (chunk in chunks) {
+            while (queue.isNotEmpty()) {
+                val chunk = queue.removeFirst()
                 try {
                     val excludedBenIds = mutableListOf<Long>()
                     val chunkDtos = chunk.mapNotNull { suspected ->
@@ -1391,6 +1404,7 @@ class TBRepo @Inject constructor(
                                         Timber.w("SYNC_DIAG[$callTag] TB Suspected push: benIds=$excludedBenIds not sent (benId resolution failed), left UNSYNCED")
                                     }
                                     updateSyncStatusSuspected(sent)
+                                    syncRetryStore.clear(SyncRetryStore.ENTITY_TB_SUSPECTED, sent.map { it.id.toLong() })
                                     successCount += sent.size
                                     failCount += chunk.size - sent.size
                                     Timber.d("SYNC_DIAG[$callTag] TB Suspected push: chunk marked SYNCED, benIds=${sent.map { it.benId }}")
@@ -1406,13 +1420,15 @@ class TBRepo @Inject constructor(
 
                                 else -> {
                                     Timber.e("SYNC_DIAG[$callTag] TB Suspected chunk failed with statusCode: $responseStatusCode, benIds=${chunk.map { it.benId }}, body=$responseString")
-                                    failCount += chunk.size
+                                    lastError = "statusCode=$responseStatusCode"
+                                    failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                                 }
                             }
                         }
                     } else {
                         Timber.e("SYNC_DIAG[$callTag] TB Suspected chunk HTTP error: $statusCode, benIds=${chunk.map { it.benId }}")
-                        failCount += chunk.size
+                        lastError = "HTTP $statusCode"
+                        failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                     }
                 } catch (e: IOException) {
                     // Hub unreachable: stop this run and let the push worker retry with backoff.
@@ -1421,10 +1437,12 @@ class TBRepo @Inject constructor(
                     break
                 } catch (e: Exception) {
                     Timber.e(e, "SYNC_DIAG[$callTag] TB Suspected chunk push failed: ${chunk.size} records, benIds=${chunk.map { it.benId }}")
-                    failCount += chunk.size
+                    lastError = e.message ?: e.javaClass.simpleName
+                    failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                 }
             }
 
+            recordTbRejections(SyncRetryStore.ENTITY_TB_SUSPECTED, rejectedSingles, successCount > 0, lastError) { it.id.toLong() }
             Timber.d("SYNC_DIAG[$callTag] TB Suspected push complete: $successCount succeeded, $failCount failed out of ${tbspList.size}")
             return@withContext if (networkFailed) PUSH_NETWORK_ERROR else 1
         }
@@ -1443,12 +1461,15 @@ class TBRepo @Inject constructor(
             if (tbspList.isEmpty()) return@withContext 1
 
             val CHUNK_SIZE = 20
-            val chunks = tbspList.chunked(CHUNK_SIZE)
+            val queue = tbUploadQueue(tbspList, CHUNK_SIZE, SyncRetryStore.ENTITY_TB_CONFIRMED) { it.id.toLong() }
+            val rejectedSingles = mutableListOf<TBConfirmedTreatmentCache>()
+            var lastError = ""
             var successCount = 0
             var failCount = 0
             var networkFailed = false
 
-            for (chunk in chunks) {
+            while (queue.isNotEmpty()) {
+                val chunk = queue.removeFirst()
                 try {
                     val chunkDtos = chunk.mapNotNull { confirmed ->
                         val ben = benDao.getBen(confirmed.benId)
@@ -1477,6 +1498,7 @@ class TBRepo @Inject constructor(
                             when (responseStatusCode) {
                                 200 -> {
                                     updateSyncStatusConfirmed(chunk)
+                                    syncRetryStore.clear(SyncRetryStore.ENTITY_TB_CONFIRMED, chunk.map { it.id.toLong() })
                                     successCount += chunk.size
                                 }
 
@@ -1489,13 +1511,15 @@ class TBRepo @Inject constructor(
 
                                 else -> {
                                     Timber.e("TB Confirmed chunk failed with statusCode: $responseStatusCode")
-                                    failCount += chunk.size
+                                    lastError = "statusCode=$responseStatusCode"
+                                    failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                                 }
                             }
                         }
                     } else {
                         Timber.e("TB Confirmed chunk HTTP error: $statusCode")
-                        failCount += chunk.size
+                        lastError = "HTTP $statusCode"
+                        failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                     }
                 } catch (e: IOException) {
                     // Hub unreachable: stop this run and let the push worker retry with backoff.
@@ -1504,10 +1528,12 @@ class TBRepo @Inject constructor(
                     break
                 } catch (e: Exception) {
                     Timber.e(e, "TB Confirmed chunk push failed: ${chunk.size} records")
-                    failCount += chunk.size
+                    lastError = e.message ?: e.javaClass.simpleName
+                    failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                 }
             }
 
+            recordTbRejections(SyncRetryStore.ENTITY_TB_CONFIRMED, rejectedSingles, successCount > 0, lastError) { it.id.toLong() }
             Timber.d("TB Confirmed push complete: $successCount succeeded, $failCount failed out of ${tbspList.size}")
             return@withContext if (networkFailed) PUSH_NETWORK_ERROR else 1
         }
@@ -1585,6 +1611,36 @@ class TBRepo @Inject constructor(
                     tbDao.saveTbConfirmed(fresh.copy(syncState = SyncState.SYNCED))
                 }
             }
+        }
+    }
+
+    // Upload order for a chunked TB push: records the server rejected before are
+    // sent alone once their retry delay has passed (records still waiting sit
+    // this cycle out); everything else goes in chunks of [size].
+    private fun <T> tbUploadQueue(records: List<T>, size: Int, entity: String, id: (T) -> Long): ArrayDeque<List<T>> {
+        val (retrying, fresh) = records.partition { syncRetryStore.contains(entity, id(it)) }
+        val due = retrying.filterNot { syncRetryStore.isWaiting(entity, id(it)) }
+        return ArrayDeque(fresh.chunked(size) + due.map { listOf(it) })
+    }
+
+    // A rejected chunk of several records is re-queued one record at a time so
+    // the others aren't held back. Returns how many records failed for good in
+    // this run (only a rejected single record counts).
+    private fun <T> rejectTbChunk(chunk: List<T>, queue: ArrayDeque<List<T>>, rejectedSingles: MutableList<T>): Int {
+        if (chunk.size > 1) {
+            chunk.forEach { queue.addLast(listOf(it)) }
+            return 0
+        }
+        rejectedSingles += chunk
+        return chunk.size
+    }
+
+    // Rejected records stay UNSYNCED and are retried individually. If nothing at
+    // all was accepted, it's treated as a server-side problem and they are not delayed.
+    private fun <T> recordTbRejections(entity: String, rejected: List<T>, anyAccepted: Boolean, error: String, id: (T) -> Long) {
+        if (anyAccepted) syncRetryStore.resetBackoff()
+        rejected.forEach {
+            syncRetryStore.recordFailure(entity, id(it), error.ifBlank { "Rejected by server" }, backoff = anyAccepted)
         }
     }
 
