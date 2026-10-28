@@ -258,6 +258,15 @@ object WorkerUtils {
         val now = SystemClock.elapsedRealtime()
         if (!force && now - lastCampQuickPullAt < campQuickPullDebounceMs) return
 
+        // Pull and push are safe to overlap, but a full pull competing with an
+        // upload slows both on the camp hub. The auto-pull loop retries shortly.
+        if (!force && getActiveUniqueWorkInfos(WorkManager.getInstance(context), pushWorkerUniqueName)
+                .any { it.state == WorkInfo.State.RUNNING }
+        ) {
+            Timber.d("Pull [AUTO_PULL] skipped: push chain is running")
+            return
+        }
+
         lastCampQuickPullAt = now
         triggerAmritPullWorker(context, triggerSource = "AUTO_PULL")
     }
