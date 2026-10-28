@@ -718,6 +718,7 @@ data class TBConfirmedTreatmentDTO(
     val treatmentCompleted: Boolean?, val actualTreatmentCompletionDate: String?,
     val treatmentOutcome: String?, val dateOfDeath: String?,
     val placeOfDeath: String?, val reasonForDeath: String?, val reasonForNotCompleting: String?,
+    val remarks: String? = null,
     val updateDate: String? = null
 ) {
     fun toCache(): TBConfirmedTreatmentCache = TBConfirmedTreatmentCache(
@@ -728,7 +729,7 @@ data class TBConfirmedTreatmentDTO(
         monthlyFollowUpDone = monthlyFollowUpDone, adherenceToMedicines = adherenceToMedicines,
         anyDiscomfort = anyDiscomfort, treatmentCompleted = treatmentCompleted,
         actualTreatmentCompletionDate = getLongFromDateMultipleSupport(actualTreatmentCompletionDate),
-        treatmentOutcome = treatmentOutcome, dateOfDeath = getLongFromDateMultipleSupport(dateOfDeath),
+        treatmentOutcome = treatmentOutcome, remarks = remarks, dateOfDeath = getLongFromDateMultipleSupport(dateOfDeath),
         placeOfDeath = placeOfDeath, reasonForDeath = reasonForDeath ?: "Tuberculosis",
         reasonForNotCompleting = reasonForNotCompleting,
         serverUpdatedDate = getLongFromDateMultipleSupport(updateDate),
