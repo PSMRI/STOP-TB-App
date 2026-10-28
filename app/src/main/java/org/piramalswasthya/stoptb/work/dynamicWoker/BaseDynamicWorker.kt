@@ -11,6 +11,7 @@ import androidx.work.workDataOf
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.network.interceptors.TokenInsertTmcInterceptor
+import org.piramalswasthya.stoptb.work.trySetForeground
 import timber.log.Timber
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -46,7 +47,7 @@ abstract class BaseDynamicWorker(
         createForegroundInfo("Syncing data...")
 
     override suspend fun doWork(): Result {
-        setForeground(getForegroundInfo())
+        trySetForeground()
 
         if (runAttemptCount >= MAX_RETRY_COUNT) {
             Timber.e("[$workerName] Max retries ($MAX_RETRY_COUNT) exceeded, giving up")

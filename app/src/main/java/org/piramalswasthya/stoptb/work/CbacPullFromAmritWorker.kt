@@ -30,7 +30,7 @@ class CbacPullFromAmritWorker @AssistedInject constructor(
     override suspend fun getForegroundInfo(): ForegroundInfo = createForegroundInfo()
 
     override suspend fun doWork(): Result {
-        setForeground(getForegroundInfo())
+        trySetForeground()
 
         return withContext(Dispatchers.IO) {
             return@withContext try {

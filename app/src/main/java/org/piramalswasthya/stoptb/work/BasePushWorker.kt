@@ -43,6 +43,8 @@ abstract class BasePushWorker(
         createForegroundInfo("Syncing data...")
 
     override suspend fun doWork(): Result {
+        trySetForeground()
+
         if (runAttemptCount >= MAX_RETRY_COUNT) {
             Timber.e("[$workerName] Max retries ($MAX_RETRY_COUNT) exceeded, giving up")
             return Result.failure(workDataOf(

@@ -37,7 +37,7 @@ class GenerateBenIdsWorker @AssistedInject constructor(
     override suspend fun getForegroundInfo(): ForegroundInfo = createForegroundInfo()
 
     override suspend fun doWork(): Result {
-        setForeground(getForegroundInfo())
+        trySetForeground()
 
         return try {
             benRepo.getBenIdsGeneratedFromServer()

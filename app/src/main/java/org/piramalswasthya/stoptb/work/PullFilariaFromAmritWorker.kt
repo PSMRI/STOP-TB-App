@@ -40,7 +40,7 @@ class PullFilariaFromAmritWorker @AssistedInject constructor(
     override suspend fun getForegroundInfo(): ForegroundInfo = createForegroundInfo("Syncing data...")
 
     override suspend fun doWork(): Result {
-        setForeground(getForegroundInfo())
+        trySetForeground()
 
         return try {
             withContext(Dispatchers.IO) {
