@@ -14,10 +14,14 @@ import org.piramalswasthya.stoptb.network.interceptors.TokenInsertTmcInterceptor
 import timber.log.Timber
 import java.net.SocketTimeoutException
 
-// Base class for all push workers. Provides foreground service protection
-// (prevents OS from killing workers on aggressive-battery devices like
-// Xiaomi MIUI, Oppo ColorOS, Vivo FunTouchOS), centralized token
-// initialization, and structured error handling.
+// Base class for all push workers. Provides centralized token
+// initialization and structured error handling.
+//
+// Workers do not call setForeground(): starting a foreground service from a
+// background worker can crash the app on Android 12+ in ways a try/catch in
+// the worker cannot intercept. getForegroundInfo() is only used when a push
+// request is expedited (see WorkerUtils.enqueuePushChain), where WorkManager
+// shows it as a foreground notification on Android 11 and below.
 //
 // Subclasses only need to implement doSyncWork() and provide workerName
 // and preferenceDao (via Hilt DI with override val).
@@ -43,8 +47,6 @@ abstract class BasePushWorker(
         createForegroundInfo("Syncing data...")
 
     override suspend fun doWork(): Result {
-        trySetForeground()
-
         if (runAttemptCount >= MAX_RETRY_COUNT) {
             Timber.e("[$workerName] Max retries ($MAX_RETRY_COUNT) exceeded, giving up")
             return Result.failure(workDataOf(

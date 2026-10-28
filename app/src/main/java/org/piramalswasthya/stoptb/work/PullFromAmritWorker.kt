@@ -50,7 +50,6 @@ class PullFromAmritWorker @AssistedInject constructor(
     override suspend fun getForegroundInfo(): ForegroundInfo = createForegroundInfo("Syncing data...")
 
     override suspend fun doWork(): Result {
-        trySetForeground()
         val triggerSource = inputData.getString(WorkerUtils.pullTriggerSourceKey) ?: "DIRECT"
         val startedAt = inputData.getLong(WorkerUtils.pullStartedAtKey, SystemClock.elapsedRealtime())
         Timber.i("Pull [$triggerSource] beneficiary and household data started")

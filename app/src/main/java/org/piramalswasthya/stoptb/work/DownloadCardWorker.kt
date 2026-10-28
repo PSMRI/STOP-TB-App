@@ -43,8 +43,6 @@ class DownloadCardWorker @AssistedInject constructor(
     override suspend fun getForegroundInfo(): ForegroundInfo = createForegroundInfo("Syncing data...")
 
     override suspend fun doWork(): Result {
-        trySetForeground()
-
         val fileName = inputData.getString(file_name)
         return try {
             withContext(Dispatchers.IO) {
