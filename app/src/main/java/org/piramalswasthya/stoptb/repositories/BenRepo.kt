@@ -32,7 +32,6 @@ import org.piramalswasthya.stoptb.model.getPlaceOfCurrentLivingIndex
 import org.piramalswasthya.stoptb.model.getPlaceOfCurrentLivingCode
 import org.piramalswasthya.stoptb.network.*
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel
-import org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository
 import org.piramalswasthya.stoptb.utils.Log
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
@@ -53,8 +52,7 @@ class BenRepo @Inject constructor(
     private val userRepo: UserRepo,
     private val tmcNetworkApiService: AmritApiService,
     private val formResponseJsonDao: FormResponseJsonDao,
-    private val db: InAppDb,
-    private val counsellingRepository: ICounsellingRepository
+    private val db: InAppDb
 ) {
 
     private val processNewBenMutex = Mutex()
@@ -602,8 +600,7 @@ class BenRepo @Inject constructor(
             } else {
                 Timber.d("Beneficiary batch push succeeded: ${benNetworkPostList.size} ben records, ${householdNetworkPostList.size} household records")
             }
-            val counsellingSyncDone = pushCounsellingData()
-            return@withContext uploadDone && counsellingSyncDone
+            return@withContext uploadDone
         }
     }
 
@@ -694,10 +691,6 @@ class BenRepo @Inject constructor(
             Timber.e("Amrit push syncDataToAmrit error: benIds=$benIds, error=$e")
             return false
         }
-    }
-
-    private suspend fun pushCounsellingData(): Boolean {
-        return counsellingRepository.syncUnsyncedRecords()
     }
 
 

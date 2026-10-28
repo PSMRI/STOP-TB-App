@@ -136,7 +136,7 @@ object WorkerUtils {
         }
 
         // StopTB push chain:
-        // Registration → NCD Referrals + TB data + ABHA
+        // Registration (+ vitals) → TB data + ABHA + counselling
         //
         // Registration is expedited so it runs promptly instead of waiting for
         // a Doze / battery-saver maintenance window. If the expedited quota is
@@ -168,11 +168,18 @@ object WorkerUtils {
             syncRequestBuilder<PushMapAbhatoBenficiaryWorker>()
         }.addTag("push_group9_digital_health").build()
 
+        val groupCounselling = if (isCampHubSyncActive) {
+            campSyncRequestBuilder<PushCounsellingWorker>()
+        } else {
+            syncRequestBuilder<PushCounsellingWorker>()
+        }.addTag("push_group10_counselling").build()
+
         val chainTB = afterRegistration.then(groupTB)
         val chainAbha = afterRegistration.then(listOf(groupAbha))
+        val chainCounselling = afterRegistration.then(listOf(groupCounselling))
 
-        WorkContinuation.combine(listOf(chainTB, chainAbha)).enqueue()
-        return listOf(registration.id, groupAbha.id) + groupTB.map { it.id }
+        WorkContinuation.combine(listOf(chainTB, chainAbha, chainCounselling)).enqueue()
+        return listOf(registration.id, groupAbha.id, groupCounselling.id) + groupTB.map { it.id }
     }
 
     fun triggerAmritPullWorker(
