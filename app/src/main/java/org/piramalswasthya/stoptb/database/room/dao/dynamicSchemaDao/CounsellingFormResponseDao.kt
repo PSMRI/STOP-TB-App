@@ -24,6 +24,12 @@ interface CounsellingFormResponseDao {
     @Update
     suspend fun updateFormResponse(response: FormResponseEntity)
 
+    // Marks a pushed response SYNCED only if it wasn't edited during the upload
+    // (every edit bumps updatedAt). Touches only the sync columns, so fields set
+    // during the push (e.g. backendResponseId) are kept.
+    @Query("UPDATE t_form_response SET syncStatus = 'SYNCED', syncedAt = :syncedAt WHERE responseId = :responseId AND updatedAt = :pushedUpdatedAt")
+    suspend fun markSyncedIfUnchanged(responseId: Long, pushedUpdatedAt: Long, syncedAt: Long = System.currentTimeMillis()): Int
+
     @Update
     suspend fun updateSectionResponse(section: SectionResponseEntity)
 

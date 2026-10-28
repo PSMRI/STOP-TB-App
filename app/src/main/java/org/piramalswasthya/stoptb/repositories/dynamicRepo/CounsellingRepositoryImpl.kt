@@ -419,9 +419,7 @@ class CounsellingRepositoryImpl @Inject constructor(
                 }
 
                 if (recordSuccess) {
-                    responseDao.updateFormResponse(
-                        resp.formResponse.copy(syncStatus = "SYNCED", syncedAt = System.currentTimeMillis())
-                    )
+                    responseDao.markSyncedIfUnchanged(resp.formResponse.responseId, resp.formResponse.updatedAt)
                 } else {
                     allSuccess = false
                 }
@@ -460,9 +458,7 @@ class CounsellingRepositoryImpl @Inject constructor(
             val recordSuccess = executeCompleteCounselling(authHeader, payload, "responseId=$responseId, sectionId=$finalSectionId")
 
             if (recordSuccess) {
-                responseDao.updateFormResponse(
-                    resp.formResponse.copy(syncStatus = "SYNCED", syncedAt = System.currentTimeMillis())
-                )
+                responseDao.markSyncedIfUnchanged(resp.formResponse.responseId, resp.formResponse.updatedAt)
 
                 val finalSectionResponse = resp.sectionResponses.find { it.sectionResponse.sectionId == finalSectionId }
                 if (finalSectionResponse != null) {

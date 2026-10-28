@@ -443,9 +443,7 @@ class ContactTracingRepositoryImpl @Inject constructor(
         }
 
         if (success) {
-            responseDao.updateFormResponse(
-                resp.formResponse.copy(syncStatus = "SYNCED", syncedAt = System.currentTimeMillis())
-            )
+            responseDao.markSyncedIfUnchanged(resp.formResponse.responseId, resp.formResponse.updatedAt)
         }
 
         return success
