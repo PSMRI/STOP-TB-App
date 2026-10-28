@@ -53,6 +53,7 @@ import org.piramalswasthya.stoptb.network.DiagnosticBeneficiaryStatusData
 import org.piramalswasthya.stoptb.network.DiagnosticManualResultRequest
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
+import java.io.IOException
 import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -1066,7 +1067,12 @@ class TBRepo @Inject constructor(
         val suspectedResult = pushUnSyncedRecordsTBSuspected()
         val confirmedResult = pushUnSyncedRecordsTBConfirmed()
         Timber.d("TB push results: screening=$screeningResult, generalOpd=$generalOpdResult, diagnostics=$diagnosticsResult, suspected=$suspectedResult, confirmed=$confirmedResult")
-        // Worker succeeds — failed records stay UNSYNCED for next cycle
+        val results = listOf(screeningResult, generalOpdResult, diagnosticsResult, suspectedResult, confirmedResult)
+        if (PUSH_NETWORK_ERROR in results) {
+            // Lets PushTBToAmritWorker retry with backoff instead of reporting success.
+            throw IOException("TB push interrupted by a network error")
+        }
+        // Records the server rejected stay UNSYNCED for the next cycle.
         return true
     }
 
@@ -1094,6 +1100,7 @@ class TBRepo @Inject constructor(
 
             var successCount = 0
             var failCount = 0
+            var networkFailed = false
 
             for (screening in tbsnList) {
                 try {
@@ -1143,6 +1150,11 @@ class TBRepo @Inject constructor(
                         Timber.e("TB Screening record HTTP error: $statusCode")
                         failCount += 1
                     }
+                } catch (e: IOException) {
+                    // Hub unreachable: stop this run and let the push worker retry with backoff.
+                    Timber.e("TB Screening push stopped by network error: $e")
+                    networkFailed = true
+                    break
                 } catch (e: Exception) {
                     Timber.e(e, "TB Screening record push failed for benId=${screening.benId}")
                     failCount += 1
@@ -1151,7 +1163,7 @@ class TBRepo @Inject constructor(
 
             Timber.d("TB Screening push complete: $successCount succeeded, $failCount failed out of ${tbsnList.size}")
             // Worker succeeds — failed records stay UNSYNCED for next cycle
-            return@withContext 1
+            return@withContext if (networkFailed) PUSH_NETWORK_ERROR else 1
         }
     }
 
@@ -1168,6 +1180,7 @@ class TBRepo @Inject constructor(
             val chunks = opdList.chunked(1)
             var successCount = 0
             var failCount = 0
+            var networkFailed = false
 
             for (chunk in chunks) {
                 try {
@@ -1220,6 +1233,11 @@ class TBRepo @Inject constructor(
                     }
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
+                } catch (e: IOException) {
+                    // Hub unreachable: stop this run and let the push worker retry with backoff.
+                    Timber.e("General OPD push stopped by network error: $e")
+                    networkFailed = true
+                    break
                 } catch (e: Exception) {
                     Timber.e(e, "General OPD chunk push failed: ${chunk.size} records")
                     failCount += chunk.size
@@ -1227,7 +1245,7 @@ class TBRepo @Inject constructor(
             }
 
             Timber.d("General OPD push complete: $successCount succeeded, $failCount failed out of ${opdList.size}")
-            return@withContext 1
+            return@withContext if (networkFailed) PUSH_NETWORK_ERROR else 1
         } }
     }
 
@@ -1244,6 +1262,7 @@ class TBRepo @Inject constructor(
             val chunks = diagnosticsList.chunked(20)
             var successCount = 0
             var failCount = 0
+            var networkFailed = false
 
             for (chunk in chunks) {
                 try {
@@ -1293,6 +1312,11 @@ class TBRepo @Inject constructor(
                         Timber.e("TB Diagnostics chunk HTTP error: $statusCode")
                         failCount += chunk.size
                     }
+                } catch (e: IOException) {
+                    // Hub unreachable: stop this run and let the push worker retry with backoff.
+                    Timber.e("TB Diagnostics push stopped by network error: $e")
+                    networkFailed = true
+                    break
                 } catch (e: Exception) {
                     Timber.e(e, "TB Diagnostics chunk push failed: ${chunk.size} records")
                     failCount += chunk.size
@@ -1300,7 +1324,7 @@ class TBRepo @Inject constructor(
             }
 
             Timber.d("TB Diagnostics push complete: $successCount succeeded, $failCount failed out of ${diagnosticsList.size}")
-            return@withContext 1
+            return@withContext if (networkFailed) PUSH_NETWORK_ERROR else 1
         }
     }
 
@@ -1323,6 +1347,7 @@ class TBRepo @Inject constructor(
             val chunks = tbspList.chunked(CHUNK_SIZE)
             var successCount = 0
             var failCount = 0
+            var networkFailed = false
 
             for (chunk in chunks) {
                 try {
@@ -1389,6 +1414,11 @@ class TBRepo @Inject constructor(
                         Timber.e("SYNC_DIAG[$callTag] TB Suspected chunk HTTP error: $statusCode, benIds=${chunk.map { it.benId }}")
                         failCount += chunk.size
                     }
+                } catch (e: IOException) {
+                    // Hub unreachable: stop this run and let the push worker retry with backoff.
+                    Timber.e("TB Suspected push stopped by network error: $e")
+                    networkFailed = true
+                    break
                 } catch (e: Exception) {
                     Timber.e(e, "SYNC_DIAG[$callTag] TB Suspected chunk push failed: ${chunk.size} records, benIds=${chunk.map { it.benId }}")
                     failCount += chunk.size
@@ -1396,7 +1426,7 @@ class TBRepo @Inject constructor(
             }
 
             Timber.d("SYNC_DIAG[$callTag] TB Suspected push complete: $successCount succeeded, $failCount failed out of ${tbspList.size}")
-            return@withContext 1
+            return@withContext if (networkFailed) PUSH_NETWORK_ERROR else 1
         }
     }
 
@@ -1416,6 +1446,7 @@ class TBRepo @Inject constructor(
             val chunks = tbspList.chunked(CHUNK_SIZE)
             var successCount = 0
             var failCount = 0
+            var networkFailed = false
 
             for (chunk in chunks) {
                 try {
@@ -1466,6 +1497,11 @@ class TBRepo @Inject constructor(
                         Timber.e("TB Confirmed chunk HTTP error: $statusCode")
                         failCount += chunk.size
                     }
+                } catch (e: IOException) {
+                    // Hub unreachable: stop this run and let the push worker retry with backoff.
+                    Timber.e("TB Confirmed push stopped by network error: $e")
+                    networkFailed = true
+                    break
                 } catch (e: Exception) {
                     Timber.e(e, "TB Confirmed chunk push failed: ${chunk.size} records")
                     failCount += chunk.size
@@ -1473,7 +1509,7 @@ class TBRepo @Inject constructor(
             }
 
             Timber.d("TB Confirmed push complete: $successCount succeeded, $failCount failed out of ${tbspList.size}")
-            return@withContext 1
+            return@withContext if (networkFailed) PUSH_NETWORK_ERROR else 1
         }
     }
 
@@ -1553,6 +1589,8 @@ class TBRepo @Inject constructor(
     }
 
     companion object {
+        // Returned by the TB push sub-functions when a network error stopped the run.
+        private const val PUSH_NETWORK_ERROR = -1
         private const val GENERAL_OPD_CATEGORY_FALLBACK = 6
         private val pollCounts = java.util.concurrent.ConcurrentHashMap<String, Int>()
         private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
