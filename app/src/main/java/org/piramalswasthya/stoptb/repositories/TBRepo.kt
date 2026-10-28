@@ -1347,12 +1347,16 @@ class TBRepo @Inject constructor(
                             Timber.d("Push to Amrit TB Suspected chunk: $responseStatusCode, callTag=$callTag, benIds=${chunk.map { it.benId }}")
                             when (responseStatusCode) {
                                 200 -> {
+                                    // Only mark what was actually sent; records whose benId
+                                    // could not be resolved stay UNSYNCED for the next push.
+                                    val sent = chunk.filterNot { it.benId in excludedBenIds }
                                     if (excludedBenIds.isNotEmpty()) {
-                                        Timber.w("SYNC_DIAG[$callTag] TB Suspected push: marking benIds=$excludedBenIds SYNCED even though they were NOT sent (benId resolution failed above) — this hides a real failure for those records")
+                                        Timber.w("SYNC_DIAG[$callTag] TB Suspected push: benIds=$excludedBenIds not sent (benId resolution failed), left UNSYNCED")
                                     }
-                                    updateSyncStatusSuspected(chunk)
-                                    successCount += chunk.size
-                                    Timber.d("SYNC_DIAG[$callTag] TB Suspected push: chunk marked SYNCED, benIds=${chunk.map { it.benId }}")
+                                    updateSyncStatusSuspected(sent)
+                                    successCount += sent.size
+                                    failCount += chunk.size - sent.size
+                                    Timber.d("SYNC_DIAG[$callTag] TB Suspected push: chunk marked SYNCED, benIds=${sent.map { it.benId }}")
                                 }
 
                                 401, 5002 -> {
