@@ -11,6 +11,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.Operation
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkInfo
 import androidx.work.WorkContinuation
 import androidx.work.WorkManager
@@ -27,6 +28,7 @@ object WorkerUtils {
 
     const val pushWorkerUniqueName = "PUSH-TO-AMRIT"
     const val pullWorkerUniqueName = "PULL-FROM-AMRIT"
+    const val syncGateUniqueName = "SYNC-GATE"
     const val pullTriggerSourceKey = "pull_trigger_source"
     const val pullStartedAtKey = "pull_started_at"
     const val campAutoPullIntervalMs = 10_000L
@@ -79,10 +81,10 @@ object WorkerUtils {
         }
     }
 
-    fun triggerAmritPushWorker(context: Context): List<java.util.UUID> {
+    private fun canPush(context: Context): Boolean {
         if (!hasLoggedInUser(context)) {
             Timber.w("Push worker skipped: no logged-in user is stored yet")
-            return emptyList()
+            return false
         }
 
         // Block all data push until camp mode is active AND hub is connected
@@ -90,19 +92,42 @@ object WorkerUtils {
         val campKey = context.getString(R.string.PREF_camp_mode_enabled)
         if (!prefs.getBoolean(campKey, false)) {
             Timber.d("Push worker skipped: camp mode is disabled")
-            return emptyList()
+            return false
         }
         val hubConnectedKey = context.getString(R.string.PREF_camp_hub_connected)
         if (!prefs.getBoolean(hubConnectedKey, false)) {
             Timber.d("Push worker skipped: camp hub is disconnected")
-            return emptyList()
+            return false
         }
+        return true
+    }
+
+    // Called on every form save. Goes through SyncGateWorker, which debounces
+    // bursts of saves into one push cycle and, if a cycle is already running,
+    // starts a follow-up cycle after it ends instead of dropping the save.
+    fun triggerAmritPushWorker(context: Context) {
+        if (!canPush(context)) return
+        val gate = OneTimeWorkRequestBuilder<SyncGateWorker>()
+            .setInitialDelay(SyncGateWorker.DEBOUNCE_SECONDS, TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            syncGateUniqueName,
+            ExistingWorkPolicy.REPLACE,
+            gate
+        )
+    }
+
+    // Enqueues the push chain directly and returns its work IDs. Used by
+    // SyncGateWorker and by manual camp refresh, which tracks these IDs.
+    fun enqueuePushChain(context: Context): List<java.util.UUID> {
+        if (!canPush(context)) return emptyList()
 
         val isCampHubSyncActive = isCampHubSyncActive(context)
         val workManager = WorkManager.getInstance(context)
         val activePushInfos = getActiveUniqueWorkInfos(workManager, pushWorkerUniqueName)
         if (activePushInfos.any { it.state == WorkInfo.State.RUNNING }) {
-            Timber.d("Push worker skipped: existing unique push chain is already running")
+            Timber.d("Push chain already running, arming sync gate for a follow-up cycle")
+            triggerAmritPushWorker(context)
             return activePushInfos.map { it.id }
         }
         if (activePushInfos.isNotEmpty() && isCampHubSyncActive) {
@@ -112,11 +137,19 @@ object WorkerUtils {
 
         // StopTB push chain:
         // Registration → NCD Referrals + TB data + ABHA
+        //
+        // Registration is expedited so it runs promptly instead of waiting for
+        // a Doze / battery-saver maintenance window. If the expedited quota is
+        // used up it falls back to normal work. On Android 11 and below,
+        // WorkManager runs expedited work as a foreground service using
+        // BasePushWorker.getForegroundInfo(); on 12+ there is no notification.
         val registration = if (isCampHubSyncActive) {
             campSyncRequestBuilder<PushToAmritWorker>()
         } else {
             syncRequestBuilder<PushToAmritWorker>()
-        }.addTag("push_group1_registration").build()
+        }.addTag("push_group1_registration")
+            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            .build()
 
         val afterRegistration = workManager.beginUniqueWork(
             pushWorkerUniqueName, ExistingWorkPolicy.KEEP, registration)
@@ -235,7 +268,7 @@ object WorkerUtils {
     ): List<java.util.UUID> {
         manualCampRefreshInProgress = true
         Timber.i("Camp sync [MANUAL_REFRESH] requested by user")
-        val pushIds = triggerAmritPushWorker(context)
+        val pushIds = enqueuePushChain(context)
         val pullIds = triggerAmritPullWorker(
             context,
             force = true,
