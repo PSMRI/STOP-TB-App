@@ -392,6 +392,7 @@ class BenRepo @Inject constructor(
                 }
             }
             ben.userImage = finalImagePath
+            requeueIfPendingPush(ben)
             if (updateIfExists && benDao.getBen(ben.beneficiaryId) != null) {
                 benDao.updateBen(ben)
             } else {
@@ -404,7 +405,17 @@ class BenRepo @Inject constructor(
 
     suspend fun updateRecord(ben: BenRegCache) {
         withContext(Dispatchers.IO) {
+            requeueIfPendingPush(ben)
             benDao.updateBen(ben)
+        }
+    }
+
+    // Edit flows set processed to 'N'/'U' but reuse the syncState loaded with
+    // the record. The push query only picks UNSYNCED rows, so an edit to an
+    // already-synced beneficiary would never be sent without this.
+    private fun requeueIfPendingPush(ben: BenRegCache) {
+        if (ben.processed == "N" || ben.processed == "U") {
+            ben.syncState = SyncState.UNSYNCED
         }
     }
 
