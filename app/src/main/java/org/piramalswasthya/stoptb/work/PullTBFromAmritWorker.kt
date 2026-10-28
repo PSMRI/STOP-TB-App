@@ -13,6 +13,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -46,6 +47,7 @@ class PullTBFromAmritWorker @AssistedInject constructor(
     companion object {
         const val name = "PullTBFromAmritWorker"
         const val Progress = "Progress"
+        private const val MAX_RUN_ATTEMPTS = 5
 
     }
 
@@ -92,6 +94,9 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                         syncDiagnosticOrderStatuses()
                         return@withContext Result.success()
                     }
+                    // Some TB datasets failed (network or server): try again with
+                    // backoff rather than reporting the pull as complete.
+                    if (runAttemptCount < MAX_RUN_ATTEMPTS) return@withContext Result.retry()
                     return@withContext Result.failure(workDataOf("worker_name" to "PullTBFromAmritWorker", "error" to "Pull operation returned incomplete results"))
                 } catch (e: SQLiteConstraintException) {
                     Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
@@ -100,6 +105,8 @@ class PullTBFromAmritWorker @AssistedInject constructor(
 
             }
 
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: java.lang.Exception) {
             Timber.e("Error occurred in PullTBFromAmritWorker $e ${e.stackTrace}")
 
@@ -133,10 +140,12 @@ class PullTBFromAmritWorker @AssistedInject constructor(
             try {
                 val res = tbRepo.getTBScreeningDetailsFromServer()
                 return@withContext res == 1 || res == 0
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
             }
-            true
+            false
         }
     }
 
@@ -145,10 +154,12 @@ class PullTBFromAmritWorker @AssistedInject constructor(
             try {
                 val res = vitalRepo.getGeneralExaminationDetailsFromServer()
                 return@withContext res == 1 || res == 0
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
             }
-            true
+            false
         }
     }
 
@@ -165,10 +176,12 @@ class PullTBFromAmritWorker @AssistedInject constructor(
             try {
                 val res = tbRepo.getTbSuspectedDetailsFromServer()
                 return@withContext res == 1 || res == 0
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
             }
-            true
+            false
         }
     }
 
@@ -177,7 +190,7 @@ class PullTBFromAmritWorker @AssistedInject constructor(
             try {
                 val res = tbRepo.getGeneralOpdDetailsFromServer()
                 return@withContext res == 1 || res == 0
-            } catch (e: kotlinx.coroutines.CancellationException) {
+            } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
@@ -191,10 +204,12 @@ class PullTBFromAmritWorker @AssistedInject constructor(
             try {
                 val res = tbRepo.getTbDiagnosticsDetailsFromServer()
                 return@withContext res == 1 || res == 0
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
             }
-            true
+            false
         }
     }
 
@@ -203,12 +218,13 @@ class PullTBFromAmritWorker @AssistedInject constructor(
         return  withContext(Dispatchers.IO) {
             try {
                 val res = tbRepo.getTbConfirmedDetailsFromServer()
-                res == 1 || res == 0
+                return@withContext res == 1 || res == 0
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
-
             }
-            true
+            false
         }
     }
 
