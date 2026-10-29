@@ -28,6 +28,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
+import org.piramalswasthya.stoptb.helpers.manualResultTextToStore
 import org.piramalswasthya.stoptb.helpers.serverResultOrNull
 import org.piramalswasthya.stoptb.model.GeneralOpdCache
 import org.piramalswasthya.stoptb.model.GeneralOpdPrescription
@@ -2253,10 +2254,12 @@ class TBRepo @Inject constructor(
                         ) {
                             if (WorkerUtils.isDiagnosticOrderPushActive(context, benId)) {
                                 // Not a connectivity problem: this device's own order push is
-                                // still in flight, and the same submit succeeds once it lands.
-                                // In camp mode the replay sweep handles that. Outside it there is
-                                // no sweep, so say plainly that it is worth retrying rather than
-                                // passing the raw "DiagnosticOrder not found" string to a nurse.
+                                // still in flight, so the same submit succeeds once it lands.
+                                // Queued rather than reported, and replayed by
+                                // DiagnosticResultPollWorker. That worker only runs in camp mode,
+                                // which is the whole deployment - every tablet talks to the camp
+                                // hub and sign-in is not possible without one - so there is no
+                                // mode in which this queue goes unserviced.
                                 return@withContext queueForLaterReplay(
                                     benId, orderType, resultSummary, reasonForRefusal, localResult
                                 )
@@ -2439,11 +2442,13 @@ class TBRepo @Inject constructor(
                     it.copy(
                         rifOrderId = fetchedOrderId ?: it.rifOrderId,
                         rifOrderStatus = OrderStatus.COMPLETED.name,
-                        // Invalid/Error immediately triggers a reorder (see
-                        // TBSuspectedQuickViewModel's ordersToPushAfterSave) — never persist this
-                        // result text locally, or a race with the reorder's own clearing write can
-                        // leave it stuck showing the old value. Indeterminate is terminal, keep it.
-                        trueNatRifResult = if (standardizedRif == RifResult.INVALID_ERROR) null else localResult,
+                        // Invalid/Error triggers a reorder, after which this text must not
+                        // outlive it locally - but only once the backend has accepted the entry.
+                        // While it is queued the text is the only thing the replay can send.
+                        // Indeterminate is terminal, keep it.
+                        trueNatRifResult = manualResultTextToStore(
+                            localResult, standardizedRif == RifResult.INVALID_ERROR, pendingSync
+                        ),
                         // RIF DR TB / Non DR TB manual entry — extend the same
                         // isConfirmed/isTBConfirmed flags the automated path sets;
                         // isDrTbConfirmed distinguishes the DR-TB-specific outcome.
@@ -2474,11 +2479,11 @@ class TBRepo @Inject constructor(
                         trueNatOrderStatus = OrderStatus.COMPLETED.name,
                         isReferredForSputum = true,
                         isNaatConducted = true,
-                        // Invalid/Error immediately triggers a reorder (see
-                        // TBSuspectedQuickViewModel's ordersToPushAfterSave) — never persist this
-                        // result text locally, or a race with the reorder's own clearing write can
-                        // leave it stuck showing the old value.
-                        naatResult = if (standardizedMtb == MtbResult.INVALID_ERROR) null else localResult,
+                        // See the RIF branch above: kept while the entry is still queued for
+                        // replay, dropped once the backend accepts and the reorder is raised.
+                        naatResult = manualResultTextToStore(
+                            localResult, standardizedMtb == MtbResult.INVALID_ERROR, pendingSync
+                        ),
                         isTBConfirmed = when (standardizedMtb) {
                             MtbResult.TB_POSITIVE -> true
                             MtbResult.TB_NEGATIVE -> false
