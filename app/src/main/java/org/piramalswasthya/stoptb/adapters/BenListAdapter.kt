@@ -510,6 +510,10 @@ class BenListAdapter(
             showExamineButton: Boolean = true,
             showScreeningStatus: Boolean = false,   // NEW
             tbDiagnosticsByBenId: Map<Long, TbDiagnosticsCardFields> = emptyMap(),
+            // False until the decoration flow has delivered its first emission. The map
+            // above starts empty, so without this a null row is indistinguishable from
+            // "this beneficiary has no order" - see the loading guards below.
+            tbDiagnosticsLoaded: Boolean = false,
             tbScreeningMap: Map<Long, TbScreeningSymptoms> = emptyMap(),
             source: Int = 0,
             retryingBenIds: List<Long> = emptyList(),
@@ -775,6 +779,16 @@ class BenListAdapter(
                             binding.btnVitalScreenSecondary.visibility = View.GONE
 
                             when {
+                                // The decoration map is filled by a separate flow and starts
+                                // empty, so on every return to this list a null row here means
+                                // "not loaded yet", not "no order". Falling through to the
+                                // Retry Referral branch below made the button flicker through
+                                // Retry Referral on each return - and that branch also fires
+                                // CHECK_PUSH_ACTIVE and offers an action that raises a second
+                                // order for a referral that already succeeded.
+                                tbDiag == null && !tbDiagnosticsLoaded -> {
+                                    ButtonConfig(context.getString(R.string.order_status_checking), android.R.color.darker_gray, "NONE", "XRAY_CHEST")
+                                }
                                 referred == false -> {
                                     ButtonConfig("TEST REFUSED", android.R.color.darker_gray, "NONE", "XRAY_CHEST")
                                 }
@@ -821,6 +835,16 @@ class BenListAdapter(
                             binding.llMtbSummaryStrip.visibility = View.GONE
 
                             when {
+                                // The decoration map is filled by a separate flow and starts
+                                // empty, so on every return to this list a null row here means
+                                // "not loaded yet", not "no order". Falling through to the
+                                // Retry Referral branch below made the button flicker through
+                                // Retry Referral on each return - and that branch also fires
+                                // CHECK_PUSH_ACTIVE and offers an action that raises a second
+                                // order for a referral that already succeeded.
+                                tbDiag == null && !tbDiagnosticsLoaded -> {
+                                    ButtonConfig(context.getString(R.string.order_status_checking), android.R.color.darker_gray, "NONE", "SPUTUM_TRUENAT")
+                                }
                                 referredForSputum == false -> {
                                     ButtonConfig("TEST REFUSED", android.R.color.darker_gray, "NONE", "SPUTUM_TRUENAT")
                                 }
@@ -1398,6 +1422,9 @@ class BenListAdapter(
      */
     private val tbDiagnosticsByBenId = mutableMapOf<Long, TbDiagnosticsCardFields>()
 
+    /** Set by [submitTBDiagnostics]; until then a missing row means "not loaded yet". */
+    private var tbDiagnosticsLoaded = false
+
     private val tbScreeningMap = mutableMapOf<Long, TbScreeningSymptoms>()
     private val householdMemberCountMap = mutableMapOf<Long, Int>()
     private val householdHeadNameMap = mutableMapOf<Long, String>()
@@ -1439,6 +1466,7 @@ class BenListAdapter(
             showAnthropometryButton = showAnthropometryButton,
             showScreeningStatus = showScreeningStatus,
             tbDiagnosticsByBenId = tbDiagnosticsByBenId,
+            tbDiagnosticsLoaded = tbDiagnosticsLoaded,
             tbScreeningMap = tbScreeningMap,
             showRedesignedCard = showRedesignedCard,
             householdMemberCountMap = householdMemberCountMap,
@@ -1482,6 +1510,7 @@ class BenListAdapter(
         tbDiagnosticsList.addAll(list)
         tbDiagnosticsByBenId.clear()
         tbDiagnosticsByBenId.putAll(newByBenId)
+        tbDiagnosticsLoaded = true
         val changedBenIds = (oldByBenId.keys + newByBenId.keys)
             .filterTo(mutableSetOf()) { benId -> oldByBenId[benId] != newByBenId[benId] }
         if (changedBenIds.isNotEmpty()) {

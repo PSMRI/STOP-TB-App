@@ -86,13 +86,15 @@ class TBScreeningListFragment : Fragment() {
             canFill = canFillTbScreening
         )
         binding.rvAny.adapter = benAdapter
+        binding.flLoading.visibility = View.VISIBLE
+        binding.rvAny.visibility = View.GONE
+        // fl_empty declares no visibility and therefore starts VISIBLE, which is what drew
+        // "No records found" on top of the list (and, briefly, on top of this loader).
+        binding.flEmpty.visibility = View.GONE
 
         lifecycleScope.launch {
             viewModel.benList.collect {
-                if (it.isEmpty())
-                    binding.flEmpty.visibility = View.VISIBLE
-                else
-                    binding.flEmpty.visibility = View.GONE
+                renderListState(it)
                 benAdapter.submitList(it)
             }
         }
@@ -108,6 +110,7 @@ class TBScreeningListFragment : Fragment() {
             }
 
             override fun afterTextChanged(p0: Editable?) {
+                onQueryChanged()
                 viewModel.filterText(p0?.toString()?.trim() ?: "")
             }
 
@@ -142,4 +145,37 @@ class TBScreeningListFragment : Fragment() {
         _binding = null
     }
 
+    /**
+     * Loading, empty and list are mutually exclusive. Previously only fl_empty was toggled, so
+     * before the first emission the screen was blank, and an empty first emission drew
+     * "No records found" on top of rv_any rather than instead of it.
+     */
+    private fun renderListState(items: List<*>) {
+        _binding?.let { b ->
+            b.rvAny.removeCallbacks(showSearchLoader)
+            b.flLoading.visibility = View.GONE
+            b.flEmpty.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
+            b.rvAny.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
+        }
+    }
+
+    /** Posted on each query change; the next emission cancels it, so a fast filter never flashes. */
+    private val showSearchLoader = Runnable {
+        _binding?.let { b ->
+            b.flEmpty.visibility = View.GONE
+            b.rvAny.visibility = View.GONE
+            b.flLoading.visibility = View.VISIBLE
+        }
+    }
+
+    private fun onQueryChanged() {
+        _binding?.rvAny?.let { rv ->
+            rv.removeCallbacks(showSearchLoader)
+            rv.postDelayed(showSearchLoader, SEARCH_LOADER_DELAY_MS)
+        }
+    }
+
+    companion object {
+        private const val SEARCH_LOADER_DELAY_MS = 300L
+    }
 }

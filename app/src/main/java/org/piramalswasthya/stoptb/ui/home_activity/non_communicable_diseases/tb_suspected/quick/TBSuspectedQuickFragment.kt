@@ -1,5 +1,7 @@
 package org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.tb_suspected.quick
 
+import android.annotation.SuppressLint
+import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -8,6 +10,9 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import androidx.swiperefreshlayout.widget.CircularProgressDrawable
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
@@ -91,6 +96,44 @@ class TBSuspectedQuickFragment : Fragment() {
                 }
             }
         }
+        // Form-load state — same llContent/llLoading pair NewBenRegFragment uses.
+        viewModel.isLoading.observe(viewLifecycleOwner) { loading ->
+            binding.llContent.visibility = if (loading) View.GONE else View.VISIBLE
+            binding.llLoading.visibility = if (loading) View.VISIBLE else View.GONE
+        }
+
+        // The advisory result check reports itself in a live region beside the form, and Submit
+        // keeps its own label and stays usable. Relabelling the primary action to report
+        // background work read as "my submission is in flight", carried the only copy of that
+        // status on a disabled control that TalkBack never announces, and could hold the one
+        // action on this screen for as long as the 60 s client read timeout.
+        viewModel.resultCheck.observe(viewLifecycleOwner) { state ->
+            binding.llCheckStatus.removeCallbacks(showCheckingStatus)
+            when (state!!) {
+                // Delayed so a check that answers in tens of milliseconds — the common case on a
+                // healthy hub — never flashes a status line at the user.
+                TBSuspectedQuickViewModel.ResultCheck.CHECKING ->
+                    binding.llCheckStatus.postDelayed(showCheckingStatus, CHECK_STATUS_DELAY_MS)
+
+                TBSuspectedQuickViewModel.ResultCheck.IDLE ->
+                    binding.llCheckStatus.visibility = View.GONE
+
+                TBSuspectedQuickViewModel.ResultCheck.FAILED -> {
+                    binding.llCheckStatus.visibility = View.VISIBLE
+                    binding.pbCheckStatus.visibility = View.GONE
+                    binding.tvCheckStatus.text = getString(R.string.check_newer_result_failed)
+                }
+
+                // A result landed while the form was being filled. The typed values are left
+                // alone; this only says so, rather than discarding the arrival silently.
+                TBSuspectedQuickViewModel.ResultCheck.NEWER_AVAILABLE -> {
+                    binding.llCheckStatus.visibility = View.VISIBLE
+                    binding.pbCheckStatus.visibility = View.GONE
+                    binding.tvCheckStatus.text = getString(R.string.result_newer_available)
+                }
+            }
+        }
+
         val isXrayDone = viewModel.viewOnly && viewModel.referralType == 6 && viewModel.getIsChestXRayDone() == true
         val isNaatDone = viewModel.viewOnly && viewModel.referralType == 7 && viewModel.getIsNaatConducted() == true
         if (!(isXrayDone || isNaatDone)) {
@@ -100,7 +143,13 @@ class TBSuspectedQuickFragment : Fragment() {
         }
         viewModel.state.observe(viewLifecycleOwner) {
             when (it) {
+                // The form stays on screen, so the beneficiary this result belongs to is still
+                // visible while the one irreversible step runs. Hiding it behind a full-screen
+                // spinner removed that context and was indistinguishable from a frozen app.
+                TBSuspectedQuickViewModel.State.SAVING -> setSubmitting(true)
+
                 TBSuspectedQuickViewModel.State.SAVE_SUCCESS -> {
+                    setSubmitting(false)
                     val message = if (viewModel.savedOfflinePendingSync.value == true) {
                         getString(R.string.diagnostics_saved_offline_pending_sync)
                     } else {
@@ -115,7 +164,26 @@ class TBSuspectedQuickFragment : Fragment() {
                     findNavController().navigateUp()
                 }
 
+                // The backend refused the entry because it already holds a result. Naming that
+                // result is the point: the raw rejection string left the user on the form with
+                // no idea what the real result was, or that pressing Submit again was futile.
+                TBSuspectedQuickViewModel.State.RESULT_ALREADY_RECORDED -> {
+                    setSubmitting(false)
+                    val recorded = viewModel.alreadyRecordedResult.value.orEmpty()
+                    MaterialAlertDialogBuilder(requireContext())
+                        .setTitle(R.string.result_already_recorded_title)
+                        .setMessage(getString(R.string.result_already_recorded_message, recorded))
+                        .setCancelable(false)
+                        .setPositiveButton(android.R.string.ok) { _, _ ->
+                            findNavController().navigateUp()
+                        }
+                        .show()
+                    viewModel.resetState()
+                }
+
                 TBSuspectedQuickViewModel.State.SAVE_FAILED -> {
+                    // Everything the user typed is still on screen — they can correct and retry.
+                    setSubmitting(false)
                     val msg = viewModel.errorMessage.value ?: getString(R.string.tb_suspected_quick_save_failed)
                     Toast.makeText(
                         requireContext(),
@@ -125,9 +193,43 @@ class TBSuspectedQuickFragment : Fragment() {
                     viewModel.resetState()
                 }
 
-                TBSuspectedQuickViewModel.State.SAVING,
                 TBSuspectedQuickViewModel.State.IDLE -> Unit
             }
+        }
+    }
+
+    /** Posted, not shown immediately — see the resultCheck observer. */
+    private val showCheckingStatus = Runnable {
+        _binding?.let { b ->
+            b.pbCheckStatus.visibility = View.VISIBLE
+            b.tvCheckStatus.text = getString(R.string.checking_newer_result)
+            b.llCheckStatus.visibility = View.VISIBLE
+        }
+    }
+
+    /**
+     * Submitting is a commitment, so it reports itself on the control the user pressed rather
+     * than through the same anonymous spinner the screen uses while it is still loading.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setSubmitting(submitting: Boolean) {
+        binding.btnSubmit.isEnabled = !submitting
+        binding.btnSubmit.text =
+            getString(if (submitting) R.string.submitting else R.string.btn_submit)
+        if (submitting) {
+            binding.btnSubmit.icon = CircularProgressDrawable(requireContext()).apply {
+                setStyle(CircularProgressDrawable.DEFAULT)
+                setColorSchemeColors(Color.WHITE)
+                start()
+            }
+            binding.btnSubmit.iconGravity = MaterialButton.ICON_GRAVITY_END
+            // The values were snapshotted when the save began, so edits made now would be
+            // silently dropped; swallow touches for the duration instead of accepting them.
+            binding.form.rvInputForm.setOnTouchListener { _, _ -> true }
+        } else {
+            (binding.btnSubmit.icon as? CircularProgressDrawable)?.stop()
+            binding.btnSubmit.icon = null
+            binding.form.rvInputForm.setOnTouchListener(null)
         }
     }
 
@@ -170,9 +272,15 @@ class TBSuspectedQuickFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        _binding?.llCheckStatus?.removeCallbacks(showCheckingStatus)
         if (isManagedFlow) {
             setAutoFlowBackNavigationBlocked(false)
         }
         _binding = null
+    }
+
+    companion object {
+        /** Long enough that a healthy hub's check never flashes a status line. */
+        private const val CHECK_STATUS_DELAY_MS = 300L
     }
 }

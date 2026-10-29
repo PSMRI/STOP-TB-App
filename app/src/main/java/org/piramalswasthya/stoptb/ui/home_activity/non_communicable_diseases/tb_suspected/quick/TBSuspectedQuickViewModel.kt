@@ -8,10 +8,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.piramalswasthya.stoptb.configuration.TBSuspectedQuickDataset
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.room.SyncState
@@ -42,7 +44,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
 ) : ViewModel() {
 
     enum class State {
-        IDLE, SAVING, SAVE_SUCCESS, SAVE_FAILED
+        IDLE, SAVING, SAVE_SUCCESS, SAVE_FAILED, RESULT_ALREADY_RECORDED
     }
 
     private val args = TBSuspectedQuickFragmentArgs.fromSavedStateHandle(savedStateHandle)
@@ -76,6 +78,34 @@ class TBSuspectedQuickViewModel @Inject constructor(
 
     private val _showSubmit = MutableLiveData(true)
     val showSubmit: LiveData<Boolean> = _showSubmit
+
+    /** True only while the local row is being read, which is a handful of indexed lookups. */
+    private val _isLoading = MutableLiveData(true)
+    val isLoading: LiveData<Boolean> = _isLoading
+
+    /** State of the advisory background check for a newer order result. */
+    enum class ResultCheck { IDLE, CHECKING, FAILED, NEWER_AVAILABLE }
+
+    /**
+     * The check is advisory, never a gate: it can fail, time out, or find nothing, and the user
+     * may still enter a result either way. It is surfaced as a status line beside the form rather
+     * than by disabling Submit - the backend is the authority on a duplicate manual result and
+     * already rejects one ("order already COMPLETED"), so blocking the only action on this screen
+     * while an optional network read runs would cost a field worker up to the client's 60 s read
+     * timeout to prevent an error the server handles correctly.
+     */
+    private val _resultCheck = MutableLiveData(ResultCheck.IDLE)
+    val resultCheck: LiveData<ResultCheck> = _resultCheck
+
+    /** Advisory check gets its own bound; OkHttp's own read timeout is 60 s. */
+    private val RESULT_CHECK_TIMEOUT_MS = 8_000L
+
+    /** The result the backend already held when it rejected this submission. */
+    private val _alreadyRecordedResult = MutableLiveData<String?>(null)
+    val alreadyRecordedResult: LiveData<String?> = _alreadyRecordedResult
+
+    /** Set as soon as the user touches a field; see [refreshLatestOrderResult]. */
+    private var userHasEditedForm = false
 
     private lateinit var tbDiagnostics: TBDiagnosticsCache
 
@@ -121,61 +151,159 @@ class TBSuspectedQuickViewModel @Inject constructor(
                     _benAgeGender.postValue("$age $ageUnit / $gender")
                 }
 
-                val orderType = if (referralType == 6) "XRAY_CHEST" else "SPUTUM_TRUENAT"
-                val hasLocalResult = if (orderType == "XRAY_CHEST") {
-                    !tbDiagnostics.chestXRayResult.isNullOrBlank()
-                } else {
-                    !tbDiagnostics.naatResult.isNullOrBlank()
-                }
-                // Real order/result contract: PENDING is the only "in flight" value our own
-                // writes ever produce (IN_PROGRESS/AWAITING_PROVIDER_RESULT are never actually
-                // stored — see TBRepo.reducedOrderStatus). Also require a real order id — a
-                // status can be optimistically PENDING before the referral's own push has
-                // actually landed (see TBScreeningFormViewModel), and fetching a result for an
-                // order that doesn't exist yet would just fail server-side for no benefit.
-                val isOrderActive = if (orderType == "XRAY_CHEST") {
-                    val status = tbDiagnostics.xrayOrderStatus
-                    !tbDiagnostics.xrayOrderId.isNullOrBlank() &&
-                        (status.equals("COMPLETED", ignoreCase = true) || status.equals("PENDING", ignoreCase = true))
-                } else {
-                    val status = tbDiagnostics.trueNatOrderStatus
-                    !tbDiagnostics.trueNatOrderId.isNullOrBlank() &&
-                        (status.equals("COMPLETED", ignoreCase = true) || status.equals("PENDING", ignoreCase = true))
-                }
-                if (!hasLocalResult && isOrderActive) {
-                    try {
-                        tbRepo.fetchOrderResult(benId, orderType)
-                    } catch (e: Exception) {
-                        Timber.e(e, "Pre-fetching results failed for $orderType")
+            }
+
+            // Build the form from the local row and show it straight away. Fetching the latest
+            // order result used to run inside the withContext above, so formList stayed empty -
+            // and the screen blank, with no spinner - for the whole order/result round trip,
+            // measured at 108 ms to 18.7 s against this backend.
+            renderPage(ben, tbScreening, vital)
+            _isLoading.value = false
+
+            refreshLatestOrderResult(ben, tbScreening, vital)
+        }
+    }
+
+    private fun resultFor(diagnostics: TBDiagnosticsCache, orderType: String): String? =
+        when (orderType) {
+            "XRAY_CHEST" -> diagnostics.chestXRayResult
+            "MDR_RIF" -> diagnostics.trueNatRifResult
+            else -> diagnostics.naatResult
+        }
+
+    /**
+     * Asks the backend what it actually holds after it refused this submission, instead of
+     * deciding from the rejection's wording - the message is backend- and locale-dependent, and
+     * the question we care about ("is there already a result?") has a direct answer.
+     * [TBRepo.fetchOrderResult] stores the authoritative row, so the card shows it afterwards.
+     */
+    private suspend fun resultAlreadyOnServer(): String? {
+        val orderType = if (referralType == 6) "XRAY_CHEST" else "SPUTUM_TRUENAT"
+        return try {
+            tbRepo.fetchOrderResult(benId, orderType, pushSuspectedAfter = false)
+            val fresh = tbRepo.getTBDiagnosticsById(benId) ?: return null
+            resultFor(fresh, orderType)?.takeIf { it.isNotBlank() }
+                ?: if (referralType == 7) {
+                    tbRepo.fetchOrderResult(benId, "MDR_RIF", pushSuspectedAfter = false)
+                    tbRepo.getTBDiagnosticsById(benId)
+                        ?.let { resultFor(it, "MDR_RIF") }?.takeIf { it.isNotBlank() }
+                } else null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e, "Could not read back the server's result after a rejected submission")
+            null
+        }
+    }
+
+    private suspend fun renderPage(
+        ben: BenRegCache?,
+        tbScreening: TBScreeningCache?,
+        vital: VitalCache?
+    ) {
+        dataset.setUpPage(
+            ben,
+            tbScreening,
+            if (::tbDiagnostics.isInitialized) tbDiagnostics else null,
+            vital = vital,
+            referralMode = viewOnly,
+            referralType = referralType,
+            manualEntryAction = manualEntryAction
+        )
+        _showSubmit.value = dataset.shouldShowSubmit()
+    }
+
+    /**
+     * Pulls the latest result for this screen's order type, now that the form is already visible.
+     * Same calls and same conditions as before, just no longer between the user and the form.
+     */
+    private suspend fun refreshLatestOrderResult(
+        ben: BenRegCache?,
+        tbScreening: TBScreeningCache?,
+        vital: VitalCache?
+    ) {
+        val orderType = if (referralType == 6) "XRAY_CHEST" else "SPUTUM_TRUENAT"
+        val hasLocalResult = if (orderType == "XRAY_CHEST") {
+            !tbDiagnostics.chestXRayResult.isNullOrBlank()
+        } else {
+            !tbDiagnostics.naatResult.isNullOrBlank()
+        }
+        // Real order/result contract: PENDING is the only "in flight" value our own
+        // writes ever produce (IN_PROGRESS/AWAITING_PROVIDER_RESULT are never actually
+        // stored — see TBRepo.reducedOrderStatus). Also require a real order id — a
+        // status can be optimistically PENDING before the referral's own push has
+        // actually landed (see TBScreeningFormViewModel), and fetching a result for an
+        // order that doesn't exist yet would just fail server-side for no benefit.
+        val isOrderActive = if (orderType == "XRAY_CHEST") {
+            val status = tbDiagnostics.xrayOrderStatus
+            !tbDiagnostics.xrayOrderId.isNullOrBlank() &&
+                (status.equals("COMPLETED", ignoreCase = true) || status.equals("PENDING", ignoreCase = true))
+        } else {
+            val status = tbDiagnostics.trueNatOrderStatus
+            !tbDiagnostics.trueNatOrderId.isNullOrBlank() &&
+                (status.equals("COMPLETED", ignoreCase = true) || status.equals("PENDING", ignoreCase = true))
+        }
+        val needsOrderResult = !hasLocalResult && isOrderActive
+        // Evaluated against the same pre-fetch snapshot the old inline version used, so the
+        // RIF leg still fires on exactly the rows it did before.
+        val needsRifResult = orderType == "SPUTUM_TRUENAT" &&
+                MtbResult.fromResultText(tbDiagnostics.naatResult) == MtbResult.TB_POSITIVE &&
+                tbDiagnostics.trueNatRifResult.isNullOrBlank() &&
+                !tbDiagnostics.rifOrderId.isNullOrBlank() &&
+                (tbDiagnostics.rifOrderStatus.equals("COMPLETED", ignoreCase = true) ||
+                        tbDiagnostics.rifOrderStatus.equals("PENDING", ignoreCase = true))
+        if (!needsOrderResult && !needsRifResult) return
+
+        _resultCheck.value = ResultCheck.CHECKING
+        var refreshed: TBDiagnosticsCache? = null
+        // Bounded independently of OkHttp's 60 s read timeout, and the outcome is recorded on
+        // every path. Reading the row back used to sit outside any catch, so a failure there
+        // left the status stuck on "checking" for the life of the screen.
+        val checkCompleted = try {
+            withTimeoutOrNull(RESULT_CHECK_TIMEOUT_MS) {
+                withContext(Dispatchers.IO) {
+                    if (needsOrderResult) {
+                        try {
+                            tbRepo.fetchOrderResult(benId, orderType)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Timber.e(e, "Pre-fetching results failed for $orderType")
+                        }
                     }
-                }
-                if (orderType == "SPUTUM_TRUENAT" && MtbResult.fromResultText(tbDiagnostics.naatResult) == MtbResult.TB_POSITIVE) {
-                    val hasLocalRifResult = !tbDiagnostics.trueNatRifResult.isNullOrBlank()
-                    val isRifActive = !tbDiagnostics.rifOrderId.isNullOrBlank() &&
-                            (tbDiagnostics.rifOrderStatus.equals("COMPLETED", ignoreCase = true) ||
-                                    tbDiagnostics.rifOrderStatus.equals("PENDING", ignoreCase = true))
-                    if (!hasLocalRifResult && isRifActive) {
+                    if (needsRifResult) {
                         try {
                             tbRepo.fetchOrderResult(benId, "MDR_RIF")
+                        } catch (e: CancellationException) {
+                            throw e
                         } catch (e: Exception) {
                             Timber.e(e, "Pre-fetching results failed for MDR_RIF")
                         }
                     }
+                    refreshed = tbRepo.getTBDiagnostics(benId)
                 }
-                tbRepo.getTBDiagnostics(benId)?.let {
-                    tbDiagnostics = it
-                }
+                true
+            } == true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e, "Checking for a newer result failed for benId=%s", benId)
+            false
+        }
+        _resultCheck.value = if (checkCompleted) ResultCheck.IDLE else ResultCheck.FAILED
+
+        // Rebuilding the page replaces every field, so a result arriving after the user has
+        // started filling the form is left for the next open rather than wiping their input.
+        val latest = refreshed
+        if (latest != null && latest != tbDiagnostics) {
+            if (!userHasEditedForm) {
+                tbDiagnostics = latest
+                renderPage(ben, tbScreening, vital)
+            } else if (!resultFor(latest, orderType).isNullOrBlank()) {
+                // Their input stays exactly as typed, but a result landing mid-edit is no longer
+                // dropped in silence - submitting over it is what the backend rejects.
+                _resultCheck.value = ResultCheck.NEWER_AVAILABLE
             }
-            dataset.setUpPage(
-                ben,
-                tbScreening,
-                if (::tbDiagnostics.isInitialized) tbDiagnostics else null,
-                vital = vital,
-                referralMode = viewOnly,
-                referralType = referralType,
-                manualEntryAction = manualEntryAction
-            )
-            _showSubmit.value = dataset.shouldShowSubmit()
         }
     }
 
@@ -226,10 +354,14 @@ class TBSuspectedQuickViewModel @Inject constructor(
     }
 
     fun saveForm() {
+        // Both set on the caller's (main) thread, before the coroutine starts. SAVING used to be
+        // posted from inside the IO block below, which left a window where a second tap still
+        // saw IDLE and fired a second order/manualResult POST for the same result.
+        if (_state.value == State.SAVING) return
+        _state.value = State.SAVING
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 try {
-                    _state.postValue(State.SAVING)
                     dataset.mapValues(tbDiagnostics, 1)
 
                     val isXrayDevIntegrated = tbRepo.isXrayIntegrated()
@@ -597,8 +729,14 @@ class TBSuspectedQuickViewModel @Inject constructor(
                         _state.postValue(State.SAVE_SUCCESS)
                     } else {
                         Timber.e("API submission failed for benId=%s: %s", benId, apiError)
-                        _errorMessage.postValue(apiError ?: "Failed to save data")
-                        _state.postValue(State.SAVE_FAILED)
+                        val serverResult = resultAlreadyOnServer()
+                        if (serverResult != null) {
+                            _alreadyRecordedResult.postValue(serverResult)
+                            _state.postValue(State.RESULT_ALREADY_RECORDED)
+                        } else {
+                            _errorMessage.postValue(apiError ?: "Failed to save data")
+                            _state.postValue(State.SAVE_FAILED)
+                        }
                     }
                 } catch (e: Exception) {
                     Timber.e(e, "Saving diagnostics failed for benId=%s", benId)
@@ -609,6 +747,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
     }
 
     fun updateListOnValueChanged(formId: Int, index: Int) {
+        userHasEditedForm = true
         viewModelScope.launch {
             dataset.updateList(formId, index)
             _showSubmit.value = dataset.shouldShowSubmit()

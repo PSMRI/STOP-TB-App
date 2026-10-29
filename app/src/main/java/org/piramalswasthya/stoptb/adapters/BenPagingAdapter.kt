@@ -60,6 +60,9 @@ class BenPagingAdapter(
      */
     private val tbDiagnosticsByBenId = mutableMapOf<Long, TbDiagnosticsCardFields>()
 
+    /** Set by [submitTBDiagnostics]; until then a missing row means "not loaded yet". */
+    private var tbDiagnosticsLoaded = false
+
     private val tbScreeningMap = mutableMapOf<Long, TbScreeningSymptoms>()
     private val retryingBenIds = mutableListOf<Long>()
 
@@ -101,6 +104,7 @@ class BenPagingAdapter(
             showAnthropometryButton = showAnthropometryButton,
             showExamineButton = showExamineButton,
             tbDiagnosticsByBenId = tbDiagnosticsByBenId,
+            tbDiagnosticsLoaded = tbDiagnosticsLoaded,
             tbScreeningMap = tbScreeningMap,
             showScreeningStatus = showScreeningStatus,   // ADD THIS
             showRedesignedCard = showRedesignedCard,
@@ -124,6 +128,7 @@ class BenPagingAdapter(
         tbDiagnosticsList.addAll(list)
         tbDiagnosticsByBenId.clear()
         tbDiagnosticsByBenId.putAll(newByBenId)
+        tbDiagnosticsLoaded = true
         val changedBenIds = (oldByBenId.keys + newByBenId.keys)
             .filterTo(mutableSetOf()) { benId -> oldByBenId[benId] != newByBenId[benId] }
         if (changedBenIds.isNotEmpty()) {
