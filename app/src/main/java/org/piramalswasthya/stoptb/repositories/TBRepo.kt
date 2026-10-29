@@ -28,6 +28,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
+import org.piramalswasthya.stoptb.helpers.serverResultOrNull
 import org.piramalswasthya.stoptb.model.GeneralOpdCache
 import org.piramalswasthya.stoptb.model.GeneralOpdPrescription
 import org.piramalswasthya.stoptb.model.OpdMedicineDraft
@@ -2251,8 +2252,13 @@ class TBRepo @Inject constructor(
                             errMsg.contains("DiagnosticOrder not found for beneficiaryId=")
                         ) {
                             if (WorkerUtils.isDiagnosticOrderPushActive(context, benId)) {
-                                return@withContext queueForCampReplayOrFail(
-                                    benId, orderType, resultSummary, reasonForRefusal, localResult, errMsg
+                                // Not a connectivity problem: this device's own order push is
+                                // still in flight, and the same submit succeeds once it lands.
+                                // In camp mode the replay sweep handles that. Outside it there is
+                                // no sweep, so say plainly that it is worth retrying rather than
+                                // passing the raw "DiagnosticOrder not found" string to a nurse.
+                                return@withContext queueForLaterReplay(
+                                    benId, orderType, resultSummary, reasonForRefusal, localResult
                                 )
                             }
                             val orderResult = createOrder(benId, orderType)
@@ -2275,8 +2281,8 @@ class TBRepo @Inject constructor(
                                     context.getString(R.string.diagnostic_order_creation_failed, orderErrMsg)
                                 )
                             }
-                            return@withContext queueForCampReplayOrFail(
-                                benId, orderType, resultSummary, reasonForRefusal, localResult, orderErrMsg
+                            return@withContext queueForLaterReplay(
+                                benId, orderType, resultSummary, reasonForRefusal, localResult
                             )
                         }
                         // A definitive rejection (e.g. already COMPLETED) won't succeed on retry —
@@ -2285,14 +2291,14 @@ class TBRepo @Inject constructor(
                     }
                 } else {
                     // Couldn't confirm anything either way — treat like an unreachable hub.
-                    return@withContext queueForCampReplayOrFail(
-                        benId, orderType, resultSummary, reasonForRefusal, localResult, null
+                    return@withContext queueForLaterReplay(
+                        benId, orderType, resultSummary, reasonForRefusal, localResult
                     )
                 }
             } catch (e: Exception) {
                 Timber.e(e, "submitManualResult failed")
-                return@withContext queueForCampReplayOrFail(
-                    benId, orderType, resultSummary, reasonForRefusal, localResult, null
+                return@withContext queueForLaterReplay(
+                    benId, orderType, resultSummary, reasonForRefusal, localResult
                 )
             }
         }
@@ -2339,28 +2345,23 @@ class TBRepo @Inject constructor(
     }
 
     /**
-     * Queues the entry for later replay, but only in camp mode.
+     * Stores the entry for later replay. Offline-first in both modes: a result a health worker
+     * has typed is never discarded because the network was unavailable at that instant.
      *
-     * The replay sweep lives in DiagnosticResultPollWorker, which by design only runs when camp
-     * mode is on and the hub is connected - polling needs the hub. Outside camp mode a queued
-     * result would therefore sit with its pending-sync flag set and never be replayed, while the
-     * user was told "saved locally, will sync when Camp Hub reconnects" about a camp hub they
-     * are not using. Reporting the failure is the honest outcome there: nothing is stored that
-     * claims to be on its way.
+     * DiagnosticResultPollWorker replays these once the hub is reachable again. That worker is
+     * camp-mode only, which is the whole deployment: every tablet talks to the camp hub, and
+     * sign-in is not possible without it. An earlier version of this refused to store anything
+     * outside camp mode on the grounds that nothing would replay it there - a case that does not
+     * arise, and the wrong trade regardless, since discarding a typed result is worse than
+     * storing one that syncs late.
      */
-    private suspend fun queueForCampReplayOrFail(
+    private suspend fun queueForLaterReplay(
         benId: Long,
         orderType: String,
         resultSummary: String?,
         reasonForRefusal: String?,
-        localResult: String?,
-        errorMessage: String?
+        localResult: String?
     ): NetworkResponse<String> {
-        if (!preferenceDao.isCampModeEnabled()) {
-            return NetworkResponse.Error(
-                errorMessage ?: context.getString(R.string.manual_result_not_saved_offline)
-            )
-        }
         saveManualResultPendingSync(benId, orderType, resultSummary, reasonForRefusal, localResult)
         return NetworkResponse.Success(PENDING_SYNC)
     }
@@ -2608,14 +2609,12 @@ class TBRepo @Inject constructor(
         // Outside the lock on purpose: fetchOrderResult takes the same per-benId lock and
         // kotlinx Mutex is not reentrant.
         val recordedResult = try {
-            fetchOrderResult(benId, orderType, pushSuspectedAfter = false)
-            tbDao.getTbDiagnosticsByBenId(benId)?.let { fresh ->
-                when {
-                    orderType.equals("XRAY_CHEST", ignoreCase = true) -> fresh.chestXRayResult
-                    orderType.equals("MDR_RIF", ignoreCase = true) -> fresh.trueNatRifResult
-                    else -> fresh.naatResult
-                }
-            }?.takeIf { it.isNotBlank() }
+            // Same contract as resultAlreadyOnServer(): fetchOrderResult signals failure by
+            // returning Error, not by throwing, and leaves the stored result untouched for a
+            // non-completed order. Reading the row back regardless would hand the user their own
+            // unsynced entry as "the result already on the server".
+            val fetched = fetchOrderResult(benId, orderType, pushSuspectedAfter = false)
+            serverResultOrNull(fetched, tbDao.getTbDiagnosticsByBenId(benId), orderType)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
