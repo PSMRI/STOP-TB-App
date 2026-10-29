@@ -16,8 +16,8 @@ import timber.log.Timber
 // user is logged out or camp sync is not active.
 //
 // It also reports records the server has not accepted for more than a day to
-// Crashlytics (entity, record ID and server error only; no personal data), at
-// most once a day per record, so support sees them without collecting logs.
+// Crashlytics (entity, record ID and the status code of the last error only),
+// at most once a day per record, so support sees them without collecting logs.
 @HiltWorker
 class SyncHeartbeatWorker @AssistedInject constructor(
     @Assisted appContext: Context,
@@ -29,7 +29,7 @@ class SyncHeartbeatWorker @AssistedInject constructor(
     companion object {
         const val name = "SyncHeartbeatWorker"
         private const val DAY_MILLIS = 24 * 60 * 60 * 1000L
-        private const val MAX_ERROR_LENGTH = 120
+        private val STATUS_PATTERN = Regex("^(statusCode=\\d+|HTTP \\d+)")
     }
 
     class LongUnsyncedRecordException(message: String) : Exception(message)
@@ -49,10 +49,15 @@ class SyncHeartbeatWorker @AssistedInject constructor(
                 analyticsHelper.recordException(
                     LongUnsyncedRecordException(
                         "${it.entity} ${it.id} not accepted by server for ${hours}h, " +
-                                "${it.attempts} attempts, last error: ${it.lastError.take(MAX_ERROR_LENGTH)}"
+                                "${it.attempts} attempts, last error: ${errorCategory(it.lastError)}"
                     )
                 )
                 syncRetryStore.markReported(it.entity, it.id, now)
             }
     }
+
+    // The server's error text can echo record data, so only the status code goes
+    // to Crashlytics. The full text stays on the device's Sync Dashboard.
+    private fun errorCategory(lastError: String): String =
+        STATUS_PATTERN.find(lastError)?.value ?: "rejected"
 }
