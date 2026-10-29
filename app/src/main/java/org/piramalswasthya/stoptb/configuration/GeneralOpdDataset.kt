@@ -8,12 +8,17 @@ import org.piramalswasthya.stoptb.model.GeneralOpdCache
 import org.piramalswasthya.stoptb.model.InputType
 
 class GeneralOpdDataset(context: Context, currentLanguage: Languages) : Dataset(context, currentLanguage) {
+    // Keep canonical complaint names for ID resolution; translated legacy arrays
+    // contain a different list. These defaults never enter the API master cache.
+    private val fallbackChiefComplaints =
+        englishResources.getStringArray(R.array.general_opd_chief_complaint_array)
+
     private val chiefComplaint = FormElement(
         id = 1,
         inputType = InputType.CHECKBOXES,
         title = resources.getString(R.string.chief_complaint),
         arrayId = R.array.general_opd_chief_complaint_array,
-        entries = emptyArray(),
+        entries = fallbackChiefComplaints.copyOf(),
         required = false,
         hasDependants = true,
         showAsMultiSelectDialog = true,
@@ -31,7 +36,11 @@ class GeneralOpdDataset(context: Context, currentLanguage: Languages) : Dataset(
     }
 
     fun setChiefComplaintEntries(entries: List<String>) {
-        chiefComplaint.entries = entries.toTypedArray()
+        chiefComplaint.entries = if (!GeneralOpdMasterConfig.USE_API_MASTERS || entries.isEmpty()) {
+            fallbackChiefComplaints.copyOf()
+        } else {
+            entries.toTypedArray()
+        }
     }
 
     override suspend fun handleListOnValueChanged(formId: Int, index: Int): Int = -1

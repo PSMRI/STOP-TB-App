@@ -14,6 +14,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.configuration.GeneralOpdMasterConfig
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
@@ -125,7 +126,12 @@ class TBRepo @Inject constructor(
     }
 
     suspend fun getCachedChiefComplaintNames(): List<String> =
-        database.chiefComplaintMasterDao.getChiefComplaints().map { it.chiefComplaint }
+        if (GeneralOpdMasterConfig.USE_API_MASTERS) {
+            database.chiefComplaintMasterDao.getChiefComplaints().map { it.chiefComplaint }
+        } else {
+            // The dataset supplies the canonical static resource list.
+            emptyList()
+        }
 
     suspend fun getGeneralOpdPrescriptions(opdId: Int) = withContext(Dispatchers.IO) {
         tbDao.getGeneralOpdPrescriptions(opdId)
@@ -147,9 +153,12 @@ class TBRepo @Inject constructor(
             }
         }
 
-    private suspend fun resolveChiefComplaintIds(cache: GeneralOpdCache): List<Int>? {
+    internal suspend fun resolveChiefComplaintIds(cache: GeneralOpdCache): List<Int>? {
         val names = cache.chiefComplaints.orEmpty()
         cache.chiefComplaintIds?.takeIf { it.size == names.size && it.all { id -> id > 0 } }?.let { return it }
+        // Preserve existing IDs. Resolve missing IDs on both local save and push retry
+        // using the supplied static mapping, never the obsolete API cache.
+        if (!GeneralOpdMasterConfig.USE_API_MASTERS) return BundledChiefComplaints.resolveIds(names)
         val master = database.chiefComplaintMasterDao.getChiefComplaints()
         val ids = names.map { name ->
             master.singleOrNull { it.chiefComplaint.trim().equals(name.trim(), ignoreCase = true) }
@@ -202,6 +211,7 @@ class TBRepo @Inject constructor(
     }
 
     suspend fun refreshVisitCategories(): Boolean {
+        if (!GeneralOpdMasterConfig.USE_API_MASTERS) return false
         return try {
             val categoriesResponse = tmcNetworkApiService.getVisitReasonAndCategories()
             val categoriesBody = categoriesResponse.body()
@@ -224,6 +234,7 @@ class TBRepo @Inject constructor(
     }
 
     suspend fun refreshChiefComplaintMasters(): Boolean {
+        if (!GeneralOpdMasterConfig.USE_API_MASTERS) return false
         val loggedInUser = preferenceDao.getLoggedInUser() ?: return false
 
         return try {

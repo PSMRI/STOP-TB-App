@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.piramalswasthya.stoptb.configuration.GeneralOpdMasterConfig
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.DrugItemMasterCache
@@ -33,11 +34,15 @@ class DrugMasterRepo @Inject constructor(
     }
 
     suspend fun getCachedMasters(): OpdDrugMasters = withContext(Dispatchers.IO) {
+        if (!GeneralOpdMasterConfig.USE_API_MASTERS) {
+            return@withContext BundledDrugMasters.forScope("general-opd/static")
+        }
         val request = currentRequest() ?: return@withContext OpdDrugMasters()
-        database.drugMasterDao.getMasters(request.scope)
+        selectMasters(database.drugMasterDao.getMasters(request.scope), request.scope)
     }
 
     suspend fun refreshMasters(): Boolean = withContext(Dispatchers.IO) {
+        if (!GeneralOpdMasterConfig.USE_API_MASTERS) return@withContext false
         refreshMutex.withLock {
             val request = currentRequest() ?: return@withLock false
             try {
@@ -69,6 +74,22 @@ class DrugMasterRepo @Inject constructor(
         private const val MASTER_FACILITY_ID = 134
         private const val MASTER_GENDER = "Male"
 
+        // Keep API cache scoped; bundled defaults are a read-time fallback only.
+        internal fun selectMasters(cached: OpdDrugMasters, scope: String): OpdDrugMasters =
+            cached.takeIf { it.isUsable() } ?: BundledDrugMasters.forScope(scope)
+
+        internal fun OpdDrugMasters.isUsable(): Boolean =
+            items.isNotEmpty() && forms.isNotEmpty() && frequencies.isNotEmpty() && durationUnits.isNotEmpty() &&
+                items.all { it.id > 0 && it.itemId > 0 && it.itemName.isNotBlank() &&
+                    forms.any { form -> form.itemFormId == it.itemFormId } } &&
+                forms.all { it.itemFormId > 0 && it.itemFormName.isNotBlank() } &&
+                frequencies.all { it.drugFrequencyId > 0 && it.frequency.isNotBlank() } &&
+                durationUnits.all { it.drugDurationId > 0 && it.drugDuration.isNotBlank() } &&
+                items.distinctBy { it.id }.size == items.size &&
+                forms.distinctBy { it.itemFormId }.size == forms.size &&
+                frequencies.distinctBy { it.drugFrequencyId }.size == frequencies.size &&
+                durationUnits.distinctBy { it.drugDurationId }.size == durationUnits.size
+
         internal fun DoctorDrugMasterData.toCache(scope: String): OpdDrugMasters? {
             val items = itemMaster ?: return null
             val forms = drugFormMaster ?: return null
@@ -84,7 +105,7 @@ class DrugMasterRepo @Inject constructor(
                 forms.map { DrugFormMasterCache(scope, it.itemFormID, it.itemFormName!!.trim()) },
                 frequencies.map { DrugFrequencyMasterCache(scope, it.drugFrequencyID, it.frequency!!.trim()) },
                 durations.map { DrugDurationUnitMasterCache(scope, it.drugDurationID, it.drugDuration!!.trim()) }
-            )
+            ).takeIf { it.isUsable() }
         }
     }
 }

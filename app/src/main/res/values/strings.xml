@@ -1310,41 +1310,26 @@
 
     <string-array name="general_opd_chief_complaint_array">
         <item>Fever</item>
-        <item>Mild to moderate body pain</item>
         <item>Headache</item>
-        <item>General weakness with fever</item>
-        <item>Acidity</item>
-        <item>Burning sensation in stomach</item>
-        <item>Indigestion</item>
-        <item>Gas</item>
-        <item>Bloating</item>
-        <item>Upper abdominal discomfort</item>
-        <item>Allergic symptoms</item>
-        <item>Sneezing</item>
+        <item>Body aches</item>
         <item>Runny nose</item>
-        <item>Itching (skin or eyes)</item>
-        <item>Mild allergic rash</item>
-        <item>Diarrhea</item>
+        <item>Sneezing</item>
+        <item>Nasal congestion</item>
+        <item>Itching</item>
+        <item>Sore throat</item>
+        <item>Cough</item>
         <item>Loose stools</item>
-        <item>Gut imbalance</item>
-        <item>Indigestion with loose motion</item>
-        <item>Dehydration</item>
-        <item>Vomiting with weakness</item>
-        <item>Heat exhaustion</item>
-        <item>General weakness</item>
-        <item>Fatigue</item>
-        <item>Nutritional deficiency</item>
-        <item>Poor appetite</item>
-        <item>Fever in children</item>
-        <item>Body ache in children</item>
-        <item>Post-vaccination fever</item>
-        <item>Allergies in children</item>
-        <item>Cold with sneezing</item>
-        <item>Itching in children</item>
-        <item>Mild skin allergy</item>
-        <item>Diarrhea in children</item>
-        <item>Weak immunity</item>
-        <item>Recovery from illness</item>
+        <item>Vomiting</item>
+        <item>Abdominal pain</item>
+        <item>Epigastric pain</item>
+        <item>Burning sensation in chest</item>
+        <item>Indigestion</item>
+        <item>Bloating</item>
+        <item>Nausea</item>
+        <item>Weakness/fatigue</item>
+        <item>Loss of appetite</item>
+        <item>Regurgitation of food</item>
+        <item>Others</item>
     </string-array>
 
     <string-array name="general_opd_medication_array">
