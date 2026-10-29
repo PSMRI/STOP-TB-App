@@ -1246,15 +1246,6 @@ class BenRepo @Inject constructor(
                 Timber.d("[pull] kept $skippedLocallyEdited locally-edited beneficiaries, not overwritten by the server copy")
             }
         }
-        android.util.Log.d(
-            org.piramalswasthya.stoptb.utils.ScreenLoadTrace.TAG,
-            "[pull] pages ${pageNumbers.minOrNull()}..${pageNumbers.maxOrNull()} " +
-                    "(${pageNumbers.size} pages) wrote ${benCacheList.size} beneficiary + " +
-                    "${householdCacheList.size} household rows " +
-                    "($updated updated, $inserted inserted) in " +
-                    "${android.os.SystemClock.elapsedRealtime() - traceStartedAt}ms " +
-                    "- one transaction, so 1 invalidation"
-        )
     }
 
 //    suspend fun getBeneficiariesFromServer(pageNumber: Int): Pair<Int, MutableList<BenBasicDomain>> {
@@ -2667,17 +2658,6 @@ class BenRepo @Inject constructor(
                     }
                 }
             }
-        }
-
-        // TEMPORARY PERF INSTRUMENTATION - shows whether the server's updatedDate is a
-        // trustworthy change signal, or whether it marks everything as changed every pull.
-        if (seenOnServer > 0) {
-            android.util.Log.d(
-                org.piramalswasthya.stoptb.utils.ScreenLoadTrace.TAG,
-                "[pull] page $pageNumber: server sent $seenOnServer beneficiaries -> ${result.size} will be written " +
-                        "(skipped $skippedUnchanged identical, skipped $skippedLocalUnsynced with local edits; " +
-                        "writing $writtenChanged changed + ${result.size - writtenChanged} new)"
-            )
         }
 
         return result

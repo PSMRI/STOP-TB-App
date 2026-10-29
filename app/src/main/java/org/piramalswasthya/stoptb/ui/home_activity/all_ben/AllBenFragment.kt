@@ -46,7 +46,6 @@ import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
-import org.piramalswasthya.stoptb.utils.ScreenLoadTrace
 import org.piramalswasthya.stoptb.utils.callPhoneNumber
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
@@ -162,12 +161,10 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     override fun onAttach(context: android.content.Context) {
         super.onAttach(context)
-        ScreenLoadTrace.markCurrent("Fragment.onAttach")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        ScreenLoadTrace.markCurrent("Fragment.onCreate")
     }
 
     override fun onCreateView(
@@ -175,14 +172,11 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         savedInstanceState: Bundle?
     ): View {
         // TEMPORARY PERF INSTRUMENTATION
-        ScreenLoadTrace.markCurrent("Fragment.onCreateView: inflating layout")
         _binding = FragmentDisplaySearchAndToggleRvButtonBinding.inflate(layoutInflater)
-        ScreenLoadTrace.markCurrent("Fragment.onCreateView: layout inflated")
         return binding.root
     }
 
     override fun onDestroyView() {
-        org.piramalswasthya.stoptb.utils.DbContentionSampler.stop()
         // The collectors run in viewLifecycleOwner.lifecycleScope, so they are cancelled with
         // the view. Resetting the guard lets the next view start its own set. On the fragment's
         // lifecycleScope they would NOT be cancelled, and a fragment returning from the back
@@ -193,12 +187,6 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        // TEMPORARY PERF INSTRUMENTATION
-        ScreenLoadTrace.markCurrent("Fragment.onViewCreated: entered")
-        org.piramalswasthya.stoptb.utils.DbContentionSampler.start(viewLifecycleOwner.lifecycleScope) {
-            viewModel.dbNoOpProbe()
-        }
-
         // Legacy, kept for reference:
 //        val roleName = prefDao.getLoggedInUser()?.role
 //        val isRegistrar = roleName.isRegistrationOfficerRole()
@@ -480,7 +468,6 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         )
 
         // TEMPORARY PERF INSTRUMENTATION
-        ScreenLoadTrace.markCurrent("adapter built, attaching to RecyclerView")
         binding.rvAny.adapter = benAdapter
         // Fires on the first frame that actually has rows laid out - this is the moment the
         // user sees content, so it closes the trace.
@@ -508,18 +495,11 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     }
                     if (benAdapter.itemCount > 0 && tracedRecyclerView.childCount > 0) {
                         stopListening()
-                        ScreenLoadTrace.endCurrent(
-                            "FIRST CONTENT DRAWN (${benAdapter.itemCount} items loaded, " +
-                                    "${tracedRecyclerView.childCount} rows on screen)"
-                        )
                         // Backstop: rows are visible, so decorations are due even if the
                         // load-state collector has not reported NotLoading yet.
                         startRowDecorationCollectors()
                     } else if (android.os.SystemClock.elapsedRealtime() > giveUpAt) {
                         stopListening()
-                        ScreenLoadTrace.endCurrent(
-                            "GAVE UP after 120s - no content ever drawn (itemCount=${benAdapter.itemCount})"
-                        )
                     }
                     return true
                 }
@@ -549,7 +529,6 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         var submittedGeneration = -1
 
         // TEMPORARY PERF INSTRUMENTATION
-        ScreenLoadTrace.markCurrent("onViewCreated: collectors wired, waiting for first page")
         var firstPagingDataSeen = false
         var firstRefreshSettled = false
 
@@ -557,7 +536,6 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             viewModel.benList.collectLatest {
                 if (!firstPagingDataSeen) {
                     firstPagingDataSeen = true
-                    ScreenLoadTrace.markCurrent("first PagingData reached the adapter")
                 }
                 submittedGeneration = viewModel.searchGeneration.value
                 benAdapter.submitData(it)
@@ -567,14 +545,9 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // TEMPORARY PERF INSTRUMENTATION - how long Paging's refresh (COUNT + page 0) takes,
         // and how many times it restarts before it settles.
         lifecycleScope.launch {
-            var refreshAttempts = 0
             benAdapter.loadStateFlow.collect { loadStates ->
-                if (loadStates.refresh is LoadState.Loading) refreshAttempts++
                 if (loadStates.refresh is LoadState.NotLoading && !firstRefreshSettled) {
                     firstRefreshSettled = true
-                    ScreenLoadTrace.markCurrent(
-                        "Paging refresh settled after $refreshAttempts load-state change(s), itemCount=${benAdapter.itemCount}"
-                    )
                     // Paging is done competing for the DB - safe to start the row decorations.
                     // This fires whether the list has rows or is empty, so it is the trigger
                     // rather than first-content-drawn (which never happens on an empty list).
@@ -768,8 +741,6 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // Polling still starts from every path that actually needs it: the worker reschedules
         // itself every 60s while an order is in progress, and it is triggered on order
         // creation/retry, on a completed result, and on camp-hub reconnect.
-
-        ScreenLoadTrace.markCurrent("onViewCreated: all collectors launched")
         binding.ibSearch.visibility = View.VISIBLE
         binding.ibSearch.setOnClickListener { sttContract.launch(Unit) }
 
@@ -924,14 +895,12 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     // -------------------------------------------------------------------------
 
     override fun onStart() {
-        ScreenLoadTrace.markCurrent("Fragment.onStart")
         super.onStart()
         updateToolbarTitle()
     }
 
     override fun onResume() {
         super.onResume()
-        ScreenLoadTrace.markCurrent("Fragment.onResume")
         updateToolbarTitle()
         viewModel.invalidateCheckedNoPushBenIds()
         viewModel.fetchBeneficiaryStatuses()
@@ -964,135 +933,115 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         rowDecorationsStarted = true
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.childCounts.collectLatest { countMap ->
-                ScreenLoadTrace.flowEmission("childCounts", countMap.size)
                 benAdapter.submitChildCounts(countMap)
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.householdMemberCounts.collectLatest { countMap ->
-                ScreenLoadTrace.flowEmission("householdMemberCounts", countMap.size)
                 benAdapter.submitHouseholdMemberCounts(countMap)
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.householdHeadNames.collectLatest { nameMap ->
-                ScreenLoadTrace.flowEmission("householdHeadNames", nameMap.size)
                 benAdapter.submitHouseholdHeadNames(nameMap)
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.vitalBenIds.collectLatest { benIds ->
-                ScreenLoadTrace.flowEmission("vitalBenIds", benIds.size)
                 benAdapter.submitBenIds(benIds)
             }
         }
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.unsyncedVitalBenIds.collectLatest { benIds ->
-                ScreenLoadTrace.flowEmission("unsyncedVitalBenIds", benIds.size)
                 benAdapter.submitUnsyncedVitalBenIds(benIds)
             }
         }
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.syncingVitalBenIds.collectLatest { benIds ->
-                ScreenLoadTrace.flowEmission("syncingVitalBenIds", benIds.size)
                 benAdapter.submitSyncingVitalBenIds(benIds)
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.tbScreeningBenIds.collectLatest { benIds ->
-                ScreenLoadTrace.flowEmission("tbScreeningBenIds", benIds.size)
                 benAdapter.submitTbScreeningBenIds(benIds)
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.unsyncedTbScreeningBenIds.collectLatest { benIds ->
-                ScreenLoadTrace.flowEmission("unsyncedTbScreeningBenIds", benIds.size)
                 benAdapter.submitUnsyncedTbScreeningBenIds(benIds)
             }
         }
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.syncingTbScreeningBenIds.collectLatest { benIds ->
-                ScreenLoadTrace.flowEmission("syncingTbScreeningBenIds", benIds.size)
                 benAdapter.submitSyncingTbScreeningBenIds(benIds)
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.generalOpdBenIds.collectLatest { benIds ->
-                ScreenLoadTrace.flowEmission("generalOpdBenIds", benIds.size)
                 benAdapter.submitGeneralOpdBenIds(benIds)
             }
         }
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.unsyncedGeneralOpdBenIds.collectLatest { benIds ->
-                ScreenLoadTrace.flowEmission("unsyncedGeneralOpdBenIds", benIds.size)
                 benAdapter.submitUnsyncedGeneralOpdBenIds(benIds)
             }
         }
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.syncingGeneralOpdBenIds.collectLatest { benIds ->
-                ScreenLoadTrace.flowEmission("syncingGeneralOpdBenIds", benIds.size)
                 benAdapter.submitSyncingGeneralOpdBenIds(benIds)
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.anthropometryFilledBenIds.collectLatest { benIds ->
-                ScreenLoadTrace.flowEmission("anthropometryFilledBenIds", benIds.size)
                 benAdapter.submitAnthropometryBenIds(benIds)
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.diagnosisBenIds.collectLatest { benIds ->
-                ScreenLoadTrace.flowEmission("diagnosisBenIds", benIds.size)
                 benAdapter.submitDiagnosisBenIds(benIds)
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.contactFollowUpDoneBenIds.collectLatest { benIds ->
-                ScreenLoadTrace.flowEmission("contactFollowUpDoneBenIds", benIds.size)
                 benAdapter.submitContactFollowUpDoneBenIds(benIds)
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.tptFollowUpDoneBenIds.collectLatest { benIds ->
-                ScreenLoadTrace.flowEmission("tptFollowUpDoneBenIds", benIds.size)
                 benAdapter.submitTptFollowUpDoneBenIds(benIds)
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.tptEligibleBenIds.collectLatest { benIds ->
-                ScreenLoadTrace.flowEmission("tptEligibleBenIds", benIds.size)
                 benAdapter.submitTptEligibleBenIds(benIds)
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.allTbDiagnostics.collectLatest { diagnosticsList ->
-                ScreenLoadTrace.flowEmission("allTbDiagnostics", diagnosticsList.size)
                 benAdapter.submitTBDiagnostics(diagnosticsList)
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.allTbScreening.collectLatest { screeningList ->
-                ScreenLoadTrace.flowEmission("allTbScreening", screeningList.size)
                 benAdapter.submitTbScreeningList(screeningList)
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.retryingBenIds.collectLatest { benIds ->
-                ScreenLoadTrace.flowEmission("retryingBenIds", benIds.size)
                 benAdapter.submitRetryingBenIds(benIds)
             }
         }
