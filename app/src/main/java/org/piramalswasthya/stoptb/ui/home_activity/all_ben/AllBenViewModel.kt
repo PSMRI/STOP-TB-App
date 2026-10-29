@@ -93,6 +93,15 @@ class AllBenViewModel @Inject constructor(
         /** An unfiltered status refresh re-runs at most this often. */
         const val statusRefreshDebounceMs = 30_000L
 
+        /**
+         * Last time an unfiltered status refresh actually ran. On the companion, not the
+         * instance: a fresh ViewModel is built on every entry to this screen, so an instance
+         * field would only suppress repeat onResume within a single visit and the full sweep
+         * would still run on every navigation back. Same reasoning as
+         * [lastDeviceIntegrationRefreshAt].
+         */
+        private var lastStatusRefreshAt = 0L
+
         /** Device-integration config re-checks at most this often. */
         const val deviceIntegrationRefreshIntervalMs = 5 * 60_000L
 
@@ -327,8 +336,7 @@ class AllBenViewModel @Inject constructor(
         }
     }
 
-    /** Last time an unfiltered status refresh actually ran, for [statusRefreshDebounceMs]. */
-    private var lastStatusRefreshAt = 0L
+
 
     fun fetchBeneficiaryStatuses(orderType: String? = null) {
         // A refresh for a specific orderType is always a response to something the user just did

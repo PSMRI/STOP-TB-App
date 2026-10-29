@@ -1076,8 +1076,21 @@ private val jsonAdapterDatePatterns = listOf(
     "MMM dd, yyyy, h:mm:ss a"
 )
 
-fun getLongFromDate(dateString: String?): Long =
-    ServerDateParser.parse(dateString, jsonAdapterDatePatterns) ?: 0L
+/**
+ * @return epoch millis, or 0 when there is no date to parse.
+ *
+ * An absent date legitimately maps to 0. A non-null value that cannot be parsed does not: it
+ * means the server sent a format this list does not cover, and silently storing 1970 corrupts
+ * the record while the pull reports success. The previous implementation threw here, which was
+ * loud but aborted the whole pulled batch (that is the U+202F bug this parser exists to fix), so
+ * this logs the offending value at error level instead and the caller sees 0.
+ */
+fun getLongFromDate(dateString: String?): Long {
+    if (dateString.isNullOrBlank()) return 0L
+    ServerDateParser.parse(dateString, jsonAdapterDatePatterns)?.let { return it }
+    Timber.e("getLongFromDate: unparseable server date '$dateString' - storing 0, record will show 1970")
+    return 0L
+}
 
 fun getLongFromDateMultipleSupport(dateStr: String?): Long? {
     if (dateStr.isNullOrBlank() || dateStr == "1970-01-01") return null

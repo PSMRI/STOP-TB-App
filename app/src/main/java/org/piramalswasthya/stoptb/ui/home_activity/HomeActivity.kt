@@ -424,6 +424,8 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
                         .setPositiveButton(getString(R.string.ok)) { dialog, _ ->
                             dialog.dismiss()
                             pref.deleteForLogout()
+                            // Process-wide backfill cursors must not carry into the next user's village.
+                            org.piramalswasthya.stoptb.repositories.TBRepo.resetOrderIdBackfillState()
                             WorkerUtils.cancelAllWork(this@HomeActivity)
                             startActivity(Intent(this@HomeActivity, LoginActivity::class.java))
                             finish()

@@ -50,7 +50,7 @@ class CampModeConnectViewModel @Inject constructor(
         // re-points every authenticated request (see CampHubUrlValidator), and it used to be
         // persisted first and validated never - so a scanned QR code pointing at a public host
         // took effect immediately and survived a failed health check.
-        val normalizedUrl = CampHubUrlValidator.normalizeOrNull(url)
+        val normalizedUrl = CampHubUrlValidator.normalizeOrNull(url, extraAllowedHost = configuredHubHost())
         if (normalizedUrl == null) {
             Log.w(TAG, "Rejected camp hub URL: not a local-network http(s) address")
             _campHubStatus.value = CampHubStatus.NOT_CONNECTED
@@ -74,6 +74,11 @@ class CampModeConnectViewModel @Inject constructor(
                 if (connected) CampHubStatus.CONNECTED else CampHubStatus.NOT_CONNECTED
         }
     }
+
+    /** Host of the URL baked into this build - always acceptable, even when it is public. */
+    private fun configuredHubHost(): String? =
+        pref.configuredCampHubUrl().takeIf { it.isNotBlank() }
+            ?.let { runCatching { java.net.URI(it).host }.getOrNull() }
 
     private suspend fun pingCampHub(rawUrl: String): Boolean = withContext(Dispatchers.IO) {
         val baseUrl = rawUrl.trim().trimEnd('/')

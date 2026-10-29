@@ -322,7 +322,15 @@ class CounsellingRepositoryImpl @Inject constructor(
             // No API call is made, so this record has NOT reached the server. Reporting success
             // here is what let an empty GENERAL_INFO section on a REFUSED record be marked
             // SYNCED and silently dropped.
-            Timber.e("submitSectionBulk: sectionId=$sectionId built an empty payload, nothing sent; leaving UNSYNCED")
+            //
+            // Known limitation: callers treat false as "retry in the background", and a section
+            // that structurally produces an empty payload can never produce a non-empty one, so
+            // this record retries on every sweep and keeps an unsynced badge. That is deliberate
+            // for now - a visibly stuck record is recoverable, a silently discarded refusal is
+            // not - but the right fix is upstream: stop creating REFUSED records with no
+            // answers, or give the caller a distinct terminal "nothing to send" outcome instead
+            // of reusing the failure value.
+            Timber.e("submitSectionBulk: sectionId=$sectionId built an empty payload, nothing sent; leaving UNSYNCED (will retry - see comment)")
             return false
         }
 

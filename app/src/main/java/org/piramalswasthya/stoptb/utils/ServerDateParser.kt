@@ -27,7 +27,12 @@ import java.util.Locale
  */
 object ServerDateParser {
 
-    private val formatterCache = ThreadLocal.withInitial { mutableMapOf<CacheKey, SimpleDateFormat>() }
+    // NOT ThreadLocal.withInitial: that is API 26 and this module is minSdk 25 with no core
+    // library desugaring, so it would throw NoSuchMethodError on an API 25 device the first
+    // time anything parsed a server date - which is every pull and most JSON deserialization.
+    private val formatterCache = object : ThreadLocal<MutableMap<CacheKey, SimpleDateFormat>>() {
+        override fun initialValue(): MutableMap<CacheKey, SimpleDateFormat> = mutableMapOf()
+    }
 
     private data class CacheKey(val pattern: String, val lenient: Boolean)
 

@@ -1782,11 +1782,24 @@ class TBRepo @Inject constructor(
         private val backfillChunkCursor = java.util.concurrent.ConcurrentHashMap<String, Int>()
 
         /**
-         * Per orderType, the awaiting-bucket size for which a complete pass found nothing left
-         * to backfill. While the bucket stays that size the scan is skipped entirely.
+         * Per orderType, a content signature of the awaiting bucket for which a complete pass
+         * found nothing left to backfill. While the bucket is unchanged the scan is skipped.
+         *
+         * Keyed on content, not size: one beneficiary entering the bucket as another leaves
+         * keeps the size identical, and a size-keyed marker would hide the newcomer's missing
+         * order id for as long as the count happened to hold steady.
          */
-        private val backfillConvergedForBucketSize =
+        private val backfillConvergedForBucket =
             java.util.concurrent.ConcurrentHashMap<String, Int>()
+
+        /**
+         * Clears the backfill cursor and converged markers. Both live here, so without this
+         * they would survive a logout and be applied to the next user's village.
+         */
+        fun resetOrderIdBackfillState() {
+            backfillChunkCursor.clear()
+            backfillConvergedForBucket.clear()
+        }
 
         private const val GENERAL_OPD_CATEGORY_FALLBACK = 6
         private val pollCounts = java.util.concurrent.ConcurrentHashMap<String, Int>()
@@ -3174,12 +3187,13 @@ class TBRepo @Inject constructor(
         isRif: Boolean
     ): List<Long> {
         if (awaitingRegIds.isEmpty()) {
-            backfillConvergedForBucketSize.remove(orderType)
+            backfillConvergedForBucket.remove(orderType)
             return emptyList()
         }
-        if (backfillConvergedForBucketSize[orderType] == awaitingRegIds.size) {
-            // A complete pass over a bucket of exactly this size found nothing to fill, and
-            // nothing has been added since. Skip the reads entirely.
+        // Content signature, computed in memory - no DB reads - so a bucket whose membership
+        // changed is always rescanned even when its size did not.
+        val bucketSignature = awaitingRegIds.sorted().hashCode()
+        if (backfillConvergedForBucket[orderType] == bucketSignature) {
             return emptyList()
         }
 
@@ -3219,10 +3233,10 @@ class TBRepo @Inject constructor(
         backfillChunkCursor[orderType] = index
         val completedFullPass = chunksExamined == chunks.size
         if (completedFullPass && needsBackfill.isEmpty()) {
-            backfillConvergedForBucketSize[orderType] = awaitingRegIds.size
+            backfillConvergedForBucket[orderType] = bucketSignature
             Timber.d("Order id backfill [$orderType]: full pass over ${awaitingRegIds.size} entries found nothing; skipping until the bucket changes")
         } else {
-            backfillConvergedForBucketSize.remove(orderType)
+            backfillConvergedForBucket.remove(orderType)
         }
 
         val batch = needsBackfill.distinct().take(orderIdBackfillPerSweep)

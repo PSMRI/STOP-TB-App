@@ -122,7 +122,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 60, exportSchema = false
+    version = 61, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -1753,6 +1753,32 @@ abstract class InAppDb : RoomDatabase() {
          * Indexes BENEFICIARY.benRegId. Pure addition - no table or view is rewritten and no
          * row is touched, so there is nothing for a partially-synced device to lose.
          */
+        /**
+         * Restores `ORDER BY b.updatedDate DESC` on BEN_BASIC_CACHE.
+         *
+         * MIGRATION_58_59 dropped GROUP BY *and* ORDER BY so SQLite could flatten the view.
+         * Dropping GROUP BY is safe (the join is on HOUSEHOLD's primary key, so it cannot
+         * multiply rows), but dropping the ordering silently reordered 43 list queries that
+         * select from this view with no ORDER BY of their own - they showed most-recently-
+         * updated beneficiaries first and fell back to rowid order.
+         *
+         * This is a separate, appended step rather than an edit to MIGRATION_58_59 because any
+         * device that already ran 58->59 would otherwise sit on a schema whose identity hash no
+         * longer matches and no migration would ever correct it - Room would throw
+         * "cannot verify the data integrity" on open.
+         *
+         * Costs ~18ms on a 10k COUNT (the view's ORDER BY forces a sort for Paging's count
+         * query); the correct list order is worth it.
+         */
+        val MIGRATION_60_61 = object : Migration(60, 61) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
+                database.execSQL(
+                    "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId, b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod, b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus, b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId, b.isNewAbha, 0 as cbacFilled, NULL as cbacSyncState, 0 as cdrFilled, NULL as cdrSyncState, 0 as mdsrFilled, NULL as mdsrSyncState, NULL as pmsmaSyncState, 0 as pmsmaFilled, 0 as hbncFilled, 0 as hbycFilled, 0 as pwrFilled, NULL as pwrSyncState, NULL as doSyncState, NULL as irSyncState, NULL as crSyncState, 0 as ecrFilled, 0 as ectFilled, 0 as isMdsr, 0 as tbsnFilled, NULL as tbsnSyncState, 0 as tbspFilled, NULL as tbspSyncState, 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled, 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled, NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState, 0 as isDelivered, 0 as pwHrp, 0 as irFilled, 0 as crFilled, 0 as doFilled, b.isNonHH, b.isAvailableForCamp, b.reasonForNotAttendingCamp, b.otherReasonForNotAttendingCamp, b.screeningStatus, b.symptomsScreenedDate, b.chestXrayDoneDate, b.trunatTestDoneDate, b.placeOfCurrentLiving, b.otherPlaceOfCurrentLiving, b.institutionName FROM BENEFICIARY b LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId WHERE b.isDraft = 0 ORDER BY b.updatedDate DESC"
+                )
+            }
+        }
+
         val MIGRATION_59_60 = object : Migration(59, 60) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("CREATE INDEX IF NOT EXISTS `ind_ben_reg_id` ON `BENEFICIARY` (`benRegId`)")
@@ -2071,6 +2097,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_57_58)
                         .addMigrations(MIGRATION_58_59)
                         .addMigrations(MIGRATION_59_60)
+                        .addMigrations(MIGRATION_60_61)
                         // Room's default is transactionExecutor = ArchTaskExecutor's IO pool and
                         // queryExecutor = that same object - ONE pool of 4 threads shared by every
                         // query, every suspend DAO call and every withTransaction block.

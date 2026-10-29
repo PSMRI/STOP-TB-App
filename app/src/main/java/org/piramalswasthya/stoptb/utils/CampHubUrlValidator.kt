@@ -19,7 +19,11 @@ import java.net.InetAddress
  * session token, the refresh token and every beneficiary record to an arbitrary host, in the
  * clear (`network_security_config.xml` permits cleartext).
  *
- * So the rule is: a camp hub must live on the local network. Public hosts are refused.
+ * The rule is therefore an allow-list, not a blanket ban on public hosts: a hub is acceptable
+ * when it is on the local network, OR it is a Piramal Swasthya host, OR it is exactly the URL
+ * baked into this build (`PreferenceDao.configuredCampHubUrl()`, which on the UAT flavor is the
+ * public `uatstoptb.piramalswasthya.org`). Anything else - an arbitrary host from a scanned
+ * code - is refused.
  */
 object CampHubUrlValidator {
 
@@ -31,7 +35,7 @@ object CampHubUrlValidator {
      * local camp-hub address. A bare host or `host:port` is assumed to be `http`, which is how
      * the LAN hubs are addressed.
      */
-    fun normalizeOrNull(raw: String?): String? {
+    fun normalizeOrNull(raw: String?, extraAllowedHost: String? = null): String? {
         val trimmed = raw?.trim().orEmpty()
         if (trimmed.isBlank() || trimmed.length > MAX_URL_LENGTH) return null
 
@@ -41,7 +45,7 @@ object CampHubUrlValidator {
         // toHttpUrlOrNull only ever yields http/https, but be explicit: anything else would be
         // a scheme OkHttp cannot carry and must not be stored.
         if (parsed.scheme != "http" && parsed.scheme != "https") return null
-        if (!isLocalHost(parsed.host)) return null
+        if (!isAllowedHost(parsed.host, extraAllowedHost)) return null
 
         return parsed.newBuilder()
             .encodedPath("/")
@@ -54,10 +58,22 @@ object CampHubUrlValidator {
     }
 
     /** True when [candidate] is already an acceptable camp-hub URL. */
-    fun isAllowed(candidate: String?): Boolean = normalizeOrNull(candidate) != null
+    fun isAllowed(candidate: String?, extraAllowedHost: String? = null): Boolean =
+        normalizeOrNull(candidate, extraAllowedHost) != null
 
-    /** True when [url]'s host is on the local network, for re-checking at request time. */
-    fun isLocalHost(url: HttpUrl): Boolean = isLocalHost(url.host)
+    /**
+     * Local network, a trusted Piramal Swasthya host, or the exact host this build ships with.
+     * The last of those is what keeps the UAT flavor working: its configured hub is the public
+     * `uatstoptb.piramalswasthya.org`, not a LAN address.
+     */
+    private fun isAllowedHost(host: String, extraAllowedHost: String?): Boolean {
+        if (host.isBlank()) return false
+        val lower = host.lowercase()
+        if (isLocalHost(lower)) return true
+        if (lower == TRUSTED_HOST_SUFFIX.removePrefix(".") || lower.endsWith(TRUSTED_HOST_SUFFIX)) return true
+        val extra = extraAllowedHost?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
+        return extra != null && lower == extra
+    }
 
     private fun isLocalHost(host: String): Boolean {
         if (host.isBlank()) return false
@@ -87,4 +103,7 @@ object CampHubUrlValidator {
     }
 
     private const val MAX_URL_LENGTH = 2048
+
+    /** Hosts operated by the project; a hub may legitimately be one of these, not just a LAN box. */
+    private const val TRUSTED_HOST_SUFFIX = ".piramalswasthya.org"
 }

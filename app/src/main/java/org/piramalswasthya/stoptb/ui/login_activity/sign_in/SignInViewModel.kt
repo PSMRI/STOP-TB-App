@@ -90,12 +90,17 @@ class SignInViewModel @Inject constructor(
     fun getCampHubUrl(): String = pref.getCampHubUrl()
 
     fun updateCampHubUrl(url: String) {
-        // Same rule as the connect screen: a camp hub is a LAN device, and the stored URL
-        // re-points authenticated requests. Refuse anything that is not local rather than
-        // storing it. See CampHubUrlValidator.
-        val normalizedUrl = normalizeCampHubUrl(url)
-        if (!CampHubUrlValidator.isAllowed(normalizedUrl)) {
-            Log.w(TAG, "Rejected camp hub URL from login screen: not a local-network address")
+        // Same rule as the connect screen: the stored URL re-points authenticated requests, so
+        // validate before storing. Store the VALIDATOR'S output, not the locally normalised
+        // string - the local one keeps credentials, path, query and fragment, so
+        // `http://user:pass@host/some/path` would be written to preferences verbatim and
+        // pingCampHub would then probe `/some/path/common-api/health`.
+        val normalizedUrl = CampHubUrlValidator.normalizeOrNull(
+            normalizeCampHubUrl(url),
+            extraAllowedHost = configuredHubHost()
+        )
+        if (normalizedUrl == null) {
+            Log.w(TAG, "Rejected camp hub URL from login screen: not an allowed host")
             _campHubStatus.value = CampHubStatus.NOT_CONNECTED
             return
         }
@@ -155,6 +160,11 @@ class SignInViewModel @Inject constructor(
         }
     }
 
+    /** Host of the URL baked into this build - always acceptable, even when it is public. */
+    private fun configuredHubHost(): String? =
+        pref.configuredCampHubUrl().takeIf { it.isNotBlank() }
+            ?.let { runCatching { java.net.URI(it).host }.getOrNull() }
+
     private fun normalizeCampHubUrl(url: String): String {
         val trimmedUrl = url.trim()
         val resolvedUrl = when {
@@ -203,6 +213,8 @@ class SignInViewModel @Inject constructor(
                 database.clearAllTables()
             }
             pref.deleteForLogout()
+            // Process-wide backfill cursors must not carry into the next user's village.
+            org.piramalswasthya.stoptb.repositories.TBRepo.resetOrderIdBackfillState()
             pref.setLastSyncedTimeStamp(Konstants.defaultTimeStamp)
             if (restoreUsernameOnly) {
                 pref.setRememberedUsernameOnly(rememberedUser!!.trim())

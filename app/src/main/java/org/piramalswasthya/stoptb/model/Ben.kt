@@ -134,7 +134,12 @@ enum class ScreeningStatus {
             ", b.institutionName" +
             " FROM BENEFICIARY b " +
             "LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId " +
-            "WHERE b.isDraft = 0"
+            // ORDER BY stays. GROUP BY was dropped (the join is on HOUSEHOLD's primary key, so
+            // it cannot multiply rows) but dropping the ordering too silently reordered 43 list
+            // queries that select from this view without an ORDER BY of their own - they showed
+            // most-recently-updated beneficiaries first and would otherwise fall back to rowid
+            // order. Costs ~18ms on a 10k COUNT; the lists are worth it.
+            "WHERE b.isDraft = 0 ORDER BY b.updatedDate DESC"
 )
 @Parcelize
 data class BenBasicCache(

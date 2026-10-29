@@ -43,6 +43,12 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import javax.inject.Inject
 
+/**
+ * Singleton because [bufferServerPage] accumulates pulled pages in instance state and
+ * [flushPendingServerBeneficiaries] commits them. A second injected instance would get its own
+ * buffer that nothing ever flushes, silently dropping up to a batch of pulled beneficiaries.
+ */
+@javax.inject.Singleton
 class BenRepo @Inject constructor(
     private val context: Application,
     private val benDao: BenDao,
@@ -1026,14 +1032,32 @@ class BenRepo @Inject constructor(
                     Timber.d("HouseHold entries not synced $e")
                 }
             }
+            // Re-check sync state INSIDE the transaction. getBenCacheFromServerResponse decides
+            // whether a local row is safe to overwrite at parse time, but with pages buffered
+            // that decision can now be up to a whole batch of network round trips old. If the
+            // user edited and saved this beneficiary in that window the row is UNSYNCED, and
+            // writing the server copy over it would discard the edit AND mark it SYNCED, so no
+            // later push would ever send it.
+            var skippedLocallyEdited = 0
             benCacheList.forEach { serverBen ->
-                if (benDao.getBen(serverBen.beneficiaryId) != null) {
-                    benDao.updateBen(serverBen)
-                    updated++
-                } else {
-                    benDao.upsert(serverBen)
-                    inserted++
+                val local = benDao.getBen(serverBen.beneficiaryId)
+                when {
+                    local == null -> {
+                        benDao.upsert(serverBen)
+                        inserted++
+                    }
+                    local.syncState != SyncState.SYNCED -> {
+                        // Locally edited since this page was parsed - leave it for the push.
+                        skippedLocallyEdited++
+                    }
+                    else -> {
+                        benDao.updateBen(serverBen)
+                        updated++
+                    }
                 }
+            }
+            if (skippedLocallyEdited > 0) {
+                Timber.d("[pull] kept $skippedLocallyEdited locally-edited beneficiaries, not overwritten by the server copy")
             }
         }
         android.util.Log.d(

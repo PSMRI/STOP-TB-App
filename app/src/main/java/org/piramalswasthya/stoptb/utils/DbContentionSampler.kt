@@ -40,7 +40,17 @@ object DbContentionSampler {
             val startedAt = SystemClock.elapsedRealtime()
             while (isActive) {
                 val probeStartedAt = SystemClock.elapsedRealtime()
-                runCatching { probe() }
+                // A probe that threw tells us nothing about contention - counting its elapsed
+                // time as a database wait would inflate every statistic this sampler reports.
+                // CancellationException must propagate: it is an Exception in Kotlin and
+                // swallowing it here would keep the sampler alive after its scope is cancelled.
+                val probeFailure = runCatching { probe() }.exceptionOrNull()
+                if (probeFailure is kotlinx.coroutines.CancellationException) throw probeFailure
+                if (probeFailure != null) {
+                    Log.d(ScreenLoadTrace.TAG, "  [db] probe failed, sample discarded: $probeFailure")
+                    delay(sampleIntervalMs)
+                    continue
+                }
                 val waitedMs = SystemClock.elapsedRealtime() - probeStartedAt
                 samples++
                 totalMs += waitedMs

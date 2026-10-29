@@ -181,18 +181,26 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // load state rather than the contents of a fully-materialised list. Until the first
         // refresh settles the screen shows a spinner - previously it showed "no records",
         // which is indistinguishable from a genuinely empty village.
+        // The spinner belongs to the FIRST refresh only. Room invalidates the PagingSource on
+        // every BENEFICIARY/HOUSEHOLD write, so during a pull - a page committed every few
+        // seconds - tying it to "is loading" made the list vanish under the user mid-scroll.
+        // Later reloads are silent; the rows stay on screen and are swapped when ready.
+        // Same reasoning as AllBenFragment's `awaitingFirstResult`.
+        var firstRefreshSettled = false
         viewLifecycleOwner.lifecycleScope.launch {
             benAdapter.loadStateFlow.collectLatest { loadStates ->
                 if (_binding == null) return@collectLatest
                 val refresh = loadStates.refresh
-                val isRefreshing = refresh is LoadState.Loading
+                if (refresh is LoadState.NotLoading) firstRefreshSettled = true
+                val awaitingFirstResult = refresh is LoadState.Loading && !firstRefreshSettled
                 val isEmpty = refresh is LoadState.NotLoading &&
                         loadStates.append.endOfPaginationReached &&
                         benAdapter.itemCount == 0
-                binding.pbSearchLoading.visibility = if (isRefreshing) View.VISIBLE else View.GONE
+                binding.pbSearchLoading.visibility =
+                    if (awaitingFirstResult) View.VISIBLE else View.GONE
                 binding.flEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
                 binding.rvAny.visibility =
-                    if (isRefreshing || isEmpty) View.GONE else View.VISIBLE
+                    if (awaitingFirstResult || isEmpty) View.GONE else View.VISIBLE
             }
         }
 

@@ -93,6 +93,7 @@ object ScreenLoadTrace {
         )
         startedAt.remove(screen)
         lastMarkAt.remove(screen)
+        stopWatchdog()
     }
 
     @JvmStatic
@@ -215,5 +216,18 @@ object ScreenLoadTrace {
         expectedTickAt = now() + TICK_MS
         watchdogHandler.postDelayed(tick, TICK_MS)
         Log.d(TAG, "main-thread stall watchdog started (reports blocks > ${STALL_THRESHOLD_MS}ms)")
+    }
+
+    /**
+     * Stops the watchdog. It re-posts itself every [TICK_MS], so without this a single card tap
+     * left a main-thread message running five times a second for the rest of the process - a
+     * permanent cost added by a tool meant to measure cost. [endCurrent] calls this once the
+     * screen it was started for has finished loading.
+     */
+    @JvmStatic
+    fun stopWatchdog() {
+        if (!watchdogRunning) return
+        watchdogRunning = false
+        watchdogHandler.removeCallbacks(tick)
     }
 }

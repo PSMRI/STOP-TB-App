@@ -25,16 +25,43 @@ class CampHubUrlValidatorTest {
     }
 
     @Test
-    fun `rejects public hosts - the QR redirect attack`() {
+    fun `rejects untrusted public hosts - the QR redirect attack`() {
         listOf(
             "http://evil.example.com/",
             "https://evil.example.com/",     // TLS does not make it trustworthy
             "evil.example.com",              // bare, scheme inferred, still public
             "http://8.8.8.8:8080",
-            "http://172.32.0.1:8080"         // just outside 172.16/12
+            "http://172.32.0.1:8080",        // just outside 172.16/12
+            "https://piramalswasthya.org.evil.com/"  // suffix must not be spoofable
         ).forEach { input ->
             assertThat(CampHubUrlValidator.isAllowed(input)).isFalse()
         }
+    }
+
+    @Test
+    fun `accepts the project's own hosts - a hub is not always on the LAN`() {
+        // The UAT flavor ships camp_hub_default_url = https://uatstoptb.piramalswasthya.org/
+        // A local-network-only rule would have made camp mode impossible to enable on UAT.
+        listOf(
+            "https://uatstoptb.piramalswasthya.org/",
+            "https://stoptb.piramalswasthya.org/",
+            "piramalswasthya.org"
+        ).forEach { input ->
+            assertThat(CampHubUrlValidator.isAllowed(input)).isTrue()
+        }
+    }
+
+    @Test
+    fun `accepts the exact host this build was configured with`() {
+        val configured = "some-hub.example.org"
+        assertThat(CampHubUrlValidator.isAllowed("https://some-hub.example.org/")).isFalse()
+        assertThat(
+            CampHubUrlValidator.isAllowed("https://some-hub.example.org/", extraAllowedHost = configured)
+        ).isTrue()
+        // but it does not open the door to anything else
+        assertThat(
+            CampHubUrlValidator.isAllowed("https://evil.example.com/", extraAllowedHost = configured)
+        ).isFalse()
     }
 
     @Test
