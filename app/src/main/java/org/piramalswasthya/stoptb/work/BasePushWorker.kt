@@ -12,12 +12,16 @@ import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.network.interceptors.TokenInsertTmcInterceptor
 import timber.log.Timber
-import java.net.SocketTimeoutException
+import java.io.IOException
 
-// Base class for all push workers. Provides foreground service protection
-// (prevents OS from killing workers on aggressive-battery devices like
-// Xiaomi MIUI, Oppo ColorOS, Vivo FunTouchOS), centralized token
-// initialization, and structured error handling.
+// Base class for all push workers. Provides centralized token
+// initialization and structured error handling.
+//
+// Workers do not call setForeground(): starting a foreground service from a
+// background worker can crash the app on Android 12+ in ways a try/catch in
+// the worker cannot intercept. getForegroundInfo() is only used when a push
+// request is expedited (see WorkerUtils.enqueuePushChain), where WorkManager
+// shows it as a foreground notification on Android 11 and below.
 //
 // Subclasses only need to implement doSyncWork() and provide workerName
 // and preferenceDao (via Hilt DI with override val).
@@ -57,10 +61,16 @@ abstract class BasePushWorker(
         initTokens()
         return try {
             doSyncWork()
-        } catch (e: SocketTimeoutException) {
-            Timber.e("[$workerName] Socket timeout, will retry")
+        } catch (e: IOException) {
+            // Network failure (hub unreachable, timeout, DNS): nothing was rejected,
+            // so retry with WorkManager backoff instead of failing the chain.
+            Timber.e("[$workerName] Network error, will retry: $e")
             Result.retry()
         } catch (e: Exception) {
+            if (preferenceDao.getLoggedInUser() == null) {
+                Timber.w("[$workerName] Logged-in user went away during sync, will retry")
+                return Result.retry()
+            }
             Timber.e(e, "[$workerName] Sync failed")
             Result.failure(workDataOf(
                 KEY_WORKER_NAME to workerName,

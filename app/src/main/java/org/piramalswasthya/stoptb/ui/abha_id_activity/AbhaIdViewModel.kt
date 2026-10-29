@@ -57,11 +57,17 @@ class AbhaIdViewModel @Inject constructor(
         val user = prefDao.getLoggedInUser()
         viewModelScope.launch {
             user?.let {
-                if (userRepo.refreshTokenTmc(user.userName, user.password)) {
+                val refreshed = try {
+                    userRepo.refreshTokenTmc(user.userName, user.password)
+                } catch (e: java.io.IOException) {
+                    _state.value = State.ERROR_NETWORK
+                    return@launch
+                }
+                if (refreshed) {
                     generateAccessToken()
                 } else {
                     _state.value = State.ERROR_SERVER
-                    Log.e("Error","Server error ${userRepo.refreshTokenTmc(user.userName, user.password)}")
+                    Log.e("Error", "Server error: Amrit token refresh failed")
                 }
             }
         }

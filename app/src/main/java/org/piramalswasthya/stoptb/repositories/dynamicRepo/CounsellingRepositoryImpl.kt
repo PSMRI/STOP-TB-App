@@ -3,6 +3,8 @@ package org.piramalswasthya.stoptb.repositories.dynamicRepo
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.room.withTransaction
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.model.dynamicEntity.*
 import org.piramalswasthya.stoptb.network.AmritApiService
@@ -412,7 +414,15 @@ class CounsellingRepositoryImpl @Inject constructor(
         return SectionClassification(finalSectionId, nonFinalSectionIdsInOrder)
     }
 
-    override suspend fun syncUnsyncedRecords(): Boolean {
+    // Serializes syncUnsyncedRecords(): it runs from CounsellingSyncWorker (on save)
+    // and from the push chain, and overlapping runs would POST the same responses twice.
+    private val syncMutex = Mutex()
+
+    override suspend fun syncUnsyncedRecords(): Boolean = syncMutex.withLock {
+        syncUnsyncedRecordsLocked()
+    }
+
+    private suspend fun syncUnsyncedRecordsLocked(): Boolean {
         Timber.d("syncUnsyncedRecords: querying all local form responses for debugging...")
         val allResponses = responseDao.getAllFormResponses()
         val allDetails = allResponses.map {
@@ -440,6 +450,12 @@ class CounsellingRepositoryImpl @Inject constructor(
 
         for (resp in unsynced) {
             val responseId = resp.formResponse.responseId
+            if (resp.formResponse.beneficiaryId <= 0L) {
+                // Saved before the beneficiary was registered; it goes out once the
+                // registration re-points it to the real ID.
+                Timber.d("syncUnsyncedRecords: responseId=$responseId waiting for beneficiary registration")
+                continue
+            }
             val formDef = metadataDao.getFormDefinitionByVersionId(resp.formResponse.formVersionId)
 
             // General Info refusal now pushes via submitBulk (not complete), reusing the same
@@ -457,9 +473,7 @@ class CounsellingRepositoryImpl @Inject constructor(
                 }
 
                 if (recordSuccess) {
-                    responseDao.updateFormResponse(
-                        resp.formResponse.copy(syncStatus = "SYNCED", syncedAt = System.currentTimeMillis())
-                    )
+                    responseDao.markSyncedIfUnchanged(resp.formResponse.responseId, resp.formResponse.updatedAt)
                 } else {
                     allSuccess = false
                 }
@@ -498,9 +512,7 @@ class CounsellingRepositoryImpl @Inject constructor(
             val recordSuccess = executeCompleteCounselling(authHeader, payload, "responseId=$responseId, sectionId=$finalSectionId")
 
             if (recordSuccess) {
-                responseDao.updateFormResponse(
-                    resp.formResponse.copy(syncStatus = "SYNCED", syncedAt = System.currentTimeMillis())
-                )
+                responseDao.markSyncedIfUnchanged(resp.formResponse.responseId, resp.formResponse.updatedAt)
 
                 val finalSectionResponse = resp.sectionResponses.find { it.sectionResponse.sectionId == finalSectionId }
                 if (finalSectionResponse != null) {
@@ -602,159 +614,202 @@ class CounsellingRepositoryImpl @Inject constructor(
             val apiResponses = response.body()?.data
             if (apiResponses.isNullOrEmpty()) return false
 
-            db.withTransaction {
-                // Preserve any locally edited (UNSYNCED) responses — do not overwrite them
-                // with server data, as that would permanently discard unsaved user edits.
-                val unsyncedLocal = responseDao.getUnsyncedResponseForBeneficiary(beneficiaryId, formVersionId)
-                if (unsyncedLocal != null) return@withTransaction
-
-                val existingCreatedAt = responseDao.getFormResponseForBeneficiary(beneficiaryId, formVersionId)
-                    ?.formResponse?.createdAt
-
-                responseDao.deleteFormResponseForBeneficiary(beneficiaryId, formVersionId)
-
-                val apiResponse = apiResponses.first()
-
-                val serverDate: Long? = try {
-                    apiResponse.submittedAt?.let { OffsetDateTime.parse(it).toInstant().toEpochMilli() }
-                } catch (e: Exception) {
-                    Timber.w(e, "fetchAndStoreCounsellingResponse: failed to parse submittedAt=${apiResponse.submittedAt}")
-                    null
-                }
-
-                val questionsMap = activeVersion.sections
-                    .flatMap { it.questions }
-                    .filter { it.question.serverQuestionId != null }
-                    .associateBy { it.question.serverQuestionId!! }
-
-                val optionsMap = mutableMapOf<Pair<Int, Int>, Int>()
-                activeVersion.sections.forEach { sec ->
-                    sec.questions.forEach { qDetails ->
-                        val serverQId = qDetails.question.serverQuestionId
-                        if (serverQId != null) {
-                            qDetails.options.forEach { optDetails ->
-                                val serverOptId = optDetails.option.serverOptionId
-                                if (serverOptId != null) {
-                                    optionsMap[Pair(serverQId, serverOptId)] = optDetails.option.optionId
-                                }
-                            }
-                        }
-                    }
-                }
-
-                val formResponse = FormResponseEntity(
-                    beneficiaryId = beneficiaryId,
-                    formVersionId = activeVersion.version.versionId,
-                    status = "SUBMITTED",
-                    lastVisitedSectionId = null,
-                    syncStatus = "SYNCED",
-                    syncedAt = System.currentTimeMillis(),
-                    createdAt = serverDate ?: existingCreatedAt ?: System.currentTimeMillis()
-                )
-                val responseId = responseDao.insertFormResponse(formResponse)
-
-                val sectionResponses = activeVersion.sections.map {
-                    SectionResponseEntity(
-                        formResponseId = responseId,
-                        sectionId = it.section.sectionId
-                    )
-                }
-                responseDao.insertSectionResponses(sectionResponses)
-
-                val insertedSections = responseDao.getFormResponseById(responseId)?.sectionResponses ?: emptyList()
-                val sectionIdToResponseIdMap = insertedSections.associate {
-                    it.sectionResponse.sectionId to it.sectionResponse.sectionResponseId
-                }
-
-                val questionResponsesToInsert = mutableListOf<QuestionResponseEntity>()
-                var hasPostSubmitAnswers = false
-                val answeredSectionIds = mutableSetOf<Int>()
-
-                apiResponse.sections.forEach { apiSec ->
-                    val sectionId = apiSec.sectionId
-                    val sectionDef = activeVersion.sections.find { it.section.sectionId == sectionId }
-                    if (sectionDef != null) {
-                        val sectionResponseId = sectionIdToResponseIdMap[sectionId]
-                        if (sectionResponseId != null) {
-                            if (apiSec.answers.isNotEmpty()) {
-                                answeredSectionIds.add(sectionId)
-                            }
-                            if (sectionDef.section.sectionPhase == "POST_SUBMIT" && apiSec.answers.isNotEmpty()) {
-                                hasPostSubmitAnswers = true
-                            }
-
-                            apiSec.answers.forEach { apiAns ->
-                                val serverQId = apiAns.questionId
-                                val qDetails = questionsMap[serverQId]
-                                if (qDetails != null) {
-                                    val qId = qDetails.question.questionId
-
-                                    val serverOptId = apiAns.optionId
-                                    val localOptId = if (serverOptId != null) {
-                                        optionsMap[Pair(serverQId, serverOptId)]
-                                    } else {
-                                        null
-                                    }
-
-                                    questionResponsesToInsert.add(
-                                        QuestionResponseEntity(
-                                            sectionResponseId = sectionResponseId,
-                                            questionId = qId,
-                                            optionId = localOptId,
-                                            answerText = apiAns.answerText
-                                        )
-                                    )
-                                } else {
-                                    Timber.w("fetchAndStoreCounsellingResponse: No local question found for serverQuestionId=$serverQId")
-                                }
-                            }
-                        }
-                    } else {
-                        Timber.w("fetchAndStoreCounsellingResponse: No local section found for serverSectionId=$sectionId")
-                    }
-                }
-
-                if (questionResponsesToInsert.isNotEmpty()) {
-                    responseDao.insertQuestionResponses(questionResponsesToInsert)
-                }
-
-                insertedSections
-                    .filter { it.sectionResponse.sectionId in answeredSectionIds }
-                    .forEach { sr ->
-                        responseDao.updateSectionResponse(
-                            sr.sectionResponse.copy(completedAt = serverDate ?: System.currentTimeMillis())
-                        )
-                    }
-
-                val preSubmitSectionIds = activeVersion.sections
-                    .filter { it.section.sectionPhase == "PRE_SUBMIT" }
-                    .map { it.section.sectionId }
-                val allPreSubmitAnswered = preSubmitSectionIds.isNotEmpty() &&
-                        preSubmitSectionIds.all { it in answeredSectionIds }
-
-                // Determines SUBMITTED status only when actual PRE_SUBMIT screening answers are complete.
-                val finalStatus = when {
-                    apiResponse.status?.uppercase() == "REFUSED" -> "REFUSED"
-                    hasPostSubmitAnswers || apiResponse.status?.uppercase() == "COMPLETE" || apiResponse.status?.uppercase() == "COMPLETED" -> "COMPLETE"
-                    allPreSubmitAnswered -> "SUBMITTED"
-                    else -> "DRAFT"
-                }
-
-                responseDao.updateFormResponse(
-                    formResponse.copy(
-                        responseId = responseId,
-                        status = finalStatus,
-                        sectionsFilled = preSubmitSectionIds.count { it in answeredSectionIds },
-                        totalSections = preSubmitSectionIds.size
-                    )
-                )
-            }
+            storeCounsellingResponse(beneficiaryId, activeVersion, apiResponses.first())
             return true
         } catch (e: Exception) {
             Timber.e(e, "fetchAndStoreCounsellingResponse failed for benId=$beneficiaryId")
             return false
         }
-    }    override suspend fun fetchAndStoreCompletedBeneficiaries(): List<CompletedBeneficiaryStatus>? {
+    }
+
+    // Saves one server counselling response, with its answers and the derived status (refused,
+    // sections filled, total sections), against the active version. Used by the per-beneficiary
+    // fetch above and by the changes feed. A local UNSYNCED response is never replaced.
+    private suspend fun storeCounsellingResponse(
+        beneficiaryId: Long,
+        activeVersion: FormVersionWithSections,
+        apiResponse: ServerCounsellingResponseDto
+    ) {
+        val formVersionId = activeVersion.version.versionId
+        db.withTransaction {
+            // Preserve any locally edited (UNSYNCED) responses — do not overwrite them
+            // with server data, as that would permanently discard unsaved user edits.
+            val unsyncedLocal = responseDao.getUnsyncedResponseForBeneficiary(beneficiaryId, formVersionId)
+            if (unsyncedLocal != null) return@withTransaction
+
+            val existingCreatedAt = responseDao.getFormResponseForBeneficiary(beneficiaryId, formVersionId)
+                ?.formResponse?.createdAt
+
+            responseDao.deleteFormResponseForBeneficiary(beneficiaryId, formVersionId)
+
+            val serverDate: Long? = try {
+                apiResponse.submittedAt?.let { OffsetDateTime.parse(it).toInstant().toEpochMilli() }
+            } catch (e: Exception) {
+                Timber.w(e, "storeCounsellingResponse: failed to parse submittedAt=${apiResponse.submittedAt}")
+                null
+            }
+
+            val questionsMap = activeVersion.sections
+                .flatMap { it.questions }
+                .filter { it.question.serverQuestionId != null }
+                .associateBy { it.question.serverQuestionId!! }
+
+            val optionsMap = mutableMapOf<Pair<Int, Int>, Int>()
+            activeVersion.sections.forEach { sec ->
+                sec.questions.forEach { qDetails ->
+                    val serverQId = qDetails.question.serverQuestionId
+                    if (serverQId != null) {
+                        qDetails.options.forEach { optDetails ->
+                            val serverOptId = optDetails.option.serverOptionId
+                            if (serverOptId != null) {
+                                optionsMap[Pair(serverQId, serverOptId)] = optDetails.option.optionId
+                            }
+                        }
+                    }
+                }
+            }
+
+            val formResponse = FormResponseEntity(
+                beneficiaryId = beneficiaryId,
+                backendResponseId = apiResponse.responseId,
+                formVersionId = activeVersion.version.versionId,
+                status = "SUBMITTED",
+                lastVisitedSectionId = null,
+                syncStatus = "SYNCED",
+                syncedAt = System.currentTimeMillis(),
+                createdAt = serverDate ?: existingCreatedAt ?: System.currentTimeMillis()
+            )
+            val responseId = responseDao.insertFormResponse(formResponse)
+
+            val sectionResponses = activeVersion.sections.map {
+                SectionResponseEntity(
+                    formResponseId = responseId,
+                    sectionId = it.section.sectionId
+                )
+            }
+            responseDao.insertSectionResponses(sectionResponses)
+
+            val insertedSections = responseDao.getFormResponseById(responseId)?.sectionResponses ?: emptyList()
+            val sectionIdToResponseIdMap = insertedSections.associate {
+                it.sectionResponse.sectionId to it.sectionResponse.sectionResponseId
+            }
+
+            val questionResponsesToInsert = mutableListOf<QuestionResponseEntity>()
+            var hasPostSubmitAnswers = false
+            val answeredSectionIds = mutableSetOf<Int>()
+
+            apiResponse.sections.forEach { apiSec ->
+                val sectionId = apiSec.sectionId
+                val sectionDef = activeVersion.sections.find { it.section.sectionId == sectionId }
+                if (sectionDef != null) {
+                    val sectionResponseId = sectionIdToResponseIdMap[sectionId]
+                    if (sectionResponseId != null) {
+                        if (apiSec.answers.isNotEmpty()) {
+                            answeredSectionIds.add(sectionId)
+                        }
+                        if (sectionDef.section.sectionPhase == "POST_SUBMIT" && apiSec.answers.isNotEmpty()) {
+                            hasPostSubmitAnswers = true
+                        }
+
+                        apiSec.answers.forEach { apiAns ->
+                            val serverQId = apiAns.questionId
+                            val qDetails = questionsMap[serverQId]
+                            if (qDetails != null) {
+                                val qId = qDetails.question.questionId
+
+                                val serverOptId = apiAns.optionId
+                                val localOptId = if (serverOptId != null) {
+                                    optionsMap[Pair(serverQId, serverOptId)]
+                                } else {
+                                    null
+                                }
+
+                                questionResponsesToInsert.add(
+                                    QuestionResponseEntity(
+                                        sectionResponseId = sectionResponseId,
+                                        questionId = qId,
+                                        optionId = localOptId,
+                                        answerText = apiAns.answerText
+                                    )
+                                )
+                            } else {
+                                Timber.w("storeCounsellingResponse: No local question found for serverQuestionId=$serverQId")
+                            }
+                        }
+                    }
+                } else {
+                    Timber.w("storeCounsellingResponse: No local section found for serverSectionId=$sectionId")
+                }
+            }
+
+            if (questionResponsesToInsert.isNotEmpty()) {
+                responseDao.insertQuestionResponses(questionResponsesToInsert)
+            }
+
+            insertedSections
+                .filter { it.sectionResponse.sectionId in answeredSectionIds }
+                .forEach { sr ->
+                    responseDao.updateSectionResponse(
+                        sr.sectionResponse.copy(completedAt = serverDate ?: System.currentTimeMillis())
+                    )
+                }
+
+            val preSubmitSectionIds = activeVersion.sections
+                .filter { it.section.sectionPhase == "PRE_SUBMIT" }
+                .map { it.section.sectionId }
+            val allPreSubmitAnswered = preSubmitSectionIds.isNotEmpty() &&
+                    preSubmitSectionIds.all { it in answeredSectionIds }
+
+            // Determines SUBMITTED status only when actual PRE_SUBMIT screening answers are complete.
+            val finalStatus = when {
+                apiResponse.status?.uppercase() == "REFUSED" -> "REFUSED"
+                hasPostSubmitAnswers || apiResponse.status?.uppercase() == "COMPLETE" || apiResponse.status?.uppercase() == "COMPLETED" -> "COMPLETE"
+                allPreSubmitAnswered -> "SUBMITTED"
+                else -> "DRAFT"
+            }
+
+            responseDao.updateFormResponse(
+                formResponse.copy(
+                    responseId = responseId,
+                    status = finalStatus,
+                    sectionsFilled = preSubmitSectionIds.count { it in answeredSectionIds },
+                    totalSections = preSubmitSectionIds.size
+                )
+            )
+        }
+    }
+
+    override suspend fun getCompletedBeneficiaries(): List<CompletedBeneficiaryStatus>? {
+        if (!preferenceDao.isChangesFeedActive()) return fetchAndStoreCompletedBeneficiaries()
+        val versionId = metadataDao.getFormDefinition(FormType.TB_COUNSELLING_V2)?.let { def ->
+            (def.versions.find { it.version.isActive } ?: def.versions.maxByOrNull { it.version.versionNumber })
+                ?.version?.versionId
+        } ?: return emptyList()
+        return responseDao.getAllFormResponses()
+            .map { it.formResponse }
+            .filter { it.formVersionId == versionId && !it.isHistorySnapshot }
+            .map {
+                CompletedBeneficiaryStatus(
+                    beneficiaryId = it.beneficiaryId,
+                    sectionsFilled = it.sectionsFilled ?: 0,
+                    totalSections = it.totalSections ?: 0,
+                    refused = it.status == "REFUSED"
+                )
+            }
+    }
+
+    override suspend fun applyFeedCounsellingResponses(responses: List<ServerCounsellingResponseDto>) {
+        if (responses.isEmpty()) return
+        val formDef = metadataDao.getFormDefinition(FormType.TB_COUNSELLING_V2) ?: return
+        val activeVersion = formDef.versions.find { it.version.isActive }
+            ?: formDef.versions.maxByOrNull { it.version.versionNumber }
+            ?: return
+        responses.groupBy { it.beneficiaryId }.forEach { (beneficiaryId, forBen) ->
+            storeCounsellingResponse(beneficiaryId, activeVersion, forBen.maxBy { it.responseId })
+        }
+    }
+
+    override suspend fun fetchAndStoreCompletedBeneficiaries(): List<CompletedBeneficiaryStatus>? {
         try {
             val jwt = preferenceDao.getJWTAmritToken()
             val authHeader = jwt ?: run {
@@ -819,6 +874,10 @@ class CounsellingRepositoryImpl @Inject constructor(
                                         totalSections = item.totalSections
                                     )
                                 )
+                            } else if (existing.formResponse.syncStatus != "SYNCED") {
+                                // Local edits not yet pushed: leave the row alone (its status
+                                // must not be overwritten and the row must not be marked SYNCED).
+                                Timber.d("fetchAndStoreCompletedBeneficiaries: benId=$benId has unsynced local changes, not overwritten")
                             } else {
                                 val currentFr = existing.formResponse
                                 if (newStatus == null ||

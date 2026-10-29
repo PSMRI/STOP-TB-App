@@ -27,8 +27,6 @@ class PullAshaWorker @AssistedInject constructor(
     override suspend fun getForegroundInfo(): ForegroundInfo = createForegroundInfo()
 
     override suspend fun doWork(): Result {
-        setForeground(getForegroundInfo())
-
         preferenceDao.lastAshaPullTimestamp =
             Calendar.getInstance().setToStartOfTheDay().timeInMillis
         return Result.success()

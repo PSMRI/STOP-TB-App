@@ -64,10 +64,13 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 if (!tbRepo.isXrayIntegrated() && !tbRepo.isTruenatIntegrated()) {
                     Timber.d("Skipping automated result polling: no diagnostic devices are integrated")
                 } else {
-                if (tbRepo.isXrayIntegrated()) {
+                // The changes feed already brings every order's status on each pull, so the
+                // village-wide status sweeps are only needed when the hub has no feed.
+                val feedActive = preferenceDao.isChangesFeedActive()
+                if (!feedActive && tbRepo.isXrayIntegrated()) {
                     tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST")
                 }
-                if (tbRepo.isTruenatIntegrated()) {
+                if (!feedActive && tbRepo.isTruenatIntegrated()) {
                     tbRepo.fetchBeneficiariesByStatus("SPUTUM_TRUENAT")
                     tbRepo.fetchBeneficiariesByStatus("MDR_RIF")
                 }

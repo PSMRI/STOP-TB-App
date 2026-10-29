@@ -122,7 +122,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 61, exportSchema = false
+    version = InAppDb.DB_VERSION, exportSchema = true
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -2014,6 +2014,77 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+
+        // Bump together with a new MIGRATION_x_y added to MIGRATIONS below.
+        const val DB_VERSION = 61
+
+        // Oldest schema version that can be migrated in place.
+        const val OLDEST_MIGRATABLE_VERSION = 2
+
+        // Every migration, in order. InAppDbMigrationsTest checks that it covers each
+        // step from OLDEST_MIGRATABLE_VERSION to DB_VERSION.
+        internal val MIGRATIONS: Array<Migration> = arrayOf(
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+            MIGRATION_4_5,
+            MIGRATION_5_6,
+            MIGRATION_6_7,
+            MIGRATION_7_8,
+            MIGRATION_8_9,
+            MIGRATION_9_10,
+            MIGRATION_10_11,
+            MIGRATION_11_12,
+            MIGRATION_12_13,
+            MIGRATION_13_14,
+            MIGRATION_14_15,
+            MIGRATION_15_16,
+            MIGRATION_16_17,
+            MIGRATION_17_18,
+            MIGRATION_18_19,
+            MIGRATION_19_20,
+            MIGRATION_20_21,
+            MIGRATION_21_22,
+            MIGRATION_22_23,
+            MIGRATION_23_24,
+            MIGRATION_24_25,
+            MIGRATION_25_26,
+            MIGRATION_26_27,
+            MIGRATION_27_28,
+            MIGRATION_28_29,
+            MIGRATION_29_30,
+            MIGRATION_30_31,
+            MIGRATION_31_32,
+            MIGRATION_32_33,
+            MIGRATION_33_34,
+            MIGRATION_34_35,
+            MIGRATION_35_36,
+            MIGRATION_36_37,
+            MIGRATION_37_38,
+            MIGRATION_38_39,
+            MIGRATION_39_40,
+            MIGRATION_40_41,
+            MIGRATION_41_42,
+            MIGRATION_42_43,
+            MIGRATION_43_44,
+            MIGRATION_44_45,
+            MIGRATION_45_46,
+            MIGRATION_46_47,
+            MIGRATION_47_48,
+            MIGRATION_48_49,
+            MIGRATION_49_50,
+            MIGRATION_50_51,
+            MIGRATION_51_52,
+            MIGRATION_52_53,
+            MIGRATION_53_54,
+            MIGRATION_54_55,
+            MIGRATION_55_56,
+            MIGRATION_56_57,
+            MIGRATION_57_58,
+            MIGRATION_58_59,
+            MIGRATION_59_60,
+            MIGRATION_60_61
+        )
+
         fun getInstance(appContext: Context): InAppDb {
 
             synchronized(this) {
@@ -2039,65 +2110,7 @@ abstract class InAppDb : RoomDatabase() {
                     }
 
                     instance = builder
-                        .addMigrations(MIGRATION_2_3)
-                        .addMigrations(MIGRATION_3_4)
-                        .addMigrations(MIGRATION_4_5)
-                        .addMigrations(MIGRATION_5_6)
-                        .addMigrations(MIGRATION_6_7)
-                        .addMigrations(MIGRATION_7_8)
-                        .addMigrations(MIGRATION_8_9)
-                        .addMigrations(MIGRATION_9_10)
-                        .addMigrations(MIGRATION_10_11)
-                        .addMigrations(MIGRATION_11_12)
-                        .addMigrations(MIGRATION_12_13)
-                        .addMigrations(MIGRATION_13_14)
-                        .addMigrations(MIGRATION_14_15)
-                        .addMigrations(MIGRATION_15_16)
-                        .addMigrations(MIGRATION_16_17)
-                        .addMigrations(MIGRATION_17_18)
-                        .addMigrations(MIGRATION_18_19)
-                        .addMigrations(MIGRATION_19_20)
-                        .addMigrations(MIGRATION_20_21)
-                        .addMigrations(MIGRATION_21_22)
-                        .addMigrations(MIGRATION_22_23)
-                        .addMigrations(MIGRATION_23_24)
-                        .addMigrations(MIGRATION_24_25)
-                        .addMigrations(MIGRATION_25_26)
-                        .addMigrations(MIGRATION_26_27)
-                        .addMigrations(MIGRATION_27_28)
-                        .addMigrations(MIGRATION_28_29)
-                        .addMigrations(MIGRATION_29_30)
-                        .addMigrations(MIGRATION_30_31)
-                        .addMigrations(MIGRATION_31_32)
-                        .addMigrations(MIGRATION_32_33)
-                        .addMigrations(MIGRATION_33_34)
-                        .addMigrations(MIGRATION_34_35)
-                        .addMigrations(MIGRATION_35_36)
-                        .addMigrations(MIGRATION_36_37)
-                        .addMigrations(MIGRATION_37_38)
-                        .addMigrations(MIGRATION_38_39)
-                        .addMigrations(MIGRATION_39_40)
-                        .addMigrations(MIGRATION_40_41)
-                        .addMigrations(MIGRATION_41_42)
-                        .addMigrations(MIGRATION_42_43)
-                        .addMigrations(MIGRATION_43_44)
-                        .addMigrations(MIGRATION_44_45)
-                        .addMigrations(MIGRATION_45_46)
-                        .addMigrations(MIGRATION_46_47)
-                        .addMigrations(MIGRATION_47_48)
-                        .addMigrations(MIGRATION_48_49)
-                        .addMigrations(MIGRATION_49_50)
-                        .addMigrations(MIGRATION_50_51)
-                        .addMigrations(MIGRATION_51_52)
-                        .addMigrations(MIGRATION_52_53)
-                        .addMigrations(MIGRATION_53_54)
-                        .addMigrations(MIGRATION_54_55)
-                        .addMigrations(MIGRATION_55_56)
-                        .addMigrations(MIGRATION_56_57)
-                        .addMigrations(MIGRATION_57_58)
-                        .addMigrations(MIGRATION_58_59)
-                        .addMigrations(MIGRATION_59_60)
-                        .addMigrations(MIGRATION_60_61)
+                        .addMigrations(*MIGRATIONS)
                         // Room's default is transactionExecutor = ArchTaskExecutor's IO pool and
                         // queryExecutor = that same object - ONE pool of 4 threads shared by every
                         // query, every suspend DAO call and every withTransaction block.
@@ -2131,7 +2144,11 @@ abstract class InAppDb : RoomDatabase() {
                                 }
                             }
                         })
-                        .fallbackToDestructiveMigration()
+                        // Never wipe the database for a missing migration: it holds records not
+                        // yet synced. A missing migration now fails at launch (and in
+                        // InAppDbMigrationsTest) instead of silently deleting field data. Only
+                        // version 1, which has no migration and is not in the field, may be reset.
+                        .fallbackToDestructiveMigrationFrom(1)
                         .build()
 
                     INSTANCE = instance

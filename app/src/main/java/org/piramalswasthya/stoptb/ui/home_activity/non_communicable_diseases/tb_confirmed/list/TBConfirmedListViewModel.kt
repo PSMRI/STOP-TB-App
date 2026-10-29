@@ -48,7 +48,7 @@ class TBConfirmedListViewModel @Inject constructor(
     fun fetchCompletedBeneficiaries() {
         viewModelScope.launch {
             try {
-                _beneficiaryIdArray.value = counsellingRepository.fetchAndStoreCompletedBeneficiaries()
+                _beneficiaryIdArray.value = counsellingRepository.getCompletedBeneficiaries()
                     ?.filterNot{ !it.refused && it.sectionsFilled == 0 }
                     ?.map { it.beneficiaryId }
             } catch (e: Exception) {
