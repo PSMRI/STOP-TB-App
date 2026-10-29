@@ -426,7 +426,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                     benId, "XRAY_CHEST", resultSummary = null, reasonForRefusal = notConductedReason
                                 )
                                 if (res is NetworkResponse.Success) {
-                                    if (res.data == "PENDING_SYNC") anyPendingManualResultSync = true
+                                    if (res.data == TBRepo.PENDING_SYNC) anyPendingManualResultSync = true
                                     tbDiagnostics.xrayOrderStatus = "CLOSED"
                                     tbDiagnostics.chestXRayResult = null
                                 } else {
@@ -442,31 +442,18 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 // an identical result the backend already accepted.
                                 val res = tbRepo.submitManualResult(benId, "XRAY_CHEST", resultSummary = enteredXrayResult.displayValue)
                                 if (res is NetworkResponse.Success) {
-                                    if (res.data == "PENDING_SYNC") anyPendingManualResultSync = true
+                                    if (res.data == TBRepo.PENDING_SYNC) anyPendingManualResultSync = true
                                     tbDiagnostics.xrayOrderStatus = "COMPLETED"
                                     tbDiagnostics.isChestXRayDone = true
                                     tbRepo.getTBDiagnosticsById(benId)?.xrayOrderId?.let { tbDiagnostics.xrayOrderId = it }
 
-                                    when {
-                                        enteredXrayResult.triggersTrueNatReferral -> {
-                                            // TB Presumptive / Abnormal-but-not-presumptive — both
-                                            // now trigger the same referral cascade (unchanged
-                                            // TrueNat call).
-                                            val currentDiag = tbRepo.getTBDiagnosticsById(benId)
-                                            val hasTruenat = !currentDiag?.trueNatOrderId.isNullOrBlank() ||
-                                                    currentDiag?.trueNatOrderStatus.equals("COMPLETED", ignoreCase = true) ||
-                                                    currentDiag?.trueNatOrderStatus.equals("PENDING", ignoreCase = true) ||
-                                                    currentDiag?.trueNatOrderStatus.equals("CLOSED", ignoreCase = true)
-                                            if (!hasTruenat) {
-                                                ordersToPushAfterSave += "SPUTUM_TRUENAT"
-                                            }
-                                        }
-                                        enteredXrayResult == ChestXrayResult.AI_INVALID -> {
-                                            // Manual AI-Invalid: re-order immediately, mirrors RIF
-                                            // Indeterminate / MTB TB-Positive.
-                                            ordersToPushAfterSave += "XRAY_CHEST"
-                                        }
-                                        else -> Unit // Normal — no cascade
+                                    // Only once the backend has accepted it: an entry that is merely
+                                    // stored locally may still be refused, and the orders it raises are
+                                    // not undone when it is. The replay sweep cascades on acceptance.
+                                    if (res.data != TBRepo.PENDING_SYNC) {
+                                        ordersToPushAfterSave += tbRepo.cascadeOrdersForConfirmedResult(
+                                            benId, "XRAY_CHEST", enteredXrayResult.displayValue
+                                        )
                                     }
                                 } else {
                                     apiSuccess = false
@@ -533,7 +520,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                     benId, "SPUTUM_TRUENAT", resultSummary = null, reasonForRefusal = sputumNotCollectedReason
                                 )
                                 if (res is NetworkResponse.Success) {
-                                    if (res.data == "PENDING_SYNC") anyPendingManualResultSync = true
+                                    if (res.data == TBRepo.PENDING_SYNC) anyPendingManualResultSync = true
                                     tbDiagnostics.trueNatOrderStatus = "CLOSED"
                                     tbDiagnostics.naatResult = null
                                 } else {
@@ -554,7 +541,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                     benId, "SPUTUM_TRUENAT", resultSummary = null, reasonForRefusal = notConductedReason
                                 )
                                 if (res is NetworkResponse.Success) {
-                                    if (res.data == "PENDING_SYNC") anyPendingManualResultSync = true
+                                    if (res.data == TBRepo.PENDING_SYNC) anyPendingManualResultSync = true
                                     tbDiagnostics.trueNatOrderStatus = "CLOSED"
                                     tbDiagnostics.naatResult = null
                                 } else {
@@ -572,7 +559,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 // save before the RIF section ever runs.
                                 val res = tbRepo.submitManualResult(benId, "SPUTUM_TRUENAT", resultSummary = enteredMtbResult.displayValue)
                                 if (res is NetworkResponse.Success) {
-                                    if (res.data == "PENDING_SYNC") anyPendingManualResultSync = true
+                                    if (res.data == TBRepo.PENDING_SYNC) anyPendingManualResultSync = true
                                     tbDiagnostics.trueNatOrderStatus = "COMPLETED"
                                     tbDiagnostics.isNaatConducted = true
                                     tbDiagnostics.naatResult = when (enteredMtbResult) {
@@ -586,16 +573,13 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                     tbDiagnostics.isConfirmed = enteredMtbResult == MtbResult.TB_POSITIVE
                                     tbRepo.getTBDiagnosticsById(benId)?.trueNatOrderId?.let { tbDiagnostics.trueNatOrderId = it }
 
-                                    when (enteredMtbResult) {
-                                        MtbResult.TB_POSITIVE -> {
-                                            // TB Positive always creates a RIF order, regardless of X-ray.
-                                            ordersToPushAfterSave += "MDR_RIF"
-                                        }
-                                        MtbResult.INVALID_ERROR -> {
-                                            // Manual Invalid/Error: re-order immediately, mirrors X-Ray's AI-Invalid.
-                                            ordersToPushAfterSave += "SPUTUM_TRUENAT"
-                                        }
-                                        else -> Unit // TB Negative — no cascade
+                                    // Only once the backend has accepted it: an entry that is merely
+                                    // stored locally may still be refused, and the orders it raises are
+                                    // not undone when it is. The replay sweep cascades on acceptance.
+                                    if (res.data != TBRepo.PENDING_SYNC) {
+                                        ordersToPushAfterSave += tbRepo.cascadeOrdersForConfirmedResult(
+                                            benId, "SPUTUM_TRUENAT", enteredMtbResult.displayValue
+                                        )
                                     }
                                 } else {
                                     apiSuccess = false
@@ -635,7 +619,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                         benId, "MDR_RIF", resultSummary = null, reasonForRefusal = rifNotConductedReason
                                     )
                                     if (rifRes is NetworkResponse.Success) {
-                                        if (rifRes.data == "PENDING_SYNC") anyPendingManualResultSync = true
+                                        if (rifRes.data == TBRepo.PENDING_SYNC) anyPendingManualResultSync = true
                                         tbDiagnostics.rifOrderStatus = "CLOSED"
                                         tbDiagnostics.trueNatRifResult = null
                                     } else {
@@ -648,7 +632,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                     // the X-ray/MTB guards above.
                                     val rifRes = tbRepo.submitManualResult(benId, "MDR_RIF", resultSummary = enteredRifResult.displayValue)
                                     if (rifRes is NetworkResponse.Success) {
-                                        if (rifRes.data == "PENDING_SYNC") anyPendingManualResultSync = true
+                                        if (rifRes.data == TBRepo.PENDING_SYNC) anyPendingManualResultSync = true
                                         tbDiagnostics.rifOrderStatus = "COMPLETED"
                                         tbDiagnostics.trueNatRifResult = when (enteredRifResult) {
                                             RifResult.DR_TB -> "Rif Resistance Detected"
@@ -669,8 +653,11 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                         tbRepo.getTBDiagnosticsById(benId)?.rifOrderId?.let { tbDiagnostics.rifOrderId = it }
 
                                         // Indeterminate is terminal; Invalid/Error re-orders, mirroring MTB.
-                                        if (enteredRifResult == RifResult.INVALID_ERROR) {
-                                            ordersToPushAfterSave += "MDR_RIF"
+                                        // Gated on backend acceptance for the same reason as above.
+                                        if (rifRes.data != TBRepo.PENDING_SYNC) {
+                                            ordersToPushAfterSave += tbRepo.cascadeOrdersForConfirmedResult(
+                                                benId, "MDR_RIF", enteredRifResult.displayValue
+                                            )
                                         }
                                     } else {
                                         apiSuccess = false

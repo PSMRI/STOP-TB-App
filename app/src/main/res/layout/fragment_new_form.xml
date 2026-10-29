@@ -81,15 +81,51 @@
                         tools:text="30 YEARS | MALE" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
+            <!-- Status of the advisory result check. Sits under the patient header, not above the
+                 buttons: down there it collided with the last answer option on the taller TrueNat
+                 form and read as one of them. "invisible" rather than "gone" so showing it can
+                 never reflow the form - a shift while someone is reaching for a result option is
+                 how the wrong result gets tapped. Live region so TalkBack announces it. -->
+            <LinearLayout
+                android:id="@+id/ll_check_status"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:minHeight="24dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="@dimen/margin_small"
+                android:accessibilityLiveRegion="polite"
+                android:visibility="invisible"
+                app:layout_constraintTop_toBottomOf="@+id/cv_patient_information"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent">
+
+                <ProgressBar
+                    android:id="@+id/pb_check_status"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginEnd="8dp"
+                    android:indeterminateTint="?attr/colorPrimary" />
+
+                <TextView
+                    android:id="@+id/tv_check_status"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="13sp"
+                    android:textColor="?attr/colorOnSurface"
+                    tools:text="Checking for a newer result…" />
+            </LinearLayout>
+
             <androidx.core.widget.NestedScrollView
                 android:layout_width="0dp"
                 android:layout_height="0dp"
                 android:layout_weight="1"
                 android:fillViewport="true"
-                app:layout_constraintBottom_toTopOf="@+id/ll_check_status"
+                app:layout_constraintBottom_toTopOf="@+id/ll_buttons"
                 app:layout_constraintEnd_toEndOf="@+id/cv_patient_information"
                 app:layout_constraintStart_toStartOf="@+id/cv_patient_information"
-                app:layout_constraintTop_toBottomOf="@+id/cv_patient_information">
+                app:layout_constraintTop_toBottomOf="@+id/ll_check_status">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -137,39 +173,6 @@
 
             </androidx.core.widget.NestedScrollView>
 
-            <!-- Background result-check status. A live region so TalkBack announces it
-                 without stealing focus; the Submit button keeps its own label and stays
-                 usable, because this check is advisory, not a gate. -->
-            <LinearLayout
-                android:id="@+id/ll_check_status"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingHorizontal="@dimen/margin_small"
-                android:paddingVertical="4dp"
-                android:accessibilityLiveRegion="polite"
-                android:visibility="gone"
-                app:layout_constraintBottom_toTopOf="@+id/ll_buttons"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent">
-
-                <ProgressBar
-                    android:id="@+id/pb_check_status"
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:layout_marginEnd="8dp"
-                    android:indeterminateTint="?attr/colorPrimary" />
-
-                <TextView
-                    android:id="@+id/tv_check_status"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:textSize="13sp"
-                    android:textColor="?attr/colorOnSurface"
-                    tools:text="Checking for a newer result…" />
-            </LinearLayout>
 
             <!-- Submit button row -->
             <LinearLayout

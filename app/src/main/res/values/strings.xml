@@ -324,6 +324,11 @@
     <string name="check_newer_result_failed">Couldn\'t check for a newer result. You can still enter one.</string>
     <string name="submitting">Submitting…</string>
     <string name="result_newer_available">A newer result arrived for this order.</string>
+    <string name="manual_result_rejected_fallback_name">A beneficiary</string>
+    <string name="manual_result_not_saved_offline">Couldn\'t reach the server, so the result was not saved. Check the connection and try again.</string>
+    <string name="manual_result_rejected_title">A result you entered was not accepted</string>
+    <string name="manual_result_rejected_with_result">%1$s: the order already had a result (%2$s). Your entry was replaced by it.</string>
+    <string name="manual_result_rejected_generic">%1$s: the hub refused the result you entered offline. Open the record to re-enter it.</string>
     <string name="result_already_recorded_title">Result already recorded</string>
     <string name="result_already_recorded_message">A result has already been recorded for this order: %1$s.\n\nYour entry was not saved. The recorded result is now shown on the card.</string>
     <string name="filter_time_period">Time Period</string>

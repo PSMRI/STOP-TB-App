@@ -116,7 +116,7 @@ class TBSuspectedQuickFragment : Fragment() {
                     binding.llCheckStatus.postDelayed(showCheckingStatus, CHECK_STATUS_DELAY_MS)
 
                 TBSuspectedQuickViewModel.ResultCheck.IDLE ->
-                    binding.llCheckStatus.visibility = View.GONE
+                    binding.llCheckStatus.visibility = View.INVISIBLE
 
                 TBSuspectedQuickViewModel.ResultCheck.FAILED -> {
                     binding.llCheckStatus.visibility = View.VISIBLE
