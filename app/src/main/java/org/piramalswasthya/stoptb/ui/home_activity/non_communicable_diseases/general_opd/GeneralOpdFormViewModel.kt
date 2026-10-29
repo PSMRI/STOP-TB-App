@@ -38,7 +38,12 @@ class GeneralOpdFormViewModel @Inject constructor(
 
     // Re-resolved in init and before saving: the nav arg can be a temp ID the push has replaced.
     var benId = GeneralOpdFormFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
-        private set
+        private set(value) {
+            if (field == value) return
+            field = value
+            // Saved so a form restored after process death uses the server ID, not the temp ID.
+            viewModelScope.launch(Dispatchers.Main) { savedStateHandle["benId"] = value }
+        }
     val viewOnly = GeneralOpdFormFragmentArgs.fromSavedStateHandle(savedStateHandle).viewOnly
     val autoFlow = GeneralOpdFormFragmentArgs.fromSavedStateHandle(savedStateHandle).autoFlow
     val generalOpdFlow = GeneralOpdFormFragmentArgs.fromSavedStateHandle(savedStateHandle).generalOpdFlow

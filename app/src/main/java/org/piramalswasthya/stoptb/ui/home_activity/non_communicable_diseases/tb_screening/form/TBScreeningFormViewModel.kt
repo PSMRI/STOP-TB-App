@@ -30,7 +30,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class TBScreeningFormViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
     private val preferenceDao: PreferenceDao,
     @ApplicationContext private val context: Context,
     private val tbRepo: TBRepo,
@@ -39,7 +39,12 @@ class TBScreeningFormViewModel @Inject constructor(
     // Re-resolved in init and before saving: the nav arg can be a temp ID the push has replaced.
     var benId =
         TBScreeningFormFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
-        private set
+        private set(value) {
+            if (field == value) return
+            field = value
+            // Saved so a form restored after process death uses the server ID, not the temp ID.
+            viewModelScope.launch(Dispatchers.Main) { savedStateHandle["benId"] = value }
+        }
     var benRegId: Long = 0L
     val viewOnly =
         TBScreeningFormFragmentArgs.fromSavedStateHandle(savedStateHandle).viewOnly

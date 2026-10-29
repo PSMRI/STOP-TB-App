@@ -25,7 +25,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class VitalScreenViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
     private val benRepo: BenRepo,
     private val vitalRepo: VitalRepo,
     private val preferenceDao: PreferenceDao,
@@ -49,8 +49,15 @@ class VitalScreenViewModel @Inject constructor(
 
     // Re-resolved in init and before saving: the nav arg can be a temp ID the push has replaced.
     var benId = VitalScreenFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
+        private set(value) {
+            if (field == value) return
+            field = value
+            // Saved so a form restored after process death uses the server ID, not the temp ID.
+            viewModelScope.launch(Dispatchers.Main) { savedStateHandle["benId"] = value }
+        }
+    // 0 in the nav arg while the ben still had a temp ID; refreshed with benId below.
+    var benRegId = VitalScreenFragmentArgs.fromSavedStateHandle(savedStateHandle).benRegId
         private set
-    val benRegId = VitalScreenFragmentArgs.fromSavedStateHandle(savedStateHandle).benRegId
     val autoFlow = VitalScreenFragmentArgs.fromSavedStateHandle(savedStateHandle).autoFlow
 
     private val _benName = MutableLiveData<String>()
@@ -81,6 +88,7 @@ class VitalScreenViewModel @Inject constructor(
             benId = benRepo.resolveCurrentBenId(benId)
             benRepo.getBenFromId(benId)?.let { ben ->
                 benCache = ben
+                if (ben.benRegId > 0L) benRegId = ben.benRegId
                 _benName.value = listOfNotNull(ben.firstName, ben.lastName).joinToString(" ")
                 _benAgeGender.value = ben.getAgeGenderDisplayString()
                 _referredFor.value = getDefaultReferralTests(ben).joinToString(", ")
@@ -158,6 +166,7 @@ class VitalScreenViewModel @Inject constructor(
                     _state.postValue(State.SAVING)
                     // Re-resolve the current beneficiary ID before submitting to ensure data is saved against the correct beneficiary.
                     benId = benRepo.resolveCurrentBenId(benId)
+                    benRepo.getBenFromId(benId)?.benRegId?.takeIf { it > 0L }?.let { benRegId = it }
                     val thresholdEvaluation = evaluateThresholds(
                         temperatureOption = temperatureOption,
                         pulseRateOption = pulseRateOption,
@@ -167,6 +176,7 @@ class VitalScreenViewModel @Inject constructor(
                     )
                     val cache = (_existingVitals.value ?: VitalCache(benId = benId,benRegId = benRegId)).copy(
                         benId = benId,
+                        benRegId = benRegId,
                         capturedAt = System.currentTimeMillis(),
                         temperature = mapTemperatureOptionToValue(temperatureOption),
                         pulseRate = mapPulseOptionToValue(pulseRateOption),

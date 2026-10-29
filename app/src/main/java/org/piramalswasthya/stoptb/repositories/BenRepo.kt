@@ -64,7 +64,9 @@ class BenRepo @Inject constructor(
         // Temp (negative) benId -> server benId, recorded when the push(server) replaces the temp ID.
         // Screens opened before that (form/Examine sheet nav args) still hold the temp ID,
         // which no longer exists in BENEFICIARY — see resolveCurrentBenId().
+        // Temp IDs are never reused (reserveTempBenIds), so a temp ID maps to one beneficiary only.
         private val finalBenIdByTempBenId = ConcurrentHashMap<Long, Long>()
+        private val tempBenIdMutex = Mutex()
         private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
         private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.ENGLISH)
         fun getCurrentDate(millis: Long = System.currentTimeMillis()): String {
@@ -467,10 +469,26 @@ class BenRepo @Inject constructor(
 
     }
 
+    /**
+     * Reserves [count] temp IDs below every temp ID issued before and returns the lowest one.
+     * The last issued ID is persisted so IDs are not reused after earlier temp rows get server IDs;
+     * an open form may still hold an old temp ID (see resolveCurrentBenId). -1 is never issued.
+     */
+    private suspend fun reserveTempBenIds(count: Int): Long = tempBenIdMutex.withLock {
+        withContext(Dispatchers.IO) {
+            val lowest = minOf(benDao.getMinBenId() ?: -1L, preferenceDao.getLastTempBenId(), -1L)
+            val first = lowest - count
+            preferenceDao.setLastTempBenId(first)
+            first
+        }
+    }
+
+    suspend fun nextTempBenId(): Long = reserveTempBenIds(1)
+
     private suspend fun getBenIdsFromLocal(count: Int, userId: Int) {
-        val minBenId = min(benDao.getMinBenId() ?: -1L, -1L)
+        val firstBenId = reserveTempBenIds(count)
         val benIdList = mutableListOf<BeneficiaryIdsAvail>()
-        for (benId in minBenId - count until minBenId) {
+        for (benId in firstBenId until firstBenId + count) {
             benIdList.add(
                 BeneficiaryIdsAvail(
                     userId = userId, benId = benId, benRegId = 0

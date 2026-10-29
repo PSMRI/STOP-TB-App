@@ -22,7 +22,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AnthropometryViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
     private val benRepo: BenRepo,
     private val preferenceDao: PreferenceDao,
     private val referralStatusManager: ReferralStatusManager,
@@ -35,7 +35,12 @@ class AnthropometryViewModel @Inject constructor(
 
     // Re-resolved in init and before saving: the nav arg can be a temp ID the push has replaced.
     var benId = AnthropometryFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
-        private set
+        private set(value) {
+            if (field == value) return
+            field = value
+            // Saved so a form restored after process death uses the server ID, not the temp ID.
+            viewModelScope.launch(Dispatchers.Main) { savedStateHandle["benId"] = value }
+        }
     val autoFlow = AnthropometryFragmentArgs.fromSavedStateHandle(savedStateHandle).autoFlow
     val examineFlow: Boolean = savedStateHandle["examineFlow"] ?: false
 

@@ -52,6 +52,8 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     private lateinit var benAdapter: BenListAdapter
     private var pendingExamineBenId: Long? = null
+    // Latest showExamineBottomSheet call; an older call whose ID lookup finishes late is dropped.
+    private var examineRequestId = 0
 
     private val sttContract = registerForActivityResult(SpeechToTextContract()) { value ->
         val lowerValue = value.lowercase()
@@ -419,10 +421,12 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     private fun showExamineBottomSheet(benId: Long) {
         val existing = childFragmentManager.findFragmentByTag(ExamineBottomSheetFragment.TAG)
         if (existing != null) return
+        val requestId = ++examineRequestId
         viewLifecycleOwner.lifecycleScope.launch {
             // In Camp Mode the push can replace a temp benId after this screen captured it;
             // open the sheet (and the forms it launches) with the current ID.
             val currentBenId = benRepo.resolveCurrentBenId(benId)
+            if (requestId != examineRequestId) return@launch
             if (pendingExamineBenId == benId) pendingExamineBenId = currentBenId
             if (childFragmentManager.isStateSaved ||
                 childFragmentManager.findFragmentByTag(ExamineBottomSheetFragment.TAG) != null

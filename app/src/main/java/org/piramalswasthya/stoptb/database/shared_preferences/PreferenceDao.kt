@@ -65,6 +65,15 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         pref.edit().putLong("diag_poll_actual_start_${benId}_${orderType}", time).apply()
     }
 
+    /** Lowest temp (negative) beneficiary ID issued so far; 0 if none. */
+    fun getLastTempBenId(): Long {
+        return pref.getLong("last_temp_ben_id", 0L)
+    }
+
+    fun setLastTempBenId(benId: Long) {
+        pref.edit().putLong("last_temp_ben_id", benId).commit()
+    }
+
     fun registerJWTAmritToken(token: String) {
         val editor = pref.edit()
         val prefKey = context.getString(R.string.PREF_primary_JWT_API_KEY)

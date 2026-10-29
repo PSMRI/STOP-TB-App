@@ -73,6 +73,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
      * Non-null => show BottomSheet whenever AllBenFragment resumes.
      */
     private var pendingExamineBenId: Long? = null
+    // Latest showExamineBottomSheet call; an older call whose ID lookup finishes late is dropped.
+    private var examineRequestId = 0
 
     @Inject
     lateinit var prefDao: PreferenceDao
@@ -818,10 +820,12 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // Always show without autoFlow — user decides whether to continue or close.
         // autoFlow=true caused the form to re-open automatically when back was pressed.
 
+        val requestId = ++examineRequestId
         viewLifecycleOwner.lifecycleScope.launch {
             // In Camp Mode the push can replace a temp benId after this screen captured it;
             // open the sheet (and the forms it launches) with the current ID.
             val currentBenId = benRepo.resolveCurrentBenId(benId)
+            if (requestId != examineRequestId) return@launch
             if (pendingExamineBenId == benId) pendingExamineBenId = currentBenId
             if (childFragmentManager.isStateSaved ||
                 childFragmentManager.findFragmentByTag(ExamineBottomSheetFragment.TAG) != null
