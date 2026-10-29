@@ -100,9 +100,12 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                         ::getTbSuspectedDetails,
                         ::getTbConfirmedDetails,
                     )
-                    val domainPulls = datasetPulls + listOf<suspend () -> Boolean>(
+                    // Counselling, contact tracing / TPT responses also come from the feed.
+                    val formPulls = if (feedApplied) emptyList() else listOf<suspend () -> Boolean>(
                         ::getCounsellingCompletedDetails,
                         ::getContactAndTptFollowUpDetails,
+                    )
+                    val domainPulls = datasetPulls + formPulls + listOf<suspend () -> Boolean>(
                         { refreshVisitCategories(triggerSource) }
                     )
                     val result1 = awaitAll(
@@ -120,7 +123,8 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                     )
 
                     if (result1.all { it }) {
-                        syncDiagnosticOrderStatuses()
+                        // Order statuses and results come from the feed when it was applied.
+                        if (!feedApplied) syncDiagnosticOrderStatuses()
                         return@withContext Result.success()
                     }
                     // Some TB datasets failed (network or server): try again with

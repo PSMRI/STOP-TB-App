@@ -33,8 +33,8 @@ import javax.inject.Singleton
  * full pull; the feed sends a beneficiary before its records within a page, and a snapshot sends all
  * beneficiaries first.
  *
- * Form responses and diagnostic orders are not taken from the feed yet; PullTBFromAmritWorker still
- * pulls them through their own endpoints.
+ * Form responses (counselling, contact tracing, TPT) and diagnostic orders come from the feed too;
+ * PullTBFromAmritWorker and DiagnosticResultPollWorker skip their own endpoints while it is active.
  */
 @Singleton
 class ChangesFeedRepo @Inject constructor(
@@ -63,7 +63,7 @@ class ChangesFeedRepo @Inject constructor(
         // Applied in this order within a page, so a beneficiary is saved before its TB records.
         val APPLIED_TYPES = listOf(
             "beneficiary", "tbScreening", "generalExamination", "generalOpd", "generalOpdLegacy",
-            "diagnostics", "tbSuspected", "tbConfirmed"
+            "diagnostics", "tbSuspected", "tbConfirmed", "formResponse", "diagnosticOrder"
         )
     }
 
@@ -92,7 +92,10 @@ class ChangesFeedRepo @Inject constructor(
             if (!response.isSuccessful) {
                 when (val code = response.code()) {
                     // The server doesn't have the feed yet: use the full pull.
-                    404, 405, 501 -> return@withContext Outcome.UNSUPPORTED
+                    404, 405, 501 -> {
+                        preferenceDao.setChangesFeedActive(false)
+                        return@withContext Outcome.UNSUPPORTED
+                    }
                     // Hub busy or unreachable through a proxy: retry later.
                     408, 429, 502, 503, 504 -> throw IOException("Changes feed HTTP $code")
                     // Any other server error: the worker falls back to the full pull.
@@ -118,7 +121,11 @@ class ChangesFeedRepo @Inject constructor(
                 is String -> JSONObject(d)
                 else -> throw IllegalStateException("Changes feed: no data")
             }
-            if (!data.optBoolean("supported", false)) return@withContext Outcome.UNSUPPORTED
+            if (!data.optBoolean("supported", false)) {
+                preferenceDao.setChangesFeedActive(false)
+                return@withContext Outcome.UNSUPPORTED
+            }
+            preferenceDao.setChangesFeedActive(true)
 
             val items = data.optJSONArray("items") ?: JSONArray()
             applyPage(items)
