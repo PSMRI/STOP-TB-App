@@ -1271,9 +1271,13 @@ class TBRepo @Inject constructor(
             while (queue.isNotEmpty()) {
                 val chunk = queue.removeFirst()
                 try {
+                    // Rows whose beneficiary isn't registered yet are left out of the
+                    // request; only the rows actually sent may be marked SYNCED.
+                    val sent = mutableListOf<TBDiagnosticsCache>()
                     val request = chunk.mapNotNull { diagnostics ->
                         val benRegId = benDao.getBen(diagnostics.benId)?.benRegId?.takeIf { it > 0L }
                         benRegId?.let {
+                            sent += diagnostics
                             TBDiagnosticsSaveRequest.from(
                                 cache = diagnostics,
                                 benRegID = it,
@@ -1296,9 +1300,10 @@ class TBRepo @Inject constructor(
                             val jsonObj = JSONObject(responseString)
                             when (val responseStatusCode = jsonObj.getInt("statusCode")) {
                                 200 -> {
-                                    updateSyncStatusDiagnostics(chunk)
-                                    syncRetryStore.clear(SyncRetryStore.ENTITY_TB_DIAGNOSTICS, chunk.map { it.id.toLong() })
-                                    successCount += chunk.size
+                                    updateSyncStatusDiagnostics(sent)
+                                    syncRetryStore.clear(SyncRetryStore.ENTITY_TB_DIAGNOSTICS, sent.map { it.id.toLong() })
+                                    successCount += sent.size
+                                    failCount += chunk.size - sent.size
                                 }
 
                                 401, 5002 -> {
@@ -1471,9 +1476,13 @@ class TBRepo @Inject constructor(
             while (queue.isNotEmpty()) {
                 val chunk = queue.removeFirst()
                 try {
+                    // Rows with no local beneficiary are left out of the request; only
+                    // the rows actually sent may be marked SYNCED.
+                    val sent = mutableListOf<TBConfirmedTreatmentCache>()
                     val chunkDtos = chunk.mapNotNull { confirmed ->
                         val ben = benDao.getBen(confirmed.benId)
                         ben?.let {
+                            sent += confirmed
                             confirmed.toDTO()
                         }
                     }
@@ -1497,9 +1506,10 @@ class TBRepo @Inject constructor(
                             Timber.d("Push to Amrit TB Confirmed chunk: $responseStatusCode")
                             when (responseStatusCode) {
                                 200 -> {
-                                    updateSyncStatusConfirmed(chunk)
-                                    syncRetryStore.clear(SyncRetryStore.ENTITY_TB_CONFIRMED, chunk.map { it.id.toLong() })
-                                    successCount += chunk.size
+                                    updateSyncStatusConfirmed(sent)
+                                    syncRetryStore.clear(SyncRetryStore.ENTITY_TB_CONFIRMED, sent.map { it.id.toLong() })
+                                    successCount += sent.size
+                                    failCount += chunk.size - sent.size
                                 }
 
                                 401, 5002 -> {
