@@ -50,6 +50,7 @@ class PullTBFromAmritWorker @AssistedInject constructor(
         const val name = "PullTBFromAmritWorker"
         const val Progress = "Progress"
         private const val MAX_RUN_ATTEMPTS = 5
+        private const val MASTERS_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000L
 
         // How many of the nine domain pulls may hold the database at once. Sized below the
         // transaction executor's 4 threads so a pull in progress can never own every one of
@@ -102,7 +103,7 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                     val domainPulls = datasetPulls + listOf<suspend () -> Boolean>(
                         ::getCounsellingCompletedDetails,
                         ::getContactAndTptFollowUpDetails,
-                        ::refreshVisitCategories
+                        { refreshVisitCategories(triggerSource) }
                     )
                     val result1 = awaitAll(
                         *domainPulls
@@ -191,10 +192,20 @@ class PullTBFromAmritWorker @AssistedInject constructor(
         }
     }
 
-    private suspend fun refreshVisitCategories(): Boolean {
-        tbRepo.refreshVisitCategories()
-        tbRepo.refreshChiefComplaintMasters()
-        drugMasterRepo.refreshMasters()
+    // Masters change rarely but were deleted and re-downloaded on every pull (every 10 s in camp).
+    // Refresh them after login, on a manual Sync Records, and otherwise at most once a day.
+    private suspend fun refreshVisitCategories(triggerSource: String): Boolean {
+        val now = System.currentTimeMillis()
+        val refreshedAt = preferenceDao.getMastersRefreshedAt()
+        if (triggerSource != "MANUAL_REFRESH" && refreshedAt > 0L && now - refreshedAt < MASTERS_REFRESH_INTERVAL_MS) {
+            return true
+        }
+        val categories = tbRepo.refreshVisitCategories()
+        val complaints = tbRepo.refreshChiefComplaintMasters()
+        val drugs = drugMasterRepo.refreshMasters()
+        // Only a complete refresh counts; a partial one is tried again on the next pull.
+        if (categories && complaints && drugs) preferenceDao.setMastersRefreshedAt(now)
+        Timber.d("Masters refreshed [$triggerSource]: categories=$categories complaints=$complaints drugs=$drugs")
         // A failed master refresh must not block the core beneficiary/form pull.
         return true
     }

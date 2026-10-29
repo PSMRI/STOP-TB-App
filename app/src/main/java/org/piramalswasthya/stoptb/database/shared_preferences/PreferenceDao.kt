@@ -21,6 +21,7 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
     private companion object {
         const val CHANGES_FEED_TOKEN = "changes_feed_token"
         const val CHANGES_FEED_SCOPE = "changes_feed_scope"
+        const val MASTERS_REFRESHED_AT = "masters_refreshed_at"
     }
 
     fun deleteAmritToken() {
@@ -205,6 +206,14 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
 
     fun setChangesFeedToken(scope: String, token: String?) {
         pref.edit().putString(CHANGES_FEED_SCOPE, scope).putString(CHANGES_FEED_TOKEN, token).apply()
+    }
+
+    // When visit categories, chief complaints and drug masters were last downloaded. Cleared at
+    // logout with everything else, so the first pull after login always refreshes them.
+    fun getMastersRefreshedAt(): Long = pref.getLong(MASTERS_REFRESHED_AT, 0L)
+
+    fun setMastersRefreshedAt(time: Long) {
+        pref.edit().putLong(MASTERS_REFRESHED_AT, time).apply()
     }
 
     fun setFirstSyncLastSyncedPage(page: Int) {
