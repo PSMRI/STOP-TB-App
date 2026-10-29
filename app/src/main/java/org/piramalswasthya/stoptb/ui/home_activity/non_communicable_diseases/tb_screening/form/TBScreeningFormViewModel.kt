@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -155,8 +156,10 @@ class TBScreeningFormViewModel @Inject constructor(
                     tbScreeningCache.longitude = capturedLongitude
                     tbScreeningCache.address = capturedAddress
                     tbScreeningCache.syncState = SyncState.UNSYNCED
-//                    tbRepo.saveTBScreening(tbScreeningCache)
 
+                    // The screening row is written inside initializeDiagnosticsAndPush(), after
+                    // it has computed the referral flags that belong on the same row. Saving here
+                    // as well would write the row twice, once without those flags.
                     initializeDiagnosticsAndPush(tbScreeningCache)
 
                     if (syncImmediately) {
@@ -167,8 +170,14 @@ class TBScreeningFormViewModel @Inject constructor(
                         }
                     }
                     _state.postValue(State.SAVE_SUCCESS)
+                } catch (e: CancellationException) {
+                    // Leaving the form mid-save must not be reported as either success or
+                    // failure - the screen is going away. CancellationException is an Exception
+                    // in Kotlin, so without this it would be caught below and the user would be
+                    // told the record saved.
+                    throw e
                 } catch (e: Exception) {
-                    Timber.d(e, "saving tb screening data failed!!")
+                    Timber.e(e, "saving tb screening data failed!!")
                     _state.postValue(State.SAVE_FAILED)
                 }
             }
@@ -206,74 +215,90 @@ class TBScreeningFormViewModel @Inject constructor(
         )
     }
 
+    /**
+     * Writes the screening row and its derived diagnostics row, then kicks off the order push.
+     *
+     * The two writes deliberately propagate. This used to be wrapped end-to-end in
+     * `catch (e: Exception) { Timber.e(...) }`, which swallowed a failed
+     * [TBRepo.saveTBScreening] and let [saveForm] post SAVE_SUCCESS anyway - the user was told
+     * the screening was saved when nothing had been written, and on an offline camp device
+     * there is no second copy. Only the order-push trigger below is best-effort.
+     */
     private suspend fun initializeDiagnosticsAndPush(tbScreeningCache: TBScreeningCache) {
-        try {
-            val isPresumptive = tbScreeningCache.coughMoreThan2Weeks == true ||
-                    tbScreeningCache.bloodInSputum == true ||
-                    tbScreeningCache.feverMoreThan2Weeks == true ||
-                    tbScreeningCache.riseOfFever == true ||
-                    tbScreeningCache.lossOfAppetite == true ||
-                    tbScreeningCache.lossOfWeight == true ||
-                    tbScreeningCache.nightSweats == true ||
-                    tbScreeningCache.chestPain == true ||
-                    tbScreeningCache.shortnessOfBreath == true ||
-                    tbScreeningCache.fatigue == true ||
-                    tbScreeningCache.failureToGainWeightInChildren == true ||
-                    tbScreeningCache.decreasedActivityOrPlayfulnessInChildren == true ||
-                    tbScreeningCache.otherSymptoms == true ||
-                    tbScreeningCache.historyOfTb == true ||
-                    tbScreeningCache.takingAntiTBDrugs == true ||
-                    tbScreeningCache.familySufferingFromTB == true
+        val isPresumptive = tbScreeningCache.coughMoreThan2Weeks == true ||
+                tbScreeningCache.bloodInSputum == true ||
+                tbScreeningCache.feverMoreThan2Weeks == true ||
+                tbScreeningCache.riseOfFever == true ||
+                tbScreeningCache.lossOfAppetite == true ||
+                tbScreeningCache.lossOfWeight == true ||
+                tbScreeningCache.nightSweats == true ||
+                tbScreeningCache.chestPain == true ||
+                tbScreeningCache.shortnessOfBreath == true ||
+                tbScreeningCache.fatigue == true ||
+                tbScreeningCache.failureToGainWeightInChildren == true ||
+                tbScreeningCache.decreasedActivityOrPlayfulnessInChildren == true ||
+                tbScreeningCache.otherSymptoms == true ||
+                tbScreeningCache.historyOfTb == true ||
+                tbScreeningCache.takingAntiTBDrugs == true ||
+                tbScreeningCache.familySufferingFromTB == true
 
-            val ben = benRepo.getBenFromId(benId)
-            val reproductiveStatus = ben?.genDetails?.reproductiveStatus
-            val isPregnant = ben?.genDetails?.reproductiveStatusId == 1 || reproductiveStatus.equals("Yes", ignoreCase = true)
+        val ben = benRepo.getBenFromId(benId)
+        val reproductiveStatus = ben?.genDetails?.reproductiveStatus
+        val isPregnant = ben?.genDetails?.reproductiveStatusId == 1 || reproductiveStatus.equals("Yes", ignoreCase = true)
 
-            val refersXray = !isPregnant
-            val refersTruenat = isPresumptive || isPregnant
+        val refersXray = !isPregnant
+        val refersTruenat = isPresumptive || isPregnant
 
-            tbScreeningCache.referredForDigitalChestXray = refersXray
-            tbScreeningCache.referredForSputumCollection = refersTruenat
-            tbRepo.saveTBScreening(tbScreeningCache)
+        tbScreeningCache.referredForDigitalChestXray = refersXray
+        tbScreeningCache.referredForSputumCollection = refersTruenat
+        tbRepo.saveTBScreening(tbScreeningCache)
 
-            val existingDiag = tbRepo.getTBDiagnosticsById(benId)
-            var currentDiag = existingDiag ?: TBDiagnosticsCache(
-                benId = benId,
-                syncState = SyncState.UNSYNCED
-            )
-            val hasXrayOrder = !existingDiag?.xrayOrderId.isNullOrBlank() ||
-                    existingDiag?.xrayOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
-                    existingDiag?.xrayOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
-                    existingDiag?.xrayOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
-            val hasTruenatOrder = !existingDiag?.trueNatOrderId.isNullOrBlank() ||
-                    existingDiag?.trueNatOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
-                    existingDiag?.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
-                    existingDiag?.trueNatOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
+        val existingDiag = tbRepo.getTBDiagnosticsById(benId)
+        var currentDiag = existingDiag ?: TBDiagnosticsCache(
+            benId = benId,
+            syncState = SyncState.UNSYNCED
+        )
+        val hasXrayOrder = !existingDiag?.xrayOrderId.isNullOrBlank() ||
+                existingDiag?.xrayOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
+                existingDiag?.xrayOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
+                existingDiag?.xrayOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
+        val hasTruenatOrder = !existingDiag?.trueNatOrderId.isNullOrBlank() ||
+                existingDiag?.trueNatOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
+                existingDiag?.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
+                existingDiag?.trueNatOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
 
-            if (refersXray) {
-                if (currentDiag.xrayOrderStatus.isNullOrBlank()) {
-                    currentDiag = currentDiag.copy(xrayOrderStatus = OrderStatus.PENDING.name, isReferredForDigitalChestXray = true)
-                }
+        if (refersXray) {
+            if (currentDiag.xrayOrderStatus.isNullOrBlank()) {
+                currentDiag = currentDiag.copy(xrayOrderStatus = OrderStatus.PENDING.name, isReferredForDigitalChestXray = true)
             }
-            if (refersTruenat) {
-                if (currentDiag.trueNatOrderStatus.isNullOrBlank()) {
-                    currentDiag = currentDiag.copy(trueNatOrderStatus = OrderStatus.PENDING.name)
-                }
+        }
+        if (refersTruenat) {
+            if (currentDiag.trueNatOrderStatus.isNullOrBlank()) {
+                currentDiag = currentDiag.copy(trueNatOrderStatus = OrderStatus.PENDING.name)
             }
-            tbRepo.saveTBDiagnostics(currentDiag)
-            val ordersToPush = mutableListOf<String>()
-            if (refersXray && !hasXrayOrder) ordersToPush.add("XRAY_CHEST")
-            if (refersTruenat && !hasTruenatOrder) ordersToPush.add("SPUTUM_TRUENAT")
-            if (ordersToPush.isNotEmpty()) {
-                try {
-                    tbRepo.pushUnSyncedTBScreeningRecords()
-                } catch (e: Exception) {
-                    Timber.e(e, "TB Screening pre-order-push sync failed; proceeding with order push anyway")
-                }
+        }
+        tbRepo.saveTBDiagnostics(currentDiag)
+        val ordersToPush = mutableListOf<String>()
+        if (refersXray && !hasXrayOrder) ordersToPush.add("XRAY_CHEST")
+        if (refersTruenat && !hasTruenatOrder) ordersToPush.add("SPUTUM_TRUENAT")
+        if (ordersToPush.isNotEmpty()) {
+            // Best effort from here on: the rows are already committed, and a worker owns
+            // the actual push. Failing to pre-sync or to enqueue must not turn a saved
+            // screening into SAVE_FAILED.
+            try {
+                tbRepo.pushUnSyncedTBScreeningRecords()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "TB Screening pre-order-push sync failed; proceeding with order push anyway")
+            }
+            try {
                 WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, ordersToPush)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to enqueue diagnostic order push workers for benId=$benId")
             }
-        } catch (e: java.lang.Exception) {
-            Timber.e(e, "Error initializing diagnostic record and pushing orders")
         }
     }
 

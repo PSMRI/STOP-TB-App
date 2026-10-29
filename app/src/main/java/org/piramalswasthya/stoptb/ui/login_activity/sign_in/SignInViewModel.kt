@@ -14,6 +14,7 @@ import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.utils.CampHubUrlValidator
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.User
@@ -89,7 +90,15 @@ class SignInViewModel @Inject constructor(
     fun getCampHubUrl(): String = pref.getCampHubUrl()
 
     fun updateCampHubUrl(url: String) {
+        // Same rule as the connect screen: a camp hub is a LAN device, and the stored URL
+        // re-points authenticated requests. Refuse anything that is not local rather than
+        // storing it. See CampHubUrlValidator.
         val normalizedUrl = normalizeCampHubUrl(url)
+        if (!CampHubUrlValidator.isAllowed(normalizedUrl)) {
+            Log.w(TAG, "Rejected camp hub URL from login screen: not a local-network address")
+            _campHubStatus.value = CampHubStatus.NOT_CONNECTED
+            return
+        }
         if (normalizedUrl == pref.getCampHubUrl()) return
 
         Log.d(TAG, "Login camp URL changed. inputUrl=$url, normalizedUrl=$normalizedUrl")

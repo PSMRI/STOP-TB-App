@@ -19,7 +19,10 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
+import androidx.paging.LoadState
+import kotlinx.coroutines.flow.first
 import org.piramalswasthya.stoptb.adapters.BenListAdapter
+import org.piramalswasthya.stoptb.adapters.BenPagingAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchAndToggleRvButtonBinding
@@ -46,7 +49,7 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     private val viewModel: NonHHViewModel by viewModels()
 
-    private lateinit var benAdapter: BenListAdapter
+    private lateinit var benAdapter: BenPagingAdapter
     private var pendingExamineBenId: Long? = null
 
     private val sttContract = registerForActivityResult(SpeechToTextContract()) { value ->
@@ -108,7 +111,7 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             sttContract.launch(Unit)
         }
 
-        benAdapter = BenListAdapter(
+        benAdapter = BenPagingAdapter(
             clickListener = BenListAdapter.BenClickListener(
                 clickedBen = { _, hhId, benId, relToHeadId ->
                     findNavController().navigate(
@@ -169,20 +172,39 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             ?.supportsChangeAnimations = false
 
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.nonHHList.collectLatest { list ->
-                benAdapter.submitList(list) {
-                    if (_binding != null && list.isNotEmpty()) {
-                        binding.rvAny.scrollToPosition(0)
-                    }
-                }
-                if (_binding != null) {
-                    if (list.isEmpty()) {
-                        binding.flEmpty.visibility = View.VISIBLE
-                        binding.rvAny.visibility = View.GONE
-                    } else {
-                        binding.flEmpty.visibility = View.GONE
-                        binding.rvAny.visibility = View.VISIBLE
-                    }
+            viewModel.nonHHList.collectLatest { pagingData ->
+                benAdapter.submitData(pagingData)
+            }
+        }
+
+        // Paging reports loading/empty itself, so the spinner and the empty view follow its
+        // load state rather than the contents of a fully-materialised list. Until the first
+        // refresh settles the screen shows a spinner - previously it showed "no records",
+        // which is indistinguishable from a genuinely empty village.
+        viewLifecycleOwner.lifecycleScope.launch {
+            benAdapter.loadStateFlow.collectLatest { loadStates ->
+                if (_binding == null) return@collectLatest
+                val refresh = loadStates.refresh
+                val isRefreshing = refresh is LoadState.Loading
+                val isEmpty = refresh is LoadState.NotLoading &&
+                        loadStates.append.endOfPaginationReached &&
+                        benAdapter.itemCount == 0
+                binding.pbSearchLoading.visibility = if (isRefreshing) View.VISIBLE else View.GONE
+                binding.flEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
+                binding.rvAny.visibility =
+                    if (isRefreshing || isEmpty) View.GONE else View.VISIBLE
+            }
+        }
+
+        // Only jump back to the top when the user changed what they are looking at. A
+        // background sync re-emits this list repeatedly, and scrolling to 0 on every emission
+        // yanked the list out from under the user.
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.searchQuery.collectLatest {
+                benAdapter.loadStateFlow
+                    .first { loadStates -> loadStates.refresh is LoadState.NotLoading }
+                if (_binding != null && benAdapter.itemCount > 0) {
+                    binding.rvAny.scrollToPosition(0)
                 }
             }
         }

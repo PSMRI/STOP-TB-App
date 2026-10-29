@@ -290,10 +290,19 @@ object WorkerUtils {
         WorkManager.getInstance(context).cancelAllWork()
     }
 
+    /**
+     * KEEP, not REPLACE: REPLACE cancels a poll that is already running and starts it again from
+     * the top, so a run that is part-way through its per-beneficiary network calls loses that work
+     * and repeats the writes it has already done. With ~9 call sites plus the worker's own 60s
+     * reschedule, runs were cancelling each other continuously (97 runs in 104 minutes, minimum
+     * gap 0.1s). KEEP lets an in-flight run finish; the worker reschedules itself every 60s while
+     * any order is still in progress, so nothing is lost — a trigger that arrives while a run is
+     * pending is simply folded into that run instead of restarting it.
+     */
     fun triggerDiagnosticResultPollWorker(context: Context) {
         val workRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>().build()
         WorkManager.getInstance(context).enqueueUniqueWork(
-            DiagnosticResultPollWorker.name, ExistingWorkPolicy.REPLACE, workRequest
+            DiagnosticResultPollWorker.name, ExistingWorkPolicy.KEEP, workRequest
         )
     }
 

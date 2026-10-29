@@ -122,7 +122,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 57, exportSchema = false
+    version = 60, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -160,6 +160,26 @@ abstract class InAppDb : RoomDatabase() {
     companion object {
         @Volatile
         private var INSTANCE: InAppDb? = null
+
+        /**
+         * Reads, and every suspend DAO call outside a transaction, run here.
+         * Sized above the pull's write concurrency so a pull in progress can never consume
+         * every thread and leave UI queries - Paging's load() in particular - unscheduled.
+         */
+        private val queryExecutor: java.util.concurrent.ExecutorService =
+            java.util.concurrent.Executors.newFixedThreadPool(8) { runnable ->
+                Thread(runnable, "stoptb-room-query").apply { isDaemon = true }
+            }
+
+        /**
+         * withTransaction blocks run here, on their own pool, so a page-long write transaction
+         * blocks only other transactions and never a read. Must stay above 1: Room can deadlock
+         * on a single-threaded transaction executor if a transaction ever awaits another.
+         */
+        private val transactionExecutor: java.util.concurrent.ExecutorService =
+            java.util.concurrent.Executors.newFixedThreadPool(4) { runnable ->
+                Thread(runnable, "stoptb-room-txn").apply { isDaemon = true }
+            }
 
         fun tableExists(db: SupportSQLiteDatabase, tableName: String): Boolean {
             val cursor = db.query(
@@ -1710,6 +1730,53 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        /**
+         * Rebuilds BEN_BASIC_CACHE without GROUP BY / ORDER BY so SQLite can flatten it.
+         *
+         * View-only change: no table is touched, so there is no data to migrate and the step is
+         * safe to re-run. The CREATE VIEW text is copied verbatim from Room's generated
+         * InAppDb_Impl so the schema hash Room validates on open matches exactly - a mismatch
+         * here would fall through to fallbackToDestructiveMigration() and wipe local data.
+         */
+        /**
+         * Drops the CBAC / TB_SCREENING / TB_SUSPECTED correlated subqueries out of
+         * BEN_BASIC_CACHE, leaving the six columns they fed as literals. See the note on the
+         * @DatabaseView in model/Ben.kt for why: Room registers an invalidation observer on every
+         * table a view reads, so those subqueries made each beneficiary list reload on any TB or
+         * CBAC write.
+         *
+         * View-only change, same as MIGRATION_57_58 - no table is touched, nothing to migrate, and
+         * the step is safe to re-run. The CREATE VIEW text is copied verbatim from Room's generated
+         * InAppDb_Impl so the schema hash Room validates on open matches exactly.
+         */
+        /**
+         * Indexes BENEFICIARY.benRegId. Pure addition - no table or view is rewritten and no
+         * row is touched, so there is nothing for a partially-synced device to lose.
+         */
+        val MIGRATION_59_60 = object : Migration(59, 60) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_ben_reg_id` ON `BENEFICIARY` (`benRegId`)")
+            }
+        }
+
+        val MIGRATION_58_59 = object : Migration(58, 59) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
+                database.execSQL(
+                    "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId, b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod, b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus, b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId, b.isNewAbha, 0 as cbacFilled, NULL as cbacSyncState, 0 as cdrFilled, NULL as cdrSyncState, 0 as mdsrFilled, NULL as mdsrSyncState, NULL as pmsmaSyncState, 0 as pmsmaFilled, 0 as hbncFilled, 0 as hbycFilled, 0 as pwrFilled, NULL as pwrSyncState, NULL as doSyncState, NULL as irSyncState, NULL as crSyncState, 0 as ecrFilled, 0 as ectFilled, 0 as isMdsr, 0 as tbsnFilled, NULL as tbsnSyncState, 0 as tbspFilled, NULL as tbspSyncState, 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled, 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled, NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState, 0 as isDelivered, 0 as pwHrp, 0 as irFilled, 0 as crFilled, 0 as doFilled, b.isNonHH, b.isAvailableForCamp, b.reasonForNotAttendingCamp, b.otherReasonForNotAttendingCamp, b.screeningStatus, b.symptomsScreenedDate, b.chestXrayDoneDate, b.trunatTestDoneDate, b.placeOfCurrentLiving, b.otherPlaceOfCurrentLiving, b.institutionName FROM BENEFICIARY b LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId WHERE b.isDraft = 0"
+                )
+            }
+        }
+
+        val MIGRATION_57_58 = object : Migration(57, 58) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
+                database.execSQL(
+                    "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId, b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod, b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus, b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId, b.isNewAbha, (SELECT COUNT(*) > 0 FROM CBAC c2 WHERE c2.benId = b.beneficiaryId) as cbacFilled, (SELECT c2.syncState FROM CBAC c2 WHERE c2.benId = b.beneficiaryId ORDER BY c2.id DESC LIMIT 1) as cbacSyncState, 0 as cdrFilled, NULL as cdrSyncState, 0 as mdsrFilled, NULL as mdsrSyncState, NULL as pmsmaSyncState, 0 as pmsmaFilled, 0 as hbncFilled, 0 as hbycFilled, 0 as pwrFilled, NULL as pwrSyncState, NULL as doSyncState, NULL as irSyncState, NULL as crSyncState, 0 as ecrFilled, 0 as ectFilled, 0 as isMdsr, (SELECT COUNT(*) > 0 FROM TB_SCREENING s2 WHERE s2.benId = b.beneficiaryId) as tbsnFilled, (SELECT s2.syncState FROM TB_SCREENING s2 WHERE s2.benId = b.beneficiaryId ORDER BY s2.id DESC LIMIT 1) as tbsnSyncState, (SELECT COUNT(*) > 0 FROM TB_SUSPECTED p2 WHERE p2.benId = b.beneficiaryId) as tbspFilled, (SELECT p2.syncState FROM TB_SUSPECTED p2 WHERE p2.benId = b.beneficiaryId ORDER BY p2.id DESC LIMIT 1) as tbspSyncState, 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled, 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled, NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState, 0 as isDelivered, 0 as pwHrp, 0 as irFilled, 0 as crFilled, 0 as doFilled, b.isNonHH, b.isAvailableForCamp, b.reasonForNotAttendingCamp, b.otherReasonForNotAttendingCamp, b.screeningStatus, b.symptomsScreenedDate, b.chestXrayDoneDate, b.trunatTestDoneDate, b.placeOfCurrentLiving, b.otherPlaceOfCurrentLiving, b.institutionName FROM BENEFICIARY b LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId WHERE b.isDraft = 0"
+                )
+            }
+        }
+
         val MIGRATION_56_57 = object : Migration(56, 57) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE `GENERAL_OPD_PRESCRIPTION` ADD COLUMN `itemFormId` INTEGER")
@@ -2001,6 +2068,42 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_54_55)
                         .addMigrations(MIGRATION_55_56)
                         .addMigrations(MIGRATION_56_57)
+                        .addMigrations(MIGRATION_57_58)
+                        .addMigrations(MIGRATION_58_59)
+                        .addMigrations(MIGRATION_59_60)
+                        // Room's default is transactionExecutor = ArchTaskExecutor's IO pool and
+                        // queryExecutor = that same object - ONE pool of 4 threads shared by every
+                        // query, every suspend DAO call and every withTransaction block.
+                        //
+                        // The pull runs several page coroutines in parallel and each wraps its
+                        // page in a transaction, so all 4 threads were held for the length of a
+                        // page (measured at 12-14s). Anything that needed the pool during that
+                        // window - notably Paging's load() - was queued, then cancelled by the
+                        // next invalidation before it ever ran. A trace of an X-ray list open
+                        // showed 383 PagingSource creations and zero load() calls: the list was
+                        // not slow, its query was never executed.
+                        //
+                        // Separate pools mean a long write transaction can no longer starve reads.
+                        .setQueryExecutor(queryExecutor)
+                        .setTransactionExecutor(transactionExecutor)
+                        .addCallback(object : RoomDatabase.Callback() {
+                            // TEMPORARY PERF INSTRUMENTATION - which journal mode and how many
+                            // SQLite connections actually back this database decides whether a
+                            // write can block a read at all. Remove with the rest of the
+                            // ScreenLoadTrace scaffolding.
+                            override fun onOpen(db: SupportSQLiteDatabase) {
+                                runCatching {
+                                    db.query("PRAGMA journal_mode").use { cursor ->
+                                        if (cursor.moveToFirst()) {
+                                            android.util.Log.d(
+                                                org.piramalswasthya.stoptb.utils.ScreenLoadTrace.TAG,
+                                                "  [db] journal_mode=${cursor.getString(0)}"
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        })
                         .fallbackToDestructiveMigration()
                         .build()
 

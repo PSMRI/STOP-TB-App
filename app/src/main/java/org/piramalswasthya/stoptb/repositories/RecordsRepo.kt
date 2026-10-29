@@ -66,8 +66,30 @@ class RecordsRepo @Inject constructor(
         benDao.searchBen(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query)
             .map { list -> list.map { it.asBasicDomainModel() } }
 
-    fun searchBenPagedSource(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false): PagingSource<Int, BenBasicCache> =
-        benDao.searchBenPaged(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query)
+    /** TEMPORARY PERF INSTRUMENTATION - see DbContentionSampler. */
+    suspend fun dbNoOpProbe() {
+        benDao.perfProbe()
+    }
+
+    /** Sources whose filter touches no TB table: 0 All, 1 ABHA, 2 RCH, 3 age 30+, 4 eligible couple. */
+    private val sourcesWithoutTbPredicates = setOf(0, 1, 2, 3, 4)
+
+    fun searchBenPagedSource(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false): PagingSource<Int, BenBasicCache> {
+        // TEMPORARY PERF INSTRUMENTATION - a new PagingSource created here means Paging threw
+        // the previous one away, so the rate of these lines IS the invalidation rate the list
+        // is fighting, and the wrapper times every load it then performs.
+        val villageIds = if (expandToBlock) allVillageIds else listOf(selectedVillage)
+        org.piramalswasthya.stoptb.utils.ScreenLoadTrace.pagingSourceCreated(query, source, 0)
+        // Sources 0-4 have no TB predicate, so they use the statement that never names a TB table
+        // and therefore is not invalidated by the sync writing to one. See
+        // BenDao.searchBenPagedWithoutTbTables.
+        val pagingSource = if (source in sourcesWithoutTbPredicates) {
+            benDao.searchBenPagedWithoutTbTables(villageIds, source, filterType, query)
+        } else {
+            benDao.searchBenPaged(villageIds, source, filterType, query)
+        }
+        return org.piramalswasthya.stoptb.utils.TimingPagingSource(pagingSource, "benList")
+    }
 
     suspend fun searchBenOnce(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false): List<BenBasicDomain> =
         benDao.searchBenOnce(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query)
@@ -88,6 +110,12 @@ class RecordsRepo @Inject constructor(
 
     fun searchNonHH(query: String) = benDao.searchNonHHBeneficiaries(selectedVillage, query)
         .map { list -> list.map { it.asBasicDomainModel() } }
+
+    fun searchNonHHPagedSource(query: String): PagingSource<Int, BenBasicCache> =
+        org.piramalswasthya.stoptb.utils.TimingPagingSource(
+            benDao.searchNonHHBeneficiariesPaged(selectedVillage, query),
+            "nonHHList"
+        )
 
     val allBenWithoutAbhaList get() = benDao.getAllBenWithoutAbha(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }

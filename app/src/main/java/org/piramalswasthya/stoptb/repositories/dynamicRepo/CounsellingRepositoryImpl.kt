@@ -295,18 +295,35 @@ class CounsellingRepositoryImpl @Inject constructor(
         submitSectionWithPhase(responseId, answers, "GENERAL_INFO", "REFUSED")
     }
 
+    /**
+     * @return true only when the server has accepted this section. Callers treat true as
+     *   confirmation and write `syncStatus = "SYNCED"`, so the no-op paths below must not
+     *   return it: doing so marked a REFUSED counselling record SYNCED without any API call
+     *   ever being made, and the refusal was never transmitted.
+     */
     override suspend fun submitSectionBulk(responseId: Long, sectionId: Int): Boolean {
-        val resp = responseDao.getFormResponseById(responseId) ?: return true
+        val resp = responseDao.getFormResponseById(responseId)
+        if (resp == null) {
+            // Nothing to transmit and nothing to mark - the row is gone.
+            Timber.w("submitSectionBulk: responseId=$responseId no longer exists, nothing to sync")
+            return true
+        }
         val sectionResponse = resp.sectionResponses.find { it.sectionResponse.sectionId == sectionId }
-            ?: return true
+        if (sectionResponse == null) {
+            Timber.e("submitSectionBulk: responseId=$responseId has no section $sectionId; leaving UNSYNCED rather than claiming it was sent")
+            return false
+        }
 
         val formDef = metadataDao.getFormDefinitionByVersionId(resp.formResponse.formVersionId)
         val officerId = preferenceDao.getLoggedInUser()?.userId?.toLong() ?: DEFAULT_OFFICER_ID
         val payload = PayloadBuilder.buildBulkPayload(resp, formDef, officerId, sectionIdFilter = sectionId)
 
         if (payload.sections.isEmpty()) {
-            Timber.d("submitSectionBulk: sectionId=$sectionId has no answers, skipping API call")
-            return true
+            // No API call is made, so this record has NOT reached the server. Reporting success
+            // here is what let an empty GENERAL_INFO section on a REFUSED record be marked
+            // SYNCED and silently dropped.
+            Timber.e("submitSectionBulk: sectionId=$sectionId built an empty payload, nothing sent; leaving UNSYNCED")
+            return false
         }
 
         val jwt = preferenceDao.getJWTAmritToken()

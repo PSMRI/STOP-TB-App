@@ -24,6 +24,7 @@ import org.piramalswasthya.stoptb.utils.KeyUtils
 import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.Locale
+import org.piramalswasthya.stoptb.utils.ServerDateParser
 
 @JsonClass(generateAdapter = true)
 data class D2DAuthUserRequest(val username: String, val password: String)
@@ -1064,22 +1065,34 @@ data class KALAZARScreeningDTO(
     )
 }
 
-fun getLongFromDate(dateString: String?): Long {
-    val f = SimpleDateFormat("MMM d, yyyy h:mm:ss a", Locale.ENGLISH)
-    val date = dateString?.let { f.parse(it) }
-    return date?.time ?: 0L
-}
+// "Oct 19, 2026 4:44:00 PM" and "Oct 19, 2026, 4:44:00\u202fPM" both arrive from Amrit - see
+// ServerDateParser for why the second form used to fail outright and take a thrown
+// ParseException with it. The comma-after-year variants are new here for that reason; the
+// original two patterns are unchanged and still tried first.
+private val jsonAdapterDatePatterns = listOf(
+    "MMM d, yyyy h:mm:ss a",
+    "MMM dd, yyyy h:mm:ss a",
+    "MMM d, yyyy, h:mm:ss a",
+    "MMM dd, yyyy, h:mm:ss a"
+)
+
+fun getLongFromDate(dateString: String?): Long =
+    ServerDateParser.parse(dateString, jsonAdapterDatePatterns) ?: 0L
 
 fun getLongFromDateMultipleSupport(dateStr: String?): Long? {
     if (dateStr.isNullOrBlank() || dateStr == "1970-01-01") return null
-    val formats = listOf("yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss", "MMM dd, yyyy h:mm:ss a", "MMM dd, yyyy hh:mm:ss a", "MMM dd, yyyy", "dd/MM/yyyy")
-    for (format in formats) {
-        try {
-            val sdf = SimpleDateFormat(format, Locale.ENGLISH)
-            sdf.isLenient = false
-            return sdf.parse(dateStr)?.time
-        } catch (e: Exception) { }
-    }
+    ServerDateParser.parse(dateStr, multiSupportDatePatterns, lenient = false)?.let { return it }
     Timber.e("Date parsing failed for: $dateStr")
     return null
 }
+
+private val multiSupportDatePatterns = listOf(
+    "yyyy-MM-dd",
+    "yyyy-MM-dd HH:mm:ss",
+    "MMM dd, yyyy h:mm:ss a",
+    "MMM dd, yyyy hh:mm:ss a",
+    "MMM dd, yyyy, h:mm:ss a",
+    "MMM dd, yyyy, hh:mm:ss a",
+    "MMM dd, yyyy",
+    "dd/MM/yyyy"
+)
