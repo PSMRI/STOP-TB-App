@@ -24,20 +24,28 @@ import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.getAgeGenderDisplayString
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
+import org.piramalswasthya.stoptb.utils.Log
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
 class TBScreeningFormViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
     private val preferenceDao: PreferenceDao,
     @ApplicationContext private val context: Context,
     private val tbRepo: TBRepo,
     private val benRepo: BenRepo
 ) : ViewModel() {
-    val benId =
+    // Re-resolved in init and before saving: the nav arg can be a temp ID the push has replaced.
+    var benId =
         TBScreeningFormFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
+        private set(value) {
+            if (field == value) return
+            field = value
+            // Saved so a form restored after process death uses the server ID, not the temp ID.
+            viewModelScope.launch(Dispatchers.Main) { savedStateHandle["benId"] = value }
+        }
     var benRegId: Long = 0L
     val viewOnly =
         TBScreeningFormFragmentArgs.fromSavedStateHandle(savedStateHandle).viewOnly
@@ -84,6 +92,8 @@ class TBScreeningFormViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            //Resolve the current beneficiary ID to load the correct beneficiary's data when the form opens.
+            benId = benRepo.resolveCurrentBenId(benId)
             val ben = benRepo.getBenFromId(benId)?.also { ben ->
                 benRegId = ben.benRegId
                 _benName.value =
@@ -151,7 +161,13 @@ class TBScreeningFormViewModel @Inject constructor(
             withContext(Dispatchers.IO) {
                 try {
                     _state.postValue(State.SAVING)
+                    // Re-resolve the current beneficiary ID before submitting to ensure data is saved against the correct beneficiary.
+                    benId = benRepo.resolveCurrentBenId(benId)
+                    if (tbScreeningCache.benId != benId) {
+                        tbScreeningCache = tbScreeningCache.copy(benId = benId)
+                    }
                     dataset.mapValues(tbScreeningCache, 1)
+                    /*Log.d("TBScreeningFormViewModel", "tbScreeningCache: $tbScreeningCache")*/
                     tbScreeningCache.latitude = capturedLatitude
                     tbScreeningCache.longitude = capturedLongitude
                     tbScreeningCache.address = capturedAddress
@@ -178,6 +194,7 @@ class TBScreeningFormViewModel @Inject constructor(
                     throw e
                 } catch (e: Exception) {
                     Timber.e(e, "saving tb screening data failed!!")
+                    /*Log.d("TBScreeningFormViewModel", "saving tb screening data failed!!")*/
                     _state.postValue(State.SAVE_FAILED)
                 }
             }

@@ -462,7 +462,7 @@ class NewBenRegViewModel @Inject constructor(
                     _state.postValue(State.SAVING)
 
                     if (!this@NewBenRegViewModel::ben.isInitialized) {
-                        val benIdToSet = minOf(benRepo.getMinBenId() - 1L, -1L)
+                        val benIdToSet = benRepo.nextTempBenId()
                         ben = BenRegCache(
                             ashaId         = user.userId,
                             beneficiaryId  = benIdToSet,

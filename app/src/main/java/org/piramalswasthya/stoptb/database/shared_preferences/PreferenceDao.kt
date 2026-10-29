@@ -65,6 +65,24 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         pref.edit().putLong("diag_poll_actual_start_${benId}_${orderType}", time).apply()
     }
 
+    /** Lowest temp (negative) beneficiary ID issued so far; 0 if none. */
+    fun getLastTempBenId(): Long {
+        return pref.getLong("last_temp_ben_id", 0L)
+    }
+
+    fun setLastTempBenId(benId: Long) {
+        pref.edit().putLong("last_temp_ben_id", benId).commit()
+    }
+
+    /** Server benId that replaced temp [tempBenId] on push; 0 if not recorded. */
+    fun getFinalBenId(tempBenId: Long): Long {
+        return pref.getLong("final_ben_id_$tempBenId", 0L)
+    }
+
+    fun setFinalBenId(tempBenId: Long, finalBenId: Long) {
+        pref.edit().putLong("final_ben_id_$tempBenId", finalBenId).commit()
+    }
+
     fun registerJWTAmritToken(token: String) {
         val editor = pref.edit()
         val prefKey = context.getString(R.string.PREF_primary_JWT_API_KEY)
