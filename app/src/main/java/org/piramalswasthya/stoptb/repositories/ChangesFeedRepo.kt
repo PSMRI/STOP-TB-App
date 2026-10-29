@@ -22,6 +22,11 @@ import javax.inject.Singleton
  * functions, so local edits are protected exactly as in the full pull. The token is saved only after
  * a page has been applied: if the app is killed halfway, the next pull re-reads that page.
  *
+ * Any failure while saving a page throws, so the token isn't saved past unsaved records and the worker
+ * falls back to the full pull. Records whose beneficiary isn't on the tablet are skipped, as in the
+ * full pull; the feed sends a beneficiary before its records within a page, and a snapshot sends all
+ * beneficiaries first.
+ *
  * Form responses and diagnostic orders are not taken from the feed yet; PullTBFromAmritWorker still
  * pulls them through their own endpoints.
  */
@@ -71,7 +76,16 @@ class ChangesFeedRepo @Inject constructor(
             val response = api.getSyncChanges(
                 SyncChangesRequest(token, user.serviceMapId, villages, APPLIED_TYPES, PAGE_SIZE)
             )
-            if (!response.isSuccessful) throw IOException("Changes feed HTTP ${response.code()}")
+            if (!response.isSuccessful) {
+                when (val code = response.code()) {
+                    // The server doesn't have the feed yet: use the full pull.
+                    404, 405, 501 -> return@withContext Outcome.UNSUPPORTED
+                    // Hub busy or unreachable through a proxy: retry later.
+                    408, 429, 502, 503, 504 -> throw IOException("Changes feed HTTP $code")
+                    // Any other server error: the worker falls back to the full pull.
+                    else -> throw IllegalStateException("Changes feed HTTP $code")
+                }
+            }
             val body = JSONObject(response.body()?.string() ?: throw IOException("Changes feed: empty body"))
             when (val status = body.optInt("statusCode")) {
                 200 -> Unit
