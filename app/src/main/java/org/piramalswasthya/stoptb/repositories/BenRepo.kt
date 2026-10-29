@@ -1029,13 +1029,9 @@ class BenRepo @Inject constructor(
         withContext(Dispatchers.IO) {
             val response = JSONObject().put("statusCode", 200)
                 .put("data", JSONObject().put("data", records)).toString()
-            val householdCacheList = try {
-                getHouseholdCacheFromServerResponse(response)
-            } catch (e: Exception) {
-                Timber.e(e, "Changes feed: household entries not parsed")
-                emptyList()
-            }
-            saveServerPage(householdCacheList, getBenCacheFromServerResponse(response))
+            // Unlike a pulled page, a household that can't be parsed fails the feed page, so the
+            // token isn't saved past it.
+            saveServerPage(getHouseholdCacheFromServerResponse(response), getBenCacheFromServerResponse(response))
         }
     }
 

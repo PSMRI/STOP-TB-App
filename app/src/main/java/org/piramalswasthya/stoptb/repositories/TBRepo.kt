@@ -539,7 +539,9 @@ class TBRepo @Inject constructor(
     }
 
     suspend fun applyFeedTbConfirmed(records: JSONArray) = withContext(Dispatchers.IO) {
-        saveTBConfirmedCacheFromResponse(JSONObject().put("userId", 0).put("tbConfirmedCases", records).toString())
+        saveTBConfirmedCacheFromResponse(
+            JSONObject().put("userId", 0).put("tbConfirmedCases", records).toString(), rethrow = true
+        )
     }
 
     private fun feedResponse(records: JSONArray): JSONObject =
@@ -1036,7 +1038,12 @@ class TBRepo @Inject constructor(
     }
 
 
-    private suspend fun saveTBConfirmedCacheFromResponse(dataObj: String): MutableList<TBConfirmedTreatmentCache> {
+    // rethrow: the changes feed must not save its token past records that were not saved, so it
+    // gets every failure; the full pull keeps logging and carrying on as before.
+    private suspend fun saveTBConfirmedCacheFromResponse(
+        dataObj: String,
+        rethrow: Boolean = false
+    ): MutableList<TBConfirmedTreatmentCache> {
 
 
         val tbConfirmedList = mutableListOf<TBConfirmedTreatmentCache>()
@@ -1071,11 +1078,13 @@ class TBRepo @Inject constructor(
                         }
 
                     } catch (e: Exception) {
+                        if (rethrow) throw e
                     }
                 }
             }
 
         } catch (e: Exception) {
+            if (rethrow) throw e
             Timber.e(e, "TBConfirmed: Error parsing or saving JSON")
         }
 
