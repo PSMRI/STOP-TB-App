@@ -17,6 +17,7 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.CompleteFormDefinition
 import org.piramalswasthya.stoptb.model.dynamicEntity.CompleteFormResponse
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormResponseEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormSectionWithQuestions
+import org.piramalswasthya.stoptb.model.dynamicEntity.FormVersionWithSections
 import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionResponseEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.SavedAnswerByUuid
 import org.piramalswasthya.stoptb.model.dynamicEntity.SectionQuestionWithDetails
@@ -614,6 +615,22 @@ class ContactTracingRepositoryImpl @Inject constructor(
         return true
     }
 
+    override suspend fun applyFeedFormResponses(
+        formType: FormType,
+        responses: List<ServerCounsellingResponseDto>
+    ) {
+        if (responses.isEmpty()) return
+        val formDef = metadataDao.getFormDefinition(formType) ?: return
+        val activeVersion = formDef.versions.firstOrNull { it.version.isActive }
+            ?: formDef.versions.maxByOrNull { it.version.versionNumber }
+            ?: return
+        if (formType == FormType.TPT_FOLLOW_UP) {
+            storeVillageTptRecords(activeVersion.version.versionId, responses)
+        } else {
+            storeVillageContactResponses(formType, activeVersion, responses)
+        }
+    }
+
     override suspend fun fetchAndRefreshVillageTptHistory(villageId: Int, formVersionId: Int): Boolean {
         val authHeader = preferenceDao.getJWTAmritToken() ?: ""
         val providerServiceMapId = preferenceDao.getLoggedInUser()?.serviceMapId
@@ -636,7 +653,16 @@ class ContactTracingRepositoryImpl @Inject constructor(
         }
 
         if (apiRecords.isEmpty()) return true
+        return storeVillageTptRecords(formVersionId, apiRecords)
+    }
 
+    // Saves server TPT follow-up responses: each POST_SUBMIT section as its own history snapshot
+    // (once per backend section response), and the PRE_SUBMIT part as the live response when none
+    // exists yet. Used by the village pull above and by the changes feed.
+    private suspend fun storeVillageTptRecords(
+        formVersionId: Int,
+        apiRecords: List<ServerCounsellingResponseDto>
+    ): Boolean {
         val activeVersion = metadataDao.getFormDefinition(FormType.TPT_FOLLOW_UP)
             ?.versions?.find { it.version.versionId == formVersionId }
             ?: return false
@@ -943,174 +969,186 @@ class ContactTracingRepositoryImpl @Inject constructor(
             val apiResponses = response.body()?.data
             if (apiResponses.isNullOrEmpty()) return true
 
-            val allQuestions = activeVersion.sections.flatMap { it.questions }
-            val activeQuestionUuids = allQuestions.mapNotNull { it.question.questionUuid }.toSet()
-            val mapByUuid = formType in UUID_MAPPED_FORMS
-
-            fun findQuestionDetails(serverQId: Int): SectionQuestionWithDetails? {
-                return allQuestions.firstOrNull {
-                    it.question.serverQuestionId == serverQId || it.question.questionId == serverQId
-                }
-            }
-
-            // Id-based option lookup, used only by forms outside UUID_MAPPED_FORMS.
-            fun findOptionId(qDetails: SectionQuestionWithDetails, serverOptId: Int?): Int? {
-                if (serverOptId == null) return null
-                return qDetails.options.firstOrNull {
-                    it.option.serverOptionId == serverOptId || it.option.optionId == serverOptId
-                }?.option?.optionId
-                    ?: qDetails.options.firstOrNull { it.option.optionOrder == serverOptId }?.option?.optionId
-                    ?: qDetails.options.getOrNull(serverOptId - 1)?.option?.optionId
-                    ?: serverOptId
-            }
-
-            val sectionByIdMap = activeVersion.sections.associateBy { it.section.sectionId }
-            val sectionByUuidMap = activeVersion.sections.mapNotNull { sec ->
-                sec.section.sectionUuid?.let { uuid -> uuid to sec }
-            }.toMap()
-
-            fun getLocalSection(sectionDto: ServerSectionResponseDto): FormSectionWithQuestions? {
-                return sectionByIdMap[sectionDto.sectionId]
-                    ?: sectionDto.sectionUuid.let { sectionByUuidMap[it] }
-            }
-
-            val activeSectionIds = activeVersion.sections.map { it.section.sectionId }.toSet()
-            val activeSectionUuids = activeVersion.sections.map { it.section.sectionUuid }.toSet()
-
-            db.withTransaction {
-                apiResponses.forEach { apiResponse ->
-                    val beneficiaryId = apiResponse.beneficiaryId ?: return@forEach
-
-                    // Older-version responses carry that version's section ids, so also match on answer uuids.
-                    val matchesFormSchema = apiResponse.sections.any { sec ->
-                        sec.sectionId in activeSectionIds || sec.sectionUuid in activeSectionUuids ||
-                            (mapByUuid && sec.answers.any { it.questionUuid in activeQuestionUuids })
-                    }
-                    if (!matchesFormSchema) {
-                        return@forEach
-                    }
-
-                    val unsyncedLocal = responseDao.getUnsyncedResponseForBeneficiary(beneficiaryId, formVersionId)
-                    if (unsyncedLocal != null) return@forEach
-
-                    // Same reasoning as fetchAndStoreContactResponse: keep a local older-version copy
-                    // while the server copy is still on an older version too.
-                    val isOlderVersionResponse = apiResponse.sections.none { it.sectionId in activeSectionIds }
-                    if (mapByUuid && isOlderVersionResponse && getLegacyResponse(beneficiaryId, formType, formVersionId) != null) {
-                        return@forEach
-                    }
-
-                    val existingCreatedAt = responseDao.getFormResponseForBeneficiary(beneficiaryId, formVersionId)
-                        ?.formResponse?.createdAt
-
-                    responseDao.deleteFormResponseForBeneficiary(beneficiaryId, formVersionId)
-
-                    val serverDate: Long? = try {
-                        apiResponse.submittedAt?.let { OffsetDateTime.parse(it).toInstant().toEpochMilli() }
-                    } catch (e: Exception) {
-                        Timber.w(e, "fetchAndStoreVillageContactResponses: failed to parse submittedAt=${apiResponse.submittedAt}")
-                        null
-                    }
-
-                    val questionResponsesToInsert = mutableListOf<QuestionResponseEntity>()
-                    var hasPostSubmitAnswers = false
-
-                    val backendSectionResponseIdBySectionId = apiResponse.sections
-                        .mapNotNull { sec -> getLocalSection(sec)?.section?.sectionId?.let { it to sec.sectionResponseId } }
-                        .toMap()
-
-                    apiResponse.sections.forEach { apiSec ->
-                        val sectionDef = getLocalSection(apiSec)
-                        if (sectionDef != null) {
-                            if (sectionDef.section.sectionPhase == "POST_SUBMIT" && apiSec.answers.isNotEmpty()) {
-                                hasPostSubmitAnswers = true
-                            }
-                        }
-                    }
-
-                    val formResponse = FormResponseEntity(
-                        beneficiaryId = beneficiaryId,
-                        formVersionId = activeVersion.version.versionId,
-                        status = "SUBMITTED",
-                        lastVisitedSectionId = null,
-                        syncStatus = "SYNCED",
-                        syncedAt = System.currentTimeMillis(),
-                        createdAt = serverDate ?: existingCreatedAt ?: System.currentTimeMillis()
-                    )
-                    val responseId = responseDao.insertFormResponse(formResponse)
-
-                    val sectionResponses = activeVersion.sections.map {
-                        SectionResponseEntity(
-                            formResponseId = responseId,
-                            sectionId = it.section.sectionId,
-                            backendSectionResponseId = backendSectionResponseIdBySectionId[it.section.sectionId]
-                        )
-                    }
-                    responseDao.insertSectionResponses(sectionResponses)
-
-                    val insertedSections = responseDao.getFormResponseById(responseId)?.sectionResponses ?: emptyList()
-                    val sectionIdToResponseIdMap = insertedSections.associate {
-                        it.sectionResponse.sectionId to it.sectionResponse.sectionResponseId
-                    }
-
-                    apiResponse.sections.forEach { apiSec ->
-                        val defaultSectionDef = getLocalSection(apiSec)
-                        val defaultSectionResponseId = defaultSectionDef?.let { sectionIdToResponseIdMap[it.section.sectionId] }
-
-                        apiSec.answers.forEach { apiAns ->
-                            val qDetails = if (mapByUuid) findQuestionForAnswer(allQuestions, apiAns)
-                                else findQuestionDetails(apiAns.questionId)
-                            if (qDetails != null) {
-                                val targetSectionResponseId = sectionIdToResponseIdMap[qDetails.question.sectionId] ?: defaultSectionResponseId
-
-                                if (targetSectionResponseId != null) {
-                                    if (mapByUuid) {
-                                        toLocalAnswer(qDetails, apiAns, targetSectionResponseId)
-                                            ?.let { questionResponsesToInsert.add(it) }
-                                    } else {
-                                        questionResponsesToInsert.add(
-                                            QuestionResponseEntity(
-                                                sectionResponseId = targetSectionResponseId,
-                                                questionId = qDetails.question.questionId,
-                                                optionId = findOptionId(qDetails, apiAns.optionId),
-                                                answerText = apiAns.answerText
-                                            )
-                                        )
-                                    }
-                                }
-                            } else {
-                                Timber.w("fetchAndStoreVillageContactResponses: No local question found for serverQuestionId=${apiAns.questionId}, questionUuid=${apiAns.questionUuid}")
-                            }
-                        }
-                    }
-
-                    if (questionResponsesToInsert.isNotEmpty()) {
-                        responseDao.insertQuestionResponses(questionResponsesToInsert)
-                    }
-
-                    val hasAnswers = questionResponsesToInsert.isNotEmpty()
-                    if (!hasAnswers && apiResponse.status?.uppercase() != "REFUSED") {
-                        Timber.d("fetchAndStoreVillageContactResponses: 0 valid question answers found. Deleting empty form response shell for benId=$beneficiaryId")
-                        responseDao.deleteFormResponseForBeneficiary(beneficiaryId, formVersionId)
-                        return@forEach
-                    }
-
-                    val finalStatus = when {
-                        apiResponse.status?.uppercase() == "REFUSED" -> "REFUSED"
-                        hasPostSubmitAnswers || apiResponse.status?.uppercase() == "COMPLETE" || apiResponse.status?.uppercase() == "COMPLETED" -> "COMPLETE"
-                        hasAnswers -> "SUBMITTED"
-                        else -> "DRAFT"
-                    }
-
-                    responseDao.updateFormResponse(
-                        formResponse.copy(status = finalStatus)
-                    )
-                }
-            }
+            storeVillageContactResponses(formType, activeVersion, apiResponses)
             return true
         } catch (e: Exception) {
             Timber.e(e, "fetchAndStoreVillageContactResponses failed for villageId=$villageId, formType=$formType")
             return false
+        }
+    }
+
+    // Saves server responses of one contact-tracing / follow-up form against its active version.
+    // Used by the village pull above and by the changes feed. A local UNSYNCED response is never
+    // replaced.
+    private suspend fun storeVillageContactResponses(
+        formType: FormType,
+        activeVersion: FormVersionWithSections,
+        apiResponses: List<ServerCounsellingResponseDto>
+    ) {
+        val formVersionId = activeVersion.version.versionId
+        val allQuestions = activeVersion.sections.flatMap { it.questions }
+        val activeQuestionUuids = allQuestions.mapNotNull { it.question.questionUuid }.toSet()
+        val mapByUuid = formType in UUID_MAPPED_FORMS
+
+        fun findQuestionDetails(serverQId: Int): SectionQuestionWithDetails? {
+            return allQuestions.firstOrNull {
+                it.question.serverQuestionId == serverQId || it.question.questionId == serverQId
+            }
+        }
+
+        // Id-based option lookup, used only by forms outside UUID_MAPPED_FORMS.
+        fun findOptionId(qDetails: SectionQuestionWithDetails, serverOptId: Int?): Int? {
+            if (serverOptId == null) return null
+            return qDetails.options.firstOrNull {
+                it.option.serverOptionId == serverOptId || it.option.optionId == serverOptId
+            }?.option?.optionId
+                ?: qDetails.options.firstOrNull { it.option.optionOrder == serverOptId }?.option?.optionId
+                ?: qDetails.options.getOrNull(serverOptId - 1)?.option?.optionId
+                ?: serverOptId
+        }
+
+        val sectionByIdMap = activeVersion.sections.associateBy { it.section.sectionId }
+        val sectionByUuidMap = activeVersion.sections.mapNotNull { sec ->
+            sec.section.sectionUuid?.let { uuid -> uuid to sec }
+        }.toMap()
+
+        fun getLocalSection(sectionDto: ServerSectionResponseDto): FormSectionWithQuestions? {
+            return sectionByIdMap[sectionDto.sectionId]
+                ?: sectionDto.sectionUuid.let { sectionByUuidMap[it] }
+        }
+
+        val activeSectionIds = activeVersion.sections.map { it.section.sectionId }.toSet()
+        val activeSectionUuids = activeVersion.sections.map { it.section.sectionUuid }.toSet()
+
+        db.withTransaction {
+            apiResponses.forEach { apiResponse ->
+                val beneficiaryId = apiResponse.beneficiaryId ?: return@forEach
+
+                // Older-version responses carry that version's section ids, so also match on answer uuids.
+                val matchesFormSchema = apiResponse.sections.any { sec ->
+                    sec.sectionId in activeSectionIds || sec.sectionUuid in activeSectionUuids ||
+                        (mapByUuid && sec.answers.any { it.questionUuid in activeQuestionUuids })
+                }
+                if (!matchesFormSchema) {
+                    return@forEach
+                }
+
+                val unsyncedLocal = responseDao.getUnsyncedResponseForBeneficiary(beneficiaryId, formVersionId)
+                if (unsyncedLocal != null) return@forEach
+
+                // Same reasoning as fetchAndStoreContactResponse: keep a local older-version copy
+                // while the server copy is still on an older version too.
+                val isOlderVersionResponse = apiResponse.sections.none { it.sectionId in activeSectionIds }
+                if (mapByUuid && isOlderVersionResponse && getLegacyResponse(beneficiaryId, formType, formVersionId) != null) {
+                    return@forEach
+                }
+
+                val existingCreatedAt = responseDao.getFormResponseForBeneficiary(beneficiaryId, formVersionId)
+                    ?.formResponse?.createdAt
+
+                responseDao.deleteFormResponseForBeneficiary(beneficiaryId, formVersionId)
+
+                val serverDate: Long? = try {
+                    apiResponse.submittedAt?.let { OffsetDateTime.parse(it).toInstant().toEpochMilli() }
+                } catch (e: Exception) {
+                    Timber.w(e, "storeVillageContactResponses: failed to parse submittedAt=${apiResponse.submittedAt}")
+                    null
+                }
+
+                val questionResponsesToInsert = mutableListOf<QuestionResponseEntity>()
+                var hasPostSubmitAnswers = false
+
+                val backendSectionResponseIdBySectionId = apiResponse.sections
+                    .mapNotNull { sec -> getLocalSection(sec)?.section?.sectionId?.let { it to sec.sectionResponseId } }
+                    .toMap()
+
+                apiResponse.sections.forEach { apiSec ->
+                    val sectionDef = getLocalSection(apiSec)
+                    if (sectionDef != null) {
+                        if (sectionDef.section.sectionPhase == "POST_SUBMIT" && apiSec.answers.isNotEmpty()) {
+                            hasPostSubmitAnswers = true
+                        }
+                    }
+                }
+
+                val formResponse = FormResponseEntity(
+                    beneficiaryId = beneficiaryId,
+                    formVersionId = activeVersion.version.versionId,
+                    status = "SUBMITTED",
+                    lastVisitedSectionId = null,
+                    syncStatus = "SYNCED",
+                    syncedAt = System.currentTimeMillis(),
+                    createdAt = serverDate ?: existingCreatedAt ?: System.currentTimeMillis()
+                )
+                val responseId = responseDao.insertFormResponse(formResponse)
+
+                val sectionResponses = activeVersion.sections.map {
+                    SectionResponseEntity(
+                        formResponseId = responseId,
+                        sectionId = it.section.sectionId,
+                        backendSectionResponseId = backendSectionResponseIdBySectionId[it.section.sectionId]
+                    )
+                }
+                responseDao.insertSectionResponses(sectionResponses)
+
+                val insertedSections = responseDao.getFormResponseById(responseId)?.sectionResponses ?: emptyList()
+                val sectionIdToResponseIdMap = insertedSections.associate {
+                    it.sectionResponse.sectionId to it.sectionResponse.sectionResponseId
+                }
+
+                apiResponse.sections.forEach { apiSec ->
+                    val defaultSectionDef = getLocalSection(apiSec)
+                    val defaultSectionResponseId = defaultSectionDef?.let { sectionIdToResponseIdMap[it.section.sectionId] }
+
+                    apiSec.answers.forEach { apiAns ->
+                        val qDetails = if (mapByUuid) findQuestionForAnswer(allQuestions, apiAns)
+                            else findQuestionDetails(apiAns.questionId)
+                        if (qDetails != null) {
+                            val targetSectionResponseId = sectionIdToResponseIdMap[qDetails.question.sectionId] ?: defaultSectionResponseId
+
+                            if (targetSectionResponseId != null) {
+                                if (mapByUuid) {
+                                    toLocalAnswer(qDetails, apiAns, targetSectionResponseId)
+                                        ?.let { questionResponsesToInsert.add(it) }
+                                } else {
+                                    questionResponsesToInsert.add(
+                                        QuestionResponseEntity(
+                                            sectionResponseId = targetSectionResponseId,
+                                            questionId = qDetails.question.questionId,
+                                            optionId = findOptionId(qDetails, apiAns.optionId),
+                                            answerText = apiAns.answerText
+                                        )
+                                    )
+                                }
+                            }
+                        } else {
+                            Timber.w("storeVillageContactResponses: No local question found for serverQuestionId=${apiAns.questionId}, questionUuid=${apiAns.questionUuid}")
+                        }
+                    }
+                }
+
+                if (questionResponsesToInsert.isNotEmpty()) {
+                    responseDao.insertQuestionResponses(questionResponsesToInsert)
+                }
+
+                val hasAnswers = questionResponsesToInsert.isNotEmpty()
+                if (!hasAnswers && apiResponse.status?.uppercase() != "REFUSED") {
+                    Timber.d("storeVillageContactResponses: 0 valid question answers found. Deleting empty form response shell for benId=$beneficiaryId")
+                    responseDao.deleteFormResponseForBeneficiary(beneficiaryId, formVersionId)
+                    return@forEach
+                }
+
+                val finalStatus = when {
+                    apiResponse.status?.uppercase() == "REFUSED" -> "REFUSED"
+                    hasPostSubmitAnswers || apiResponse.status?.uppercase() == "COMPLETE" || apiResponse.status?.uppercase() == "COMPLETED" -> "COMPLETE"
+                    hasAnswers -> "SUBMITTED"
+                    else -> "DRAFT"
+                }
+
+                responseDao.updateFormResponse(
+                    formResponse.copy(status = finalStatus)
+                )
+            }
         }
     }
 

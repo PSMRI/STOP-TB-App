@@ -34,6 +34,14 @@ interface ICounsellingRepository {
     suspend fun syncUnsyncedRecords(): Boolean
     suspend fun fetchAndStoreCounsellingResponse(beneficiaryId: Long, formUuid: String): Boolean
     suspend fun fetchAndStoreCompletedBeneficiaries(): List<CompletedBeneficiaryStatus>?
+
+    // Counselling status per beneficiary: from local responses when the changes feed keeps them
+    // up to date, otherwise from the server (fetchAndStoreCompletedBeneficiaries).
+    suspend fun getCompletedBeneficiaries(): List<CompletedBeneficiaryStatus>?
+
+    // TB_COUNSELLING_V2 responses from the changes feed: the latest per beneficiary is saved with
+    // its answers and derived status. Local UNSYNCED responses are kept.
+    suspend fun applyFeedCounsellingResponses(responses: List<ServerCounsellingResponseDto>)
     suspend fun revertFormStatus(responseId: Long, status: String)
     suspend fun getLocalPreSubmitFilledCounts(): Map<Long, Int>
 }

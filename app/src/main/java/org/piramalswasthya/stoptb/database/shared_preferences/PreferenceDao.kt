@@ -22,6 +22,7 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         const val CHANGES_FEED_TOKEN = "changes_feed_token"
         const val CHANGES_FEED_SCOPE = "changes_feed_scope"
         const val MASTERS_REFRESHED_AT = "masters_refreshed_at"
+        const val CHANGES_FEED_ACTIVE = "changes_feed_active"
     }
 
     fun deleteAmritToken() {
@@ -206,6 +207,15 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
 
     fun setChangesFeedToken(scope: String, token: String?) {
         pref.edit().putString(CHANGES_FEED_SCOPE, scope).putString(CHANGES_FEED_TOKEN, token).apply()
+    }
+
+    // True after a pull completed through the changes feed, false when the server has no feed.
+    // Screens and workers that used to call the per-dataset endpoints read local data instead
+    // while it is true.
+    fun isChangesFeedActive(): Boolean = pref.getBoolean(CHANGES_FEED_ACTIVE, false)
+
+    fun setChangesFeedActive(active: Boolean) {
+        pref.edit().putBoolean(CHANGES_FEED_ACTIVE, active).apply()
     }
 
     // When visit categories, chief complaints and drug masters were last downloaded. Cleared at

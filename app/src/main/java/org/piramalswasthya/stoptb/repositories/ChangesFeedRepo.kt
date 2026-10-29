@@ -5,9 +5,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import com.google.gson.Gson
+import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.model.dynamicEntity.ServerCounsellingResponseDto
 import org.piramalswasthya.stoptb.network.AmritApiService
 import org.piramalswasthya.stoptb.network.SyncChangesRequest
+import org.piramalswasthya.stoptb.repositories.contactTracing.IContactTracingRepository
+import org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository
+import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import timber.log.Timber
 import java.io.IOException
 import javax.inject.Inject
@@ -38,6 +44,9 @@ class ChangesFeedRepo @Inject constructor(
     private val benRepo: BenRepo,
     private val tbRepo: TBRepo,
     private val vitalRepo: VitalRepo,
+    private val counsellingRepository: ICounsellingRepository,
+    private val contactTracingRepository: IContactTracingRepository,
+    private val db: InAppDb,
 ) {
 
     enum class Outcome {
@@ -159,12 +168,45 @@ class ChangesFeedRepo @Inject constructor(
                     "diagnostics" -> tbRepo.applyFeedDiagnostics(records)
                     "tbSuspected" -> tbRepo.applyFeedTbSuspected(records)
                     "tbConfirmed" -> tbRepo.applyFeedTbConfirmed(records)
+                    "formResponse" -> applyFormResponses(records)
+                    "diagnosticOrder" -> tbRepo.applyFeedDiagnosticOrders(records)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 // Don't move the token past records that weren't saved.
                 throw IllegalStateException("Changes feed: could not save $type records", e)
+            }
+        }
+    }
+
+    // Form responses arrive for every form in scope; each is matched to its form by the server formId,
+    // which is the local form definition's id. Definitions are downloaded once if a formId is
+    // unknown; a form the app doesn't use is skipped, but a failed download fails the page so the
+    // token isn't saved past responses that couldn't be read.
+    private suspend fun applyFormResponses(records: JSONArray) {
+        val gson = Gson()
+        val responses = (0 until records.length()).mapNotNull { i ->
+            records.optJSONObject(i)?.let { gson.fromJson(it.toString(), ServerCounsellingResponseDto::class.java) }
+        }
+        val metadataDao = db.dynamicFormMetadataDao()
+        var downloadedForms = false
+        for ((formId, forForm) in responses.groupBy { it.formId }) {
+            var form = metadataDao.getFormById(formId)
+            if (form == null && !downloadedForms) {
+                downloadedForms = true
+                if (!counsellingRepository.downloadAndStoreAllForms()) {
+                    throw IllegalStateException("Changes feed: form definitions could not be downloaded")
+                }
+                form = metadataDao.getFormById(formId)
+            }
+            val formType = form?.let { runCatching { FormType.valueOf(it.formType) }.getOrNull() } ?: continue
+            when (formType) {
+                FormType.TB_COUNSELLING_V2 -> counsellingRepository.applyFeedCounsellingResponses(forForm)
+                FormType.COMMUNITY_CONTACT_TRACING, FormType.OCCUPATION_CONTACT_TRACING,
+                FormType.CONTACT_FOLLOW_UP, FormType.TPT_FOLLOW_UP ->
+                    contactTracingRepository.applyFeedFormResponses(formType, forForm)
+                FormType.TB_COUNSELLING -> Unit
             }
         }
     }
