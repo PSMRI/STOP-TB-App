@@ -606,15 +606,23 @@ class BenRepo @Inject constructor(
             // a household's members form one group, which is accepted or
             // rejected as a unit. Groups with a rejected member that is still
             // waiting out its retry delay sit this cycle out (they stay UNSYNCED).
-            val groups = readyBens.groupBy { it.householdId?.takeIf { hh -> hh > 0L } ?: -it.beneficiaryId }
-                .values.map { members -> buildUploadGroup(members, user) }
-            val (waiting, due) = groups.partition { g ->
-                g.benIds.any { syncRetryStore.isWaiting(SyncRetryStore.ENTITY_BENEFICIARY, it) }
+            fun groupKey(ben: BenRegCache) = ben.householdId?.takeIf { hh -> hh > 0L } ?: -ben.beneficiaryId
+            val (waiting, dueMembers) = readyBens.groupBy(::groupKey).values.partition { members ->
+                members.any { syncRetryStore.isWaiting(SyncRetryStore.ENTITY_BENEFICIARY, it.beneficiaryId) }
             }
             if (waiting.isNotEmpty()) {
-                Timber.w("Beneficiary push: ${waiting.size} group(s) waiting to retry: ${waiting.flatMap { it.benIds }}")
+                Timber.w("Beneficiary push: ${waiting.size} group(s) waiting to retry: ${waiting.flatten().map { it.beneficiaryId }}")
             }
-            due.forEach { g -> g.members.forEach { benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.SYNCING) } }
+            // Claim, then re-read: the payload is built from the rows as they are at the claim, not
+            // from the read above. An edit between that read and here is sent with this push; an
+            // edit after the claim sets UNSYNCED again and is not marked synced below.
+            val claimed = db.withTransaction {
+                dueMembers.flatten().map { it.beneficiaryId }.chunked(500).flatMap { ids ->
+                    benDao.claimForSync(ids)
+                    benDao.getSyncingBens(ids)
+                }
+            }
+            val due = claimed.groupBy(::groupKey).values.map { members -> buildUploadGroup(members, user) }
 
             // New records go as one batch; records that were rejected before are
             // retried one group at a time so they can't hold the batch back.

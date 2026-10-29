@@ -1077,6 +1077,15 @@ interface BenDao {
 
     // Only rows still SYNCING are touched: a row edited while its upload was in
     // flight is back to UNSYNCED and must stay queued for the next push.
+    // Claims records for a push: only rows still UNSYNCED become SYNCING. Together with
+    // getSyncingBens, the payload is built from the rows as they are when claimed, so an edit
+    // made before the claim is sent and one made after it (UNSYNCED again) is not marked synced.
+    @Query("UPDATE BENEFICIARY SET syncState = 1 WHERE beneficiaryId IN (:benIds) AND syncState = 0 AND isDraft = 0 AND processed = 'U'")
+    suspend fun claimForSync(benIds: List<Long>)
+
+    @Query("SELECT * FROM BENEFICIARY WHERE beneficiaryId IN (:benIds) AND syncState = 1")
+    suspend fun getSyncingBens(benIds: List<Long>): List<BenRegCache>
+
     @Query("UPDATE BENEFICIARY SET processed = 'P' , syncState = 2 WHERE beneficiaryId in (:benId) AND syncState = 1")
     suspend fun benSyncedWithServer(vararg benId: Long)
 
