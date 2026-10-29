@@ -318,6 +318,19 @@ class CounsellingRepositoryImpl @Inject constructor(
         val officerId = preferenceDao.getLoggedInUser()?.userId?.toLong() ?: DEFAULT_OFFICER_ID
         val payload = PayloadBuilder.buildBulkPayload(resp, formDef, officerId, sectionIdFilter = sectionId)
 
+        // A section targeted by sectionIdFilter is kept by PayloadBuilder even with no answers
+        // (deliberately, so an optional blank final section still submits). That means the
+        // emptiness check below never fires for the targeted path, and a REFUSED record whose
+        // GENERAL_INFO section has no answers would be POSTed as an empty answer list and then
+        // marked SYNCED on the 200. Catch that case explicitly.
+        if (resp.formResponse.status == "REFUSED" && sectionResponse.questionResponses.isEmpty()) {
+            Timber.e(
+                "submitSectionBulk: REFUSED responseId=$responseId section=$sectionId has no " +
+                        "answers - refusing to submit an empty payload and claim it synced"
+            )
+            return false
+        }
+
         if (payload.sections.isEmpty()) {
             // No API call is made, so this record has NOT reached the server. Reporting success
             // here is what let an empty GENERAL_INFO section on a REFUSED record be marked

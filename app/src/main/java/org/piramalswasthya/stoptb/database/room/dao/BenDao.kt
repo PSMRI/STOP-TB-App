@@ -597,7 +597,11 @@ interface BenDao {
                 (SELECT xrayOrderStatus FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId ORDER BY id DESC LIMIT 1), '')
                 WHEN 'FAILED' THEN 0
                 WHEN 'MANUAL_ENTRY' THEN 0
-                WHEN '' THEN 2
+                -- No status, but an order id means the order exists and is in flight: rank it
+                -- with the other in-flight orders, not with beneficiaries who have no order.
+                -- The pull can store id and status independently. The subquery only runs for
+                -- rows that reached this branch, i.e. those with no status at all.
+                WHEN '' THEN (CASE WHEN (SELECT xrayOrderId FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId ORDER BY id DESC LIMIT 1) IS NOT NULL THEN 1 ELSE 2 END)
                 WHEN 'COMPLETED' THEN 3
                 WHEN 'CLOSED' THEN 4
                 ELSE 1
@@ -606,7 +610,11 @@ interface BenDao {
                 (SELECT trueNatOrderStatus FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId ORDER BY id DESC LIMIT 1), '')
                 WHEN 'FAILED' THEN 0
                 WHEN 'MANUAL_ENTRY' THEN 0
-                WHEN '' THEN 2
+                -- No status, but an order id means the order exists and is in flight: rank it
+                -- with the other in-flight orders, not with beneficiaries who have no order.
+                -- The pull can store id and status independently. The subquery only runs for
+                -- rows that reached this branch, i.e. those with no status at all.
+                WHEN '' THEN (CASE WHEN (SELECT trueNatOrderId FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId ORDER BY id DESC LIMIT 1) IS NOT NULL THEN 1 ELSE 2 END)
                 WHEN 'COMPLETED' THEN 3
                 WHEN 'CLOSED' THEN 4
                 ELSE 1

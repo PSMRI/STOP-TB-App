@@ -177,9 +177,10 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     override fun onDestroyView() {
         org.piramalswasthya.stoptb.utils.DbContentionSampler.stop()
-        // onViewCreated builds a fresh benAdapter, so the decorations must be re-collected for
-        // it. Without this reset the guard would keep the collectors pointed at the discarded
-        // adapter and the new one would never be decorated.
+        // The collectors run in viewLifecycleOwner.lifecycleScope, so they are cancelled with
+        // the view. Resetting the guard lets the next view start its own set. On the fragment's
+        // lifecycleScope they would NOT be cancelled, and a fragment returning from the back
+        // stack would accumulate another 17 Room Flow subscriptions per view creation.
         rowDecorationsStarted = false
         super.onDestroyView()
     }
@@ -944,135 +945,135 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // destroyed view would stop the next, legitimate call from ever starting them.
         if (_binding == null || rowDecorationsStarted) return
         rowDecorationsStarted = true
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.childCounts.collectLatest { countMap ->
                 ScreenLoadTrace.flowEmission("childCounts", countMap.size)
                 benAdapter.submitChildCounts(countMap)
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.householdMemberCounts.collectLatest { countMap ->
                 ScreenLoadTrace.flowEmission("householdMemberCounts", countMap.size)
                 benAdapter.submitHouseholdMemberCounts(countMap)
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.householdHeadNames.collectLatest { nameMap ->
                 ScreenLoadTrace.flowEmission("householdHeadNames", nameMap.size)
                 benAdapter.submitHouseholdHeadNames(nameMap)
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.vitalBenIds.collectLatest { benIds ->
                 ScreenLoadTrace.flowEmission("vitalBenIds", benIds.size)
                 benAdapter.submitBenIds(benIds)
             }
         }
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.unsyncedVitalBenIds.collectLatest { benIds ->
                 ScreenLoadTrace.flowEmission("unsyncedVitalBenIds", benIds.size)
                 benAdapter.submitUnsyncedVitalBenIds(benIds)
             }
         }
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.syncingVitalBenIds.collectLatest { benIds ->
                 ScreenLoadTrace.flowEmission("syncingVitalBenIds", benIds.size)
                 benAdapter.submitSyncingVitalBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.tbScreeningBenIds.collectLatest { benIds ->
                 ScreenLoadTrace.flowEmission("tbScreeningBenIds", benIds.size)
                 benAdapter.submitTbScreeningBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.unsyncedTbScreeningBenIds.collectLatest { benIds ->
                 ScreenLoadTrace.flowEmission("unsyncedTbScreeningBenIds", benIds.size)
                 benAdapter.submitUnsyncedTbScreeningBenIds(benIds)
             }
         }
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.syncingTbScreeningBenIds.collectLatest { benIds ->
                 ScreenLoadTrace.flowEmission("syncingTbScreeningBenIds", benIds.size)
                 benAdapter.submitSyncingTbScreeningBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.generalOpdBenIds.collectLatest { benIds ->
                 ScreenLoadTrace.flowEmission("generalOpdBenIds", benIds.size)
                 benAdapter.submitGeneralOpdBenIds(benIds)
             }
         }
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.unsyncedGeneralOpdBenIds.collectLatest { benIds ->
                 ScreenLoadTrace.flowEmission("unsyncedGeneralOpdBenIds", benIds.size)
                 benAdapter.submitUnsyncedGeneralOpdBenIds(benIds)
             }
         }
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.syncingGeneralOpdBenIds.collectLatest { benIds ->
                 ScreenLoadTrace.flowEmission("syncingGeneralOpdBenIds", benIds.size)
                 benAdapter.submitSyncingGeneralOpdBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.anthropometryFilledBenIds.collectLatest { benIds ->
                 ScreenLoadTrace.flowEmission("anthropometryFilledBenIds", benIds.size)
                 benAdapter.submitAnthropometryBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.diagnosisBenIds.collectLatest { benIds ->
                 ScreenLoadTrace.flowEmission("diagnosisBenIds", benIds.size)
                 benAdapter.submitDiagnosisBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.contactFollowUpDoneBenIds.collectLatest { benIds ->
                 ScreenLoadTrace.flowEmission("contactFollowUpDoneBenIds", benIds.size)
                 benAdapter.submitContactFollowUpDoneBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.tptFollowUpDoneBenIds.collectLatest { benIds ->
                 ScreenLoadTrace.flowEmission("tptFollowUpDoneBenIds", benIds.size)
                 benAdapter.submitTptFollowUpDoneBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.tptEligibleBenIds.collectLatest { benIds ->
                 ScreenLoadTrace.flowEmission("tptEligibleBenIds", benIds.size)
                 benAdapter.submitTptEligibleBenIds(benIds)
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.allTbDiagnostics.collectLatest { diagnosticsList ->
                 ScreenLoadTrace.flowEmission("allTbDiagnostics", diagnosticsList.size)
                 benAdapter.submitTBDiagnostics(diagnosticsList)
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.allTbScreening.collectLatest { screeningList ->
                 ScreenLoadTrace.flowEmission("allTbScreening", screeningList.size)
                 benAdapter.submitTbScreeningList(screeningList)
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.retryingBenIds.collectLatest { benIds ->
                 ScreenLoadTrace.flowEmission("retryingBenIds", benIds.size)
                 benAdapter.submitRetryingBenIds(benIds)

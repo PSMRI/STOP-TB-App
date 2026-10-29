@@ -122,11 +122,17 @@ object ScreenLoadTrace {
 
     // ── Paging ────────────────────────────────────────────────────────────────
 
+    /**
+     * The beneficiary search accepts names, mobile numbers and ABHA ids, so the raw term is
+     * never logged - only whether a filter is active and how long it is. What this trace needs
+     * is the *rate* of PagingSource creation, not its contents.
+     */
     @JvmStatic
     fun pagingSourceCreated(query: String, source: Int, generation: Int) {
+        val queryShape = if (query.isBlank()) "empty" else "len=${query.length}"
         Log.d(
             TAG,
-            "  [paging] NEW PagingSource #$generation (query='$query' source=$source) +${sinceStart()}ms"
+            "  [paging] NEW PagingSource #$generation (query=$queryShape source=$source) +${sinceStart()}ms"
         )
     }
 
