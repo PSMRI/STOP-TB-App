@@ -61,6 +61,9 @@ class IconGridAdapter(
                 icon.disabledMessage?.let { disabledClickListener?.invoke(it) }
                 return
             }
+            // TEMPORARY PERF INSTRUMENTATION - starts the clock at the tap.
+            org.piramalswasthya.stoptb.utils.ScreenLoadTrace.startWatchdog()
+            org.piramalswasthya.stoptb.utils.ScreenLoadTrace.start(icon.title)
             icon.navAction?.let(selectedListener)
         }
     }

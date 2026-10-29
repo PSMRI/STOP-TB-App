@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.utils.CampHubUrlValidator
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import org.piramalswasthya.stoptb.utils.sync.CampHubReachability
 import javax.inject.Inject
@@ -44,8 +45,17 @@ class CampModeConnectViewModel @Inject constructor(
     }
 
     fun connectToCampHub(url: String) {
-        val normalizedUrl = normalizeCampHubUrl(url)
-        Log.d(TAG, "Connect clicked. inputUrl=$url, normalizedUrl=$normalizedUrl")
+        // Reject anything that is not a local-network address BEFORE storing it. The stored URL
+        // re-points every authenticated request (see CampHubUrlValidator), and it used to be
+        // persisted first and validated never - so a scanned QR code pointing at a public host
+        // took effect immediately and survived a failed health check.
+        val normalizedUrl = CampHubUrlValidator.normalizeOrNull(url, extraAllowedHost = configuredHubHost())
+        if (normalizedUrl == null) {
+            Log.w(TAG, "Rejected camp hub URL: not a local-network http(s) address")
+            _campHubStatus.value = CampHubStatus.NOT_CONNECTED
+            return
+        }
+        Log.d(TAG, "Connect clicked. normalizedUrl=$normalizedUrl")
         pref.setCampHubUrl(normalizedUrl)
         pref.setCampModeEnabled(false)
         pref.setCampHubConnected(false)
@@ -64,15 +74,10 @@ class CampModeConnectViewModel @Inject constructor(
         }
     }
 
-    private fun normalizeCampHubUrl(url: String): String {
-        val trimmedUrl = url.trim()
-        val resolvedUrl = when {
-            trimmedUrl.isBlank() -> ""
-            trimmedUrl.contains("://") -> trimmedUrl
-            else -> "http://$trimmedUrl"
-        }
-        return resolvedUrl.trimEnd('/').plus("/")
-    }
+    /** Host of the URL baked into this build - always acceptable, even when it is public. */
+    private fun configuredHubHost(): String? =
+        pref.configuredCampHubUrl().takeIf { it.isNotBlank() }
+            ?.let { runCatching { java.net.URI(it).host }.getOrNull() }
 
     private suspend fun pingCampHub(rawUrl: String): Boolean = withContext(Dispatchers.IO) {
         CampHubReachability.isReachable(rawUrl)

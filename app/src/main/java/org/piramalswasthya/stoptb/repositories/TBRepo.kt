@@ -4,10 +4,13 @@ import android.content.Context
 import com.google.gson.Gson
 import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -37,6 +40,7 @@ import org.piramalswasthya.stoptb.model.MtbResult
 import org.piramalswasthya.stoptb.model.RifResult
 import org.piramalswasthya.stoptb.model.VisitCategoryMasterCache
 import org.piramalswasthya.stoptb.network.AmritApiService
+import org.piramalswasthya.stoptb.utils.ServerDateParser
 import org.piramalswasthya.stoptb.network.GeneralOpdRequestDTO
 import org.piramalswasthya.stoptb.network.GeneralOpdSaveRequest
 import org.piramalswasthya.stoptb.network.GeneralOpdDrugResponse
@@ -60,6 +64,7 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
 
 @Singleton
 class TBRepo @Inject constructor(
@@ -85,6 +90,40 @@ class TBRepo @Inject constructor(
     private suspend fun <T> withBenIdLock(benId: Long, block: suspend () -> T): T =
         benIdLocks.getOrPut(benId) { Mutex() }.withLock { block() }
 
+    /**
+     * Holds every lock in [benIds] for the duration of [block], acquiring them in ascending
+     * benId order.
+     *
+     * Used by the pull loops, which need a whole chunk of records inside one write transaction.
+     * The ordering matters twice over:
+     *
+     *  - Ascending order between callers means two overlapping chunks can never hold each
+     *    other's next lock, so they cannot deadlock against one another.
+     *  - Every lock is taken *before* the transaction opens. That keeps one global ordering -
+     *    beneficiary mutex first, database write lock second - across every path in this file.
+     *    Acquiring them the other way round (opening the transaction and then waiting on a lock
+     *    held by, say, DiagnosticResultPollWorker, which is itself blocked on the write lock we
+     *    are holding) would deadlock the two.
+     */
+    private suspend fun <T> withBenIdLocks(benIds: Collection<Long>, block: suspend () -> T): T {
+        val ordered = benIds.distinct().sorted()
+        val acquired = ArrayList<Mutex>(ordered.size)
+        try {
+            ordered.forEach { benId ->
+                // Acquired one at a time rather than by nesting withBenIdLock, so a chunk of a
+                // few hundred does not build a correspondingly deep chain of suspend frames.
+                // Cancellation while waiting here still unwinds through the finally below.
+                benIdLocks.getOrPut(benId) { Mutex() }.also { mutex ->
+                    mutex.lock()
+                    acquired += mutex
+                }
+            }
+            return block()
+        } finally {
+            for (index in acquired.indices.reversed()) acquired[index].unlock()
+        }
+    }
+
     // Serializes pushUnSyncedRecordsTBSuspected() against itself — it reads all UNSYNCED rows,
     // posts them, then marks that snapshot synced with no claim/lease step, so overlapping calls
     // (createOrder/retryPushOrder/fetchOrderResult plus the generic push sweep) can double-POST
@@ -96,9 +135,22 @@ class TBRepo @Inject constructor(
     private val tbScreeningPushMutex = Mutex()
     private val generalOpdPushMutex = Mutex()
 
-    val allTbDiagnostics: Flow<List<TBDiagnosticsCache>> = tbDao.getAllTbDiagnostics()
+    /**
+     * Card-rendering columns only. The list screens decorate rows from this; nothing on a card
+     * reads the other seventeen columns. See [org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields].
+     */
+    val allTbDiagnostics: Flow<List<org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields>> =
+        tbDao.getAllTbDiagnosticsCardFields()
 
-    val allTbScreening: Flow<List<TBScreeningCache>> = tbDao.getAllTbScreening()
+    /**
+     * benIds of every TB_DIAGNOSTICS row, derived from [allTbDiagnostics] rather than queried
+     * again. Screens that want both were running two scans of the same table per invalidation
+     * - the same duplication already removed for TB_SCREENING above.
+     */
+    val tbDiagnosticsBenIdsFromCards: Flow<List<Long>> =
+        allTbDiagnostics.map { rows -> rows.map { row -> row.benId } }
+
+    val allTbScreening: Flow<List<TbScreeningSymptoms>> = tbDao.getAllTbScreeningSymptoms()
 
     suspend fun getDiagnosticsList(): List<TBDiagnosticsCache> = withContext(Dispatchers.IO) {
         tbDao.getDiagnosticsList()
@@ -256,13 +308,25 @@ class TBRepo @Inject constructor(
         }
     }
 
-    val tbScreeningBenIds: Flow<List<Long>> = tbDao.getAllTbScreeningBenIds()
-    val unsyncedTbScreeningBenIds: Flow<List<Long>> = tbDao.getTbScreeningBenIdsBySyncState(SyncState.UNSYNCED)
-    val syncingTbScreeningBenIds: Flow<List<Long>> = tbDao.getTbScreeningBenIdsBySyncState(SyncState.SYNCING)
+    // One query per table for all three sets. These were three Room Flows over the same table,
+    // so every write re-ran three queries and woke three collectors on the list screens.
+    private val tbScreeningBenIdStates: Flow<List<org.piramalswasthya.stoptb.model.BenIdSyncState>> =
+        tbDao.getTbScreeningBenIdSyncStates()
 
-    val generalOpdBenIds: Flow<List<Long>> = tbDao.getAllGeneralOpdBenIds()
-    val unsyncedGeneralOpdBenIds: Flow<List<Long>> = tbDao.getGeneralOpdBenIdsBySyncState(SyncState.UNSYNCED)
-    val syncingGeneralOpdBenIds: Flow<List<Long>> = tbDao.getGeneralOpdBenIdsBySyncState(SyncState.SYNCING)
+    val tbScreeningBenIds: Flow<List<Long>> = tbScreeningBenIdStates.map { rows -> rows.map { it.benId } }
+    val unsyncedTbScreeningBenIds: Flow<List<Long>> =
+        tbScreeningBenIdStates.map { rows -> rows.filter { it.syncState == SyncState.UNSYNCED }.map { it.benId } }
+    val syncingTbScreeningBenIds: Flow<List<Long>> =
+        tbScreeningBenIdStates.map { rows -> rows.filter { it.syncState == SyncState.SYNCING }.map { it.benId } }
+
+    private val generalOpdBenIdStates: Flow<List<org.piramalswasthya.stoptb.model.BenIdSyncState>> =
+        tbDao.getGeneralOpdBenIdSyncStates()
+
+    val generalOpdBenIds: Flow<List<Long>> = generalOpdBenIdStates.map { rows -> rows.map { it.benId } }
+    val unsyncedGeneralOpdBenIds: Flow<List<Long>> =
+        generalOpdBenIdStates.map { rows -> rows.filter { it.syncState == SyncState.UNSYNCED }.map { it.benId } }
+    val syncingGeneralOpdBenIds: Flow<List<Long>> =
+        generalOpdBenIdStates.map { rows -> rows.filter { it.syncState == SyncState.SYNCING }.map { it.benId } }
 
     val tbSuspectedBenIds: Flow<List<Long>> = tbDao.getAllTbSuspectedBenIds()
 
@@ -554,51 +618,88 @@ class TBRepo @Inject constructor(
             is JSONObject -> data.optJSONArray("data") ?: org.json.JSONArray()
             else -> org.json.JSONArray()
         }
-        database.withTransaction {
-            for (index in 0 until records.length()) {
-                val item = records.optJSONObject(index) ?: continue
-                val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { it > 0 } ?: continue
-                val ben = benDao.getBenByRegId(benRegId) ?: continue
-                val visitDate = getLongFromDateMultipleSupport(item.optString("visitDate"))
-                val existing = tbDao.getTbScreening(ben.beneficiaryId)
-                val serverUpdatedDate = getServerUpdatedDate(item)
-                if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
-                    continue
+        // One transaction per [pullWriteChunkSize] records instead of one per record - see that
+        // constant for why. The inner `for` is local to the lambda, so `continue` still skips a
+        // single record rather than ending the chunk.
+        //
+        // Both lookups are resolved for the whole chunk up front. Done per record, they cost
+        // three statements each: benRegId carries no index (the primary key is beneficiaryId),
+        // so `getBenByRegId` scanned the entire beneficiary table - 9,987 wide rows on a camp
+        // device - to read one id, once per record. At ~10,000 records that is ~10,000 full
+        // scans for this domain alone, which is what holds the database for the length of a
+        // pull and leaves the beneficiary list waiting seconds for a query that costs 54 ms.
+        for (chunkStart in 0 until records.length() step pullWriteChunkSize) {
+            val chunkEnd = minOf(chunkStart + pullWriteChunkSize, records.length())
+            database.withTransaction {
+                val chunkItems = (chunkStart until chunkEnd).mapNotNull { index ->
+                    val item = records.optJSONObject(index) ?: return@mapNotNull null
+                    val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { regId -> regId > 0 }
+                        ?: return@mapNotNull null
+                    item to benRegId
                 }
-                val cache = (existing ?: TBScreeningCache(benId = ben.beneficiaryId)).copy(
-                    visitDate = visitDate,
-                    coughMoreThan2Weeks = item.optNullableBoolean("coughMoreThan2Weeks"),
-                    bloodInSputum = item.optNullableBoolean("bloodInSputum"),
-                    feverMoreThan2Weeks = item.optNullableBoolean("feverMoreThan2Weeks"),
-                    lossOfWeight = item.optNullableBoolean("lossOfWeight"),
-                    nightSweats = item.optNullableBoolean("nightSweats"),
-                    historyOfTb = item.optNullableBoolean("historyOfTb"),
-                    takingAntiTBDrugs = item.optNullableBoolean("takingAntiTBDrugs"),
-                    familySufferingFromTB = item.optNullableBoolean("familySufferingFromTB"),
-                    riseOfFever = item.optNullableBoolean("riseOfFever"),
-                    lossOfAppetite = item.optNullableBoolean("lossOfAppetite"),
+                // associateBy keeps the last duplicate; the per-record query it replaces used
+                // LIMIT 1 with no ORDER BY, which SQLite answers with the first row in scan
+                // order, so resolve ties by the lowest id to match the old behaviour.
+                val benIdByRegId = benDao.getBenIdsByRegIds(chunkItems.map { (_, regId) -> regId })
+                    .groupBy { mapping -> mapping.benRegId }
+                    .mapValues { (_, mappings) -> mappings.minOf { mapping -> mapping.beneficiaryId } }
+                // Mutable, because the per-record version wrote each row immediately and so a
+                // second record for the same beneficiary in the same chunk compared against the
+                // row the first one had just written. Keeping that matters: a brand-new row
+                // carries id = 0, and inserting it twice would create two rows for one
+                // beneficiary rather than updating one.
+                val existingByBenId = tbDao.getTbScreeningByBenIds(benIdByRegId.values.toList())
+                    .groupBy { screening -> screening.benId }
+                    .mapValues { (_, screenings) -> screenings.minByOrNull { screening -> screening.id }!! }
+                    .toMutableMap()
+                val pendingWrites = linkedMapOf<Long, TBScreeningCache>()
 
-                    chestPain = item.optNullableBoolean("chestPain") ?: existing?.chestPain,
-                    shortnessOfBreath = item.optNullableBoolean("shortnessOfBreath") ?: existing?.shortnessOfBreath,
-                    fatigue = item.optNullableBoolean("fatigue") ?: existing?.fatigue,
-                    failureToGainWeightInChildren = item.optNullableBoolean("failureToGainWeightInChildren") ?: existing?.failureToGainWeightInChildren,
-                    decreasedActivityOrPlayfulnessInChildren = item.optNullableBoolean("decreasedActivityOrPlayfulnessInChildren") ?: existing?.decreasedActivityOrPlayfulnessInChildren,
-                    otherSymptoms = item.optNullableBoolean("otherSymptoms") ?: existing?.otherSymptoms,
-                    referredForDigitalChestXray = item.optNullableBoolean("referredForDigitalChestXray"),
-                    referredForSputumCollection = item.optNullableBoolean("referredForSputumCollection"),
-                    sputumSampleSubmittedAt = item.optStringOrNull("sputumSampleSubmittedAt"),
-                    recommendedForTruenatTest = item.optNullableBoolean("recommendedForTruenat"),
-                    recommendedForLiquidCultureTest = item.optNullableBoolean("recommendedForLiquidCulture"),
-                    reasonForDenialForGettingTested = item.optStringListOrNull("testDenialReasons"),
-                    keyPopulationRiskFactorIds = item.optIntListOrNull("keyPopulationRiskFactorIds"),
-                    keyPopulationRiskFactors = item.optStringListOrNull("keyPopulationRiskFactors"),
-                    hivStatusId = item.optIntOrNull("hivStatusId"),
-                    hivStatus = item.optStringOrNull("hivStatus"),
-                    serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
-                    syncState = SyncState.SYNCED
-                )
-                tbDao.saveTbScreening(cache)
-                tbScreeningList.add(cache)
+                for ((item, benRegId) in chunkItems) {
+                    val benId = benIdByRegId[benRegId] ?: continue
+                    val visitDate = getLongFromDateMultipleSupport(item.optString("visitDate"))
+                    val existing = existingByBenId[benId]
+                    val serverUpdatedDate = getServerUpdatedDate(item)
+                    if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
+                        continue
+                    }
+                    val cache = (existing ?: TBScreeningCache(benId = benId)).copy(
+                        visitDate = visitDate,
+                        coughMoreThan2Weeks = item.optNullableBoolean("coughMoreThan2Weeks"),
+                        bloodInSputum = item.optNullableBoolean("bloodInSputum"),
+                        feverMoreThan2Weeks = item.optNullableBoolean("feverMoreThan2Weeks"),
+                        lossOfWeight = item.optNullableBoolean("lossOfWeight"),
+                        nightSweats = item.optNullableBoolean("nightSweats"),
+                        historyOfTb = item.optNullableBoolean("historyOfTb"),
+                        takingAntiTBDrugs = item.optNullableBoolean("takingAntiTBDrugs"),
+                        familySufferingFromTB = item.optNullableBoolean("familySufferingFromTB"),
+                        riseOfFever = item.optNullableBoolean("riseOfFever"),
+                        lossOfAppetite = item.optNullableBoolean("lossOfAppetite"),
+
+                        chestPain = item.optNullableBoolean("chestPain") ?: existing?.chestPain,
+                        shortnessOfBreath = item.optNullableBoolean("shortnessOfBreath") ?: existing?.shortnessOfBreath,
+                        fatigue = item.optNullableBoolean("fatigue") ?: existing?.fatigue,
+                        failureToGainWeightInChildren = item.optNullableBoolean("failureToGainWeightInChildren") ?: existing?.failureToGainWeightInChildren,
+                        decreasedActivityOrPlayfulnessInChildren = item.optNullableBoolean("decreasedActivityOrPlayfulnessInChildren") ?: existing?.decreasedActivityOrPlayfulnessInChildren,
+                        otherSymptoms = item.optNullableBoolean("otherSymptoms") ?: existing?.otherSymptoms,
+                        referredForDigitalChestXray = item.optNullableBoolean("referredForDigitalChestXray"),
+                        referredForSputumCollection = item.optNullableBoolean("referredForSputumCollection"),
+                        sputumSampleSubmittedAt = item.optStringOrNull("sputumSampleSubmittedAt"),
+                        recommendedForTruenatTest = item.optNullableBoolean("recommendedForTruenat"),
+                        recommendedForLiquidCultureTest = item.optNullableBoolean("recommendedForLiquidCulture"),
+                        reasonForDenialForGettingTested = item.optStringListOrNull("testDenialReasons"),
+                        keyPopulationRiskFactorIds = item.optIntListOrNull("keyPopulationRiskFactorIds"),
+                        keyPopulationRiskFactors = item.optStringListOrNull("keyPopulationRiskFactors"),
+                        hivStatusId = item.optIntOrNull("hivStatusId"),
+                        hivStatus = item.optStringOrNull("hivStatus"),
+                        serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
+                        syncState = SyncState.SYNCED
+                    )
+                    existingByBenId[benId] = cache
+                    pendingWrites[benId] = cache
+                    tbScreeningList.add(cache)
+                }
+                // One batched insert per chunk rather than one statement per record.
+                if (pendingWrites.isNotEmpty()) tbDao.saveTbScreening(pendingWrites.values.toList())
             }
         }
         return tbScreeningList
@@ -629,68 +730,84 @@ class TBRepo @Inject constructor(
 
     private suspend fun saveGeneralOpdCacheFromNewResponse(jsonObj: JSONObject): Boolean {
         val records = getStopTbDataArray(jsonObj)
-        return processGeneralOpdPullBatch(
-            records = (0 until records.length()).map { records.optJSONObject(it) },
-            parse = { record ->
-                val item = requireNotNull(record) { "Invalid General OPD record" }
-                val hasDrugs = item.has("drugs") && !item.isNull("drugs")
-                if (hasDrugs) {
-                    val drugs = requireNotNull(item.optJSONArray("drugs")) { "Invalid General OPD drugs array" }
-                    GeneralOpdDrugResponse.parsePrescriptions(drugs.toString(), 0)
-                } else emptyList()
-            },
-            save = saveRecord@ { record, incomingRows ->
-                val item = requireNotNull(record)
-                val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { it > 0 } ?: return@saveRecord
-                val ben = benDao.getBenByRegId(benRegId) ?: return@saveRecord
-                val serverUpdatedDate = getServerUpdatedDate(item)
-                val incomingComplaints = item.optChiefComplaintsOrNull()
-                val hasDrugs = item.has("drugs") && !item.isNull("drugs")
+        // One transaction per [pullWriteChunkSize] records instead of one per record - see that
+        // constant for why. Room's withTransaction is reentrant, so the per-record one inside
+        // `save` below joins this chunk's transaction rather than committing on its own; the
+        // prescription rows a record rewrites therefore still land atomically with it.
+        var complete = true
+        var recordsBeforeChunk = 0
+        (0 until records.length()).map { index -> records.optJSONObject(index) }
+            .chunked(pullWriteChunkSize)
+            .forEach { chunk ->
+                val chunkOffset = recordsBeforeChunk
                 database.withTransaction {
-                    val existing = tbDao.getGeneralOpd(ben.beneficiaryId)
-                    val applyRecord = shouldApplyServerRecord(existing?.syncState,
-                        existing?.serverUpdatedDate, serverUpdatedDate)
-                    val recoverDrugs = canRecoverGeneralOpdDrugs(existing, incomingRows, serverUpdatedDate)
-                    if (!applyRecord && !recoverDrugs) {
-                        if (canRecoverChiefComplaints(existing, incomingComplaints, serverUpdatedDate)) {
-                            val recovered = existing!!.copy(chiefComplaints = incomingComplaints,
-                                chiefComplaintIds = null)
-                            tbDao.saveGeneralOpd(recovered)
-                            return@withTransaction
+                    val chunkComplete = processGeneralOpdPullBatch(
+                        records = chunk,
+                        parse = { record ->
+                            val item = requireNotNull(record) { "Invalid General OPD record" }
+                            val hasDrugs = item.has("drugs") && !item.isNull("drugs")
+                            if (hasDrugs) {
+                                val drugs = requireNotNull(item.optJSONArray("drugs")) { "Invalid General OPD drugs array" }
+                                GeneralOpdDrugResponse.parsePrescriptions(drugs.toString(), 0)
+                            } else emptyList()
+                        },
+                        save = saveRecord@ { record, incomingRows ->
+                            val item = requireNotNull(record)
+                            val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { it > 0 } ?: return@saveRecord
+                            val ben = benDao.getBenByRegId(benRegId) ?: return@saveRecord
+                            val serverUpdatedDate = getServerUpdatedDate(item)
+                            val incomingComplaints = item.optChiefComplaintsOrNull()
+                            val hasDrugs = item.has("drugs") && !item.isNull("drugs")
+                            database.withTransaction perRecord@ {
+                                val existing = tbDao.getGeneralOpd(ben.beneficiaryId)
+                                val applyRecord = shouldApplyServerRecord(existing?.syncState,
+                                    existing?.serverUpdatedDate, serverUpdatedDate)
+                                val recoverDrugs = canRecoverGeneralOpdDrugs(existing, incomingRows, serverUpdatedDate)
+                                if (!applyRecord && !recoverDrugs) {
+                                    if (canRecoverChiefComplaints(existing, incomingComplaints, serverUpdatedDate)) {
+                                        val recovered = existing!!.copy(chiefComplaints = incomingComplaints,
+                                            chiefComplaintIds = null)
+                                        tbDao.saveGeneralOpd(recovered)
+                                        return@perRecord
+                                    }
+                                    return@perRecord
+                                }
+                                val complaints = incomingComplaints ?: existing?.chiefComplaints
+                                val cache = (existing ?: GeneralOpdCache(benId = ben.beneficiaryId)).copy(
+                                    chiefComplaints = complaints,
+                                    chiefComplaintIds = existing?.chiefComplaintIds?.takeIf { complaints == existing?.chiefComplaints },
+                                    medications = if (incomingRows.isNotEmpty()) incomingRows.map { it.medicine }
+                                        else item.optStringOrNull("medication")?.split(",")?.map { it.trim() }
+                                            ?.filter { it.isNotBlank() } ?: existing?.medications,
+                                    dosage = item.optStringOrNull("dosage") ?: existing?.dosage,
+                                    frequency = if (incomingRows.isNotEmpty()) incomingRows.joinToString(", ") { it.frequency }
+                                        else item.optStringOrNull("frequency") ?: existing?.frequency,
+                                    duration = if (incomingRows.isNotEmpty()) incomingRows.joinToString(", ") {
+                                        "${it.durationCount} ${it.durationUnit}"
+                                    } else item.optStringOrNull("duration") ?: existing?.duration,
+                                    notes = item.optStringOrNull("notes") ?: existing?.notes,
+                                    serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
+                                    syncState = SyncState.SYNCED
+                                )
+                                val opdId = tbDao.saveGeneralOpd(cache).toInt()
+                                // Parent and per-drug rows must become visible together, never from different revisions.
+                                if (hasDrugs || cache.medications != existing?.medications ||
+                                    cache.frequency != existing?.frequency || cache.duration != existing?.duration) {
+                                    tbDao.deleteGeneralOpdPrescriptions(opdId)
+                                    if (incomingRows.isNotEmpty()) tbDao.insertGeneralOpdPrescriptions(
+                                        incomingRows.map { it.copy(opdId = opdId) })
+                                }
+                            }
+                        },
+                        onInvalid = { index, error ->
+                            Timber.e("General OPD pull skipped invalid record at index ${chunkOffset + index} (${error.javaClass.simpleName})")
                         }
-                        return@withTransaction
-                    }
-                    val complaints = incomingComplaints ?: existing?.chiefComplaints
-                    val cache = (existing ?: GeneralOpdCache(benId = ben.beneficiaryId)).copy(
-                        chiefComplaints = complaints,
-                        chiefComplaintIds = existing?.chiefComplaintIds?.takeIf { complaints == existing?.chiefComplaints },
-                        medications = if (incomingRows.isNotEmpty()) incomingRows.map { it.medicine }
-                            else item.optStringOrNull("medication")?.split(",")?.map { it.trim() }
-                                ?.filter { it.isNotBlank() } ?: existing?.medications,
-                        dosage = item.optStringOrNull("dosage") ?: existing?.dosage,
-                        frequency = if (incomingRows.isNotEmpty()) incomingRows.joinToString(", ") { it.frequency }
-                            else item.optStringOrNull("frequency") ?: existing?.frequency,
-                        duration = if (incomingRows.isNotEmpty()) incomingRows.joinToString(", ") {
-                            "${it.durationCount} ${it.durationUnit}"
-                        } else item.optStringOrNull("duration") ?: existing?.duration,
-                        notes = item.optStringOrNull("notes") ?: existing?.notes,
-                        serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
-                        syncState = SyncState.SYNCED
                     )
-                    val opdId = tbDao.saveGeneralOpd(cache).toInt()
-                    // Parent and per-drug rows must become visible together, never from different revisions.
-                    if (hasDrugs || cache.medications != existing?.medications ||
-                        cache.frequency != existing?.frequency || cache.duration != existing?.duration) {
-                        tbDao.deleteGeneralOpdPrescriptions(opdId)
-                        if (incomingRows.isNotEmpty()) tbDao.insertGeneralOpdPrescriptions(
-                            incomingRows.map { it.copy(opdId = opdId) })
-                    }
+                    if (!chunkComplete) complete = false
                 }
-            },
-            onInvalid = { index, error ->
-                Timber.e("General OPD pull skipped invalid record at index $index (${error.javaClass.simpleName})")
+                recordsBeforeChunk += chunk.size
             }
-        )
+        return complete
     }
 
     suspend fun getTbDiagnosticsDetailsFromServer(): Int {
@@ -783,45 +900,69 @@ class TBRepo @Inject constructor(
     private suspend fun saveTBDiagnosticsCacheFromNewResponse(jsonObj: JSONObject): MutableList<TBDiagnosticsCache> {
         val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
         val records = getStopTbDataArray(jsonObj)
-        for (index in 0 until records.length()) {
-            val item = records.optJSONObject(index) ?: continue
-            val benRegId = item.optLong("benRegID", 0L).takeIf { it > 0 } ?: continue
-            val ben = benDao.getBenByRegId(benRegId) ?: continue
-            val visitDate = getLongFromDateMultipleSupport(item.optString("visitDate"))
-            val serverUpdatedDate = getServerUpdatedDate(item)
-            // Unlike every other TB_DIAGNOSTICS write path in this file, this pull used to read
-            // `existing` once and write much later (after the full network round-trip for every
-            // beneficiary in the response) with no lock at all — a wide TOCTOU window where a
-            // concurrent createOrder()/submitManualResult() write (e.g. re-ordering a Closed order,
-            // which correctly clears naatResult/trueNatRifResult/reasonNotConducted*) could land in
-            // between and then get silently overwritten by this pull's stale snapshot. Re-read fresh
-            // inside the lock, right before deciding/writing, same pattern as fetchOrderResult.
-            withBenIdLock(ben.beneficiaryId) {
-                val existing = tbDao.getTbDiagnostics(ben.beneficiaryId)
-                if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
-                    return@withBenIdLock
+        // One transaction per [pullWriteChunkSize] records instead of one per record - see that
+        // constant for why.
+        //
+        // Unlike every other TB_DIAGNOSTICS write path in this file, this pull used to read
+        // `existing` once and write much later (after the full network round-trip for every
+        // beneficiary in the response) with no lock at all — a wide TOCTOU window where a
+        // concurrent createOrder()/submitManualResult() write (e.g. re-ordering a Closed order,
+        // which correctly clears naatResult/trueNatRifResult/reasonNotConducted*) could land in
+        // between and then get silently overwritten by this pull's stale snapshot. The read still
+        // happens immediately before the decision and the write, and now additionally inside the
+        // transaction that commits it, so that window stays closed.
+        //
+        // The chunk's locks are all taken before the transaction opens. Taking them the other way
+        // round would let this loop hold the write lock while waiting on a beneficiary lock held
+        // by DiagnosticResultPollWorker, which would itself be waiting for that write lock.
+        for (chunkStart in 0 until records.length() step pullWriteChunkSize) {
+            val chunkEnd = minOf(chunkStart + pullWriteChunkSize, records.length())
+            val chunkBenIds = (chunkStart until chunkEnd).mapNotNull { index ->
+                val item = records.optJSONObject(index) ?: return@mapNotNull null
+                val benRegId = item.optLong("benRegID", 0L).takeIf { it > 0 } ?: return@mapNotNull null
+                benDao.getBenByRegId(benRegId)?.beneficiaryId
+            }.toSet()
+            if (chunkBenIds.isEmpty()) continue
+            withBenIdLocks(chunkBenIds) {
+                database.withTransaction {
+                    for (index in chunkStart until chunkEnd) {
+                        val item = records.optJSONObject(index) ?: continue
+                        val benRegId = item.optLong("benRegID", 0L).takeIf { it > 0 } ?: continue
+                        val ben = benDao.getBenByRegId(benRegId) ?: continue
+                        // A beneficiary registered between the pass above and here would not
+                        // have had its lock taken, so writing it now would be unsynchronised.
+                        // Leave it for the next pull cycle instead - the pull is a pure
+                        // server->device download and re-applying a record is idempotent.
+                        if (ben.beneficiaryId !in chunkBenIds) continue
+                        val visitDate = getLongFromDateMultipleSupport(item.optString("visitDate"))
+                        val serverUpdatedDate = getServerUpdatedDate(item)
+                        val existing = tbDao.getTbDiagnostics(ben.beneficiaryId)
+                        if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
+                            continue
+                        }
+                        val cache = (existing ?: TBDiagnosticsCache(benId = ben.beneficiaryId)).copy(
+                            visitDate = visitDate,
+                            nikshayId = item.optStringOrNull("nikshayId") ?: existing?.nikshayId,
+                            isChestXRayDone = item.optNullableBoolean("isDigitalChestXrayConducted") ?: existing?.isChestXRayDone,
+                            chestXRayResult = item.optStringOrNull("digitalChestXrayResult") ?: existing?.chestXRayResult,
+                            isNaatConducted = item.optNullableBoolean("isTruenatConducted") ?: existing?.isNaatConducted,
+                            naatResult = item.optStringOrNull("truenatResult") ?: existing?.naatResult,
+                            recommendedForLiquidCultureTest = item.optNullableBoolean("recommendedForLiquidCulture") ?: existing?.recommendedForLiquidCultureTest,
+                            liquidCultureResult = item.optStringOrNull("liquidCultureResult") ?: existing?.liquidCultureResult,
+                            xrayOrderId = item.optStringOrNull("xrayOrderId") ?: existing?.xrayOrderId,
+                            xrayOrderStatus = item.optStringOrNull("xrayOrderStatus") ?: existing?.xrayOrderStatus,
+                            trueNatOrderId = item.optStringOrNull("trueNatOrderId") ?: existing?.trueNatOrderId,
+                            trueNatOrderStatus = item.optStringOrNull("trueNatOrderStatus") ?: existing?.trueNatOrderStatus,
+                            trueNatRifResult = item.optStringOrNull("trueNatRifResult") ?: existing?.trueNatRifResult,
+                            rifOrderId = item.optStringOrNull("rifOrderId") ?: existing?.rifOrderId,
+                            rifOrderStatus = item.optStringOrNull("rifOrderStatus") ?: existing?.rifOrderStatus,
+                            serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
+                            syncState = SyncState.SYNCED
+                        )
+                        tbDao.saveTbDiagnostics(cache)
+                        tbDiagnosticsList.add(cache)
+                    }
                 }
-                val cache = (existing ?: TBDiagnosticsCache(benId = ben.beneficiaryId)).copy(
-                    visitDate = visitDate,
-                    nikshayId = item.optStringOrNull("nikshayId") ?: existing?.nikshayId,
-                    isChestXRayDone = item.optNullableBoolean("isDigitalChestXrayConducted") ?: existing?.isChestXRayDone,
-                    chestXRayResult = item.optStringOrNull("digitalChestXrayResult") ?: existing?.chestXRayResult,
-                    isNaatConducted = item.optNullableBoolean("isTruenatConducted") ?: existing?.isNaatConducted,
-                    naatResult = item.optStringOrNull("truenatResult") ?: existing?.naatResult,
-                    recommendedForLiquidCultureTest = item.optNullableBoolean("recommendedForLiquidCulture") ?: existing?.recommendedForLiquidCultureTest,
-                    liquidCultureResult = item.optStringOrNull("liquidCultureResult") ?: existing?.liquidCultureResult,
-                    xrayOrderId = item.optStringOrNull("xrayOrderId") ?: existing?.xrayOrderId,
-                    xrayOrderStatus = item.optStringOrNull("xrayOrderStatus") ?: existing?.xrayOrderStatus,
-                    trueNatOrderId = item.optStringOrNull("trueNatOrderId") ?: existing?.trueNatOrderId,
-                    trueNatOrderStatus = item.optStringOrNull("trueNatOrderStatus") ?: existing?.trueNatOrderStatus,
-                    trueNatRifResult = item.optStringOrNull("trueNatRifResult") ?: existing?.trueNatRifResult,
-                    rifOrderId = item.optStringOrNull("rifOrderId") ?: existing?.rifOrderId,
-                    rifOrderStatus = item.optStringOrNull("rifOrderStatus") ?: existing?.rifOrderStatus,
-                    serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
-                    syncState = SyncState.SYNCED
-                )
-                tbDao.saveTbDiagnostics(cache)
-                tbDiagnosticsList.add(cache)
             }
         }
         return tbDiagnosticsList
@@ -901,63 +1042,67 @@ class TBRepo @Inject constructor(
     private suspend fun saveTBSuspectedCacheFromResponse(dataObj: String): MutableList<TBSuspectedCache> {
         val tbSuspectedList = mutableListOf<TBSuspectedCache>()
         val requestDTO = Gson().fromJson(dataObj, TBSuspectedRequestDTO::class.java)
-        database.withTransaction {
-            requestDTO?.tbSuspectedList?.forEach { tbSuspectedDTO ->
-                tbSuspectedDTO.visitDate?.let {
-                    val matchedByVisitDate: TBSuspectedCache? =
-                        tbDao.getTbSuspected(
-                            tbSuspectedDTO.benId,
-                            getLongFromDate(tbSuspectedDTO.visitDate),
-                            getLongFromDate(tbSuspectedDTO.visitDate) - 19_800_000
-                        )
-                    val tbSuspectedCache = matchedByVisitDate ?: tbDao.getTbSuspected(tbSuspectedDTO.benId)
-                    val cache = tbSuspectedDTO.toCache().let { incoming ->
-                        tbSuspectedCache?.copy(
-                            visitDate = incoming.visitDate,
-                            visitLabel = incoming.visitLabel,
-                            typeOfTBCase = incoming.typeOfTBCase,
-                            reasonForSuspicion = incoming.reasonForSuspicion,
-                            hasSymptoms = incoming.hasSymptoms,
-                            isSputumCollected = incoming.isSputumCollected,
-                            sputumSubmittedAt = incoming.sputumSubmittedAt,
-                            nikshayId = incoming.nikshayId,
-                            sputumTestResult = incoming.sputumTestResult,
-                            isChestXRayDone = incoming.isChestXRayDone,
-                            chestXRayResult = incoming.chestXRayResult,
-                            isAICoughAssessmentDone = incoming.isAICoughAssessmentDone,
-                            aiCoughAssessmentResult = incoming.aiCoughAssessmentResult,
-                            isNaatConducted = incoming.isNaatConducted,
-                            naatResult = incoming.naatResult,
-                            recommendedForLiquidCultureTest = incoming.recommendedForLiquidCultureTest,
-                            isLiquidCultureConducted = incoming.isLiquidCultureConducted,
-                            liquidCultureResult = incoming.liquidCultureResult,
-                            referralFacility = incoming.referralFacility,
-                            isTBConfirmed = incoming.isTBConfirmed,
-                            isDRTBConfirmed = incoming.isDRTBConfirmed,
-                            otherReasonForSuspicion = incoming.otherReasonForSuspicion,
-                            isConfirmed = incoming.isConfirmed,
-                            latitude = incoming.latitude,
-                            longitude = incoming.longitude,
-                            address = incoming.address,
-                            referred = incoming.referred,
-                            followUps = incoming.followUps,
-                            serverUpdatedDate = incoming.serverUpdatedDate,
-                            syncState = SyncState.SYNCED
-                        ) ?: incoming
-                    }
-                    val shouldApply = shouldApplyServerRecord(
-                        tbSuspectedCache?.syncState,
-                        tbSuspectedCache?.serverUpdatedDate,
-                        cache.serverUpdatedDate ?: 0L
-                    )
-                    Timber.d("SYNC_DIAG TB Suspected pull: benId=${tbSuspectedDTO.benId} serverId=${tbSuspectedDTO.id} matchedLocalId=${tbSuspectedCache?.id} localSyncState=${tbSuspectedCache?.syncState} localServerUpdatedDate=${tbSuspectedCache?.serverUpdatedDate} incomingServerUpdatedDate=${cache.serverUpdatedDate} shouldApply=$shouldApply")
-                    if (shouldApply) {
-                        benDao.getBen(tbSuspectedDTO.benId)?.let {
-                            tbDao.saveTbSuspected(cache)
-                            tbSuspectedList.add(cache)
+        // One transaction per [pullWriteChunkSize] records instead of one per record. Nothing
+        // inside the loop touches the network, so the write lock is only held for local work.
+        requestDTO?.tbSuspectedList.orEmpty().chunked(pullWriteChunkSize).forEach { chunk ->
+            database.withTransaction {
+                chunk.forEach { tbSuspectedDTO ->
+                    tbSuspectedDTO.visitDate?.let {
+                        val matchedByVisitDate: TBSuspectedCache? =
+                            tbDao.getTbSuspected(
+                                tbSuspectedDTO.benId,
+                                getLongFromDate(tbSuspectedDTO.visitDate),
+                                getLongFromDate(tbSuspectedDTO.visitDate) - 19_800_000
+                            )
+                        val tbSuspectedCache = matchedByVisitDate ?: tbDao.getTbSuspected(tbSuspectedDTO.benId)
+                        val cache = tbSuspectedDTO.toCache().let { incoming ->
+                            tbSuspectedCache?.copy(
+                                visitDate = incoming.visitDate,
+                                visitLabel = incoming.visitLabel,
+                                typeOfTBCase = incoming.typeOfTBCase,
+                                reasonForSuspicion = incoming.reasonForSuspicion,
+                                hasSymptoms = incoming.hasSymptoms,
+                                isSputumCollected = incoming.isSputumCollected,
+                                sputumSubmittedAt = incoming.sputumSubmittedAt,
+                                nikshayId = incoming.nikshayId,
+                                sputumTestResult = incoming.sputumTestResult,
+                                isChestXRayDone = incoming.isChestXRayDone,
+                                chestXRayResult = incoming.chestXRayResult,
+                                isAICoughAssessmentDone = incoming.isAICoughAssessmentDone,
+                                aiCoughAssessmentResult = incoming.aiCoughAssessmentResult,
+                                isNaatConducted = incoming.isNaatConducted,
+                                naatResult = incoming.naatResult,
+                                recommendedForLiquidCultureTest = incoming.recommendedForLiquidCultureTest,
+                                isLiquidCultureConducted = incoming.isLiquidCultureConducted,
+                                liquidCultureResult = incoming.liquidCultureResult,
+                                referralFacility = incoming.referralFacility,
+                                isTBConfirmed = incoming.isTBConfirmed,
+                                isDRTBConfirmed = incoming.isDRTBConfirmed,
+                                otherReasonForSuspicion = incoming.otherReasonForSuspicion,
+                                isConfirmed = incoming.isConfirmed,
+                                latitude = incoming.latitude,
+                                longitude = incoming.longitude,
+                                address = incoming.address,
+                                referred = incoming.referred,
+                                followUps = incoming.followUps,
+                                serverUpdatedDate = incoming.serverUpdatedDate,
+                                syncState = SyncState.SYNCED
+                            ) ?: incoming
                         }
-                    } else if (tbSuspectedCache != null && tbSuspectedCache.syncState != SyncState.SYNCED) {
-                        Timber.w("SYNC_DIAG TB Suspected pull: benId=${tbSuspectedDTO.benId} server already has this record (serverId=${tbSuspectedDTO.id}) but local id=${tbSuspectedCache.id} is stuck at syncState=${tbSuspectedCache.syncState} — reconciliation SKIPPED, will remain unsynced until a push of this local row succeeds")
+                        val shouldApply = shouldApplyServerRecord(
+                            tbSuspectedCache?.syncState,
+                            tbSuspectedCache?.serverUpdatedDate,
+                            cache.serverUpdatedDate ?: 0L
+                        )
+                        Timber.d("SYNC_DIAG TB Suspected pull: benId=${tbSuspectedDTO.benId} serverId=${tbSuspectedDTO.id} matchedLocalId=${tbSuspectedCache?.id} localSyncState=${tbSuspectedCache?.syncState} localServerUpdatedDate=${tbSuspectedCache?.serverUpdatedDate} incomingServerUpdatedDate=${cache.serverUpdatedDate} shouldApply=$shouldApply")
+                        if (shouldApply) {
+                            benDao.getBen(tbSuspectedDTO.benId)?.let {
+                                tbDao.saveTbSuspected(cache)
+                                tbSuspectedList.add(cache)
+                            }
+                        } else if (tbSuspectedCache != null && tbSuspectedCache.syncState != SyncState.SYNCED) {
+                            Timber.w("SYNC_DIAG TB Suspected pull: benId=${tbSuspectedDTO.benId} server already has this record (serverId=${tbSuspectedDTO.id}) but local id=${tbSuspectedCache.id} is stuck at syncState=${tbSuspectedCache.syncState} — reconciliation SKIPPED, will remain unsynced until a push of this local row succeeds")
+                        }
                     }
                 }
             }
@@ -1051,34 +1196,44 @@ class TBRepo @Inject constructor(
         try {
             val requestDTO = Gson().fromJson(dataObj, TBConfirmedRequestDTO::class.java)
 
+            // One transaction per [pullWriteChunkSize] records instead of one per record - see
+            // that constant for why.
+            requestDTO?.tbConfirmedList.orEmpty().chunked(pullWriteChunkSize).forEach { chunk ->
+                database.withTransaction {
+                    chunk.forEach { tbConfirmedDTO ->
 
-            database.withTransaction {
-                requestDTO?.tbConfirmedList?.forEachIndexed { index, tbConfirmedDTO ->
 
+                        try {
+                            val cache = tbConfirmedDTO.toCache()
+                            // Get all existing follow-ups for this ben
+                            val allExisting = tbDao.getAllFollowUpsForBeneficiary(cache.benId)
+                            // Find exact match by followUpDate
+                            val existing = allExisting.find {
+                                it.followUpDate != null &&
+                                        cache.followUpDate != null &&
+                                        it.followUpDate == cache.followUpDate
+                            }
+                            if (shouldApplyServerRecord(
+                                    existing?.syncState,
+                                    existing?.serverUpdatedDate,
+                                    cache.serverUpdatedDate ?: 0L
+                                )
+                            ) {
+                                val cacheToSave = if (existing != null) cache.copy(id = existing.id) else cache
+                                tbDao.saveTbConfirmed(cacheToSave)
+                                tbConfirmedList.add(cacheToSave)
+                            }
 
-                    try {
-                        val cache = tbConfirmedDTO.toCache()
-                        // Get all existing follow-ups for this ben
-                        val allExisting = tbDao.getAllFollowUpsForBeneficiary(cache.benId)
-                        // Find exact match by followUpDate
-                        val existing = allExisting.find {
-                            it.followUpDate != null &&
-                                    cache.followUpDate != null &&
-                                    it.followUpDate == cache.followUpDate
+                        } catch (e: CancellationException) {
+                            // Must propagate: without this, a cancelled worker keeps looping
+                            // because every later suspend call in the chunk throws and is
+                            // swallowed here, so the transaction only notices at the end.
+                            throw e
+                        } catch (e: Exception) {
+                            // The changes feed must not move its token past a record that wasn't saved.
+                            if (rethrow) throw e
+                            Timber.e(e, "TBConfirmed: skipping one record in this chunk")
                         }
-                        if (shouldApplyServerRecord(
-                                existing?.syncState,
-                                existing?.serverUpdatedDate,
-                                cache.serverUpdatedDate ?: 0L
-                            )
-                        ) {
-                            val cacheToSave = if (existing != null) cache.copy(id = existing.id) else cache
-                            tbDao.saveTbConfirmed(cacheToSave)
-                            tbConfirmedList.add(cacheToSave)
-                        }
-
-                    } catch (e: Exception) {
-                        if (rethrow) throw e
                     }
                 }
             }
@@ -1306,16 +1461,22 @@ class TBRepo @Inject constructor(
             while (queue.isNotEmpty()) {
                 val chunk = queue.removeFirst()
                 try {
-                    // Rows whose beneficiary isn't registered yet are left out of the
-                    // request; only the rows actually sent may be marked SYNCED.
-                    val sent = mutableListOf<TBDiagnosticsCache>()
+                    // See the TB Suspected push below: only what is actually sent may be
+                    // marked SYNCED. A row whose beneficiary has no server benRegId yet is
+                    // dropped here, and updateSyncStatusDiagnostics would otherwise find it
+                    // unchanged against its snapshot and flip it to SYNCED regardless.
+                    val excludedBenIds = mutableListOf<Long>()
+                    val sentRecords = mutableListOf<TBDiagnosticsCache>()
                     val request = chunk.mapNotNull { diagnostics ->
                         val benRegId = benDao.getBen(diagnostics.benId)?.benRegId?.takeIf { it > 0L }
-                        benRegId?.let {
-                            sent += diagnostics
+                        if (benRegId == null) {
+                            excludedBenIds += diagnostics.benId
+                            null
+                        } else {
+                            sentRecords += diagnostics
                             TBDiagnosticsSaveRequest.from(
                                 cache = diagnostics,
-                                benRegID = it,
+                                benRegID = benRegId,
                                 providerServiceMapID = user.serviceMapId,
                                 createdBy = user.userName
                             )
@@ -1335,10 +1496,13 @@ class TBRepo @Inject constructor(
                             val jsonObj = JSONObject(responseString)
                             when (val responseStatusCode = jsonObj.getInt("statusCode")) {
                                 200 -> {
-                                    updateSyncStatusDiagnostics(sent)
-                                    syncRetryStore.clear(SyncRetryStore.ENTITY_TB_DIAGNOSTICS, sent.map { it.id.toLong() })
-                                    successCount += sent.size
-                                    failCount += chunk.size - sent.size
+                                    if (excludedBenIds.isNotEmpty()) {
+                                        failCount += excludedBenIds.size
+                                        Timber.w("TB Diagnostics push: benIds=$excludedBenIds were NOT sent (no server benRegId yet) and stay UNSYNCED for the next cycle")
+                                    }
+                                    updateSyncStatusDiagnostics(sentRecords)
+                                    syncRetryStore.clear(SyncRetryStore.ENTITY_TB_DIAGNOSTICS, sentRecords.map { it.id.toLong() })
+                                    successCount += sentRecords.size
                                 }
 
                                 401, 5002 -> {
@@ -1405,13 +1569,20 @@ class TBRepo @Inject constructor(
                 val chunk = queue.removeFirst()
                 try {
                     val excludedBenIds = mutableListOf<Long>()
+                    // Only the records that actually make it into the payload may be marked
+                    // SYNCED afterwards. Passing the whole `chunk` to updateSyncStatusSuspected
+                    // marked the excluded ones SYNCED too, so a TB Suspected row whose
+                    // BENEFICIARY had not been pulled yet - routine in camp mode - was silently
+                    // dropped from the payload and then became invisible to every future push.
+                    val sentRecords = mutableListOf<TBSuspectedCache>()
                     val chunkDtos = chunk.mapNotNull { suspected ->
                         val ben = benDao.getBen(suspected.benId)
                         if (ben == null) {
                             excludedBenIds += suspected.benId
-                            Timber.w("SYNC_DIAG[$callTag] TB Suspected push: benId=${suspected.benId} (local id=${suspected.id}, visitDate=${suspected.visitDate}) has NO matching BENEFICIARY row locally — excluded from push payload")
-                        }
-                        ben?.let {
+                            Timber.w("SYNC_DIAG[$callTag] TB Suspected push: benId=${suspected.benId} (local id=${suspected.id}, visitDate=${suspected.visitDate}) has NO matching BENEFICIARY row locally — excluded from push payload, left UNSYNCED to retry")
+                            null
+                        } else {
+                            sentRecords += suspected
                             suspected.toDTO()
                         }
                     }
@@ -1437,17 +1608,14 @@ class TBRepo @Inject constructor(
                             Timber.d("Push to Amrit TB Suspected chunk: $responseStatusCode, callTag=$callTag, benIds=${chunk.map { it.benId }}")
                             when (responseStatusCode) {
                                 200 -> {
-                                    // Only mark what was actually sent; records whose benId
-                                    // could not be resolved stay UNSYNCED for the next push.
-                                    val sent = chunk.filterNot { it.benId in excludedBenIds }
                                     if (excludedBenIds.isNotEmpty()) {
-                                        Timber.w("SYNC_DIAG[$callTag] TB Suspected push: benIds=$excludedBenIds not sent (benId resolution failed), left UNSYNCED")
+                                        failCount += excludedBenIds.size
+                                        Timber.w("SYNC_DIAG[$callTag] TB Suspected push: benIds=$excludedBenIds were NOT sent (benId resolution failed above) and stay UNSYNCED for the next cycle")
                                     }
-                                    updateSyncStatusSuspected(sent)
-                                    syncRetryStore.clear(SyncRetryStore.ENTITY_TB_SUSPECTED, sent.map { it.id.toLong() })
-                                    successCount += sent.size
-                                    failCount += chunk.size - sent.size
-                                    Timber.d("SYNC_DIAG[$callTag] TB Suspected push: chunk marked SYNCED, benIds=${sent.map { it.benId }}")
+                                    updateSyncStatusSuspected(sentRecords)
+                                    syncRetryStore.clear(SyncRetryStore.ENTITY_TB_SUSPECTED, sentRecords.map { it.id.toLong() })
+                                    successCount += sentRecords.size
+                                    Timber.d("SYNC_DIAG[$callTag] TB Suspected push: chunk marked SYNCED, benIds=${sentRecords.map { it.benId }}")
                                 }
 
                                 401, 5002 -> {
@@ -1511,13 +1679,18 @@ class TBRepo @Inject constructor(
             while (queue.isNotEmpty()) {
                 val chunk = queue.removeFirst()
                 try {
-                    // Rows with no local beneficiary are left out of the request; only
-                    // the rows actually sent may be marked SYNCED.
-                    val sent = mutableListOf<TBConfirmedTreatmentCache>()
+                    // See the TB Suspected push above: only what is actually sent may be
+                    // marked SYNCED, or a record whose BENEFICIARY has not been pulled yet is
+                    // dropped from the payload and then never retried.
+                    val excludedBenIds = mutableListOf<Long>()
+                    val sentRecords = mutableListOf<TBConfirmedTreatmentCache>()
                     val chunkDtos = chunk.mapNotNull { confirmed ->
                         val ben = benDao.getBen(confirmed.benId)
-                        ben?.let {
-                            sent += confirmed
+                        if (ben == null) {
+                            excludedBenIds += confirmed.benId
+                            null
+                        } else {
+                            sentRecords += confirmed
                             confirmed.toDTO()
                         }
                     }
@@ -1541,10 +1714,13 @@ class TBRepo @Inject constructor(
                             Timber.d("Push to Amrit TB Confirmed chunk: $responseStatusCode")
                             when (responseStatusCode) {
                                 200 -> {
-                                    updateSyncStatusConfirmed(sent)
-                                    syncRetryStore.clear(SyncRetryStore.ENTITY_TB_CONFIRMED, sent.map { it.id.toLong() })
-                                    successCount += sent.size
-                                    failCount += chunk.size - sent.size
+                                    if (excludedBenIds.isNotEmpty()) {
+                                        failCount += excludedBenIds.size
+                                        Timber.w("TB Confirmed push: benIds=$excludedBenIds were NOT sent (no local BENEFICIARY row) and stay UNSYNCED for the next cycle")
+                                    }
+                                    updateSyncStatusConfirmed(sentRecords)
+                                    syncRetryStore.clear(SyncRetryStore.ENTITY_TB_CONFIRMED, sentRecords.map { it.id.toLong() })
+                                    successCount += sentRecords.size
                                 }
 
                                 401, 5002 -> {
@@ -1585,14 +1761,22 @@ class TBRepo @Inject constructor(
     }
 
 
-    // Same stale-snapshot race as updateSyncStatusDiagnostics() below: re-read the
-    // row and only mark it SYNCED if nothing changed since it was pushed.
+    // Each of these runs after a push chunk comes back 200 and flips that chunk to SYNCED. They
+    // wrote one row per commit, so a 20-row chunk produced 20 separate transactions and therefore
+    // 20 Room invalidations. TB_SUSPECTED and TB_SCREENING are both referenced by the
+    // BEN_BASIC_CACHE view, so each of those invalidations threw away the list screens'
+    // PagingSource mid-load and re-ran every observer flow over the table. Measured on the device
+    // while a push was running: 83 PagingSource generations and 93 diagnosisBenIds emissions
+    // (929k boxed Longs) in 171s, with each list REFRESH taking 1.8-3.6s for a query that costs
+    // 54ms - the list never settled. One transaction per chunk makes that one invalidation.
+    // Each row is re-read inside that transaction and marked SYNCED only if it is unchanged since it
+    // was pushed, so an edit saved while the push was in flight stays UNSYNCED and goes next push.
     private suspend fun updateSyncStatusScreening(tbsnList: List<TBScreeningCache>) {
-        tbsnList.forEach { pushed ->
-            withBenIdLock(pushed.benId) {
-                val fresh = tbDao.getTbScreeningById(pushed.id) ?: return@withBenIdLock
-                val unchanged = fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)
-                if (unchanged) {
+        if (tbsnList.isEmpty()) return
+        database.withTransaction {
+            tbsnList.forEach { pushed ->
+                val fresh = tbDao.getTbScreeningById(pushed.id) ?: return@forEach
+                if (fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)) {
                     tbDao.saveTbScreening(fresh.copy(syncState = SyncState.SYNCED))
                 }
             }
@@ -1622,12 +1806,16 @@ class TBRepo @Inject constructor(
     // syncState if nothing else changed since the snapshot was pushed; otherwise leave it
     // UNSYNCED so the next sync cycle picks up and pushes the newer state instead.
     private suspend fun updateSyncStatusDiagnostics(diagnosticsList: List<TBDiagnosticsCache>) {
-        diagnosticsList.forEach { pushed ->
-            withBenIdLock(pushed.benId) {
-                val fresh = tbDao.getTbDiagnosticsByBenId(pushed.benId) ?: return@withBenIdLock
-                val unchanged = fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)
-                if (unchanged) {
-                    tbDao.saveTbDiagnostics(fresh.copy(syncState = SyncState.SYNCED))
+        if (diagnosticsList.isEmpty()) return
+        // Locks first, then the transaction - the one global ordering withBenIdLocks documents.
+        withBenIdLocks(diagnosticsList.map { it.benId }) {
+            database.withTransaction {
+                diagnosticsList.forEach perRecord@ { pushed ->
+                    val fresh = tbDao.getTbDiagnosticsByBenId(pushed.benId) ?: return@perRecord
+                    val unchanged = fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)
+                    if (unchanged) {
+                        tbDao.saveTbDiagnostics(fresh.copy(syncState = SyncState.SYNCED))
+                    }
                 }
             }
         }
@@ -1635,24 +1823,28 @@ class TBRepo @Inject constructor(
 
     // Same stale-snapshot race as updateSyncStatusDiagnostics() above, for TB_SUSPECTED.
     private suspend fun updateSyncStatusSuspected(tbspList: List<TBSuspectedCache>) {
-        tbspList.forEach { pushed ->
-            withBenIdLock(pushed.benId) {
-                val fresh = tbDao.getTbSuspected(pushed.benId) ?: return@withBenIdLock
-                val unchanged = fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)
-                if (unchanged) {
-                    tbDao.saveTbSuspected(fresh.copy(syncState = SyncState.SYNCED))
+        if (tbspList.isEmpty()) return
+        withBenIdLocks(tbspList.map { it.benId }) {
+            database.withTransaction {
+                tbspList.forEach perRecord@ { pushed ->
+                    val fresh = tbDao.getTbSuspected(pushed.benId) ?: return@perRecord
+                    val unchanged = fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)
+                    if (unchanged) {
+                        tbDao.saveTbSuspected(fresh.copy(syncState = SyncState.SYNCED))
+                    }
                 }
             }
         }
     }
 
-    // Same stale-snapshot race as updateSyncStatusDiagnostics() above.
+    // Same as updateSyncStatusScreening: one transaction per chunk, and only rows unchanged since
+    // they were pushed become SYNCED.
     private suspend fun updateSyncStatusConfirmed(tbcList: List<TBConfirmedTreatmentCache>) {
-        tbcList.forEach { pushed ->
-            withBenIdLock(pushed.benId) {
-                val fresh = tbDao.getTbConfirmedById(pushed.id) ?: return@withBenIdLock
-                val unchanged = fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)
-                if (unchanged) {
+        if (tbcList.isEmpty()) return
+        database.withTransaction {
+            tbcList.forEach { pushed ->
+                val fresh = tbDao.getTbConfirmedById(pushed.id) ?: return@forEach
+                if (fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)) {
                     tbDao.saveTbConfirmed(fresh.copy(syncState = SyncState.SYNCED))
                 }
             }
@@ -1692,6 +1884,74 @@ class TBRepo @Inject constructor(
     companion object {
         // Returned by the TB push sub-functions when a network error stopped the run.
         private const val PUSH_NETWORK_ERROR = -1
+
+        /**
+         * Records per write transaction in the pull loops below.
+         *
+         * Each of those loops used to commit once per record. Room's InvalidationTracker fires
+         * per transaction, so a 20,000-record payload invalidated BENEFICIARY/TB_* twenty
+         * thousand times, and every invalidation re-ran every query the open screen observes -
+         * including a full PagingSource refresh of BEN_BASIC_CACHE, which the view's scalar
+         * subqueries tie to TB_SCREENING and TB_SUSPECTED. Measured on device, that feedback
+         * loop (write -> invalidate -> multi-second refresh -> next write queues behind it)
+         * cost 3.34s per record: 64 of 5,505 TB Suspected rows in 214 seconds.
+         *
+         * Chunking rather than one transaction for the whole payload keeps the write lock hold
+         * bounded and lets the list fill in progressively, while still cutting invalidations by
+         * three orders of magnitude.
+         */
+        private const val pullWriteChunkSize = 500
+
+        /**
+         * How many "completed" beneficiaries one sweep of [fetchBeneficiariesByStatus] fans out
+         * at a time. Sized to keep OkHttp's 5 per-host slots saturated with a little slack for
+         * the Room reads each one does first, without holding thousands of coroutines alive.
+         */
+        private const val completedFetchChunkSize = 16
+
+        /**
+         * Chunk size for `IN (:ids)` reads. SQLite's default host-parameter ceiling is 999, so
+         * this stays clear of it while still collapsing a whole bucket into a handful of reads.
+         */
+        private const val sqliteInClauseChunkSize = 900
+
+        /**
+         * How many missing order ids one sweep of [fetchBeneficiariesByStatus] backfills.
+         *
+         * Each backfill is a network round trip plus a TB_DIAGNOSTICS write, and every one of
+         * those writes invalidates the Paging source and the diagnostics flow of whichever
+         * screen triggered the sweep. Unbounded, a single open of the X-ray list fired 552
+         * result fetches and the list never settled - it was re-created five times in 28 s.
+         * The backlog drains across sweeps instead.
+         */
+        private const val orderIdBackfillPerSweep = 50
+
+        /**
+         * Per orderType, the chunk index the previous backfill pass stopped at, so the next
+         * sweep resumes there rather than re-scanning the same already-filled prefix.
+         */
+        private val backfillChunkCursor = java.util.concurrent.ConcurrentHashMap<String, Int>()
+
+        /**
+         * Per orderType, a content signature of the awaiting bucket for which a complete pass
+         * found nothing left to backfill. While the bucket is unchanged the scan is skipped.
+         *
+         * Keyed on content, not size: one beneficiary entering the bucket as another leaves
+         * keeps the size identical, and a size-keyed marker would hide the newcomer's missing
+         * order id for as long as the count happened to hold steady.
+         */
+        private val backfillConvergedForBucket =
+            java.util.concurrent.ConcurrentHashMap<String, Int>()
+
+        /**
+         * Clears the backfill cursor and converged markers. Both live here, so without this
+         * they would survive a logout and be applied to the next user's village.
+         */
+        fun resetOrderIdBackfillState() {
+            backfillChunkCursor.clear()
+            backfillConvergedForBucket.clear()
+        }
+
         private const val GENERAL_OPD_CATEGORY_FALLBACK = 6
         private val pollCounts = java.util.concurrent.ConcurrentHashMap<String, Int>()
         private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
@@ -1702,37 +1962,37 @@ class TBRepo @Inject constructor(
             return "${dateString}T${timeString}.000Z"
         }
 
+        private val singleVisitDatePattern = listOf("MMM d, yyyy h:mm:ss a")
+
         private fun getLongFromDate(dateString: String): Long {
             //Jul 22, 2023 8:17:23 AM"
-            val f = SimpleDateFormat("MMM d, yyyy h:mm:ss a", Locale.ENGLISH)
-            val date = f.parse(dateString)
-            return date?.time ?: throw IllegalStateException("Invalid date for dateReg")
+            return ServerDateParser.parse(dateString, singleVisitDatePattern)
+                ?: throw IllegalStateException("Invalid date for dateReg")
         }
 
         private fun getLongFromDateMultipleSupport(dateString: String?): Long {
             if (dateString.isNullOrBlank() || dateString.equals("null", ignoreCase = true)) {
                 return 0L
             }
-            val patterns = listOf(
-                "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
-                "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
-                "MMM d, yyyy, h:mm:ss a",
-                "MMM dd, yyyy, h:mm:ss a",
-                "MMM d, yyyy h:mm:ss a",
-                "MMM dd, yyyy h:mm:ss a",
-                "yyyy-MM-dd'T'HH:mm:ss.SSS",
-                "yyyy-MM-dd'T'HH:mm:ss",
-                "yyyy-MM-dd HH:mm:ss",
-                "yyyy-MM-dd"
-            )
-            patterns.forEach { pattern ->
-                runCatching {
-                    SimpleDateFormat(pattern, Locale.ENGLISH).parse(dateString)?.time
-                }.getOrNull()?.let { return it }
-            }
-            Timber.w("TB_DATE_PARSE: failed to parse visitDate='$dateString'")
-            return 0L
+            return ServerDateParser.parse(dateString, visitDatePatterns)
+                ?: run {
+                    Timber.w("TB_DATE_PARSE: failed to parse visitDate='$dateString'")
+                    0L
+                }
         }
+
+        private val visitDatePatterns = listOf(
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+            "MMM d, yyyy, h:mm:ss a",
+            "MMM dd, yyyy, h:mm:ss a",
+            "MMM d, yyyy h:mm:ss a",
+            "MMM dd, yyyy h:mm:ss a",
+            "yyyy-MM-dd'T'HH:mm:ss.SSS",
+            "yyyy-MM-dd'T'HH:mm:ss",
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd"
+        )
         private fun getServerUpdatedDate(jsonObject: JSONObject): Long {
             return parseServerUpdateDate(
                 jsonObject.optStringOrNull("updateDate")
@@ -1742,19 +2002,21 @@ class TBRepo @Inject constructor(
 
         private fun parseServerUpdateDate(dateString: String?): Long {
             if (dateString.isNullOrBlank() || dateString.equals("null", ignoreCase = true)) return 0L
-            val patterns = listOf(
-                "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
-                "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
-                "MMM dd, yyyy h:mm:ss a",
-                "MMM d, yyyy h:mm:ss a"
-            )
-            patterns.forEach { pattern ->
-                runCatching {
-                    SimpleDateFormat(pattern, Locale.ENGLISH).parse(dateString)?.time
-                }.getOrNull()?.let { return it }
-            }
-            return 0L
+            // Same U+202F separator problem as visitDate above, but this one failed silently:
+            // an unparseable updateDate became 0L, and shouldApplyServerRecord() treats 0L as
+            // "no server timestamp, apply it" - so every record was rewritten on every pull
+            // instead of only the changed ones, invalidating every observing query each time.
+            return ServerDateParser.parse(dateString, serverUpdateDatePatterns) ?: 0L
         }
+
+        private val serverUpdateDatePatterns = listOf(
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+            "MMM dd, yyyy, h:mm:ss a",
+            "MMM d, yyyy, h:mm:ss a",
+            "MMM dd, yyyy h:mm:ss a",
+            "MMM d, yyyy h:mm:ss a"
+        )
 
         private fun shouldApplyServerRecord(
             existingSyncState: SyncState?,
@@ -2705,7 +2967,20 @@ class TBRepo @Inject constructor(
         }
     }
 
-    suspend fun fetchOrderResult(benId: Long, orderType: String): NetworkResponse<String> {
+    /**
+     * @param pushSuspectedAfter when true (the default, and what every single-beneficiary caller
+     *   wants) this pushes the unsynced TB Suspected rows once the result has been stored.
+     *   Batch callers pass false and push once after the whole batch instead: that push reads
+     *   every UNSYNCED row and POSTs them, so doing it per beneficiary turned one sweep into
+     *   hundreds of identical `tb/suspected/saveAll` calls - 125 of them against 552 result
+     *   fetches in one measured capture - each writing back to TB_SUSPECTED and so invalidating
+     *   every list the open screen is collecting.
+     */
+    suspend fun fetchOrderResult(
+        benId: Long,
+        orderType: String,
+        pushSuspectedAfter: Boolean = true
+    ): NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
             val ben = benDao.getBen(benId)
                 ?: return@withContext NetworkResponse.Error(context.getString(R.string.error_beneficiary_not_found))
@@ -3007,10 +3282,12 @@ class TBRepo @Inject constructor(
                             } catch (e: Exception) {
                                 Timber.e(e, "Failed to sync diagnostic results into tb_suspected table")
                             }
-                            try {
-                                pushUnSyncedRecordsTBSuspected()
-                            } catch (e: Exception) {
-                                Timber.e(e, "Failed to call pushUnSyncedRecordsTBSuspected after fetchOrderResult")
+                            if (pushSuspectedAfter) {
+                                try {
+                                    pushUnSyncedRecordsTBSuspected()
+                                } catch (e: Exception) {
+                                    Timber.e(e, "Failed to call pushUnSyncedRecordsTBSuspected after fetchOrderResult")
+                                }
                             }
 
                             return@withContext NetworkResponse.Success(status)
@@ -3021,11 +3298,106 @@ class TBRepo @Inject constructor(
                     }
                 }
                 NetworkResponse.Error(context.getString(R.string.error_http_code, statusCode))
+            } catch (e: CancellationException) {
+                // Leaving the X-ray/TrueNat list cancels every poll this sweep still has queued.
+                // Catching that as a plain failure logged one full stack trace per cancelled call
+                // - 2,664 of them in one measured back-press - and swallowed the cancellation
+                // instead of letting it propagate, which is what structured concurrency needs.
+                throw e
             } catch (e: Exception) {
                 Timber.e(e, "fetchOrderResult failed")
                 NetworkResponse.Error(e.message ?: "Unknown error")
             }
         }
+    }
+
+    /**
+     * The beneficiaries in the awaiting buckets that still have no local order id, capped at
+     * [orderIdBackfillPerSweep].
+     *
+     * Resolving the *whole* bucket to find the next 50 is what made every referral-list open
+     * slow. On a 19,110-entry bucket that is ~21 chunks x 2 large IN-clause reads = ~42 cursor
+     * fills, queued on the same ~3 SQLite read connections as the Paging refresh the user is
+     * waiting on: a no-op "SELECT 1" was measured waiting 2,872 ms behind it while the refresh
+     * took 3,588 ms of a 4,068 ms screen open.
+     *
+     * Three things bound it now:
+     *  - it stops as soon as the cap is reached, so the common case is one or two reads;
+     *  - it resumes from where the previous sweep stopped ([backfillChunkCursor]) instead of
+     *    re-scanning an already-backfilled prefix, so successive sweeps make progress;
+     *  - once a full pass finds nothing, it short-circuits entirely until the bucket changes
+     *    size ([backfillConvergedForBucketSize]), so a drained backlog costs no reads at all.
+     *
+     * The cursor and the converged marker are in-memory on purpose: losing them on process
+     * death only costs one extra full pass.
+     */
+    private suspend fun collectBenIdsNeedingOrderId(
+        awaitingRegIds: List<Long>,
+        orderType: String,
+        isXray: Boolean,
+        isRif: Boolean
+    ): List<Long> {
+        if (awaitingRegIds.isEmpty()) {
+            backfillConvergedForBucket.remove(orderType)
+            return emptyList()
+        }
+        // Content signature, computed in memory - no DB reads - so a bucket whose membership
+        // changed is always rescanned even when its size did not.
+        val bucketSignature = awaitingRegIds.sorted().hashCode()
+        if (backfillConvergedForBucket[orderType] == bucketSignature) {
+            return emptyList()
+        }
+
+        val chunks = awaitingRegIds.chunked(sqliteInClauseChunkSize)
+        val startChunk = (backfillChunkCursor[orderType] ?: 0).let { if (it in chunks.indices) it else 0 }
+        val needsBackfill = mutableListOf<Long>()
+        var chunksExamined = 0
+        var index = startChunk
+
+        while (chunksExamined < chunks.size && needsBackfill.size < orderIdBackfillPerSweep) {
+            val regIdChunk = chunks[index]
+
+            val mappings = benDao.getBenIdsByRegIds(regIdChunk)
+            val benIds = mappings.mapTo(mutableListOf()) { mapping -> mapping.beneficiaryId }
+            // Same fallback the per-record form had: an id that matches no benRegId may already
+            // BE a local beneficiaryId.
+            val matchedRegIds = mappings.mapTo(mutableSetOf()) { mapping -> mapping.benRegId }
+            val unmatched = regIdChunk.filterNot { regId -> regId in matchedRegIds }
+            if (unmatched.isNotEmpty()) {
+                benIds += benDao.getExistingBenIds(unmatched)
+            }
+
+            val distinctBenIds = benIds.distinct()
+            if (distinctBenIds.isNotEmpty()) {
+                val withOrderId = when {
+                    isXray -> tbDao.getBenIdsWithXrayOrderId(distinctBenIds)
+                    isRif -> tbDao.getBenIdsWithRifOrderId(distinctBenIds)
+                    else -> tbDao.getBenIdsWithTrueNatOrderId(distinctBenIds)
+                }.toSet()
+                needsBackfill += distinctBenIds.filterNot { benId -> benId in withOrderId }
+            }
+
+            index = (index + 1) % chunks.size
+            chunksExamined++
+        }
+
+        backfillChunkCursor[orderType] = index
+        val completedFullPass = chunksExamined == chunks.size
+        if (completedFullPass && needsBackfill.isEmpty()) {
+            backfillConvergedForBucket[orderType] = bucketSignature
+            Timber.d("Order id backfill [$orderType]: full pass over ${awaitingRegIds.size} entries found nothing; skipping until the bucket changes")
+        } else {
+            backfillConvergedForBucket.remove(orderType)
+        }
+
+        val batch = needsBackfill.distinct().take(orderIdBackfillPerSweep)
+        if (batch.isNotEmpty()) {
+            Timber.d(
+                "Order id backfill [$orderType]: filling ${batch.size} ids, " +
+                        "examined $chunksExamined of ${chunks.size} chunks from chunk $startChunk"
+            )
+        }
+        return batch
     }
 
     suspend fun fetchBeneficiariesByStatus(orderType: String, fetchResult: Boolean = true): NetworkResponse<DiagnosticBeneficiaryStatusData> {
@@ -3082,12 +3454,47 @@ class TBRepo @Inject constructor(
                                 }
                             }
                             dataObj?.optJSONArray("failed")?.let { arr ->
-                                for (i in 0 until arr.length()) {
+                                // Read TB_DIAGNOSTICS once and index it, instead of running
+                                // "SELECT * FROM TB_DIAGNOSTICS" inside the loop and scanning the
+                                // whole materialised list for every failed order.
+                                // The bucket carries benRegIds. Resolve them to local
+                                // beneficiaryIds and index the diagnostics by benId.
+                                //
+                                // This used to match `it.id.toLong() == arr.getLong(i)`, i.e. it
+                                // compared a benRegId against the TB_DIAGNOSTICS autogenerated
+                                // row id. A match was coincidental and returned another
+                                // beneficiary's error message; the same unresolved value was then
+                                // passed as `benId` into isAwaitingReconciliation, so
+                                // reconcileOrderResult could read and overwrite a different
+                                // beneficiary's diagnostics row.
+                                val failedRegIds = (0 until arr.length()).map { arr.getLong(it) }
+                                val failedBenIdByRegId = mutableMapOf<Long, Long>()
+                                failedRegIds.chunked(sqliteInClauseChunkSize).forEach { chunk ->
+                                    benDao.getBenIdsByRegIds(chunk).forEach { mapping ->
+                                        failedBenIdByRegId[mapping.benRegId] = mapping.beneficiaryId
+                                    }
+                                    val unmatched = chunk.filterNot { it in failedBenIdByRegId }
+                                    // A value that matches no benRegId may already BE a local id.
+                                    benDao.getExistingBenIds(unmatched).forEach { benId ->
+                                        failedBenIdByRegId[benId] = benId
+                                    }
+                                }
+                                val diagnosticsByBenId = if (failedRegIds.isNotEmpty()) {
+                                    tbDao.getDiagnosticsList().associateBy { it.benId }
+                                } else {
+                                    emptyMap()
+                                }
+                                for (regId in failedRegIds) {
+                                    val benId = failedBenIdByRegId[regId]
+                                    if (benId == null) {
+                                        Timber.w("Failed-order reconciliation: no local beneficiary for benRegId=$regId, skipping")
+                                        failedList.add(regId)
+                                        continue
+                                    }
                                     isAwaitingReconciliation(
-                                        arr.getLong(i),
+                                        benId,
                                         apiOrderType,
-                                        tbDao.getDiagnosticsList()
-                                            .firstOrNull { it.id.toLong() == arr.getLong(i) }
+                                        diagnosticsByBenId[benId]
                                             ?.let { bens ->
                                                 when {
                                                     orderType.equals("XRAY_CHEST", ignoreCase = true) ->
@@ -3103,7 +3510,7 @@ class TBRepo @Inject constructor(
                                                 }
                                             }
                                     )
-                                    failedList.add(arr.getLong(i))
+                                    failedList.add(regId)
                                 }
                             }
                             dataObj?.optJSONArray("awaitingManualEntry")?.let { arr ->
@@ -3114,6 +3521,52 @@ class TBRepo @Inject constructor(
 
                             val isXray = orderType.equals("XRAY_CHEST", ignoreCase = true)
                             val isRif = orderType.equals("MDR_RIF", ignoreCase = true)
+
+                            // 0. Backfill order ids for the two "order exists, no result yet"
+                            // buckets. getBeneficiariesByStatus returns benRegIds only - it never
+                            // carries an order id - so a beneficiary referred somewhere else (the
+                            // registrar tab, say) arrives here with a real backend order, gets a
+                            // status of PENDING or MANUAL_ENTRY written below, and still has no
+                            // local order id. The card reads a missing id as "the referral never
+                            // went through" and offers Retry Referral, which would raise a second
+                            // order for one that already succeeded.
+                            //
+                            // fetchOrderResult is the only call that returns externalOrderId, so
+                            // pull it once per beneficiary that lacks one. Three things keep the
+                            // cost off the screen that triggered this: the "who is missing an id"
+                            // question is answered in bulk rather than per beneficiary; the
+                            // fetches themselves are capped per sweep; and they are chunked like
+                            // the completed bucket below, because one coroutine per entry is what
+                            // caused the 2,664-job cancellation stall documented there.
+                            //
+                            // It must run OUTSIDE withBenIdLock - fetchOrderResult takes the same
+                            // per-benId lock itself and kotlinx Mutex is not reentrant.
+                            if (fetchResult) {
+                                val awaitingRegIds =
+                                    (awaitingProvResList + awaitingManualEntryList).distinct()
+                                val backfillBatch = collectBenIdsNeedingOrderId(
+                                    awaitingRegIds = awaitingRegIds,
+                                    orderType = orderType,
+                                    isXray = isXray,
+                                    isRif = isRif
+                                )
+                                backfillBatch.chunked(completedFetchChunkSize).forEach { benIdChunk ->
+                                    coroutineScope {
+                                        benIdChunk.forEach { benId ->
+                                            // pushSuspectedAfter = false: one push after the whole
+                                            // batch below, not one per beneficiary.
+                                            launch { fetchOrderResult(benId, orderType, pushSuspectedAfter = false) }
+                                        }
+                                    }
+                                }
+                                if (backfillBatch.isNotEmpty()) {
+                                    try {
+                                        pushUnSyncedRecordsTBSuspected()
+                                    } catch (e: Exception) {
+                                        Timber.e(e, "Failed to push TB Suspected after order id backfill")
+                                    }
+                                }
+                            }
 
                             // 1. Awaiting Provider Result — the only real "still in progress"
                             // bucket (no separate "awaiting test completion" bucket exists).
@@ -3164,7 +3617,13 @@ class TBRepo @Inject constructor(
                                                     )
                                                 }
                                             }
-                                            tbDao.saveTbDiagnostics(cache)
+                                            // Only write when the row actually changed. These status buckets
+                                            // re-report the same orders on every poll, so saving unconditionally
+                                            // rewrote the row and invalidated every list observing TB_DIAGNOSTICS
+                                            // once per beneficiary, for no change at all.
+                                            if (cache != fresh) {
+                                                tbDao.saveTbDiagnostics(cache)
+                                            }
                                         }
                                     }
                                 }
@@ -3173,15 +3632,31 @@ class TBRepo @Inject constructor(
                             // 3. Completed — each beneficiary here is independent (its own
                             // benId lock, no shared mutable state beyond the ConcurrentHashMaps
                             // already used elsewhere in this file), so fan these out concurrently
-                            // instead of one-by-one. This bucket previously issued a real network
-                            // round trip per beneficiary needing a fresh result (fetchOrderResult)
-                            // strictly sequentially — on a village with several outstanding
-                            // results, that serialized wait is what made opening the X-ray/TrueNat
-                            // list slow. OkHttp's own per-host connection limit (default 5) still
-                            // throttles how many of these are actually in flight at once, so this
-                            // only removes the artificial serialization, not any real safeguard.
+                            // instead of one-by-one — but a chunk at a time, not all at once.
+                            // completedList is the whole backlog the backend reports as done for
+                            // this order type - a
+                            // real camp device measured 4,000 of them for XRAY_CHEST and 1,500 for
+                            // MTB - and `completedList.map { async { ... } }` created one live
+                            // coroutine for every single one. The comment that used to sit here
+                            // reasoned that OkHttp's per-host cap (5) made that safe; it does cap
+                            // requests in flight, but that is exactly what made it unsafe. The
+                            // other ~5,495 coroutines did not disappear, they queued behind that
+                            // 5-wide pipe holding their Room reads alive, and at ~42 results/sec
+                            // the queue took over two minutes to drain. Measured on the device:
+                            // 433 MB allocated in 18 s, 12 GCs, heap pinned at 160/160 MB with 0%
+                            // free. Leaving the screen then cancelled 2,664 still-queued jobs at
+                            // once and froze the UI for ~1.8 s (180 dropped frames).
+                            //
+                            // Chunking keeps at most [completedFetchChunkSize] coroutines alive,
+                            // which still keeps OkHttp's 5 slots busy - the pipe, not the number
+                            // of waiting coroutines, is what sets throughput - while bounding both
+                            // the live heap and how much there is to cancel on the way out.
+                            // Set by any entry that actually fetched a result, so the single
+                            // post-bucket TB Suspected push below is skipped when nothing changed.
+                            val resultsFetchedForCompleted = java.util.concurrent.atomic.AtomicBoolean(false)
+                            completedList.chunked(completedFetchChunkSize).forEach { completedChunk ->
                             coroutineScope {
-                                completedList.map { regId ->
+                                completedChunk.map { regId ->
                                 async {
                                 val ben = benDao.getBenByRegId(regId) ?: benDao.getBen(regId)
                                 ben?.let { b ->
@@ -3207,7 +3682,12 @@ class TBRepo @Inject constructor(
                                     }
 
                                     if (needsResultFetch && fetchResult) {
-                                        fetchOrderResult(b.beneficiaryId, orderType)
+                                        // pushSuspectedAfter = false: this runs once per entry in
+                                        // a bucket measured at 4,000 entries, and that push reads
+                                        // and POSTs every UNSYNCED TB Suspected row each time.
+                                        // One push after the whole bucket, below.
+                                        fetchOrderResult(b.beneficiaryId, orderType, pushSuspectedAfter = false)
+                                        resultsFetchedForCompleted.set(true)
                                     }
                                     if (!fetchResult || !needsResultFetch) {
                                         withBenIdLock(b.beneficiaryId) {
@@ -3247,12 +3727,26 @@ class TBRepo @Inject constructor(
                                                 )
                                             }
                                         }
-                                        tbDao.saveTbDiagnostics(cache)
+                                        // Only write when the row actually changed. These status buckets
+                                        // re-report the same orders on every poll, so saving unconditionally
+                                        // rewrote the row and invalidated every list observing TB_DIAGNOSTICS
+                                        // once per beneficiary, for no change at all.
+                                        if (cache != fresh) {
+                                            tbDao.saveTbDiagnostics(cache)
+                                        }
                                         }
                                     }
                                 }
                                 }
                                 }.awaitAll()
+                            }
+                            }
+                            if (resultsFetchedForCompleted.get()) {
+                                try {
+                                    pushUnSyncedRecordsTBSuspected()
+                                } catch (e: Exception) {
+                                    Timber.e(e, "Failed to push TB Suspected after completed-bucket result fetches")
+                                }
                             }
 
                             // 4. Closed — backend's own confirmed closure (EoD expiry, not
@@ -3290,7 +3784,13 @@ class TBRepo @Inject constructor(
                                                     )
                                                 }
                                             }
-                                            tbDao.saveTbDiagnostics(cache)
+                                            // Only write when the row actually changed. These status buckets
+                                            // re-report the same orders on every poll, so saving unconditionally
+                                            // rewrote the row and invalidated every list observing TB_DIAGNOSTICS
+                                            // once per beneficiary, for no change at all.
+                                            if (cache != fresh) {
+                                                tbDao.saveTbDiagnostics(cache)
+                                            }
                                         }
                                     }
                                 }
@@ -3332,7 +3832,13 @@ class TBRepo @Inject constructor(
                                                     )
                                                 }
                                             }
-                                            tbDao.saveTbDiagnostics(cache)
+                                            // Only write when the row actually changed. These status buckets
+                                            // re-report the same orders on every poll, so saving unconditionally
+                                            // rewrote the row and invalidated every list observing TB_DIAGNOSTICS
+                                            // once per beneficiary, for no change at all.
+                                            if (cache != fresh) {
+                                                tbDao.saveTbDiagnostics(cache)
+                                            }
                                         }
                                     }
                                 }
@@ -3377,7 +3883,13 @@ class TBRepo @Inject constructor(
                                                     )
                                                 }
                                             }
-                                            tbDao.saveTbDiagnostics(cache)
+                                            // Only write when the row actually changed. These status buckets
+                                            // re-report the same orders on every poll, so saving unconditionally
+                                            // rewrote the row and invalidated every list observing TB_DIAGNOSTICS
+                                            // once per beneficiary, for no change at all.
+                                            if (cache != fresh) {
+                                                tbDao.saveTbDiagnostics(cache)
+                                            }
                                         }
                                     }
                                 }
@@ -3398,6 +3910,10 @@ class TBRepo @Inject constructor(
                     }
                 }
                 NetworkResponse.Error(context.getString(R.string.error_http_code, statusCode))
+            } catch (e: CancellationException) {
+                // Leaving the screen mid-sweep is ordinary, not a failure - let it propagate
+                // rather than reporting it as one. See the matching catch in fetchOrderResult.
+                throw e
             } catch (e: Exception) {
                 Timber.e(e, "fetchBeneficiariesByStatus failed for $orderType")
                 NetworkResponse.Error(e.message ?: "Unknown error")

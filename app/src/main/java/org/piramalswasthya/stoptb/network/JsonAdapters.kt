@@ -24,6 +24,7 @@ import org.piramalswasthya.stoptb.utils.KeyUtils
 import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.Locale
+import org.piramalswasthya.stoptb.utils.ServerDateParser
 
 @JsonClass(generateAdapter = true)
 data class D2DAuthUserRequest(val username: String, val password: String)
@@ -1073,22 +1074,47 @@ data class KALAZARScreeningDTO(
     )
 }
 
+// "Oct 19, 2026 4:44:00 PM" and "Oct 19, 2026, 4:44:00\u202fPM" both arrive from Amrit - see
+// ServerDateParser for why the second form used to fail outright and take a thrown
+// ParseException with it. The comma-after-year variants are new here for that reason; the
+// original two patterns are unchanged and still tried first.
+private val jsonAdapterDatePatterns = listOf(
+    "MMM d, yyyy h:mm:ss a",
+    "MMM dd, yyyy h:mm:ss a",
+    "MMM d, yyyy, h:mm:ss a",
+    "MMM dd, yyyy, h:mm:ss a"
+)
+
+/**
+ * @return epoch millis, or 0 when there is no date to parse.
+ *
+ * An absent date legitimately maps to 0. A non-null value that cannot be parsed does not: it
+ * means the server sent a format this list does not cover, and silently storing 1970 corrupts
+ * the record while the pull reports success. The previous implementation threw here, which was
+ * loud but aborted the whole pulled batch (that is the U+202F bug this parser exists to fix), so
+ * this logs the offending value at error level instead and the caller sees 0.
+ */
 fun getLongFromDate(dateString: String?): Long {
-    val f = SimpleDateFormat("MMM d, yyyy h:mm:ss a", Locale.ENGLISH)
-    val date = dateString?.let { f.parse(it) }
-    return date?.time ?: 0L
+    if (dateString.isNullOrBlank()) return 0L
+    ServerDateParser.parse(dateString, jsonAdapterDatePatterns)?.let { return it }
+    Timber.e("getLongFromDate: unparseable server date '$dateString' - storing 0, record will show 1970")
+    return 0L
 }
 
 fun getLongFromDateMultipleSupport(dateStr: String?): Long? {
     if (dateStr.isNullOrBlank() || dateStr == "1970-01-01") return null
-    val formats = listOf("yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss", "MMM dd, yyyy h:mm:ss a", "MMM dd, yyyy hh:mm:ss a", "MMM dd, yyyy", "dd/MM/yyyy")
-    for (format in formats) {
-        try {
-            val sdf = SimpleDateFormat(format, Locale.ENGLISH)
-            sdf.isLenient = false
-            return sdf.parse(dateStr)?.time
-        } catch (e: Exception) { }
-    }
+    ServerDateParser.parse(dateStr, multiSupportDatePatterns, lenient = false)?.let { return it }
     Timber.e("Date parsing failed for: $dateStr")
     return null
 }
+
+private val multiSupportDatePatterns = listOf(
+    "yyyy-MM-dd",
+    "yyyy-MM-dd HH:mm:ss",
+    "MMM dd, yyyy h:mm:ss a",
+    "MMM dd, yyyy hh:mm:ss a",
+    "MMM dd, yyyy, h:mm:ss a",
+    "MMM dd, yyyy, hh:mm:ss a",
+    "MMM dd, yyyy",
+    "dd/MM/yyyy"
+)

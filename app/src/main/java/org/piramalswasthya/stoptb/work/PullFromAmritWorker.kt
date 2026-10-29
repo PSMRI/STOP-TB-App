@@ -14,6 +14,7 @@ import androidx.work.workDataOf
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -25,7 +26,6 @@ import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.ChangesFeedRepo
 import timber.log.Timber
 import java.io.IOException
-import java.lang.Integer.min
 import java.util.concurrent.TimeUnit
 
 @HiltWorker
@@ -41,15 +41,18 @@ class PullFromAmritWorker @AssistedInject constructor(
         const val name = "PullFromAmritWorker"
         const val Progress = "Progress"
         const val NumPages = "Total Pages"
-        const val n = 4 // Number of threads!
+        // Parallel page fetchers. This is BOTH the number of shards and the page stride, so
+        // the two must change together or shards overlap and re-fetch each other's pages.
+        // Reduced from 4: each shard wraps its page in a write transaction, and four of those
+        // held every thread Room had. SQLite also allows only one writer at a time, so the
+        // extra shards were contending for the write lock rather than adding throughput.
+        const val n = 2
         private const val MAX_PAGE_ATTEMPTS = 3
         private const val MAX_RUN_ATTEMPTS = 5
     }
 
-    private var page1: Int = 0
-    private var page2: Int = 0
-    private var page3: Int = 0
-    private var page4: Int = 0
+    /** Next page each shard will fetch; index is the shard's remainder. One writer per index. */
+    private val pagesByShard = IntArray(n)
 
 
     override suspend fun getForegroundInfo(): ForegroundInfo = createForegroundInfo("Syncing data...")
@@ -99,6 +102,12 @@ class PullFromAmritWorker @AssistedInject constructor(
                 }
 
                 try {
+                    // Pages are buffered and written in batches, so that a ~2,000-page pull
+                    // invalidates every observed query ~100 times rather than ~2,000 times.
+                    // Whatever is still buffered when this worker stops - normally, by failure,
+                    // or by cancellation - has to be committed here or it is silently dropped
+                    // and left to contaminate the next run's first batch.
+                    //
                     // -2 means a timeout or a just-refreshed token: try the first
                     // page a few times, then let WorkManager retry with backoff.
                     var attempts = 0
@@ -114,10 +123,9 @@ class PullFromAmritWorker @AssistedInject constructor(
                         return@withContext Result.success()
                     val result1 = supervisorScope {
                         awaitAll(
-                            async { getBenForPage(numPages, 0, startPage) },
-                            async { getBenForPage(numPages, 1, startPage) },
-                            async { getBenForPage(numPages, 2, startPage) },
-                            async { getBenForPage(numPages, 3, startPage) },
+                            *(0 until n)
+                                .map { shard -> async { getBenForPage(numPages, shard, startPage) } }
+                                .toTypedArray()
                         )
                     }
                     val endTime = System.currentTimeMillis()
@@ -134,6 +142,10 @@ class PullFromAmritWorker @AssistedInject constructor(
                 } catch (e: SQLiteConstraintException) {
                     Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
                     return@withContext Result.failure(workDataOf("worker_name" to "PullFromAmritWorker", "error" to "SQLite constraint: ${e.message}"))
+                } finally {
+                    withContext(NonCancellable) {
+                        benRepo.flushPendingServerBeneficiaries()
+                    }
                 }
 
             }
@@ -200,18 +212,19 @@ class PullFromAmritWorker @AssistedInject constructor(
                         if (pageAttempts >= MAX_PAGE_ATTEMPTS) throw IOException("Pull page $page timed out $pageAttempts times")
                     } else {
                         pageAttempts = 0
-                        val finalPage = (page1 + page2 + page3 + page4) / 4
-                        val minPageSynced = min(min(page1, page2), min(page3, page4))
+                        val finalPage = pagesByShard.sum() / n
+                        // Pages are written in batches, so "fetched" is ahead of "on disk".
+                        // The resume marker has to stay behind the oldest page still buffered,
+                        // otherwise a worker that dies before its next flush resumes past rows
+                        // that were never committed.
+                        val unflushedFloor = benRepo.lowestUnflushedPullPage()
+                        val minPageSynced =
+                            listOfNotNull(pagesByShard.min(), unflushedFloor).min()
                         preferenceDao.setFirstSyncLastSyncedPage(minPageSynced)
                         setProgressAsync(workDataOf(Progress to finalPage, NumPages to numPages))
                         page += n
                     }
-                    when (rem) {
-                        0 -> page1 = page
-                        1 -> page2 = page
-                        2 -> page3 = page
-                        3 -> page4 = page
-                    }
+                    pagesByShard[rem] = page
 
                 }
             } catch (e: CancellationException) {

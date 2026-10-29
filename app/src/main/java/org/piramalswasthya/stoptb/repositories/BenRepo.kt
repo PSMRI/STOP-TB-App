@@ -26,6 +26,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
 import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.helpers.Konstants
+import androidx.room.withTransaction
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.helpers.dynamicMapper.PayloadBuilder
 import org.piramalswasthya.stoptb.model.*
@@ -41,10 +42,17 @@ import java.io.File
 import java.lang.Long.min
 import java.io.IOException
 import java.net.SocketTimeoutException
+import java.util.concurrent.ConcurrentHashMap
 import java.text.SimpleDateFormat
 import java.util.Locale
 import javax.inject.Inject
 
+/**
+ * Singleton because [bufferServerPage] accumulates pulled pages in instance state and
+ * [flushPendingServerBeneficiaries] commits them. A second injected instance would get its own
+ * buffer that nothing ever flushes, silently dropping up to a batch of pulled beneficiaries.
+ */
+@javax.inject.Singleton
 class BenRepo @Inject constructor(
     private val context: Application,
     private val benDao: BenDao,
@@ -65,7 +73,21 @@ class BenRepo @Inject constructor(
     private var lastBenUploadError: String? = null
 
     companion object {
+        /**
+         * How many pulled pages share one write transaction. The server fixes the page size at
+         * 10 beneficiaries, so this is 200 rows per commit and one Room invalidation per 20
+         * pages instead of per page.
+         */
+        private const val benWriteBatchPages = 20
         private const val DEFAULT_OFFICER_ID = 501L
+
+        // Temp (negative) benId -> server benId, recorded when the push(server) replaces the temp ID.
+        // Screens opened before that (form/Examine sheet nav args) still hold the temp ID,
+        // which no longer exists in BENEFICIARY — see resolveCurrentBenId().
+        // Also persisted in preferences so a form restored after process death can still resolve it.
+        // Temp IDs are never reused (reserveTempBenIds), so a temp ID maps to one beneficiary only.
+        private val finalBenIdByTempBenId = ConcurrentHashMap<Long, Long>()
+        private val tempBenIdMutex = Mutex()
         private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
         private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.ENGLISH)
         fun getCurrentDate(millis: Long = System.currentTimeMillis()): String {
@@ -234,6 +256,20 @@ class BenRepo @Inject constructor(
     suspend fun getBenFromId(benId: Long): BenRegCache? {
         return withContext(Dispatchers.IO) {
             benDao.getBen(benId)
+        }
+    }
+
+    /**
+     * Returns the server benId if [benId] is a temp ID the push has since replaced
+     * (Camp Mode pushes within seconds, often while a form for the temp ID is open);
+     * otherwise returns [benId] unchanged.
+     */
+    suspend fun resolveCurrentBenId(benId: Long): Long {
+        return withContext(Dispatchers.IO) {
+            if (benDao.getBen(benId) != null) benId
+            else finalBenIdByTempBenId[benId]
+                ?: preferenceDao.getFinalBenId(benId).takeIf { it > 0L }
+                ?: benId
         }
     }
 
@@ -467,10 +503,32 @@ class BenRepo @Inject constructor(
 
     }
 
+    /**
+     * Reserves [count] temp IDs below every temp ID issued before and returns the lowest one.
+     * The last issued ID is persisted so IDs are not reused after earlier temp rows get server IDs;
+     * an open form may still hold an old temp ID (see resolveCurrentBenId). -1 is never issued.
+     */
+    private suspend fun reserveTempBenIds(count: Int): Long = tempBenIdMutex.withLock {
+        withContext(Dispatchers.IO) {
+            // BEN_ID_LIST may still hold pool IDs generated before the last issued ID was persisted.
+            val lowest = minOf(
+                benDao.getMinBenId() ?: -1L,
+                benIdGenDao.getMinBenId() ?: -1L,
+                preferenceDao.getLastTempBenId(),
+                -1L
+            )
+            val first = lowest - count
+            preferenceDao.setLastTempBenId(first)
+            first
+        }
+    }
+
+    suspend fun nextTempBenId(): Long = reserveTempBenIds(1)
+
     private suspend fun getBenIdsFromLocal(count: Int, userId: Int) {
-        val minBenId = min(benDao.getMinBenId() ?: -1L, -1L)
+        val firstBenId = reserveTempBenIds(count)
         val benIdList = mutableListOf<BeneficiaryIdsAvail>()
-        for (benId in minBenId - count until minBenId) {
+        for (benId in firstBenId until firstBenId + count) {
             benIdList.add(
                 BeneficiaryIdsAvail(
                     userId = userId, benId = benId, benRegId = 0
@@ -531,6 +589,9 @@ class BenRepo @Inject constructor(
                                 }
                         }
                     }
+                    // Forms opened with the temporary ID resolve to the real one (Stop-727).
+                    finalBenIdByTempBenId[ben.beneficiaryId] = newBenId
+                    preferenceDao.setFinalBenId(ben.beneficiaryId, newBenId)
                     ben.beneficiaryId = newBenId
                     ben.benRegId = newBenRegId
                     return true
@@ -947,7 +1008,6 @@ class BenRepo @Inject constructor(
 
                 if (statusCode == 200) {
                     val responseString = response.body()?.string()
-                    Timber.d("PULL_HH_DEBUG: $responseString")
 
                     if (responseString != null) {
                         val jsonObj = JSONObject(responseString)
@@ -971,9 +1031,9 @@ class BenRepo @Inject constructor(
                                 }
 
                                 val benCacheList =
-                                    getBenCacheFromServerResponse(responseString)
+                                    getBenCacheFromServerResponse(responseString, pageNumber)
 
-                                saveServerPage(householdCacheList, benCacheList)
+                                bufferServerPage(householdCacheList, benCacheList, pageNumber)
 
                                 Timber.d("GeTBenDataList: $pageSize")
 
@@ -1032,26 +1092,118 @@ class BenRepo @Inject constructor(
     }
 
     // Beneficiaries (with their households) from the changes feed, in the same JSON getBeneficiaryData
-    // returns, saved exactly as a pulled page is.
+    // returns, written at once with the same rules as a pulled batch (no buffering: the feed saves its
+    // token right after this returns).
     suspend fun applyFeedBeneficiaries(records: JSONArray) {
         withContext(Dispatchers.IO) {
             val response = JSONObject().put("statusCode", 200)
                 .put("data", JSONObject().put("data", records)).toString()
             // Unlike a pulled page, a household that can't be parsed fails the feed page, so the
             // token isn't saved past it.
-            saveServerPage(getHouseholdCacheFromServerResponse(response), getBenCacheFromServerResponse(response))
+            writeServerPageBatch(
+                getHouseholdCacheFromServerResponse(response),
+                getBenCacheFromServerResponse(response),
+                emptyList()
+            )
         }
     }
 
-    // Saves one pulled page. Rows are re-checked inside the transaction because
-    // a push or a user edit can change them between parsing and writing: a
-    // beneficiary that is not SYNCED, or a household that is not processed or
-    // has any member not SYNCED, has local work and is left untouched.
-    private suspend fun saveServerPage(
+    // ── Bulk-pull write batching ──────────────────────────────────────────────
+    // The server pages beneficiaries 10 at a time, so a full pull of this village is ~2,000
+    // requests. Committing one transaction per page fired Room's InvalidationTracker ~once a
+    // second for the entire (~40 minute) pull, and every invalidation re-ran every query the
+    // open screen observes - on the non-household list that is a full, unpaged materialisation
+    // of every row in BEN_BASIC_CACHE. Buffering the pages and committing in batches cuts the
+    // invalidation rate by `benWriteBatchPages` without changing what ends up in the database.
+    //
+    // A batch that is dropped (worker cancelled, process death) is simply re-pulled on the next
+    // cycle: the pull is a pure server->device download and every write is an upsert, so
+    // re-applying a page is idempotent. `setFirstSyncLastSyncedPage` only ever moves backwards
+    // to a page that has been flushed, so resume cannot skip an unwritten page.
+    private val pendingBenPages = mutableListOf<BenRegCache>()
+    private val pendingHouseholdPages = mutableListOf<HouseholdCache>()
+    private val pendingPageNumbers = mutableListOf<Int>()
+    private val pendingPagesMutex = Mutex()
+
+    /**
+     * The lowest page number still sitting in the write buffer, or null when nothing is
+     * buffered. A first-sync resume marker must not advance past this, or the pages still in
+     * memory would be skipped if the worker died before its next flush.
+     */
+    suspend fun lowestUnflushedPullPage(): Int? =
+        pendingPagesMutex.withLock { pendingPageNumbers.minOrNull() }
+
+    /**
+     * Accumulates one pulled page. Flushes to the database once [benWriteBatchPages] pages have
+     * been collected; otherwise returns immediately so the next page can be fetched.
+     */
+    private suspend fun bufferServerPage(
         householdCacheList: List<HouseholdCache>,
-        benCacheList: List<BenRegCache>
+        benCacheList: List<BenRegCache>,
+        pageNumber: Int
     ) {
+        val batch: Triple<List<HouseholdCache>, List<BenRegCache>, List<Int>>? =
+            pendingPagesMutex.withLock {
+                pendingHouseholdPages += householdCacheList
+                pendingBenPages += benCacheList
+                pendingPageNumbers += pageNumber
+                if (pendingPageNumbers.size < benWriteBatchPages) {
+                    null
+                } else {
+                    Triple(
+                        pendingHouseholdPages.toList(),
+                        pendingBenPages.toList(),
+                        pendingPageNumbers.toList()
+                    ).also {
+                        pendingHouseholdPages.clear()
+                        pendingBenPages.clear()
+                        pendingPageNumbers.clear()
+                    }
+                }
+            }
+        if (batch != null) writeServerPageBatch(batch.first, batch.second, batch.third)
+    }
+
+    /**
+     * Writes whatever pages are still buffered. The pull worker must call this when its shards
+     * finish (successfully or not) so the tail of the pull is not left in memory.
+     */
+    suspend fun flushPendingServerBeneficiaries() {
+        val batch: Triple<List<HouseholdCache>, List<BenRegCache>, List<Int>>? =
+            pendingPagesMutex.withLock {
+                if (pendingPageNumbers.isEmpty()) {
+                    null
+                } else {
+                    Triple(
+                        pendingHouseholdPages.toList(),
+                        pendingBenPages.toList(),
+                        pendingPageNumbers.toList()
+                    ).also {
+                        pendingHouseholdPages.clear()
+                        pendingBenPages.clear()
+                        pendingPageNumbers.clear()
+                    }
+                }
+            }
+        if (batch != null) writeServerPageBatch(batch.first, batch.second, batch.third)
+    }
+
+    private suspend fun writeServerPageBatch(
+        householdCacheList: List<HouseholdCache>,
+        benCacheList: List<BenRegCache>,
+        pageNumbers: List<Int>
+    ) {
+        if (householdCacheList.isEmpty() && benCacheList.isEmpty()) return
+        val traceStartedAt = android.os.SystemClock.elapsedRealtime()
+        var updated = 0
+        var inserted = 0
+        // One transaction for the whole batch. Room's InvalidationTracker fires once per
+        // transaction, so N pages now invalidate BENEFICIARY once rather than N times - and
+        // every one of those invalidations re-ran every query observing the view. Households
+        // ride in the same transaction for the same reason.
         db.withTransaction {
+            // A household that is not processed, or has any member not SYNCED, has local work
+            // (an edit or a registration still to push) and is left untouched.
             householdCacheList.forEach { serverHh ->
                 val existingHh = householdDao.getHousehold(serverHh.householdId)
                 val hasLocalWork = existingHh != null && (existingHh.processed != "P" ||
@@ -1066,16 +1218,43 @@ class BenRepo @Inject constructor(
                     }
                 }
             }
+            // Re-check sync state INSIDE the transaction. getBenCacheFromServerResponse decides
+            // whether a local row is safe to overwrite at parse time, but with pages buffered
+            // that decision can now be up to a whole batch of network round trips old. If the
+            // user edited and saved this beneficiary in that window the row is UNSYNCED, and
+            // writing the server copy over it would discard the edit AND mark it SYNCED, so no
+            // later push would ever send it.
+            var skippedLocallyEdited = 0
             benCacheList.forEach { serverBen ->
-                val existingBen = benDao.getBen(serverBen.beneficiaryId)
+                val local = benDao.getBen(serverBen.beneficiaryId)
                 when {
-                    existingBen == null -> benDao.upsert(serverBen)
-                    existingBen.syncState != SyncState.SYNCED ->
-                        Timber.d("Pull: beneficiary ${serverBen.beneficiaryId} has local changes, not overwritten")
-                    else -> benDao.updateBen(serverBen)
+                    local == null -> {
+                        benDao.upsert(serverBen)
+                        inserted++
+                    }
+                    local.syncState != SyncState.SYNCED -> {
+                        // Locally edited since this page was parsed - leave it for the push.
+                        skippedLocallyEdited++
+                    }
+                    else -> {
+                        benDao.updateBen(serverBen)
+                        updated++
+                    }
                 }
             }
+            if (skippedLocallyEdited > 0) {
+                Timber.d("[pull] kept $skippedLocallyEdited locally-edited beneficiaries, not overwritten by the server copy")
+            }
         }
+        android.util.Log.d(
+            org.piramalswasthya.stoptb.utils.ScreenLoadTrace.TAG,
+            "[pull] pages ${pageNumbers.minOrNull()}..${pageNumbers.maxOrNull()} " +
+                    "(${pageNumbers.size} pages) wrote ${benCacheList.size} beneficiary + " +
+                    "${householdCacheList.size} household rows " +
+                    "($updated updated, $inserted inserted) in " +
+                    "${android.os.SystemClock.elapsedRealtime() - traceStartedAt}ms " +
+                    "- one transaction, so 1 invalidation"
+        )
     }
 
 //    suspend fun getBeneficiariesFromServer(pageNumber: Int): Pair<Int, MutableList<BenBasicDomain>> {
@@ -1893,9 +2072,19 @@ class BenRepo @Inject constructor(
 //        return result
 //    }
 
-    private suspend fun getBenCacheFromServerResponse(response: String): MutableList<BenRegCache> {
+    private suspend fun getBenCacheFromServerResponse(
+        response: String,
+        pageNumber: Int = -1
+    ): MutableList<BenRegCache> {
         val jsonObj = JSONObject(response)
         val result = mutableListOf<BenRegCache>()
+
+        // TEMPORARY PERF INSTRUMENTATION - how effective the existing change filter is.
+        // Counting only; the filtering logic below is untouched.
+        var seenOnServer = 0
+        var skippedLocalUnsynced = 0
+        var skippedUnchanged = 0
+        var writtenChanged = 0
 
         val responseStatusCode = jsonObj.getInt("statusCode")
         if (responseStatusCode == 200) {
@@ -2408,53 +2597,68 @@ class BenRepo @Inject constructor(
                                 noOfChildren = jsonObject.optInt("noOfchildren", 0),
                             )
 
-                        val nowMillis = System.currentTimeMillis()
+                        seenOnServer++   // TEMPORARY PERF INSTRUMENTATION
 
                         if (existingBen == null) {
                             result.add(serverBen)
                         } else {
-                            val rawSavedServerUpdatedDate = existingBen.serverUpdatedDate ?: 0L
-                            // Treat corrupted future-dated local values (e.g. from device clock issues) as invalid
-                            val savedServerUpdatedDate = if (rawSavedServerUpdatedDate > nowMillis + 86_400_000L) 0L else rawSavedServerUpdatedDate
-                            val serverUpdatedDate = serverBen.serverUpdatedDate ?: 0L
-
-                            // Skip ONLY if the record is genuinely unsynced locally (has unpushed local edits).
-                            // Do NOT skip purely because serverUpdatedDate is older/equal — always re-check
-                            // actual field-level diffs as a fallback so the pull is never silently dropped.
-                            val hasNewerServerDate = serverUpdatedDate > savedServerUpdatedDate
-                            val hasFieldDiff = serverBen.lastName != existingBen.lastName ||
-                                    serverBen.firstName != existingBen.firstName ||
-                                    serverBen.isDeath != existingBen.isDeath ||
-                                    serverBen.contactNumber != existingBen.contactNumber
-
                             if (existingBen.syncState != SyncState.SYNCED) {
                                 // Local has unpushed edits or is mid-push: don't overwrite with server data
+                                skippedLocalUnsynced++   // TEMPORARY PERF INSTRUMENTATION
                                 nikshayIdValue?.takeIf { it.isNotBlank() && it != existingBen.nikshayId }?.let {
                                     benDao.updateNikshayId(benId, it)
                                 }
                                 continue
                             }
 
-                            if (!hasNewerServerDate && !hasFieldDiff) {
-                                nikshayIdValue?.takeIf { it.isNotBlank() && it != existingBen.nikshayId }?.let {
-                                    benDao.updateNikshayId(benId, it)
-                                }
-                                continue
-                            }
-
-                            result.add(
-                                serverBen.copy(
-                                    userImage = serverBen.userImage ?: existingBen.userImage,
-                                    healthIdDetails = serverBen.healthIdDetails ?: existingBen.healthIdDetails,
-                                    height = serverBen.height ?: existingBen.height,
-                                    weight = serverBen.weight ?: existingBen.weight,
-                                    bmi = serverBen.bmi ?: existingBen.bmi,
-                                    temperature = serverBen.temperature ?: existingBen.temperature,
-                                    isConsent = serverBen.isConsent || existingBen.isConsent,
-                                    syncState = SyncState.SYNCED,
-                                    processed = "P"
-                                )
+                            // The row exactly as it would be persisted, merge rules included.
+                            val mergedBen = serverBen.copy(
+                                userImage = serverBen.userImage ?: existingBen.userImage,
+                                healthIdDetails = serverBen.healthIdDetails ?: existingBen.healthIdDetails,
+                                height = serverBen.height ?: existingBen.height,
+                                weight = serverBen.weight ?: existingBen.weight,
+                                bmi = serverBen.bmi ?: existingBen.bmi,
+                                temperature = serverBen.temperature ?: existingBen.temperature,
+                                isConsent = serverBen.isConsent || existingBen.isConsent,
+                                syncState = SyncState.SYNCED,
+                                processed = "P"
                             )
+
+                            // Compare the whole row we are about to write against the whole row
+                            // already stored, rather than a hand-picked subset of columns. A pull
+                            // then cannot rewrite a row that is already byte-identical (which cost
+                            // a transaction and invalidated every list observing BENEFICIARY), and
+                            // cannot silently drop a column that genuinely changed but happened to
+                            // sit outside that subset.
+                            //
+                            // serverUpdatedDate and the created*/updated* audit columns are
+                            // deliberately excluded: they move on their own and a difference there
+                            // alone is not a data change. That keeps the previous intent — never
+                            // skip purely on a timestamp — while making the fallback complete
+                            // instead of four fields wide.
+                            val localAuditFieldsCopied = mergedBen.copy(
+                                serverUpdatedDate = existingBen.serverUpdatedDate,
+                                createdBy = existingBen.createdBy,
+                                createdDate = existingBen.createdDate,
+                                updatedBy = existingBen.updatedBy,
+                                updatedDate = existingBen.updatedDate
+                            )
+                            val storedNormalised = existingBen.copy(
+                                syncState = SyncState.SYNCED,
+                                processed = "P"
+                            )
+
+                            if (localAuditFieldsCopied == storedNormalised) {
+                                skippedUnchanged++   // TEMPORARY PERF INSTRUMENTATION
+                                nikshayIdValue?.takeIf { it.isNotBlank() && it != existingBen.nikshayId }?.let {
+                                    benDao.updateNikshayId(benId, it)
+                                }
+                                continue
+                            }
+
+                            writtenChanged++   // TEMPORARY PERF INSTRUMENTATION
+
+                            result.add(mergedBen)
                         }
                     } catch (e: JSONException) {
                         Timber.e("Beneficiary skipped: ${jsonObject.optLong("benficieryid", -1L)} with error $e")
@@ -2463,6 +2667,17 @@ class BenRepo @Inject constructor(
                     }
                 }
             }
+        }
+
+        // TEMPORARY PERF INSTRUMENTATION - shows whether the server's updatedDate is a
+        // trustworthy change signal, or whether it marks everything as changed every pull.
+        if (seenOnServer > 0) {
+            android.util.Log.d(
+                org.piramalswasthya.stoptb.utils.ScreenLoadTrace.TAG,
+                "[pull] page $pageNumber: server sent $seenOnServer beneficiaries -> ${result.size} will be written " +
+                        "(skipped $skippedUnchanged identical, skipped $skippedLocalUnsynced with local edits; " +
+                        "writing $writtenChanged changed + ${result.size - writtenChanged} new)"
+            )
         }
 
         return result

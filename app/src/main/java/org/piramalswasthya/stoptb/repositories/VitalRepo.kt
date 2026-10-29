@@ -1,10 +1,13 @@
 package org.piramalswasthya.stoptb.repositories
 
+import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.VitalDao
@@ -26,8 +29,14 @@ class VitalRepo @Inject constructor(
     private val benDao: BenDao,
     private val preferenceDao: PreferenceDao,
     private val userRepo: UserRepo,
-    private val tmcNetworkApiService: AmritApiService
+    private val tmcNetworkApiService: AmritApiService,
+    private val database: InAppDb
 ) {
+
+    private companion object {
+        /** Records per write transaction in the general-examination pull. */
+        const val pullWriteChunkSize = 500
+    }
 
     suspend fun getVitals(benId: Long): VitalCache? {
         return withContext(Dispatchers.IO) {
@@ -35,9 +44,18 @@ class VitalRepo @Inject constructor(
         }
     }
 
-    val vitalBenIds: Flow<List<Long>> = vitalDao.getAllVitalBenIds()
-    val unsyncedVitalBenIds: Flow<List<Long>> = vitalDao.getVitalBenIdsBySyncState(SyncState.UNSYNCED)
-    val syncingVitalBenIds: Flow<List<Long>> = vitalDao.getVitalBenIdsBySyncState(SyncState.SYNCING)
+    /**
+     * One query for all three sets. Previously these were three Room Flows over the same table,
+     * so every write to BEN_VITALS re-ran three queries and woke three collectors.
+     */
+    private val vitalBenIdStates: Flow<List<org.piramalswasthya.stoptb.model.BenIdSyncState>> =
+        vitalDao.getVitalBenIdSyncStates()
+
+    val vitalBenIds: Flow<List<Long>> = vitalBenIdStates.map { rows -> rows.map { it.benId } }
+    val unsyncedVitalBenIds: Flow<List<Long>> =
+        vitalBenIdStates.map { rows -> rows.filter { it.syncState == SyncState.UNSYNCED }.map { it.benId } }
+    val syncingVitalBenIds: Flow<List<Long>> =
+        vitalBenIdStates.map { rows -> rows.filter { it.syncState == SyncState.SYNCING }.map { it.benId } }
 
     suspend fun saveVitals(vitalCache: VitalCache) {
         withContext(Dispatchers.IO) {
@@ -254,51 +272,60 @@ class VitalRepo @Inject constructor(
     }
 
     private suspend fun saveGeneralExaminationRecords(records: List<GeneralExaminationRecord>) {
-        records.forEach { record ->
-            val beneficiary = record.beneficiaryID?.let { benDao.getBen(it) }
-                ?: record.beneficiaryRegID?.let { benDao.getBenByRegId(it) }
-            val benId = beneficiary?.beneficiaryId ?: record.beneficiaryID ?: return@forEach
-            val benRegId = record.beneficiaryRegID ?: beneficiary?.benRegId ?: return@forEach
+        // One transaction per [pullWriteChunkSize] records instead of one per record.
+        // Room's InvalidationTracker fires per transaction, so a 20,000-record payload
+        // used to invalidate VITALS - and every query observing it - twenty thousand
+        // times, each invalidation re-running the open screen's list queries while the
+        // next record waited behind them for the connection.
+        records.chunked(pullWriteChunkSize).forEach { chunk ->
+            database.withTransaction {
+                chunk.forEach perRecord@ { record ->
+                    val beneficiary = record.beneficiaryID?.let { benDao.getBen(it) }
+                        ?: record.beneficiaryRegID?.let { benDao.getBenByRegId(it) }
+                    val benId = beneficiary?.beneficiaryId ?: record.beneficiaryID ?: return@perRecord
+                    val benRegId = record.beneficiaryRegID ?: beneficiary?.benRegId ?: return@perRecord
 
-            val existing = vitalDao.getVitals(benId)
-            val serverUpdatedDate = parseServerUpdateDate(record.updateDate ?: record.createdDate)
-            if (!shouldApplyServerRecord(
-                    existing?.syncState,
-                    existing?.serverUpdatedDate,
-                    existing?.capturedAt,
-                    serverUpdatedDate
-                )
-            ) {
-                return@forEach
+                    val existing = vitalDao.getVitals(benId)
+                    val serverUpdatedDate = parseServerUpdateDate(record.updateDate ?: record.createdDate)
+                    if (!shouldApplyServerRecord(
+                            existing?.syncState,
+                            existing?.serverUpdatedDate,
+                            existing?.capturedAt,
+                            serverUpdatedDate
+                        )
+                    ) {
+                        return@perRecord
+                    }
+                    vitalDao.saveVitals(
+                        (existing ?: VitalCache(benId = benId, benRegId = benRegId)).copy(
+                            benRegId = benRegId,
+                            pulseRate = record.pulseRate,
+                            bpSystolic = record.systolicBP,
+                            bpDiastolic = record.diastolicBP,
+                            rbs = record.randomBloodSugar,
+                            pallorId = record.pallorId,
+                            pallor = record.pallor,
+                            icterusId = record.icterusId,
+                            icterus = record.icterus,
+                            cyanosisId = record.cyanosisId,
+                            cyanosis = record.cyanosis,
+                            clubbingId = record.clubbingId,
+                            clubbing = record.clubbing,
+                            lymphadenopathyId = record.lymphadenopathyId,
+                            lymphadenopathy = record.lymphadenopathy,
+                            oedemaId = record.oedemaId,
+                            oedema = record.oedema,
+                            keyPopulationRiskFactorIds = parseIntList(record.keyPopulationRiskFactorIds),
+                            keyPopulationRiskFactors = parseStringList(record.keyPopulationRiskFactors),
+                            hivStatusId = record.hivStatusId,
+                            hivStatus = record.hivStatus,
+                            referralToHwcNeeded = record.referralToHWCNeeded,
+                            serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
+                            syncState = SyncState.SYNCED
+                        )
+                    )
+                }
             }
-            vitalDao.saveVitals(
-                (existing ?: VitalCache(benId = benId, benRegId = benRegId)).copy(
-                    benRegId = benRegId,
-                    pulseRate = record.pulseRate,
-                    bpSystolic = record.systolicBP,
-                    bpDiastolic = record.diastolicBP,
-                    rbs = record.randomBloodSugar,
-                    pallorId = record.pallorId,
-                    pallor = record.pallor,
-                    icterusId = record.icterusId,
-                    icterus = record.icterus,
-                    cyanosisId = record.cyanosisId,
-                    cyanosis = record.cyanosis,
-                    clubbingId = record.clubbingId,
-                    clubbing = record.clubbing,
-                    lymphadenopathyId = record.lymphadenopathyId,
-                    lymphadenopathy = record.lymphadenopathy,
-                    oedemaId = record.oedemaId,
-                    oedema = record.oedema,
-                    keyPopulationRiskFactorIds = parseIntList(record.keyPopulationRiskFactorIds),
-                    keyPopulationRiskFactors = parseStringList(record.keyPopulationRiskFactors),
-                    hivStatusId = record.hivStatusId,
-                    hivStatus = record.hivStatus,
-                    referralToHwcNeeded = record.referralToHWCNeeded,
-                    serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
-                    syncState = SyncState.SYNCED
-                )
-            )
         }
     }
 
