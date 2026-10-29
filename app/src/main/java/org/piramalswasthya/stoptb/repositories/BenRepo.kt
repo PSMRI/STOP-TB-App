@@ -1023,6 +1023,22 @@ class BenRepo @Inject constructor(
         }
     }
 
+    // Beneficiaries (with their households) from the changes feed, in the same JSON getBeneficiaryData
+    // returns, saved exactly as a pulled page is.
+    suspend fun applyFeedBeneficiaries(records: JSONArray) {
+        withContext(Dispatchers.IO) {
+            val response = JSONObject().put("statusCode", 200)
+                .put("data", JSONObject().put("data", records)).toString()
+            val householdCacheList = try {
+                getHouseholdCacheFromServerResponse(response)
+            } catch (e: Exception) {
+                Timber.e(e, "Changes feed: household entries not parsed")
+                emptyList()
+            }
+            saveServerPage(householdCacheList, getBenCacheFromServerResponse(response))
+        }
+    }
+
     // Saves one pulled page. Rows are re-checked inside the transaction because
     // a push or a user edit can change them between parsing and writing: a
     // beneficiary that is not SYNCED, or a household that is not processed or

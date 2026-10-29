@@ -96,6 +96,10 @@ interface AmritApiService {
     @POST("flw-api/stoptb/nurse/tbScreening/getAll")
     suspend fun getTBScreeningData(@Body request: StopTbVillageRequest): Response<ResponseBody>
 
+    // Only on camp hubs (and UAT central); elsewhere it answers supported=false.
+    @POST("flw-api/stoptb/sync/changes")
+    suspend fun getSyncChanges(@Body request: SyncChangesRequest): Response<ResponseBody>
+
     @POST("flw-api/tb/suspected/getAll")
     suspend fun getTBSuspectedData(@Body userDetail: GetDataPaginatedRequest): Response<ResponseBody>
 

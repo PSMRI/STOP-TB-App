@@ -17,6 +17,12 @@ import javax.inject.Singleton
 class PreferenceDao @Inject constructor(@ApplicationContext private val context: Context) {
 
     private val pref = PreferenceManager.getInstance(context)
+
+    private companion object {
+        const val CHANGES_FEED_TOKEN = "changes_feed_token"
+        const val CHANGES_FEED_SCOPE = "changes_feed_scope"
+    }
+
     fun deleteAmritToken() {
         val editor = pref.edit()
         val prefKey = context.getString(R.string.PREF_D2D_API_KEY)
@@ -172,6 +178,15 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
     fun getLastSyncedTimeStamp(): Long {
         val prefKey = context.getString(R.string.PREF_full_load_pull_progress)
         return pref.getLong(prefKey, Konstants.defaultTimeStamp)
+    }
+
+    // Changes feed position. The scope (service, villages, record types) is stored with it: a token is
+    // only valid for the scope it was issued for, so a different scope starts a new full download.
+    fun getChangesFeedToken(scope: String): String? =
+        if (pref.getString(CHANGES_FEED_SCOPE, null) == scope) pref.getString(CHANGES_FEED_TOKEN, null) else null
+
+    fun setChangesFeedToken(scope: String, token: String?) {
+        pref.edit().putString(CHANGES_FEED_SCOPE, scope).putString(CHANGES_FEED_TOKEN, token).apply()
     }
 
     fun setFirstSyncLastSyncedPage(page: Int) {

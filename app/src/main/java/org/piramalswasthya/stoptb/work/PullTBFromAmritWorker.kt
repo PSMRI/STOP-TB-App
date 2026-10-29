@@ -57,7 +57,9 @@ class PullTBFromAmritWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         val triggerSource = inputData.getString(WorkerUtils.pullTriggerSourceKey) ?: "DIRECT"
         val startedAt = inputData.getLong(WorkerUtils.pullStartedAtKey, SystemClock.elapsedRealtime())
-        Timber.i("Pull [$triggerSource] TB data started")
+        // Set by PullFromAmritWorker when the changes feed already brought these datasets up to date.
+        val feedApplied = inputData.getBoolean(WorkerUtils.changesFeedAppliedKey, false)
+        Timber.i("Pull [$triggerSource] TB data started${if (feedApplied) " (TB datasets from the changes feed)" else ""}")
 
         return try {
             withContext(Dispatchers.IO) {
@@ -69,14 +71,17 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                     else 0
 
                 try {
+                    val datasetPulls = if (feedApplied) emptyList() else listOf(
+                        async { getGeneralExaminationDetails() },
+                        async { getTbScreeningDetails() },
+                        async { getGeneralOpdDetails() },
+                        async { getTbDiagnosticsDetails() },
+                        async { getTbSuspectedDetails() },
+                        async { getTbConfirmedDetails() },
+                    )
                     val result1 =
                         awaitAll(
-                            async { getGeneralExaminationDetails() },
-                            async { getTbScreeningDetails() },
-                            async { getGeneralOpdDetails() },
-                            async { getTbDiagnosticsDetails() },
-                            async { getTbSuspectedDetails() },
-                            async { getTbConfirmedDetails() },
+                            *datasetPulls.toTypedArray(),
                             async { getCounsellingCompletedDetails() },
                             async { getContactAndTptFollowUpDetails() },
                             async { refreshVisitCategories() }

@@ -142,52 +142,7 @@ class VitalRepo @Inject constructor(
                     )
                 )
 
-                records.forEach { record ->
-                    val beneficiary = record.beneficiaryID?.let { benDao.getBen(it) }
-                        ?: record.beneficiaryRegID?.let { benDao.getBenByRegId(it) }
-                    val benId = beneficiary?.beneficiaryId ?: record.beneficiaryID ?: return@forEach
-                    val benRegId = record.beneficiaryRegID ?: beneficiary?.benRegId ?: return@forEach
-
-                    val existing = vitalDao.getVitals(benId)
-                    val serverUpdatedDate = parseServerUpdateDate(record.updateDate ?: record.createdDate)
-                    if (!shouldApplyServerRecord(
-                            existing?.syncState,
-                            existing?.serverUpdatedDate,
-                            existing?.capturedAt,
-                            serverUpdatedDate
-                        )
-                    ) {
-                        return@forEach
-                    }
-                    vitalDao.saveVitals(
-                        (existing ?: VitalCache(benId = benId, benRegId = benRegId)).copy(
-                            benRegId = benRegId,
-                            pulseRate = record.pulseRate,
-                            bpSystolic = record.systolicBP,
-                            bpDiastolic = record.diastolicBP,
-                            rbs = record.randomBloodSugar,
-                            pallorId = record.pallorId,
-                            pallor = record.pallor,
-                            icterusId = record.icterusId,
-                            icterus = record.icterus,
-                            cyanosisId = record.cyanosisId,
-                            cyanosis = record.cyanosis,
-                            clubbingId = record.clubbingId,
-                            clubbing = record.clubbing,
-                            lymphadenopathyId = record.lymphadenopathyId,
-                            lymphadenopathy = record.lymphadenopathy,
-                            oedemaId = record.oedemaId,
-                            oedema = record.oedema,
-                            keyPopulationRiskFactorIds = parseIntList(record.keyPopulationRiskFactorIds),
-                            keyPopulationRiskFactors = parseStringList(record.keyPopulationRiskFactors),
-                            hivStatusId = record.hivStatusId,
-                            hivStatus = record.hivStatus,
-                            referralToHwcNeeded = record.referralToHWCNeeded,
-                            serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
-                            syncState = SyncState.SYNCED
-                        )
-                    )
-                }
+                saveGeneralExaminationRecords(records)
 
                 if (records.isEmpty()) 0 else 1
             } catch (e: SocketTimeoutException) {
@@ -289,6 +244,62 @@ class VitalRepo @Inject constructor(
             List(jsonArray.length()) { index -> jsonArray.optString(index) }
                 .filter { it.isNotBlank() }
         }.getOrNull()
+    }
+
+    // Records from the changes feed, in the same JSON getAll returns.
+    suspend fun applyFeedGeneralExaminations(records: JSONArray) {
+        withContext(Dispatchers.IO) {
+            saveGeneralExaminationRecords(parseGeneralExaminationRecords(JSONObject().put("data", records)))
+        }
+    }
+
+    private suspend fun saveGeneralExaminationRecords(records: List<GeneralExaminationRecord>) {
+        records.forEach { record ->
+            val beneficiary = record.beneficiaryID?.let { benDao.getBen(it) }
+                ?: record.beneficiaryRegID?.let { benDao.getBenByRegId(it) }
+            val benId = beneficiary?.beneficiaryId ?: record.beneficiaryID ?: return@forEach
+            val benRegId = record.beneficiaryRegID ?: beneficiary?.benRegId ?: return@forEach
+
+            val existing = vitalDao.getVitals(benId)
+            val serverUpdatedDate = parseServerUpdateDate(record.updateDate ?: record.createdDate)
+            if (!shouldApplyServerRecord(
+                    existing?.syncState,
+                    existing?.serverUpdatedDate,
+                    existing?.capturedAt,
+                    serverUpdatedDate
+                )
+            ) {
+                return@forEach
+            }
+            vitalDao.saveVitals(
+                (existing ?: VitalCache(benId = benId, benRegId = benRegId)).copy(
+                    benRegId = benRegId,
+                    pulseRate = record.pulseRate,
+                    bpSystolic = record.systolicBP,
+                    bpDiastolic = record.diastolicBP,
+                    rbs = record.randomBloodSugar,
+                    pallorId = record.pallorId,
+                    pallor = record.pallor,
+                    icterusId = record.icterusId,
+                    icterus = record.icterus,
+                    cyanosisId = record.cyanosisId,
+                    cyanosis = record.cyanosis,
+                    clubbingId = record.clubbingId,
+                    clubbing = record.clubbing,
+                    lymphadenopathyId = record.lymphadenopathyId,
+                    lymphadenopathy = record.lymphadenopathy,
+                    oedemaId = record.oedemaId,
+                    oedema = record.oedema,
+                    keyPopulationRiskFactorIds = parseIntList(record.keyPopulationRiskFactorIds),
+                    keyPopulationRiskFactors = parseStringList(record.keyPopulationRiskFactors),
+                    hivStatusId = record.hivStatusId,
+                    hivStatus = record.hivStatus,
+                    referralToHwcNeeded = record.referralToHWCNeeded,
+                    serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
+                    syncState = SyncState.SYNCED
+                )
+            )
+        }
     }
 
     private fun parseGeneralExaminationRecords(jsonObj: JSONObject): List<GeneralExaminationRecord> {

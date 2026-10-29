@@ -35,6 +35,7 @@ object WorkerUtils {
     private const val syncHeartbeatIntervalMinutes = 15L
     const val pullTriggerSourceKey = "pull_trigger_source"
     const val pullStartedAtKey = "pull_started_at"
+    const val changesFeedAppliedKey = "changes_feed_applied"
     const val campAutoPullIntervalMs = 10_000L
     private const val campQuickPullDebounceMs = 10_000L
     private var lastCampQuickPullAt = 0L

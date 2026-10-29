@@ -354,6 +354,15 @@ data class AddHealthIdRecord(
 )
 
 data class StopTbVillageRequest(val providerServiceMapID: Int, val villageID: Int)
+
+/** STOP-TB changes feed: token null starts a full download; types are the records the app applies. */
+data class SyncChangesRequest(
+    val token: String?,
+    val providerServiceMapID: Int,
+    val villageIds: List<Int>,
+    val types: List<String>,
+    val limit: Int
+)
 data class TBScreeningRequestDTO(val userId: Int, val tbScreeningList: List<TBScreeningDTO>)
 data class TBScreeningSaveRequest(
     val beneficiaryRegID: Long,

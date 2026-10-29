@@ -22,6 +22,7 @@ import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.repositories.BenRepo
+import org.piramalswasthya.stoptb.repositories.ChangesFeedRepo
 import timber.log.Timber
 import java.io.IOException
 import java.lang.Integer.min
@@ -33,6 +34,7 @@ class PullFromAmritWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val benRepo: BenRepo,
     private val preferenceDao: PreferenceDao,
+    private val changesFeedRepo: ChangesFeedRepo,
 ) : CoroutineWorker(appContext, params) {
 
     companion object {
@@ -60,6 +62,27 @@ class PullFromAmritWorker @AssistedInject constructor(
         if (preferenceDao.getLoggedInUser() == null) {
             Timber.w("[$name] Worker deferred: logged-in user is not available yet")
             return Result.retry()
+        }
+
+        // On a camp hub, pull only what changed through the changes feed. It covers beneficiaries and
+        // the TB datasets, so PullTBFromAmritWorker skips those when this succeeds.
+        try {
+            if (changesFeedRepo.pull() == ChangesFeedRepo.Outcome.DONE) {
+                Timber.i(
+                    "Pull [$triggerSource] changes feed completed in " +
+                            "${TimeUnit.MILLISECONDS.toSeconds(SystemClock.elapsedRealtime() - startedAt)} seconds"
+                )
+                return Result.success(workDataOf(WorkerUtils.changesFeedAppliedKey to true))
+            }
+            Timber.i("Pull [$triggerSource] no changes feed on this server, using the full pull")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: IOException) {
+            Timber.e("Pull [$triggerSource] changes feed network error: $e")
+            return if (runAttemptCount < MAX_RUN_ATTEMPTS) Result.retry()
+            else Result.failure(workDataOf("worker_name" to "PullFromAmritWorker", "error" to "Network error: ${e.message}"))
+        } catch (e: Exception) {
+            Timber.e(e, "Pull [$triggerSource] changes feed failed, using the full pull")
         }
 
         return try {

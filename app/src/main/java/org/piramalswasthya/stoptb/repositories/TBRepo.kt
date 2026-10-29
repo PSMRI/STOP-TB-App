@@ -519,6 +519,32 @@ class TBRepo @Inject constructor(
         }
     }
 
+    // ── Records from the changes feed, in the same JSON each getAll returns ──
+    // Each goes through the same save path as the full pull, so the rules for local edits are identical.
+
+    suspend fun applyFeedTbScreenings(records: JSONArray) = withContext(Dispatchers.IO) {
+        saveTBScreeningCacheFromNewResponse(feedResponse(records))
+    }
+
+    suspend fun applyFeedGeneralOpd(records: JSONArray) = withContext(Dispatchers.IO) {
+        saveGeneralOpdCacheFromNewResponse(feedResponse(records))
+    }
+
+    suspend fun applyFeedDiagnostics(records: JSONArray) = withContext(Dispatchers.IO) {
+        saveTBDiagnosticsCacheFromNewResponse(feedResponse(records))
+    }
+
+    suspend fun applyFeedTbSuspected(records: JSONArray) = withContext(Dispatchers.IO) {
+        saveTBSuspectedCacheFromResponse(JSONObject().put("userId", 0).put("tbSuspectedList", records).toString())
+    }
+
+    suspend fun applyFeedTbConfirmed(records: JSONArray) = withContext(Dispatchers.IO) {
+        saveTBConfirmedCacheFromResponse(JSONObject().put("userId", 0).put("tbConfirmedCases", records).toString())
+    }
+
+    private fun feedResponse(records: JSONArray): JSONObject =
+        JSONObject().put("statusCode", 200).put("data", JSONObject().put("data", records))
+
     private suspend fun saveTBScreeningCacheFromNewResponse(jsonObj: JSONObject): MutableList<TBScreeningCache> {
         val tbScreeningList = mutableListOf<TBScreeningCache>()
         val records = when (val data = jsonObj.opt("data")) {
