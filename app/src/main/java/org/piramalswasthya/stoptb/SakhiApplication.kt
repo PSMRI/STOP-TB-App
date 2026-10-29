@@ -22,6 +22,7 @@ import org.piramalswasthya.stoptb.helpers.SyncLogFileWriter
 import org.piramalswasthya.stoptb.helpers.SyncLogManager
 import org.piramalswasthya.stoptb.helpers.SyncLogTree
 import org.piramalswasthya.stoptb.utils.KeyUtils
+import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -67,6 +68,7 @@ class SakhiApplication : Application(), Configuration.Provider {
         FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(true)
         Timber.plant(CrashlyticsTree())
         createNotificationChannels()
+        WorkerUtils.scheduleSyncHeartbeat(this)
 
         Thread.setDefaultUncaughtExceptionHandler(CrashHandler(applicationContext))
 

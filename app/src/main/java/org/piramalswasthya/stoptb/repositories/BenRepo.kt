@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.repositories
 import android.app.Application
 import android.net.Uri
 import android.widget.Toast
+import androidx.room.withTransaction
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CancellationException
@@ -22,6 +23,7 @@ import org.piramalswasthya.stoptb.database.room.dao.BeneficiaryIdsAvailDao
 import org.piramalswasthya.stoptb.database.room.dao.HouseholdDao
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.FormResponseJsonDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
 import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.helpers.Konstants
 import androidx.room.withTransaction
@@ -32,12 +34,13 @@ import org.piramalswasthya.stoptb.model.getPlaceOfCurrentLivingIndex
 import org.piramalswasthya.stoptb.model.getPlaceOfCurrentLivingCode
 import org.piramalswasthya.stoptb.network.*
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel
-import org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository
+import org.piramalswasthya.stoptb.utils.sync.BatchIsolation
 import org.piramalswasthya.stoptb.utils.Log
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
 import java.io.File
 import java.lang.Long.min
+import java.io.IOException
 import java.net.SocketTimeoutException
 import java.util.concurrent.ConcurrentHashMap
 import java.text.SimpleDateFormat
@@ -60,10 +63,14 @@ class BenRepo @Inject constructor(
     private val tmcNetworkApiService: AmritApiService,
     private val formResponseJsonDao: FormResponseJsonDao,
     private val db: InAppDb,
-    private val counsellingRepository: ICounsellingRepository
+    private val syncRetryStore: SyncRetryStore
 ) {
 
     private val processNewBenMutex = Mutex()
+
+    // Last server rejection message from the beneficiary push, kept for the
+    // retry store. Only written under processNewBenMutex.
+    private var lastBenUploadError: String? = null
 
     companion object {
         /**
@@ -428,6 +435,7 @@ class BenRepo @Inject constructor(
                 }
             }
             ben.userImage = finalImagePath
+            requeueIfPendingPush(ben)
             if (updateIfExists && benDao.getBen(ben.beneficiaryId) != null) {
                 benDao.updateBen(ben)
             } else {
@@ -440,7 +448,17 @@ class BenRepo @Inject constructor(
 
     suspend fun updateRecord(ben: BenRegCache) {
         withContext(Dispatchers.IO) {
+            requeueIfPendingPush(ben)
             benDao.updateBen(ben)
+        }
+    }
+
+    // Edit flows set processed to 'N'/'U' but reuse the syncState loaded with
+    // the record. The push query only picks UNSYNCED rows, so an edit to an
+    // already-synced beneficiary would never be sent without this.
+    private fun requeueIfPendingPush(ben: BenRegCache) {
+        if (ben.processed == "N" || ben.processed == "U") {
+            ben.syncState = SyncState.UNSYNCED
         }
     }
 
@@ -520,8 +538,11 @@ class BenRepo @Inject constructor(
         benIdGenDao.insert(*benIdList.toTypedArray())
     }
 
+    // Network failures (IOException) propagate so the push worker retries with
+    // backoff. A token refresh is retried at most once.
     private suspend fun createBenIdAtServerByBeneficiarySending(
-        ben: BenRegCache, user: User, locationRecord: LocationRecord
+        ben: BenRegCache, user: User, locationRecord: LocationRecord,
+        retriedAfterRefresh: Boolean = false
     ): Boolean {
         val household = if (ben.householdId != null && ben.householdId!! > 0L) householdDao.getHousehold(ben.householdId!!) else null
         val sendingData = ben.asNetworkSendingModel(user, locationRecord, context, household)
@@ -541,31 +562,42 @@ class BenRepo @Inject constructor(
                     val newBenRegId = jsonObjectData.getString("benRegId").toLong()
                     Timber.d("Amrit push beneficiary registration success: oldBenId=${ben.beneficiaryId}, newBenId=$newBenId, benRegId=$newBenRegId")
                     val photoUri = ImageUtils.renameImage(context, ben.beneficiaryId, newBenId)
-                    benDao.updateToFinalBenId(
-                        hhId = ben.householdId,
-                        oldId = ben.beneficiaryId,
-                        newBenRegId = newBenRegId,
-                        newId = newBenId,
-                        imageUri = photoUri
-                    )
+                    // All references to the temporary ID move to the real one together,
+                    // so a crash midway can't leave records pointing at an ID that no
+                    // longer exists.
+                    db.withTransaction {
+                        benDao.updateToFinalBenId(
+                            hhId = ben.householdId,
+                            oldId = ben.beneficiaryId,
+                            newBenRegId = newBenRegId,
+                            newId = newBenId,
+                            imageUri = photoUri
+                        )
+                        formResponseJsonDao.updateVisitBenId(
+                            oldBenId = ben.beneficiaryId,
+                            newBenId = newBenId
+                        )
+                        db.counsellingFormResponseDao().updateBeneficiaryId(
+                            oldBenId = ben.beneficiaryId,
+                            newBenId = newBenId
+                        )
+                        ben.householdId?.let { hhId ->
+                            householdDao.getHousehold(hhId)
+                                ?.takeIf { it.benId == ben.beneficiaryId }?.let {
+                                    it.benId = newBenId
+                                    householdDao.update(it)
+                                }
+                        }
+                    }
+                    // Forms opened with the temporary ID resolve to the real one (Stop-727).
                     finalBenIdByTempBenId[ben.beneficiaryId] = newBenId
                     preferenceDao.setFinalBenId(ben.beneficiaryId, newBenId)
-                    formResponseJsonDao.updateVisitBenId(
-                        oldBenId = ben.beneficiaryId,
-                        newBenId = newBenId
-                    )
-                    ben.householdId?.let { hhId ->
-                        householdDao.getHousehold(hhId)
-                            ?.takeIf { it.benId == ben.beneficiaryId }?.let {
-                                it.benId = newBenId
-                                householdDao.update(it)
-                            }
-                    }
                     ben.beneficiaryId = newBenId
                     ben.benRegId = newBenRegId
                     return true
                 }
                 Timber.e("Amrit push beneficiary registration failed: statusCode=$responseStatusCode, error=$errorMessage, benId=${ben.beneficiaryId}")
+                lastBenUploadError = "statusCode=$responseStatusCode: $errorMessage"
                 if (responseStatusCode == 5002 || responseStatusCode == 401) {
                     if (userRepo.refreshTokenTmc(
                             user.userName, user.password
@@ -574,14 +606,18 @@ class BenRepo @Inject constructor(
                 }
             } else {
                 Timber.e("Amrit push beneficiary registration failed: response body is null, httpStatus=$statusCode, benId=${ben.beneficiaryId}")
+                lastBenUploadError = "HTTP $statusCode, empty response"
             }
             throw IllegalStateException("Response undesired!")
         } catch (se: SocketTimeoutException) {
-            if (se.message == "Refreshed Token") {
-                return createBenIdAtServerByBeneficiarySending(ben, user, locationRecord)
+            if (se.message == "Refreshed Token" && !retriedAfterRefresh) {
+                return createBenIdAtServerByBeneficiarySending(ben, user, locationRecord, retriedAfterRefresh = true)
             }
             Timber.e("Amrit push beneficiary registration timeout: benId=${ben.beneficiaryId}, error=$se")
-            return false
+            throw se
+        } catch (e: IOException) {
+            Timber.e("Amrit push beneficiary registration network error: benId=${ben.beneficiaryId}, error=$e")
+            throw e
         } catch (e: java.lang.Exception) {
             benDao.setSyncState(ben.householdId, ben.beneficiaryId, SyncState.UNSYNCED)
             Timber.e("Amrit push beneficiary registration error: benId=${ben.beneficiaryId}, error=$e")
@@ -600,53 +636,119 @@ class BenRepo @Inject constructor(
             val benList = benDao.getAllUnprocessedBen()
             Timber.d("YTR 419 $benList")
 
-            val benNetworkPostList = mutableSetOf<BenPost>()
-            val householdNetworkPostList = mutableSetOf<HouseholdNetwork>()
-            val kidNetworkPostList = mutableSetOf<BenRegKidNetwork>()
-
+            // Registration is already one request per beneficiary, so a rejected
+            // one never blocks the others; failures are recorded for visibility.
+            var registered = 0
             benList.forEach {
+                val tempId = it.beneficiaryId
+                lastBenUploadError = null
                 val idGenerated = createBenIdAtServerByBeneficiarySending(it, user, it.locationRecord)
-                if (!idGenerated) {
+                if (idGenerated) {
+                    registered++
+                    syncRetryStore.clear(SyncRetryStore.ENTITY_REGISTRATION, listOf(tempId))
+                } else {
+                    syncRetryStore.recordFailure(
+                        SyncRetryStore.ENTITY_REGISTRATION, tempId,
+                        lastBenUploadError ?: "Registration rejected by server", backoff = false
+                    )
                     Timber.w("Amrit push beneficiary registration pending retry: benId=${it.beneficiaryId}, benRegId=${it.benRegId}, hhId=${it.householdId}")
                 }
-                Timber.d("YTR 429 $it")
             }
 
-            val updateBenList = benDao.getAllBenForSyncWithServer()
-            updateBenList.forEach {
+            val readyBens = benDao.getAllBenForSyncWithServer().filter {
                 if (it.beneficiaryId <= 0L || it.benRegId <= 0L) {
                     benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.UNSYNCED)
                     Timber.w("Skipping beneficiary final sync until real IDs are available: benId=${it.beneficiaryId}, benRegId=${it.benRegId}, hhId=${it.householdId}")
-                    return@forEach
-                }
-                benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.SYNCING)
-                val household = it.householdId?.let { hhId -> if (hhId > 0L) householdDao.getHousehold(hhId) else null }
-                benNetworkPostList.add(it.asNetworkPostModel(context, user, household))
-                household?.let { hh ->
-                    householdNetworkPostList.add(hh.asNetworkModel(user))
-                }
-                try {
-                    if (it.ageUnitId != 3 || it.age < 15) kidNetworkPostList.add(
-                        it.asKidNetworkModel(user)
-                    )
-                } catch (e: Exception) {
-                    Timber.e("caught error in adding kidDetails : $e")
-                }
+                    false
+                } else true
             }
 
-            val uploadDone = postDataToAmritServer(benNetworkPostList, householdNetworkPostList, kidNetworkPostList)
-            if (!uploadDone) {
-                benNetworkPostList.takeIf { it.isNotEmpty() }?.map { it.benId }?.let {
-                    benDao.benSyncWithServerFailed(*it.toLongArray())
-                }
-                Timber.e("Beneficiary batch push FAILED: ${benNetworkPostList.size} ben records, ${householdNetworkPostList.size} household records")
-            } else {
-                Timber.d("Beneficiary batch push succeeded: ${benNetworkPostList.size} ben records, ${householdNetworkPostList.size} household records")
+            // A beneficiary is sent together with its household and kid record;
+            // a household's members form one group, which is accepted or
+            // rejected as a unit. Groups with a rejected member that is still
+            // waiting out its retry delay sit this cycle out (they stay UNSYNCED).
+            fun groupKey(ben: BenRegCache) = ben.householdId?.takeIf { hh -> hh > 0L } ?: -ben.beneficiaryId
+            val (waiting, dueMembers) = readyBens.groupBy(::groupKey).values.partition { members ->
+                members.any { syncRetryStore.isWaiting(SyncRetryStore.ENTITY_BENEFICIARY, it.beneficiaryId) }
             }
-            val counsellingSyncDone = pushCounsellingData()
-            return@withContext uploadDone && counsellingSyncDone
+            if (waiting.isNotEmpty()) {
+                Timber.w("Beneficiary push: ${waiting.size} group(s) waiting to retry: ${waiting.flatten().map { it.beneficiaryId }}")
+            }
+            // Claim, then re-read: the payload is built from the rows as they are at the claim, not
+            // from the read above. An edit between that read and here is sent with this push; an
+            // edit after the claim sets UNSYNCED again and is not marked synced below.
+            val claimed = db.withTransaction {
+                dueMembers.flatten().map { it.beneficiaryId }.chunked(500).flatMap { ids ->
+                    benDao.claimForSync(ids)
+                    benDao.getSyncingBens(ids)
+                }
+            }
+            val due = claimed.groupBy(::groupKey).values.map { members -> buildUploadGroup(members, user) }
+
+            // New records go as one batch; records that were rejected before are
+            // retried one group at a time so they can't hold the batch back.
+            val (retrying, fresh) = due.partition { g ->
+                g.benIds.any { syncRetryStore.contains(SyncRetryStore.ENTITY_BENEFICIARY, it) }
+            }
+            val outcomes = listOf(BatchIsolation.send(fresh) { postUploadGroups(it) }) +
+                    retrying.map { g -> BatchIsolation.send(listOf(g)) { postUploadGroups(it) } }
+            val sent = outcomes.flatMap { it.sent }
+            val rejected = outcomes.flatMap { it.rejected }
+
+            sent.forEach { syncRetryStore.clear(SyncRetryStore.ENTITY_BENEFICIARY, it.benIds) }
+            if (sent.isNotEmpty() || registered > 0) {
+                // The server is accepting data: make every waiting record due again.
+                syncRetryStore.resetBackoff()
+            }
+            if (rejected.isNotEmpty()) {
+                val serverWide = sent.isEmpty()
+                val ids = rejected.flatMap { it.benIds }
+                benDao.benSyncWithServerFailed(*ids.toLongArray())
+                ids.forEach {
+                    syncRetryStore.recordFailure(
+                        SyncRetryStore.ENTITY_BENEFICIARY, it,
+                        lastBenUploadError ?: "Rejected by server", backoff = !serverWide
+                    )
+                }
+                Timber.e("Beneficiary push: ${rejected.size} group(s) rejected${if (serverWide) " (server rejected everything)" else ""}: $ids")
+            }
+            Timber.d("Beneficiary push: ${sent.size} group(s) sent, ${rejected.size} rejected, ${waiting.size} waiting")
+            return@withContext rejected.isEmpty()
         }
     }
+
+    private class UploadGroup(
+        val members: List<BenRegCache>,
+        val bens: List<BenPost>,
+        val households: List<HouseholdNetwork>,
+        val kids: List<BenRegKidNetwork>,
+    ) {
+        val benIds: List<Long> get() = members.map { it.beneficiaryId }
+    }
+
+    private suspend fun buildUploadGroup(members: List<BenRegCache>, user: User): UploadGroup {
+        val bens = mutableListOf<BenPost>()
+        val households = mutableSetOf<HouseholdNetwork>()
+        val kids = mutableListOf<BenRegKidNetwork>()
+        members.forEach {
+            val household = it.householdId?.let { hhId -> if (hhId > 0L) householdDao.getHousehold(hhId) else null }
+            bens.add(it.asNetworkPostModel(context, user, household))
+            household?.let { hh -> households.add(hh.asNetworkModel(user)) }
+            try {
+                if (it.ageUnitId != 3 || it.age < 15) kids.add(it.asKidNetworkModel(user))
+            } catch (e: Exception) {
+                Timber.e("caught error in adding kidDetails : $e")
+            }
+        }
+        return UploadGroup(members, bens, households.toList(), kids)
+    }
+
+    private suspend fun postUploadGroups(groups: List<UploadGroup>): Boolean =
+        postDataToAmritServer(
+            groups.flatMap { it.bens }.toMutableSet(),
+            groups.flatMap { it.households }.toMutableSet(),
+            groups.flatMap { it.kids }.toMutableSet(),
+        )
 
     private suspend fun postDataToAmritServer(
         benNetworkPostSet: MutableSet<BenPost>,
@@ -710,30 +812,41 @@ class BenRepo @Inject constructor(
                         else throw IllegalStateException("User seems to be logged out and refresh token not working!!!!")
                     }
                     Timber.e("Amrit push syncDataToAmrit failed: statusCode=$responseStatusCode, error=$errorMessage")
+                    lastBenUploadError = "statusCode=$responseStatusCode: $errorMessage"
                 } else {
                     Timber.e("Amrit push syncDataToAmrit failed: response body is null, httpStatus=$statusCode")
+                    lastBenUploadError = "HTTP $statusCode, empty response"
                 }
             }
             Timber.w("Amrit push syncDataToAmrit bad response: httpStatus=$statusCode, benIds=$benIds")
+            if (statusCode != 200) lastBenUploadError = "HTTP $statusCode"
             return false
         } catch (e: SocketTimeoutException) {
-            Timber.e("Amrit push syncDataToAmrit timeout: benIds=$benIds, error=$e")
-            if (retryCount > 0) return postDataToAmritServer(
-                benNetworkPostSet, householdNetworkPostSet, kidNetworkPostSet, retryCount - 1
+            // "Refreshed Token!" is thrown above after a successful token refresh;
+            // resend once. A real timeout propagates so the worker retries with
+            // backoff (resending the batch here could duplicate it on the server).
+            if (e.message == "Refreshed Token!" && retryCount > 0) return postDataToAmritServer(
+                benNetworkPostSet, householdNetworkPostSet, kidNetworkPostSet, retryCount = 0
             )
-            Timber.e("Amrit push syncDataToAmrit: max retries exhausted")
-            return false
+            Timber.e("Amrit push syncDataToAmrit timeout: benIds=$benIds, error=$e")
+            throw e
+        } catch (e: IOException) {
+            Timber.e("Amrit push syncDataToAmrit network error: benIds=$benIds, error=$e")
+            throw e
         } catch (e: JSONException) {
             Timber.e("Amrit push syncDataToAmrit JSON error: benIds=$benIds, error=$e")
+            lastBenUploadError = "Unreadable server response"
             return false
         } catch (e: java.lang.Exception) {
+            if (e is IllegalStateException && e.message?.contains("logged out") == true) {
+                // Authentication failure, not a problem with these records: let the
+                // worker handle it instead of splitting the batch into more requests.
+                throw e
+            }
             Timber.e("Amrit push syncDataToAmrit error: benIds=$benIds, error=$e")
+            lastBenUploadError = e.message ?: e.javaClass.simpleName
             return false
         }
-    }
-
-    private suspend fun pushCounsellingData(): Boolean {
-        return counsellingRepository.syncUnsyncedRecords()
     }
 
 
@@ -913,7 +1026,7 @@ class BenRepo @Inject constructor(
                                 val householdCacheList = try {
                                     getHouseholdCacheFromServerResponse(responseString)
                                 } catch (e: Exception) {
-                                    Timber.d("HouseHold entries not parsed $e")
+                                    Timber.e(e, "Pull page $pageNumber: household entries not parsed")
                                     emptyList()
                                 }
 
@@ -975,6 +1088,23 @@ class BenRepo @Inject constructor(
             }
 
             -1
+        }
+    }
+
+    // Beneficiaries (with their households) from the changes feed, in the same JSON getBeneficiaryData
+    // returns, written at once with the same rules as a pulled batch (no buffering: the feed saves its
+    // token right after this returns).
+    suspend fun applyFeedBeneficiaries(records: JSONArray) {
+        withContext(Dispatchers.IO) {
+            val response = JSONObject().put("statusCode", 200)
+                .put("data", JSONObject().put("data", records)).toString()
+            // Unlike a pulled page, a household that can't be parsed fails the feed page, so the
+            // token isn't saved past it.
+            writeServerPageBatch(
+                getHouseholdCacheFromServerResponse(response),
+                getBenCacheFromServerResponse(response),
+                emptyList()
+            )
         }
     }
 
@@ -1072,11 +1202,20 @@ class BenRepo @Inject constructor(
         // every one of those invalidations re-ran every query observing the view. Households
         // ride in the same transaction for the same reason.
         db.withTransaction {
-            if (householdCacheList.isNotEmpty()) {
-                try {
-                    householdDao.upsert(*householdCacheList.toTypedArray())
-                } catch (e: Exception) {
-                    Timber.d("HouseHold entries not synced $e")
+            // A household that is not processed, or has any member not SYNCED, has local work
+            // (an edit or a registration still to push) and is left untouched.
+            householdCacheList.forEach { serverHh ->
+                val existingHh = householdDao.getHousehold(serverHh.householdId)
+                val hasLocalWork = existingHh != null && (existingHh.processed != "P" ||
+                        benDao.countNotSyncedInHousehold(serverHh.householdId) > 0)
+                if (hasLocalWork) {
+                    Timber.d("Pull: household ${serverHh.householdId} has local changes, not overwritten")
+                } else {
+                    try {
+                        householdDao.upsert(serverHh)
+                    } catch (e: Exception) {
+                        Timber.e(e, "Pull: household ${serverHh.householdId} not saved")
+                    }
                 }
             }
             // Re-check sync state INSIDE the transaction. getBenCacheFromServerResponse decides
@@ -2463,8 +2602,8 @@ class BenRepo @Inject constructor(
                         if (existingBen == null) {
                             result.add(serverBen)
                         } else {
-                            if (existingBen.syncState == SyncState.UNSYNCED) {
-                                // Local has unpushed edits — don't overwrite with server data
+                            if (existingBen.syncState != SyncState.SYNCED) {
+                                // Local has unpushed edits or is mid-push: don't overwrite with server data
                                 skippedLocalUnsynced++   // TEMPORARY PERF INSTRUMENTATION
                                 nikshayIdValue?.takeIf { it.isNotBlank() && it != existingBen.nikshayId }?.let {
                                     benDao.updateNikshayId(benId, it)

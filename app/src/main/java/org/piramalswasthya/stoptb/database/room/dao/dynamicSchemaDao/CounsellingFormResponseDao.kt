@@ -24,6 +24,24 @@ interface CounsellingFormResponseDao {
     @Update
     suspend fun updateFormResponse(response: FormResponseEntity)
 
+    // Re-points responses saved against a temporary beneficiary ID once the
+    // server has assigned the real one (t_form_response has no foreign key to
+    // BENEFICIARY, so the ID change does not cascade).
+    @Query("UPDATE t_form_response SET beneficiaryId = :newBenId WHERE beneficiaryId = :oldBenId")
+    suspend fun updateBeneficiaryId(oldBenId: Long, newBenId: Long)
+
+    // Unsynced responses still on a temporary beneficiary ID whose beneficiary no
+    // longer exists under that ID (registered before responses were re-pointed).
+    // These can't be matched automatically and are shown on the Sync Dashboard.
+    @Query("SELECT COUNT(*) FROM t_form_response r WHERE r.syncStatus = 'UNSYNCED' AND r.isHistorySnapshot = 0 AND r.beneficiaryId <= 0 AND NOT EXISTS (SELECT 1 FROM BENEFICIARY b WHERE b.beneficiaryId = r.beneficiaryId)")
+    suspend fun countOrphanedTempIdResponses(): Int
+
+    // Marks a pushed response SYNCED only if it wasn't edited during the upload
+    // (every edit bumps updatedAt). Touches only the sync columns, so fields set
+    // during the push (e.g. backendResponseId) are kept.
+    @Query("UPDATE t_form_response SET syncStatus = 'SYNCED', syncedAt = :syncedAt WHERE responseId = :responseId AND updatedAt = :pushedUpdatedAt")
+    suspend fun markSyncedIfUnchanged(responseId: Long, pushedUpdatedAt: Long, syncedAt: Long = System.currentTimeMillis()): Int
+
     @Update
     suspend fun updateSectionResponse(section: SectionResponseEntity)
 

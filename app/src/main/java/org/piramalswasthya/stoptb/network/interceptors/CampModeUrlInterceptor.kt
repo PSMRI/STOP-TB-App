@@ -5,8 +5,7 @@ import okhttp3.Interceptor
 import okhttp3.Response
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.utils.CampHubUrlValidator
-import java.net.HttpURLConnection
-import java.net.URL
+import org.piramalswasthya.stoptb.utils.sync.CampHubReachability
 import java.io.IOException
 import java.io.InterruptedIOException
 import javax.inject.Inject
@@ -69,21 +68,6 @@ class CampModeUrlInterceptor @Inject constructor(
         preferenceDao.configuredCampHubUrl().takeIf { it.isNotBlank() }
             ?.let { runCatching { java.net.URI(it).host }.getOrNull() }
 
-    private fun isCampHubReachable(rawUrl: String): Boolean {
-        val baseUrl = rawUrl.trim().trimEnd('/')
-        val healthUrl = "$baseUrl/common-api/health"
-        var connection: HttpURLConnection? = null
-
-        return runCatching {
-            connection = URL(healthUrl).openConnection() as HttpURLConnection
-            connection?.connectTimeout = 3000
-            connection?.readTimeout = 3000
-            connection?.requestMethod = "GET"
-            connection?.useCaches = false
-            val responseCode = connection?.responseCode ?: return@runCatching false
-            responseCode in 200..299
-        }.getOrDefault(false).also {
-            connection?.disconnect()
-        }
-    }
+    private fun isCampHubReachable(rawUrl: String): Boolean =
+        CampHubReachability.isReachable(rawUrl)
 }

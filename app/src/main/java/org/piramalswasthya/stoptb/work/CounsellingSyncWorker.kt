@@ -31,13 +31,9 @@ class CounsellingSyncWorker @AssistedInject constructor(
     companion object {
         private const val SYNC_WORK_NAME = "counselling_sync_work"
 
+        // No network constraint: camp Wi-Fi has no internet, so CONNECTED would never be met.
         fun scheduleSync(context: Context) {
-            val constraints = Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build()
-
             val syncRequest = OneTimeWorkRequestBuilder<CounsellingSyncWorker>()
-                .setConstraints(constraints)
                 .setBackoffCriteria(
                     BackoffPolicy.EXPONENTIAL,
                     WorkRequest.MIN_BACKOFF_MILLIS,

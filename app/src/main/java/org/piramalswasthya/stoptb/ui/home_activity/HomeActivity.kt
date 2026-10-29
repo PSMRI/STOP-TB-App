@@ -60,6 +60,7 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.BuildConfig
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
 import org.piramalswasthya.stoptb.helpers.AccountDeactivationManager
 import org.piramalswasthya.stoptb.helpers.TokenExpiryManager
 import org.piramalswasthya.stoptb.databinding.ActivityHomeBinding
@@ -70,7 +71,6 @@ import org.piramalswasthya.stoptb.helpers.InAppUpdateHelper
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
 import org.piramalswasthya.stoptb.helpers.TapjackingProtectionHelper
-import org.piramalswasthya.stoptb.helpers.isInternetAvailable
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.home.HomeViewModel
 import org.piramalswasthya.stoptb.ui.home_activity.sync.SyncBottomSheetFragment
@@ -102,6 +102,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
                 runOnUiThread {
                     refreshCampHubOfflineBanner()
                     if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
+                        syncRetryStore.resetBackoff()
                         WorkerUtils.triggerAmritPushWorker(applicationContext)
                         WorkerUtils.triggerCampQuickPullIfConnected(applicationContext, pref, force = true)
                     }
@@ -136,6 +137,9 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
 
     @Inject
     lateinit var pref: PreferenceDao
+
+    @Inject
+    lateinit var syncRetryStore: SyncRetryStore
 
     @Inject
     lateinit var accountDeactivationManager: AccountDeactivationManager
@@ -193,17 +197,20 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
     }
 
 
-    private val logoutAlert by lazy {
+    // Built each time it is shown so the unsynced count is current (it used to be
+    // fixed at the value from the first time the dialog was opened).
+    private fun buildLogoutAlert(): androidx.appcompat.app.AlertDialog {
         var str = ""
-        if (viewModel.unprocessedRecordsCount.value!! > 0) {
-            str += viewModel.unprocessedRecordsCount.value!!
+        val unprocessed = viewModel.unprocessedRecordsCount.value ?: 0
+        if (unprocessed > 0) {
+            str += unprocessed
             str += resources.getString(R.string.not_processed)
         } else {
             str += resources.getString(R.string.all_records_synced)
         }
         str += resources.getString(R.string.are_you_sure_to_logout)
 
-        MaterialAlertDialogBuilder(this).setTitle(resources.getString(R.string.logout))
+        return MaterialAlertDialogBuilder(this).setTitle(resources.getString(R.string.logout))
             .setMessage(str)
             .setPositiveButton(resources.getString(R.string.yes)) { dialog, _ ->
                 viewModel.logout()
@@ -265,6 +272,9 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
 //        FirebaseMessaging.getInstance().subscribeToTopic("ANC${pref.getLoggedInUser()?.userId}")
 //        FirebaseMessaging.getInstance().subscribeToTopic("Immunization${pref.getLoggedInUser()?.userId}")
         super.onCreate(savedInstanceState)
+        WorkerUtils.scheduleSyncHeartbeat(applicationContext)
+        // Opening the app (including right after login) retries waiting records now.
+        syncRetryStore.resetBackoff()
         _binding = ActivityHomeBinding.inflate(layoutInflater)
 
         TapjackingProtectionHelper.enableTouchFiltering(this)
@@ -360,10 +370,10 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
             if (it > 0) {
                 val now = SystemClock.elapsedRealtime()
                 if (now - lastAutoTriggerPushTime >= AUTO_PUSH_DEBOUNCE_MS) {
-                    if (isInternetAvailable(this)) {
-                        lastAutoTriggerPushTime = now
-                        WorkerUtils.triggerAmritPushWorker(this)
-                    }
+                    // No internet check: camp Wi-Fi reaches the hub without internet, and the
+                    // push gate checks the hub itself.
+                    lastAutoTriggerPushTime = now
+                    WorkerUtils.triggerAmritPushWorker(this)
                 }
             }
         }
@@ -777,7 +787,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
 
         }
         binding.navView.menu.findItem(R.id.menu_logout).setOnMenuItemClickListener {
-            logoutAlert.show()
+            buildLogoutAlert().show()
             true
 
         }

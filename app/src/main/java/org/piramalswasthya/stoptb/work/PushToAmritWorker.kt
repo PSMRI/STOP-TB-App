@@ -3,7 +3,6 @@ package org.piramalswasthya.stoptb.work
 import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.WorkerParameters
-import androidx.work.workDataOf
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -26,15 +25,15 @@ class PushToAmritWorker @AssistedInject constructor(
     override val workerName = name
 
     override suspend fun doSyncWork(): Result {
-        val benWorkerResult = benRepo.processNewBen()
-        val vitalWorkerResult = vitalRepo.pushUnSyncedVitals()
-        val workerResult = benWorkerResult && vitalWorkerResult
-        return if (workerResult /*&& workerResult1 && workerResult2*/) {
-            Timber.d("Worker completed")
-            Result.success()
-        } else {
-            Timber.e("Worker Failed as usual!")
-            Result.failure(workDataOf(KEY_WORKER_NAME to workerName, KEY_ERROR to "Sync operation returned false"))
+        // Network failures throw and are retried by BasePushWorker. A false result
+        // means the server rejected the beneficiary batch: those records stay
+        // UNSYNCED for the next cycle, and the worker still succeeds so the TB,
+        // ABHA and counselling workers that follow it in the chain are not failed.
+        if (!benRepo.processNewBen()) {
+            Timber.e("[$workerName] Beneficiary batch rejected by server; records stay UNSYNCED")
         }
+        vitalRepo.pushUnSyncedVitals()
+        Timber.d("Worker completed")
+        return Result.success()
     }
 }
