@@ -64,6 +64,7 @@ class BenRepo @Inject constructor(
         // Temp (negative) benId -> server benId, recorded when the push(server) replaces the temp ID.
         // Screens opened before that (form/Examine sheet nav args) still hold the temp ID,
         // which no longer exists in BENEFICIARY — see resolveCurrentBenId().
+        // Also persisted in preferences so a form restored after process death can still resolve it.
         // Temp IDs are never reused (reserveTempBenIds), so a temp ID maps to one beneficiary only.
         private val finalBenIdByTempBenId = ConcurrentHashMap<Long, Long>()
         private val tempBenIdMutex = Mutex()
@@ -246,7 +247,9 @@ class BenRepo @Inject constructor(
     suspend fun resolveCurrentBenId(benId: Long): Long {
         return withContext(Dispatchers.IO) {
             if (benDao.getBen(benId) != null) benId
-            else finalBenIdByTempBenId[benId] ?: benId
+            else finalBenIdByTempBenId[benId]
+                ?: preferenceDao.getFinalBenId(benId).takeIf { it > 0L }
+                ?: benId
         }
     }
 
@@ -476,7 +479,13 @@ class BenRepo @Inject constructor(
      */
     private suspend fun reserveTempBenIds(count: Int): Long = tempBenIdMutex.withLock {
         withContext(Dispatchers.IO) {
-            val lowest = minOf(benDao.getMinBenId() ?: -1L, preferenceDao.getLastTempBenId(), -1L)
+            // BEN_ID_LIST may still hold pool IDs generated before the last issued ID was persisted.
+            val lowest = minOf(
+                benDao.getMinBenId() ?: -1L,
+                benIdGenDao.getMinBenId() ?: -1L,
+                preferenceDao.getLastTempBenId(),
+                -1L
+            )
             val first = lowest - count
             preferenceDao.setLastTempBenId(first)
             first
@@ -527,6 +536,7 @@ class BenRepo @Inject constructor(
                         imageUri = photoUri
                     )
                     finalBenIdByTempBenId[ben.beneficiaryId] = newBenId
+                    preferenceDao.setFinalBenId(ben.beneficiaryId, newBenId)
                     formResponseJsonDao.updateVisitBenId(
                         oldBenId = ben.beneficiaryId,
                         newBenId = newBenId
