@@ -118,7 +118,7 @@ class UnScreenedPeopleViewModel @Inject constructor(
 
     val diagnosisBenIds: StateFlow<List<Long>> =
         combine(
-            tbRepo.tbDiagnosticsBenIds,
+            tbRepo.tbDiagnosticsBenIdsFromCards,
             tbRepo.tbSuspectedBenIds
         ) { diagnostics, suspected ->
             (diagnostics + suspected).distinct()

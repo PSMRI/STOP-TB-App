@@ -1,6 +1,7 @@
 package org.piramalswasthya.stoptb.helpers
 
 import android.util.Log
+import org.piramalswasthya.stoptb.BuildConfig
 import org.piramalswasthya.stoptb.model.LogLevel
 import timber.log.Timber
 
@@ -48,10 +49,15 @@ class SyncLogTree(
         if (!isSyncRelated(tag, message)) return
 
         // Write sync-related logs to logcat via DebugTree.log().
-        // In debug builds this duplicates what DebugTree already outputs, but
-        // in release builds (where DebugTree is not planted) this is the ONLY
-        // path to logcat — essential for field debugging with adb.
-        super.log(priority, tag, message, t)
+        // In release builds (where DebugTree is not planted) this is the ONLY path to
+        // logcat — essential for field debugging with adb — so it must stay.
+        // In debug builds DebugTree is planted too and already emits every line, so doing
+        // it here as well wrote each sync line to logcat twice. Anything whose tag or
+        // message matches the sync keywords paid that cost, which includes every OkHttp
+        // line (the backend hostname contains "amrit"), and logcat writes are blocking.
+        if (!BuildConfig.DEBUG) {
+            super.log(priority, tag, message, t)
+        }
 
         val level = when {
             priority >= Log.ERROR -> LogLevel.ERROR

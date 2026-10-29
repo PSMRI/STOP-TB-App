@@ -14,6 +14,7 @@ import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.utils.CampHubUrlValidator
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.User
@@ -89,7 +90,20 @@ class SignInViewModel @Inject constructor(
     fun getCampHubUrl(): String = pref.getCampHubUrl()
 
     fun updateCampHubUrl(url: String) {
-        val normalizedUrl = normalizeCampHubUrl(url)
+        // Same rule as the connect screen: the stored URL re-points authenticated requests, so
+        // validate before storing. Store the VALIDATOR'S output, not the locally normalised
+        // string - the local one keeps credentials, path, query and fragment, so
+        // `http://user:pass@host/some/path` would be written to preferences verbatim and
+        // pingCampHub would then probe `/some/path/common-api/health`.
+        val normalizedUrl = CampHubUrlValidator.normalizeOrNull(
+            normalizeCampHubUrl(url),
+            extraAllowedHost = configuredHubHost()
+        )
+        if (normalizedUrl == null) {
+            Log.w(TAG, "Rejected camp hub URL from login screen: not an allowed host")
+            _campHubStatus.value = CampHubStatus.NOT_CONNECTED
+            return
+        }
         if (normalizedUrl == pref.getCampHubUrl()) return
 
         Log.d(TAG, "Login camp URL changed. inputUrl=$url, normalizedUrl=$normalizedUrl")
@@ -146,6 +160,11 @@ class SignInViewModel @Inject constructor(
         }
     }
 
+    /** Host of the URL baked into this build - always acceptable, even when it is public. */
+    private fun configuredHubHost(): String? =
+        pref.configuredCampHubUrl().takeIf { it.isNotBlank() }
+            ?.let { runCatching { java.net.URI(it).host }.getOrNull() }
+
     private fun normalizeCampHubUrl(url: String): String {
         val trimmedUrl = url.trim()
         val resolvedUrl = when {
@@ -194,6 +213,8 @@ class SignInViewModel @Inject constructor(
                 database.clearAllTables()
             }
             pref.deleteForLogout()
+            // Process-wide backfill cursors must not carry into the next user's village.
+            org.piramalswasthya.stoptb.repositories.TBRepo.resetOrderIdBackfillState()
             pref.setLastSyncedTimeStamp(Konstants.defaultTimeStamp)
             if (restoreUsernameOnly) {
                 pref.setRememberedUsernameOnly(rememberedUser!!.trim())

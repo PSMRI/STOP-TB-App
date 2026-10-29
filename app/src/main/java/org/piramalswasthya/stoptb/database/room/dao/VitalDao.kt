@@ -23,6 +23,10 @@ interface VitalDao {
     @Query("SELECT benId FROM BEN_VITALS")
     fun getAllVitalBenIds(): Flow<List<Long>>
 
+    /** id + syncState in one pass; callers split it instead of running three queries. */
+    @Query("SELECT benId, syncState FROM BEN_VITALS")
+    fun getVitalBenIdSyncStates(): Flow<List<org.piramalswasthya.stoptb.model.BenIdSyncState>>
+
     @Query("SELECT benId FROM BEN_VITALS WHERE syncState = :syncState")
     fun getVitalBenIdsBySyncState(syncState: SyncState): Flow<List<Long>>
 }
