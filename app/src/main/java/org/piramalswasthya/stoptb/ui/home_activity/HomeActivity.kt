@@ -71,7 +71,6 @@ import org.piramalswasthya.stoptb.helpers.InAppUpdateHelper
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
 import org.piramalswasthya.stoptb.helpers.TapjackingProtectionHelper
-import org.piramalswasthya.stoptb.helpers.isInternetAvailable
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
 import org.piramalswasthya.stoptb.ui.home_activity.home.HomeViewModel
 import org.piramalswasthya.stoptb.ui.home_activity.sync.SyncBottomSheetFragment
@@ -371,10 +370,10 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
             if (it > 0) {
                 val now = SystemClock.elapsedRealtime()
                 if (now - lastAutoTriggerPushTime >= AUTO_PUSH_DEBOUNCE_MS) {
-                    if (isInternetAvailable(this)) {
-                        lastAutoTriggerPushTime = now
-                        WorkerUtils.triggerAmritPushWorker(this)
-                    }
+                    // No internet check: camp Wi-Fi reaches the hub without internet, and the
+                    // push gate checks the hub itself.
+                    lastAutoTriggerPushTime = now
+                    WorkerUtils.triggerAmritPushWorker(this)
                 }
             }
         }

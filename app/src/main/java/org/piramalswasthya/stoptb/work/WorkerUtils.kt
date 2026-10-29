@@ -61,6 +61,14 @@ object WorkerUtils {
         return !prefs.getString(userKey, null).isNullOrBlank()
     }
 
+    // Camp Wi-Fi reaches the hub but has no internet. WorkManager's CONNECTED constraint waits for a
+    // network Android has validated as having internet, so in camp mode sync work must not use it;
+    // the sync gate checks the hub itself.
+    private fun isCampModeEnabled(context: Context): Boolean {
+        val prefs = PreferenceManager.getInstance(context)
+        return prefs.getBoolean(context.getString(R.string.PREF_camp_mode_enabled), false)
+    }
+
     private fun isCampHubSyncActive(context: Context): Boolean {
         val prefs = PreferenceManager.getInstance(context)
         val campEnabledKey = context.getString(R.string.PREF_camp_mode_enabled)
@@ -134,9 +142,11 @@ object WorkerUtils {
     // calls cheap; logout cancels all work and the next app start or login
     // screen schedules it again.
     fun scheduleSyncHeartbeat(context: Context) {
+        // No network constraint: in camp there is Wi-Fi but no internet, and the gate it
+        // triggers checks the hub itself.
         val request = PeriodicWorkRequestBuilder<SyncHeartbeatWorker>(
             syncHeartbeatIntervalMinutes, TimeUnit.MINUTES
-        ).setConstraints(networkOnlyConstraint).build()
+        ).build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             syncHeartbeatUniqueName,
             ExistingPeriodicWorkPolicy.KEEP,
@@ -162,6 +172,8 @@ object WorkerUtils {
             workManager.cancelUniqueWork(pushWorkerUniqueName)
         }
 
+        val campMode = isCampModeEnabled(context)
+
         // StopTB push chain:
         // Registration (+ vitals) → TB data + ABHA + counselling + contact tracing
         //
@@ -170,7 +182,7 @@ object WorkerUtils {
         // used up it falls back to normal work. On Android 11 and below,
         // WorkManager runs expedited work as a foreground service using
         // BasePushWorker.getForegroundInfo(); on 12+ there is no notification.
-        val registration = if (isCampHubSyncActive) {
+        val registration = if (campMode) {
             campSyncRequestBuilder<PushToAmritWorker>()
         } else {
             syncRequestBuilder<PushToAmritWorker>()
@@ -182,26 +194,26 @@ object WorkerUtils {
             pushWorkerUniqueName, ExistingWorkPolicy.KEEP, registration)
 
         val groupTB = listOf(
-            (if (isCampHubSyncActive) {
+            (if (campMode) {
                 campSyncRequestBuilder<PushTBToAmritWorker>()
             } else {
                 syncRequestBuilder<PushTBToAmritWorker>()
             }).addTag("push_group5_tb").build(),
         ) 
 
-        val groupAbha = if (isCampHubSyncActive) {
+        val groupAbha = if (campMode) {
             campSyncRequestBuilder<PushMapAbhatoBenficiaryWorker>()
         } else {
             syncRequestBuilder<PushMapAbhatoBenficiaryWorker>()
         }.addTag("push_group9_digital_health").build()
 
-        val groupCounselling = if (isCampHubSyncActive) {
+        val groupCounselling = if (campMode) {
             campSyncRequestBuilder<PushCounsellingWorker>()
         } else {
             syncRequestBuilder<PushCounsellingWorker>()
         }.addTag("push_group10_counselling").build()
 
-        val groupContactTracing = if (isCampHubSyncActive) {
+        val groupContactTracing = if (campMode) {
             campSyncRequestBuilder<PushContactTracingWorker>()
         } else {
             syncRequestBuilder<PushContactTracingWorker>()
@@ -227,7 +239,6 @@ object WorkerUtils {
             return emptyList()
         }
 
-        val isCampHubSyncActive = isCampHubSyncActive(context)
         val workManager = WorkManager.getInstance(context)
         val activePullInfos = getActiveUniqueWorkInfos(workManager, pullWorkerUniqueName)
         if (!force && activePullInfos.isNotEmpty()) {
@@ -243,7 +254,8 @@ object WorkerUtils {
 
         // StopTB pull chain:
         // Beneficiaries → Referrals + TB data → Mark complete
-        val pullWorkRequest = if (isCampHubSyncActive) {
+        val campMode = isCampModeEnabled(context)
+        val pullWorkRequest = if (campMode) {
             campSyncRequestBuilder<PullFromAmritWorker>()
         } else {
             syncRequestBuilder<PullFromAmritWorker>()
@@ -256,7 +268,7 @@ object WorkerUtils {
         )
 
         val groupTB = listOf(
-            (if (isCampHubSyncActive) {
+            (if (campMode) {
                 campSyncRequestBuilder<PullTBFromAmritWorker>()
             } else {
                 syncRequestBuilder<PullTBFromAmritWorker>()
