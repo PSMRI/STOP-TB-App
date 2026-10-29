@@ -56,6 +56,10 @@ class SyncRetryStore @Inject constructor(
 
     private val prefs get() = PreferenceManager.getInstance(context)
 
+    // In-memory copy of the stored entries, so per-record lookups during a push
+    // don't decrypt and parse the preferences each time. Written through on save.
+    private var cache: Map<String, Entry>? = null
+
     /**
      * Records a rejection. With [backoff] false the record stays due on the next
      * cycle; used when the server rejected everything, which points to a
@@ -122,7 +126,14 @@ class SyncRetryStore @Inject constructor(
     private fun key(entity: String, id: Long) = "$entity:$id"
 
     private fun load(): MutableMap<String, Entry> {
-        val raw = prefs.getString(PREF_KEY, null) ?: return mutableMapOf()
+        val cached = cache
+        // Logout clears all preferences; drop the in-memory copy if that happened.
+        if (cached != null && (cached.isEmpty() || prefs.contains(PREF_KEY))) return cached.toMutableMap()
+        return readFromPrefs().also { cache = it }.toMutableMap()
+    }
+
+    private fun readFromPrefs(): Map<String, Entry> {
+        val raw = prefs.getString(PREF_KEY, null) ?: return emptyMap()
         return try {
             val array = JSONArray(raw)
             val map = mutableMapOf<String, Entry>()
@@ -147,6 +158,7 @@ class SyncRetryStore @Inject constructor(
     }
 
     private fun save(entries: Map<String, Entry>) {
+        cache = entries.toMap()
         val array = JSONArray()
         entries.values.forEach { e ->
             array.put(
