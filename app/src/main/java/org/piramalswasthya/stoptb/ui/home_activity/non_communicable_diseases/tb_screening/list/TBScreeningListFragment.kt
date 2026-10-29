@@ -11,6 +11,8 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.Lifecycle
 import androidx.navigation.fragment.findNavController
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -92,10 +94,15 @@ class TBScreeningListFragment : Fragment() {
         // "No records found" on top of the list (and, briefly, on top of this loader).
         binding.flEmpty.visibility = View.GONE
 
-        lifecycleScope.launch {
-            viewModel.benList.collect {
+        // viewLifecycleOwner + repeatOnLifecycle: the fragment outlives its view on the back
+        // stack, so a fragment-scoped collector survives onDestroyView and a second one is
+        // started the next time onViewCreated runs, each doing the same work on every emission.
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.benList.collect {
                 renderListState(it)
                 benAdapter.submitList(it)
+                }
             }
         }
 
@@ -110,8 +117,9 @@ class TBScreeningListFragment : Fragment() {
             }
 
             override fun afterTextChanged(p0: Editable?) {
-                onQueryChanged()
-                viewModel.filterText(p0?.toString()?.trim() ?: "")
+                val query = p0?.toString()?.trim().orEmpty()
+                onQueryChanged(query)
+                viewModel.filterText(query)
             }
 
         }
@@ -168,7 +176,16 @@ class TBScreeningListFragment : Fragment() {
         }
     }
 
-    private fun onQueryChanged() {
+    private var lastQuery: String? = null
+
+    private fun onQueryChanged(query: String) {
+        // The ViewModel normalizes to lowercase and the filter is a StateFlow, which drops an
+        // equal value - so a keystroke that doesn't change the normalized query (a trailing
+        // space, or re-casing a letter) produces no emission, and nothing would ever clear a
+        // loader scheduled here. Compare against the same normalized form.
+        val normalized = query.lowercase()
+        if (normalized == lastQuery) return
+        lastQuery = normalized
         _binding?.rvAny?.let { rv ->
             rv.removeCallbacks(showSearchLoader)
             rv.postDelayed(showSearchLoader, SEARCH_LOADER_DELAY_MS)

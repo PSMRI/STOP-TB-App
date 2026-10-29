@@ -19,9 +19,11 @@ import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
+import org.piramalswasthya.stoptb.helpers.serverResultOrNull
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.ChestXrayResult
+import org.piramalswasthya.stoptb.model.OrderStatus
 import org.piramalswasthya.stoptb.model.MtbResult
 import org.piramalswasthya.stoptb.model.RifResult
 import org.piramalswasthya.stoptb.model.TBScreeningCache
@@ -177,17 +179,15 @@ class TBSuspectedQuickViewModel @Inject constructor(
      * the question we care about ("is there already a result?") has a direct answer.
      * [TBRepo.fetchOrderResult] stores the authoritative row, so the card shows it afterwards.
      */
-    private suspend fun resultAlreadyOnServer(): String? {
-        val orderType = if (referralType == 6) "XRAY_CHEST" else "SPUTUM_TRUENAT"
+    private suspend fun resultAlreadyOnServer(orderType: String): String? {
         return try {
-            tbRepo.fetchOrderResult(benId, orderType, pushSuspectedAfter = false)
-            val fresh = tbRepo.getTBDiagnosticsById(benId) ?: return null
-            resultFor(fresh, orderType)?.takeIf { it.isNotBlank() }
-                ?: if (referralType == 7) {
-                    tbRepo.fetchOrderResult(benId, "MDR_RIF", pushSuspectedAfter = false)
-                    tbRepo.getTBDiagnosticsById(benId)
-                        ?.let { resultFor(it, "MDR_RIF") }?.takeIf { it.isNotBlank() }
-                } else null
+            // The order's own status decides this, not whether the local row happens to hold a
+            // string. fetchOrderResult returns Success for a PENDING order too, and
+            // applyOrderResult leaves the stored result untouched for a non-completed order - so
+            // a stale local value would otherwise be reported back as "the server already has a
+            // result", which is the opposite of true.
+            val fetched = tbRepo.fetchOrderResult(benId, orderType, pushSuspectedAfter = false)
+            serverResultOrNull(fetched, tbRepo.getTBDiagnosticsById(benId), orderType)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -256,28 +256,38 @@ class TBSuspectedQuickViewModel @Inject constructor(
 
         _resultCheck.value = ResultCheck.CHECKING
         var refreshed: TBDiagnosticsCache? = null
+        var anyFetchFailed = false
         // Bounded independently of OkHttp's 60 s read timeout, and the outcome is recorded on
         // every path. Reading the row back used to sit outside any catch, so a failure there
         // left the status stuck on "checking" for the life of the screen.
         val checkCompleted = try {
             withTimeoutOrNull(RESULT_CHECK_TIMEOUT_MS) {
                 withContext(Dispatchers.IO) {
+                    // fetchOrderResult reports a failed call by returning Error rather than
+                    // throwing, so ignoring the return value reported a check that never
+                    // happened as a successful one.
                     if (needsOrderResult) {
                         try {
-                            tbRepo.fetchOrderResult(benId, orderType)
+                            if (tbRepo.fetchOrderResult(benId, orderType) is NetworkResponse.Error) {
+                                anyFetchFailed = true
+                            }
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
                             Timber.e(e, "Pre-fetching results failed for $orderType")
+                            anyFetchFailed = true
                         }
                     }
                     if (needsRifResult) {
                         try {
-                            tbRepo.fetchOrderResult(benId, "MDR_RIF")
+                            if (tbRepo.fetchOrderResult(benId, "MDR_RIF") is NetworkResponse.Error) {
+                                anyFetchFailed = true
+                            }
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
                             Timber.e(e, "Pre-fetching results failed for MDR_RIF")
+                            anyFetchFailed = true
                         }
                     }
                     refreshed = tbRepo.getTBDiagnostics(benId)
@@ -290,13 +300,20 @@ class TBSuspectedQuickViewModel @Inject constructor(
             Timber.e(e, "Checking for a newer result failed for benId=%s", benId)
             false
         }
-        _resultCheck.value = if (checkCompleted) ResultCheck.IDLE else ResultCheck.FAILED
+        _resultCheck.value =
+            if (checkCompleted && !anyFetchFailed) ResultCheck.IDLE else ResultCheck.FAILED
 
         // Rebuilding the page replaces every field, so a result arriving after the user has
         // started filling the form is left for the next open rather than wiping their input.
         val latest = refreshed
         if (latest != null && latest != tbDiagnostics) {
-            if (!userHasEditedForm) {
+            // mapValues() mutates tbDiagnostics in place - the submission timestamp among other
+            // fields - and saveForm() persists that same instance later. Replacing the property
+            // mid-save would store an unmapped snapshot. Submit stays enabled during the check,
+            // so this window is reachable whenever someone submits without editing a field.
+            if (_state.value == State.SAVING) {
+                _resultCheck.value = ResultCheck.NEWER_AVAILABLE
+            } else if (!userHasEditedForm) {
                 tbDiagnostics = latest
                 renderPage(ben, tbScreening, vital)
             } else if (!resultFor(latest, orderType).isNullOrBlank()) {
@@ -369,6 +386,9 @@ class TBSuspectedQuickViewModel @Inject constructor(
 
                     var apiSuccess = true
                     var apiError: String? = null
+                    // Which order the rejection was about, so the conflict check asks the
+                    // backend about that order rather than the screen's primary one.
+                    var failedOrderType: String? = null
                     // True if any submitManualResult() call this save fell back to its
                     // offline-first path (camp hub disconnected / unreachable) — the result is
                     // still saved and this save still succeeds, but the user should be told it's
@@ -411,6 +431,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 } else {
                                     apiSuccess = false
                                     apiError = (res as? NetworkResponse.Error)?.message ?: "Push Order Failed"
+                                    failedOrderType = "XRAY_CHEST"
                                 }
                             }
                             !isXrayConducted -> {
@@ -432,6 +453,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 } else {
                                     apiSuccess = false
                                     apiError = (res as? NetworkResponse.Error)?.message ?: "Not Conducted Submission Failed"
+                                    failedOrderType = "XRAY_CHEST"
                                 }
                             }
                             enteredXrayResult != null && !tbDiagnostics.xrayOrderStatus.equals("COMPLETED", ignoreCase = true) -> {
@@ -458,6 +480,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 } else {
                                     apiSuccess = false
                                     apiError = (res as? NetworkResponse.Error)?.message ?: "Submit Manual Result Failed"
+                                    failedOrderType = "XRAY_CHEST"
                                 }
                             }
                             else -> {
@@ -505,6 +528,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 } else {
                                     apiSuccess = false
                                     apiError = (res as? NetworkResponse.Error)?.message ?: "Push Order Failed"
+                                    failedOrderType = "SPUTUM_TRUENAT"
                                 }
                             }
                             !isSputumCollectedNow -> {
@@ -526,6 +550,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 } else {
                                     apiSuccess = false
                                     apiError = (res as? NetworkResponse.Error)?.message ?: "Sputum Not Collected Submission Failed"
+                                    failedOrderType = "SPUTUM_TRUENAT"
                                 }
                             }
                             !isMtbConducted -> {
@@ -547,6 +572,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 } else {
                                     apiSuccess = false
                                     apiError = (res as? NetworkResponse.Error)?.message ?: "Not Conducted Submission Failed"
+                                    failedOrderType = "SPUTUM_TRUENAT"
                                 }
                             }
                             enteredMtbResult != null && !tbDiagnostics.trueNatOrderStatus.equals("COMPLETED", ignoreCase = true) -> {
@@ -584,6 +610,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 } else {
                                     apiSuccess = false
                                     apiError = (res as? NetworkResponse.Error)?.message ?: "Submit Manual Result Failed"
+                                    failedOrderType = "SPUTUM_TRUENAT"
                                 }
                             }
                             else -> {
@@ -625,6 +652,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                     } else {
                                         apiSuccess = false
                                         apiError = (rifRes as? NetworkResponse.Error)?.message ?: "RIF Not Conducted Submission Failed"
+                                        failedOrderType = "MDR_RIF"
                                     }
                                 }
                                 enteredRifResult != null && !tbDiagnostics.rifOrderStatus.equals("COMPLETED", ignoreCase = true) -> {
@@ -662,6 +690,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                     } else {
                                         apiSuccess = false
                                         apiError = (rifRes as? NetworkResponse.Error)?.message ?: "Submit RIF Manual Result Failed"
+                                        failedOrderType = "MDR_RIF"
                                     }
                                 }
                                 else -> Unit // RIF section not answered on this save
@@ -716,7 +745,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                         _state.postValue(State.SAVE_SUCCESS)
                     } else {
                         Timber.e("API submission failed for benId=%s: %s", benId, apiError)
-                        val serverResult = resultAlreadyOnServer()
+                        val serverResult = failedOrderType?.let { resultAlreadyOnServer(it) }
                         if (serverResult != null) {
                             _alreadyRecordedResult.postValue(serverResult)
                             _state.postValue(State.RESULT_ALREADY_RECORDED)

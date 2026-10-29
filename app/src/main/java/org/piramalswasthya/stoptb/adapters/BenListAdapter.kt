@@ -1431,9 +1431,6 @@ class BenListAdapter(
     var source: Int = 0
 
     override fun onBindViewHolder(holder: BenViewHolder, position: Int) {
-        // TEMPORARY PERF INSTRUMENTATION - aggregated, reported at most once a second.
-        val bindStartedAtNanos = System.nanoTime()
-        try {
         val item = getItem(position)
         holder.bind(
             item,
@@ -1478,11 +1475,6 @@ class BenListAdapter(
             showAddMemberButton = showAddMemberButton
 
         )
-        } finally {
-            org.piramalswasthya.stoptb.utils.ScreenLoadTrace.rowBind(
-                (System.nanoTime() - bindStartedAtNanos) / 1000
-            )
-        }
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -1510,12 +1502,23 @@ class BenListAdapter(
         tbDiagnosticsList.addAll(list)
         tbDiagnosticsByBenId.clear()
         tbDiagnosticsByBenId.putAll(newByBenId)
+        // A beneficiary with no diagnostics row at all appears in neither map, so the diff below
+        // never names it. Before the first emission such a card renders the "not loaded yet"
+        // placeholder, and without a rebind here it would stay on that disabled placeholder for
+        // good. Only the first load needs the blanket refresh.
+        val firstLoad = !tbDiagnosticsLoaded
         tbDiagnosticsLoaded = true
+        if (firstLoad) {
+            notifyDataSetChanged()
+            return
+        }
         val changedBenIds = (oldByBenId.keys + newByBenId.keys)
             .filterTo(mutableSetOf()) { benId -> oldByBenId[benId] != newByBenId[benId] }
-        if (changedBenIds.isNotEmpty()) {
+        if (changedBenIds.isNotEmpty() || firstLoad) {
             currentList.forEachIndexed { index, item ->
-                if (item.benId in changedBenIds) notifyItemChanged(index)
+                if (item.benId in changedBenIds || (firstLoad && item.benId !in newByBenId)) {
+                    notifyItemChanged(index)
+                }
             }
         }
     }

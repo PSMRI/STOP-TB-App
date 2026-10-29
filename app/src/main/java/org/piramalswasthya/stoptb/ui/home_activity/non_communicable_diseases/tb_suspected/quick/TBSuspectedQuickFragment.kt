@@ -1,6 +1,5 @@
 package org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.tb_suspected.quick
 
-import android.annotation.SuppressLint
 import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
@@ -39,6 +38,9 @@ class TBSuspectedQuickFragment : Fragment() {
 
     private val viewModel: TBSuspectedQuickViewModel by viewModels()
 
+    /** Held so a submit in flight can actually disable the inputs. */
+    private var formAdapter: FormInputAdapter? = null
+
     private val isManagedFlow: Boolean
         get() = viewModel.autoFlow || viewModel.generalOpdFlow
 
@@ -62,6 +64,7 @@ class TBSuspectedQuickFragment : Fragment() {
             isEnabled = true
         )
         binding.form.rvInputForm.adapter = adapter
+        formAdapter = adapter
         binding.btnCancel.visibility = View.GONE
         binding.fabEdit.visibility = View.GONE
         binding.btnSubmit.visibility = if (viewModel.viewOnly) View.GONE else View.VISIBLE
@@ -96,6 +99,10 @@ class TBSuspectedQuickFragment : Fragment() {
                 }
             }
         }
+        // Shared layout defaults this strip to gone; this screen is the only one with a
+        // result check, so it reserves the space here rather than on all six.
+        binding.llCheckStatus.visibility = View.INVISIBLE
+
         // Form-load state — same llContent/llLoading pair NewBenRegFragment uses.
         viewModel.isLoading.observe(viewLifecycleOwner) { loading ->
             binding.llContent.visibility = if (loading) View.GONE else View.VISIBLE
@@ -211,7 +218,6 @@ class TBSuspectedQuickFragment : Fragment() {
      * Submitting is a commitment, so it reports itself on the control the user pressed rather
      * than through the same anonymous spinner the screen uses while it is still loading.
      */
-    @SuppressLint("ClickableViewAccessibility")
     private fun setSubmitting(submitting: Boolean) {
         binding.btnSubmit.isEnabled = !submitting
         binding.btnSubmit.text =
@@ -223,13 +229,19 @@ class TBSuspectedQuickFragment : Fragment() {
                 start()
             }
             binding.btnSubmit.iconGravity = MaterialButton.ICON_GRAVITY_END
-            // The values were snapshotted when the save began, so edits made now would be
-            // silently dropped; swallow touches for the duration instead of accepting them.
-            binding.form.rvInputForm.setOnTouchListener { _, _ -> true }
         } else {
             (binding.btnSubmit.icon as? CircularProgressDrawable)?.stop()
             binding.btnSubmit.icon = null
-            binding.form.rvInputForm.setOnTouchListener(null)
+        }
+        // The values were snapshotted when the save began, so edits made now would be silently
+        // dropped. An OnTouchListener on the RecyclerView does not stop this: it is consulted
+        // from the RecyclerView's own onTouchEvent, which runs only after its children have had
+        // the event, so every dropdown and text field stayed live. Disable the rows instead.
+        formAdapter?.let { formRows ->
+            if (formRows.isEnabled == submitting) {
+                formRows.isEnabled = !submitting
+                formRows.notifyDataSetChanged()
+            }
         }
     }
 
@@ -273,6 +285,7 @@ class TBSuspectedQuickFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding?.llCheckStatus?.removeCallbacks(showCheckingStatus)
+        formAdapter = null
         if (isManagedFlow) {
             setAutoFlowBackNavigationBlocked(false)
         }
