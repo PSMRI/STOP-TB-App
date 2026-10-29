@@ -4,6 +4,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.Response
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.utils.CampHubUrlValidator
 import java.net.HttpURLConnection
 import java.net.URL
 import java.io.IOException
@@ -17,6 +18,13 @@ class CampModeUrlInterceptor @Inject constructor(
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
 
+        // Only redirect while camp mode is actually on. This used to key off the stored URL
+        // alone, so a URL left behind by a failed connect kept re-pointing every request even
+        // after the user turned camp mode off.
+        if (!preferenceDao.isCampModeEnabled()) {
+            return chain.proceed(originalRequest)
+        }
+
         val storedCampHubUrl = preferenceDao.getStoredCampHubUrl()
             ?.trim()
             ?.takeIf { it.isNotBlank() }
@@ -25,12 +33,13 @@ class CampModeUrlInterceptor @Inject constructor(
             throw IOException("Camp hub URL not configured")
         }
 
-        val campHubUrl = storedCampHubUrl
-            .trim()
-            .trimEnd('/')
-            .plus("/")
-            .toHttpUrlOrNull()
-            ?: throw IOException("Invalid camp hub URL: $storedCampHubUrl")
+        // Re-validate at request time, not just at storage time: this request already carries
+        // the Jwttoken/userId headers, and on the auth client it is the refresh-token call.
+        // A stored value that is not a local-network address must never receive either.
+        val campHubUrl = CampHubUrlValidator
+            .normalizeOrNull(storedCampHubUrl, extraAllowedHost = configuredCampHubHost())
+            ?.toHttpUrlOrNull()
+            ?: throw IOException("Refusing to route request to non-local camp hub URL")
 
         val campUrl = originalRequest.url.newBuilder()
             .scheme(campHubUrl.scheme)
@@ -54,6 +63,11 @@ class CampModeUrlInterceptor @Inject constructor(
             throw e
         }
     }
+
+    /** Host of the URL baked into this build, which is always an acceptable hub. */
+    private fun configuredCampHubHost(): String? =
+        preferenceDao.configuredCampHubUrl().takeIf { it.isNotBlank() }
+            ?.let { runCatching { java.net.URI(it).host }.getOrNull() }
 
     private fun isCampHubReachable(rawUrl: String): Boolean {
         val baseUrl = rawUrl.trim().trimEnd('/')

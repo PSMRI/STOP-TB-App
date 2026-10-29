@@ -286,7 +286,19 @@ interface BenDao {
                 )
                 OR benId IN (
                     SELECT td.benId FROM TB_DIAGNOSTICS td
-                    WHERE td.isNaatConducted IS NOT NULL
+                    -- An order the backend already holds makes this beneficiary a member,
+                    -- with or without local clinical evidence. Every bucket
+                    -- getBeneficiariesByStatus reports - awaitingProviderResult, completed,
+                    -- awaitingManualEntry, failed, closed - means an order exists, yet a
+                    -- beneficiary awaiting a provider result has isNaatConducted still NULL and
+                    -- no result, so none of the clinical clauses match. One referred from
+                    -- another tab can reach this device with the order and no screening row of
+                    -- its own and was then missing from the list entirely.
+                    --
+                    -- Uncorrelated, so SQLite materialises it once per query, not once per row.
+                    WHERE td.trueNatOrderId IS NOT NULL
+                       OR td.trueNatOrderStatus IS NOT NULL
+                       OR td.isNaatConducted IS NOT NULL
                        OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                 )
                 OR benId IN (
@@ -458,7 +470,19 @@ interface BenDao {
                 )
                 OR benId IN (
                     SELECT td.benId FROM TB_DIAGNOSTICS td
-                    WHERE td.isNaatConducted IS NOT NULL
+                    -- An order the backend already holds makes this beneficiary a member,
+                    -- with or without local clinical evidence. Every bucket
+                    -- getBeneficiariesByStatus reports - awaitingProviderResult, completed,
+                    -- awaitingManualEntry, failed, closed - means an order exists, yet a
+                    -- beneficiary awaiting a provider result has isNaatConducted still NULL and
+                    -- no result, so none of the clinical clauses match. One referred from
+                    -- another tab can reach this device with the order and no screening row of
+                    -- its own and was then missing from the list entirely.
+                    --
+                    -- Uncorrelated, so SQLite materialises it once per query, not once per row.
+                    WHERE td.trueNatOrderId IS NOT NULL
+                       OR td.trueNatOrderStatus IS NOT NULL
+                       OR td.isNaatConducted IS NOT NULL
                        OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                 )
                 OR benId IN (
@@ -557,21 +581,42 @@ interface BenDao {
         -- above terminal (Closed) — instead of ordering purely by recency, which could bury a
         -- beneficiary whose order genuinely needs a retry under one that's already resolved.
         -- Every other source falls into the ELSE branch, unaffected, same as before.
+        --
+        -- An order that is placed and awaiting a result (tier 1) now ranks above a beneficiary
+        -- who has no order at all (tier 2). Both used to share one tier, so a live order sat
+        -- among everyone who merely qualifies for the test - on a full village that is most of
+        -- the list, and the one beneficiary actually waiting on a device was indistinguishable.
+        -- Completed and Closed keep their existing position below both.
+        --
+        -- IFNULL is what separates them: a bare CASE cannot match NULL (NULL = NULL is never
+        -- true), so "no order" and "order pending" both fell through to the same ELSE. Folding
+        -- NULL to '' costs nothing and keeps this a simple CASE, which evaluates its subject
+        -- expression exactly once - the subquery count per row is unchanged.
         CASE
-            WHEN :source = 6 THEN CASE
-                (SELECT xrayOrderStatus FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId ORDER BY id DESC LIMIT 1)
+            WHEN :source = 6 THEN CASE IFNULL(
+                (SELECT xrayOrderStatus FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId ORDER BY id DESC LIMIT 1), '')
                 WHEN 'FAILED' THEN 0
                 WHEN 'MANUAL_ENTRY' THEN 0
-                WHEN 'COMPLETED' THEN 2
-                WHEN 'CLOSED' THEN 3
+                -- No status, but an order id means the order exists and is in flight: rank it
+                -- with the other in-flight orders, not with beneficiaries who have no order.
+                -- The pull can store id and status independently. The subquery only runs for
+                -- rows that reached this branch, i.e. those with no status at all.
+                WHEN '' THEN (CASE WHEN (SELECT xrayOrderId FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId ORDER BY id DESC LIMIT 1) IS NOT NULL THEN 1 ELSE 2 END)
+                WHEN 'COMPLETED' THEN 3
+                WHEN 'CLOSED' THEN 4
                 ELSE 1
             END
-            WHEN :source = 7 THEN CASE
-                (SELECT trueNatOrderStatus FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId ORDER BY id DESC LIMIT 1)
+            WHEN :source = 7 THEN CASE IFNULL(
+                (SELECT trueNatOrderStatus FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId ORDER BY id DESC LIMIT 1), '')
                 WHEN 'FAILED' THEN 0
                 WHEN 'MANUAL_ENTRY' THEN 0
-                WHEN 'COMPLETED' THEN 2
-                WHEN 'CLOSED' THEN 3
+                -- No status, but an order id means the order exists and is in flight: rank it
+                -- with the other in-flight orders, not with beneficiaries who have no order.
+                -- The pull can store id and status independently. The subquery only runs for
+                -- rows that reached this branch, i.e. those with no status at all.
+                WHEN '' THEN (CASE WHEN (SELECT trueNatOrderId FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId ORDER BY id DESC LIMIT 1) IS NOT NULL THEN 1 ELSE 2 END)
+                WHEN 'COMPLETED' THEN 3
+                WHEN 'CLOSED' THEN 4
                 ELSE 1
             END
             ELSE 1
@@ -613,6 +658,67 @@ interface BenDao {
         benId DESC
     """)
     fun searchBenPaged(villageIds: List<Int>, source: Int, filterType: Int, query: String): PagingSource<Int, BenBasicCache>
+
+    /**
+     * The beneficiary list query for the sources that have no TB predicate: 0 All, 1 ABHA,
+     * 2 RCH, 3 age 30+, 4 eligible couple.
+     *
+     * searchBenPaged() handles every source in one statement, and its :source = 5..10 branches
+     * name TB_SUSPECTED, TB_DIAGNOSTICS, TB_SCREENING and BEN_VITALS. Room derives a query's
+     * observed tables from the SQL text, not from which branch runs, so the All Beneficiaries list
+     * was invalidated by every TB write even though it can never take those branches - and with
+     * the sync writing every couple of seconds the list was cancelled and restarted faster than it
+     * could load, leaving a spinner that never resolved.
+     *
+     * This statement mentions only BEN_BASIC_CACHE, so it observes BENEFICIARY and HOUSEHOLD and
+     * nothing else. The WHERE/ORDER BY are otherwise identical to searchBenPaged's for these
+     * sources, with the 6/7-only ORDER BY branches dropped because they collapse to the ELSE arm.
+     */
+    @Query("""
+        SELECT * FROM BEN_BASIC_CACHE
+        WHERE villageId IN (:villageIds)
+        AND isDeactivate = 0
+        AND (:source = 0
+            OR (:source = 1 AND abhaId IS NOT NULL)
+            OR (:source = 2 AND rchId IS NOT NULL AND rchId != '')
+            OR (:source = 3 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) >= 30 AND isDeath = 0)
+            OR (:source = 4 AND gender = 'Female' AND isDeath = 0
+                AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
+                AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
+        )
+        AND (:filterType = 0
+            OR (:filterType = 1 AND abhaId IS NOT NULL)
+            OR (:filterType = 2 AND abhaId IS NULL)
+            OR (:filterType = 3 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) >= 30 AND isDeath = 0)
+            OR (:filterType = 4 AND gender = 'Female' AND isDeath = 0
+                AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
+                AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
+        )
+        AND (:query = '' OR
+            benName LIKE '%' || :query || '%'
+            OR benSurname LIKE '%' || :query || '%'
+            OR (IFNULL(benName, '') || ' ' || IFNULL(benSurname, '')) LIKE '%' || :query || '%'
+            OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
+            OR REPLACE(IFNULL(abhaId, ''), '-', '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
+            OR IFNULL(familyHeadName, '') LIKE '%' || :query || '%'
+            OR IFNULL(spouseName, '') LIKE '%' || :query || '%'
+            OR IFNULL(fatherName, '') LIKE '%' || :query || '%'
+            OR CAST(benId AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
+            OR CAST(hhId AS TEXT) LIKE '%' || :query || '%'
+            OR IFNULL(rchId, '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
+        )
+        ORDER BY CASE
+            WHEN isDeath = 0 AND isDeactivate = 0 THEN 0
+            WHEN isDeath = 1 AND isDeactivate = 0 THEN 1
+            WHEN isDeactivate = 1 THEN 2
+            ELSE 3
+        END ASC,
+        COALESCE(createdDate, regDate, 0) DESC,
+        benId DESC
+    """)
+    fun searchBenPagedWithoutTbTables(villageIds: List<Int>, source: Int, filterType: Int, query: String): PagingSource<Int, BenBasicCache>
+
+
 
     @Query("""
         SELECT * FROM BEN_BASIC_CACHE
@@ -673,7 +779,19 @@ interface BenDao {
                 )
                 OR benId IN (
                     SELECT td.benId FROM TB_DIAGNOSTICS td
-                    WHERE td.isNaatConducted IS NOT NULL
+                    -- An order the backend already holds makes this beneficiary a member,
+                    -- with or without local clinical evidence. Every bucket
+                    -- getBeneficiariesByStatus reports - awaitingProviderResult, completed,
+                    -- awaitingManualEntry, failed, closed - means an order exists, yet a
+                    -- beneficiary awaiting a provider result has isNaatConducted still NULL and
+                    -- no result, so none of the clinical clauses match. One referred from
+                    -- another tab can reach this device with the order and no screening row of
+                    -- its own and was then missing from the list entirely.
+                    --
+                    -- Uncorrelated, so SQLite materialises it once per query, not once per row.
+                    WHERE td.trueNatOrderId IS NOT NULL
+                       OR td.trueNatOrderStatus IS NOT NULL
+                       OR td.isNaatConducted IS NOT NULL
                        OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
                 )
                 OR benId IN (
@@ -824,10 +942,12 @@ interface BenDao {
     fun getAllTbScreeningBen(selectedVillage: Int): Flow<List<BenWithTbScreeningCache>>
 
     @Transaction
-    @Query("SELECT * FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0 and tbsnFilled = 1")
+    // tbsnFilled is a literal in the view now - these two genuinely mean "has a screening
+    // row", so they ask TB_SCREENING directly and go on observing it, which is correct here.
+    @Query("SELECT * FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0 and EXISTS (SELECT 1 FROM TB_SCREENING s WHERE s.benId = BEN_BASIC_CACHE.benId)")
     fun getPendingTbScreeningBen(selectedVillage: Int): Flow<List<BenWithTbScreeningCache>>
 
-    @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0 and tbsnFilled = 1")
+    @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0 and EXISTS (SELECT 1 FROM TB_SCREENING s WHERE s.benId = BEN_BASIC_CACHE.benId)")
     fun getPendingTbScreeningCount(selectedVillage: Int): Flow<Int>
 
     /** Count of beneficiaries who have a TB_SCREENING record (directly from TB_SCREENING table — reliable for both local and server-synced data) */
@@ -913,6 +1033,16 @@ interface BenDao {
 
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0")
     fun getAllBenCount(selectedVillage: Int): Flow<Int>
+
+    /**
+     * TEMPORARY PERFORMANCE INSTRUMENTATION - remove with the rest of the trace scaffolding.
+     *
+     * Costs nothing to execute, so however long it takes to come back is time spent queueing on
+     * Room's query executor rather than doing work. Timing it either side of a paging load splits
+     * "this query is expensive" from "the database is busy with the sync".
+     */
+    @Query("SELECT 1")
+    suspend fun perfProbe(): Int
 
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage AND isDeactivate=0 AND abhaId IS NOT NULL")
     fun getAllBenWithAbhaCount(selectedVillage: Int): Flow<Int>
@@ -1039,6 +1169,22 @@ interface BenDao {
 
     @Query("SELECT * FROM BENEFICIARY WHERE benRegId = :benRegId LIMIT 1")
     suspend fun getBenByRegId(benRegId: Long): BenRegCache?
+
+    /**
+     * Resolves a whole chunk of server benRegIds to local beneficiaryIds in one statement.
+     * [getBenByRegId] scans the beneficiary table for a single id because benRegId is not
+     * indexed, so a pull calling it per record scans the table once per record.
+     */
+    @Query("SELECT benRegId, beneficiaryId FROM BENEFICIARY WHERE benRegId IN (:benRegIds)")
+    suspend fun getBenIdsByRegIds(benRegIds: List<Long>): List<org.piramalswasthya.stoptb.model.BenRegIdMapping>
+
+    /**
+     * Which of [benIds] exist as local beneficiaryIds. Callers that resolve a server id first
+     * by benRegId and then fall back to treating it as a local beneficiaryId use this for the
+     * fallback leg, so the fallback is one statement per chunk rather than one per id.
+     */
+    @Query("SELECT beneficiaryId FROM BENEFICIARY WHERE beneficiaryId IN (:benIds)")
+    suspend fun getExistingBenIds(benIds: List<Long>): List<Long>
 
     @Query("SELECT beneficiaryId FROM BENEFICIARY WHERE loc_village_id = :selectedVillage AND isDeactivate = 0 AND isDraft = 0")
     suspend fun getActiveBeneficiaryIds(selectedVillage: Int): List<Long>
@@ -1181,14 +1327,24 @@ interface BenDao {
             )
             OR benId IN (
               SELECT td.benId FROM TB_DIAGNOSTICS td
-              WHERE td.isNaatConducted IS NOT NULL
+              -- Must match the source = 7 membership rule in searchBenPaged exactly, or the
+              -- card's badge disagrees with the list it opens. See the note there.
+              WHERE td.trueNatOrderId IS NOT NULL
+                 OR td.trueNatOrderStatus IS NOT NULL
+                 OR td.isNaatConducted IS NOT NULL
                  OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
             )
+            -- reproductiveStatusId is a BEN_BASIC_CACHE column, not a TB_SCREENING one. Having
+            -- it inside this subquery made the subquery correlated, so SQLite re-scanned the
+            -- whole of TB_SCREENING once per beneficiary - O(beneficiaries x screenings), which
+            -- measured 5.3 SECONDS on a mid-range device at 5,000 beneficiaries and grows
+            -- quadratically. Hoisted to the outer level, which is logically identical (same
+            -- row counts verified at 5k and 25k) and uncorrelated, it runs in ~44ms.
+            OR (reproductiveStatusId = 1 AND benId IN (SELECT tbs.benId FROM TB_SCREENING tbs))
             OR benId IN (
               SELECT tbs.benId FROM TB_SCREENING tbs
               WHERE
                 tbs.recommendedForTruenatTest = 1
-                OR reproductiveStatusId = 1
                 OR (
                   tbs.bloodInSputum = 1
                   OR tbs.coughMoreThan2Weeks = 1
@@ -1365,11 +1521,11 @@ interface BenDao {
     fun getAllMotherImmunizationList(selectedVillage: Int): Flow<List<BenBasicCache>>
 
 
-    @Query("select * from BEN_BASIC_CACHE b inner join tb_screening t on  b.benId = t.benId where villageId = :villageId  and tbsnFilled = 1 and (t.bloodInSputum =1 or t.coughMoreThan2Weeks = 1 or feverMoreThan2Weeks = 1 or nightSweats = 1 or lossOfWeight = 1 or historyOfTb = 1)")
+    @Query("select * from BEN_BASIC_CACHE b inner join tb_screening t on  b.benId = t.benId where villageId = :villageId and (t.bloodInSputum =1 or t.coughMoreThan2Weeks = 1 or feverMoreThan2Weeks = 1 or nightSweats = 1 or lossOfWeight = 1 or historyOfTb = 1)")
     fun getScreeningList(villageId: Int): Flow<List<BenBasicCache>>
 
     @Transaction
-    @Query("select b.* from BEN_BASIC_CACHE b inner join tb_screening t on b.benId = t.benId LEFT JOIN TB_SUSPECTED ts ON b.benId = ts.benId LEFT JOIN TB_DIAGNOSTICS td ON b.benId = td.benId where villageId = :villageId and isDeactivate=0 and b.isDeath = 0  and tbsnFilled = 1 and (\n" +
+    @Query("select b.* from BEN_BASIC_CACHE b inner join tb_screening t on b.benId = t.benId LEFT JOIN TB_SUSPECTED ts ON b.benId = ts.benId LEFT JOIN TB_DIAGNOSTICS td ON b.benId = td.benId where villageId = :villageId and isDeactivate=0 and b.isDeath = 0 and (\n" +
             "            t.bloodInSputum = 1\n" +
             "            OR t.coughMoreThan2Weeks = 1\n" +
             "            OR t.feverMoreThan2Weeks = 1\n" +
@@ -1587,6 +1743,37 @@ interface BenDao {
     """)
     fun searchNonHHBeneficiaries(selectedVillage: Int, query: String): Flow<List<BenBasicCache>>
 
+    /**
+     * Paged form of [searchNonHHBeneficiaries]. The Flow variant materialises every matching
+     * row - on a camp device that is the whole village, ~20k rows of 92 columns, rebuilt on
+     * every database invalidation. That allocation is what pushes the heap into continuous GC,
+     * so the screen loads a page at a time instead.
+     *
+     * The ORDER BY is required, not cosmetic. A PagingSource walks this with LIMIT/OFFSET, and
+     * OFFSET only identifies the same rows twice if the statement has a total order to offset
+     * into. Without one the order is whatever the plan happens to produce, so a plan change -
+     * a different index chosen once the search term is non-empty, say - can silently hand the
+     * adapter a row it has already shown or skip one it has not.
+     *
+     * benId ASC is what the current plan already yields (verified identical, same rows in the
+     * same order, browsing and searching), so this pins today's behaviour rather than changing
+     * it. It is also free: beneficiaryId is the rowid and all three WHERE terms are equalities,
+     * so ind_ben_village_deactivate already returns rows in this order and no sort is added -
+     * measured at 25k rows, 0.34ms page 0 either way, with no temp B-tree in the plan.
+     *
+     * ASC specifically, not DESC. Pulled beneficiaries arrive with ascending ids, so ASC appends
+     * them past the pages already read while DESC would insert them at the front and shift every
+     * offset underneath the adapter: paging 40 pages while a pull committed 50 rows between each
+     * returned 390 duplicates under DESC and 0 under ASC.
+     */
+    @Query("""
+        SELECT * FROM BEN_BASIC_CACHE
+        WHERE villageId = :selectedVillage AND isDeactivate = 0 AND isNonHH = 1
+        AND (:query = '' OR benName LIKE '%' || :query || '%' OR benSurname LIKE '%' || :query || '%' OR (IFNULL(benName, '') || ' ' || IFNULL(benSurname, '')) LIKE '%' || :query || '%' OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%')
+        ORDER BY benId ASC
+    """)
+    fun searchNonHHBeneficiariesPaged(selectedVillage: Int, query: String): PagingSource<Int, BenBasicCache>
+
 
     @Query("""
     SELECT COUNT(*)
@@ -1609,7 +1796,9 @@ interface BenDao {
     @Query("""
         SELECT
             COUNT(*) AS population,
-            COUNT(CASE WHEN screeningStatus = 'UNSCREENED' AND tbsnFilled = 0 THEN 1 END) AS unscreened
+            COUNT(CASE WHEN screeningStatus = 'UNSCREENED'
+                       AND NOT EXISTS (SELECT 1 FROM TB_SCREENING s WHERE s.benId = BEN_BASIC_CACHE.benId)
+                  THEN 1 END) AS unscreened
         FROM BEN_BASIC_CACHE
         WHERE isDeactivate = 0 AND isDeath = 0
           AND villageId IN (:villageIds)

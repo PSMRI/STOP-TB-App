@@ -295,18 +295,56 @@ class CounsellingRepositoryImpl @Inject constructor(
         submitSectionWithPhase(responseId, answers, "GENERAL_INFO", "REFUSED")
     }
 
+    /**
+     * @return true only when the server has accepted this section. Callers treat true as
+     *   confirmation and write `syncStatus = "SYNCED"`, so the no-op paths below must not
+     *   return it: doing so marked a REFUSED counselling record SYNCED without any API call
+     *   ever being made, and the refusal was never transmitted.
+     */
     override suspend fun submitSectionBulk(responseId: Long, sectionId: Int): Boolean {
-        val resp = responseDao.getFormResponseById(responseId) ?: return true
+        val resp = responseDao.getFormResponseById(responseId)
+        if (resp == null) {
+            // Nothing to transmit and nothing to mark - the row is gone.
+            Timber.w("submitSectionBulk: responseId=$responseId no longer exists, nothing to sync")
+            return true
+        }
         val sectionResponse = resp.sectionResponses.find { it.sectionResponse.sectionId == sectionId }
-            ?: return true
+        if (sectionResponse == null) {
+            Timber.e("submitSectionBulk: responseId=$responseId has no section $sectionId; leaving UNSYNCED rather than claiming it was sent")
+            return false
+        }
 
         val formDef = metadataDao.getFormDefinitionByVersionId(resp.formResponse.formVersionId)
         val officerId = preferenceDao.getLoggedInUser()?.userId?.toLong() ?: DEFAULT_OFFICER_ID
         val payload = PayloadBuilder.buildBulkPayload(resp, formDef, officerId, sectionIdFilter = sectionId)
 
+        // A section targeted by sectionIdFilter is kept by PayloadBuilder even with no answers
+        // (deliberately, so an optional blank final section still submits). That means the
+        // emptiness check below never fires for the targeted path, and a REFUSED record whose
+        // GENERAL_INFO section has no answers would be POSTed as an empty answer list and then
+        // marked SYNCED on the 200. Catch that case explicitly.
+        if (resp.formResponse.status == "REFUSED" && sectionResponse.questionResponses.isEmpty()) {
+            Timber.e(
+                "submitSectionBulk: REFUSED responseId=$responseId section=$sectionId has no " +
+                        "answers - refusing to submit an empty payload and claim it synced"
+            )
+            return false
+        }
+
         if (payload.sections.isEmpty()) {
-            Timber.d("submitSectionBulk: sectionId=$sectionId has no answers, skipping API call")
-            return true
+            // No API call is made, so this record has NOT reached the server. Reporting success
+            // here is what let an empty GENERAL_INFO section on a REFUSED record be marked
+            // SYNCED and silently dropped.
+            //
+            // Known limitation: callers treat false as "retry in the background", and a section
+            // that structurally produces an empty payload can never produce a non-empty one, so
+            // this record retries on every sweep and keeps an unsynced badge. That is deliberate
+            // for now - a visibly stuck record is recoverable, a silently discarded refusal is
+            // not - but the right fix is upstream: stop creating REFUSED records with no
+            // answers, or give the caller a distinct terminal "nothing to send" outcome instead
+            // of reusing the failure value.
+            Timber.e("submitSectionBulk: sectionId=$sectionId built an empty payload, nothing sent; leaving UNSYNCED (will retry - see comment)")
+            return false
         }
 
         val jwt = preferenceDao.getJWTAmritToken()

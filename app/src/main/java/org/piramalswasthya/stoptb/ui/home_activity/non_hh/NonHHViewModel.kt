@@ -12,6 +12,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.FlowPreview
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
+import androidx.paging.map
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.HouseholdBasicCache
@@ -21,7 +30,7 @@ import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
 import javax.inject.Inject
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
 class NonHHViewModel @Inject constructor(
     private val recordsRepo: RecordsRepo,
@@ -55,7 +64,7 @@ class NonHHViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val diagnosisBenIds: StateFlow<List<Long>> = combine(
-        tbRepo.tbDiagnosticsBenIds,
+        tbRepo.tbDiagnosticsBenIdsFromCards,
         tbRepo.tbSuspectedBenIds
     ) { diagnostics, suspected -> (diagnostics + suspected).distinct() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -63,15 +72,26 @@ class NonHHViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> get() = _searchQuery
 
-    val nonHHList: StateFlow<List<BenBasicDomain>> = _searchQuery
+    /**
+     * Pages the non-household list instead of materialising it.
+     *
+     * The previous `Flow<List<BenBasicDomain>>` loaded every matching row - on a camp device
+     * that is the entire village (~20k rows of 92 columns), rebuilt from scratch on every
+     * database invalidation. Measured on the device, just walking that cursor took 2.5s, and
+     * the resulting allocation churn kept the heap pinned near its limit, so the whole app
+     * stalled in GC. Paging keeps it to one 30-row page.
+     */
+    val nonHHList: Flow<PagingData<BenBasicDomain>> = _searchQuery
+        // Typing fires onTextChanged per keystroke, and each distinct query starts a fresh
+        // query. Collapse a burst of keystrokes into one.
+        .debounce { query -> if (query.isEmpty()) 0L else searchDebounceMs }
+        .distinctUntilChanged()
         .flatMapLatest { query ->
-            recordsRepo.searchNonHH(query)
+            Pager(config = PagingConfig(pageSize = 30, prefetchDistance = 10)) {
+                recordsRepo.searchNonHHPagedSource(query)
+            }.flow.map { pagingData -> pagingData.map { it.asBasicDomainModel() } }
         }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+        .cachedIn(viewModelScope)
 
     val hhList: Flow<List<HouseholdBasicCache>>
         get() {
@@ -82,6 +102,10 @@ class NonHHViewModel @Inject constructor(
 
     fun filterText(query: String) {
         _searchQuery.value = query
+    }
+
+    private companion object {
+        const val searchDebounceMs = 300L
     }
 
     suspend fun getBenFromId(benId: Long) = benRepo.getBenFromId(benId)

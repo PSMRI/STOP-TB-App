@@ -34,6 +34,7 @@ import org.piramalswasthya.stoptb.network.AbhaApiService
 import org.piramalswasthya.stoptb.network.AmritApiService
 import org.piramalswasthya.stoptb.network.interceptors.AccountDeactivationInterceptor
 import org.piramalswasthya.stoptb.network.interceptors.CampModeUrlInterceptor
+import org.piramalswasthya.stoptb.network.interceptors.PerfTimingInterceptor
 import org.piramalswasthya.stoptb.network.interceptors.ContentTypeInterceptor
 import org.piramalswasthya.stoptb.network.interceptors.LoggingInterceptor
 import org.piramalswasthya.stoptb.network.interceptors.TokenAuthenticator
@@ -64,7 +65,8 @@ object AppModule {
     fun provideAuthClient(
         loggingInterceptor: HttpLoggingInterceptor,
         campModeUrlInterceptor: CampModeUrlInterceptor,
-        accountDeactivationInterceptor: AccountDeactivationInterceptor
+        accountDeactivationInterceptor: AccountDeactivationInterceptor,
+        perfTimingInterceptor: PerfTimingInterceptor
     ): OkHttpClient {
         return OkHttpClient.Builder()
             .connectTimeout(60, TimeUnit.SECONDS)
@@ -74,6 +76,8 @@ object AppModule {
             .addInterceptor(campModeUrlInterceptor)
             .addInterceptor(loggingInterceptor)
             .addInterceptor(accountDeactivationInterceptor)
+            // TEMPORARY PERF INSTRUMENTATION - appended last, existing order unchanged.
+            .addInterceptor(perfTimingInterceptor)
             .build()
     }
 
@@ -102,7 +106,8 @@ object AppModule {
         tokenAuthenticator: TokenAuthenticator,
         loggingInterceptor: HttpLoggingInterceptor,
         campModeUrlInterceptor: CampModeUrlInterceptor,
-        accountDeactivationInterceptor: AccountDeactivationInterceptor
+        accountDeactivationInterceptor: AccountDeactivationInterceptor,
+        perfTimingInterceptor: PerfTimingInterceptor
     ): OkHttpClient {
         return baseClient
             .newBuilder()
@@ -111,6 +116,9 @@ object AppModule {
             .addInterceptor(campModeUrlInterceptor)
             .addInterceptor(loggingInterceptor)
             .addInterceptor(accountDeactivationInterceptor)
+            // TEMPORARY PERF INSTRUMENTATION - appended LAST so the order of every existing
+            // interceptor is unchanged and the timing covers what the caller actually waits for.
+            .addInterceptor(perfTimingInterceptor)
             .authenticator(tokenAuthenticator) // attach authenticator for 401 handling
             .build()
     }
@@ -133,11 +141,15 @@ object AppModule {
     @Provides
     fun provideHttpLoggingInterceptor(): HttpLoggingInterceptor {
         val loggingInterceptor = HttpLoggingInterceptor(LoggingInterceptor()).apply {
-            level =
-                    //if (BuildConfig.DEBUG)
-                HttpLoggingInterceptor.Level.BODY
-            //else
-            //HttpLoggingInterceptor.Level.NONE
+            // BASIC, not BODY. At BODY this interceptor reads every response fully into a
+            // Buffer and then copies it into a String purely to log it - for the bulk
+            // `getAll` endpoints that is a multi-megabyte UTF-16 copy of a body the parser is
+            // about to materialise again. On a camp device that showed up as ~93MB sitting in
+            // the large-object space and a heap pinned near its 186MB ceiling, which stalled
+            // the whole app in back-to-back GCs. BASIC keeps method, URL, status and size.
+            // Flip this to BODY temporarily when a payload actually has to be inspected; it
+            // also writes beneficiary PII (names, DOB, phone numbers) into logcat.
+            level = HttpLoggingInterceptor.Level.BASIC
         }
         return loggingInterceptor
     }
