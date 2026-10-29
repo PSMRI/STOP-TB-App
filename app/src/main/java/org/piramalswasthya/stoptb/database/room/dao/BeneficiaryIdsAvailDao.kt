@@ -22,5 +22,8 @@ interface BeneficiaryIdsAvailDao {
     @Query("SELECT COUNT(*) FROM BEN_ID_LIST")
     fun liveCount(): Flow<Int>
 
+    @Query("SELECT MIN(benId) FROM BEN_ID_LIST")
+    suspend fun getMinBenId(): Long?
+
 
 }
