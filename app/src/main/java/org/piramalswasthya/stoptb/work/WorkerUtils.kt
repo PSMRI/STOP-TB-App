@@ -163,7 +163,7 @@ object WorkerUtils {
         }
 
         // StopTB push chain:
-        // Registration (+ vitals) → TB data + ABHA + counselling
+        // Registration (+ vitals) → TB data + ABHA + counselling + contact tracing
         //
         // Registration is expedited so it runs promptly instead of waiting for
         // a Doze / battery-saver maintenance window. If the expedited quota is
@@ -201,12 +201,20 @@ object WorkerUtils {
             syncRequestBuilder<PushCounsellingWorker>()
         }.addTag("push_group10_counselling").build()
 
+        val groupContactTracing = if (isCampHubSyncActive) {
+            campSyncRequestBuilder<PushContactTracingWorker>()
+        } else {
+            syncRequestBuilder<PushContactTracingWorker>()
+        }.addTag("push_group11_contact_tracing").build()
+
         val chainTB = afterRegistration.then(groupTB)
         val chainAbha = afterRegistration.then(listOf(groupAbha))
         val chainCounselling = afterRegistration.then(listOf(groupCounselling))
+        val chainContactTracing = afterRegistration.then(listOf(groupContactTracing))
 
-        WorkContinuation.combine(listOf(chainTB, chainAbha, chainCounselling)).enqueue()
-        return listOf(registration.id, groupAbha.id, groupCounselling.id) + groupTB.map { it.id }
+        WorkContinuation.combine(listOf(chainTB, chainAbha, chainCounselling, chainContactTracing)).enqueue()
+        return listOf(registration.id, groupAbha.id, groupCounselling.id, groupContactTracing.id) +
+                groupTB.map { it.id }
     }
 
     fun triggerAmritPullWorker(
