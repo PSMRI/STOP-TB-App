@@ -208,19 +208,23 @@ interface BenDao {
     @Query("SELECT * FROM BEN_BASIC_CACHE where villageId = :selectedVillage AND isDeactivate = 0")
     fun getAllBen(selectedVillage: Int): Flow<List<BenBasicCache>>
 
-    @Query("""
-        SELECT beneficiaryId FROM BENEFICIARY
-        WHERE loc_village_id = :selectedVillage
-        AND isDeactivate = 0
-        AND isDraft = 0
-        AND (
-            height IS NOT NULL
-            OR weight IS NOT NULL
-            OR bmi IS NOT NULL
-            OR temperature IS NOT NULL
-        )
-    """)
-    fun getAnthropometryFilledBenIds(selectedVillage: Int): Flow<List<Long>>
+
+    // Not filtered by village: the ben list can show other-village beneficiaries (block search),
+        // and TB Screening status isn't village-filtered either.
+        @Query("""
+            SELECT beneficiaryId FROM BENEFICIARY
+            WHERE isDeactivate = 0
+            AND isDraft = 0
+            AND (
+                height IS NOT NULL
+                OR weight IS NOT NULL
+                OR bmi IS NOT NULL
+                OR temperature IS NOT NULL
+            )
+        """)
+
+
+    fun getAnthropometryFilledBenIds(): Flow<List<Long>>
 
 
     @Query("""
