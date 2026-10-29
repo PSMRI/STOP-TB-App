@@ -64,10 +64,14 @@ class ChangesFeedRepo @Inject constructor(
      */
     suspend fun pull(): Outcome = withContext(Dispatchers.IO) {
         val user = preferenceDao.getLoggedInUser() ?: throw IllegalStateException("No user logged in")
-        val villageId = preferenceDao.getLocationRecord()?.village?.id
-            ?: throw IllegalStateException("No village selected")
-        val villages = listOf(villageId)
-        val scope = "${user.serviceMapId}|${villages.sorted().joinToString(",")}|${APPLIED_TYPES.joinToString(",")}"
+        // Every village assigned to the user, so the tablet holds all of them and works offline in
+        // any; the selected village is only a view filter. The selected village is always included,
+        // in case the user record carries no village list.
+        val selectedVillage = preferenceDao.getLocationRecord()?.village?.id
+        val villages = (user.villages.map { it.id } + listOfNotNull(selectedVillage))
+            .filter { it > 0 }.distinct().sorted()
+        if (villages.isEmpty()) throw IllegalStateException("No village assigned or selected")
+        val scope = "${user.serviceMapId}|${villages.joinToString(",")}|${APPLIED_TYPES.joinToString(",")}"
 
         var token = preferenceDao.getChangesFeedToken(scope)
         var refreshedToken = false
