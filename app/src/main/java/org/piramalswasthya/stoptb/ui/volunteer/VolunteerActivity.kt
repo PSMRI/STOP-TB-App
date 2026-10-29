@@ -54,6 +54,7 @@ import org.piramalswasthya.stoptb.ui.login_activity.LoginActivity
 import org.piramalswasthya.stoptb.ui.service_location_activity.ServiceLocationActivity
 import org.piramalswasthya.stoptb.ui.volunteer.fragment.VolunteerViewModel
 import org.piramalswasthya.stoptb.work.WorkerUtils
+import org.piramalswasthya.stoptb.utils.sync.CampHubReachability
 import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -700,21 +701,10 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
      * Any HTTP response (even 4xx) means the server is up.
      * Must be called from a background thread.
      */
-    private fun pingCampHub(): Boolean {
-        return try {
-            val url = java.net.URL(pref.getCampHubUrl())
-            val conn = url.openConnection() as java.net.HttpURLConnection
-            conn.connectTimeout = 3000
-            conn.readTimeout = 3000
-            conn.requestMethod = "GET"
-            conn.connect()
-            val code = conn.responseCode
-            conn.disconnect()
-            code in 100..499
-        } catch (e: Exception) {
-            false
-        }
-    }
+    // Same reachability rule as the sign-in screen, interceptor and sync gate
+    // (GET /common-api/health, 2xx). Blocking: call off the main thread.
+    private fun pingCampHub(): Boolean =
+        CampHubReachability.isReachable(pref.getCampHubUrl())
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
