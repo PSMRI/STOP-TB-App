@@ -139,16 +139,21 @@ object WorkerUtils {
     }
 
     // Tells the camp laptop which app version this tablet runs. Cheap no-op outside a camp.
-    // No network constraint, same reason as the heartbeat below.
+    // No network constraint, same reason as the heartbeat below. Not important: it has its own
+    // unique name (no sync screen or gate watches it), and it never throws into the caller.
     fun reportTabletVersion(context: Context, force: Boolean) {
-        val request = OneTimeWorkRequestBuilder<TabletVersionReportWorker>()
-            .setInputData(Data.Builder().putBoolean(TabletVersionReportWorker.FORCE, force).build())
-            .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            tabletVersionReportUniqueName,
-            if (force) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
-            request
-        )
+        try {
+            val request = OneTimeWorkRequestBuilder<TabletVersionReportWorker>()
+                .setInputData(Data.Builder().putBoolean(TabletVersionReportWorker.FORCE, force).build())
+                .build()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                tabletVersionReportUniqueName,
+                if (force) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
+                request
+            )
+        } catch (e: Exception) {
+            Timber.d("Tablet version report not scheduled: ${e.message}")
+        }
     }
 
     // Schedules SyncHeartbeatWorker every 15 minutes (the WorkManager minimum) so

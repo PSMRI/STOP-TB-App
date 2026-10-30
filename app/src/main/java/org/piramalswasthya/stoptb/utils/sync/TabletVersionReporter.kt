@@ -48,7 +48,12 @@ object TabletVersionReporter {
      * Sends the report when camp mode is on and the hub is an IP. Without [force], at most once an
      * hour unless the version, user or camp changed since the last report that got through.
      */
-    fun report(context: Context, pref: PreferenceDao, force: Boolean = false): Boolean {
+    fun report(context: Context, pref: PreferenceDao, force: Boolean = false): Boolean =
+        runCatching { send(context, pref, force) }
+            .onFailure { Timber.d("Tablet version report skipped: ${it.javaClass.simpleName}: ${it.message}") }
+            .getOrDefault(false)
+
+    private fun send(context: Context, pref: PreferenceDao, force: Boolean): Boolean {
         if (!pref.isCampModeEnabled()) return false
         val url = reportUrl(pref.getCampHubUrl()) ?: return false
         val userName = pref.getLoggedInUser()?.userName ?: pref.getRememberedUserName()
