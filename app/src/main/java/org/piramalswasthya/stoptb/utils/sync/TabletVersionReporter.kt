@@ -13,7 +13,7 @@ import java.net.URL
 
 /**
  * Tells the camp laptop which app version this tablet runs, so AMRIT Fleet can flag camps whose
- * tablets need an update. Only at a real camp: the camp hub URL must point at an IP address
+ * tablets need an update. Only at a real camp: the camp hub URL must point at a private IP address
  * (a hostname means a server such as UAT, which has no laptop console). The report goes to the
  * laptop console's tablet port on that IP, not to the AMRIT APIs.
  *
@@ -29,15 +29,20 @@ object TabletVersionReporter {
     private const val LAST_KEY = "last_key"
     private val IPV4 = Regex("""^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$""")
 
-    /** http://<ip>:9091/tablet/report for a camp hub URL whose host is an IPv4 address, else null. */
+    /** http://<ip>:9091/tablet/report for a camp hub URL whose host is a private IPv4 address, else null. */
     fun reportUrl(campHubUrl: String?): String? {
         val raw = campHubUrl?.trim().orEmpty()
         val withScheme = if ("://" in raw) raw else "http://$raw"     // QR codes may hold a bare host:port
         val host = runCatching { URI(withScheme).host }.getOrNull() ?: return null
         val m = IPV4.matchEntire(host) ?: return null
-        if (m.groupValues.drop(1).any { it.toInt() > 255 }) return null
+        val o = m.groupValues.drop(1).map { it.toInt() }
+        if (o.any { it > 255 } || !isPrivate(o)) return null
         return "http://$host:$TABLET_PORT/tablet/report"
     }
+
+    /** Camp laptops are on a private network; never send the tablet id and user name anywhere else. */
+    private fun isPrivate(o: List<Int>): Boolean =
+        o[0] == 10 || (o[0] == 172 && o[1] in 16..31) || (o[0] == 192 && o[1] == 168)
 
     /**
      * Sends the report when camp mode is on and the hub is an IP. Without [force], at most once an
