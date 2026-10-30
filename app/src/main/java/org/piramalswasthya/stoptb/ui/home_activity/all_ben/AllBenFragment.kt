@@ -707,6 +707,12 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         }
 
         lifecycleScope.launch {
+            viewModel.allTbSuspected.collectLatest { suspectedList ->
+                benAdapter.submitTbSuspected(suspectedList)
+            }
+        }
+
+        lifecycleScope.launch {
             viewModel.retryingBenIds.collectLatest { benIds ->
                 benAdapter.submitRetryingBenIds(benIds)
             }

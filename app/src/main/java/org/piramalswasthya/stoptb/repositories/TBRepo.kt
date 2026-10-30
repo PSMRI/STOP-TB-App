@@ -98,6 +98,8 @@ class TBRepo @Inject constructor(
 
     val allTbScreening: Flow<List<TBScreeningCache>> = tbDao.getAllTbScreening()
 
+    val allTbSuspected: Flow<List<TBSuspectedCache>> = tbDao.getAllTbSuspected()
+
     suspend fun getDiagnosticsList(): List<TBDiagnosticsCache> = withContext(Dispatchers.IO) {
         tbDao.getDiagnosticsList()
     }
