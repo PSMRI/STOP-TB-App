@@ -8,6 +8,7 @@ import org.json.JSONObject
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.VitalDao
+import org.piramalswasthya.stoptb.database.room.dao.VitalRiskFactors
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.VitalCache
 import org.piramalswasthya.stoptb.network.AmritApiService
@@ -35,6 +36,7 @@ class VitalRepo @Inject constructor(
     }
 
     val vitalBenIds: Flow<List<Long>> = vitalDao.getAllVitalBenIds()
+    val vitalRiskFactors: Flow<List<VitalRiskFactors>> = vitalDao.observeVitalRiskFactors()
     val unsyncedVitalBenIds: Flow<List<Long>> = vitalDao.getVitalBenIdsBySyncState(SyncState.UNSYNCED)
     val syncingVitalBenIds: Flow<List<Long>> = vitalDao.getVitalBenIdsBySyncState(SyncState.SYNCING)
 

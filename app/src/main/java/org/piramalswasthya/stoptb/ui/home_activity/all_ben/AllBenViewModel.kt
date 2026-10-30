@@ -248,6 +248,10 @@ class AllBenViewModel @Inject constructor(
 
     val allTbScreening: Flow<List<TBScreeningCache>> = tbRepo.allTbScreening
 
+    val allTbSuspected = tbRepo.allTbSuspected
+
+    val vitalRiskFactors = vitalRepo.vitalRiskFactors
+
     sealed class OrderActionResult {
         object Idle : OrderActionResult()
         object Loading : OrderActionResult()

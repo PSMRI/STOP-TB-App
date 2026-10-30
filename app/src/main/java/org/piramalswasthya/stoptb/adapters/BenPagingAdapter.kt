@@ -8,6 +8,7 @@ import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
+import org.piramalswasthya.stoptb.model.TBSuspectedCache
 
 class BenPagingAdapter(
     private val clickListener: BenListAdapter.BenClickListener? = null,
@@ -54,6 +55,9 @@ class BenPagingAdapter(
     private val householdHeadNameMap = mutableMapOf<Long, String>()
     private val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
     private val tbScreeningMap = mutableMapOf<Long, TBScreeningCache>()
+    private val tbScreeningRecords = mutableListOf<TBScreeningCache>()
+    private val tbSuspectedRecords = mutableListOf<TBSuspectedCache>()
+    private val vitalRiskByBenId = mutableMapOf<Long, List<String>>()
     private val retryingBenIds = mutableListOf<Long>()
 
     override fun onCreateViewHolder(
@@ -104,7 +108,10 @@ class BenPagingAdapter(
             showContactTracingForms = showContactTracingForms,
             roleManager = roleManager,
             showAddMemberButton = showAddMemberButton,
-            showVillageName = showVillageName
+            showVillageName = showVillageName,
+            tbSuspectedList = tbSuspectedRecords,
+            tbScreeningRecords = tbScreeningRecords,
+            vitalRiskByBenId = vitalRiskByBenId
         )
     }
 
@@ -130,9 +137,28 @@ class BenPagingAdapter(
 
 
     fun submitTbScreeningList(list: List<TBScreeningCache>) {
+        tbScreeningRecords.clear()
+        tbScreeningRecords.addAll(list)
         tbScreeningMap.clear()
         tbScreeningMap.putAll(list.associateBy { it.benId })
         notifyDataSetChanged()
+    }
+
+    fun submitTbSuspected(list: List<TBSuspectedCache>) {
+        val old = tbSuspectedRecords.groupBy { it.benId }
+        tbSuspectedRecords.clear()
+        tbSuspectedRecords.addAll(list)
+        if (source != 10) return
+        val new = list.groupBy { it.benId }
+        notifyBenIds((old.keys + new.keys).filterTo(mutableSetOf()) { old[it] != new[it] })
+    }
+
+    fun submitVitalRiskFactors(rows: Map<Long, List<String>>) {
+        val old = vitalRiskByBenId.toMap()
+        vitalRiskByBenId.clear()
+        vitalRiskByBenId.putAll(rows)
+        if (source != 10) return
+        notifyBenIds((old.keys + rows.keys).filterTo(mutableSetOf()) { old[it] != rows[it] })
     }
 
     fun submitBenIds(list: List<Long>) {
@@ -209,7 +235,10 @@ class BenPagingAdapter(
     }
 
     private fun notifyChangedIds(oldIds: Set<Long>, newIds: Set<Long>) {
-        val changed = (oldIds - newIds) + (newIds - oldIds)
+        notifyBenIds((oldIds - newIds) + (newIds - oldIds))
+    }
+
+    private fun notifyBenIds(changed: Set<Long>) {
         if (changed.isNotEmpty()) {
             val items = snapshot()
             items.forEachIndexed { index, item ->

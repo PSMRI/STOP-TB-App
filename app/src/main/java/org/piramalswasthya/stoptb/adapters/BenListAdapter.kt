@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.adapters
 
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.TextPaint
@@ -23,6 +24,8 @@ import com.google.android.material.R.attr.colorOnPrimary
 import com.google.android.material.color.MaterialColors
 import org.piramalswasthya.stoptb.BuildConfig
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.clinical.ClinicalAssessmentClassifier
+import org.piramalswasthya.stoptb.clinical.ClinicalAssessmentGroup
 import org.piramalswasthya.stoptb.configuration.TBScreeningDataset
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -39,6 +42,7 @@ import org.piramalswasthya.stoptb.model.OrderStatus
 import org.piramalswasthya.stoptb.model.RifResult
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
+import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.ui.setSyncStateForBen
 import timber.log.Timber
 
@@ -494,7 +498,10 @@ class BenListAdapter(
             householdMemberCountMap: Map<Long, Int> = emptyMap(),
             householdHeadNameMap: Map<Long, String> = emptyMap(),
             showAddMemberButton: Boolean = false,
-            showVillageName: Boolean = false
+            showVillageName: Boolean = false,
+            tbSuspectedList: List<TBSuspectedCache> = emptyList(),
+            tbScreeningRecords: List<TBScreeningCache> = emptyList(),
+            vitalRiskByBenId: Map<Long, List<String>> = emptyMap()
         ) {
             binding.btnAbha.visibility = View.VISIBLE
             if (!showSyncIcon) item.syncState = null
@@ -1340,8 +1347,79 @@ class BenListAdapter(
                     binding.contentLayout.setBackgroundColor(ContextCompat.getColor(binding.contentLayout.context, R.color.md_theme_light_primary))
                 }
             }
+//            bindClinicalGroup(
+//                item = item,
+//                source = source,
+//                diagnostics = tbDiagnosticsList,
+//                screenings = tbScreeningRecords.ifEmpty { listOfNotNull(tbScreeningMap[item.benId]) },
+//                suspected = tbSuspectedList,
+//                vitalRiskFactors = vitalRiskByBenId[item.benId].orEmpty()
+//            )
             binding.executePendingBindings()
             binding.ivSyncState.setSyncStateForBen(effectiveSyncState)
+        }
+
+        private fun bindClinicalGroup(
+            item: BenBasicDomain,
+            source: Int,
+            diagnostics: List<TBDiagnosticsCache>,
+            screenings: List<TBScreeningCache>,
+            suspected: List<TBSuspectedCache>,
+            vitalRiskFactors: List<String>
+        ) {
+            val label = binding.tvClinicalGroup
+            if (source != 10) {
+                label.visibility = View.GONE
+                return
+            }
+            val group = ClinicalAssessmentClassifier.classifyRecords(
+                dobMillis = item.dob,
+                reproductiveStatusId = item.reproductiveStatusId,
+                screenings = screenings.filter { it.benId == item.benId },
+                diagnostics = diagnostics.filter { it.benId == item.benId },
+                suspected = suspected.filter { it.benId == item.benId },
+                vitalRiskFactors = vitalRiskFactors
+            )
+            if (group == null) {
+                label.visibility = View.GONE
+                return
+            }
+            val (textRes, backgroundRes, textColorRes) = when (group) {
+                ClinicalAssessmentGroup.CATEGORY_1_SYMPTOMATIC -> Triple(
+                    R.string.clinical_group_cat1_symptomatic,
+                    R.color.clinical_cat1_symptomatic_bg,
+                    R.color.clinical_cat1_symptomatic_text
+                )
+                ClinicalAssessmentGroup.CATEGORY_1_ASYMPTOMATIC -> Triple(
+                    R.string.clinical_group_cat1_asymptomatic,
+                    R.color.clinical_cat1_asymptomatic_bg,
+                    R.color.clinical_cat1_asymptomatic_text
+                )
+                ClinicalAssessmentGroup.CATEGORY_2 -> Triple(
+                    R.string.clinical_group_cat2,
+                    R.color.clinical_cat2_bg,
+                    R.color.clinical_cat2_text
+                )
+                ClinicalAssessmentGroup.POSITIVE_XRAY_NEGATIVE_NAAT -> Triple(
+                    R.string.clinical_group_positive_xray_negative_naat,
+                    R.color.clinical_existing_bg,
+                    R.color.clinical_existing_text
+                )
+                ClinicalAssessmentGroup.RIF_INDETERMINATE -> Triple(
+                    R.string.clinical_group_rif_indeterminate,
+                    R.color.clinical_existing_bg,
+                    R.color.clinical_existing_text
+                )
+            }
+            val context = label.context
+            label.visibility = View.VISIBLE
+            label.setText(textRes)
+            label.setTextColor(ContextCompat.getColor(context, textColorRes))
+            val density = label.resources.displayMetrics.density
+            label.background = GradientDrawable().apply {
+                cornerRadius = 12f * density
+                setColor(ContextCompat.getColor(context, backgroundRes))
+            }
         }
     }
 
