@@ -17,6 +17,7 @@ import org.piramalswasthya.stoptb.database.room.dao.AesDao
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.BeneficiaryIdsAvailDao
 import org.piramalswasthya.stoptb.database.room.dao.CbacDao
+import org.piramalswasthya.stoptb.database.room.dao.DataMissingBenInfoDao
 import org.piramalswasthya.stoptb.database.room.dao.FilariaDao
 import org.piramalswasthya.stoptb.database.room.dao.HouseholdDao
 import org.piramalswasthya.stoptb.database.room.dao.KalaAzarDao
@@ -251,6 +252,10 @@ object AppModule {
     @Singleton
     @Provides
     fun provideBenDao(database: InAppDb): BenDao = database.benDao
+
+    @Singleton
+    @Provides
+    fun provideDataMissingBenInfoDao(database: InAppDb): DataMissingBenInfoDao = database.dataMissingBenInfoDao
 
     @Singleton
     @Provides

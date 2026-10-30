@@ -13,6 +13,7 @@
     <string name="PREF_user_entry" translatable="false">logged-in-user</string>
     <string name="PREF_full_load_pull_progress" translatable="false">full_load_sync_pull_amrit</string>
     <string name="PREF_first_pull_amrit_last_synced_page" translatable="false">full_load_sync_pull_amrit_first_sync_last_saved_page</string>
+    <string name="PREF_first_pull_missing_data_last_synced_page" translatable="false">full_load_sync_pull_amrit_first_missing_data_sync_last_saved_page</string>
     <string name="PREF_current_saved_language" translatable="false">Locale.Helper.Selected.Language</string>
     <string name="PREF_current_dp_uri" translatable="false">DP_URI_cat</string>
     <string name="PREF_camp_mode_enabled" translatable="false">camp-mode-enabled</string>
@@ -348,6 +349,8 @@
     <string name="home_quick_actions">Quick Actions</string>
     <string name="home_health_id_section">Health IDs</string>
     <string name="home_card_all_ben_subtitle">View and manage all beneficiaries</string>
+    <string name="home_card_missing_data_ben_title">Missing Data Beneficiaries</string>
+    <string name="home_card_missing_data_ben_subtitle" translatable="false">View and update missing details of beneficiaries</string>
     <string name="home_card_household_subtitle">Register and manage households</string>
     <string name="home_card_tb_subtitle">Track screening and support TB cases</string>
     <string name="home_card_ncd_subtitle">Manage non-communicable disease workflows</string>
@@ -361,6 +364,10 @@
     <string name="home_card_tb_suspected_short_subtitle">Follow up presumptive TB cases</string>
     <string name="home_card_tb_confirmed_short_subtitle">Track confirmed TB patients</string>
     <string name="view_details">View Details</string>
+    <string name="update_details">update Details</string>
+    <string name="label_update">Update</string>
+    <string name="label_reason_mssing_data">Reasons for Missing Data:</string>
+    <string name="no_reasons_specified">No reasons specified</string>
     <string name="referral_digital_chest_xray">Digital Chest X-ray</string>
     <string name="referral_true_nat">True NAT</string>
     <string name="referral_hwc">Health and Wellness Centre</string>
@@ -1585,6 +1592,7 @@
 
     <string name="dialog_no">No</string>
     <string name="registration_successful">Registration Successful</string>
+    <string name="data_update_successful">Data Update Successful</string>
     <string name="patient_registered_successfully">Patient Registered Successfully</string>
     <string name="proceed_to_register_hof">Do you want to proceed with registration of Head of the Family?</string>
     <string name="refused">Refused</string>

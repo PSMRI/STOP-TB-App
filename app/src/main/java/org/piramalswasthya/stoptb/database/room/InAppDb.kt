@@ -20,6 +20,7 @@ import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.BeneficiaryIdsAvailDao
 import org.piramalswasthya.stoptb.database.room.dao.CbacDao
 import org.piramalswasthya.stoptb.database.room.dao.ChiefComplaintMasterDao
+import org.piramalswasthya.stoptb.database.room.dao.DataMissingBenInfoDao
 import org.piramalswasthya.stoptb.database.room.dao.DrugMasterDao
 import org.piramalswasthya.stoptb.database.room.dao.FilariaDao
 import org.piramalswasthya.stoptb.database.room.dao.HouseholdDao
@@ -77,6 +78,8 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.SectionResponseEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionResponseEntity
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.DynamicFormMetadataDao
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.CounsellingFormResponseDao
+import org.piramalswasthya.stoptb.model.DataMissingBenInfo
+import org.piramalswasthya.stoptb.model.MissingDataInfoStatusConverter
 
 
 @Database(
@@ -119,24 +122,26 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         OptionConditionEntity::class,
         FormResponseEntity::class,
         SectionResponseEntity::class,
-        QuestionResponseEntity::class
+        QuestionResponseEntity::class,
+        DataMissingBenInfo::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 60, exportSchema = false
+    version = 61, exportSchema = false
 )
 @TypeConverters(
     LocationEntityListConverter::class,
     SyncStateConverter::class,
     StringListConverter::class,
     GenderConverter::class,
-    ScreeningStatusConverter::class
-
+    ScreeningStatusConverter::class,
+    MissingDataInfoStatusConverter::class
 )
 abstract class InAppDb : RoomDatabase() {
 
     abstract val benIdGenDao: BeneficiaryIdsAvailDao
     abstract val householdDao: HouseholdDao
     abstract val benDao: BenDao
+    abstract val dataMissingBenInfoDao: DataMissingBenInfoDao
     abstract val cbacDao: CbacDao
     abstract val chiefComplaintMasterDao: ChiefComplaintMasterDao
     abstract val drugMasterDao: DrugMasterDao
@@ -1742,6 +1747,21 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_60_61 = object : Migration(60, 61) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+            CREATE TABLE IF NOT EXISTS DATA_MISSING_BEN_INFO (
+                beneficiaryId INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                PRIMARY KEY(beneficiaryId)
+            )
+            """.trimIndent()
+                )
+            }
+        }
+
         private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
             database.execSQL(
@@ -2029,6 +2049,7 @@ abstract class InAppDb : RoomDatabase() {
                         .addMigrations(MIGRATION_57_58)
                         .addMigrations(MIGRATION_58_59)
                         .addMigrations(MIGRATION_59_60)
+                        .addMigrations(MIGRATION_60_61)
                         .fallbackToDestructiveMigration()
                         .build()
 

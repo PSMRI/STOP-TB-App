@@ -25,6 +25,7 @@
     <string name="til_hint_selected_village">Selected Village</string>
     <string name="icon_title_household">All Household</string>
     <string name="icon_title_ben">All Beneficiaries</string>
+    <string name="icon_title_missing_data_ben">Beneficiaries With Missing Data</string>
     <string name="icon_title_non_hh">Non-Household</string>
     <string name="icon_title_unscreened">Unscreened Population</string>
     <string name="home_card_unscreened_subtitle">Beneficiaries pending TB screening</string>

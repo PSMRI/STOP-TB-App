@@ -186,6 +186,18 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         return pref.getInt(prefKey, 0)
     }
 
+    fun setFirstSyncMissingDataLastSyncedPage(page: Int) {
+        val editor = pref.edit()
+        val prefKey = context.getString(R.string.PREF_first_pull_missing_data_last_synced_page)
+        editor.putInt(prefKey, page)
+        editor.apply()
+    }
+
+    fun getFirstSyncMissingDataLastSyncedPage(): Int {
+        val prefKey = context.getString(R.string.PREF_first_pull_missing_data_last_synced_page)
+        return pref.getInt(prefKey, 0)
+    }
+
 
     fun saveSetLanguage(language: Languages) {
         val key = context.getString(R.string.PREF_current_saved_language)

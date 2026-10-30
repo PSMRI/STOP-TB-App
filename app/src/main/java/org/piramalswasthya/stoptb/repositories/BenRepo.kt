@@ -354,6 +354,39 @@ class BenRepo @Inject constructor(
         ben.isDraft = false
     }
 
+    suspend fun updateBenMissingDataStatus(beneficiaryId: Long) = withContext(Dispatchers.IO) {
+        val status = processNewBen(beneficiaryId)
+        val update = status && updateNikshaySyncStatus(beneficiaryId)
+        if(update) {
+            db.dataMissingBenInfoDao.updateStatus(beneficiaryId, MissingDataInfoStatus.UPDATED)
+        } else {
+            throw Exception("Failed to update missing data status")
+        }
+    }
+
+    suspend fun updateNikshaySyncStatus(beneficiaryId: Long, isUpdated: Boolean = true): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val request = UpdateNikshaySyncStatusRequest(
+                    beneficiaryId = beneficiaryId,
+                    isUpdated = isUpdated
+                )
+                val response = tmcNetworkApiService.updateNikshaySyncStatus(request)
+                if (response.isSuccessful && response.code() == 200) {
+                    val body = response.body()
+                    val success = body?.status.equals("SUCCESS", ignoreCase = true) || (body?.data?.isUpdated == true)
+                    success
+                } else {
+                    Timber.e("updateNikshaySyncStatus failed with code: ${response.code()}")
+                    false
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Exception in updateNikshaySyncStatus")
+                false
+            }
+        }
+    }
+
     suspend fun persistRecord(ben: BenRegCache, updateIfExists: Boolean = false) {
         withContext(Dispatchers.IO) {
 
@@ -528,16 +561,21 @@ class BenRepo @Inject constructor(
             return false
         }
     }
-    suspend fun processNewBen(): Boolean = processNewBenMutex.withLock {
+    suspend fun processNewBen(beneficiaryId: Long? = null): Boolean = processNewBenMutex.withLock {
         withContext(Dispatchers.IO) {
             val user =
                 preferenceDao.getLoggedInUser()
                     ?: throw IllegalStateException("No user logged in!!")
 
-            benDao.resetSyncingToUnsynced()
-            benDao.requeueTempBeneficiariesForRegistration()
+            if (beneficiaryId == null) {
+                benDao.resetSyncingToUnsynced()
+                benDao.requeueTempBeneficiariesForRegistration()
+            }
 
-            val benList = benDao.getAllUnprocessedBen()
+            val benList = beneficiaryId?.let {
+                benDao.getUnprocessedBenForBeneficiary(it)
+            } ?: benDao.getAllUnprocessedBen()
+
             Timber.d("YTR 419 $benList")
 
             val benNetworkPostList = mutableSetOf<BenPost>()
@@ -552,7 +590,10 @@ class BenRepo @Inject constructor(
                 Timber.d("YTR 429 $it")
             }
 
-            val updateBenList = benDao.getAllBenForSyncWithServer()
+            val updateBenList = beneficiaryId?.let {
+                benDao.getBenForSyncWithServerForBeneficiary(it)
+            } ?: benDao.getAllBenForSyncWithServer()
+
             updateBenList.forEach {
                 if (it.beneficiaryId <= 0L || it.benRegId <= 0L) {
                     benDao.setSyncState(it.householdId, it.beneficiaryId, SyncState.UNSYNCED)
@@ -583,7 +624,7 @@ class BenRepo @Inject constructor(
             } else {
                 Timber.d("Beneficiary batch push succeeded: ${benNetworkPostList.size} ben records, ${householdNetworkPostList.size} household records")
             }
-            val counsellingSyncDone = pushCounsellingData()
+            val counsellingSyncDone = beneficiaryId != null || pushCounsellingData()
             return@withContext uploadDone && counsellingSyncDone
         }
     }
@@ -807,6 +848,42 @@ class BenRepo @Inject constructor(
         } catch (e: java.lang.Exception) {
             Timber.e("Caught exception $e here")
             return false
+        }
+    }
+
+    suspend fun getMissingDataBeneficiariesFromServerForWorker(pageNumber: Int): Int {
+        val user = preferenceDao.getLoggedInUser() ?: return -1
+        val locationRecord = preferenceDao.getLocationRecord() ?: return -1
+        val providerServiceMapID = user.serviceMapId
+        val villageID = locationRecord.village.id
+
+        return try {
+            val response = tmcNetworkApiService.getMissingDataBeneficiaries(
+                providerServiceMapID = providerServiceMapID,
+                villageID = villageID,
+                pageNo = pageNumber
+            )
+            if (response.isSuccessful && response.code() == 200) {
+                val responseBody = response.body()
+                val dtoList = responseBody?.data ?: emptyList()
+                if (dtoList.isNotEmpty()) {
+                    val missingInfoList = dtoList.map { dto ->
+                        DataMissingBenInfo(
+                            beneficiaryId = dto.beneficiaryId,
+                            status = if (dto.isUpdated) MissingDataInfoStatus.UPDATED else MissingDataInfoStatus.MISSING,
+                            reason = dto.reason.joinToString(MISSING_DATA_REASON_SEPARATOR)
+                        )
+                    }
+                    db.dataMissingBenInfoDao.insertAll(missingInfoList)
+                }
+                responseBody?.pagination?.totalPages ?: 0
+            } else {
+                Timber.e("getMissingDataBeneficiaries API failed with HTTP ${response.code()}")
+                -1
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error fetching missing beneficiary data from server")
+            -1
         }
     }
 
