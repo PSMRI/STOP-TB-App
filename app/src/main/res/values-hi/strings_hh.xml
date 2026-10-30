@@ -82,8 +82,9 @@
         <item>हाँ</item>
         <item>नहीं</item>
     </string-array>
+    xml
     <string name="nhhr_fuel_cooking">खाना पकाने के लिए उपयोग किए जाने वाले ईंधन का मुख्य स्रोत</string>
-    <string name="nhhr_fuel_cooking_1">लकड़ी</string>
+    <string name="nhhr_fuel_cooking_1">लकड़ी (ईंधन)</string>
     <string name="nhhr_fuel_cooking_2">फसल अवशेष</string>
     <string name="nhhr_fuel_cooking_3">गोबर के उपले</string>
     <string name="nhhr_fuel_cooking_4">कोयला</string>
