@@ -32,6 +32,7 @@ object WorkerUtils {
     const val pullWorkerUniqueName = "PULL-FROM-AMRIT"
     const val syncGateUniqueName = "SYNC-GATE"
     const val syncHeartbeatUniqueName = "SYNC-HEARTBEAT"
+    const val tabletVersionReportUniqueName = "TABLET-VERSION-REPORT"
     private const val syncHeartbeatIntervalMinutes = 15L
     const val pullTriggerSourceKey = "pull_trigger_source"
     const val pullStartedAtKey = "pull_started_at"
@@ -135,6 +136,24 @@ object WorkerUtils {
             ExistingWorkPolicy.REPLACE,
             gate
         )
+    }
+
+    // Tells the camp laptop which app version this tablet runs. Cheap no-op outside a camp.
+    // No network constraint, same reason as the heartbeat below. Not important: it has its own
+    // unique name (no sync screen or gate watches it), and it never throws into the caller.
+    fun reportTabletVersion(context: Context, force: Boolean) {
+        try {
+            val request = OneTimeWorkRequestBuilder<TabletVersionReportWorker>()
+                .setInputData(Data.Builder().putBoolean(TabletVersionReportWorker.FORCE, force).build())
+                .build()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                tabletVersionReportUniqueName,
+                if (force) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
+                request
+            )
+        } catch (e: Exception) {
+            Timber.d("Tablet version report not scheduled: ${e.message}")
+        }
     }
 
     // Schedules SyncHeartbeatWorker every 15 minutes (the WorkManager minimum) so
