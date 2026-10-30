@@ -84,9 +84,9 @@
     <string name="nhhr_fuel_cooking_5">Kerosene</string>
     <string name="nhhr_fuel_cooking_6">Liquefied Petroleum Gas (LPG)</string>
     <string name="nhhr_fuel_cooking_7">Induction (Electricity)</string>
-    <string name="nhhr_fuel_cooking_8">Other</string>
-    <string name="nhhr_fuel_cooking_9">Piped Natural Gas (PNG)</string>
-    <string name="nhhr_fuel_cooking_10">Biogas (Gobar Gas)</string>
+    <string name="nhhr_fuel_cooking_8">Piped Natural Gas (PNG)</string>
+    <string name="nhhr_fuel_cooking_9">Biogas (Gobar Gas)</string>
+    <string name="nhhr_fuel_cooking_10">Other</string>
 
     <string-array name="nhhr_fuel_cooking_array">
         <item>@string/nhhr_fuel_cooking_1</item>
