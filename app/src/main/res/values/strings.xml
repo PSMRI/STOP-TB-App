@@ -366,11 +366,6 @@
     <string name="referral_hwc">Health and Wellness Centre</string>
     <string name="referral_liquid_culture">Liquid Culture</string>
     <string name="referral_clinical_assessment">Clinical Assessment &amp; Diagnosis</string>
-    <string name="clinical_group_cat1_symptomatic">Category 1 – Symptomatic</string>
-    <string name="clinical_group_cat1_asymptomatic">Category 1 – Asymptomatic</string>
-    <string name="clinical_group_cat2">Category 2 – No chest X-ray</string>
-    <string name="clinical_group_positive_xray_negative_naat">Positive X-ray, negative NAAT</string>
-    <string name="clinical_group_rif_indeterminate">RIF indeterminate</string>
     <string name="dashboard_tb_screening_subtitle">Track outreach and screening volume</string>
     <string name="dashboard_tb_suspected_subtitle">Follow up high-risk suspected cases</string>
     <string name="dashboard_tb_confirmed_subtitle">Monitor confirmed patients and support</string>

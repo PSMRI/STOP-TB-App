@@ -69,17 +69,17 @@ object ClinicalAssessmentSql {
                   SELECT 1 FROM TB_DIAGNOSTICS d
                   WHERE d.benId = b.benId
                     AND (
-                      d.isNaatConducted = 0
-                      OR TRIM(IFNULL(d.reasonNotConductedNaat,'')) != ''
+                      TRIM(IFNULL(d.reasonNotConductedNaat,'')) != ''
+                      OR (
+                        d.isNaatConducted = 0
+                        AND UPPER(TRIM(IFNULL(d.trueNatOrderStatus,''))) = 'CLOSED'
+                      )
                     )
                 )
                 OR EXISTS (
                   SELECT 1 FROM TB_SUSPECTED su
                   WHERE su.benId = b.benId
-                    AND (
-                      su.isNaatConducted = 0
-                      OR TRIM(IFNULL(su.reasonForRefusalMTB,'')) != ''
-                    )
+                    AND TRIM(IFNULL(su.reasonForRefusalMTB,'')) != ''
                 )
               )
             )

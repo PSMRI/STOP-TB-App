@@ -55,9 +55,7 @@ class BenPagingAdapter(
     private val householdHeadNameMap = mutableMapOf<Long, String>()
     private val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
     private val tbScreeningMap = mutableMapOf<Long, TBScreeningCache>()
-    private val tbScreeningRecords = mutableListOf<TBScreeningCache>()
     private val tbSuspectedRecords = mutableListOf<TBSuspectedCache>()
-    private val vitalRiskByBenId = mutableMapOf<Long, List<String>>()
     private val retryingBenIds = mutableListOf<Long>()
 
     override fun onCreateViewHolder(
@@ -109,9 +107,7 @@ class BenPagingAdapter(
             roleManager = roleManager,
             showAddMemberButton = showAddMemberButton,
             showVillageName = showVillageName,
-            tbSuspectedList = tbSuspectedRecords,
-            tbScreeningRecords = tbScreeningRecords,
-            vitalRiskByBenId = vitalRiskByBenId
+            tbSuspectedList = tbSuspectedRecords
         )
     }
 
@@ -137,8 +133,6 @@ class BenPagingAdapter(
 
 
     fun submitTbScreeningList(list: List<TBScreeningCache>) {
-        tbScreeningRecords.clear()
-        tbScreeningRecords.addAll(list)
         tbScreeningMap.clear()
         tbScreeningMap.putAll(list.associateBy { it.benId })
         notifyDataSetChanged()
@@ -151,14 +145,6 @@ class BenPagingAdapter(
         if (source != 10) return
         val new = list.groupBy { it.benId }
         notifyBenIds((old.keys + new.keys).filterTo(mutableSetOf()) { old[it] != new[it] })
-    }
-
-    fun submitVitalRiskFactors(rows: Map<Long, List<String>>) {
-        val old = vitalRiskByBenId.toMap()
-        vitalRiskByBenId.clear()
-        vitalRiskByBenId.putAll(rows)
-        if (source != 10) return
-        notifyBenIds((old.keys + rows.keys).filterTo(mutableSetOf()) { old[it] != rows[it] })
     }
 
     fun submitBenIds(list: List<Long>) {

@@ -136,13 +136,5 @@
     <color name="tb_status_on_banner">#FFFFFF</color>
     <color name="tb_status_pending_bg">#E7EEEC</color>
     <color name="tb_status_pending_text">#5B7073</color>
-    <color name="clinical_cat1_symptomatic_bg">#FFDCCB</color>
-    <color name="clinical_cat1_symptomatic_text">#3C1700</color>
-    <color name="clinical_cat1_asymptomatic_bg">#D7EFEC</color>
-    <color name="clinical_cat1_asymptomatic_text">#00201F</color>
-    <color name="clinical_cat2_bg">#E8D5F2</color>
-    <color name="clinical_cat2_text">#4A148C</color>
-    <color name="clinical_existing_bg">#E7EEEC</color>
-    <color name="clinical_existing_text">#183033</color>
 
 </resources>

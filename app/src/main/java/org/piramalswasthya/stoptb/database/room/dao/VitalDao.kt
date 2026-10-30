@@ -8,11 +8,6 @@ import kotlinx.coroutines.flow.Flow
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.model.VitalCache
 
-data class VitalRiskFactors(
-    val benId: Long,
-    val keyPopulationRiskFactors: List<String>?
-)
-
 @Dao
 interface VitalDao {
 
@@ -27,9 +22,6 @@ interface VitalDao {
 
     @Query("SELECT benId FROM BEN_VITALS")
     fun getAllVitalBenIds(): Flow<List<Long>>
-
-    @Query("SELECT benId, keyPopulationRiskFactors FROM BEN_VITALS")
-    fun observeVitalRiskFactors(): Flow<List<VitalRiskFactors>>
 
     @Query("SELECT benId FROM BEN_VITALS WHERE syncState = :syncState")
     fun getVitalBenIdsBySyncState(syncState: SyncState): Flow<List<Long>>

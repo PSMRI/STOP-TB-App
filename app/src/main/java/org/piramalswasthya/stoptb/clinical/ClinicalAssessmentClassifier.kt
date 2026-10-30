@@ -53,6 +53,7 @@ data class DiagnosticFacts(
     val naatResult: String? = null,
     val isNaatConducted: Boolean? = null,
     val reasonNotConductedNaat: String? = null,
+    val trueNatOrderStatus: String? = null,
     val trueNatRifResult: String? = null
 )
 
@@ -228,10 +229,15 @@ object ClinicalAssessmentClassifier {
         suspected.isChestXRayDone == false || filled(suspected.reasonForRefusalXray)
 
     private fun truenatCouldNotBeConducted(diagnostics: DiagnosticFacts): Boolean =
-        diagnostics.isNaatConducted == false || filled(diagnostics.reasonNotConductedNaat)
+        filled(diagnostics.reasonNotConductedNaat) ||
+            (diagnostics.isNaatConducted == false && isClosedOrder(diagnostics.trueNatOrderStatus))
 
     private fun truenatCouldNotBeConducted(suspected: SuspectedFacts): Boolean =
-        suspected.isNaatConducted == false || filled(suspected.reasonForRefusalMTB)
+        filled(suspected.reasonForRefusalMTB)
+
+    /** CLOSED is the only lifecycle-terminal status. A missing or pending status is not final. */
+    private fun isClosedOrder(status: String?): Boolean =
+        status?.trim()?.equals("CLOSED", ignoreCase = true) == true
 
     private fun isAbnormalCxr(result: String?): Boolean = normalize(result) in abnormalCxr
 
@@ -280,6 +286,7 @@ private fun TBDiagnosticsCache.toFacts() = DiagnosticFacts(
     naatResult = naatResult,
     isNaatConducted = isNaatConducted,
     reasonNotConductedNaat = reasonNotConductedNaat,
+    trueNatOrderStatus = trueNatOrderStatus,
     trueNatRifResult = trueNatRifResult
 )
 

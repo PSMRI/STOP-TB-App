@@ -250,8 +250,6 @@ class AllBenViewModel @Inject constructor(
 
     val allTbSuspected = tbRepo.allTbSuspected
 
-    val vitalRiskFactors = vitalRepo.vitalRiskFactors
-
     sealed class OrderActionResult {
         object Idle : OrderActionResult()
         object Loading : OrderActionResult()

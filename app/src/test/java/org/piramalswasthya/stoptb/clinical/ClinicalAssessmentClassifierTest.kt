@@ -61,7 +61,63 @@ class ClinicalAssessmentClassifierTest {
             diagnostics = listOf(
                 DiagnosticFacts(
                     chestXRayResult = "Abnormal",
+                    isNaatConducted = false,
+                    trueNatOrderStatus = "CLOSED"
+                )
+            )
+        )
+        assertEquals(ClinicalAssessmentGroup.CATEGORY_1_ASYMPTOMATIC, group)
+    }
+
+    @Test
+    fun pendingTruenatOrderIsNotTreatedAsCouldNotBeConducted() {
+        val group = classify(
+            diagnostics = listOf(
+                DiagnosticFacts(
+                    chestXRayResult = "Abnormal",
+                    isNaatConducted = false,
+                    trueNatOrderStatus = "PENDING"
+                )
+            )
+        )
+        assertEquals(null, group)
+    }
+
+    @Test
+    fun explicitTruenatReasonStillQualifiesWhenOrderIsPending() {
+        val group = classify(
+            diagnostics = listOf(
+                DiagnosticFacts(
+                    chestXRayResult = "Abnormal",
+                    isNaatConducted = false,
+                    reasonNotConductedNaat = "Cartridge unavailable",
+                    trueNatOrderStatus = "PENDING"
+                )
+            )
+        )
+        assertEquals(ClinicalAssessmentGroup.CATEGORY_1_ASYMPTOMATIC, group)
+    }
+
+    @Test
+    fun suspectedNaatFlagWithoutReasonIsNotCouldNotBeConducted() {
+        val group = classify(
+            suspected = listOf(
+                SuspectedFacts(
+                    chestXRayResult = "Abnormal",
                     isNaatConducted = false
+                )
+            )
+        )
+        assertEquals(null, group)
+    }
+
+    @Test
+    fun suspectedRefusalReasonWithAbnormalCxrIsCategory1() {
+        val group = classify(
+            suspected = listOf(
+                SuspectedFacts(
+                    chestXRayResult = "Abnormal",
+                    reasonForRefusalMTB = "Could not produce sputum"
                 )
             )
         )

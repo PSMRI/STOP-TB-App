@@ -713,16 +713,6 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         }
 
         lifecycleScope.launch {
-            viewModel.vitalRiskFactors.collectLatest { rows ->
-                benAdapter.submitVitalRiskFactors(
-                    rows.groupBy { it.benId }.mapValues { (_, items) ->
-                        items.flatMap { it.keyPopulationRiskFactors.orEmpty() }
-                    }
-                )
-            }
-        }
-
-        lifecycleScope.launch {
             viewModel.retryingBenIds.collectLatest { benIds ->
                 benAdapter.submitRetryingBenIds(benIds)
             }
