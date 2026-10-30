@@ -32,6 +32,7 @@ object WorkerUtils {
     const val pullWorkerUniqueName = "PULL-FROM-AMRIT"
     const val syncGateUniqueName = "SYNC-GATE"
     const val syncHeartbeatUniqueName = "SYNC-HEARTBEAT"
+    const val tabletVersionReportUniqueName = "TABLET-VERSION-REPORT"
     private const val syncHeartbeatIntervalMinutes = 15L
     const val pullTriggerSourceKey = "pull_trigger_source"
     const val pullStartedAtKey = "pull_started_at"
@@ -134,6 +135,19 @@ object WorkerUtils {
             syncGateUniqueName,
             ExistingWorkPolicy.REPLACE,
             gate
+        )
+    }
+
+    // Tells the camp laptop which app version this tablet runs. Cheap no-op outside a camp.
+    // No network constraint, same reason as the heartbeat below.
+    fun reportTabletVersion(context: Context, force: Boolean) {
+        val request = OneTimeWorkRequestBuilder<TabletVersionReportWorker>()
+            .setInputData(Data.Builder().putBoolean(TabletVersionReportWorker.FORCE, force).build())
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            tabletVersionReportUniqueName,
+            if (force) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
+            request
         )
     }
 

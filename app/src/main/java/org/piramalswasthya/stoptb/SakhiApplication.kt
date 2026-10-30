@@ -69,6 +69,7 @@ class SakhiApplication : Application(), Configuration.Provider {
         Timber.plant(CrashlyticsTree())
         createNotificationChannels()
         WorkerUtils.scheduleSyncHeartbeat(this)
+        WorkerUtils.reportTabletVersion(this, force = true)
 
         Thread.setDefaultUncaughtExceptionHandler(CrashHandler(applicationContext))
 

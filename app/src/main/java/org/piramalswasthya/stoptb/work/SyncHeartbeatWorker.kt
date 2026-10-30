@@ -38,6 +38,7 @@ class SyncHeartbeatWorker @AssistedInject constructor(
         reportLongUnsyncedRecords()
         Timber.d("SyncHeartbeat: triggering push gate")
         WorkerUtils.triggerAmritPushWorker(applicationContext)
+        WorkerUtils.reportTabletVersion(applicationContext, force = false)
         return Result.success()
     }
 
