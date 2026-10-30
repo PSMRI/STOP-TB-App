@@ -76,6 +76,7 @@ class MissingDataBenAdapter(val onItemClick: (MissingDataBenItem) -> Unit) :
 
         val benItem: BenBasicDomain = item.benBasicDomain
 
+        btnEditBen.isVisible = benItem.isDeath.not()
         btnEditBen.setOnClickListener {
             onItemClick.invoke(item)
         }
@@ -101,7 +102,7 @@ class MissingDataBenAdapter(val onItemClick: (MissingDataBenItem) -> Unit) :
         }"
 
         llIsDeath.isVisible = benItem.isDeath
-        tvDateOfDeath.text = benItem.dobString
+        tvDateOfDeath.text = benItem.dateOfDeath ?: contentLayout.context.getString(R.string.not_available_short)
 
         renderContextCard(
             benItem,

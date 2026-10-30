@@ -88,7 +88,7 @@ data class GetMissingDataBenResponse(
 data class MissingDataBenDto(
     val beneficiaryId: Long,
     val isUpdated: Boolean = false,
-    val reason: List<String> = emptyList()
+    val reason: List<String>? = null
 )
 
 @JsonClass(generateAdapter = true)

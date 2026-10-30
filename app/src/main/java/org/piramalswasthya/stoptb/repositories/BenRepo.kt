@@ -871,7 +871,7 @@ class BenRepo @Inject constructor(
                         DataMissingBenInfo(
                             beneficiaryId = dto.beneficiaryId,
                             status = if (dto.isUpdated) MissingDataInfoStatus.UPDATED else MissingDataInfoStatus.MISSING,
-                            reason = dto.reason.joinToString(MISSING_DATA_REASON_SEPARATOR)
+                            reason = dto.reason?.joinToString(MISSING_DATA_REASON_SEPARATOR) ?: ""
                         )
                     }
                     db.dataMissingBenInfoDao.insertAll(missingInfoList)
