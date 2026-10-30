@@ -2126,24 +2126,6 @@ abstract class InAppDb : RoomDatabase() {
                         // Separate pools mean a long write transaction can no longer starve reads.
                         .setQueryExecutor(queryExecutor)
                         .setTransactionExecutor(transactionExecutor)
-                        .addCallback(object : RoomDatabase.Callback() {
-                            // TEMPORARY PERF INSTRUMENTATION - which journal mode and how many
-                            // SQLite connections actually back this database decides whether a
-                            // write can block a read at all. Remove with the rest of the
-                            // ScreenLoadTrace scaffolding.
-                            override fun onOpen(db: SupportSQLiteDatabase) {
-                                runCatching {
-                                    db.query("PRAGMA journal_mode").use { cursor ->
-                                        if (cursor.moveToFirst()) {
-                                            android.util.Log.d(
-                                                org.piramalswasthya.stoptb.utils.ScreenLoadTrace.TAG,
-                                                "  [db] journal_mode=${cursor.getString(0)}"
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        })
                         // Never wipe the database for a missing migration: it holds records not
                         // yet synced. A missing migration now fails at launch (and in
                         // InAppDbMigrationsTest) instead of silently deleting field data. Only

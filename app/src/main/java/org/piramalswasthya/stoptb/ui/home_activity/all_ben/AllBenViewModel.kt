@@ -133,7 +133,6 @@ class AllBenViewModel @Inject constructor(
     val searchGeneration: StateFlow<Int> = _searchGeneration.asStateFlow()
 
     init {
-        org.piramalswasthya.stoptb.utils.ScreenLoadTrace.markCurrent("ViewModel constructed (Hilt graph ready)")
         // No fetchBeneficiaryStatuses() here: the Fragment calls it from onResume, which always
         // runs right after this ViewModel is created, so doing it in both places ran the whole
         // status refresh - network calls plus their TB_DIAGNOSTICS writes - twice on every entry.
@@ -200,11 +199,6 @@ class AllBenViewModel @Inject constructor(
         tbRepo.tbSuspectedBenIds
     ) { diagnostics, suspected -> (diagnostics + suspected).distinct() }
         .distinctUntilChanged()
-
-    /** TEMPORARY PERF INSTRUMENTATION - see DbContentionSampler. */
-    suspend fun dbNoOpProbe() {
-        recordsRepo.dbNoOpProbe()
-    }
 
     private val _abha = MutableLiveData<String?>()
     val abha: LiveData<String?>

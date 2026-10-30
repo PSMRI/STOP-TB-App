@@ -60,6 +60,9 @@ class BenPagingAdapter(
      */
     private val tbDiagnosticsByBenId = mutableMapOf<Long, TbDiagnosticsCardFields>()
 
+    /** Set by [submitTBDiagnostics]; until then a missing row means "not loaded yet". */
+    private var tbDiagnosticsLoaded = false
+
     private val tbScreeningMap = mutableMapOf<Long, TbScreeningSymptoms>()
     private val retryingBenIds = mutableListOf<Long>()
 
@@ -101,6 +104,7 @@ class BenPagingAdapter(
             showAnthropometryButton = showAnthropometryButton,
             showExamineButton = showExamineButton,
             tbDiagnosticsByBenId = tbDiagnosticsByBenId,
+            tbDiagnosticsLoaded = tbDiagnosticsLoaded,
             tbScreeningMap = tbScreeningMap,
             showScreeningStatus = showScreeningStatus,   // ADD THIS
             showRedesignedCard = showRedesignedCard,
@@ -124,12 +128,21 @@ class BenPagingAdapter(
         tbDiagnosticsList.addAll(list)
         tbDiagnosticsByBenId.clear()
         tbDiagnosticsByBenId.putAll(newByBenId)
+        // A beneficiary with no diagnostics row at all appears in neither map, so the diff below
+        // never names it; before the first emission such a card renders the "not loaded yet"
+        // placeholder and would stay on that disabled placeholder for good. Only those rows need
+        // the extra nudge - a blanket notifyDataSetChanged() here would rebind every visible row
+        // and swallow a tap in flight, which is what the targeted diff exists to avoid.
+        val firstLoad = !tbDiagnosticsLoaded
+        tbDiagnosticsLoaded = true
         val changedBenIds = (oldByBenId.keys + newByBenId.keys)
             .filterTo(mutableSetOf()) { benId -> oldByBenId[benId] != newByBenId[benId] }
-        if (changedBenIds.isNotEmpty()) {
+        if (changedBenIds.isNotEmpty() || firstLoad) {
             val items = snapshot()
             items.forEachIndexed { index, item ->
-                if (item != null && item.benId in changedBenIds) {
+                if (item != null &&
+                    (item.benId in changedBenIds || (firstLoad && item.benId !in newByBenId))
+                ) {
                     notifyItemChanged(index)
                 }
             }

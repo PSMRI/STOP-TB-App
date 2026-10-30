@@ -1041,8 +1041,6 @@ interface BenDao {
      * Room's query executor rather than doing work. Timing it either side of a paging load splits
      * "this query is expensive" from "the database is busy with the sync".
      */
-    @Query("SELECT 1")
-    suspend fun perfProbe(): Int
 
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage AND isDeactivate=0 AND abhaId IS NOT NULL")
     fun getAllBenWithAbhaCount(selectedVillage: Int): Flow<Int>

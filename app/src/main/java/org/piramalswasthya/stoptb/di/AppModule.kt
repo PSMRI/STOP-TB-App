@@ -34,7 +34,6 @@ import org.piramalswasthya.stoptb.network.AbhaApiService
 import org.piramalswasthya.stoptb.network.AmritApiService
 import org.piramalswasthya.stoptb.network.interceptors.AccountDeactivationInterceptor
 import org.piramalswasthya.stoptb.network.interceptors.CampModeUrlInterceptor
-import org.piramalswasthya.stoptb.network.interceptors.PerfTimingInterceptor
 import org.piramalswasthya.stoptb.network.interceptors.ContentTypeInterceptor
 import org.piramalswasthya.stoptb.network.interceptors.LoggingInterceptor
 import org.piramalswasthya.stoptb.network.interceptors.TokenAuthenticator
@@ -65,8 +64,7 @@ object AppModule {
     fun provideAuthClient(
         loggingInterceptor: HttpLoggingInterceptor,
         campModeUrlInterceptor: CampModeUrlInterceptor,
-        accountDeactivationInterceptor: AccountDeactivationInterceptor,
-        perfTimingInterceptor: PerfTimingInterceptor
+        accountDeactivationInterceptor: AccountDeactivationInterceptor
     ): OkHttpClient {
         return OkHttpClient.Builder()
             .connectTimeout(60, TimeUnit.SECONDS)
@@ -76,8 +74,6 @@ object AppModule {
             .addInterceptor(campModeUrlInterceptor)
             .addInterceptor(loggingInterceptor)
             .addInterceptor(accountDeactivationInterceptor)
-            // TEMPORARY PERF INSTRUMENTATION - appended last, existing order unchanged.
-            .addInterceptor(perfTimingInterceptor)
             .build()
     }
 
@@ -106,8 +102,7 @@ object AppModule {
         tokenAuthenticator: TokenAuthenticator,
         loggingInterceptor: HttpLoggingInterceptor,
         campModeUrlInterceptor: CampModeUrlInterceptor,
-        accountDeactivationInterceptor: AccountDeactivationInterceptor,
-        perfTimingInterceptor: PerfTimingInterceptor
+        accountDeactivationInterceptor: AccountDeactivationInterceptor
     ): OkHttpClient {
         return baseClient
             .newBuilder()
@@ -116,9 +111,6 @@ object AppModule {
             .addInterceptor(campModeUrlInterceptor)
             .addInterceptor(loggingInterceptor)
             .addInterceptor(accountDeactivationInterceptor)
-            // TEMPORARY PERF INSTRUMENTATION - appended LAST so the order of every existing
-            // interceptor is unchanged and the timing covers what the caller actually waits for.
-            .addInterceptor(perfTimingInterceptor)
             .authenticator(tokenAuthenticator) // attach authenticator for 401 handling
             .build()
     }

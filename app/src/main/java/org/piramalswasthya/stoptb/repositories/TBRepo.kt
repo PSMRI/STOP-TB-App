@@ -28,6 +28,8 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
+import org.piramalswasthya.stoptb.helpers.manualResultTextToStore
+import org.piramalswasthya.stoptb.helpers.serverResultOrNull
 import org.piramalswasthya.stoptb.model.GeneralOpdCache
 import org.piramalswasthya.stoptb.model.GeneralOpdPrescription
 import org.piramalswasthya.stoptb.model.OpdMedicineDraft
@@ -1961,6 +1963,9 @@ class TBRepo @Inject constructor(
         // Returned by the TB push sub-functions when a network error stopped the run.
         private const val PUSH_NETWORK_ERROR = -1
 
+        /** [submitManualResult]'s "stored locally, not yet accepted by the backend" result. */
+        const val PENDING_SYNC = "PENDING_SYNC"
+
         /**
          * Records per write transaction in the pull loops below.
          *
@@ -2215,7 +2220,7 @@ class TBRepo @Inject constructor(
             // network attempt entirely when the hub is known-disconnected.
             if (preferenceDao.isCampModeEnabled() && !preferenceDao.isCampHubConnected()) {
                 saveManualResultPendingSync(benId, orderType, resultSummary, reasonForRefusal, localResult)
-                return@withContext NetworkResponse.Success("PENDING_SYNC")
+                return@withContext NetworkResponse.Success(PENDING_SYNC)
             }
 
             try {
@@ -2248,8 +2253,16 @@ class TBRepo @Inject constructor(
                             errMsg.contains("DiagnosticOrder not found for beneficiaryId=")
                         ) {
                             if (WorkerUtils.isDiagnosticOrderPushActive(context, benId)) {
-                                saveManualResultPendingSync(benId, orderType, resultSummary, reasonForRefusal, localResult)
-                                return@withContext NetworkResponse.Success("PENDING_SYNC")
+                                // Not a connectivity problem: this device's own order push is
+                                // still in flight, so the same submit succeeds once it lands.
+                                // Queued rather than reported, and replayed by
+                                // DiagnosticResultPollWorker. That worker only runs in camp mode,
+                                // which is the whole deployment - every tablet talks to the camp
+                                // hub and sign-in is not possible without one - so there is no
+                                // mode in which this queue goes unserviced.
+                                return@withContext queueForLaterReplay(
+                                    benId, orderType, resultSummary, reasonForRefusal, localResult
+                                )
                             }
                             val orderResult = createOrder(benId, orderType)
                             if (orderResult is NetworkResponse.Success) {
@@ -2271,8 +2284,9 @@ class TBRepo @Inject constructor(
                                     context.getString(R.string.diagnostic_order_creation_failed, orderErrMsg)
                                 )
                             }
-                            saveManualResultPendingSync(benId, orderType, resultSummary, reasonForRefusal, localResult)
-                            return@withContext NetworkResponse.Success("PENDING_SYNC")
+                            return@withContext queueForLaterReplay(
+                                benId, orderType, resultSummary, reasonForRefusal, localResult
+                            )
                         }
                         // A definitive rejection (e.g. already COMPLETED) won't succeed on retry —
                         // surface it as a real error instead of queuing for offline-first retry.
@@ -2280,15 +2294,79 @@ class TBRepo @Inject constructor(
                     }
                 } else {
                     // Couldn't confirm anything either way — treat like an unreachable hub.
-                    saveManualResultPendingSync(benId, orderType, resultSummary, reasonForRefusal, localResult)
-                    return@withContext NetworkResponse.Success("PENDING_SYNC")
+                    return@withContext queueForLaterReplay(
+                        benId, orderType, resultSummary, reasonForRefusal, localResult
+                    )
                 }
             } catch (e: Exception) {
-                Timber.e(e, "submitManualResult failed, saving locally for later sync")
-                saveManualResultPendingSync(benId, orderType, resultSummary, reasonForRefusal, localResult)
-                return@withContext NetworkResponse.Success("PENDING_SYNC")
+                Timber.e(e, "submitManualResult failed")
+                return@withContext queueForLaterReplay(
+                    benId, orderType, resultSummary, reasonForRefusal, localResult
+                )
             }
         }
+    }
+
+    /**
+     * The follow-on orders a manual result raises, once the backend has actually accepted it.
+     *
+     * Single source of truth for both callers: the form (which cascades as soon as its submit is
+     * confirmed) and [retryPendingManualResultSyncs] (which cascades when a queued entry is
+     * finally accepted). Cascading off an *unconfirmed* entry is what left a beneficiary showing
+     * "RIF Order ID: Pending" after their offline TrueNat result was refused and replaced by a
+     * TB Negative one - a drug-resistance test apparently in progress that the backend had never
+     * heard of, on a patient who did not need one.
+     */
+    suspend fun cascadeOrdersForConfirmedResult(
+        benId: Long,
+        orderType: String,
+        resultSummary: String?
+    ): List<String> {
+        val existing = tbDao.getTbDiagnosticsByBenId(benId)
+        return when {
+            orderType.equals("XRAY_CHEST", ignoreCase = true) -> {
+                when (ChestXrayResult.fromResultText(resultSummary)) {
+                    ChestXrayResult.TB_PRESUMPTIVE, ChestXrayResult.ABNORMAL_NOT_PRESUMPTIVE -> {
+                        val hasTrueNat = !existing?.trueNatOrderId.isNullOrBlank() ||
+                                existing?.trueNatOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
+                                existing?.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
+                                existing?.trueNatOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
+                        if (hasTrueNat) emptyList() else listOf("SPUTUM_TRUENAT")
+                    }
+                    ChestXrayResult.AI_INVALID -> listOf("XRAY_CHEST")
+                    else -> emptyList()
+                }
+            }
+            orderType.equals("MDR_RIF", ignoreCase = true) ->
+                if (RifResult.fromResultText(resultSummary) == RifResult.INVALID_ERROR) listOf("MDR_RIF") else emptyList()
+            else -> when (MtbResult.fromResultText(resultSummary)) {
+                MtbResult.TB_POSITIVE -> listOf("MDR_RIF")
+                MtbResult.INVALID_ERROR -> listOf("SPUTUM_TRUENAT")
+                else -> emptyList()
+            }
+        }
+    }
+
+    /**
+     * Stores the entry for later replay. Offline-first in both modes: a result a health worker
+     * has typed is never discarded because the network was unavailable at that instant.
+     *
+     * DiagnosticResultPollWorker replays these once the hub is reachable again. That worker is
+     * camp-mode only, which is the whole deployment: every tablet talks to the camp hub, and
+     * sign-in is not possible without it. An earlier version of this refused to store anything
+     * outside camp mode on the grounds that nothing would replay it there - a case that does not
+     * arise, and the wrong trade regardless, since discarding a typed result is worse than
+     * storing one that syncs late.
+     */
+    private suspend fun queueForLaterReplay(
+        benId: Long,
+        orderType: String,
+        resultSummary: String?,
+        reasonForRefusal: String?,
+        localResult: String?
+    ): NetworkResponse<String> {
+        saveManualResultPendingSync(benId, orderType, resultSummary, reasonForRefusal, localResult)
+        return NetworkResponse.Success(PENDING_SYNC)
     }
 
     /** Writes the same fields the confirmed-by-backend path would, marked with this test
@@ -2364,11 +2442,13 @@ class TBRepo @Inject constructor(
                     it.copy(
                         rifOrderId = fetchedOrderId ?: it.rifOrderId,
                         rifOrderStatus = OrderStatus.COMPLETED.name,
-                        // Invalid/Error immediately triggers a reorder (see
-                        // TBSuspectedQuickViewModel's ordersToPushAfterSave) — never persist this
-                        // result text locally, or a race with the reorder's own clearing write can
-                        // leave it stuck showing the old value. Indeterminate is terminal, keep it.
-                        trueNatRifResult = if (standardizedRif == RifResult.INVALID_ERROR) null else localResult,
+                        // Invalid/Error triggers a reorder, after which this text must not
+                        // outlive it locally - but only once the backend has accepted the entry.
+                        // While it is queued the text is the only thing the replay can send.
+                        // Indeterminate is terminal, keep it.
+                        trueNatRifResult = manualResultTextToStore(
+                            localResult, standardizedRif == RifResult.INVALID_ERROR, pendingSync
+                        ),
                         // RIF DR TB / Non DR TB manual entry — extend the same
                         // isConfirmed/isTBConfirmed flags the automated path sets;
                         // isDrTbConfirmed distinguishes the DR-TB-specific outcome.
@@ -2399,11 +2479,11 @@ class TBRepo @Inject constructor(
                         trueNatOrderStatus = OrderStatus.COMPLETED.name,
                         isReferredForSputum = true,
                         isNaatConducted = true,
-                        // Invalid/Error immediately triggers a reorder (see
-                        // TBSuspectedQuickViewModel's ordersToPushAfterSave) — never persist this
-                        // result text locally, or a race with the reorder's own clearing write can
-                        // leave it stuck showing the old value.
-                        naatResult = if (standardizedMtb == MtbResult.INVALID_ERROR) null else localResult,
+                        // See the RIF branch above: kept while the entry is still queued for
+                        // replay, dropped once the backend accepts and the reorder is raised.
+                        naatResult = manualResultTextToStore(
+                            localResult, standardizedMtb == MtbResult.INVALID_ERROR, pendingSync
+                        ),
                         isTBConfirmed = when (standardizedMtb) {
                             MtbResult.TB_POSITIVE -> true
                             MtbResult.TB_NEGATIVE -> false
@@ -2455,8 +2535,11 @@ class TBRepo @Inject constructor(
                     if (resultSummary != null || reason != null) {
                         val response = submitManualResult(diag.benId, "XRAY_CHEST", resultSummary, reason)
                         when {
-                            response.data == "PENDING_SYNC" -> stillPending = true
+                            response.data == PENDING_SYNC -> stillPending = true
                             response is NetworkResponse.Error -> clearStuckPendingSync(diag.benId, "XRAY_CHEST", response.message)
+                            // Accepted at last - raise the follow-on orders the form could not
+                            // raise at entry time, because back then nothing had accepted it yet.
+                            else -> cascadeAcceptedReplay(diag.benId, "XRAY_CHEST", resultSummary)
                         }
                     }
                 }
@@ -2467,8 +2550,11 @@ class TBRepo @Inject constructor(
                     if (resultSummary != null || reason != null) {
                         val response = submitManualResult(diag.benId, "SPUTUM_TRUENAT", resultSummary, reason)
                         when {
-                            response.data == "PENDING_SYNC" -> stillPending = true
+                            response.data == PENDING_SYNC -> stillPending = true
                             response is NetworkResponse.Error -> clearStuckPendingSync(diag.benId, "SPUTUM_TRUENAT", response.message)
+                            // Accepted at last - raise the follow-on orders the form could not
+                            // raise at entry time, because back then nothing had accepted it yet.
+                            else -> cascadeAcceptedReplay(diag.benId, "SPUTUM_TRUENAT", resultSummary)
                         }
                     }
                 }
@@ -2479,8 +2565,11 @@ class TBRepo @Inject constructor(
                     if (resultSummary != null || reason != null) {
                         val response = submitManualResult(diag.benId, "MDR_RIF", resultSummary, reason)
                         when {
-                            response.data == "PENDING_SYNC" -> stillPending = true
+                            response.data == PENDING_SYNC -> stillPending = true
                             response is NetworkResponse.Error -> clearStuckPendingSync(diag.benId, "MDR_RIF", response.message)
+                            // Accepted at last - raise the follow-on orders the form could not
+                            // raise at entry time, because back then nothing had accepted it yet.
+                            else -> cascadeAcceptedReplay(diag.benId, "MDR_RIF", resultSummary)
                         }
                     }
                 }
@@ -2489,8 +2578,27 @@ class TBRepo @Inject constructor(
         }
     }
 
+    private suspend fun cascadeAcceptedReplay(benId: Long, orderType: String, resultSummary: String?) {
+        try {
+            val orders = cascadeOrdersForConfirmedResult(benId, orderType, resultSummary)
+            if (orders.isNotEmpty()) {
+                WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, orders)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e, "Could not raise follow-on orders after an accepted manual-result replay")
+        }
+    }
+
     /** A definitively-rejected retry (e.g. "already COMPLETED") won't succeed by retrying again —
-     *  clears just that test type's pending-sync flag so it stops retrying forever. */
+     *  clears just that test type's pending-sync flag so it stops retrying forever, pulls in
+     *  whatever the backend actually holds, and tells the user their entry didn't land.
+     *
+     *  Clearing the flag alone used to be the whole of this: the tablet then went on showing the
+     *  result the user had entered offline while the backend held a different one, and the only
+     *  record of the divergence was a log line nobody reads. The user had been told "saved
+     *  locally, will sync when Camp Hub reconnects", and that promise was withdrawn in silence. */
     private suspend fun clearStuckPendingSync(benId: Long, orderType: String, errorMessage: String?) {
         Timber.w("Manual result retry for benId=$benId orderType=$orderType was rejected by the backend (not a connectivity issue) — clearing pending-sync flag to stop endless retries: $errorMessage")
         withBenIdLock(benId) {
@@ -2501,6 +2609,59 @@ class TBRepo @Inject constructor(
                 else -> existing.copy(trueNatManualResultPendingSync = false)
             }
             tbDao.saveTbDiagnostics(cache)
+        }
+
+        // Outside the lock on purpose: fetchOrderResult takes the same per-benId lock and
+        // kotlinx Mutex is not reentrant.
+        val recordedResult = try {
+            // Same contract as resultAlreadyOnServer(): fetchOrderResult signals failure by
+            // returning Error, not by throwing, and leaves the stored result untouched for a
+            // non-completed order. Reading the row back regardless would hand the user their own
+            // unsynced entry as "the result already on the server".
+            val fetched = fetchOrderResult(benId, orderType, pushSuspectedAfter = false)
+            serverResultOrNull(fetched, tbDao.getTbDiagnosticsByBenId(benId), orderType)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e, "Could not read back the backend's result after a rejected manual-result replay")
+            null
+        }
+
+        notifyManualResultRejected(benId, recordedResult)
+    }
+
+    /**
+     * The replay runs in a worker with no screen attached, so the only way to reach the person
+     * who typed the result is a notification. Private visibility: the body names a beneficiary,
+     * which shouldn't appear on a locked screen.
+     */
+    private suspend fun notifyManualResultRejected(benId: Long, recordedResult: String?) {
+        try {
+            val name = benDao.getBen(benId)?.let { "${it.firstName.orEmpty()} ${it.lastName.orEmpty()}".trim() }
+                ?.takeIf { it.isNotBlank() } ?: context.getString(R.string.manual_result_rejected_fallback_name)
+            val text = if (recordedResult != null) {
+                context.getString(R.string.manual_result_rejected_with_result, name, recordedResult)
+            } else {
+                context.getString(R.string.manual_result_rejected_generic, name)
+            }
+            val notification = androidx.core.app.NotificationCompat.Builder(
+                context, context.getString(R.string.notification_sync_channel_id)
+            )
+                .setSmallIcon(R.drawable.ic__ncd)
+                .setContentTitle(context.getString(R.string.manual_result_rejected_title))
+                .setContentText(text)
+                .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(text))
+                .setVisibility(androidx.core.app.NotificationCompat.VISIBILITY_PRIVATE)
+                .setAutoCancel(true)
+                .build()
+            // Distinct id per beneficiary so two rejections don't overwrite each other.
+            androidx.core.app.NotificationManagerCompat.from(context)
+                .notify("manual-result-rejected", benId.hashCode(), notification)
+        } catch (e: SecurityException) {
+            // Notification permission denied - the data has still been reconciled above.
+            Timber.w(e, "Could not post the rejected-manual-result notification")
+        } catch (e: Exception) {
+            Timber.e(e, "Could not post the rejected-manual-result notification")
         }
     }
 

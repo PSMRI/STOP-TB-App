@@ -10,6 +10,7 @@ import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.TBDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
 import org.piramalswasthya.stoptb.network.AmritApiService
 import org.piramalswasthya.stoptb.model.GeneralOpdCache
 
@@ -40,7 +41,8 @@ class GeneralOpdStaticMasterModeTest {
         val api = mock(AmritApiService::class.java)
         val repo = TBRepo(
             mock(TBDao::class.java, RETURNS_DEEP_STUBS), mock(BenDao::class.java), preferences,
-            mock(UserRepo::class.java), api, db, mock(DrugMasterRepo::class.java), mock(Context::class.java)
+            mock(UserRepo::class.java), api, db, mock(DrugMasterRepo::class.java),
+            mock(SyncRetryStore::class.java), mock(Context::class.java)
         )
 
         // Empty master names deliberately select the dataset's static resource list.
@@ -57,7 +59,8 @@ class GeneralOpdStaticMasterModeTest {
         val api = mock(AmritApiService::class.java)
         val repo = TBRepo(
             mock(TBDao::class.java, RETURNS_DEEP_STUBS), mock(BenDao::class.java), preferences,
-            mock(UserRepo::class.java), api, db, mock(DrugMasterRepo::class.java), mock(Context::class.java)
+            mock(UserRepo::class.java), api, db, mock(DrugMasterRepo::class.java),
+            mock(SyncRetryStore::class.java), mock(Context::class.java)
         )
         val pending = GeneralOpdCache(benId = 1L, chiefComplaints = listOf("Fever", "Cough"))
         assertEquals(listOf(1, 9), repo.resolveChiefComplaintIds(pending))
