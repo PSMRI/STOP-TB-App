@@ -298,9 +298,13 @@ class NewBenRegFragment : Fragment() {
                 State.SAVE_SUCCESS -> {
                     binding.llContent.visibility = View.VISIBLE
                     binding.pbForm.visibility = View.GONE
-                    Toast.makeText(context, resources.getString(R.string.registration_successful), Toast.LENGTH_LONG).show()
+                    val toastMessageResId =
+                        if (viewModel.isDataUpdateFlow) R.string.data_update_successful else R.string.registration_successful
+                    Toast.makeText(context, resources.getString(toastMessageResId), Toast.LENGTH_LONG).show()
                     try {
-                        WorkerUtils.triggerAmritPushWorker(requireContext())
+                        if (viewModel.isDataUpdateFlow.not()) {
+                            WorkerUtils.triggerAmritPushWorker(requireContext())
+                        }
                         if (viewModel.isNonHHArg) {
                             val popped = findNavController().popBackStack(R.id.nonHHFragment, false)
                             if (!popped) findNavController().navigateUp()
@@ -322,23 +326,33 @@ class NewBenRegFragment : Fragment() {
 
         // Edit FAB
         binding.fabEdit.setOnClickListener {
-            isEditingExisting = true
-            originalLocationState = viewModel.locationState.value
-            originalCampSite = viewModel.isCampSite.value
-            updateLocationRequested = false
-
-            viewModel.setLocationOverridden(false)
-            suppressRadioCallbacks = true
-            binding.rbUpdateNo.isChecked = true
-            binding.rgCampSite.check(if (originalCampSite) R.id.rb_camp_yes else R.id.rb_camp_no)
-            suppressRadioCallbacks = false
-            viewModel.setRecordExist(false)
-            viewModel.enableEditMode()
-            binding.fabEdit.visibility = View.GONE
-            binding.btnSubmit.visibility = View.VISIBLE
+            fabEditClickEvent()
             adapter.isEnabled = true
             adapter.notifyDataSetChanged()
         }
+
+        if (viewModel.isDataUpdateFlow) {
+            fabEditClickEvent()
+            adapter.isEnabled = true
+            adapter.notifyDataSetChanged()
+        }
+    }
+
+    private fun fabEditClickEvent() {
+        isEditingExisting = true
+        originalLocationState = viewModel.locationState.value
+        originalCampSite = viewModel.isCampSite.value
+        updateLocationRequested = false
+
+        viewModel.setLocationOverridden(false)
+        suppressRadioCallbacks = true
+        binding.rbUpdateNo.isChecked = true
+        binding.rgCampSite.check(if (originalCampSite) R.id.rb_camp_yes else R.id.rb_camp_no)
+        suppressRadioCallbacks = false
+        viewModel.setRecordExist(false)
+        viewModel.enableEditMode()
+        binding.fabEdit.visibility = View.GONE
+        binding.btnSubmit.visibility = View.VISIBLE
     }
 
     // Both fabEdit observers must call this rather than recompute their own check — isDeath
@@ -837,6 +851,7 @@ class NewBenRegFragment : Fragment() {
         super.onStart()
         val isNonHH = viewModel.isNonHHArg || (viewModel.benIdFromArgs != 0L && viewModel.showLinkHouseholdButton)
         val title = when {
+            viewModel.isDataUpdateFlow -> getString(R.string.beneficiary_details)
             isNonHH                     -> getString(R.string.title_new_non_hh_reg)
             viewModel.relToHeadId == 18 -> getString(R.string.title_new_ben_reg_hof)
             viewModel.relToHeadId > 0   -> getString(R.string.title_new_ben_reg_non_hof)
@@ -892,7 +907,9 @@ class NewBenRegFragment : Fragment() {
             .setCancelable(false)
             .setPositiveButton(getString(R.string.discard)) { dialog, _ ->
                 dialog.dismiss()
-                if (isAdded) {
+                if (viewModel.isDataUpdateFlow) {
+                    findNavController().popBackStack()
+                } else if (isAdded) {
                     val popped = findNavController().popBackStack(R.id.homeFragment, false)
                     if (!popped) {
                         findNavController().popBackStack(R.id.volunteerHomeFragment, false)

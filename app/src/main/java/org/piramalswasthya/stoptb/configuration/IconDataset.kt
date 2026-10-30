@@ -69,6 +69,17 @@ class IconDataset @Inject constructor(
                 )
             )
         }
+        if (AppModule.MISSING_DATA_BENEFICIARIES in homeModules) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic_all_ben,
+                    resources.getString(R.string.icon_title_missing_data_ben),
+                    resources.getString(R.string.home_card_missing_data_ben_subtitle),
+                    recordsRepo.allMissingDataBenListCount,
+                    VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToMissingDataBenFragment()
+                )
+            )
+        }
 
 //        if (role.isRegistrationOfficerRole() || role.isCounsellingOfficerRole() || role.isNurseRole()) {
         if (AppModule.NON_HOUSEHOLD in homeModules) {
@@ -211,6 +222,17 @@ class IconDataset @Inject constructor(
                     resources.getString(R.string.home_card_all_ben_subtitle),
                     recordsRepo.allBenListCount,
                     VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment()
+                )
+            )
+        }
+        if (AppModule.MISSING_DATA_BENEFICIARIES in modules) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic_all_ben,
+                    resources.getString(R.string.icon_title_missing_data_ben),
+                    resources.getString(R.string.home_card_missing_data_ben_subtitle),
+                    recordsRepo.allMissingDataBenListCount,
+                    VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToMissingDataBenFragment()
                 )
             )
         }

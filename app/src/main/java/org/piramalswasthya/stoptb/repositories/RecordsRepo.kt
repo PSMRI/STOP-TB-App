@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.piramalswasthya.stoptb.model.BenBasicCache
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
+import org.piramalswasthya.stoptb.database.room.dao.DataMissingBenInfoDao
 import org.piramalswasthya.stoptb.database.room.dao.HouseholdDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.BenBasicDomain
@@ -20,6 +21,7 @@ class RecordsRepo @Inject constructor(
     @ApplicationContext private val context: Context,
     private val householdDao: HouseholdDao,
     private val benDao: BenDao,
+    private val missingBenInfoDao: DataMissingBenInfoDao,
     private val  preferenceDao: PreferenceDao
 ) {
 //    private val selectedVillage = preferenceDao.getLocationRecord()?.village?.id ?: 0
@@ -74,6 +76,7 @@ class RecordsRepo @Inject constructor(
             .map { it.asBasicDomainModel() }
 
     val allBenListCount get() = benDao.getAllBenCount(selectedVillage)
+    val allMissingDataBenListCount get() = missingBenInfoDao.getDataCount(selectedVillage)
     val nonHHListCount get() = benDao.getNonHHCount(selectedVillage)
     val nonHHList get() = benDao.getNonHHBeneficiaries(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }

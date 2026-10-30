@@ -77,6 +77,50 @@ data class GetDataPaginatedRequests(
 )
 
 @JsonClass(generateAdapter = true)
+data class GetMissingDataBenResponse(
+    val status: String? = null,
+    val message: String? = null,
+    val data: List<MissingDataBenDto>? = null,
+    val pagination: PaginationDto? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class MissingDataBenDto(
+    val beneficiaryId: Long,
+    val isUpdated: Boolean = false,
+    val reason: List<String>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class PaginationDto(
+    val page: Int = 0,
+    val size: Int = 10,
+    val totalElements: Int = 0,
+    val totalPages: Int = 0,
+    val hasNext: Boolean = false
+)
+
+@JsonClass(generateAdapter = true)
+data class UpdateNikshaySyncStatusRequest(
+    val beneficiaryId: Long,
+    val isUpdated: Boolean
+)
+
+@JsonClass(generateAdapter = true)
+data class UpdateNikshaySyncStatusResponse(
+    val status: String?,
+    val message: String?,
+    val data: NikshayUpdateData?
+)
+
+@JsonClass(generateAdapter = true)
+data class NikshayUpdateData(
+    val beneficiaryId: Long,
+    val isUpdated: Boolean,
+    val recordsUpdated: Int
+)
+
+@JsonClass(generateAdapter = true)
 data class NurseWorklistRequest(
     val providerServiceMapID: Int,
     val villageId: Int,

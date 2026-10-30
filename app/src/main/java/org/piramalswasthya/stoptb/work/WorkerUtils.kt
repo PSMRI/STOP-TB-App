@@ -188,14 +188,23 @@ object WorkerUtils {
             }).setInputData(pullRunData).addTag("pull_group5_tb").build(),
         )
 
+        val groupMissingData = listOf(
+            (if (isCampHubSyncActive) {
+                campSyncRequestBuilder<PullMissingDataFromAmritWorker>()
+            } else {
+                syncRequestBuilder<PullMissingDataFromAmritWorker>()
+            }).setInputData(pullRunData).addTag("pull_missing_data").build()
+        )
+
         val setSyncCompleteWorker = OneTimeWorkRequestBuilder<UpdatePrefForPullCompleteWorker>()
             .setInputData(pullRunData)
             .build()
 
         val chainTB = afterFoundation.then(groupTB)
+        val chainMissingData = chainTB.then(groupMissingData)
 
-        chainTB.then(setSyncCompleteWorker).enqueue()
-        return listOf(pullWorkRequest.id, setSyncCompleteWorker.id) + groupTB.map { it.id }
+        chainMissingData.then(setSyncCompleteWorker).enqueue()
+        return listOf(pullWorkRequest.id, setSyncCompleteWorker.id) + groupTB.map { it.id } + groupMissingData.map { it.id }
     }
 
     /** Convenience alias — camp check is already inside [triggerAmritPushWorker]. */

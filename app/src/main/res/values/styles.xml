@@ -232,4 +232,14 @@
         <item name="android:textSelectHandleRight">@drawable/pv_invisible_image</item>
     </style>
 
+    <style name="ShapeAppearance.App.Dialog" parent="ShapeAppearance.Material3.Corner.None">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">8dp</item>
+    </style>
+
+    <style name="ThemeOverlay.App.Dialog"
+        parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearance.App.Dialog</item>
+    </style>
+
 </resources>

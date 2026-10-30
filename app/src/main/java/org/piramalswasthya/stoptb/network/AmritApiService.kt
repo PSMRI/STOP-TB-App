@@ -61,6 +61,19 @@ interface AmritApiService {
     @POST("flw-api/beneficiary/getBeneficiaryData")
     suspend fun getBeneficiaries(@Body userDetail: GetDataPaginatedRequests): Response<ResponseBody>
 
+    @GET("nikshay/syncStatus/missingBeneficiaries")
+    suspend fun getMissingDataBeneficiaries(
+        @Query("providerServiceMapID") providerServiceMapID: Int,
+        @Query("villageID") villageID: Int,
+        @Query("pageNo") pageNo: Int = 0,
+        @Query("pageSize") pageSize: Int = 30
+    ): Response<GetMissingDataBenResponse>
+
+    @POST("nikshay/syncStatus/update")
+    suspend fun updateNikshaySyncStatus(
+        @Body request: UpdateNikshaySyncStatusRequest
+    ): Response<UpdateNikshaySyncStatusResponse>
+
 //    @POST("flw-api/stoptb/nurse/worklist")
 //    suspend fun getNurseWorklist(@Body request: NurseWorklistRequest): Response<ResponseBody>
 //
