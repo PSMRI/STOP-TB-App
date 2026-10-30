@@ -116,6 +116,23 @@ class BenListAdapter(
             }
         }
 
+        /**
+         * Clinical Assessment list only. A completed result stays as-is. When that test was
+         * not conducted, show the same reason text the Digital Chest X-ray and TrueNat lists use.
+         */
+        private fun clinicalResultOrNotConductedReason(
+            source: Int,
+            result: String?,
+            notConductedReason: String,
+            fallbackReason: String,
+            formatResult: (String?) -> String
+        ): String {
+            if (source != 10 || !result.isNullOrBlank()) return formatResult(result)
+            val reason = notConductedReason.ifBlank { fallbackReason }.trim()
+            if (reason.isEmpty()) return formatResult(result)
+            return binding.root.context.getString(R.string.ben_card_result, reason)
+        }
+
         private fun normalizedName(name: String): String =
             name.trim().replace(Regex("\\s+"), " ").lowercase(java.util.Locale.ROOT)
 
@@ -724,7 +741,20 @@ class BenListAdapter(
                 )
                 binding.tvXrayStatus.text = if (xrayResult.isNullOrBlank()) "Unscreened" else "Screened"
                 binding.tvXrayStatus.visibility = View.GONE
-                binding.tvXrayResult.text = formatScreeningResult(xrayResult)
+                val suspectedForStatus = tbSuspectedList.find { it.benId == item.benId }
+                binding.tvXrayResult.text = clinicalResultOrNotConductedReason(
+                    source = source,
+                    result = xrayResult,
+                    notConductedReason = formatDenialReason(
+                        tbDiagForStatus?.reasonNotConductedChestXray,
+                        tbDiagForStatus?.reasonNotConductedChestXrayOther
+                    ),
+                    fallbackReason = formatDenialReason(
+                        tbDiagForStatus?.reasonForDenialChestXray,
+                        tbDiagForStatus?.reasonForDenialChestXrayOther
+                    ).ifBlank { suspectedForStatus?.reasonForRefusalXray.orEmpty() },
+                    formatResult = { formatScreeningResult(it) }
+                )
                 binding.tvXrayResult.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
 
                 // ---------------------------------------------------------
@@ -737,7 +767,19 @@ class BenListAdapter(
                 )
                 binding.tvTruenatStatus.text = if (truenatResult.isNullOrBlank()) "Unscreened" else "Screened"
                 binding.tvTruenatStatus.visibility = View.GONE
-                binding.tvTruenatResult.text = formatScreeningResult(truenatResult)
+                binding.tvTruenatResult.text = clinicalResultOrNotConductedReason(
+                    source = source,
+                    result = truenatResult,
+                    notConductedReason = formatDenialReason(
+                        tbDiagForStatus?.reasonNotConductedNaat,
+                        tbDiagForStatus?.reasonNotConductedNaatOther
+                    ),
+                    fallbackReason = formatDenialReason(
+                        tbDiagForStatus?.reasonForDenialSputum,
+                        tbDiagForStatus?.reasonForDenialSputumOther
+                    ).ifBlank { suspectedForStatus?.reasonForRefusalMTB.orEmpty() },
+                    formatResult = { formatScreeningResult(it) }
+                )
                 binding.tvTruenatResult.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
             } else {
                 binding.detailsDivider.visibility = View.GONE
