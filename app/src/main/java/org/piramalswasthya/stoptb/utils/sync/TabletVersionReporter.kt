@@ -6,7 +6,6 @@ import android.provider.Settings
 import org.json.JSONObject
 import org.piramalswasthya.stoptb.BuildConfig
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
-import timber.log.Timber
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
@@ -44,23 +43,32 @@ object TabletVersionReporter {
     private fun isPrivate(o: List<Int>): Boolean =
         o[0] == 10 || (o[0] == 172 && o[1] in 16..31) || (o[0] == 192 && o[1] == 168)
 
+    /** What one attempt did, in words a field engineer can act on (shown in the Sync Dashboard log). */
+    data class Outcome(val kind: Kind, val message: String) {
+        enum class Kind { SENT, SKIPPED, FAILED }
+    }
+
     /**
      * Sends the report when camp mode is on and the hub is an IP. Without [force], at most once an
      * hour unless the version, user or camp changed since the last report that got through.
      */
-    fun report(context: Context, pref: PreferenceDao, force: Boolean = false): Boolean =
+    fun report(context: Context, pref: PreferenceDao, force: Boolean = false): Outcome =
         runCatching { send(context, pref, force) }
-            .onFailure { Timber.d("Tablet version report skipped: ${it.javaClass.simpleName}: ${it.message}") }
-            .getOrDefault(false)
+            .getOrElse { Outcome(Outcome.Kind.FAILED, "error: ${it.javaClass.simpleName}: ${it.message}") }
 
-    private fun send(context: Context, pref: PreferenceDao, force: Boolean): Boolean {
-        if (!pref.isCampModeEnabled()) return false
-        val url = reportUrl(pref.getCampHubUrl()) ?: return false
+    private fun send(context: Context, pref: PreferenceDao, force: Boolean): Outcome {
+        if (!pref.isCampModeEnabled()) return Outcome(Outcome.Kind.SKIPPED, "camp mode is off")
+        val hub = pref.getCampHubUrl()
+        val url = reportUrl(hub)
+            ?: return Outcome(Outcome.Kind.SKIPPED, "camp hub $hub is not a camp laptop IP (10.x, 172.16-31.x or 192.168.x)")
+        val version = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
         val userName = pref.getLoggedInUser()?.userName ?: pref.getRememberedUserName()
         val key = listOf(url, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE, userName).joinToString("|")
         val store = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
-        if (!force && store.getString(LAST_KEY, null) == key && now - store.getLong(LAST_AT, 0L) < MIN_INTERVAL_MS) return false
+        if (!force && store.getString(LAST_KEY, null) == key && now - store.getLong(LAST_AT, 0L) < MIN_INTERVAL_MS) {
+            return Outcome(Outcome.Kind.SKIPPED, "version $version already reported within the last hour")
+        }
 
         val body = JSONObject()
             .put("tabletId", tabletId(context))
@@ -70,7 +78,7 @@ object TabletVersionReporter {
         if (!userName.isNullOrBlank()) body.put("userName", userName.trim())
 
         var connection: HttpURLConnection? = null
-        val ok = runCatching {
+        val outcome = try {
             connection = (URL(url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = TIMEOUT_MS
                 readTimeout = TIMEOUT_MS
@@ -79,15 +87,27 @@ object TabletVersionReporter {
                 useCaches = false
                 setRequestProperty("Content-Type", "application/json")
             }
-            connection!!.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
-            connection!!.responseCode in 200..299
-        }.onFailure {
-            Timber.d("Tablet version report not sent: ${it.javaClass.simpleName}: ${it.message}")
-        }.also { connection?.disconnect() }.getOrDefault(false)
+            connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+            val code = connection.responseCode
+            if (code in 200..299) {
+                Outcome(Outcome.Kind.SENT, "version $version reported to the camp laptop at $url")
+            } else {
+                Outcome(Outcome.Kind.FAILED, "the camp laptop at $url answered HTTP $code${errorText(connection)}")
+            }
+        } catch (e: Exception) {
+            Outcome(Outcome.Kind.FAILED, "could not reach the camp laptop at $url: ${e.javaClass.simpleName}: ${e.message}")
+        } finally {
+            connection?.disconnect()
+        }
 
-        if (ok) store.edit().putString(LAST_KEY, key).putLong(LAST_AT, now).apply()
-        return ok
+        if (outcome.kind == Outcome.Kind.SENT) store.edit().putString(LAST_KEY, key).putLong(LAST_AT, now).apply()
+        return outcome
     }
+
+    /** The console's short error body (e.g. {"error":"invalid userName"}), if any. */
+    private fun errorText(connection: HttpURLConnection): String =
+        runCatching { connection.errorStream?.use { it.readBytes().decodeToString().trim().take(200) } }
+            .getOrNull()?.takeIf { it.isNotBlank() }?.let { ": $it" } ?: ""
 
     @SuppressLint("HardwareIds")
     private fun tabletId(context: Context): String =
