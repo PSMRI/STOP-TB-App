@@ -29,12 +29,19 @@ class TabletVersionReportWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         try {
-            withContext(Dispatchers.IO) {
+            val outcome = withContext(Dispatchers.IO) {
                 TabletVersionReporter.report(applicationContext, preferenceDao, inputData.getBoolean(FORCE, false))
+            }
+            // Logged from the worker so SyncLogTree keeps it (its tag contains "Worker"): every
+            // attempt is in the Sync Dashboard log and the exported log file, also in release builds.
+            when (outcome.kind) {
+                TabletVersionReporter.Outcome.Kind.SENT -> Timber.i("Tablet version report: ${outcome.message}")
+                TabletVersionReporter.Outcome.Kind.SKIPPED -> Timber.i("Tablet version report skipped: ${outcome.message}")
+                TabletVersionReporter.Outcome.Kind.FAILED -> Timber.w("Tablet version report failed: ${outcome.message}")
             }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            Timber.d("Tablet version report failed: ${e.message}")
+            Timber.w("Tablet version report failed: ${e.javaClass.simpleName}: ${e.message}")
         }
         return Result.success()
     }
