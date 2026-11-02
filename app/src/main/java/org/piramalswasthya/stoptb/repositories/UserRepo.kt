@@ -222,13 +222,18 @@ class UserRepo @Inject constructor(
                     return@withContext false
                 }
 
-            } catch (se: SocketTimeoutException) {
-                return@withContext refreshTokenTmc(userName, password)
+            } catch (e: IOException) {
+                // Network failure (including timeouts): let the caller's worker retry
+                // with backoff. Retrying here recursed without limit.
+                throw e
             } catch (e: HttpException) {
                 Timber.e("Auth Failed!")
                 return@withContext false
             } catch (e: Exception) {
-                return@withContext true
+                // Reporting success here made callers retry their request in a loop
+                // even though no new token was obtained.
+                Timber.e(e, "Token refresh failed")
+                return@withContext false
             }
         }
     }
