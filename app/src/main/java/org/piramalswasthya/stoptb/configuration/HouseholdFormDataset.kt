@@ -225,6 +225,14 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         }
     }
 
+    // Position of "Other" in nhhr_fuel_cooking_array (ID 8). Keep fixed: new fuels are appended after it.
+    private val OTHER_FUEL_INDEX = 7
+
+    private fun isOtherFuelSelected(): Boolean {
+        val otherLabel = fuelForCooking.entries?.getOrNull(OTHER_FUEL_INDEX) ?: return false
+        return fuelForCooking.value == otherLabel
+    }
+
     private fun setDefaultRegisteredAtCampSiteIfNeeded() {
         if (registeredAtCampSite.value.isNullOrBlank()) {
             // entries = ["Yes", "No"] — default to "No"
@@ -357,7 +365,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             availOfToilet.setSavedChoice(saved.availabilityOfToiletId, saved.availabilityOfToilet)
             otherAvailOfToilet.value = saved.otherAvailabilityOfToilet
         }
-        if (fuelForCooking.value == fuelForCooking.entries!!.last()) {
+        if (isOtherFuelSelected()) {
             list.add(list.indexOf(fuelForCooking) + 1, otherFuelForCooking)
         }
         if (sourceOfWater.value == sourceOfWater.entries!!.last()) {
@@ -620,7 +628,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             availOfToilet.setSavedChoice(saved.availabilityOfToiletId, saved.availabilityOfToilet)
             otherAvailOfToilet.value = saved.otherAvailabilityOfToilet
         }
-        if (fuelForCooking.value == fuelForCooking.entries!!.last()) {
+        if (isOtherFuelSelected()) {
             list.add(list.indexOf(fuelForCooking) + 1, otherFuelForCooking)
         }
         if (sourceOfWater.value == sourceOfWater.entries!!.last()) {
@@ -740,7 +748,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             fuelForCooking.id -> triggerDependants(
                 source = fuelForCooking,
                 passedIndex = index,
-                triggerIndex = fuelForCooking.entries!!.size - 1,
+                triggerIndex = OTHER_FUEL_INDEX,
                 target = otherFuelForCooking
             )
 
@@ -935,7 +943,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
 
             amenities.fuelUsedId = fuelForCooking.getPosition()
             amenities.fuelUsed = fuelForCooking.getEnglishStringFromPosition(amenities.fuelUsedId)
-            amenities.otherFuelUsed = otherFuelForCooking.value
+            amenities.otherFuelUsed = otherFuelForCooking.value.takeIf { isOtherFuelSelected() }
 
             amenities.sourceOfDrinkingWaterId = sourceOfWater.getPosition()
             amenities.sourceOfDrinkingWater =

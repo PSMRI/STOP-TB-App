@@ -80,9 +80,9 @@
         <item>নহয়</item>
     </string-array>
 
-    <string name="nhhr_fuel_cooking">ৰন্ধা-বঢ়াৰ বাবে ব্যৱহাৰ কৰা ইন্ধনৰ প্ৰধান উৎস</string>
+    <string name="nhhr_fuel_cooking">ৰন্ধন কাৰ্যৰ বাবে ব্যৱহাৰ কৰা ইন্ধনৰ প্ৰধান উৎস</string>
     <string name="nhhr_fuel_cooking_1">খৰি (কাঠ)</string>
-    <string name="nhhr_fuel_cooking_2">শস্যৰ অৱশিষ্ট</string>
+    <string name="nhhr_fuel_cooking_2">শস্যৰ অৱশিষ্টাংশ</string>
     <string name="nhhr_fuel_cooking_3">গোবৰ শুকুৱাই তৈয়াৰ কৰা উপলা</string>
     <string name="nhhr_fuel_cooking_4">কয়লা</string>
     <string name="nhhr_fuel_cooking_5">কেৰাচিন</string>
