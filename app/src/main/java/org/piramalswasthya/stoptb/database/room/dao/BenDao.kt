@@ -13,6 +13,50 @@ data class VillageHeadcount(
     val unscreened: Int = 0,
 )
 
+/**
+ * Abnormal vitals / physical-sign predicate on BEN_VITALS (aliased `v`), shared by the
+ * HWC-referral (source = 5) queries below. Kept as a `const val` so it stays a compile-time
+ * constant usable inside Room `@Query` annotations.
+ */
+private const val ABNORMAL_VITALS_CONDITION = """(
+    (v.pulseRate IS NOT NULL AND v.pulseRate < 60)
+    OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
+    OR (v.bpSystolic IS NOT NULL AND v.bpSystolic < 90)
+    OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
+    OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
+    OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
+    OR (v.rbs IS NOT NULL AND v.rbs >= 100)
+    OR (v.pallorId = 1 OR UPPER(TRIM(IFNULL(v.pallor, ''))) IN ('PRESENT', 'YES'))
+    OR (v.icterusId = 1 OR UPPER(TRIM(IFNULL(v.icterus, ''))) IN ('PRESENT', 'YES'))
+    OR (v.cyanosisId = 1 OR UPPER(TRIM(IFNULL(v.cyanosis, ''))) IN ('PRESENT', 'YES'))
+    OR (v.clubbingId = 1 OR UPPER(TRIM(IFNULL(v.clubbing, ''))) IN ('PRESENT', 'YES'))
+    OR (v.lymphadenopathyId = 1 OR UPPER(TRIM(IFNULL(v.lymphadenopathy, ''))) IN ('PRESENT', 'YES'))
+    OR (v.oedemaId = 1 OR UPPER(TRIM(IFNULL(v.oedema, ''))) IN ('PRESENT', 'YES'))
+)"""
+
+/**
+ * Beneficiaries belonging on the Liquid Culture referral card (source = 8 queries and
+ * getLiquidCultureBenCount). If the TB_SCREENING branch changes, update the TB Screening
+ * post-submit popup logic that mirrors it (feat/liquid_culture_referral).
+ */
+private const val LIQUID_CULTURE_REFERRAL_CONDITION = """(
+    benId IN (
+        SELECT ts.benId FROM TB_SUSPECTED ts
+        WHERE ts.isLiquidCultureConducted IS NOT NULL
+    )
+    OR benId IN (
+        SELECT td.benId FROM TB_DIAGNOSTICS td
+        WHERE td.isLiquidCultureConducted IS NOT NULL
+    )
+    OR benId IN (
+        SELECT tbs.benId FROM TB_SCREENING tbs
+        WHERE tbs.recommendedForLiquidCultureTest = 1
+           OR tbs.historyOfTb = 1
+           OR tbs.takingAntiTBDrugs = 1
+           OR tbs.familySufferingFromTB = 1
+    )
+)"""
+
 @Dao
 interface BenDao {
 
@@ -239,19 +283,7 @@ interface BenDao {
                 WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
                 UNION
                 SELECT v.benId FROM BEN_VITALS v
-                WHERE (v.pulseRate IS NOT NULL AND v.pulseRate < 60)
-                   OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
-                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic < 90)
-                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
-                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
-                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
-                   OR (v.rbs IS NOT NULL AND v.rbs >= 100)
-                   OR (v.pallorId = 1 OR UPPER(TRIM(IFNULL(v.pallor, ''))) IN ('PRESENT', 'YES'))
-                   OR (v.icterusId = 1 OR UPPER(TRIM(IFNULL(v.icterus, ''))) IN ('PRESENT', 'YES'))
-                   OR (v.cyanosisId = 1 OR UPPER(TRIM(IFNULL(v.cyanosis, ''))) IN ('PRESENT', 'YES'))
-                   OR (v.clubbingId = 1 OR UPPER(TRIM(IFNULL(v.clubbing, ''))) IN ('PRESENT', 'YES'))
-                   OR (v.lymphadenopathyId = 1 OR UPPER(TRIM(IFNULL(v.lymphadenopathy, ''))) IN ('PRESENT', 'YES'))
-                   OR (v.oedemaId = 1 OR UPPER(TRIM(IFNULL(v.oedema, ''))) IN ('PRESENT', 'YES'))
+                WHERE ${ABNORMAL_VITALS_CONDITION}
                 UNION
                 SELECT ts.benId FROM TB_SUSPECTED ts
                 WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
@@ -311,21 +343,7 @@ interface BenDao {
                 )
             ))
             OR (:source = 8 AND isDeath = 0 AND (
-                benId IN (
-                    SELECT ts.benId FROM TB_SUSPECTED ts
-                    WHERE ts.isLiquidCultureConducted IS NOT NULL
-                )
-                OR benId IN (
-                    SELECT td.benId FROM TB_DIAGNOSTICS td
-                    WHERE td.isLiquidCultureConducted IS NOT NULL
-                )
-                OR benId IN (
-                    SELECT tbs.benId FROM TB_SCREENING tbs
-                    WHERE tbs.recommendedForLiquidCultureTest = 1
-                       OR tbs.historyOfTb = 1
-                       OR tbs.takingAntiTBDrugs = 1
-                       OR tbs.familySufferingFromTB = 1
-                )
+                ${LIQUID_CULTURE_REFERRAL_CONDITION}
             ))
             OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
                 SELECT 1
@@ -420,19 +438,7 @@ interface BenDao {
                 WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
                 UNION
                 SELECT v.benId FROM BEN_VITALS v
-                WHERE (v.pulseRate IS NOT NULL AND v.pulseRate < 60)
-                   OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
-                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic < 90)
-                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
-                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
-                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
-                   OR (v.rbs IS NOT NULL AND v.rbs >= 100)
-                   OR (v.pallorId = 1 OR UPPER(TRIM(IFNULL(v.pallor, ''))) IN ('PRESENT', 'YES'))
-                   OR (v.icterusId = 1 OR UPPER(TRIM(IFNULL(v.icterus, ''))) IN ('PRESENT', 'YES'))
-                   OR (v.cyanosisId = 1 OR UPPER(TRIM(IFNULL(v.cyanosis, ''))) IN ('PRESENT', 'YES'))
-                   OR (v.clubbingId = 1 OR UPPER(TRIM(IFNULL(v.clubbing, ''))) IN ('PRESENT', 'YES'))
-                   OR (v.lymphadenopathyId = 1 OR UPPER(TRIM(IFNULL(v.lymphadenopathy, ''))) IN ('PRESENT', 'YES'))
-                   OR (v.oedemaId = 1 OR UPPER(TRIM(IFNULL(v.oedema, ''))) IN ('PRESENT', 'YES'))
+                WHERE ${ABNORMAL_VITALS_CONDITION}
                 UNION
                 SELECT ts.benId FROM TB_SUSPECTED ts
                 WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
@@ -492,21 +498,7 @@ interface BenDao {
                 )
             ))
             OR (:source = 8 AND isDeath = 0 AND (
-                benId IN (
-                    SELECT ts.benId FROM TB_SUSPECTED ts
-                    WHERE ts.isLiquidCultureConducted IS NOT NULL
-                )
-                OR benId IN (
-                    SELECT td.benId FROM TB_DIAGNOSTICS td
-                    WHERE td.isLiquidCultureConducted IS NOT NULL
-                )
-                OR benId IN (
-                    SELECT tbs.benId FROM TB_SCREENING tbs
-                    WHERE tbs.recommendedForLiquidCultureTest = 1
-                       OR tbs.historyOfTb = 1
-                       OR tbs.takingAntiTBDrugs = 1
-                       OR tbs.familySufferingFromTB = 1
-                )
+                ${LIQUID_CULTURE_REFERRAL_CONDITION}
             ))
             OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
                 SELECT 1
@@ -644,19 +636,7 @@ interface BenDao {
                 WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
                 UNION
                 SELECT v.benId FROM BEN_VITALS v
-                WHERE (v.pulseRate IS NOT NULL AND v.pulseRate < 60)
-                   OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
-                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic < 90)
-                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
-                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
-                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
-                   OR (v.rbs IS NOT NULL AND v.rbs >= 100)
-                   OR (v.pallorId = 1 OR UPPER(TRIM(IFNULL(v.pallor, ''))) IN ('PRESENT', 'YES'))
-                   OR (v.icterusId = 1 OR UPPER(TRIM(IFNULL(v.icterus, ''))) IN ('PRESENT', 'YES'))
-                   OR (v.cyanosisId = 1 OR UPPER(TRIM(IFNULL(v.cyanosis, ''))) IN ('PRESENT', 'YES'))
-                   OR (v.clubbingId = 1 OR UPPER(TRIM(IFNULL(v.clubbing, ''))) IN ('PRESENT', 'YES'))
-                   OR (v.lymphadenopathyId = 1 OR UPPER(TRIM(IFNULL(v.lymphadenopathy, ''))) IN ('PRESENT', 'YES'))
-                   OR (v.oedemaId = 1 OR UPPER(TRIM(IFNULL(v.oedema, ''))) IN ('PRESENT', 'YES'))
+                WHERE ${ABNORMAL_VITALS_CONDITION}
                 UNION
                 SELECT ts.benId FROM TB_SUSPECTED ts
                 WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
@@ -716,21 +696,7 @@ interface BenDao {
                 )
             ))
             OR (:source = 8 AND isDeath = 0 AND (
-                benId IN (
-                    SELECT ts.benId FROM TB_SUSPECTED ts
-                    WHERE ts.isLiquidCultureConducted IS NOT NULL
-                )
-                OR benId IN (
-                    SELECT td.benId FROM TB_DIAGNOSTICS td
-                    WHERE td.isLiquidCultureConducted IS NOT NULL
-                )
-                OR benId IN (
-                    SELECT tbs.benId FROM TB_SCREENING tbs
-                    WHERE tbs.recommendedForLiquidCultureTest = 1
-                       OR tbs.historyOfTb = 1
-                       OR tbs.takingAntiTBDrugs = 1
-                       OR tbs.familySufferingFromTB = 1
-                )
+                ${LIQUID_CULTURE_REFERRAL_CONDITION}
             ))
             OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
                 SELECT 1
@@ -1151,19 +1117,7 @@ interface BenDao {
             WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
             UNION
             SELECT v.benId FROM BEN_VITALS v
-            WHERE (v.pulseRate IS NOT NULL AND v.pulseRate < 60)
-               OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
-               OR (v.bpSystolic IS NOT NULL AND v.bpSystolic < 90)
-               OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
-               OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
-               OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
-               OR (v.rbs IS NOT NULL AND v.rbs >= 100)
-               OR (v.pallorId = 1 OR UPPER(TRIM(IFNULL(v.pallor, ''))) IN ('PRESENT', 'YES'))
-               OR (v.icterusId = 1 OR UPPER(TRIM(IFNULL(v.icterus, ''))) IN ('PRESENT', 'YES'))
-               OR (v.cyanosisId = 1 OR UPPER(TRIM(IFNULL(v.cyanosis, ''))) IN ('PRESENT', 'YES'))
-               OR (v.clubbingId = 1 OR UPPER(TRIM(IFNULL(v.clubbing, ''))) IN ('PRESENT', 'YES'))
-               OR (v.lymphadenopathyId = 1 OR UPPER(TRIM(IFNULL(v.lymphadenopathy, ''))) IN ('PRESENT', 'YES'))
-               OR (v.oedemaId = 1 OR UPPER(TRIM(IFNULL(v.oedema, ''))) IN ('PRESENT', 'YES'))
+            WHERE ${ABNORMAL_VITALS_CONDITION}
             UNION
             SELECT ts.benId FROM TB_SUSPECTED ts
             WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
@@ -1242,21 +1196,7 @@ interface BenDao {
           AND isDeactivate = 0
           AND isDeath = 0
           AND (
-            benId IN (
-              SELECT ts.benId FROM TB_SUSPECTED ts
-              WHERE ts.isLiquidCultureConducted IS NOT NULL
-            )
-            OR benId IN (
-              SELECT td.benId FROM TB_DIAGNOSTICS td
-              WHERE td.isLiquidCultureConducted IS NOT NULL
-            )
-            OR benId IN (
-              SELECT tbs.benId FROM TB_SCREENING tbs
-              WHERE tbs.recommendedForLiquidCultureTest = 1
-                 OR tbs.historyOfTb = 1
-                 OR tbs.takingAntiTBDrugs = 1
-                 OR tbs.familySufferingFromTB = 1
-            )
+            ${LIQUID_CULTURE_REFERRAL_CONDITION}
           )
     """)
     fun getLiquidCultureBenCount(selectedVillage: Int): Flow<Int>
