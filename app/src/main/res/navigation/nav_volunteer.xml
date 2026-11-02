@@ -468,7 +468,7 @@
     <fragment
         android:id="@+id/missingDataBenFragment"
         android:name="org.piramalswasthya.stoptb.ui.home_activity.all_ben.data_missing_ben.MissingDataBenFragment"
-        android:label="fragment_missing_data_ben"
+        android:label="@string/label_missing_data_ben_fragment"
         tools:layout="@layout/fragment_missing_data_ben" >
         <action
             android:id="@+id/action_missingDataBenFragment_to_newBenRegFragment"

@@ -1144,6 +1144,7 @@
     <string name="see_more">See more</string>
     <string name="see_less">See less</string>
     <string name="vital_screen">General Examination</string>
+        <string name="label_missing_data_ben_fragment">Missing-data Beneficiary List</string>
     <string name="vital_screen_placeholder">Vitals and Anthropometric for beneficiary ID: %1$d</string>
     <string name="vital_details">Vitals (Optional)</string>
     <string name="temperature">Temperature</string>

@@ -46,6 +46,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -332,9 +333,12 @@ class NewBenRegFragment : Fragment() {
         }
 
         if (viewModel.isDataUpdateFlow) {
-            fabEditClickEvent()
-            adapter.isEnabled = true
-            adapter.notifyDataSetChanged()
+            viewLifecycleOwner.lifecycleScope.launch {
+                viewModel.isLoading.first { !it }
+                fabEditClickEvent()
+                adapter.isEnabled = true
+                adapter.notifyDataSetChanged()
+            }
         }
     }
 

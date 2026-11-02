@@ -168,6 +168,7 @@ object WorkerUtils {
 
         // StopTB pull chain:
         // Beneficiaries → Referrals + TB data → Mark complete
+        //               ↘ Missing beneficiary data (parallel branch)
         val pullWorkRequest = if (isCampHubSyncActive) {
             campSyncRequestBuilder<PullFromAmritWorker>()
         } else {
@@ -200,10 +201,10 @@ object WorkerUtils {
             .setInputData(pullRunData)
             .build()
 
-        val chainTB = afterFoundation.then(groupTB)
-        val chainMissingData = chainTB.then(groupMissingData)
+        val chainTB = afterFoundation.then(groupTB).then(setSyncCompleteWorker)
+        val chainMissingData = afterFoundation.then(groupMissingData)
 
-        chainMissingData.then(setSyncCompleteWorker).enqueue()
+        WorkContinuation.combine(listOf(chainTB, chainMissingData)).enqueue()
         return listOf(pullWorkRequest.id, setSyncCompleteWorker.id) + groupTB.map { it.id } + groupMissingData.map { it.id }
     }
 

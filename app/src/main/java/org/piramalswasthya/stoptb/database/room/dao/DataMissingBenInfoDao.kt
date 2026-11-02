@@ -9,12 +9,14 @@ import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import org.piramalswasthya.stoptb.database.room.SyncState
+import org.piramalswasthya.stoptb.model.BenBasicCache
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.DataMissingBenInfo
 import org.piramalswasthya.stoptb.model.MISSING_DATA_REASON_SEPARATOR
 import org.piramalswasthya.stoptb.model.MissingDataInfoStatus
 import org.piramalswasthya.stoptb.model.ScreeningStatus
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.data_missing_ben.MissingDataBenItem
+import java.util.Date
 
 @Dao
 interface DataMissingBenInfoDao {
@@ -50,7 +52,7 @@ interface DataMissingBenInfoDao {
 
             b.gen_reproductiveStatusId AS reproductiveStatusId,
 
-            CAST(b.regDate AS TEXT) AS regDate,
+            b.regDate,
 
             b.firstName AS benName,
             b.lastName AS benSurname,
@@ -170,7 +172,7 @@ data class MissingDataBenQuery(
 
     val reproductiveStatusId: Int,
 
-    val regDate: String,
+    val regDate: Long,
 
     val benName: String,
     val benSurname: String?,
@@ -178,7 +180,7 @@ data class MissingDataBenQuery(
     val dob: Long,
 
     val relToHeadId: Int,
-    val mobileNo: String,
+    val mobileNo: Long?,
 
     val abhaId: String?,
     val isNewAbha: Boolean,
@@ -246,14 +248,14 @@ data class MissingDataBenQuery(
 
                 reproductiveStatusId = reproductiveStatusId,
 
-                regDate = regDate,
+                regDate = BenBasicCache.dateFormat.format(Date(regDate)),
                 benName = benName,
                 benSurname = benSurname,
                 gender = gender,
                 dob = dob,
 
                 relToHeadId = relToHeadId,
-                mobileNo = mobileNo,
+                mobileNo = mobileNo?.toString().orEmpty(),
 
                 abhaId = abhaId,
                 isNewAbha = isNewAbha,
