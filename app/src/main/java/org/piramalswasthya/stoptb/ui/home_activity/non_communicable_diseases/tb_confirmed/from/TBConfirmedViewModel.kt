@@ -149,8 +149,7 @@ class TBConfirmedViewModel @Inject constructor(
                         )
 
                     dataset.mapValues(tbConfirmedTreatmentCache!!, 1)
-                    if (tbConfirmedTreatmentCache!!.treatmentOutcome.equals( "Death")) {
-                        benRepo.getBenFromId(benId)?.let {
+                    if (tbConfirmedTreatmentCache!!.treatmentOutcome.equals("Died")) {                        benRepo.getBenFromId(benId)?.let {
                             it.isDeath = true
                             it.isDeathValue = "Death"
                             it.dateOfDeath = longToDateString(tbConfirmedTreatmentCache!!.dateOfDeath)

@@ -632,11 +632,16 @@
         <item>Irregular</item>
     </string-array>
 
+    <string name="remarks">Remarks</string>
+
     <string-array name="tb_treatment_outcomes">
+        <item>Treatment completed</item>
+        <item>Died</item>
+        <item>Treatment Failure</item>
+        <item>Lost to Follow Up</item>
+        <item>Mark as Duplicate</item>
         <item>Cured</item>
-        <item>Failed</item>
-        <item>Lost to Follow-up (LFU)</item>
-        <item>Death</item>
+        <item>Treatment Regimen Changed</item>
     </string-array>
 
     <string-array name="place_of_death">

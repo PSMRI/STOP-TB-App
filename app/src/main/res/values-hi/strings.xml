@@ -616,6 +616,18 @@
         <item>अन्य</item>
     </string-array>
 
+    <string name="remarks">टिप्पणी</string>
+
+    <string-array name="tb_treatment_outcomes">
+        <item>उपचार पूरा हुआ</item>
+        <item>मृत्यु</item>
+        <item>उपचार विफल</item>
+        <item>अनुवर्ती जाँच के लिए संपर्क टूट गया</item>
+        <item>डुप्लिकेट के रूप में चिह्नित करें</item>
+        <item>रोगमुक्त</item>
+        <item>उपचार पद्धति बदली गई</item>
+    </string-array>
+
     <string-array name="body_part_female">
         <item>दाएं हाथ</item>
         <item>बाएं हाथ</item>

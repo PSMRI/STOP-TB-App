@@ -37,6 +37,14 @@ class TBConfirmedDataset(
     private var treatmentStartDateValue: Long? = null
     private var regimenTypeValue: String? = null
 
+
+    // Old stored outcome -> new outcome (English). Cured is unchanged.
+    private val legacyOutcomeMap = mapOf(
+        "Death" to "Died",
+        "Failed" to "Treatment Failure",
+        "Lost to Follow-up (LFU)" to "Lost to Follow Up"
+    )
+
     private val regimenType = FormElement(
         id = 1,
         inputType = InputType.DROPDOWN,
@@ -171,6 +179,15 @@ class TBConfirmedDataset(
 
     )
 
+    private val remarks = FormElement(
+        id = 15,
+        inputType = InputType.EDIT_TEXT,
+        title = resources.getString(R.string.remarks),
+        required = false,
+        etMaxLength = 400,
+        isEnabled = true
+    )
+
     suspend fun setUpPage(
         ben: BenRegCache?,
         saved: TBConfirmedTreatmentCache?,
@@ -232,12 +249,14 @@ class TBConfirmedDataset(
             treatmentCompleted.value = saved.treatmentCompleted?.let { if (it) yesValue else noValue }
             actualTreatmentCompletionDate.value =
                 saved.actualTreatmentCompletionDate?.let { getDateFromLong(it) }
+            val outcomeEn = legacyOutcomeMap[saved.treatmentOutcome] ?: saved.treatmentOutcome
             treatmentOutcome.value =
-                getLocalValueInArray(R.array.tb_treatment_outcomes, saved.treatmentOutcome)
+                getLocalValueInArray(R.array.tb_treatment_outcomes, outcomeEn)
             dateOfDeath.value = saved.dateOfDeath?.let { getDateFromLong(it) }
             placeOfDeath.value = getLocalValueInArray(R.array.place_of_death, saved.placeOfDeath)
             reasonForDeath.value = saved.reasonForDeath ?: resources.getString(R.string.tuberculosis)
             reasonForNotCompleting.value = saved.reasonForNotCompleting
+            remarks.value = saved.remarks
 
             treatmentStartDateValue =
                 if (saved.treatmentStartDate > 0) millisAtStartOfDay(saved.treatmentStartDate) else null
@@ -275,16 +294,21 @@ class TBConfirmedDataset(
 
                     if (saved.treatmentOutcome != null) {
                         baseList.add(treatmentOutcome)
+                    }
 
-                        if (treatmentOutcome.value == treatmentOutcome.entries!![3]) {
-                            baseList.addAll(
-                                listOf(
-                                    dateOfDeath,
-                                    placeOfDeath,
-                                    reasonForDeath
-                                )
+                    // Remarks is independent of the outcome, so it is always shown
+                    baseList.add(remarks)
+
+                    if (saved.treatmentOutcome != null &&
+                        treatmentOutcome.value == treatmentOutcome.entries!![1]
+                    ) {
+                        baseList.addAll(
+                            listOf(
+                                dateOfDeath,
+                                placeOfDeath,
+                                reasonForDeath
                             )
-                        }
+                        )
                     }
                 } else {
                     baseList.add(reasonForNotCompleting)
@@ -292,7 +316,7 @@ class TBConfirmedDataset(
             }
 
             treatmentOutcome.value?.let { outcome ->
-                if (outcome == treatmentOutcome.entries!![0] || outcome == treatmentOutcome.entries!!.last()) {
+                if (outcome == treatmentOutcome.entries!![5] || outcome == treatmentOutcome.entries!![1]) {
                     baseList.forEach { it.isEnabled = false }
                 }
             }
@@ -330,7 +354,7 @@ class TBConfirmedDataset(
                     triggerDependants(
                         source = treatmentCompleted,
                         removeItems = listOf(reasonForNotCompleting),
-                        addItems = listOf(actualTreatmentCompletionDate, treatmentOutcome),
+                        addItems = listOf(actualTreatmentCompletionDate, treatmentOutcome,remarks),
                         position = -2
                     )
                 } else {
@@ -339,6 +363,7 @@ class TBConfirmedDataset(
                         removeItems = listOf(
                             actualTreatmentCompletionDate,
                             treatmentOutcome,
+                            remarks,
                             dateOfDeath,
                             placeOfDeath,
                             reasonForDeath
@@ -351,7 +376,7 @@ class TBConfirmedDataset(
 
             treatmentOutcome.id -> {
                 val treatmentOutcomes = resources.getStringArray(R.array.tb_treatment_outcomes)
-                return if (treatmentOutcome.value == treatmentOutcomes[3]) {
+                return if (treatmentOutcome.value == treatmentOutcomes[1]) {
                     triggerDependants(
                         source = treatmentOutcome,
                         removeItems = listOf(),
@@ -457,6 +482,12 @@ class TBConfirmedDataset(
             reasonForNotCompleting.value.isNullOrEmpty()) {
             reasonForNotCompleting.errorText = "Reason for not completing is required"
             isValid = false
+        }
+        if (!remarks.value.isNullOrEmpty() && remarks.value!!.length > 400) {
+            remarks.errorText = "Remarks cannot exceed 400 characters"
+            isValid = false
+        } else {
+            remarks.errorText = null
         }
 
         return isValid
@@ -605,6 +636,7 @@ class TBConfirmedDataset(
                 removeItems = listOf(
                     actualTreatmentCompletionDate,
                     treatmentOutcome,
+                    remarks,
                     reasonForNotCompleting,
                     dateOfDeath,
                     placeOfDeath,
@@ -660,10 +692,12 @@ class TBConfirmedDataset(
             form.actualTreatmentCompletionDate = getLongFromDate(actualTreatmentCompletionDate.value)
             form.treatmentOutcome =
                 getEnglishValueInArray(R.array.tb_treatment_outcomes, treatmentOutcome.value)
-            form.dateOfDeath = getLongFromDate(dateOfDeath.value)
-            form.placeOfDeath = getEnglishValueInArray(R.array.place_of_death, placeOfDeath.value)
+            val died = form.treatmentOutcome == "Died"
+            form.dateOfDeath = if (died) getLongFromDate(dateOfDeath.value).takeIf { it > 0 } else null
+            form.placeOfDeath = if (died) getEnglishValueInArray(R.array.place_of_death, placeOfDeath.value) else null
             form.reasonForDeath = reasonForDeath.value ?: resources.getString(R.string.tuberculosis)
             form.reasonForNotCompleting = reasonForNotCompleting.value
+            form.remarks = remarks.value?.takeIf { it.isNotBlank() }
         }
     }
 
