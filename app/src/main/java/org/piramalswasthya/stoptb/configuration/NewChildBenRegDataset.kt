@@ -853,8 +853,8 @@ class NewChildBenRegDataset(context: Context, language: Languages) : Dataset(con
 
             val childViews = listOf(
                 bundle.name,
-                bundle.dob,
                 bundle.age,
+                bundle.dob,
                 bundle.gender,
                 bundle.gap
             )
@@ -1499,7 +1499,7 @@ data class ChildBundle(
                 gender.value.isNullOrEmpty() &&
                 name.value.isNullOrEmpty()
     }
-    fun toFormList() = listOf(details, name, dob, age, gender, gap)
+    fun toFormList() = listOf(details, name, age, dob, gender, gap)
     fun clearValues() {
         name.value = null
         dob.value = null
