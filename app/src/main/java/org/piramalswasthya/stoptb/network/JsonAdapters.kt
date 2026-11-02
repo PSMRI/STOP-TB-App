@@ -24,6 +24,7 @@ import org.piramalswasthya.stoptb.utils.KeyUtils
 import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.Locale
+import org.piramalswasthya.stoptb.utils.ServerDateParser
 
 @JsonClass(generateAdapter = true)
 data class D2DAuthUserRequest(val username: String, val password: String)
@@ -240,7 +241,7 @@ data class Tokens(
     val token: String = "", val expiresIn: Int = 0,
     val refreshToken: String = "", val refreshExpiresIn: Int = 0
 ) : Parcelable
-
+ 
 @Parcelize
 @JsonClass(generateAdapter = true)
 data class ABHAProfile(
@@ -354,6 +355,15 @@ data class AddHealthIdRecord(
 )
 
 data class StopTbVillageRequest(val providerServiceMapID: Int, val villageID: Int)
+
+/** STOP-TB changes feed: token null starts a full download; types are the records the app applies. */
+data class SyncChangesRequest(
+    val token: String?,
+    val providerServiceMapID: Int,
+    val villageIds: List<Int>,
+    val types: List<String>,
+    val limit: Int
+)
 data class TBScreeningRequestDTO(val userId: Int, val tbScreeningList: List<TBScreeningDTO>)
 data class TBScreeningSaveRequest(
     val beneficiaryRegID: Long,
@@ -432,33 +442,6 @@ data class TBScreeningSaveRequest(
 }
 data class TBDiagnosticsRequestDTO(val userId: Int, val tbDiagnosticsList: List<TBDiagnosticsDTO>)
 data class GeneralOpdRequestDTO(val userId: Int, val generalOpdList: List<GeneralOpdDTO>)
-data class GeneralOpdSaveRequest(
-    val beneficiaryRegID: Long,
-    val providerServiceMapID: Int,
-    val chiefComplaint: List<String>?,
-    val medication: String?,
-    val dosage: String?,
-    val frequency: String?,
-    val duration: String?,
-    val notes: String?,
-    val createdBy: String?
-) {
-    companion object {
-        fun from(cache: GeneralOpdCache, beneficiaryRegID: Long, providerServiceMapID: Int, createdBy: String?): GeneralOpdSaveRequest {
-            return GeneralOpdSaveRequest(
-                beneficiaryRegID = beneficiaryRegID,
-                providerServiceMapID = providerServiceMapID,
-                chiefComplaint = cache.chiefComplaints,
-                medication = cache.medications?.joinToString(", "),
-                dosage = cache.dosage,
-                frequency = cache.frequency,
-                duration = cache.duration,
-                notes = cache.notes,
-                createdBy = createdBy
-            )
-        }
-    }
-}
 data class PatientRequest(
     val firstName: String,
     val lastName: String,
@@ -470,27 +453,33 @@ data class DiagnosticOrderPushRequest(
     @com.squareup.moshi.Json(name = "beneficiaryId")
     @com.google.gson.annotations.SerializedName("beneficiaryId")
     val benRegID: Long,
-    val visitCode: Int,
     val providerServiceMapID: Int,
     val orderType: String,
     val orderEvent: String = "STOP_TB_REFERRAL",
-    val reasonForRefusal: String? = null,
+    // Real backend field name (confirmed against the API doc's own order/push close/refuse
+    // example) — presence of this field is what makes order/push close/refuse the order instead
+    // of pushing it, per the documented contract.
+    val reasonToClose: String? = null,
     val patient: PatientRequest
 )
 
 data class DiagnosticManualResultRequest(
     val beneficiaryId: Long,
     val orderType: String,
-    val resultSummary: String
+    // Null when this call represents a "Not Conducted" closure rather than an actual result
+    // (see reasonToClose below) — Chest X-Ray order lifecycle redesign.
+    val resultSummary: String? = null,
+    // Real backend field name (confirmed directly against the backend, not just the written API
+    // doc) — sent for the "Not Conducted" closure path only.
+    val reasonToClose: String? = null
 )
 
+// Real, confirmed `getBeneficiariesByStatus` response shape — exactly these 5 buckets.
 data class DiagnosticBeneficiaryStatusData(
-    val awaitingTestCompletion: List<Long>? = emptyList(),
     val awaitingProviderResult: List<Long>? = emptyList(),
     val completed: List<Long>? = emptyList(),
-    val pollingTimedOut: List<Long>? = emptyList(),
     val failed: List<Long>? = emptyList(),
-    val refused: List<Long>? = emptyList(),
+    val closed: List<Long>? = emptyList(),
     val awaitingManualEntry: List<Long>? = emptyList()
 )
 
@@ -549,7 +538,7 @@ data class TBDiagnosticsSaveRequest(
                 reasonNotConductedChestXray = cache.reasonNotConductedChestXray,
                 reasonNotConductedChestXrayOther = cache.reasonNotConductedChestXrayOther,
                 digitalChestXrayResult = cache.chestXRayResult,
-                isReferredForSputumCollection = cache.isSputumCollected,
+                isReferredForSputumCollection = cache.isReferredForSputum,
                 reasonForDenialSputum = cache.reasonForDenialSputum,
                 reasonForDenialSputumOther = cache.reasonForDenialSputumOther,
                 sputumSubmittedAt = cache.sputumSubmittedAt,
@@ -1085,22 +1074,47 @@ data class KALAZARScreeningDTO(
     )
 }
 
+// "Oct 19, 2026 4:44:00 PM" and "Oct 19, 2026, 4:44:00\u202fPM" both arrive from Amrit - see
+// ServerDateParser for why the second form used to fail outright and take a thrown
+// ParseException with it. The comma-after-year variants are new here for that reason; the
+// original two patterns are unchanged and still tried first.
+private val jsonAdapterDatePatterns = listOf(
+    "MMM d, yyyy h:mm:ss a",
+    "MMM dd, yyyy h:mm:ss a",
+    "MMM d, yyyy, h:mm:ss a",
+    "MMM dd, yyyy, h:mm:ss a"
+)
+
+/**
+ * @return epoch millis, or 0 when there is no date to parse.
+ *
+ * An absent date legitimately maps to 0. A non-null value that cannot be parsed does not: it
+ * means the server sent a format this list does not cover, and silently storing 1970 corrupts
+ * the record while the pull reports success. The previous implementation threw here, which was
+ * loud but aborted the whole pulled batch (that is the U+202F bug this parser exists to fix), so
+ * this logs the offending value at error level instead and the caller sees 0.
+ */
 fun getLongFromDate(dateString: String?): Long {
-    val f = SimpleDateFormat("MMM d, yyyy h:mm:ss a", Locale.ENGLISH)
-    val date = dateString?.let { f.parse(it) }
-    return date?.time ?: 0L
+    if (dateString.isNullOrBlank()) return 0L
+    ServerDateParser.parse(dateString, jsonAdapterDatePatterns)?.let { return it }
+    Timber.e("getLongFromDate: unparseable server date '$dateString' - storing 0, record will show 1970")
+    return 0L
 }
 
 fun getLongFromDateMultipleSupport(dateStr: String?): Long? {
     if (dateStr.isNullOrBlank() || dateStr == "1970-01-01") return null
-    val formats = listOf("yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss", "MMM dd, yyyy h:mm:ss a", "MMM dd, yyyy hh:mm:ss a", "MMM dd, yyyy", "dd/MM/yyyy")
-    for (format in formats) {
-        try {
-            val sdf = SimpleDateFormat(format, Locale.ENGLISH)
-            sdf.isLenient = false
-            return sdf.parse(dateStr)?.time
-        } catch (e: Exception) { }
-    }
+    ServerDateParser.parse(dateStr, multiSupportDatePatterns, lenient = false)?.let { return it }
     Timber.e("Date parsing failed for: $dateStr")
     return null
 }
+
+private val multiSupportDatePatterns = listOf(
+    "yyyy-MM-dd",
+    "yyyy-MM-dd HH:mm:ss",
+    "MMM dd, yyyy h:mm:ss a",
+    "MMM dd, yyyy hh:mm:ss a",
+    "MMM dd, yyyy, h:mm:ss a",
+    "MMM dd, yyyy, hh:mm:ss a",
+    "MMM dd, yyyy",
+    "dd/MM/yyyy"
+)

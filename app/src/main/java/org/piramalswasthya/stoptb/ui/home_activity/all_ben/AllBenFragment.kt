@@ -18,14 +18,17 @@ import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import androidx.paging.LoadState
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.helpers.RoleManager
+import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.adapters.BenListAdapter
 import org.piramalswasthya.stoptb.adapters.BenPagingAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
@@ -33,6 +36,9 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertFilterBinding
 import org.piramalswasthya.stoptb.databinding.AlertNewBenBinding
 import android.widget.ArrayAdapter
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.SimpleItemAnimator
 import kotlinx.coroutines.delay
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchAndToggleRvButtonBinding
 import org.piramalswasthya.stoptb.model.AppRole
@@ -41,6 +47,7 @@ import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.utils.callPhoneNumber
+import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -48,7 +55,7 @@ import javax.inject.Inject
 class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     private companion object {
-        val READ_ONLY_REFERRAL_SOURCES = setOf(5, 6, 7, 8)
+        val READ_ONLY_REFERRAL_SOURCES = setOf(5, 6, 7, 8, 10)
     }
 
     private data class SearchUiState(
@@ -66,12 +73,17 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
      * Non-null => show BottomSheet whenever AllBenFragment resumes.
      */
     private var pendingExamineBenId: Long? = null
+    // Latest showExamineBottomSheet call; an older call whose ID lookup finishes late is dropped.
+    private var examineRequestId = 0
 
     @Inject
     lateinit var prefDao: PreferenceDao
 
     @Inject
     lateinit var roleManager: RoleManager
+
+    @Inject
+    lateinit var benRepo: BenRepo
 
     private var _binding: FragmentDisplaySearchAndToggleRvButtonBinding? = null
 
@@ -147,17 +159,34 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         alert
     }
 
+    override fun onAttach(context: android.content.Context) {
+        super.onAttach(context)
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        // TEMPORARY PERF INSTRUMENTATION
         _binding = FragmentDisplaySearchAndToggleRvButtonBinding.inflate(layoutInflater)
         return binding.root
     }
 
+    override fun onDestroyView() {
+        // The collectors run in viewLifecycleOwner.lifecycleScope, so they are cancelled with
+        // the view. Resetting the guard lets the next view start its own set. On the fragment's
+        // lifecycleScope they would NOT be cancelled, and a fragment returning from the back
+        // stack would accumulate another 17 Room Flow subscriptions per view creation.
+        rowDecorationsStarted = false
+        super.onDestroyView()
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         // Legacy, kept for reference:
 //        val roleName = prefDao.getLoggedInUser()?.role
 //        val isRegistrar = roleName.isRegistrationOfficerRole()
@@ -312,16 +341,31 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                                 AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
                                     benId = item.benId,
                                     viewOnly = false,
-                                    referralType = if (orderType == "XRAY_CHEST") 6 else 7
+                                    referralType = if (orderType == "XRAY_CHEST") 6 else 7,
+                                    manualEntryAction = "COMPLETE"
                                 )
                             )
+                        }
+                        "NOT_CONDUCTED" -> {
+                            findNavController().navigate(
+                                AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                    benId = item.benId,
+                                    viewOnly = false,
+                                    referralType = if (orderType == "XRAY_CHEST") 6 else 7,
+                                    manualEntryAction = "NOT_CONDUCTED"
+                                )
+                            )
+                        }
+                        "REORDER" -> {
+                            viewModel.createNewOrder(item.benId, orderType, requireContext())
                         }
                         "COMPLETE_RIF" -> {
                             findNavController().navigate(
                                 AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
                                     benId = item.benId,
                                     viewOnly = false,
-                                    referralType = 7
+                                    referralType = 7,
+                                    manualEntryAction = "COMPLETE"
                                 )
                             )
                         }
@@ -334,93 +378,29 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         "RETRY_PUSH" -> {
                             viewModel.retryTest(item.benId, orderType, requireContext())
                         }
+                        "CHECK_PUSH_ACTIVE" -> {
+                            viewModel.checkAndTrackInFlightPush(item.benId, requireContext())
+                        }
                         "RETRY_RIF_POLL" -> {
                             viewModel.retryResultFetch(item.benId, "MDR_RIF", requireContext())
                         }
-                        "REPEAT_TEST" -> {
-                            lifecycleScope.launch {
-                                val diag = viewModel.tbRepo.getTBDiagnosticsById(item.benId)
-                                val naatRes = diag?.naatResult
-                                val rifRes = diag?.trueNatRifResult
-
-                                val isInvalidMtb = naatRes.equals("Invalid", ignoreCase = true)
-                                val isIndeterminateRif = rifRes.equals("Indeterminate", ignoreCase = true)
-
-                                val title = when {
-                                    isInvalidMtb -> "Invalid Test Result"
-                                    isIndeterminateRif -> "Indeterminate Test Result"
-                                    else -> "Repeat Test"
-                                }
-
-                                val msg = when {
-                                    isInvalidMtb -> "The test results are invalid. Repeat the test."
-                                    isIndeterminateRif -> "The test results are indeterminate. Repeat the test."
-                                    else -> "Are you sure you want to repeat this test? A new test order will be created."
-                                }
-
-                                val targetOrder = when {
-                                    isIndeterminateRif -> "MDR_RIF"
-                                    else -> "SPUTUM_TRUENAT"
-                                }
-
-                                androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                                    .setTitle(title)
-                                    .setMessage(msg)
-                                    .setPositiveButton("REPEAT TEST") { d, _ ->
-                                        d.dismiss()
-                                        viewModel.repeatTest(item.benId, targetOrder)
-                                    }
-                                    .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
-                                    .show()
-                            }
-                        }
                         "VIEW" -> {
-                            lifecycleScope.launch {
-                                val diag = viewModel.tbRepo.getTBDiagnosticsById(item.benId)
-                                if (diag?.naatResult.equals("Invalid", ignoreCase = true)) {
-                                    androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                                        .setTitle("Invalid Test Result")
-                                        .setMessage("The test result is invalid. Please repeat the test.")
-                                        .setPositiveButton("REPEAT TEST") { d, _ ->
-                                            d.dismiss()
-                                            viewModel.repeatTest(item.benId, "SPUTUM_TRUENAT")
-                                        }
-                                        .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
-                                        .show()
-                                } else {
-                                    findNavController().navigate(
-                                        AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
-                                            benId = item.benId,
-                                            viewOnly = true,
-                                            referralType = if (orderType == "XRAY_CHEST") 6 else 7
-                                        )
-                                    )
-                                }
-                            }
+                            findNavController().navigate(
+                                AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                    benId = item.benId,
+                                    viewOnly = true,
+                                    referralType = if (orderType == "XRAY_CHEST") 6 else 7
+                                )
+                            )
                         }
                         "VIEW_RIF" -> {
-                            lifecycleScope.launch {
-                                val diag = viewModel.tbRepo.getTBDiagnosticsById(item.benId)
-                                if (diag?.trueNatRifResult.equals("Indeterminate", ignoreCase = true)) {
-                                    androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                                        .setTitle("Indeterminate Test Result")
-                                        .setMessage("The test result is indeterminate. Please repeat the test.")
-                                        .setPositiveButton("REPEAT TEST") { d, _ ->
-                                            d.dismiss()
-                                            viewModel.repeatTest(item.benId, "MDR_RIF")
-                                        }
-                                        .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
-                                        .show()
-                                } else {
-                                    findNavController().navigate(
-                                        AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
-                                            benId = item.benId,
-                                            viewOnly = true,
-                                            referralType = 7
-                                        )
-                                    )
-                                }
-                            }
+                            findNavController().navigate(
+                                AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                    benId = item.benId,
+                                    viewOnly = true,
+                                    referralType = 7
+                                )
+                            )
                         }
                         "ENTER_LC", "VIEW_LC" -> {
                             findNavController().navigate(
@@ -487,28 +467,149 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
         )
 
+        // TEMPORARY PERF INSTRUMENTATION
         binding.rvAny.adapter = benAdapter
+        // Fires on the first frame that actually has rows laid out - this is the moment the
+        // user sees content, so it closes the trace.
+        //
+        // This runs on every frame and can still fire after the view is gone, so it holds the
+        // RecyclerView directly and never touches `binding` (which is `_binding!!` and would
+        // throw once the view is destroyed).
+        val tracedRecyclerView = binding.rvAny
+        tracedRecyclerView.viewTreeObserver.addOnPreDrawListener(
+            object : android.view.ViewTreeObserver.OnPreDrawListener {
+                // A list that legitimately stays empty would otherwise keep this listener on
+                // every frame for the fragment's whole life, so give up after a bound - and say
+                // so, because "content never appeared" is itself the thing being investigated.
+                private val giveUpAt = android.os.SystemClock.elapsedRealtime() + 120_000L
+
+                private fun stopListening() {
+                    val observer = tracedRecyclerView.viewTreeObserver
+                    if (observer.isAlive) observer.removeOnPreDrawListener(this)
+                }
+
+                override fun onPreDraw(): Boolean {
+                    if (_binding == null) {
+                        stopListening()
+                        return true
+                    }
+                    if (benAdapter.itemCount > 0 && tracedRecyclerView.childCount > 0) {
+                        stopListening()
+                        // Backstop: rows are visible, so decorations are due even if the
+                        // load-state collector has not reported NotLoading yet.
+                        startRowDecorationCollectors()
+                    } else if (android.os.SystemClock.elapsedRealtime() > giveUpAt) {
+                        stopListening()
+                    }
+                    return true
+                }
+            }
+        )
         binding.rvAny.setHasFixedSize(true)
-        (binding.rvAny.itemAnimator as? androidx.recyclerview.widget.SimpleItemAnimator)
+        (binding.rvAny.itemAnimator as? SimpleItemAnimator)
             ?.supportsChangeAnimations = false
         binding.rvAny.setItemViewCacheSize(20)
-        (binding.rvAny.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager)?.apply {
+        (binding.rvAny.layoutManager as? LinearLayoutManager)?.apply {
             initialPrefetchItemCount = 10
         }
 
+        benAdapter.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
+            override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
+                val rv = _binding?.rvAny ?: return
+                val lm = rv.layoutManager as? LinearLayoutManager
+                    ?: return
+                if (positionStart == 0 && lm.findFirstCompletelyVisibleItemPosition() <= 0) {
+                    rv.scrollToPosition(0)
+                }
+            }
+        })
+
+        // Search generation of the PagingData currently submitted to the adapter.
+        // flatMapLatest bumps the generation before building the new Pager, so the value read here belongs to `it`.
+        var submittedGeneration = -1
+
+        // TEMPORARY PERF INSTRUMENTATION
+        var firstPagingDataSeen = false
+        var firstRefreshSettled = false
+
         lifecycleScope.launch {
             viewModel.benList.collectLatest {
+                if (!firstPagingDataSeen) {
+                    firstPagingDataSeen = true
+                }
+                submittedGeneration = viewModel.searchGeneration.value
                 benAdapter.submitData(it)
             }
         }
 
-        binding.btnExpandSearchBlock.setOnClickListener {
-            viewModel.expandSearchToBlock()
+        // TEMPORARY PERF INSTRUMENTATION - how long Paging's refresh (COUNT + page 0) takes,
+        // and how many times it restarts before it settles.
+        lifecycleScope.launch {
+            benAdapter.loadStateFlow.collect { loadStates ->
+                if (loadStates.refresh is LoadState.NotLoading && !firstRefreshSettled) {
+                    firstRefreshSettled = true
+                    // Paging is done competing for the DB - safe to start the row decorations.
+                    // This fires whether the list has rows or is empty, so it is the trigger
+                    // rather than first-content-drawn (which never happens on an empty list).
+                    startRowDecorationCollectors()
+                }
+            }
         }
 
         var lastSearchGeneration = -1
         var settledForGeneration = false
         var currentlyShowingEmpty = false
+        // Tracks the search generation when "Search in other villages" is tapped, while the expanded search is running.
+        var expandPendingSinceGeneration: Int? = null
+
+        binding.btnExpandSearchBlock.setOnClickListener {
+            expandPendingSinceGeneration = viewModel.searchGeneration.value
+            currentlyShowingEmpty = false
+            binding.flEmpty.visibility = View.GONE
+            binding.btnExpandSearchBlock.visibility = View.GONE
+            binding.pbSearchLoading.visibility = View.VISIBLE
+            viewModel.expandSearchToBlock()
+        }
+
+        lifecycleScope.launch {
+            // Settles only once the expanded search's PagingData is submitted and its refresh has completed,
+            // so page updates from the previous search can't end the loading state early.
+            benAdapter.onPagesUpdatedFlow.collect {
+                val pendingGeneration = expandPendingSinceGeneration ?: return@collect
+                if (submittedGeneration <= pendingGeneration) return@collect
+                if (benAdapter.loadStateFlow.first().refresh is LoadState.Loading) return@collect
+                expandPendingSinceGeneration = null
+                settledForGeneration = true
+                val isEmpty = benAdapter.itemCount == 0
+                binding.pbSearchLoading.visibility = View.GONE
+                binding.flEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
+                binding.btnExpandSearchBlock.visibility = View.GONE
+                currentlyShowingEmpty = isEmpty
+            }
+        }
+
+        lifecycleScope.launch {
+            // A failed refresh never produces a page update, so settle the expanded search's error here
+            // instead of leaving the loader up; Retry re-runs the same refresh via benAdapter.retry().
+            benAdapter.loadStateFlow.collect { loadStates ->
+                val pendingGeneration = expandPendingSinceGeneration ?: return@collect
+                if (submittedGeneration <= pendingGeneration) return@collect
+                if (loadStates.refresh !is LoadState.Error) return@collect
+                expandPendingSinceGeneration = null
+                settledForGeneration = true
+                currentlyShowingEmpty = false
+                binding.pbSearchLoading.visibility = View.GONE
+                binding.flEmpty.visibility = View.GONE
+                binding.btnExpandSearchBlock.visibility = View.GONE
+                Snackbar.make(binding.root, R.string.search_other_villages_failed, Snackbar.LENGTH_INDEFINITE)
+                    .setAction(R.string.search_other_villages_retry) {
+                        expandPendingSinceGeneration = pendingGeneration
+                        binding.pbSearchLoading.visibility = View.VISIBLE
+                        benAdapter.retry()
+                    }
+                    .show()
+            }
+        }
 
         lifecycleScope.launch {
             combine(
@@ -530,12 +631,31 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         settledForGeneration = false
                     }
 
+                    // Expanded search still running - keep the loader; onPagesUpdatedFlow above settles the UI.
+                    if (expandPendingSinceGeneration != null) {
+                        return@collectLatest
+                    }
+
+                    // The loader belongs to the FIRST refresh of a search only. Background
+                    // writes keep invalidating the PagingSource (one search term was rebuilt 131
+                    // times in six minutes), so tying the spinner to "is loading" left it up
+                    // forever and the "no results" view could never appear. Once a refresh has
+                    // completed for this search, later reloads are silent.
+                    val awaitingFirstResult = state.isLoading && !settledForGeneration
+                    if (awaitingFirstResult) {
+                        binding.pbSearchLoading.visibility = View.VISIBLE
+                        binding.flEmpty.visibility = View.GONE
+                        binding.btnExpandSearchBlock.visibility = View.GONE
+                        currentlyShowingEmpty = false
+                        return@collectLatest
+                    }
+                    binding.pbSearchLoading.visibility = View.GONE
+
+                    // Settled already - a background reload must not disturb what is on screen.
                     if (settledForGeneration && state.isLoading) {
                         return@collectLatest
                     }
-                    if (!state.isLoading) {
-                        settledForGeneration = true
-                    }
+                    settledForGeneration = true
 
                     if (state.isEmpty) {
                         if (currentlyShowingEmpty) {
@@ -543,7 +663,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                                 if (state.canExpand) View.VISIBLE else View.GONE
                             return@collectLatest
                         }
-                        binding.pbSearchLoading.visibility = if (state.isSearching) View.VISIBLE else View.GONE
+                        binding.pbSearchLoading.visibility = View.GONE
                         binding.flEmpty.visibility = View.GONE
                         binding.btnExpandSearchBlock.visibility = View.GONE
                         delay(300)
@@ -552,8 +672,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         binding.btnExpandSearchBlock.visibility = if (state.canExpand) View.VISIBLE else View.GONE
                         currentlyShowingEmpty = true
                     } else {
-                        binding.pbSearchLoading.visibility =
-                            if (state.isLoading && state.isSearching) View.VISIBLE else View.GONE
+                        binding.pbSearchLoading.visibility = View.GONE
                         binding.flEmpty.visibility = View.GONE
                         binding.btnExpandSearchBlock.visibility = View.GONE
                         currentlyShowingEmpty = false
@@ -561,108 +680,20 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 }
         }
 
-        lifecycleScope.launch {
-            viewModel.childCounts.collectLatest { countMap ->
-                benAdapter.submitChildCounts(countMap)
-            }
-        }
+        // Row decorations - the badges, counts and status icons painted ON each row - are not
+        // first-paint content: nothing here decides whether the list appears, only how a row
+        // that is already on screen is annotated. Every one of them is a Room Flow over a whole
+        // table (allTbDiagnostics alone returned 10,163 rows of 46 columns on the camp device),
+        // and launching all seventeen in onViewCreated put them in the same executor and the
+        // same SQLite connection pool as Paging's refresh - the one query the user is actually
+        // waiting on. Measured during a camp pull: that refresh took 4,606 ms against the
+        // ~300 ms it costs on its own, and a no-op "SELECT 1" waited up to 8,548 ms behind the
+        // same queue.
+        //
+        // They start once Paging's first refresh has settled instead (see the loadStateFlow
+        // collector above, with first-content-drawn as a backstop). The rows are drawn from the
+        // page data either way; the decorations land a frame later.
 
-        lifecycleScope.launch {
-            viewModel.householdMemberCounts.collectLatest { countMap ->
-                benAdapter.submitHouseholdMemberCounts(countMap)
-            }
-        }
-
-        lifecycleScope.launch {
-            viewModel.vitalBenIds.collectLatest { benIds ->
-                benAdapter.submitBenIds(benIds)
-            }
-        }
-        lifecycleScope.launch {
-            viewModel.unsyncedVitalBenIds.collectLatest { benIds ->
-                benAdapter.submitUnsyncedVitalBenIds(benIds)
-            }
-        }
-        lifecycleScope.launch {
-            viewModel.syncingVitalBenIds.collectLatest { benIds ->
-                benAdapter.submitSyncingVitalBenIds(benIds)
-            }
-        }
-
-        lifecycleScope.launch {
-            viewModel.tbScreeningBenIds.collectLatest { benIds ->
-                Timber.e("TB Screening IDs: $benIds")
-                benAdapter.submitTbScreeningBenIds(benIds)
-            }
-        }
-        lifecycleScope.launch {
-            viewModel.unsyncedTbScreeningBenIds.collectLatest { benIds ->
-                benAdapter.submitUnsyncedTbScreeningBenIds(benIds)
-            }
-        }
-        lifecycleScope.launch {
-            viewModel.syncingTbScreeningBenIds.collectLatest { benIds ->
-                benAdapter.submitSyncingTbScreeningBenIds(benIds)
-            }
-        }
-
-        lifecycleScope.launch {
-            viewModel.generalOpdBenIds.collectLatest { benIds ->
-                benAdapter.submitGeneralOpdBenIds(benIds)
-            }
-        }
-        lifecycleScope.launch {
-            viewModel.unsyncedGeneralOpdBenIds.collectLatest { benIds ->
-                benAdapter.submitUnsyncedGeneralOpdBenIds(benIds)
-            }
-        }
-        lifecycleScope.launch {
-            viewModel.syncingGeneralOpdBenIds.collectLatest { benIds ->
-                benAdapter.submitSyncingGeneralOpdBenIds(benIds)
-            }
-        }
-
-        lifecycleScope.launch {
-            viewModel.anthropometryFilledBenIds.collectLatest { benIds ->
-                benAdapter.submitAnthropometryBenIds(benIds)
-            }
-        }
-
-        lifecycleScope.launch {
-            viewModel.diagnosisBenIds.collectLatest { benIds ->
-                benAdapter.submitDiagnosisBenIds(benIds)
-            }
-        }
-
-        lifecycleScope.launch {
-            viewModel.contactFollowUpDoneBenIds.collectLatest { benIds ->
-                benAdapter.submitContactFollowUpDoneBenIds(benIds)
-            }
-        }
-
-        lifecycleScope.launch {
-            viewModel.tptFollowUpDoneBenIds.collectLatest { benIds ->
-                benAdapter.submitTptFollowUpDoneBenIds(benIds)
-            }
-        }
-
-        lifecycleScope.launch {
-            viewModel.tptEligibleBenIds.collectLatest { benIds ->
-                benAdapter.submitTptEligibleBenIds(benIds)
-            }
-        }
-
-        lifecycleScope.launch {
-            viewModel.allTbDiagnostics.collectLatest { diagnosticsList ->
-                benAdapter.submitTBDiagnostics(diagnosticsList)
-            }
-        }
-
-        lifecycleScope.launch {
-            viewModel.retryingBenIds.collectLatest { benIds ->
-                benAdapter.submitRetryingBenIds(benIds)
-            }
-        }
 
         lifecycleScope.launch {
             viewModel.orderActionState.collectLatest { state ->
@@ -674,11 +705,11 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         viewModel.resetOrderActionState()
                         if (state.message.contains("completed", ignoreCase = true) || state.orderType.equals("MDR_RIF", ignoreCase = true)) {
                             if (state.orderType.equals("MDR_RIF", ignoreCase = true)) {
-                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(requireContext())
+                                WorkerUtils.triggerRifDiagnosticResultPollWorker(requireContext())
                             } else if (state.orderType.equals("SPUTUM_TRUENAT", ignoreCase = true)) {
-                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext())
+                                WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext())
                             } else {
-                                org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(requireContext())
+                                WorkerUtils.triggerDiagnosticResultPollWorker(requireContext())
                             }
                         }
                     }
@@ -701,10 +732,15 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             }
         }
 
-        org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(requireContext())
-        org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext())
-        org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(requireContext())
-
+        // Opening this list used to kick off three result-poll runs (all three helpers enqueue
+        // the same unique DiagnosticResultPollWorker with REPLACE, so it was one worker started
+        // three times). That worker writes TB_DIAGNOSTICS and TB_SUSPECTED per beneficiary, both
+        // of which back BEN_BASIC_CACHE — so the screen was invalidating the very query it was
+        // waiting on, roughly every 400ms, and the Paging refresh could never settle.
+        //
+        // Polling still starts from every path that actually needs it: the worker reschedules
+        // itself every 60s while an order is in progress, and it is triggered on order
+        // creation/retry, on a completed result, and on camp-hub reconnect.
         binding.ibSearch.visibility = View.VISIBLE
         binding.ibSearch.setOnClickListener { sttContract.launch(Unit) }
 
@@ -776,8 +812,19 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // Always show without autoFlow — user decides whether to continue or close.
         // autoFlow=true caused the form to re-open automatically when back was pressed.
 
-        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false, showContactTracingForms = args.showContactTracingForms)
-            .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
+        val requestId = ++examineRequestId
+        viewLifecycleOwner.lifecycleScope.launch {
+            // In Camp Mode the push can replace a temp benId after this screen captured it;
+            // open the sheet (and the forms it launches) with the current ID.
+            val currentBenId = benRepo.resolveCurrentBenId(benId)
+            if (requestId != examineRequestId) return@launch
+            if (pendingExamineBenId == benId) pendingExamineBenId = currentBenId
+            if (childFragmentManager.isStateSaved ||
+                childFragmentManager.findFragmentByTag(ExamineBottomSheetFragment.TAG) != null
+            ) return@launch
+            ExamineBottomSheetFragment.newInstance(currentBenId, autoFlow = false, showContactTracingForms = args.showContactTracingForms)
+                .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
+        }
     }
 
     /** Navigate to the correct form based on [formIndex]. */
@@ -855,12 +902,9 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
     override fun onResume() {
         super.onResume()
         updateToolbarTitle()
+        viewModel.invalidateCheckedNoPushBenIds()
         viewModel.fetchBeneficiaryStatuses()
-
-        // If TBSuspectedQuickFragment (Diagnosis) signalled that the examine flow
-        // is fully complete, clear pendingExamineBenId so the BottomSheet does NOT
-        // re-open — otherwise the back button would have to dismiss the BottomSheet
-        // before it could navigate away from this screen.
+        
         val sh = findNavController().currentBackStackEntry?.savedStateHandle
         if (sh?.remove<Boolean>("examine_flow_done") == true) {
             pendingExamineBenId = null
@@ -871,6 +915,135 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         val benId = pendingExamineBenId
         if (benId != null) {
             showExamineBottomSheet(benId)
+        }
+    }
+
+    /** Guards [startRowDecorationCollectors] - first refresh settling and first content drawn both call it. */
+    private var rowDecorationsStarted = false
+
+
+    /**
+     * Collectors for the per-row badges/counts/status icons. See the call site for why these do
+     * not run until Paging's first refresh has settled.
+     */
+    private fun startRowDecorationCollectors() {
+        // Binding first, then the guard: claiming the guard for a call that then bails on a
+        // destroyed view would stop the next, legitimate call from ever starting them.
+        if (_binding == null || rowDecorationsStarted) return
+        rowDecorationsStarted = true
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.childCounts.collectLatest { countMap ->
+                benAdapter.submitChildCounts(countMap)
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.householdMemberCounts.collectLatest { countMap ->
+                benAdapter.submitHouseholdMemberCounts(countMap)
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.householdHeadNames.collectLatest { nameMap ->
+                benAdapter.submitHouseholdHeadNames(nameMap)
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.vitalBenIds.collectLatest { benIds ->
+                benAdapter.submitBenIds(benIds)
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.unsyncedVitalBenIds.collectLatest { benIds ->
+                benAdapter.submitUnsyncedVitalBenIds(benIds)
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.syncingVitalBenIds.collectLatest { benIds ->
+                benAdapter.submitSyncingVitalBenIds(benIds)
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.tbScreeningBenIds.collectLatest { benIds ->
+                benAdapter.submitTbScreeningBenIds(benIds)
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.unsyncedTbScreeningBenIds.collectLatest { benIds ->
+                benAdapter.submitUnsyncedTbScreeningBenIds(benIds)
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.syncingTbScreeningBenIds.collectLatest { benIds ->
+                benAdapter.submitSyncingTbScreeningBenIds(benIds)
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.generalOpdBenIds.collectLatest { benIds ->
+                benAdapter.submitGeneralOpdBenIds(benIds)
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.unsyncedGeneralOpdBenIds.collectLatest { benIds ->
+                benAdapter.submitUnsyncedGeneralOpdBenIds(benIds)
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.syncingGeneralOpdBenIds.collectLatest { benIds ->
+                benAdapter.submitSyncingGeneralOpdBenIds(benIds)
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.anthropometryFilledBenIds.collectLatest { benIds ->
+                benAdapter.submitAnthropometryBenIds(benIds)
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.diagnosisBenIds.collectLatest { benIds ->
+                benAdapter.submitDiagnosisBenIds(benIds)
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.contactFollowUpDoneBenIds.collectLatest { benIds ->
+                benAdapter.submitContactFollowUpDoneBenIds(benIds)
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.tptFollowUpDoneBenIds.collectLatest { benIds ->
+                benAdapter.submitTptFollowUpDoneBenIds(benIds)
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.tptEligibleBenIds.collectLatest { benIds ->
+                benAdapter.submitTptEligibleBenIds(benIds)
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.allTbDiagnostics.collectLatest { diagnosticsList ->
+                benAdapter.submitTBDiagnostics(diagnosticsList)
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.allTbScreening.collectLatest { screeningList ->
+                benAdapter.submitTbScreeningList(screeningList)
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.retryingBenIds.collectLatest { benIds ->
+                benAdapter.submitRetryingBenIds(benIds)
+            }
         }
     }
 
@@ -890,13 +1063,23 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 getString(R.string.referral_liquid_culture)
             } else if (args.source == 9) {
                 getString(R.string.icon_title_tpt_module)
+            } else if (args.source == 10) {
+                getString(R.string.referral_clinical_assessment)
             } else {
                 getString(R.string.icon_title_ben)
             }
 
+            val icon = if (args.source == 6) {
+                R.drawable.ic_health_xray
+            } else if (args.source == 7) {
+                R.drawable.ic_truenat_device
+            } else {
+                R.drawable.ic__ben
+            }
+
             when (it) {
-                is HomeActivity -> it.updateActionBar(R.drawable.ic__ben, title)
-                is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ben, title)
+                is HomeActivity -> it.updateActionBar(icon, title)
+                is VolunteerActivity -> it.updateActionBar(icon, title)
             }
         }
     }

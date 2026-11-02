@@ -153,8 +153,8 @@ class CounsellingActivity : AppCompatActivity() {
             return
         }
 
-        binding.ConsentToggleButton.visibility = View.VISIBLE
-        binding.consentToggleHeader.visibility = View.VISIBLE
+        binding.ConsentToggleButton.visibility = View.GONE
+        binding.consentToggleHeader.visibility = View.GONE
 
         val consentQuestion = questions.firstOrNull { it.questionUuid == "TB2_GI_Q1" || it.questionUuid == "TB_A_Q1" }
         val consentAnswer = when (val v = consentQuestion?.value) {
@@ -423,12 +423,12 @@ class CounsellingActivity : AppCompatActivity() {
     }
 
     private fun populatePatientHeader(data: CounsellingOverviewData) {
-        binding.patientHeader.tvPatientName.text = data.patientName
+        binding.patientHeader.tvPatientName.text = data.patientName +" / "+data.ageGender
         binding.patientHeader.tvNikshayIdHeader.text =
             getString(R.string.counselling_nikshay_id_format, data.nikshayId)
         binding.patientHeader.tvBeneficiaryId.text = data.beneficiaryId
         binding.patientHeader.tvNikshayId.text = data.nikshayId
-        binding.patientHeader.tvAgeGender.text = data.ageGender
+//        binding.patientHeader.tvAgeGender.text = data.ageGender
         binding.patientHeader.tvDiagnosis.text = data.diagnosis
     }
 

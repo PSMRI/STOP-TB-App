@@ -115,7 +115,12 @@
     <string name="high_risk_babies">उच्च जोखिम वाले शिशु</string>
     <string name="low_birth_weight_babies">कम वजन वाले शिशु</string>
     <string name="registration_date">पंजीकरण तिथि</string>
+    <string name="mobile_number_ben">मोबाइल नंबर</string>
     <string name="beneficiary_id">लाभार्थी आईडी</string>
+    <string name="btn_examine_count_ben">जांच (%1$d/%2$d)</string>
+    <string name="screening_presumptive">संभावित</string>
+    <string name="screening_asymptomatic">लक्षणरहित</string>
+    <string name="family_members">परिवार के सदस्य</string>
     <string name="rch_id">आरसीएच आईडी</string>
     <string name="sync_to_local">स्थानीय से सिंक करें</string>
     <string name="husband_s_name">पति का नाम</string>
@@ -155,6 +160,97 @@
     <string name="communicable_diseases">संचारी (संक्रामक) रोग</string>
     <string name="dashboard">डैशबोर्ड</string>
     <string name="total_unscreened">अस्क्रीन किए गए लाभार्थी</string>
+    <string name="dashboard_screening_coverage">स्क्रीनिंग कवरेज</string>
+    <string name="dashboard_coverage_subtitle">जनसंख्या और कवरेज % अब तक संचयी हैं — अवधि फ़िल्टर इन पर लागू नहीं होता</string>
+    <string name="dashboard_village_population">गाँव की जनसंख्या</string>
+    <string name="dashboard_screened">स्क्रीन किए गए</string>
+    <string name="dashboard_unscreened">अस्क्रीन</string>
+    <string name="dashboard_coverage">कवरेज</string>
+    <string name="dashboard_coverage_formula">%2$d जनसंख्या में से %1$d स्क्रीन — अभी %3$d%% कवरेज।</string>
+    <string name="dashboard_count_of_total">%1$d / %2$d</string>
+    <string name="dashboard_percent">%1$d%%</string>
+    <string name="dashboard_value_with_percent">%1$d (%2$d%%)</string>
+    <string name="dashboard_screened_population">स्क्रीन की गई जनसंख्या</string>
+    <string name="dashboard_screened_period_label">— %1$s</string>
+    <string name="dashboard_screened_population_subtitle">चयनित गाँव और अवधि के अनुसार जनसांख्यिकी (संचयी नहीं)</string>
+    <string name="dashboard_overview_title">स्क्रीनिंग और जांच सारांश</string>
+    <string name="dashboard_overview_subtitle">जनसांख्यिकी देखने के लिए KPI पर टैप करें।</string>
+    <string name="dashboard_view_by_demographic">जनसांख्यिकी देखें</string>
+    <string name="dashboard_presumptive_summary">कुल संभावित मामले सारांश</string>
+    <string name="dashboard_past_history_summary">टीबी का पिछला इतिहास सारांश</string>
+    <string name="dashboard_anti_tb_summary">वर्तमान में एंटी-टीबी दवाओं पर</string>
+    <string name="dashboard_xray_summary">चेस्ट एक्स-रे सारांश</string>
+    <string name="dashboard_sputum_summary">स्पूटम संग्रह सारांश</string>
+    <string name="dashboard_mtb_summary">एमटीबी टेस्ट सारांश</string>
+    <string name="dashboard_rif_summary">आरआईएफ टेस्ट सारांश</string>
+    <string name="dashboard_liquid_culture_summary">लिक्विड कल्चर नमूना सारांश</string>
+    <string name="dashboard_hwc_summary">एचडब्ल्यूसी रेफरल सारांश</string>
+    <string name="dashboard_clinical_summary">क्लिनिकल आकलन और निदान सारांश</string>
+    <string name="dashboard_confirmed_summary">टीबी पुष्ट मामले सारांश</string>
+    <string name="dashboard_tpt_summary">टीपीटी मामले सारांश</string>
+    <string name="dashboard_nikshay_summary">निक्षय आईडी सारांश</string>
+    <string name="dashboard_abha_summary">आभा आईडी सारांश</string>
+    <string name="dashboard_demo_male">पुरुष</string>
+    <string name="dashboard_demo_female">महिला</string>
+    <string name="dashboard_demo_pregnant">गर्भवती महिलाएँ</string>
+    <string name="dashboard_demo_children">बच्चे (&lt;15 वर्ष)</string>
+    <string name="dashboard_demo_others">अन्य</string>
+    <string name="dashboard_demo_senior">वरिष्ठ नागरिक (≥60 वर्ष)</string>
+    <string name="dashboard_demo_transgender">ट्रांसजेंडर</string>
+    <string name="dashboard_demo_total">कुल</string>
+    <string name="dashboard_class_xray_normal">सामान्य</string>
+    <string name="dashboard_class_xray_abnormal">असामान्य (गैर-टीबी संभावित)</string>
+    <string name="dashboard_class_xray_tb_presumptive">टीबी संभावित</string>
+    <string name="dashboard_class_xray_invalid">एआई अमान्य परिणाम</string>
+    <string name="dashboard_class_sputum_collected">नमूना एकत्र</string>
+    <string name="dashboard_class_sputum_not_collected">नमूना एकत्र नहीं</string>
+    <string name="dashboard_class_sputum_rejected">नमूना अस्वीकृत</string>
+    <string name="dashboard_class_mtb_positive">टीबी पॉजिटिव</string>
+    <string name="dashboard_class_mtb_negative">टीबी नेगेटिव</string>
+    <string name="dashboard_class_mtb_invalid">अमान्य</string>
+    <string name="dashboard_class_mtb_neg_xray_normal">टीबी नेगेटिव + एक्स-रे सामान्य</string>
+    <string name="dashboard_class_mtb_neg_xray_abnormal">टीबी नेगेटिव + एक्स-रे असामान्य (गैर-टीबी संभावित)</string>
+    <string name="dashboard_class_mtb_neg_xray_presumptive">टीबी नेगेटिव + एक्स-रे टीबी संभावित</string>
+    <string name="dashboard_class_rif_dr">डीआर टीबी</string>
+    <string name="dashboard_class_rif_non_dr">नॉन-डीआर टीबी</string>
+    <string name="dashboard_class_rif_indeterminate">अनिर्धारित</string>
+    <string name="dashboard_class_rif_invalid">अमान्य</string>
+    <string name="dashboard_class_lc_positive">पॉजिटिव</string>
+    <string name="dashboard_class_lc_negative">नेगेटिव</string>
+    <string name="dashboard_class_lc_contaminated">संदूषित</string>
+    <string name="dashboard_class_lc_invalid">अमान्य/त्रुटि</string>
+    <string name="dashboard_class_lc_pending">परिणाम लंबित</string>
+    <string name="dashboard_class_clinical_diagnosed">टीबी निदान</string>
+    <string name="dashboard_class_clinical_not_diagnosed">टीबी निदान नहीं</string>
+    <string name="dashboard_class_clinical_pending">निदान लंबित</string>
+    <string name="dashboard_class_clinical_referred">आगे मूल्यांकन के लिए रेफर</string>
+    <string name="dashboard_class_clinical_dr">ड्रग-रेसिस्टेंट टीबी निदान</string>
+    <string name="dashboard_class_confirmed_micro">सूक्ष्मजैविक रूप से पुष्ट टीबी</string>
+    <string name="dashboard_class_confirmed_clinical">क्लिनिकल रूप से निदान टीबी</string>
+    <string name="dashboard_class_confirmed_ds">ड्रग-सेंसिटिव टीबी (डीएस-टीबी)</string>
+    <string name="dashboard_class_confirmed_dr">ड्रग-रेसिस्टेंट टीबी (डीआर-टीबी)</string>
+    <string name="dashboard_class_tpt_eligible">टीपीटी के लिए पात्र</string>
+    <string name="dashboard_class_tpt_initiated">टीपीटी शुरू</string>
+    <string name="dashboard_class_tpt_ongoing">टीपीटी जारी</string>
+    <string name="dashboard_class_tpt_completed">टीपीटी पूर्ण</string>
+    <string name="dashboard_class_tpt_discontinued">टीपीटी बंद/डिफॉल्ट</string>
+    <string name="dashboard_class_tpt_not_eligible">टीपीटी के लिए अपात्र</string>
+    <string name="filter_village_label">गाँव</string>
+    <string name="filter_village_name">गाँव का नाम</string>
+    <string name="filter_district">जिला</string>
+    <string name="filter_block">ब्लॉक</string>
+    <string name="filter_period">अवधि</string>
+    <string name="filter_all_districts">सभी जिले</string>
+    <string name="filter_all_blocks">सभी ब्लॉक</string>
+    <string name="filter_yesterday">कल</string>
+    <string name="filter_this_week">इस सप्ताह</string>
+    <string name="filter_this_month">इस महीने</string>
+    <string name="filter_this_year">इस वर्ष</string>
+    <string name="filter_all_time">सभी समय</string>
+    <string name="dashboard_filters">फ़िल्टर</string>
+    <string name="dashboard_filters_subtitle">डैशबोर्ड में क्या दिखे, इसे बदलें</string>
+    <string name="dashboard_filter_reset">रीसेट</string>
+    <string name="dashboard_filter_apply">लागू करें</string>
     <string name="sign_in">साइन इन</string>
     <string name="save_successful">सफलतापूर्वक सहेजें</string>
     <string name="something_wend_wong_contact_testing">कुछ गड़बड़ है! संपर्क परीक्षण!</string>
@@ -358,6 +454,12 @@
     <string name="symptomatic_tb_screening">टीबी के लक्षणों की जांच</string>
     <string name="tb_asymptomatic_symptoms">बिना लक्षण वाले लोगों की टीबी जांच</string>
     <string name="tb_is_beneficiary_asymptomatic">लाभार्थी लक्षणरहित है</string>
+    <string name="tb_symptom_status">लक्षण की स्थिति</string>
+    <string name="tb_status_asymptomatic">लक्षणरहित</string>
+    <string name="tb_status_symptomatic">लक्षणयुक्त</string>
+    <string name="tb_status_asymptomatic_detail">कोई टीबी संबंधी लक्षण नहीं मिला</string>
+    <string name="tb_status_symptomatic_detail">कम से कम एक टीबी संबंधी लक्षण मिला</string>
+    <string name="tb_symptom_status_pending">लक्षण वाले प्रश्नों के उत्तर दें। यह स्थिति अपने आप तय होगी।</string>
     <string name="tb_rise_of_fever">रोजाना शाम को तेज बुखार आता है?</string>
     <string name="tb_loss_of_appetite">भूख कम लगना</string>
     <string name="tb_age_more_than_60">उम्र 60 वर्ष से अधिक</string>
@@ -686,9 +788,9 @@
     <string name="weight_kgs">वज़न (किग्रा)</string>
     <string name="height_cms">लंबाई (सेमी)</string>
     <string name="temperature_degree_fahrenheit">तापमान (डिग्री फारेनहाइट)</string>
-    <string name="temperature_hypothermia">&lt;97 - Hypothermia</string>
-    <string name="normal_temperature_range">97-99 - Normal</string>
-    <string name="temperature_100_or_more">&gt;99 - Fever</string>
+    <string name="temperature_hypothermia">&lt;97 - हाइपोथर्मिया</string>
+    <string name="normal_temperature_range">97-99 - सामान्य</string>
+    <string name="temperature_100_or_more">&gt;99 - बुखार</string>
     <string name="anthropometry_age_gender_format">%1$d %2$s | %3$s</string>
     <string name="age_unit_years">वर्ष</string>
     <string name="age_unit_months">महीने</string>
@@ -726,6 +828,7 @@
     <string name="unknown">अज्ञात</string>
     <string name="not_applicable">लागू नहीं</string>
     <string name="diagnostics_submitted">जांच जमा की गई</string>
+    <string name="diagnostics_saved_offline_pending_sync">परिणाम स्थानीय रूप से सहेजा गया — कैंप हब पुनः जुड़ने पर सिंक होगा</string>
     <string name="general_opd">जनरल ओपीडी</string>
     <string name="enter_value_between">%1$s %2$s और %3$s के बीच दर्ज करें</string>
     <string name="chief_complaint">मुख्य शिकायत</string>
@@ -802,7 +905,7 @@
         <item>शहरी झुग्गी</item>
         <item>वयस्क BCG टीकाकरण का इतिहास</item>
         <item>कुपोषित / अल्पपोषित (BMI &lt;18.5 kg/m2)</item>
-        <item>वृद्ध (आयु &gt;60 वर्ष)</item>
+        <item>वृद्ध (आयु &gt;=60 वर्ष)</item>
         <item>कार्यस्थल सेटिंग्स (कोयला/सैंडब्लास्टिंग/ईंट भट्टा)</item>
         <item>चाय बागान कर्मी</item>
         <item>निर्माण स्थल कर्मी</item>
@@ -856,7 +959,32 @@
     <string name="ben_card_tb_symptoms">टीबी के लक्षण</string>
     <string name="ben_card_chest_xray">छाती एक्स-रे</string>
     <string name="ben_card_truenat">ट्रूनैट</string>
-    <string name="ben_card_result">परिणाम: %1$s</string>
+    <string name="ben_card_clinical_assessment">क्लिनिकल आकलन</string>
+    <string name="ben_card_result">परिणाम:\n%1$s</string>
+    <string name="ben_card_result_title">परिणाम:</string>
+
+    <!-- TrueNat & RIF order lifecycle redesign -->
+    <string name="order_status_fetching_from_device">डिवाइस से परिणाम प्राप्त हो रहा है…</string>
+    <string name="order_status_manual_action_required">मैन्युअल कार्रवाई आवश्यक</string>
+    <string name="order_status_polling_stopped">डिवाइस पोलिंग बंद हो गई है — परिणाम स्वतः प्राप्त नहीं होंगे।</string>
+    <string name="order_status_manual_unavailable">स्वचालित डिवाइस परिणाम उपलब्ध नहीं है। कृपया परीक्षण परिणाम मैन्युअल रूप से दर्ज करें।</string>
+    <string name="order_status_polling_stopped_title">डिवाइस पोलिंग बंद हो गई है।</string>
+    <string name="order_status_polling_stopped_desc">परिणाम स्वतः प्राप्त नहीं होंगे।</string>
+    <string name="order_status_manual_unavailable_title">स्वचालित डिवाइस परिणाम उपलब्ध नहीं है।</string>
+    <string name="order_status_manual_unavailable_desc">कृपया परीक्षण परिणाम मैन्युअल रूप से दर्ज करें।</string>
+    <string name="order_status_hub_disconnected">हब जुड़ा नहीं है</string>
+    <string name="order_status_saved_locally_syncing">स्थानीय रूप से सहेजा गया — सिंक हो रहा है…</string>
+    <string name="order_status_hub_disconnected_title">कैंप हब जुड़ा नहीं है।</string>
+    <string name="order_status_hub_disconnected_desc">परिणाम के लिए पोलिंग नहीं हो रही — कृपया कैंप हब से कनेक्ट करें।</string>
+    <string name="order_status_last_checked_caption">%1$s पहले जांचा गया · हर %2$d सेकंड में स्वतः रिफ्रेश</string>
+    <string name="order_status_few_seconds">कुछ सेकंड</string>
+    <string name="order_status_enter_result">परिणाम दर्ज करें</string>
+    <string name="order_status_not_conducted">नहीं किया गया</string>
+    <string name="order_status_view_mtb_result">एमटीबी परिणाम देखें</string>
+    <string name="order_status_view_rif_result">आरआईएफ परिणाम देखें</string>
+    <string name="order_status_rif_block_label">आरआईएफ परीक्षण · एमटीबी पॉजिटिव द्वारा ट्रिगर</string>
+    <string name="order_status_create_new_order">नया ऑर्डर बनाएं</string>
+    <string name="order_status_clinical_assessment_referred">क्लिनिकल आकलन एवं निदान हेतु संदर्भित</string>
     <string name="btn_examine">जांचें</string>
     <string name="btn_examine_count">जांचें %1$d/4</string>
     <string name="examine_bottomsheet_title">परीक्षण फॉर्म</string>
@@ -865,6 +993,7 @@
     <string name="diagnosis_locked_msg">कृपया पहले टीबी स्क्रीनिंग फॉर्म भरें</string>
     <string name="tb_screening_locked_msg">कृपया पहले टीबी स्क्रीनिंग फॉर्म भरें</string>
     <string name="examine_form_view_only_msg">आपके पास इस फॉर्म को केवल देखने की अनुमति है</string>
+    <string name="tb_screening_no_permission_msg">आपके पास टीबी स्क्रीनिंग तक पहुँचने की अनुमति नहीं है</string>
     <string name="contact_tracing_load_error">यह फॉर्म लोड नहीं हो सका।</string>
     <string name="examine_btn_history">पिछला रिकॉर्ड</string>
     <string name="tb_screening_legend_xray_sputum">* डिजिटल छाती एक्स-रे या थूक संग्रह के लिए रेफर करें</string>
@@ -876,10 +1005,11 @@
     <string name="tb_reason_for_denial_chest_xray_other">इनकार का अन्य कारण बताएं (एक्स-रे)</string>
     <string name="tb_reason_not_conducted_xray">एक्स-रे न होने का कारण</string>
     <string name="tb_reason_not_conducted_xray_other">अन्य कारण बताएं (एक्स-रे नहीं हुआ)</string>
-    <string name="tb_referred_for_sputum_collection">थूक संग्रह के लिए रेफर किया गया?</string>
+    <string name="tb_referred_for_sputum_collection">थूक संग्रह/ट्रूनैट जांच के लिए रेफर किया गया?</string>
+    <string name="tb_is_sputum_collected">क्या थूक एकत्र किया गया?</string>
     <string name="tb_reason_for_denial_sputum">थूक संग्रह से इनकार का कारण</string>
     <string name="tb_reason_for_denial_sputum_other">इनकार का अन्य कारण बताएं (थूक)</string>
-    <string name="tb_sputum_submitted_at">थूक सैंपल कहाँ जमा किया</string>
+    <string name="tb_sputum_submitted_at">थूक सैंपल जमा करने का केंद्र</string>
     <string name="tb_reason_not_conducted_naat">True NAT न होने का कारण</string>
     <string name="tb_reason_not_conducted_naat_other">अन्य कारण बताएं (True NAT नहीं हुआ)</string>
 
@@ -1006,6 +1136,14 @@
     <string name="role_tab_nurse">उपचार</string>
     <string name="role_tab_counseling">परामर्श</string>
     <string name="role_tab_lab_technician">निदान</string>
+
+
+    <string name="home_village_at_a_glance">गाँव %1$s एक नज़र में</string>
+    <string name="home_glance_households">कुल परिवार</string>
+    <string name="home_glance_population">कुल जनसंख्या</string>
+    <string name="home_glance_unscreened">अस्क्रीन की गई जनसंख्या</string>
+
+
 </resources>
 
 

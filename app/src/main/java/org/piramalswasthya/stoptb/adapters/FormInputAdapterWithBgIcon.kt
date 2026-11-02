@@ -1172,8 +1172,7 @@ class FormInputAdapterWithBgIcon (
             FILE_UPLOAD -> FileUploadInputViewHolder.from(parent)
             InputType.NUMBER_PICKER -> NumberPickerInputViewHolder.from(parent)
             InputType.MULTIFILE_UPLOAD -> MultiFileUploadInputViewHolder.from(parent)
-
-
+            InputType.STATUS_INDICATOR -> FormInputAdapter.StatusIndicatorViewHolder.from(parent)
         }
     }
 
@@ -1216,6 +1215,8 @@ class FormInputAdapterWithBgIcon (
             InputType.NUMBER_PICKER -> (holder as NumberPickerInputViewHolder).bind(
                 item, isEnabled, formValueListener
             )
+            InputType.STATUS_INDICATOR ->
+                (holder as FormInputAdapter.StatusIndicatorViewHolder).bind(item)
         }
     }
 

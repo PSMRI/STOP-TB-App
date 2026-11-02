@@ -55,15 +55,31 @@ class RecordsRepo @Inject constructor(
         benDao.getHouseholdMemberCounts(selectedVillage)
             .map { list -> list.associate { it.hhId to it.memberCount } }
 
+    val householdHeadNames: Flow<Map<Long, String>> get() =
+        benDao.getHouseholdHeadNames(selectedVillage)
+            .map { list -> list.associate { it.hhId to it.fullName } }
+
     val anthropometryFilledBenIds: Flow<List<Long>> get() =
-        benDao.getAnthropometryFilledBenIds(selectedVillage)
+        benDao.getAnthropometryFilledBenIds()
 
     fun searchBen(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false): Flow<List<BenBasicDomain>> =
         benDao.searchBen(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query)
             .map { list -> list.map { it.asBasicDomainModel() } }
 
-    fun searchBenPagedSource(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false): PagingSource<Int, BenBasicCache> =
-        benDao.searchBenPaged(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query)
+    /** Sources whose filter touches no TB table: 0 All, 1 ABHA, 2 RCH, 3 age 30+, 4 eligible couple. */
+    private val sourcesWithoutTbPredicates = setOf(0, 1, 2, 3, 4)
+
+    fun searchBenPagedSource(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false): PagingSource<Int, BenBasicCache> {
+        val villageIds = if (expandToBlock) allVillageIds else listOf(selectedVillage)
+        // Sources 0-4 have no TB predicate, so they use the statement that never names a TB table
+        // and therefore is not invalidated by the sync writing to one. See
+        // BenDao.searchBenPagedWithoutTbTables.
+        return if (source in sourcesWithoutTbPredicates) {
+            benDao.searchBenPagedWithoutTbTables(villageIds, source, filterType, query)
+        } else {
+            benDao.searchBenPaged(villageIds, source, filterType, query)
+        }
+    }
 
     suspend fun searchBenOnce(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false): List<BenBasicDomain> =
         benDao.searchBenOnce(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query)
@@ -84,6 +100,9 @@ class RecordsRepo @Inject constructor(
 
     fun searchNonHH(query: String) = benDao.searchNonHHBeneficiaries(selectedVillage, query)
         .map { list -> list.map { it.asBasicDomainModel() } }
+
+    fun searchNonHHPagedSource(query: String): PagingSource<Int, BenBasicCache> =
+        benDao.searchNonHHBeneficiariesPaged(selectedVillage, query)
 
     val allBenWithoutAbhaList get() = benDao.getAllBenWithoutAbha(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }
@@ -125,6 +144,7 @@ class RecordsRepo @Inject constructor(
     val trueNatReferralCount get() = benDao.getTrueNatBenCount(selectedVillage)
     val liquidCultureReferralCount get() = benDao.getLiquidCultureBenCount(selectedVillage)
     val hwcReferralCount get() = benDao.getHwcBenDataCount(selectedVillage)
+    val clinicalAssessmentReferralCount get() = benDao.getClinicalAssessmentBenCount(selectedVillage)
 
     val getNcdPriorityList get() = getNcdEligibleList.map {
         it.filter { it.savedCbacRecords.isNotEmpty() && it.savedCbacRecords.maxBy { it.createdDate }.total_score > 4 }

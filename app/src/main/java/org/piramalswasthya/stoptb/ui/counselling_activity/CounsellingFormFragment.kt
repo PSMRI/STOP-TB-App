@@ -1,9 +1,12 @@
 package org.piramalswasthya.stoptb.ui.counselling_activity
 
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.CheckBox
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -17,6 +20,7 @@ class   CounsellingFormFragment : Fragment() {
 
     private val viewModel: CounsellingViewModel by activityViewModels()
     private lateinit var adapter: CounsellingDynamicAdapter
+    private var suppressSelectAllCallback = false
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -30,6 +34,33 @@ class   CounsellingFormFragment : Fragment() {
 
         val rv = view.findViewById<RecyclerView>(R.id.rv_counselling_form)
         rv.layoutManager = LinearLayoutManager(requireContext())
+        val cbSelectAll = view.findViewById<CheckBox>(R.id.cb_select_all)
+
+        fun updateSelectAll() {
+            val section = viewModel.schemaData?.sections?.getOrNull(viewModel.currentStep.value ?: 0)
+            val show = viewModel.currentSectionHasCheckboxes()
+            val sectionEditable = viewModel.isSectionEditable(section)
+            cbSelectAll.visibility = if (show) View.VISIBLE else View.GONE
+            cbSelectAll.isEnabled = sectionEditable
+            cbSelectAll.isClickable = sectionEditable
+            val boxColor = ContextCompat.getColor(
+                cbSelectAll.context,
+                if (sectionEditable) R.color.md_theme_light_primary else R.color.grey
+            )
+            val labelColor = ContextCompat.getColor(
+                cbSelectAll.context,
+                if (sectionEditable) R.color.md_theme_light_onSurfaceVariant else R.color.grey
+            )
+            cbSelectAll.buttonTintList = ColorStateList.valueOf(boxColor)
+            (cbSelectAll as? com.google.android.material.checkbox.MaterialCheckBox)?.buttonIconTintList =
+                ColorStateList.valueOf(
+                    ContextCompat.getColor(cbSelectAll.context, R.color.md_theme_light_onPrimary)
+                )
+            cbSelectAll.setTextColor(labelColor)
+            suppressSelectAllCallback = true
+            cbSelectAll.isChecked = viewModel.areAllCheckboxesSelected()
+            suppressSelectAllCallback = false
+        }
 
         adapter = CounsellingDynamicAdapter(
             questions = emptyList(),
@@ -37,9 +68,21 @@ class   CounsellingFormFragment : Fragment() {
                 if (updatedQ.questionType != "TEXT") {
                     viewModel.evaluateConditions(updatedQ)
                 }
-            }
+                updateSelectAll()
+            },
+            unlockRemarksWithPencil = true
         )
         rv.adapter = adapter
+
+        cbSelectAll.setOnCheckedChangeListener { _, isChecked ->
+            if (suppressSelectAllCallback) return@setOnCheckedChangeListener
+            val section = viewModel.schemaData?.sections?.getOrNull(viewModel.currentStep.value ?: 0)
+            if (!viewModel.isSectionEditable(section)) {
+                updateSelectAll()
+                return@setOnCheckedChangeListener
+            }
+            viewModel.selectAllCheckboxes(isChecked)
+        }
 
         fun refreshAdapter() {
             val section = viewModel.schemaData?.sections?.getOrNull(viewModel.currentStep.value ?: 0)
@@ -47,6 +90,7 @@ class   CounsellingFormFragment : Fragment() {
                 viewModel.activeQuestions.value.orEmpty(),
                 viewModel.isSectionEditable(section)
             )
+            updateSelectAll()
         }
         viewModel.activeQuestions.observe(viewLifecycleOwner) { refreshAdapter() }
         viewModel.isFormEditable.observe(viewLifecycleOwner) { refreshAdapter() }
@@ -67,6 +111,7 @@ class   CounsellingFormFragment : Fragment() {
                 }
                 tvLetter.text = letter
                 tvName.text = it.sectionName
+                updateSelectAll()
             }
         }
     }

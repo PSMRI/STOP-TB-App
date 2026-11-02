@@ -17,7 +17,8 @@ import org.piramalswasthya.stoptb.network.GeneralOpdDTO
         onUpdate = ForeignKey.CASCADE,
         onDelete = ForeignKey.CASCADE
     )],
-    indices = [Index(name = "ind_general_opd_ben", value = ["benId"])]
+    indices = [Index(name = "ind_general_opd_ben", value = ["benId"]),
+        Index(value = ["submissionId"], unique = true)]
 )
 data class GeneralOpdCache(
     @PrimaryKey(autoGenerate = true)
@@ -31,7 +32,9 @@ data class GeneralOpdCache(
     var duration: String? = null,
     var notes: String? = null,
     var serverUpdatedDate: Long? = null,
-    var syncState: SyncState = SyncState.UNSYNCED
+    var syncState: SyncState = SyncState.UNSYNCED,
+    val submissionId: String? = null,
+    val chiefComplaintIds: List<Int>? = null
 ) : FormDataModel {
     fun toDTO(): GeneralOpdDTO = GeneralOpdDTO(
         id = id.toLong(),

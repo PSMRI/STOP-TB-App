@@ -54,10 +54,10 @@ class CounsellingViewModel @Inject constructor(
     val isFormEditable: LiveData<Boolean> get() = _isFormEditable
 
     fun isSectionEditable(section: CounsellingSectionDto?): Boolean {
-        // Backend's isEditable=true (only the last section) is an unconditional override — that
-        // section stays editable forever regardless of submitted/completed/refused state.
-        if (section?.isEditable == true) return true
+        // Once submitted, option checkboxes and Select All stay locked. Notes can still
+        // be opened with the pencil icon. isEditable only applies before submit.
         if (section?.isSubmitted == true) return false
+        if (section?.isEditable == true) return true
         return _isFormEditable.value != false
     }
 
@@ -343,8 +343,100 @@ class CounsellingViewModel @Inject constructor(
         _currentStep.value = index
 
         evaluateAllConditions(section)
+        section.questions.forEach {
+            it.remarksUnlocked = false
+            it.remarksRequestFocus = false
+        }
+        captureRemarksSnapshot(section)
 
         _activeQuestions.value = section.questions.toList()
+    }
+
+    fun currentSectionHasCheckboxes(): Boolean = checkboxQuestions(currentSection()).isNotEmpty()
+
+    fun areAllCheckboxesSelected(): Boolean {
+        val boxes = checkboxQuestions(currentSection())
+        if (boxes.isEmpty()) return false
+        return boxes.all { q ->
+            val options = q.options.orEmpty().map { it.optionValue }
+            options.isEmpty() || selectedValues(q).containsAll(options)
+        }
+    }
+
+    fun selectAllCheckboxes(selectAll: Boolean) {
+        val section = currentSection() ?: return
+        if (!isSectionEditable(section)) return
+        if (selectAll) {
+            var previousIds: Set<Int>? = null
+            var guard = section.questions.size.coerceAtLeast(1)
+            while (guard-- > 0) {
+                val visible = checkboxQuestions(section)
+                val ids = visible.map { it.questionId }.toSet()
+                if (ids == previousIds) break
+                previousIds = ids
+                visible.forEach { q ->
+                    q.value = q.options.orEmpty().map { it.optionValue }
+                    q.errorMessage = null
+                }
+                evaluateAllConditions(section)
+            }
+        } else {
+            section.questions.filter { isCheckboxQuestion(it) }.forEach { q ->
+                q.value = emptyList<String>()
+            }
+            evaluateAllConditions(section)
+        }
+        _activeQuestions.value = section.questions.toList()
+    }
+
+    private fun currentSection(): CounsellingSectionDto? =
+        schemaData?.sections?.getOrNull(_currentStep.value ?: 0)
+
+    private fun isCheckboxQuestion(q: CounsellingQuestionDto): Boolean {
+        val type = QuestionType.from(q.questionType)
+        return type == QuestionType.CHECKBOX ||
+            type == QuestionType.CHECKBOX_MULTI ||
+            type == QuestionType.MCQ
+    }
+
+    private fun checkboxQuestions(section: CounsellingSectionDto?): List<CounsellingQuestionDto> =
+        section?.questions?.filter {
+            it.visible && isCheckboxQuestion(it) && !it.options.isNullOrEmpty()
+        }.orEmpty()
+
+    private fun selectedValues(q: CounsellingQuestionDto): Set<String> = when (val v = q.value) {
+        is List<*> -> v.mapNotNull { it?.toString() }.toSet()
+        is String -> setOf(v)
+        else -> emptySet()
+    }
+
+    private var remarksSnapshot: Map<String, String> = emptyMap()
+
+    private fun remarksKey(sectionId: Int, questionId: Int) = "$sectionId:$questionId"
+
+    private fun captureRemarksSnapshot(section: CounsellingSectionDto) {
+        val updates = section.questions
+            .filter { it.isRemarksField() }
+            .associate { remarksKey(section.sectionId, it.questionId) to (it.value?.toString() ?: "") }
+        remarksSnapshot = remarksSnapshot + updates
+    }
+
+    private fun remarksChanged(section: CounsellingSectionDto): Boolean {
+        return section.questions
+            .filter { it.isRemarksField() }
+            .any { remarksSnapshot[remarksKey(section.sectionId, it.questionId)] != (it.value?.toString() ?: "") }
+    }
+
+    private fun remarksAreValid(section: CounsellingSectionDto): Boolean {
+        var valid = true
+        section.questions
+            .filter { it.visible && it.isRemarksField() }
+            .forEach { q ->
+                val error = validateQuestion(q, section)
+                q.errorMessage = error
+                if (error != null) valid = false
+            }
+        return valid
     }
 
     fun evaluateConditions(q: CounsellingQuestionDto) {
@@ -576,20 +668,33 @@ class CounsellingViewModel @Inject constructor(
     }
 
     fun nextSection() {
-        if (!validateCurrentSection()) return
         val current = _currentStep.value ?: 0
         val section = schemaData?.sections?.getOrNull(current) ?: return
         val formId = schemaData?.formId ?: 2
         val versionNumber = schemaData?.versionNumber ?: 1
 
         if (!isSectionEditable(section)) {
-            if (current < (schemaData?.sections?.size ?: 1) - 1) {
-                loadSection(current + 1)
-            } else {
-                _formSubmitted.value = true
+            if (!remarksChanged(section)) {
+                moveForward(current)
+                return
+            }
+            if (!remarksAreValid(section)) {
+                _activeQuestions.value = section.questions.toList()
+                return
+            }
+            viewModelScope.launch {
+                val saved = counsellingRepo.saveRemarksOnly(benId, formId, section, versionNumber)
+                if (saved) {
+                    captureRemarksSnapshot(section)
+                    moveForward(current)
+                } else {
+                    _saveError.value = "Failed to save section answers. Please try again."
+                }
             }
             return
         }
+
+        if (!validateCurrentSection()) return
 
         viewModelScope.launch {
             if (current == 0 && lastEntryMode == CounsellingEntryMode.COUNSELLING && !generalInfoSubmittedThisSession) {
@@ -607,14 +712,18 @@ class CounsellingViewModel @Inject constructor(
                 if (persistedSection?.sectionResponse?.completedAt != null) {
                     section.isSubmitted = true
                 }
-                if (current < (schemaData?.sections?.size ?: 1) - 1) {
-                    loadSection(current + 1)
-                } else {
-                    _formSubmitted.value = true
-                }
+                moveForward(current)
             } else {
                 _saveError.value = "Failed to save section answers. Please try again."
             }
+        }
+    }
+
+    private fun moveForward(current: Int) {
+        if (current < (schemaData?.sections?.size ?: 1) - 1) {
+            loadSection(current + 1)
+        } else {
+            _formSubmitted.value = true
         }
     }
 
@@ -623,9 +732,26 @@ class CounsellingViewModel @Inject constructor(
         if (current > 0) {
             val section = schemaData?.sections?.getOrNull(current) ?: return
 
-            // In read-only mode skip the save and navigate directly.
             if (!isSectionEditable(section)) {
-                loadSection(current - 1)
+                if (!remarksChanged(section)) {
+                    loadSection(current - 1)
+                    return
+                }
+                if (!remarksAreValid(section)) {
+                    _activeQuestions.value = section.questions.toList()
+                    return
+                }
+                val formId = schemaData?.formId ?: 2
+                val versionNumber = schemaData?.versionNumber ?: 1
+                viewModelScope.launch {
+                    val saved = counsellingRepo.saveRemarksOnly(benId, formId, section, versionNumber)
+                    if (saved) {
+                        captureRemarksSnapshot(section)
+                        loadSection(current - 1)
+                    } else {
+                        _saveError.value = "Failed to save section answers. Please try again."
+                    }
+                }
                 return
             }
             val formId = schemaData?.formId ?: 2

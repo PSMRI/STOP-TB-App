@@ -52,5 +52,6 @@
 
     <string name="counselling_start_button">পৰামৰ্শ আৰম্ভ কৰক</string>
     <string name="counselling_follow_up_button">ফলো-আপ</string>
+    <string name="counselling_select_all">সকলো বাছনি কৰক</string>
     <string name="counselling_data_load_error">আমি তথ্য লাভ কৰিবলৈ অসমৰ্থ।\nঅনুগ্ৰহ কৰি পাছত পুনৰ চেষ্টা কৰক।</string>
 </resources>

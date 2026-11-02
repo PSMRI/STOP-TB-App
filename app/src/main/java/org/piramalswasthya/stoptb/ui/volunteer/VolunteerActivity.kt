@@ -38,6 +38,7 @@ import dagger.hilt.components.SingletonComponent
 import org.piramalswasthya.stoptb.BuildConfig
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
 import org.piramalswasthya.stoptb.databinding.ActivityVolunteerBinding
 import org.piramalswasthya.stoptb.helpers.AutoFlowBackNavigationHost
 import org.piramalswasthya.stoptb.helpers.ImageUtils
@@ -53,6 +54,7 @@ import org.piramalswasthya.stoptb.ui.login_activity.LoginActivity
 import org.piramalswasthya.stoptb.ui.service_location_activity.ServiceLocationActivity
 import org.piramalswasthya.stoptb.ui.volunteer.fragment.VolunteerViewModel
 import org.piramalswasthya.stoptb.work.WorkerUtils
+import org.piramalswasthya.stoptb.utils.sync.CampHubReachability
 import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -65,6 +67,9 @@ import kotlinx.coroutines.launch
 class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
 
     private var autoFlowBackNavigationBlocked: Boolean = false
+    private var refreshMenuItem: MenuItem? = null
+    private var showQuickRefreshAction: Boolean = false
+    private var quickRefreshActionEnabled: Boolean = true
 
     /** Mirrors the same listener in HomeActivity — see comments there. */
     private val campHubPrefListener =
@@ -73,6 +78,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
                 runOnUiThread {
                     refreshCampHubOfflineBanner()
                     if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
+                        syncRetryStore.resetBackoff()
                         WorkerUtils.triggerAmritPushWorker(applicationContext)
                         WorkerUtils.triggerCampQuickPullIfConnected(applicationContext, pref, force = true)
                     }
@@ -120,6 +126,9 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
 
     @Inject
     lateinit var pref: PreferenceDao
+
+    @Inject
+    lateinit var syncRetryStore: SyncRetryStore
 
     @Inject
     lateinit var roleManager: RoleManager
@@ -218,6 +227,9 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     override fun onCreate(savedInstanceState: Bundle?) {
         TapjackingProtectionHelper.applyWindowSecurity(this)
         super.onCreate(savedInstanceState)
+        WorkerUtils.scheduleSyncHeartbeat(applicationContext)
+        // Opening the app (including right after login) retries waiting records now.
+        syncRetryStore.resetBackoff()
         // Resolve assigned/active role for this cold start. Always resets to the first
         // assigned role — no persistence across app restarts, by design.
         roleManager.initializeFromLoggedInUser()
@@ -234,7 +246,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         }
         refreshCampHubOfflineBanner()
 
-        binding.versionName.text = "App Version ${BuildConfig.VERSION_NAME}"
+        binding.versionName.text = getString(R.string.login_app_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
 
 
         viewModel.navigateToLoginPage.observe(this) {
@@ -247,7 +259,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
 
         // Redirect to ServiceLocationActivity if location not set (multi-village users)
         if (pref.getLocationRecord() == null) {
-            val intent = Intent(this, org.piramalswasthya.stoptb.ui.service_location_activity.ServiceLocationActivity::class.java)
+            val intent = Intent(this, ServiceLocationActivity::class.java)
             intent.putExtra("fromVolunteer", true)
             startActivity(intent)
             finish()
@@ -307,6 +319,14 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             true
         }
 
+        // Observes the role rather than the click so a Counselling start tab (selected before the
+        // listener is attached) is checked too.
+        lifecycleScope.launch {
+            roleManager.activeRole.collect { role ->
+                if (role == AppRole.COUNSELING) viewModel.checkFormVersions()
+            }
+        }
+
         // Visible on Home only; addOnDestinationChangedListener fires immediately with the
         // current destination, so this also sets the correct initial state.
         navController.addOnDestinationChangedListener { _, destination, _ ->
@@ -338,12 +358,19 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
                 menuInflater.inflate(R.menu.home_toolbar, menu)
                 menu.findItem(R.id.toolbar_menu_home)?.isVisible = false
                 menu.findItem(R.id.toolbar_menu_language)?.isVisible = true
+                refreshMenuItem = menu.findItem(R.id.toolbar_menu_refresh)
+                refreshMenuItem?.isVisible = showQuickRefreshAction
+                refreshMenuItem?.isEnabled = quickRefreshActionEnabled
             }
 
             override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
                 when (menuItem.itemId) {
                     R.id.toolbar_menu_language -> {
                         langChooseAlert.show()
+                        return true
+                    }
+                    R.id.toolbar_menu_refresh -> {
+                        findVolunteerHomeFragment()?.requestQuickRefresh()
                         return true
                     }
                     R.id.sync_status -> {
@@ -468,10 +495,10 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             toolbarIconPadding
         )
 //        binding.toolbar.title = null
+        val titleName = title.substringBefore("(").trim()
         binding.toolbar.title = ""
         supportActionBar?.setDisplayShowTitleEnabled(false)
-        binding.tvToolbar.text = title
-
+        binding.tvToolbar.text = titleName
     }
 
     fun addClickListenerToHomepageActionBarTitle() {
@@ -641,6 +668,23 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         }
     }
 
+    fun setQuickRefreshActionVisible(visible: Boolean) {
+        showQuickRefreshAction = visible
+        refreshMenuItem?.isVisible = visible
+    }
+
+    fun setQuickRefreshActionEnabled(enabled: Boolean) {
+        quickRefreshActionEnabled = enabled
+        refreshMenuItem?.isEnabled = enabled
+    }
+
+    private fun findVolunteerHomeFragment() =
+        (supportFragmentManager.findFragmentById(R.id.nav_host_fragment_volunteer) as? NavHostFragment)
+            ?.childFragmentManager
+            ?.fragments
+            ?.filterIsInstance<org.piramalswasthya.stoptb.ui.volunteer.fragment.VolunteerHomeFragment>()
+            ?.firstOrNull()
+
     fun updateQuickRefreshProgress(progress: Int) {
         binding.pbQuickRefreshTop.progress = progress.coerceIn(0, 100)
     }
@@ -657,21 +701,10 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
      * Any HTTP response (even 4xx) means the server is up.
      * Must be called from a background thread.
      */
-    private fun pingCampHub(): Boolean {
-        return try {
-            val url = java.net.URL(pref.getCampHubUrl())
-            val conn = url.openConnection() as java.net.HttpURLConnection
-            conn.connectTimeout = 3000
-            conn.readTimeout = 3000
-            conn.requestMethod = "GET"
-            conn.connect()
-            val code = conn.responseCode
-            conn.disconnect()
-            code in 100..499
-        } catch (e: Exception) {
-            false
-        }
-    }
+    // Same reachability rule as the sign-in screen, interceptor and sync gate
+    // (GET /common-api/health, 2xx). Blocking: call off the main thread.
+    private fun pingCampHub(): Boolean =
+        CampHubReachability.isReachable(pref.getCampHubUrl())
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {

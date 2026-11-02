@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.tb_suspected.quick
 
+import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -8,6 +9,9 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import androidx.swiperefreshlayout.widget.CircularProgressDrawable
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
@@ -34,6 +38,9 @@ class TBSuspectedQuickFragment : Fragment() {
 
     private val viewModel: TBSuspectedQuickViewModel by viewModels()
 
+    /** Held so a submit in flight can actually disable the inputs. */
+    private var formAdapter: FormInputAdapter? = null
+
     private val isManagedFlow: Boolean
         get() = viewModel.autoFlow || viewModel.generalOpdFlow
 
@@ -57,6 +64,7 @@ class TBSuspectedQuickFragment : Fragment() {
             isEnabled = true
         )
         binding.form.rvInputForm.adapter = adapter
+        formAdapter = adapter
         binding.btnCancel.visibility = View.GONE
         binding.fabEdit.visibility = View.GONE
         binding.btnSubmit.visibility = if (viewModel.viewOnly) View.GONE else View.VISIBLE
@@ -65,36 +73,12 @@ class TBSuspectedQuickFragment : Fragment() {
             viewModel.formList.collect {
                 if (it.isNotEmpty()) {
                     adapter.submitList(it)
-                    
-                    if (viewModel.viewOnly && viewModel.referralType == 7) {
-                        val naatRes = viewModel.getNaatResult()
-                        val rifRes = viewModel.getTrueNatRifResult()
-                        if (naatRes != null && naatRes.equals("Invalid", ignoreCase = true)) {
-                            androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                                .setTitle("Invalid Test Result")
-                                .setMessage("The test results are invalid, repeat the test")
-                                .setPositiveButton("REPEAT TEST") { d, _ ->
-                                    viewModel.repeatTest("SPUTUM_TRUENAT")
-                                    Toast.makeText(requireContext(), "Repeat test order created. Please mark test complete on the listing page.", Toast.LENGTH_LONG).show()
-                                    d.dismiss()
-                                    findNavController().popBackStack()
-                                }
-                                .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
-                                .show()
-                        } else if (rifRes != null && rifRes.equals("Indeterminate", ignoreCase = true)) {
-                            androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                                .setTitle("Indeterminate Test Result")
-                                .setMessage("The test results are indeterminate, repeat the test")
-                                .setPositiveButton("REPEAT TEST") { d, _ ->
-                                    viewModel.repeatTest("MDR_RIF")
-                                    Toast.makeText(requireContext(), "Repeat test order created. Please mark test complete on the listing page.", Toast.LENGTH_LONG).show()
-                                    d.dismiss()
-                                    findNavController().popBackStack()
-                                }
-                                .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
-                                .show()
-                        }
-                    }
+                    // TrueNat & RIF order lifecycle redesign: the AlertDialog-based "REPEAT TEST"
+                    // prompt that used to fire here on naatResult == "Invalid" /
+                    // trueNatRifResult == "Indeterminate" is fully superseded by the
+                    // Closed-status-driven "Create New Order" button on the beneficiary card
+                    // (Invalid/Error is the repeat-trigger now; Indeterminate is terminal) — see
+                    // AllBenFragment's "REORDER" action.
                 }
             }
         }
@@ -111,10 +95,52 @@ class TBSuspectedQuickFragment : Fragment() {
             if (!(isXrayDone || isNaatDone)) {
                 binding.btnSubmit.visibility = if (it) View.VISIBLE else View.GONE
                 if (!viewModel.viewOnly && (viewModel.referralType == 6 || viewModel.referralType == 7)) {
-                    binding.btnSubmit.text = "SUBMIT REFERRAL"
+                    binding.btnSubmit.text = getString(R.string.btn_submit)
                 }
             }
         }
+        // Shared layout defaults this strip to gone; this screen is the only one with a
+        // result check, so it reserves the space here rather than on all six.
+        binding.llCheckStatus.visibility = View.INVISIBLE
+
+        // Form-load state — same llContent/llLoading pair NewBenRegFragment uses.
+        viewModel.isLoading.observe(viewLifecycleOwner) { loading ->
+            binding.llContent.visibility = if (loading) View.GONE else View.VISIBLE
+            binding.llLoading.visibility = if (loading) View.VISIBLE else View.GONE
+        }
+
+        // The advisory result check reports itself in a live region beside the form, and Submit
+        // keeps its own label and stays usable. Relabelling the primary action to report
+        // background work read as "my submission is in flight", carried the only copy of that
+        // status on a disabled control that TalkBack never announces, and could hold the one
+        // action on this screen for as long as the 60 s client read timeout.
+        viewModel.resultCheck.observe(viewLifecycleOwner) { state ->
+            binding.llCheckStatus.removeCallbacks(showCheckingStatus)
+            when (state!!) {
+                // Delayed so a check that answers in tens of milliseconds — the common case on a
+                // healthy hub — never flashes a status line at the user.
+                TBSuspectedQuickViewModel.ResultCheck.CHECKING ->
+                    binding.llCheckStatus.postDelayed(showCheckingStatus, CHECK_STATUS_DELAY_MS)
+
+                TBSuspectedQuickViewModel.ResultCheck.IDLE ->
+                    binding.llCheckStatus.visibility = View.INVISIBLE
+
+                TBSuspectedQuickViewModel.ResultCheck.FAILED -> {
+                    binding.llCheckStatus.visibility = View.VISIBLE
+                    binding.pbCheckStatus.visibility = View.GONE
+                    binding.tvCheckStatus.text = getString(R.string.check_newer_result_failed)
+                }
+
+                // A result landed while the form was being filled. The typed values are left
+                // alone; this only says so, rather than discarding the arrival silently.
+                TBSuspectedQuickViewModel.ResultCheck.NEWER_AVAILABLE -> {
+                    binding.llCheckStatus.visibility = View.VISIBLE
+                    binding.pbCheckStatus.visibility = View.GONE
+                    binding.tvCheckStatus.text = getString(R.string.result_newer_available)
+                }
+            }
+        }
+
         val isXrayDone = viewModel.viewOnly && viewModel.referralType == 6 && viewModel.getIsChestXRayDone() == true
         val isNaatDone = viewModel.viewOnly && viewModel.referralType == 7 && viewModel.getIsNaatConducted() == true
         if (!(isXrayDone || isNaatDone)) {
@@ -124,17 +150,47 @@ class TBSuspectedQuickFragment : Fragment() {
         }
         viewModel.state.observe(viewLifecycleOwner) {
             when (it) {
+                // The form stays on screen, so the beneficiary this result belongs to is still
+                // visible while the one irreversible step runs. Hiding it behind a full-screen
+                // spinner removed that context and was indistinguishable from a frozen app.
+                TBSuspectedQuickViewModel.State.SAVING -> setSubmitting(true)
+
                 TBSuspectedQuickViewModel.State.SAVE_SUCCESS -> {
+                    setSubmitting(false)
+                    val message = if (viewModel.savedOfflinePendingSync.value == true) {
+                        getString(R.string.diagnostics_saved_offline_pending_sync)
+                    } else {
+                        getString(R.string.diagnostics_submitted)
+                    }
                     Toast.makeText(
                         requireContext(),
-                        getString(R.string.diagnostics_submitted),
+                        message,
                         Toast.LENGTH_SHORT
                     ).show()
                     WorkerUtils.triggerCampAwarePushWorker(requireContext(), preferenceDao)
                     findNavController().navigateUp()
                 }
 
+                // The backend refused the entry because it already holds a result. Naming that
+                // result is the point: the raw rejection string left the user on the form with
+                // no idea what the real result was, or that pressing Submit again was futile.
+                TBSuspectedQuickViewModel.State.RESULT_ALREADY_RECORDED -> {
+                    setSubmitting(false)
+                    val recorded = viewModel.alreadyRecordedResult.value.orEmpty()
+                    MaterialAlertDialogBuilder(requireContext())
+                        .setTitle(R.string.result_already_recorded_title)
+                        .setMessage(getString(R.string.result_already_recorded_message, recorded))
+                        .setCancelable(false)
+                        .setPositiveButton(android.R.string.ok) { _, _ ->
+                            findNavController().navigateUp()
+                        }
+                        .show()
+                    viewModel.resetState()
+                }
+
                 TBSuspectedQuickViewModel.State.SAVE_FAILED -> {
+                    // Everything the user typed is still on screen — they can correct and retry.
+                    setSubmitting(false)
                     val msg = viewModel.errorMessage.value ?: getString(R.string.tb_suspected_quick_save_failed)
                     Toast.makeText(
                         requireContext(),
@@ -144,8 +200,47 @@ class TBSuspectedQuickFragment : Fragment() {
                     viewModel.resetState()
                 }
 
-                TBSuspectedQuickViewModel.State.SAVING,
                 TBSuspectedQuickViewModel.State.IDLE -> Unit
+            }
+        }
+    }
+
+    /** Posted, not shown immediately — see the resultCheck observer. */
+    private val showCheckingStatus = Runnable {
+        _binding?.let { b ->
+            b.pbCheckStatus.visibility = View.VISIBLE
+            b.tvCheckStatus.text = getString(R.string.checking_newer_result)
+            b.llCheckStatus.visibility = View.VISIBLE
+        }
+    }
+
+    /**
+     * Submitting is a commitment, so it reports itself on the control the user pressed rather
+     * than through the same anonymous spinner the screen uses while it is still loading.
+     */
+    private fun setSubmitting(submitting: Boolean) {
+        binding.btnSubmit.isEnabled = !submitting
+        binding.btnSubmit.text =
+            getString(if (submitting) R.string.submitting else R.string.btn_submit)
+        if (submitting) {
+            binding.btnSubmit.icon = CircularProgressDrawable(requireContext()).apply {
+                setStyle(CircularProgressDrawable.DEFAULT)
+                setColorSchemeColors(Color.WHITE)
+                start()
+            }
+            binding.btnSubmit.iconGravity = MaterialButton.ICON_GRAVITY_END
+        } else {
+            (binding.btnSubmit.icon as? CircularProgressDrawable)?.stop()
+            binding.btnSubmit.icon = null
+        }
+        // The values were snapshotted when the save began, so edits made now would be silently
+        // dropped. An OnTouchListener on the RecyclerView does not stop this: it is consulted
+        // from the RecyclerView's own onTouchEvent, which runs only after its children have had
+        // the event, so every dropdown and text field stayed live. Disable the rows instead.
+        formAdapter?.let { formRows ->
+            if (formRows.isEnabled == submitting) {
+                formRows.isEnabled = !submitting
+                formRows.notifyDataSetChanged()
             }
         }
     }
@@ -162,25 +257,19 @@ class TBSuspectedQuickFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
+        // Title/icon now match the specific test this screen is for (same icons the dashboard
+        // uses for its Chest X-Ray / TrueNat tiles) instead of a generic "Diagnostics" label —
+        // RIF shares the TrueNat icon/title since it's the same referralType (7) and the same
+        // order family as TrueNat, just a follow-on sub-test.
+        val (icon, title) = if (viewModel.referralType == 6) {
+            R.drawable.ic_health_xray to getString(R.string.ben_card_chest_xray)
+        } else {
+            R.drawable.ic_truenat_device to getString(R.string.ben_card_truenat)
+        }
         activity?.let {
             when (it) {
-//                is HomeActivity -> it.updateActionBar(
-//                    R.drawable.ic__ncd,
-//                    getString(R.string.tb_suspected_quick_title)
-//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
-//                is VolunteerActivity -> it.updateActionBar(
-//                    R.drawable.ic__ncd,
-//                    getString(R.string.tb_suspected_quick_title)
-//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
-
-                is HomeActivity -> it.updateActionBar(
-                    R.drawable.ic__ncd,
-                    getString(R.string.tb_suspected_quick_title)
-                )
-                is VolunteerActivity -> it.updateActionBar(
-                    R.drawable.ic__ncd,
-                    getString(R.string.tb_suspected_quick_title)
-                )
+                is HomeActivity -> it.updateActionBar(icon, title)
+                is VolunteerActivity -> it.updateActionBar(icon, title)
             }
         }
     }
@@ -195,9 +284,16 @@ class TBSuspectedQuickFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        _binding?.llCheckStatus?.removeCallbacks(showCheckingStatus)
+        formAdapter = null
         if (isManagedFlow) {
             setAutoFlowBackNavigationBlocked(false)
         }
         _binding = null
+    }
+
+    companion object {
+        /** Long enough that a healthy hub's check never flashes a status line. */
+        private const val CHECK_STATUS_DELAY_MS = 300L
     }
 }

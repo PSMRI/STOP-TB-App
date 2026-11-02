@@ -58,6 +58,11 @@
     <string name="long_to_string">%d</string>
     <string name="tv_reg_date_ph">Registration Date</string>
     <string name="reg_date">Reg Date</string>
+    <string name="family_members">Family members</string>
+    <string name="mobile_number_ben">Mobile Number</string>
+    <string name="btn_examine_count_ben">Examine (%1$d/%2$d)</string>
+    <string name="screening_presumptive">Presumptive</string>
+    <string name="screening_asymptomatic">Asymptomatic</string>
     <string name="tv_ben_name_ph">Beneficiary Name</string>
     <string name="tv_type_of_list">Type of List</string>
     <string name="tv_rch_id">RCH ID</string>
@@ -99,6 +104,10 @@
     <string name="tb_ai_cough_assessment_result">AI Cough Assessment result</string>
     <string name="tb_naat_conducted">True NAT conducted?</string>
     <string name="tb_naat_result">True NAT result</string>
+    <string name="tb_quick_naat_conducted">Is Truenat - MTB Test Conducted?</string>
+    <string name="tb_quick_naat_result">Truenat - MTB Test Result</string>
+    <string name="tb_quick_rif_conducted">Is Truenat - RIF Test Conducted?</string>
+    <string name="tb_quick_rif_result">Truenat - RIF Test Result</string>
     <string name="tb_liquid_culture_conducted">Is Liquid culture conducted?</string>
     <string name="tb_liquid_culture_result">Liquid Culture result</string>
     <string name="tb_suspected_quick_title">Diagnostics</string>
@@ -266,6 +275,7 @@
     <string name="contact_tracing_section_progress">Section %1$d of %2$d</string>
     <string name="contact_tracing_number_picker_decrement">Decrease</string>
     <string name="contact_tracing_number_picker_increment">Increase</string>
+    <string name="contact_tracing_number_picker_value">Value</string>
     <string name="contact_tracing_type_bottomsheet_title">Start Contact Tracing</string>
     <string name="home">Home</string>
     <string name="asha_profile">Profile</string>
@@ -310,10 +320,36 @@
     <string name="abha_ids">ABHA IDs</string>
     <string name="pending_sync">Pending Sync</string>
     <string name="loading_form">Loading form...</string>
+    <string name="checking_newer_result">Checking for a newer result…</string>
+    <string name="check_newer_result_failed">Couldn\'t check for a newer result. You can still enter one.</string>
+    <string name="submitting">Submitting…</string>
+    <string name="result_newer_available">A newer result arrived for this order.</string>
+    <string name="manual_result_rejected_fallback_name">A beneficiary</string>
+    <string name="manual_result_rejected_title">A result you entered was not accepted</string>
+    <string name="manual_result_rejected_with_result">%1$s: the order already had a result (%2$s). Your entry was replaced by it.</string>
+    <string name="manual_result_rejected_generic">%1$s: the hub refused the result you entered offline. Open the record to re-enter it.</string>
+    <string name="result_already_recorded_title">Result already recorded</string>
+    <string name="result_already_recorded_message">A result has already been recorded for this order: %1$s.\n\nYour entry was not saved. The recorded result is now shown on the card.</string>
     <string name="filter_time_period">Time Period</string>
     <string name="filter_village">Village / Hamlet</string>
+    <string name="filter_village_label">Village</string>
+    <string name="filter_village_name">Village Name</string>
+    <string name="filter_district">District</string>
+    <string name="filter_block">Block</string>
+    <string name="filter_period">Period</string>
     <string name="filter_all_villages">All Villages</string>
+    <string name="filter_all_districts">All Districts</string>
+    <string name="filter_all_blocks">All Blocks</string>
     <string name="filter_today">Today</string>
+    <string name="filter_yesterday">Yesterday</string>
+    <string name="filter_this_week">This Week</string>
+    <string name="filter_this_month">This Month</string>
+    <string name="filter_this_year">This Year</string>
+    <string name="filter_all_time">All Time</string>
+    <string name="dashboard_filters">Filters</string>
+    <string name="dashboard_filters_subtitle">Change what this dashboard shows</string>
+    <string name="dashboard_filter_reset">Reset</string>
+    <string name="dashboard_filter_apply">Apply</string>
     <string name="label_greeting_name">%1$s, %2$s</string>
     <string name="dashboard_greeting_subtitle">Let\'s make impact today</string>
     <string name="dashboard_stay_safe">Stay Safe</string>
@@ -338,6 +374,7 @@
     <string name="referral_true_nat">True NAT</string>
     <string name="referral_hwc">Health and Wellness Centre</string>
     <string name="referral_liquid_culture">Liquid Culture</string>
+    <string name="referral_clinical_assessment">Clinical Assessment &amp; Diagnosis</string>
     <string name="dashboard_tb_screening_subtitle">Track outreach and screening volume</string>
     <string name="dashboard_tb_suspected_subtitle">Follow up high-risk suspected cases</string>
     <string name="dashboard_tb_confirmed_subtitle">Monitor confirmed patients and support</string>
@@ -359,6 +396,81 @@
     <string name="label_children">Children(&lt;15y): %d</string>
     <string name="label_others">Others: %d</string>
     <string name="label_senior_citizen">Age(>=60): %d</string>
+    <string name="dashboard_screening_coverage">Screening Coverage</string>
+    <string name="dashboard_coverage_subtitle">Population and coverage % are cumulative to date — not limited by the period filter</string>
+    <string name="dashboard_village_population">Village Population</string>
+    <string name="dashboard_screened">Screened</string>
+    <string name="dashboard_unscreened">Unscreened</string>
+    <string name="dashboard_coverage">Coverage</string>
+    <string name="dashboard_coverage_formula">%1$d screened out of %2$d population — %3$d%% coverage so far.</string>
+    <string name="dashboard_count_of_total">%1$d / %2$d</string>
+    <string name="dashboard_percent">%1$d%%</string>
+    <string name="dashboard_value_with_percent">%1$d (%2$d%%)</string>
+    <string name="dashboard_screened_population">Screened Population</string>
+    <string name="dashboard_screened_period_label">— %1$s</string>
+    <string name="dashboard_screened_population_subtitle">By Demographic, for the selected Village and Period (not cumulative)</string>
+    <string name="dashboard_overview_title">Screening &amp; Testing Overview</string>
+    <string name="dashboard_overview_subtitle">Tap a KPI to view demographic details.</string>
+    <string name="dashboard_view_by_demographic">View by demographic</string>
+    <string name="dashboard_presumptive_summary">Total Presumptive Cases Summary</string>
+    <string name="dashboard_past_history_summary">Past History of TB Cases Summary</string>
+    <string name="dashboard_anti_tb_summary">Currently on Anti-TB Drugs</string>
+    <string name="dashboard_xray_summary">Chest X-Ray Summary</string>
+    <string name="dashboard_sputum_summary">Sputum Collection Summary</string>
+    <string name="dashboard_mtb_summary">MTB Test Summary</string>
+    <string name="dashboard_rif_summary">RIF Test Summary</string>
+    <string name="dashboard_liquid_culture_summary">Samples for Liquid Culture Test Summary</string>
+    <string name="dashboard_hwc_summary">HWC Referral Cases Summary</string>
+    <string name="dashboard_clinical_summary">Clinical Assessment &amp; Diagnosis Cases Summary</string>
+    <string name="dashboard_confirmed_summary">TB Confirmed Cases Summary</string>
+    <string name="dashboard_tpt_summary">TPT Cases Summary</string>
+    <string name="dashboard_nikshay_summary">NIKSHAY IDs Summary</string>
+    <string name="dashboard_abha_summary">ABHA IDs Summary</string>
+    <string name="dashboard_demo_male">Male</string>
+    <string name="dashboard_demo_female">Female</string>
+    <string name="dashboard_demo_pregnant">Pregnant Women</string>
+    <string name="dashboard_demo_children">Children (&lt;15y)</string>
+    <string name="dashboard_demo_others">Others</string>
+    <string name="dashboard_demo_senior">Senior Citizens (≥60y)</string>
+    <string name="dashboard_demo_transgender">Transgender</string>
+    <string name="dashboard_demo_total">Total</string>
+    <string name="dashboard_class_xray_normal">Normal</string>
+    <string name="dashboard_class_xray_abnormal">Abnormal but not TB Presumptive</string>
+    <string name="dashboard_class_xray_tb_presumptive">TB Presumptive</string>
+    <string name="dashboard_class_xray_invalid">AI Invalid Result</string>
+    <string name="dashboard_class_sputum_collected">Sample Collected</string>
+    <string name="dashboard_class_sputum_not_collected">Sample Not Collected</string>
+    <string name="dashboard_class_sputum_rejected">Sample Rejected</string>
+    <string name="dashboard_class_mtb_positive">TB Positive</string>
+    <string name="dashboard_class_mtb_negative">TB Negative</string>
+    <string name="dashboard_class_mtb_invalid">Invalid</string>
+    <string name="dashboard_class_mtb_neg_xray_normal">TB Negative + X-Ray Normal</string>
+    <string name="dashboard_class_mtb_neg_xray_abnormal">TB Negative + X-Ray Abnormal but not TB Presumptive</string>
+    <string name="dashboard_class_mtb_neg_xray_presumptive">TB Negative + X-Ray TB Presumptive</string>
+    <string name="dashboard_class_rif_dr">DR TB</string>
+    <string name="dashboard_class_rif_non_dr">Non-DR TB</string>
+    <string name="dashboard_class_rif_indeterminate">Indeterminate</string>
+    <string name="dashboard_class_rif_invalid">Invalid</string>
+    <string name="dashboard_class_lc_positive">Positive</string>
+    <string name="dashboard_class_lc_negative">Negative</string>
+    <string name="dashboard_class_lc_contaminated">Contaminated</string>
+    <string name="dashboard_class_lc_invalid">Invalid/Error</string>
+    <string name="dashboard_class_lc_pending">Result Pending</string>
+    <string name="dashboard_class_clinical_diagnosed">Diagnosed with TB</string>
+    <string name="dashboard_class_clinical_not_diagnosed">Not Diagnosed with TB</string>
+    <string name="dashboard_class_clinical_pending">Diagnosis Pending</string>
+    <string name="dashboard_class_clinical_referred">Referred for Further Evaluation</string>
+    <string name="dashboard_class_clinical_dr">Drug-Resistant TB Diagnosed</string>
+    <string name="dashboard_class_confirmed_micro">Microbiologically Confirmed TB</string>
+    <string name="dashboard_class_confirmed_clinical">Clinically Diagnosed TB</string>
+    <string name="dashboard_class_confirmed_ds">Drug-Sensitive TB (DS-TB)</string>
+    <string name="dashboard_class_confirmed_dr">Drug-Resistant TB (DR-TB)</string>
+    <string name="dashboard_class_tpt_eligible">Eligible for TPT</string>
+    <string name="dashboard_class_tpt_initiated">Initiated on TPT</string>
+    <string name="dashboard_class_tpt_ongoing">TPT Ongoing</string>
+    <string name="dashboard_class_tpt_completed">TPT Completed</string>
+    <string name="dashboard_class_tpt_discontinued">TPT Discontinued/Defaulted</string>
+    <string name="dashboard_class_tpt_not_eligible">Not Eligible for TPT</string>
     <string name="dashboard_row_male_pos_neg">Male: Positive %1$d / Negative %2$d</string>
     <string name="dashboard_row_female_pos_neg">Female: Positive %1$d / Negative %2$d</string>
     <string name="dashboard_row_children_pos_neg">Children (&lt;15 yrs): Positive %1$d / Negative %2$d</string>
@@ -904,6 +1016,20 @@
     <string name="sync_dashboard_worker_idle">Idle</string>
     <string name="sync_dashboard_worker_complete">Complete</string>
     <string name="sync_dashboard_worker_failed">Failed: %1$d worker(s) - tap to see details</string>
+    <string name="sync_dashboard_needs_attention_title">Needs attention</string>
+    <string name="sync_dashboard_needs_attention_summary">%1$d record(s) not accepted by the server yet. They are retried automatically. Tap Retry now once the problem is fixed.</string>
+    <string name="sync_dashboard_retry_now">Retry now</string>
+    <string name="sync_dashboard_retry_detail">Not synced for %1$s, %2$d attempt(s). Last error: %3$s</string>
+    <string name="sync_dashboard_orphan_responses_title">Counselling / contact tracing</string>
+    <string name="sync_dashboard_orphan_responses_detail">%1$d response(s) were saved before their beneficiary was registered and cannot be matched to the registered beneficiary. Please report to support.</string>
+    <string name="sync_dashboard_age_minutes">%1$d min</string>
+    <string name="sync_dashboard_age_hours">%1$d h</string>
+    <string name="sync_dashboard_age_days">%1$d days</string>
+    <string name="sync_entity_beneficiary">Beneficiary</string>
+    <string name="sync_entity_registration">Beneficiary registration</string>
+    <string name="sync_entity_tb_diagnostics">TB diagnostics</string>
+    <string name="sync_entity_tb_suspected">TB suspected</string>
+    <string name="sync_entity_tb_confirmed">TB confirmed</string>
     <string name="sync_dashboard_no_logs">No sync logs yet. Trigger a sync to see activity.</string>
     <string name="sync_dashboard_clear_logs">Clear Logs</string>
     <string name="sync_dashboard_export_logs">Export Logs</string>
@@ -912,6 +1038,7 @@
     <string name="no_records_found_hh">No Household records found.</string>
     <string name="something_went_wrong_nunable_to_connect_to_server_ntry_again_later">Something went wrong !\nUnable to connect to server !\nTry again later!</string>
     <string name="try_again">Try Again!</string>
+    <string name="error_login_server_error">Server is busy, please try again in a moment</string>
 
     <string name="camera">Camera</string>
 
@@ -922,6 +1049,12 @@
     <string name="check_if_the_person_has_any_of_these_symptoms">Check if the person has any of these Symptoms:</string>
     <string name="tb_asymptomatic_screening">Asymptomatic Screening</string>
     <string name="tb_is_beneficiary_asymptomatic">Beneficiary is Asymptomatic</string>
+    <string name="tb_symptom_status">Symptom status</string>
+    <string name="tb_status_asymptomatic">Asymptomatic</string>
+    <string name="tb_status_symptomatic">Symptomatic</string>
+    <string name="tb_status_asymptomatic_detail">No TB-related symptoms were identified</string>
+    <string name="tb_status_symptomatic_detail">At least one TB-related symptom was identified</string>
+    <string name="tb_symptom_status_pending">Answer the symptom questions. This status is set automatically.</string>
     <string name="risk_factors">Risk Factors</string>
     <string name="other_details">Other Details</string>
     <string name="tb_rise_of_fever">Rise of fever in evening</string>
@@ -1007,6 +1140,15 @@
     <string name="quick_refresh_refreshing">Refreshing beneficiary data...</string>
     <string name="quick_refresh_failed">Refresh failed. Try again</string>
     <string name="quick_refresh_action">Refresh</string>
+    <plurals name="home_presumptive_referral">
+        <item quantity="one">%d presumptive case needs referral</item>
+        <item quantity="other">%d presumptive cases need referral</item>
+    </plurals>
+    <string name="home_presumptive_referral_subtitle">Flagged from recent TB screenings</string>
+    <string name="home_village_at_a_glance">Village %1$s at Glance</string>
+    <string name="home_glance_households">Total Households</string>
+    <string name="home_glance_population">Total Population</string>
+    <string name="home_glance_unscreened">Unscreened Population</string>
     <string name="quick_refresh_camp_disconnected">Camp Hub is not connected. Please reconnect first.</string>
     <string name="quick_refresh_ip_not_reachable">IP address not reachable: %1$s</string>
     <string name="error_message">Error Message : </string>
@@ -1093,6 +1235,7 @@
     <string name="pulse_option_70_80">70-80</string>
     <string name="pulse_option_above_90">More than 90</string>
     <string name="diagnostics_submitted">Diagnostics submitted</string>
+    <string name="diagnostics_saved_offline_pending_sync">Result saved locally — will sync when Camp Hub reconnects</string>
     <string-array name="vital_temperature_options">
         <item>@string/temperature_option_97_5</item>
         <item>@string/temperature_option_98_5</item>
@@ -1141,7 +1284,7 @@
         <item>Urban Slum</item>
         <item>H/o Adult BCG Vaccination</item>
         <item>Undernourished / Malnourished (BMI &lt;18.5 kg/m2)</item>
-        <item>Elderly (age &gt;60 years)</item>
+        <item>Elderly (age &gt;=60 years)</item>
         <item>Workplace settings (coal/sandblasting/brick kiln)</item>
         <item>Tea garden worker</item>
         <item>Construction site worker</item>
@@ -1159,6 +1302,28 @@
 
     <string name="general_opd">General OPD</string>
     <string name="chief_complaint">Chief Complaint</string>
+    <string name="prescription">Prescription</string>
+    <string name="opd_medicine_title">Medicine-%1$d</string>
+    <string name="opd_medicine_hint">Medicine</string>
+    <string name="opd_drug_form">Drug Form</string>
+    <string name="opd_no_medicine_matches">No medicines found</string>
+    <string name="opd_drug_master_unavailable">Medicine master is unavailable. Connect and sync to load medicines.</string>
+    <string name="opd_out_of_stock">Out of Stock</string>
+    <string name="opd_duration_unit">Unit</string>
+    <string name="opd_instruction">Instruction</string>
+    <string name="opd_reset_medicine">Reset medicine</string>
+    <string name="opd_add_medicine">Add medicine</string>
+    <string name="opd_remove_medicine">Remove medicine</string>
+    <string name="opd_increase_duration">Increase duration</string>
+    <string name="opd_decrease_duration">Decrease duration</string>
+    <string name="opd_complete_medicine">Select medicine, frequency and duration unit for each card.</string>
+    <string-array name="opd_duration_units">
+        <item>Day(s)</item><item>Week(s)</item><item>Month(s)</item>
+    </string-array>
+    <string-array name="opd_instructions">
+        <item>Before food</item><item>After food</item><item>With food</item><item>At bedtime</item>
+    </string-array>
+    <string name="general_opd_medicine_one">Medicine - 1: Form / Medicine / Dosage</string>
     <string name="medication">Medication</string>
     <string name="dosage">Dosage</string>
     <string name="frequency">Frequency</string>
@@ -1169,41 +1334,26 @@
 
     <string-array name="general_opd_chief_complaint_array">
         <item>Fever</item>
-        <item>Mild to moderate body pain</item>
         <item>Headache</item>
-        <item>General weakness with fever</item>
-        <item>Acidity</item>
-        <item>Burning sensation in stomach</item>
-        <item>Indigestion</item>
-        <item>Gas</item>
-        <item>Bloating</item>
-        <item>Upper abdominal discomfort</item>
-        <item>Allergic symptoms</item>
-        <item>Sneezing</item>
+        <item>Body aches</item>
         <item>Runny nose</item>
-        <item>Itching (skin or eyes)</item>
-        <item>Mild allergic rash</item>
-        <item>Diarrhea</item>
+        <item>Sneezing</item>
+        <item>Nasal congestion</item>
+        <item>Itching</item>
+        <item>Sore throat</item>
+        <item>Cough</item>
         <item>Loose stools</item>
-        <item>Gut imbalance</item>
-        <item>Indigestion with loose motion</item>
-        <item>Dehydration</item>
-        <item>Vomiting with weakness</item>
-        <item>Heat exhaustion</item>
-        <item>General weakness</item>
-        <item>Fatigue</item>
-        <item>Nutritional deficiency</item>
-        <item>Poor appetite</item>
-        <item>Fever in children</item>
-        <item>Body ache in children</item>
-        <item>Post-vaccination fever</item>
-        <item>Allergies in children</item>
-        <item>Cold with sneezing</item>
-        <item>Itching in children</item>
-        <item>Mild skin allergy</item>
-        <item>Diarrhea in children</item>
-        <item>Weak immunity</item>
-        <item>Recovery from illness</item>
+        <item>Vomiting</item>
+        <item>Abdominal pain</item>
+        <item>Epigastric pain</item>
+        <item>Burning sensation in chest</item>
+        <item>Indigestion</item>
+        <item>Bloating</item>
+        <item>Nausea</item>
+        <item>Weakness/fatigue</item>
+        <item>Loss of appetite</item>
+        <item>Regurgitation of food</item>
+        <item>Others</item>
     </string-array>
 
     <string-array name="general_opd_medication_array">
@@ -1237,7 +1387,52 @@
     <string name="ben_card_tb_symptoms">TB Symptoms</string>
     <string name="ben_card_chest_xray">Chest X-Ray</string>
     <string name="ben_card_truenat">TrueNat</string>
-    <string name="ben_card_result">Result: %1$s</string>
+    <string name="ben_card_clinical_assessment">Clinical Assessment</string>
+    <string name="ben_card_result">Result:\n%1$s</string>
+    <string name="ben_card_result_title">Result:</string>
+
+    <!-- TrueNat & RIF order lifecycle redesign — Order Status area pill/caption/button copy,
+         reused identically by Chest X-Ray's own retrofit of the same design language. -->
+    <string name="order_status_fetching_from_device">Fetching result from device…</string>
+    <string name="order_status_order_not_created">Referral order not created — tap Retry Referral</string>
+    <string name="order_status_manual_action_required">Manual Action Required</string>
+    <string name="order_status_polling_stopped">Device polling has stopped — results won\'t be fetched automatically.</string>
+    <string name="order_status_manual_unavailable">Automatic device result is unavailable. Please record the test result manually.</string>
+    <string name="order_status_polling_stopped_title">Device polling has stopped.</string>
+    <string name="order_status_polling_stopped_desc">Results won\'t be fetched automatically.</string>
+    <string name="order_status_manual_unavailable_title">Automatic device result is unavailable.</string>
+    <string name="order_status_manual_unavailable_desc">Please record the test result manually.</string>
+    <string name="order_status_hub_disconnected">Hub Disconnected</string>
+    <string name="order_status_saved_locally_syncing">Saved Locally — Syncing…</string>
+    <string name="order_status_hub_disconnected_title">Camp Hub is disconnected.</string>
+    <string name="order_status_hub_disconnected_desc">Not polling for result — please connect to Camp Hub.</string>
+    <string name="order_status_last_checked_caption">Last checked %1$s ago · Auto-refresh every %2$d seconds</string>
+
+    <string name="order_status_few_seconds">a few seconds</string>
+
+    <string name="order_status_enter_result">Enter Result</string>
+    <string name="order_status_not_conducted">Not Conducted</string>
+    <string name="order_status_view_mtb_result">View MTB Result</string>
+    <string name="order_status_view_rif_result">View RIF Result</string>
+    <string name="order_status_rif_block_label">RIF Test · triggered by MTB Positive</string>
+    <string name="order_status_create_new_order">Create New Order</string>
+    <string name="order_status_clinical_assessment_referred">Referred for Clinical Assessment &amp; Diagnosis</string>
+    <string name="order_status_retry_referral">Retry Referral</string>
+    <string name="order_status_checking">Checking…</string>
+    <string name="diagnostic_manual_result_success">Result submitted successfully</string>
+    <string name="diagnostic_order_creation_failed">Unable to submit result: order could not be created (%1$s)</string>
+    <string name="error_beneficiary_not_found">Beneficiary not found</string>
+    <string name="error_beneficiary_id_invalid">Beneficiary ID not valid</string>
+    <string name="error_no_user_logged_in">No user logged in!!</string>
+    <string name="error_camp_hub_not_connected">Camp Hub not connected</string>
+    <string name="error_http_code">HTTP Error %1$d</string>
+    <string name="error_no_location_record_found">No location record found</string>
+    <string name="error_camp_mode_disabled">Camp Mode is disabled</string>
+    <string name="error_camp_hub_disconnected">Camp Hub is disconnected</string>
+    <string name="error_manual_result_rejected">Manual result submission was rejected</string>
+    <string name="error_push_order_failed">Failed to push order</string>
+    <string name="error_retry_order_failed">Failed to retry order</string>
+    <string name="error_fetch_result_failed">Failed to fetch result</string>
     <string name="btn_examine">Examine</string>
     <string name="btn_examine_count">Examine %1$d/4</string>
     <string name="btn_examine_count_of">Examine %1$d/%2$d</string>
@@ -1251,6 +1446,7 @@
     <string name="diagnosis_locked_msg">Please fill TB Screening form first</string>
     <string name="tb_screening_locked_msg">Please fill TB Screening form first</string>
     <string name="examine_form_view_only_msg">You have view-only access to this form</string>
+    <string name="tb_screening_no_permission_msg">You don\'t have permission to access TB Screening</string>
     <string name="tb_screening_legend_xray_sputum">* Refer for Digital Chest X-Ray or for Sputum Collection</string>
     <string name="tb_screening_legend_family_members">** Advise for screening of all family members</string>
 
@@ -1260,10 +1456,11 @@
     <string name="tb_reason_for_denial_chest_xray_other">Specify other reason for denial (X-Ray)</string>
     <string name="tb_reason_not_conducted_xray">Reason Digital Chest X-Ray not conducted</string>
     <string name="tb_reason_not_conducted_xray_other">Specify other reason (X-Ray not conducted)</string>
-    <string name="tb_referred_for_sputum_collection">Referred for Sputum Collection?</string>
+    <string name="tb_referred_for_sputum_collection">Referred for sputum collection/TrueNat Test?</string>
+    <string name="tb_is_sputum_collected">Is sputum collected?</string>
     <string name="tb_reason_for_denial_sputum">Reason for Denial of Sputum Collection</string>
     <string name="tb_reason_for_denial_sputum_other">Specify other reason for denial (Sputum)</string>
-    <string name="tb_sputum_submitted_at">Sputum sample submitted at</string>
+    <string name="tb_sputum_submitted_at">Sputum Sample Submission Center</string>
     <string name="sputum_sample_submitted_at_screening_camp">Sputum Sample Submitted at TB Screening Camp</string>
     <string name="tb_reason_not_conducted_naat">Reason True NAT not conducted</string>
     <string name="tb_reason_not_conducted_naat_other">Specify other reason (True NAT not conducted)</string>
@@ -1402,7 +1599,23 @@
     <string name="home_card_tb_treatment_followup_title">TB Treatment Follow-up</string>
     <string name="home_card_tpt_title">TPT</string>
     <string name="home_card_coming_soon_subtitle">Coming soon</string>
+
+
+
+    <string name="sync_beneficiary">Beneficiary</string>
+    <string name="sync_anthropometric">Anthropometric</string>
+    <string name="sync_tb_screening">TB Screening</string>
+    <string name="sync_tb_confirmed">TB Confirmed</string>
+    <string name="sync_counselling">Counselling</string>
+
+
+
+
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
+
+
+
+
 </resources>
 

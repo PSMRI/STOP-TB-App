@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Overridden only by the UAT flavor. Other builds leave this blank. -->
+    <string name="camp_hub_default_url" translatable="false"></string>
+</resources>

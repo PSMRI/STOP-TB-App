@@ -109,6 +109,9 @@ class SignInFragment : Fragment() {
             }.setNegativeButton(resources.getString(R.string.no)) { dialog, _ ->
                 viewModel.updateState(NetworkResponse.Idle())
                 dialog.dismiss()
+            }.setOnCancelListener{
+                // Back dismisses the dialog and prevents the login screen from getting stuck in Loading.
+                viewModel.updateState(NetworkResponse.Idle())
             }.create()
     }
 
@@ -135,7 +138,7 @@ class SignInFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         updateLoginAppName()
-        binding.tvLoginVersion?.text = getString(R.string.login_app_version, BuildConfig.VERSION_NAME)
+        binding.tvLoginVersion?.text = getString(R.string.login_app_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
         val initialLeft = binding.root.paddingLeft
         val initialTop = binding.root.paddingTop
         val initialRight = binding.root.paddingRight

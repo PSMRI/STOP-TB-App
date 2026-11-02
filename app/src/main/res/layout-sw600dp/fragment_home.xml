@@ -34,8 +34,7 @@
                 android:paddingTop="@dimen/padding_small"
                 android:paddingEnd="@dimen/padding_small"
                 android:paddingBottom="@dimen/padding_small"
-                android:visibility="gone"
-                tools:visibility="visible">
+                android:visibility="gone">
 
                 <TextView
                     android:id="@+id/tv_quick_refresh_status"
@@ -66,27 +65,23 @@
             <com.google.android.material.tabs.TabLayout
                 android:id="@+id/tl_home_viewpager"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="48dp"
-                android:layout_marginTop="24dp"
-                android:layout_marginEnd="48dp"
+                android:layout_height="48dp"
                 android:background="@drawable/bg_tab_strip"
-                android:padding="8dp"
-                app:tabGravity="fill"
                 app:tabIndicator="@drawable/bg_tab_indicator"
-                app:tabIndicatorFullWidth="false"
-                app:tabIndicatorHeight="0dp"
-                app:tabInlineLabel="true"
-                app:tabMaxWidth="0dp"
+                app:tabIndicatorColor="@android:color/white"
+                app:tabIndicatorFullWidth="true"
+                app:tabIndicatorGravity="stretch"
+                app:tabIndicatorHeight="48dp"
                 app:tabMode="fixed"
-                app:tabPaddingBottom="16dp"
-                app:tabPaddingEnd="24dp"
-                app:tabPaddingStart="24dp"
-                app:tabPaddingTop="16dp"
-                app:tabRippleColor="@color/md_theme_light_primaryContainer"
+                app:tabGravity="fill"
+                app:tabMaxWidth="0dp"
+                app:tabRippleColor="@android:color/transparent"
                 app:tabSelectedTextColor="@color/md_theme_light_primary"
                 app:tabTextAppearance="@style/TextAppearance.Sakhi.HomeTab"
-                app:tabTextColor="@color/md_theme_light_onSurfaceVariant" />
+                app:tabTextColor="@color/md_theme_light_onSurfaceVariant"
+                android:layout_marginStart="26dp"
+                android:layout_marginTop="16dp"
+                android:layout_marginEnd="26dp"/>
 
             <androidx.viewpager2.widget.ViewPager2
                 android:id="@+id/vp2_home"

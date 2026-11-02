@@ -15,6 +15,7 @@ import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -44,6 +45,7 @@ import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.LocationState
 import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.home_activity.new_household_registration.NewHouseholdViewModel.State
+import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import timber.log.Timber
 import javax.inject.Inject
@@ -105,10 +107,14 @@ class NewHouseholdFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
-        (activity as? VolunteerActivity)?.updateActionBar(
-            R.drawable.ic__hh,
-            getString(R.string.frag_nhhr_title)
-        )
+        updateActionBarTitle(getString(R.string.frag_nhhr_title))
+    }
+
+    private fun updateActionBarTitle(title: String) {
+        when (val host = activity) {
+            is HomeActivity -> host.updateActionBar(R.drawable.ic__hh, title)
+            is VolunteerActivity -> host.updateActionBar(R.drawable.ic__hh, title)
+        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -210,8 +216,7 @@ class NewHouseholdFragment : Fragment() {
     private fun observeViewModel() {
         // Record exists → drives view/edit mode
         viewModel.readRecord.observe(viewLifecycleOwner) { recordExists ->
-            (activity as? VolunteerActivity)?.updateActionBar(
-                R.drawable.ic__hh,
+            updateActionBarTitle(
                 if (recordExists) getString(R.string.view_household_information)
                 else getString(R.string.frag_nhhr_title)
             )
@@ -321,25 +326,26 @@ class NewHouseholdFragment : Fragment() {
     }
 
 
+    // Refresh only the row whose value the dataset changed. notifyDataSetChanged() here rebinds every
+    // row and reshuffles recycled views between fields; a focused EditText then keeps showing another
+    // field's text (e.g. village name inside Mobile No).
     private fun hardCodedListUpdate(formId: Int) {
-        binding.form.rvInputForm.adapter?.apply {
-            when (formId) {
-
-                // Village dropdown changed
-                23 -> {      // <-- villageHamlet.id
-                    notifyDataSetChanged()
-                }
-
-                // Address changed
-                24 -> {      // <-- address.id
-                    notifyDataSetChanged()
-                }
-
-                // Mobile number not available checkbox changed
-                1002 -> {    // <-- mobileNotAvailable.id
-                    notifyDataSetChanged()
-                }
-            }
+        val targetId = when (formId) {
+            23 -> 24      // villageHamlet changed → address is auto-filled
+            1002 -> 2     // mobileNotAvailable toggled → mobileNoHeadOfFamily cleared/enabled/disabled
+            else -> return // address (24) edits: its own watcher already shows the validation error
+        }
+        requireActivity().currentFocus?.clearFocus()
+        val rv = binding.form.rvInputForm
+        if (formId == 1002) {
+            // Toggling "Mobile Number Not Available" must never leave a keyboard open.
+            (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)
+                ?.hideSoftInputFromWindow(rv.windowToken, 0)
+        }
+        rv.post {
+            val adapter = rv.adapter as? FormInputAdapter ?: return@post
+            val position = adapter.currentList.indexOfFirst { it.id == targetId }
+            if (position >= 0) adapter.notifyItemChanged(position)
         }
     }
 

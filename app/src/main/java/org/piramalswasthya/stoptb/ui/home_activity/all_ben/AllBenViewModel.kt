@@ -1,6 +1,7 @@
 package org.piramalswasthya.stoptb.ui.home_activity.all_ben
 
 import android.content.Context
+import android.os.SystemClock
 import android.media.MediaScannerConnection
 import android.os.Environment
 import android.widget.Toast
@@ -12,6 +13,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import androidx.paging.map
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,6 +21,7 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
@@ -43,7 +46,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.database.room.SyncState
+import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.BenRegCache
+import org.piramalswasthya.stoptb.model.TBScreeningCache
+import org.piramalswasthya.stoptb.work.WorkerUtils
+import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
 
 @HiltViewModel
 class AllBenViewModel @Inject constructor(
@@ -82,6 +89,29 @@ class AllBenViewModel @Inject constructor(
         }
     }
 
+    private companion object {
+        /** An unfiltered status refresh re-runs at most this often. */
+        const val statusRefreshDebounceMs = 30_000L
+
+        /**
+         * Last time an unfiltered status refresh actually ran. On the companion, not the
+         * instance: a fresh ViewModel is built on every entry to this screen, so an instance
+         * field would only suppress repeat onResume within a single visit and the full sweep
+         * would still run on every navigation back. Same reasoning as
+         * [lastDeviceIntegrationRefreshAt].
+         */
+        private var lastStatusRefreshAt = 0L
+
+        /** Device-integration config re-checks at most this often. */
+        const val deviceIntegrationRefreshIntervalMs = 5 * 60_000L
+
+        /**
+         * Held on the companion, not the instance: a fresh ViewModel is built on every entry
+         * to this screen, so an instance field would never actually suppress anything.
+         */
+        var lastDeviceIntegrationRefreshAt = 0L
+    }
+
     private var sourceFromArgs = AllBenFragmentArgs.fromSavedStateHandle(savedStateHandle).source
 
     private val filterOrg = MutableStateFlow("")
@@ -100,12 +130,23 @@ class AllBenViewModel @Inject constructor(
      * not background reloads, so the UI can distinguish a fresh search from a silent re-run.
      * */
     private val _searchGeneration = MutableStateFlow(0)
-    val searchGeneration: Flow<Int> = _searchGeneration
+    val searchGeneration: StateFlow<Int> = _searchGeneration.asStateFlow()
 
     init {
-        fetchBeneficiaryStatuses()
-        viewModelScope.launch {
-            tbRepo.refreshDeviceIntegrationConfig()
+        // No fetchBeneficiaryStatuses() here: the Fragment calls it from onResume, which always
+        // runs right after this ViewModel is created, so doing it in both places ran the whole
+        // status refresh - network calls plus their TB_DIAGNOSTICS writes - twice on every entry.
+        // Device-integration state only changes when the camp hub's hardware is reconnected,
+        // but each refresh is two sequential vendor/health calls that measured a consistent
+        // ~5.1s each - ten seconds of network on every single entry to this screen. The
+        // result lives in preferences and is read synchronously, so a stale value costs
+        // nothing until the next refresh.
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastDeviceIntegrationRefreshAt > deviceIntegrationRefreshIntervalMs) {
+            lastDeviceIntegrationRefreshAt = now
+            viewModelScope.launch {
+                tbRepo.refreshDeviceIntegrationConfig()
+            }
         }
     }
 
@@ -123,10 +164,11 @@ class AllBenViewModel @Inject constructor(
         }.flow.map { pagingData ->
             pagingData.map { it.asBasicDomainModel() }
         }
-    }
+    }.cachedIn(viewModelScope)
 
     val childCounts: Flow<Map<Long, Int>> = recordsRepo.childCountsByBen
     val householdMemberCounts: Flow<Map<Long, Int>> = recordsRepo.householdMemberCounts
+    val householdHeadNames: Flow<Map<Long, String>> = recordsRepo.householdHeadNames
     val vitalBenIds: Flow<List<Long>> = vitalRepo.vitalBenIds
     val unsyncedVitalBenIds: Flow<List<Long>> = vitalRepo.unsyncedVitalBenIds
     val syncingVitalBenIds: Flow<List<Long>> = vitalRepo.syncingVitalBenIds
@@ -141,11 +183,22 @@ class AllBenViewModel @Inject constructor(
     val tptFollowUpDoneBenIds: Flow<List<Long>> = contactTracingRepo.observeTptFollowUpTargetReachedBenIds()
     val tptEligibleBenIds: Flow<List<Long>> = contactTracingRepo.observeTptEligibleBenIds()
 
-    /** Diagnosis = TB_DIAGNOSTICS (new saves) OR TB_SUSPECTED (legacy saves) */
+    /**
+     * Diagnosis = TB_DIAGNOSTICS (new saves) OR TB_SUSPECTED (legacy saves)
+     *
+     * combine() emits once per emission of *either* source, so a single logical change that
+     * touches both tables delivers the same merged list twice. Each delivery rebuilds ~12.5k
+     * boxed Longs and re-runs the adapter diff on the main thread; on a camp device that was 93
+     * emissions carrying 929k Longs in under three minutes. distinctUntilChanged() drops the
+     * duplicate half - the list only reaches the UI when its contents actually differ.
+     */
     val diagnosisBenIds: Flow<List<Long>> = combine(
-        tbRepo.tbDiagnosticsBenIds,
+        // Derived from allTbDiagnostics, which this screen already collects, instead of a
+        // second "SELECT benId FROM TB_DIAGNOSTICS" scan of the same 10k rows per invalidation.
+        tbRepo.tbDiagnosticsBenIdsFromCards,
         tbRepo.tbSuspectedBenIds
     ) { diagnostics, suspected -> (diagnostics + suspected).distinct() }
+        .distinctUntilChanged()
 
     private val _abha = MutableLiveData<String?>()
     val abha: LiveData<String?>
@@ -239,7 +292,10 @@ class AllBenViewModel @Inject constructor(
         }
     }
 
-    val allTbDiagnostics: Flow<List<TBDiagnosticsCache>> = tbRepo.allTbDiagnostics
+    val allTbDiagnostics: Flow<List<org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields>> =
+        tbRepo.allTbDiagnostics
+
+    val allTbScreening: Flow<List<TbScreeningSymptoms>> = tbRepo.allTbScreening
 
     sealed class OrderActionResult {
         object Idle : OrderActionResult()
@@ -263,10 +319,10 @@ class AllBenViewModel @Inject constructor(
         viewModelScope.launch {
             _orderActionState.value = OrderActionResult.Loading
             when (val response = tbRepo.createOrder(benId, orderType)) {
-                is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success -> {
+                is NetworkResponse.Success -> {
                     _orderActionState.value = OrderActionResult.Success("Order created successfully. Order ID: ${response.data}", orderType)
                 }
-                is org.piramalswasthya.stoptb.helpers.NetworkResponse.Error -> {
+                is NetworkResponse.Error -> {
                     _orderActionState.value = OrderActionResult.Error(response.message ?: "Failed to create order")
                 }
                 else -> {}
@@ -274,7 +330,19 @@ class AllBenViewModel @Inject constructor(
         }
     }
 
+
+
     fun fetchBeneficiaryStatuses(orderType: String? = null) {
+        // A refresh for a specific orderType is always a response to something the user just did
+        // (created/retried an order, fetched a result), so it is never debounced. The unfiltered
+        // refresh is the one that fires on every onResume - returning from a form, dismissing a
+        // dialog, the screen coming back from the background - and each run hits the network and
+        // writes TB_DIAGNOSTICS per beneficiary, which invalidates every list on this screen.
+        if (orderType == null) {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastStatusRefreshAt < statusRefreshDebounceMs) return
+            lastStatusRefreshAt = now
+        }
         viewModelScope.launch {
             if (orderType != null) {
                 tbRepo.fetchBeneficiariesByStatus(orderType)
@@ -295,11 +363,11 @@ class AllBenViewModel @Inject constructor(
         viewModelScope.launch {
             _orderActionState.value = OrderActionResult.Loading
             when (val response = tbRepo.markTestCompleted(benId, orderType)) {
-                is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success -> {
+                is NetworkResponse.Success -> {
                     fetchBeneficiaryStatuses(orderType)
                     _orderActionState.value = OrderActionResult.Success("Test marked as completed. Status: ${response.data}", orderType)
                 }
-                is org.piramalswasthya.stoptb.helpers.NetworkResponse.Error -> {
+                is NetworkResponse.Error -> {
                     _orderActionState.value = OrderActionResult.Error(response.message ?: "Failed to mark test completed")
                 }
                 else -> {}
@@ -311,11 +379,11 @@ class AllBenViewModel @Inject constructor(
         viewModelScope.launch {
             _orderActionState.value = OrderActionResult.Loading
             when (val response = tbRepo.fetchOrderResult(benId, orderType)) {
-                is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success -> {
+                is NetworkResponse.Success -> {
                     fetchBeneficiaryStatuses(orderType)
                     _orderActionState.value = OrderActionResult.Success("Result fetched successfully. Status: ${response.data}", orderType)
                 }
-                is org.piramalswasthya.stoptb.helpers.NetworkResponse.Error -> {
+                is NetworkResponse.Error -> {
                     _orderActionState.value = OrderActionResult.Error(response.message ?: "Failed to fetch result")
                 }
                 else -> {}
@@ -323,14 +391,14 @@ class AllBenViewModel @Inject constructor(
         }
     }
 
-    fun repeatTest(benId: Long, orderType: String, customVisitCode: Int? = null) {
+    fun repeatTest(benId: Long, orderType: String) {
         viewModelScope.launch {
             _orderActionState.value = OrderActionResult.Loading
-            when (val response = tbRepo.createOrder(benId, orderType, customVisitCode)) {
-                is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success -> {
+            when (val response = tbRepo.createOrder(benId, orderType)) {
+                is NetworkResponse.Success -> {
                     _orderActionState.value = OrderActionResult.Success("Fresh repeat test order created. Status: ${response.data}", orderType)
                 }
-                is org.piramalswasthya.stoptb.helpers.NetworkResponse.Error -> {
+                is NetworkResponse.Error -> {
                     _orderActionState.value = OrderActionResult.Error(response.message ?: "Failed to create repeat test order")
                 }
                 else -> {}
@@ -349,7 +417,7 @@ class AllBenViewModel @Inject constructor(
         while (attempt <= maxRetries && !success) {
             updateDiagnosticsOrderStatus(benId, "XRAY_CHEST", "CREATING")
             val response = tbRepo.createOrder(benId, "XRAY_CHEST")
-            if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+            if (response is NetworkResponse.Success) {
                 success = true
             } else {
                 attempt++
@@ -370,7 +438,7 @@ class AllBenViewModel @Inject constructor(
         while (attempt <= maxRetries && !success) {
             updateDiagnosticsOrderStatus(benId, "SPUTUM_TRUENAT", "CREATING")
             val response = tbRepo.createOrder(benId, "SPUTUM_TRUENAT")
-            if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+            if (response is NetworkResponse.Success) {
                 success = true
             } else {
                 attempt++
@@ -391,7 +459,7 @@ class AllBenViewModel @Inject constructor(
         while (attempt <= maxRetries && !success) {
             updateDiagnosticsOrderStatus(benId, "MDR_RIF", "CREATING")
             val response = tbRepo.createOrder(benId, "MDR_RIF")
-            if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+            if (response is NetworkResponse.Success) {
                 success = true
             } else {
                 attempt++
@@ -441,7 +509,7 @@ class AllBenViewModel @Inject constructor(
         viewModelScope.launch {
             _orderActionState.value = OrderActionResult.Loading
             val response = tbRepo.retryPushOrder(benId, orderType)
-            if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
+            if (response is NetworkResponse.Success) {
                 val existing = tbRepo.getTBDiagnosticsById(benId)
                 existing?.let {
                     val cache = if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
@@ -454,92 +522,134 @@ class AllBenViewModel @Inject constructor(
                     tbRepo.saveTBDiagnostics(cache)
                 }
                 if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
-                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(context)
+                    WorkerUtils.triggerDiagnosticResultPollWorker(context)
                 } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
-                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context)
+                    WorkerUtils.triggerRifDiagnosticResultPollWorker(context)
                 } else {
-                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context)
+                    WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context)
                 }
                 _orderActionState.value = OrderActionResult.Success("Result fetch retried successfully.", orderType)
             } else {
-                val errorMsg = (response as? org.piramalswasthya.stoptb.helpers.NetworkResponse.Error)?.message ?: "Failed to retry order"
+                val errorMsg = (response as? NetworkResponse.Error)?.message ?: "Failed to retry order"
                 _orderActionState.value = OrderActionResult.Error(errorMsg)
             }
         }
     }
 
+    private fun hasRealOrderId(orderId: String?) =
+        !orderId.isNullOrBlank() && !orderId.equals("N/A", ignoreCase = true)
+
     fun retryTest(benId: Long, orderType: String, context: Context) {
         if (_retryingBenIds.value.contains(benId)) return
+        _retryingBenIds.value += benId
         viewModelScope.launch {
-            val existingBeforePush = tbRepo.getTBDiagnosticsById(benId)
-            val statusBeforePush = if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
-                existingBeforePush?.xrayOrderStatus
-            } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
-                existingBeforePush?.rifOrderStatus
-            } else {
-                existingBeforePush?.trueNatOrderStatus
-            }
-            if (statusBeforePush.equals("AWAITING_PROVIDER_RESULT", ignoreCase = true) ||
-                statusBeforePush.equals("IN_PROGRESS", ignoreCase = true) ||
-                statusBeforePush.equals("PENDING", ignoreCase = true)
-            ) {
-                return@launch
-            }
-            _orderActionState.value = OrderActionResult.Loading
-            _retryingBenIds.value += benId
-            val response = try {
-                tbRepo.createOrder(benId, orderType)
+            try {
+                val existingBeforePush = tbRepo.getTBDiagnosticsById(benId)
+                val statusBeforePush = if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
+                    existingBeforePush?.xrayOrderStatus
+                } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
+                    existingBeforePush?.rifOrderStatus
+                } else {
+                    existingBeforePush?.trueNatOrderStatus
+                }
+                val orderIdBeforePush = if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
+                    existingBeforePush?.xrayOrderId
+                } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
+                    existingBeforePush?.rifOrderId
+                } else {
+                    existingBeforePush?.trueNatOrderId
+                }
+                if (statusBeforePush.equals("PENDING", ignoreCase = true) && hasRealOrderId(orderIdBeforePush)) {
+                    _orderActionState.value = OrderActionResult.Success(
+                        "Order already created for this beneficiary — refreshing.", orderType
+                    )
+                    return@launch
+                }
+                val pushActive = withContext(Dispatchers.IO) {
+                    WorkerUtils.isDiagnosticOrderPushActive(context, benId)
+                }
+                if (pushActive) {
+                    _orderActionState.value = OrderActionResult.Error(
+                        "An order push is already in progress for this beneficiary. Please wait a moment and try again."
+                    )
+                    return@launch
+                }
+                _orderActionState.value = OrderActionResult.Loading
+                val response = tbRepo.createOrder(benId, orderType)
+                if (response is NetworkResponse.Success) {
+                    if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
+                        WorkerUtils.triggerDiagnosticResultPollWorker(context)
+                    } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
+                        WorkerUtils.triggerRifDiagnosticResultPollWorker(context)
+                    } else {
+                        WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context)
+                    }
+
+                    _orderActionState.value = OrderActionResult.Success("New order created and workflow restarted.", orderType)
+                } else {
+                    val errorMsg = (response as? NetworkResponse.Error)?.message ?: "Failed to create new order"
+                    _orderActionState.value = OrderActionResult.Error(errorMsg)
+                }
             } finally {
                 _retryingBenIds.value -= benId
             }
-            if (response is org.piramalswasthya.stoptb.helpers.NetworkResponse.Success) {
-                val existing = tbRepo.getTBDiagnosticsById(benId)
-                existing?.let {
-                    val cache = if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
-                        it.copy(
-                            xrayOrderStatus = "AWAITING_PROVIDER_RESULT",
-                            isChestXRayDone = true,
-                            chestXRayResult = null,
-                            syncState = SyncState.UNSYNCED
-                        )
-                    } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
-                        it.copy(
-                            rifOrderStatus = "AWAITING_PROVIDER_RESULT",
-                            trueNatRifResult = null,
-                            syncState = SyncState.UNSYNCED
-                        )
-                    } else {
-                        it.copy(
-                            trueNatOrderStatus = "AWAITING_PROVIDER_RESULT",
-                            isNaatConducted = true,
-                            naatResult = null,
-                            rifOrderId = null,
-                            rifOrderStatus = null,
-                            trueNatRifResult = null,
-                            syncState = SyncState.UNSYNCED
-                        )
-                    }
-                    tbRepo.saveTBDiagnostics(cache)
-                    tbRepo.syncTBSuspectedFromDiagnostics(benId, cache)
-                    try {
-                        tbRepo.pushUnSyncedRecordsTBSuspected()
-                    } catch (e: java.lang.Exception) {
-                        timber.log.Timber.e(e, "Failed to call pushUnSyncedRecordsTBSuspected in retryTest")
-                    }
-                }
+        }
+    }
 
-                if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
-                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerDiagnosticResultPollWorker(context)
-                } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
-                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerRifDiagnosticResultPollWorker(context)
-                } else {
-                    org.piramalswasthya.stoptb.work.WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(context)
+    // Routed through the DiagnosticOrderPushWorker chain (serialized per benId) instead of a
+    // direct createOrder() call, so two quick taps can't create a duplicate order.
+    fun createNewOrder(benId: Long, orderType: String, context: Context) {
+        if (_retryingBenIds.value.contains(benId)) return
+        _retryingBenIds.value += benId
+        WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, listOf(orderType))
+        _orderActionState.value = OrderActionResult.Success("New order queued.", orderType)
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                delay(300L)
+                while (WorkerUtils.isDiagnosticOrderPushActive(context, benId)) {
+                    delay(500L)
                 }
-                
-                _orderActionState.value = OrderActionResult.Success("New order created and workflow restarted.", orderType)
-            } else {
-                val errorMsg = (response as? org.piramalswasthya.stoptb.helpers.NetworkResponse.Error)?.message ?: "Failed to create new order"
-                _orderActionState.value = OrderActionResult.Error(errorMsg)
+            }
+            _retryingBenIds.value -= benId
+        }
+    }
+    //Cache of beneficiaries confirmed to have no active push
+    private val checkedNoPushBenIds = mutableSetOf<Long>()
+
+    //Tracks beneficiaries with an active check coroutine in flight.
+    private val checkingBenIds = mutableSetOf<Long>()
+
+    fun invalidateCheckedNoPushBenIds() {
+        checkedNoPushBenIds.clear()
+    }
+
+    fun checkAndTrackInFlightPush(benId: Long, context: Context) {
+        if (_retryingBenIds.value.contains(benId)) return
+        //If we already checked WorkManager for this row and confirmed nothing is uploading, don't keep asking WorkManager on every scroll/re-render
+        if (checkedNoPushBenIds.contains(benId)) return
+        //If a query for this row is already in flight, don't launch a redundant second one.
+        if (!checkingBenIds.add(benId)) return
+        viewModelScope.launch {
+            try {
+                val isActive = withContext(Dispatchers.IO) {
+                    WorkerUtils.isDiagnosticOrderPushActive(context, benId)
+                }
+                if (!isActive) {
+                    checkedNoPushBenIds += benId
+                    return@launch
+                }
+                _retryingBenIds.value += benId
+                try {
+                    withContext(Dispatchers.IO) {
+                        while (WorkerUtils.isDiagnosticOrderPushActive(context, benId)) {
+                            delay(500L)
+                        }
+                    }
+                } finally {
+                    _retryingBenIds.value -= benId
+                }
+            } finally {
+                checkingBenIds.remove(benId)
             }
         }
     }

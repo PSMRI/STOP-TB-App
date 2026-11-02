@@ -463,7 +463,7 @@ class SuspectedTBDataset(
         isQuickPrefillLockActive && (!savedCache?.chestXRayResult.isNullOrBlank() || !diagnosticsCache?.chestXRayResult.isNullOrBlank())
 
     private fun shouldLockSputumCollected(): Boolean =
-        isQuickPrefillLockActive && (savedCache?.isSputumCollected != null || diagnosticsCache?.isSputumCollected != null)
+        isQuickPrefillLockActive && (savedCache?.isSputumCollected != null || diagnosticsCache?.isReferredForSputum != null)
 
     private fun shouldLockTrueNatConducted(): Boolean =
         isQuickPrefillLockActive && (savedCache?.isNaatConducted != null || diagnosticsCache?.isNaatConducted != null)
@@ -488,7 +488,7 @@ class SuspectedTBDataset(
 
     private fun isSputumReferralEnabled(): Boolean =
         isChestXRayPositive() ||
-            diagnosticsCache?.isSputumCollected == true ||
+            diagnosticsCache?.isReferredForSputum == true ||
             screeningCache?.historyOfTb == true ||
             isPregnant() ||
             screeningCache?.takingAntiTBDrugs == true ||
@@ -533,8 +533,8 @@ class SuspectedTBDataset(
 
     private fun prefillFromDiagnostics(diagnostics: TBDiagnosticsCache?) {
         diagnostics ?: return
-        val isSputumCollectedVal = diagnostics.isSputumCollected == true || !diagnostics.naatResult.isNullOrBlank()
-        sputumCollected.value = boolToYesNo(if (isSputumCollectedVal) true else diagnostics.isSputumCollected)
+        val isSputumCollectedVal = diagnostics.isReferredForSputum == true || !diagnostics.naatResult.isNullOrBlank()
+        sputumCollected.value = boolToYesNo(if (isSputumCollectedVal) true else diagnostics.isReferredForSputum)
         sputumSubmittedAt.value = getLocalValueInArray(
             R.array.tb_diagnostics_sputum_submitted_at,
             diagnostics.sputumSubmittedAt
@@ -557,8 +557,8 @@ class SuspectedTBDataset(
     private fun prefillMissingFromDiagnostics(diagnostics: TBDiagnosticsCache?) {
         diagnostics ?: return
         if (sputumCollected.value.isNullOrBlank()) {
-            val isSputumCollectedVal = diagnostics.isSputumCollected == true || !diagnostics.naatResult.isNullOrBlank()
-            sputumCollected.value = boolToYesNo(if (isSputumCollectedVal) true else diagnostics.isSputumCollected)
+            val isSputumCollectedVal = diagnostics.isReferredForSputum == true || !diagnostics.naatResult.isNullOrBlank()
+            sputumCollected.value = boolToYesNo(if (isSputumCollectedVal) true else diagnostics.isReferredForSputum)
         }
         if (sputumSubmittedAt.value.isNullOrBlank()) {
             sputumSubmittedAt.value = getLocalValueInArray(
@@ -601,16 +601,17 @@ class SuspectedTBDataset(
         return positiveNegativeEntries.getOrNull(if (isPositive) 0 else 1)
     }
 
-    private fun hasActiveOrder(status: String?): Boolean =
-        !status.isNullOrBlank() && !status.equals(OrderStatus.NONE.name, ignoreCase = true)
+    // "NONE" was never actually written anywhere as a status value — no order existing is
+    // represented by a null/blank status, not a magic string — so this only needs the blank
+    // check.
+    private fun hasActiveOrder(status: String?): Boolean = !status.isNullOrBlank()
 
     private fun resultPlaceholder(status: String?): String? = when {
         status.isNullOrBlank() -> null
-        status.equals(OrderStatus.NONE.name, ignoreCase = true) -> null
         status.equals(OrderStatus.COMPLETED.name, ignoreCase = true) -> null
-        status.equals(OrderStatus.REFUSED.name, ignoreCase = true) -> "Test Refused"
+        status.equals(OrderStatus.CLOSED.name, ignoreCase = true) -> "Test Closed"
         status.equals(OrderStatus.FAILED.name, ignoreCase = true) -> "Referral Failed"
-        else -> "Waiting for Result" // PENDING, CREATED, AWAITING_TEST_COMPLETION, AWAITING_PROVIDER_RESULT, POLLING_TIMEOUT, MANUAL_ENTRY
+        else -> "Waiting for Result" // PENDING or MANUAL_ENTRY
     }
 
     private fun applyResultPlaceholders() {

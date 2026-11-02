@@ -214,6 +214,23 @@ jobs:
             fi
           fi
 
+          if [ "$DO_INTUNE" = true ]; then
+
+            if [ "$TARGET_ENV" = uat ]; then
+              case "$DEPLOY_TO" in
+                QA-Group-1) INTUNE_GROUP_ID="$INTUNE_GROUP_QA_1"; QA_SUFFIX=QA1 ;;
+                QA-Group-2) INTUNE_GROUP_ID="$INTUNE_GROUP_QA_2"; QA_SUFFIX=QA2 ;;
+                *)
+                  echo "ERROR: Unknown Intune deployment target: '$DEPLOY_TO'"
+                  exit 1
+                  ;;
+              esac
+              INTUNE_DISPLAY_NAME="StopTB_Internal_Testing_UAT_${QA_SUFFIX}"
+            else
+              INTUNE_GROUP_ID="$INTUNE_GROUP_ID_PROD"
+            fi
+          fi
+
           {
             echo "package_id=$PACKAGE_ID"
             echo "apk_dir=app/build/outputs/apk/${FLAVOR_DIR}/${APK_VARIANT}"

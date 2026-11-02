@@ -18,6 +18,13 @@ import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.Toast
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import androidx.exifinterface.media.ExifInterface
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.FileOutputStream
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.content.FileProvider
@@ -751,6 +758,7 @@ class NewBenRegFragment : Fragment() {
     }
 
     /** No fresh fix within the fetch timeout — try a cached last-known location (GPS, then network) before giving up. */
+    @SuppressLint("MissingPermission")
     private fun resolveWithCachedLocation(fetchStartElapsed: Long) {
         // This is a terminal outcome (Captured or Failed either way) — the 75s master watchdog
         // must not be allowed to fire later and clobber whatever we're about to set.
@@ -972,11 +980,14 @@ class NewBenRegFragment : Fragment() {
         detector.process(image)
             .addOnSuccessListener { faces ->
                 if (faces.isNotEmpty()) {
-                    viewModel.setImageUriToFormElement(uri)
-                    binding.form.rvInputForm.adapter?.notifyItemChanged(0)
-                    if (continuePreviewAfterPhoto) {
-                        continuePreviewAfterPhoto = false
-                        showPreview()
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        val finalUri = withContext(Dispatchers.Default) { compressPhoto(uri) } ?: uri
+                        viewModel.setImageUriToFormElement(finalUri)
+                        binding.form.rvInputForm.adapter?.notifyItemChanged(0)
+                        if (continuePreviewAfterPhoto) {
+                            continuePreviewAfterPhoto = false
+                            showPreview()
+                        }
                     }
                 } else {
                     val shouldContinueAfterRetake = continuePreviewAfterPhoto
@@ -1002,6 +1013,50 @@ class NewBenRegFragment : Fragment() {
             }
             .setNegativeButton(android.R.string.cancel) { dialog, _ -> dialog.dismiss() }
             .show()
+    }
+
+
+    /** Resizes to max 1024px on the long side and re-encodes as JPEG (~100-250 KB). Returns null on failure. */
+    private fun compressPhoto(uri: Uri, maxDim: Int = 1024, quality: Int = 70): Uri? {
+        return try {
+            val resolver = requireContext().contentResolver
+
+            // 1. Read size only
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+            // 2. Decode a downsampled bitmap
+            var sample = 1
+            while (bounds.outWidth / (sample * 2) >= maxDim || bounds.outHeight / (sample * 2) >= maxDim) sample *= 2
+            val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+            var bmp = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) } ?: return null
+
+            // 3. Keep the correct orientation
+            val rotation = resolver.openInputStream(uri)?.use {
+                when (ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+                    ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                    ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                    ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                    else -> 0f
+                }
+            } ?: 0f
+
+            // 4. Final scale to maxDim (and rotate if needed)
+            val scale = minOf(1f, maxDim.toFloat() / maxOf(bmp.width, bmp.height))
+            val m = Matrix().apply { postScale(scale, scale); postRotate(rotation) }
+            val out = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+            if (out !== bmp) bmp.recycle()
+
+            // 5. Write the compressed JPEG
+            val file = File.createTempFile(Konstants.tempBenImagePrefix, ".jpg", requireActivity().cacheDir)
+            FileOutputStream(file).use { out.compress(Bitmap.CompressFormat.JPEG, quality, it) }
+            out.recycle()
+            FileProvider.getUriForFile(requireContext(), "${requireContext().packageName}.provider", file)
+        } catch (e: Exception) {
+            Timber.e(e, "Photo compression failed")
+            null
+        }
     }
 
     private fun getTmpFileUri(): Uri {

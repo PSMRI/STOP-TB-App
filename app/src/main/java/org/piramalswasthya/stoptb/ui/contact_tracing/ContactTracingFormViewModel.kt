@@ -11,6 +11,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.dynamicEntity.CompleteFormResponse
 import org.piramalswasthya.stoptb.model.dynamicEntity.ConditionRefDto
@@ -21,6 +23,8 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingQuestionDto
 import org.piramalswasthya.stoptb.model.dynamicEntity.CounsellingValidationDto
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormSectionWithQuestions
 import org.piramalswasthya.stoptb.model.dynamicEntity.OptionConditionEntity
+import org.piramalswasthya.stoptb.model.dynamicEntity.SavedAnswerByUuid
+import org.piramalswasthya.stoptb.helpers.dynamicMapper.FormVersionAnswerMapper
 import org.piramalswasthya.stoptb.model.dynamicEntity.SectionQuestionEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.SectionQuestionWithDetails
 import org.piramalswasthya.stoptb.database.room.SyncState
@@ -28,6 +32,7 @@ import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.contactTracing.IContactTracingRepository
+import org.piramalswasthya.stoptb.helpers.QuestionRenderer
 import org.piramalswasthya.stoptb.ui.counselling_activity.ActionType
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import org.piramalswasthya.stoptb.ui.counselling_activity.QuestionType
@@ -42,14 +47,21 @@ import javax.inject.Inject
 
 private const val QUESTION_UUID_TFU_REGISTRATION_DATE = "TFU_REGISTRATION_DATE"
 
+private val VERSION_COMPATIBLE_FORMS = setOf(FormType.COMMUNITY_CONTACT_TRACING, FormType.OCCUPATION_CONTACT_TRACING)
+
 @HiltViewModel
 class ContactTracingFormViewModel @Inject constructor(
     private val repository: IContactTracingRepository,
     private val tbRepo: TBRepo,
+    private val preferenceDao: PreferenceDao,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val gson = Gson()
+
+    // Same language switch as CounsellingRepo.getFormSchema; read at build time so a reopened form follows the app language.
+    private val isHindi: Boolean
+        get() = preferenceDao.getCurrentLanguage() == Languages.HINDI
 
     private var sections: List<FormSectionWithQuestions> = emptyList()
     private var rawQuestionsByUuid: Map<String, SectionQuestionEntity> = emptyMap()
@@ -74,6 +86,10 @@ class ContactTracingFormViewModel @Inject constructor(
     private var historyResponseIndex: Int = 0
     private var historyVisitIndex: Int = 0
     private var historyVisitCounts: List<Int> = emptyList()
+
+    private var legacyAnswersByUuid: Map<String, List<SavedAnswerByUuid>>? = null
+    private var legacyRemovedQuestions: List<SectionQuestionWithDetails> = emptyList()
+    private var activeVersionSections: List<FormSectionWithQuestions> = emptyList()
 
     private val _activeQuestions = MutableLiveData<List<CounsellingQuestionDto>>()
     val activeQuestions: LiveData<List<CounsellingQuestionDto>> get() = _activeQuestions
@@ -124,6 +140,8 @@ class ContactTracingFormViewModel @Inject constructor(
         lastContactType = contactType
         lastViewHistory = viewHistory
         isHistoryMode = viewHistory
+        legacyAnswersByUuid = null
+        legacyRemovedQuestions = emptyList()
         _formSchemaState.value = NetworkResponse.Loading()
         viewModelScope.launch {
             val response = repository.getFormSchema(formType)
@@ -139,6 +157,7 @@ class ContactTracingFormViewModel @Inject constructor(
                 return@launch
             }
             val allSections = activeVersion.sections.sortedBy { it.section.sectionOrder }
+            activeVersionSections = allSections
 
             sections = sectionPhase?.let { p -> allSections.filter { it.section.sectionPhase == p.value } }
                 ?: allSections
@@ -194,10 +213,18 @@ class ContactTracingFormViewModel @Inject constructor(
             val followUpTargetReached = formType == FormType.TPT_FOLLOW_UP && sectionPhase == SectionPhase.POST_SUBMIT &&
                 repository.isFollowUpTargetReached(indexCaseBenId, activeVersion.version.versionId)
 
-            if (existing != null) {
-                responseId = existing.responseId
-                persistedStatus = existing.status
-                _isEditable.value = !followUpTargetReached && isEditableFor(existing.status, sectionPhase)
+            // No response on the active version: fall back to one saved against an older version,
+            // whose answers are carried over by questionUuid.
+            val legacy = if (existing == null && formType in VERSION_COMPATIBLE_FORMS) {
+                repository.getLegacyResponse(indexCaseBenId, formType, activeVersion.version.versionId)
+            } else null
+            if (legacy != null) loadLegacyAnswers(legacy.responseId, allSections)
+
+            val current = existing ?: legacy
+            if (current != null) {
+                responseId = current.responseId
+                persistedStatus = current.status
+                _isEditable.value = !followUpTargetReached && isEditableFor(current.status, sectionPhase)
             } else {
                 responseId = 0L
                 persistedStatus = null
@@ -227,6 +254,58 @@ class ContactTracingFormViewModel @Inject constructor(
 
     fun enterEditMode() {
         _isEditable.value = true
+        // View mode of an older-version response lists only answered fields; rebuild with the full current form.
+        if (legacyAnswersByUuid != null) loadSection(currentSectionIndex)
+    }
+
+    private suspend fun loadLegacyAnswers(legacyResponseId: Long, currentSections: List<FormSectionWithQuestions>) {
+        val answersByUuid = FormVersionAnswerMapper.groupByUuid(repository.getAnswersWithUuid(legacyResponseId))
+        val currentUuids = currentSections.flatMap { it.questions }.mapNotNull { it.question.questionUuid }.toSet()
+        val removedUuids = FormVersionAnswerMapper.removedAnsweredUuids(answersByUuid, currentUuids)
+        val removedQuestionIds = removedUuids.flatMap { uuid -> answersByUuid[uuid].orEmpty() }
+            .map { it.questionId }
+            .distinct()
+        legacyRemovedQuestions = repository.getQuestionsWithDetails(removedQuestionIds)
+            .sortedBy { it.question.questionOrder }
+        legacyAnswersByUuid = answersByUuid
+    }
+
+    /** Moves an older-version response onto the active version before its first save, so it is
+     * stored and synced under the current questionUuids; answers to removed fields are dropped. */
+    private suspend fun upgradeLegacyResponseIfNeeded() {
+        val legacyAnswers = legacyAnswersByUuid
+        if (legacyAnswers == null || responseId <= 0) return
+        // Every section gets its carried-over answers persisted, not just the one being saved, so
+        // sections the user never revisits keep their older-version data.
+        val answersBySectionId = activeVersionSections.associate { sectionWithQuestions ->
+            val questions = sectionWithQuestions.questions.map { it.toCounsellingQuestionDto(isHindi) }
+            questions.forEach { q ->
+                q.value = legacyAnswers[q.questionUuid]?.let { FormVersionAnswerMapper.resolveValue(q, it) }
+            }
+            sectionWithQuestions.section.sectionId to buildAnswerRows(questions)
+        }
+        repository.upgradeResponseToVersion(responseId, pendingFormVersionId, answersBySectionId)
+        legacyAnswersByUuid = null
+        legacyRemovedQuestions = emptyList()
+    }
+
+    // View mode for an older-version response shows only what was answered: current fields that
+    // carried an answer over, plus answered fields the current version has since removed.
+    private fun legacyViewQuestions(
+        built: List<CounsellingQuestionDto>,
+        populatedUuids: Set<String>,
+        answersByUuid: Map<String, List<SavedAnswerByUuid>>,
+        sectionIndex: Int
+    ): List<CounsellingQuestionDto> {
+        val answered = built.filter { it.questionUuid in populatedUuids }.onEach { it.visible = true }
+        if (sectionIndex != sections.lastIndex) return answered
+        val removed = legacyRemovedQuestions.map { it.toCounsellingQuestionDto(isHindi) }
+            .onEach { q ->
+                q.value = FormVersionAnswerMapper.resolveValue(q, answersByUuid[q.questionUuid].orEmpty())
+                q.visible = true
+            }
+            .filter { it.value != null }
+        return answered + removed
     }
     fun retryLoad() {
         val formType = currentFormType ?: return
@@ -312,7 +391,10 @@ class ContactTracingFormViewModel @Inject constructor(
 
         val builtQuestions = sectionWithQuestions.questions
             .sortedBy { it.question.questionOrder }
-            .map { it.toCounsellingQuestionDto() }
+            .map { it.toCounsellingQuestionDto(isHindi) }
+        val sectionName = localized(
+            sectionWithQuestions.section.sectionName, sectionWithQuestions.section.sectionNameHindi, isHindi
+        )
 
         questionsByUuid = questionsByUuid + builtQuestions.associateBy { it.questionUuid }
 
@@ -322,26 +404,36 @@ class ContactTracingFormViewModel @Inject constructor(
             } else {
                 repository.getCompleteResponse(responseId)
             }
-            populateAnswers(builtQuestions, sectionWithQuestions.section.sectionId, existing, historyVisitIndex)
+            val legacyAnswers = legacyAnswersByUuid
+            val legacyPopulatedUuids = if (legacyAnswers != null) {
+                FormVersionAnswerMapper.applyAnswers(builtQuestions, legacyAnswers)
+            } else {
+                populateAnswers(builtQuestions, sectionWithQuestions.section.sectionId, existing, historyVisitIndex)
+                emptySet()
+            }
             questionsByUuid = questionsByUuid + builtQuestions.associateBy { it.questionUuid }
             evaluateAllConditions(builtQuestions)
             ensureTptRegistrationDate(builtQuestions, sectionWithQuestions.section.sectionId)
             ensureDateNotBeforeScreening(builtQuestions, sectionWithQuestions.section.sectionId)
             ensureExpectedCompletionDate(builtQuestions, sectionWithQuestions.section.sectionId)
 
-            _activeQuestions.value = builtQuestions.filter { it.visible }
+            _activeQuestions.value = if (legacyAnswers != null && _isEditable.value != true) {
+                legacyViewQuestions(builtQuestions, legacyPopulatedUuids, legacyAnswers, index)
+            } else {
+                builtQuestions.filter { it.visible }
+            }
             if (isHistoryMode) {
                 val visitsBeforeThisResponse = historyVisitCounts.take(historyResponseIndex).sum()
                 val totalVisits = historyVisitCounts.sum().coerceAtLeast(1)
                 val followUpNumber = visitsBeforeThisResponse + historyVisitIndex + 1
                 _currentSectionName.value = context.getString(
                     R.string.tpt_history_section_label,
-                    sectionWithQuestions.section.sectionName, followUpNumber, totalVisits
+                    sectionName, followUpNumber, totalVisits
                 )
                 _progress.value = ((followUpNumber - 1) * sections.size + index + 1) to
                     (totalVisits * sections.size)
             } else {
-                _currentSectionName.value = sectionWithQuestions.section.sectionName
+                _currentSectionName.value = sectionName
                 _progress.value = (index + 1) to sections.size
             }
             _formSchemaState.value = NetworkResponse.Success(Unit)
@@ -401,7 +493,11 @@ class ContactTracingFormViewModel @Inject constructor(
         if (question.questionUuid == "CCT_NO_OF_CONTACTS" || question.questionId in countFieldIds) {
             val allQuestions = questionsByUuid.values.toList()
             val newSum = allQuestions
-                .filter { it.questionId in countFieldIds }
+                .filter { it.questionId in countFieldIds
+                        && it.questionUuid.startsWith(
+                    QuestionRenderer.CT_RELATIONSHIP_COUNT_PREFIX
+                        )
+                }
                 .sumOf { it.value?.toString()?.toIntOrNull() ?: 0 }
                 .toString()
 
@@ -465,6 +561,8 @@ class ContactTracingFormViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 saveCurrentSection(current)
+                // Covers a submit with every field cleared, where saveCurrentSection writes nothing.
+                upgradeLegacyResponseIfNeeded()
                 val finalStatus = if (currentFormType == FormType.TPT_FOLLOW_UP && currentSectionPhase == SectionPhase.POST_SUBMIT)
                     "COMPLETE" else "SUBMITTED"
                 repository.submitResponse(responseId, finalStatus)
@@ -555,6 +653,7 @@ class ContactTracingFormViewModel @Inject constructor(
 
         if (answerRows.isEmpty()) return
         val id = ensureResponseCreated()
+        upgradeLegacyResponseIfNeeded()
         val status = persistedStatus?.takeIf { it != "DRAFT" } ?: "DRAFT"
         repository.saveSectionAnswers(id, section.section.sectionId, answerRows, status)
     }
@@ -762,7 +861,9 @@ class ContactTracingFormViewModel @Inject constructor(
     private fun getMandatoryError(q: CounsellingQuestionDto): String? {
         val mandatoryIf = q.validations?.firstOrNull { it.validationType == ActionType.MANDATORY_IF.value }
         if (mandatoryIf != null && matchesMandatoryIfValidation(q)) return mandatoryIf.errorMessage
-        return if (q.isMandatory) "This field is required" else null
+
+        if (!q.isMandatory) return null
+        return if (isHindi) "यह जानकारी अनिवार्य है।" else "This field is required"
     }
 
 
@@ -860,14 +961,19 @@ private fun computeExpectedCompletionDate(startDateStr: String, regimen: Regimen
     }
 }
 
-private fun SectionQuestionWithDetails.toCounsellingQuestionDto(): CounsellingQuestionDto {
+// Hindi text when the app is in Hindi and the schema provides it, otherwise English.
+private fun localized(english: String, hindi: String?, isHindi: Boolean): String =
+    if (isHindi) hindi.takeIf { !it.isNullOrEmpty() } ?: english else english
+
+// Only display text is localized; optionValue / ids stay the same so answers, conditions and sync are unaffected.
+private fun SectionQuestionWithDetails.toCounsellingQuestionDto(isHindi: Boolean): CounsellingQuestionDto {
     val q = question
     val maxLength = q.maxLength
         ?: validations.find { it.validationType == "MAX_LENGTH" }?.validationValue?.toIntOrNull()
     return CounsellingQuestionDto(
         questionId = q.questionId,
         questionUuid = q.questionUuid ?: q.questionId.toString(),
-        questionText = q.questionText,
+        questionText = localized(q.questionText, q.questionTextHindi, isHindi),
         questionType = q.questionType,
         isMandatory = q.isRequired,
         displayOrder = q.questionOrder,
@@ -896,7 +1002,7 @@ private fun SectionQuestionWithDetails.toCounsellingQuestionDto(): CounsellingQu
         options = options.sortedBy { it.option.optionOrder }.map { owc ->
             CounsellingOptionDto(
                 optionId = owc.option.optionId,
-                optionLabel = owc.option.optionText,
+                optionLabel = localized(owc.option.optionText, owc.option.optionTextHindi, isHindi),
                 optionValue = owc.option.optionValue,
                 displayOrder = owc.option.optionOrder,
                 conditions = owc.conditions.map { c ->

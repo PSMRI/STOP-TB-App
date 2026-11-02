@@ -24,7 +24,9 @@ import org.piramalswasthya.stoptb.network.TmcRefreshTokenRequest
 import org.piramalswasthya.stoptb.network.interceptors.TokenInsertTmcInterceptor
 import retrofit2.HttpException
 import timber.log.Timber
+import java.io.IOException
 import java.net.ConnectException
+import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.inject.Inject
@@ -52,13 +54,15 @@ class UserRepo @Inject constructor(
     suspend fun authenticateUser(userName: String, password: String): NetworkResponse<User?> {
         return withContext(Dispatchers.IO) {
             try {
-                val authData = getTokenAmrit(userName, password)
-                val user = setUserRole(
-                    authData.userId,
-                    password,
-                    authData.subCentre,
-                    authData.assignedRoleScreenNames
-                )
+                val user = withRetry {
+                    val authData = getTokenAmrit(userName, password)
+                    setUserRole(
+                        authData.userId,
+                        password,
+                        authData.subCentre,
+                        authData.assignedRoleScreenNames
+                    )
+                }
                 return@withContext NetworkResponse.Success(user)
             } catch (se: SocketTimeoutException) {
                 return@withContext NetworkResponse.Error(
@@ -69,8 +73,11 @@ class UserRepo @Inject constructor(
                     401 -> NetworkResponse.Error(
                         message = userMessageContext().getString(R.string.error_sign_in_invalid_u_p)
                     )
+                    in 500..599 -> NetworkResponse.Error(
+                        message = userMessageContext().getString(R.string.error_login_server_error)
+                    )
                     else -> NetworkResponse.Error(
-                        message = userMessageContext().getString(R.string.error_login_unable_to_reach_server)
+                        message = userMessageContext().getString(R.string.error_login_generic)
                     )
                 }
             } catch (ce: ConnectException) {
@@ -81,7 +88,16 @@ class UserRepo @Inject constructor(
                 return@withContext NetworkResponse.Error(
                     message = userMessageContext().getString(R.string.error_login_unable_to_reach_server)
                 )
-            } catch (ie: Exception) {
+            }
+
+            catch (io: IOException) {   // SocketException, SSLException, EOFException
+                Timber.e(io, "Login network error")
+                return@withContext NetworkResponse.Error(
+                    message = userMessageContext().getString(R.string.error_login_unable_to_reach_server)
+                )
+            }
+
+            catch (ie: Exception) {
                 return@withContext NetworkResponse.Error(message = localizedAuthExceptionMessage(ie))
             }
         }
@@ -206,13 +222,18 @@ class UserRepo @Inject constructor(
                     return@withContext false
                 }
 
-            } catch (se: SocketTimeoutException) {
-                return@withContext refreshTokenTmc(userName, password)
+            } catch (e: IOException) {
+                // Network failure (including timeouts): let the caller's worker retry
+                // with backoff. Retrying here recursed without limit.
+                throw e
             } catch (e: HttpException) {
                 Timber.e("Auth Failed!")
                 return@withContext false
             } catch (e: Exception) {
-                return@withContext true
+                // Reporting success here made callers retry their request in a loop
+                // even though no new token was obtained.
+                Timber.e(e, "Token refresh failed")
+                return@withContext false
             }
         }
     }
@@ -261,14 +282,18 @@ class UserRepo @Inject constructor(
                         encryptedPassword
                     )
                 )
+            if (!response.isSuccessful) throw HttpException(response)
             Timber.d("JWT : $response")
             val responseBody = JSONObject(
                 response.body()?.string()
                     ?: throw IllegalStateException("Response success but data missing @ $response")
             )
             val statusCode = responseBody.getInt("statusCode")
+            // Keep the server's message: it carries the remaining-attempts / account-locked info.
             if (statusCode == 5002)
-                throw IllegalStateException("Login failed")
+                throw IllegalStateException(
+                    responseBody.optString("errorMessage").ifBlank { "Login failed" }
+                )
             if (statusCode == 401)
                 throw IllegalStateException("Invalid username / password")
             val data = responseBody.getJSONObject("data")
@@ -295,8 +320,21 @@ class UserRepo @Inject constructor(
     }
 
     private fun localizedAuthExceptionMessage(ie: Exception): String {
+        val message = ie.message.orEmpty()
+        val remainingAttempts = REMAINING_ATTEMPTS_REGEX.find(message)
+            ?.groupValues?.get(1)?.toIntOrNull()
+        if (remainingAttempts != null) {
+            return if (remainingAttempts == 1)
+                userMessageContext().getString(R.string.error_login_last_attempt)
+            else
+                userMessageContext().getString(R.string.error_login_remaining_attempts, remainingAttempts)
+        }
+        if (message.contains("locked", ignoreCase = true)) {
+            return userMessageContext().getString(R.string.error_login_account_locked)
+        }
         return when (ie.message) {
             "Invalid username / password",
+            "Invalid username or password",
             "Invalid Username/password" -> userMessageContext().getString(R.string.error_sign_in_invalid_u_p)
 
             "Login failed" -> userMessageContext().getString(R.string.error_login_failed)
@@ -327,4 +365,37 @@ class UserRepo @Inject constructor(
         }
     }
 
+    private fun isTransient(e: Throwable): Boolean = when (e) {
+        is SocketTimeoutException,
+        is ConnectException,
+        is UnknownHostException,
+        is SocketException,
+        is javax.net.ssl.SSLException -> true
+        is HttpException -> e.code() in setOf(408, 429, 502, 503, 504)
+        else -> false
+    }
+
+    private suspend fun <T> withRetry(
+        attempts: Int = 3,
+        initialDelayMs: Long = 500,
+        block: suspend () -> T
+    ): T {
+        var delayMs = initialDelayMs
+        repeat(attempts - 1) { attempt ->
+            try {
+                return block()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (!isTransient(e)) throw e
+                Timber.w(e, "Login attempt ${attempt + 1} failed, retrying in ${delayMs}ms")
+            }
+            kotlinx.coroutines.delay(delayMs)
+            delayMs *= 2
+        }
+        return block() // last attempt: let the exception propagate
+    }
+
 }
+
+private val REMAINING_ATTEMPTS_REGEX = Regex("""Remaining attempts:\s*(\d+)""", RegexOption.IGNORE_CASE)

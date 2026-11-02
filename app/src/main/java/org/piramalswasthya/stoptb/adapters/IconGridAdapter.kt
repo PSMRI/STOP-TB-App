@@ -52,9 +52,16 @@ class IconGridAdapter(
         holder.bind(getItem(position), clickListener, scope)
     }
 
-    class GridIconClickListener(val selectedListener: (dest: NavDirections) -> Unit) {
-        // "Coming soon" placeholder cards have navAction == null — tapping them is a no-op.
+    class GridIconClickListener(
+        val disabledClickListener: ((message: String) -> Unit)? = null,
+        val selectedListener: (dest: NavDirections) -> Unit
+    ) {
         fun onClicked(icon: Icon) {
+            if (!icon.enabled) {
+                icon.disabledMessage?.let { disabledClickListener?.invoke(it) }
+                return
+            }
+            // TEMPORARY PERF INSTRUMENTATION - starts the clock at the tap.
             icon.navAction?.let(selectedListener)
         }
     }

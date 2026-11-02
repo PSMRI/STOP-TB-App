@@ -520,6 +520,51 @@ class CounsellingRepo @Inject constructor(
             }
         }
     }
+
+    // Persists remarks after the rest of the section is locked, without clearing completion.
+    suspend fun saveRemarksOnly(
+        benId: Long,
+        formId: Int,
+        section: CounsellingSectionDto,
+        formVersionNumber: Int
+    ): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val remarks = section.questions.filter { it.isRemarksField() }
+                if (remarks.isEmpty()) return@withContext true
+
+                val versionId = formId * 1000 + formVersionNumber
+                val draftResponse = counsellingRepository.getOrCreateDraft(benId, versionId)
+                val answers = remarks.mapNotNull { q ->
+                    val text = q.value?.toString()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                    QuestionResponseEntity(
+                        sectionResponseId = 0L,
+                        questionId = q.questionId,
+                        optionId = null,
+                        answerText = text
+                    )
+                }
+                counsellingRepository.replaceQuestionAnswers(
+                    draftResponse.formResponse.responseId,
+                    section.sectionId,
+                    remarks.map { it.questionId },
+                    answers
+                )
+                val bulkSuccess = counsellingRepository.submitSectionBulk(
+                    draftResponse.formResponse.responseId,
+                    section.sectionId
+                )
+                if (!bulkSuccess) {
+                    CounsellingSyncWorker.scheduleSync(context)
+                }
+                true
+            } catch (e: Exception) {
+                Timber.e(e, "saveRemarksOnly failed")
+                false
+            }
+        }
+    }
+
     suspend fun submitGeneralInfoAnswers(
         benId: Long,
         formId: Int,

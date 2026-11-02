@@ -11,6 +11,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
+import android.util.TypedValue
 import android.text.Editable
 import android.text.InputFilter
 import android.text.InputFilter.AllCaps
@@ -27,7 +28,6 @@ import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.CheckBox
-import android.widget.CheckedTextView
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ListView
@@ -37,6 +37,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.children
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -59,6 +60,7 @@ import org.piramalswasthya.stoptb.databinding.RvItemFormHeadlineV2Binding
 import org.piramalswasthya.stoptb.databinding.RvItemFormImageViewV2Binding
 import org.piramalswasthya.stoptb.databinding.RvItemFormNumberPickerBinding
 import org.piramalswasthya.stoptb.databinding.RvItemFormRadioV2Binding
+import org.piramalswasthya.stoptb.databinding.RvItemFormStatusIndicatorBinding
 import org.piramalswasthya.stoptb.databinding.RvItemFormTextViewV2Binding
 import org.piramalswasthya.stoptb.databinding.RvItemFormTimepickerV2Binding
 import org.piramalswasthya.stoptb.helpers.Konstants
@@ -75,6 +77,7 @@ import org.piramalswasthya.stoptb.model.InputType.EDIT_TEXT
 import org.piramalswasthya.stoptb.model.InputType.HEADLINE
 import org.piramalswasthya.stoptb.model.InputType.IMAGE_VIEW
 import org.piramalswasthya.stoptb.model.InputType.RADIO
+import org.piramalswasthya.stoptb.model.InputType.STATUS_INDICATOR
 import org.piramalswasthya.stoptb.model.InputType.TEXT_VIEW
 import org.piramalswasthya.stoptb.model.InputType.TIME_PICKER
 import org.piramalswasthya.stoptb.model.InputType.values
@@ -259,6 +262,8 @@ class FormInputAdapter(
 //                        } else
 //                            item.errorText = null
 //                    }
+                    // Ignore events if this view has since been rebound to a different field.
+                    if (binding.form !== item) return
                     item.value = editable?.toString()
                     val emptyError = binding.root.context.getString(R.string.form_input_empty_error)
                     if (!item.value.isNullOrBlank() && item.errorText == emptyError) {
@@ -365,16 +370,21 @@ class FormInputAdapter(
             binding.et.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus){
                     binding.et.requestFocus()
+                    // Already attached in bind(); remove first so focus never registers a duplicate
+                    // that bind() can't fully detach when this view is recycled for another field.
+                    binding.et.removeTextChangedListener(textWatcher)
                     binding.et.addTextChangedListener(textWatcher)
+                    // Explicit show/hide, not toggleSoftInput(): a toggle flips the keyboard, so losing
+                    // focus while it is closed (e.g. ticking "Mobile Number Not Available") opened it.
                     val imm =
                         binding.root.context.getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager?
-                    imm!!.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0)
+                    imm?.showSoftInput(binding.et, InputMethodManager.SHOW_IMPLICIT)
                 } else {
                     binding.et.removeTextChangedListener(textWatcher)
                     binding.et.clearFocus()
                     val imm =
                         binding.root.context.getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager?
-                    imm!!.toggleSoftInput(InputMethodManager.HIDE_IMPLICIT_ONLY, 0)
+                    imm?.hideSoftInputFromWindow(binding.et.windowToken, 0)
                 }
             }
             binding.et.setOnEditorActionListener { v, actionId, _ ->
@@ -539,16 +549,23 @@ class FormInputAdapter(
 
             binding.rg.apply {
                 item.entries?.let { items ->
+                    val isVertical = item.orientation == LinearLayout.VERTICAL
                     orientation = item.orientation ?: LinearLayout.HORIZONTAL
-                    weightSum = items.size.toFloat()
-                    items.forEach {
+                    weightSum = if (isVertical) 0f else items.size.toFloat()
+                    items.forEachIndexed { index, it ->
                         val rdBtn = RadioButton(this.context)
                         rdBtn.layoutParams = RadioGroup.LayoutParams(
+                            if (isVertical) RadioGroup.LayoutParams.MATCH_PARENT else RadioGroup.LayoutParams.WRAP_CONTENT,
                             RadioGroup.LayoutParams.WRAP_CONTENT,
-                            RadioGroup.LayoutParams.WRAP_CONTENT,
-                            1.0F
+                            if (isVertical) 0f else 1.0F
                         ).apply {
-                            gravity = Gravity.CENTER_HORIZONTAL
+                            gravity = if (isVertical) Gravity.START else Gravity.CENTER_HORIZONTAL
+                            if (isVertical && index > 0) {
+                                topMargin = binding.root.resources.getDimensionPixelSize(R.dimen.padding_normal)
+                            }
+                        }
+                        if (isVertical) {
+                            rdBtn.gravity = Gravity.CENTER_VERTICAL or Gravity.START
                         }
                         rdBtn.id = View.generateViewId()
                         val colorStateList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -692,6 +709,11 @@ class FormInputAdapter(
                 ?.toMutableSet()
                 ?: mutableSetOf()
 
+            if (item.showAsSingleSelectDialog) {
+                bindSingleSelectDialog(item, effectiveEnabled, selectedIndexes, formValueListener)
+                return
+            }
+
             if (item.showAsMultiSelectDialog) {
                 bindMultiSelectDialog(item, effectiveEnabled, selectedIndexes, formValueListener)
                 return
@@ -730,6 +752,125 @@ class FormInputAdapter(
             }
 
             binding.executePendingBindings()
+        }
+
+        private fun bindSingleSelectDialog(
+            item: FormElement,
+            effectiveEnabled: Boolean,
+            selectedIndexes: MutableSet<Int>,
+            formValueListener: FormValueListener?
+        ) {
+            binding.tvTitle.visibility = View.GONE
+            binding.llChecks.visibility = View.GONE
+            binding.tilMultiSelect.visibility = View.VISIBLE
+            binding.tilMultiSelect.hint = item.title
+            binding.tilMultiSelect.isEnabled = effectiveEnabled
+            binding.etMultiSelect.isEnabled = effectiveEnabled
+            binding.etMultiSelect.isClickable = effectiveEnabled
+            binding.etMultiSelect.isFocusable = false
+            binding.etMultiSelect.setText(selectedIndexes.firstOrNull()?.let {
+                item.entries?.getOrNull(it)
+            }.orEmpty())
+            binding.tilMultiSelect.error = item.errorText
+
+            val showDialog = View.OnClickListener {
+                if (!effectiveEnabled) return@OnClickListener
+                showSearchableSingleSelectDialog(item, selectedIndexes, formValueListener)
+            }
+            binding.etMultiSelect.setOnClickListener(showDialog)
+            binding.tilMultiSelect.setEndIconOnClickListener(showDialog)
+            binding.executePendingBindings()
+        }
+
+        private fun showSearchableSingleSelectDialog(
+            item: FormElement,
+            selectedIndexes: MutableSet<Int>,
+            formValueListener: FormValueListener?
+        ) {
+            val context = binding.root.context
+            val labels = item.entries ?: emptyArray()
+            if (labels.isEmpty()) return
+
+            val density = context.resources.displayMetrics.density
+            val maxListHeightPx = (context.resources.displayMetrics.heightPixels * 0.58f).toInt()
+            val rowHeightPx = (48 * density).toInt()
+            val container = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding((20 * density).toInt(), (8 * density).toInt(), (20 * density).toInt(), 0)
+            }
+            val searchInput = EditText(context).apply {
+                hint = context.getString(R.string.household_search)
+                setSingleLine(true)
+            }
+            val listView = ListView(context)
+            container.addView(
+                searchInput,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+            container.addView(
+                listView,
+                LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0)
+            )
+
+            var filteredIndices = labels.indices.toList()
+            lateinit var dialog: AlertDialog
+
+            fun refreshFilteredList(query: String) {
+                filteredIndices = labels.indices.filter { labels[it].contains(query, ignoreCase = true) }
+                listView.adapter = ArrayAdapter(
+                    context,
+                    android.R.layout.simple_list_item_1,
+                    filteredIndices.map { labels[it] }
+                )
+                listView.layoutParams = listView.layoutParams.apply {
+                    height = minOf(filteredIndices.size * rowHeightPx, maxListHeightPx)
+                }
+            }
+
+            refreshFilteredList("")
+            listView.setOnItemClickListener { _, _, position, _ ->
+                val selectedIndex = filteredIndices[position]
+                selectedIndexes.clear()
+                selectedIndexes.add(selectedIndex)
+                item.value = selectedIndex.toString()
+                item.errorText = null
+                binding.tilMultiSelect.error = null
+                binding.clRi.setBackgroundResource(0)
+                binding.etMultiSelect.setText(labels[selectedIndex])
+                formValueListener?.onValueChanged(item, selectedIndex)
+                dialog.dismiss()
+            }
+            searchInput.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+                override fun afterTextChanged(s: Editable?) {
+                    refreshFilteredList(s?.toString().orEmpty())
+                }
+            })
+
+            dialog = AlertDialog.Builder(context)
+                .setTitle(item.title)
+                .setView(container)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create()
+            dialog.show()
+            dialog.window?.setLayout(
+                (context.resources.displayMetrics.widthPixels * 0.9f).toInt(),
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+
+            val buttonPadding = (16 * density).toInt()
+            val actionTextColor = ContextCompat.getColor(context, R.color.md_theme_light_primary)
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.apply {
+                background = null
+                minWidth = 0
+                minimumWidth = 0
+                setTextColor(actionTextColor)
+                setPadding(buttonPadding, 0, buttonPadding, 0)
+            }
         }
 
         private fun bindMultiSelectDialog(
@@ -783,18 +924,37 @@ class FormInputAdapter(
                         formValueListener
                     )
                 } else {
-                    AlertDialog.Builder(binding.root.context)
+                    val dialog = AlertDialog.Builder(binding.root.context)
                         .setTitle(item.title)
-                        .setMultiChoiceItems(labels, checkedItems) { dialog, which, isChecked ->
+                        .setMultiChoiceItems(labels, checkedItems) { dialogInterface, which, isChecked ->
                             applyExclusiveSelection(item, checkedItems, which, isChecked)
-                            val listView = (dialog as? AlertDialog)?.listView
-                            checkedItems.indices.forEach { idx -> listView?.setItemChecked(idx, checkedItems[idx]) }
+
+                            val listView = (dialogInterface as? AlertDialog)?.listView
+                            checkedItems.indices.forEach { idx ->
+                                listView?.setItemChecked(idx, checkedItems[idx])
+                            }
                         }
                         .setPositiveButton(android.R.string.ok) { _, _ ->
                             applyMultiSelectResult(item, checkedItems, selectedIndexes, formValueListener)
                         }
                         .setNegativeButton(android.R.string.cancel, null)
-                        .show()
+                        .create()
+
+                    dialog.show()
+
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.apply {
+                        background = null
+                        setBackgroundColor(Color.TRANSPARENT)
+                        setTextColor(
+                            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.currentTextColor
+                                ?: Color.BLACK
+                        )
+                    }
+
+                    dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.apply {
+                        background = null
+                        setBackgroundColor(Color.TRANSPARENT)
+                    }
                 }
             }
             binding.etMultiSelect.setOnClickListener(showDialog)
@@ -851,7 +1011,7 @@ class FormInputAdapter(
             val context = binding.root.context
             val density = context.resources.displayMetrics.density
             val maxListHeightPx = (context.resources.displayMetrics.heightPixels * 0.58f).toInt()
-            val rowHeightPx = (48 * density).toInt()
+            val rowHeightPx = (56 * density).toInt()
             val container = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding((20 * density).toInt(), (8 * density).toInt(), (20 * density).toInt(), 0)
@@ -882,16 +1042,31 @@ class FormInputAdapter(
 
             fun refreshFilteredList(query: String) {
                 filteredIndices = labels.indices.filter { labels[it].contains(query, ignoreCase = true) }
-                val adapter = object : ArrayAdapter<String>(
-                    context,
-                    android.R.layout.simple_list_item_multiple_choice,
-                    filteredIndices.map { labels[it] }
-                ) {
+                val adapter = object : ArrayAdapter<String>(context, 0, filteredIndices.map { labels[it] }) {
                     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                        val view = super.getView(position, convertView, parent) as CheckedTextView
+                        val row = (convertView as? LinearLayout) ?: LinearLayout(context).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            gravity = Gravity.CENTER_VERTICAL
+                            minimumHeight = rowHeightPx
+                            val horizontalPadding = (16 * density).toInt()
+                            setPadding(horizontalPadding, 0, horizontalPadding, 0)
+
+                            addView(CheckBox(context).apply {
+                                isClickable = false
+                                isFocusable = false
+                            })
+                            addView(TextView(context).apply {
+                                gravity = Gravity.CENTER_VERTICAL or Gravity.LEFT
+                                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                                setPadding((12 * density).toInt(), 0, 0, 0)
+                            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
+                        }
                         val originalIndex = filteredIndices[position]
-                        view.isChecked = checkedItems[originalIndex]
-                        return view
+                        val checkbox = row.getChildAt(0) as CheckBox
+                        val label = row.getChildAt(1) as TextView
+                        checkbox.isChecked = checkedItems[originalIndex]
+                        label.text = labels[originalIndex]
+                        return row
                     }
                 }
                 listView.adapter = adapter
@@ -1427,6 +1602,7 @@ class FormInputAdapter(
             binding.etNumberInput.isEnabled = isEnabled
             binding.btnDecrement.isEnabled = isEnabled
             binding.btnIncrement.isEnabled = isEnabled
+            binding.containerNumberPickerCard.alpha = if (isEnabled) 1f else 0.5f
             if (!isEnabled) {
                 hideError()
                 return
@@ -1562,6 +1738,93 @@ class FormInputAdapter(
 
 
 
+    class StatusIndicatorViewHolder private constructor(
+        private val binding: RvItemFormStatusIndicatorBinding
+    ) : ViewHolder(binding.root) {
+        companion object {
+            fun from(parent: ViewGroup): ViewHolder {
+                val layoutInflater = LayoutInflater.from(parent.context)
+                val binding = RvItemFormStatusIndicatorBinding.inflate(layoutInflater, parent, false)
+                return StatusIndicatorViewHolder(binding)
+            }
+        }
+
+        fun bind(item: FormElement) {
+            bind(item.title, item.value, item.entries)
+        }
+
+        fun bind(title: String, value: String?, entries: Array<String>?) {
+            val context = binding.root.context
+            val yes = entries?.getOrNull(0)
+            val no = entries?.getOrNull(1)
+            binding.tvStatusLabel.text = title
+            when {
+                matches(value, yes, "YES") -> showResolved(
+                    label = context.getString(R.string.tb_status_asymptomatic),
+                    detail = context.getString(R.string.tb_status_asymptomatic_detail),
+                    background = R.color.tb_status_asymptomatic,
+                    icon = R.drawable.ic_check_circle
+                )
+                matches(value, no, "NO") -> showResolved(
+                    label = context.getString(R.string.tb_status_symptomatic),
+                    detail = context.getString(R.string.tb_status_symptomatic_detail),
+                    background = R.color.tb_status_symptomatic,
+                    icon = R.drawable.ic_exclamation_circle
+                )
+                else -> showPending(context.getString(R.string.tb_symptom_status_pending))
+            }
+        }
+
+        private fun matches(value: String?, localized: String?, stored: String): Boolean {
+            if (value.isNullOrBlank()) return false
+            return value.equals(localized, ignoreCase = true) || value.equals(stored, ignoreCase = true)
+        }
+
+        private fun showResolved(label: String, detail: String, background: Int, icon: Int) {
+            val context = binding.root.context
+            val onBanner = ContextCompat.getColor(context, R.color.tb_status_on_banner)
+            tintBanner(ContextCompat.getColor(context, background))
+            val iconDrawable = AppCompatResources.getDrawable(context, icon)?.mutate()
+            if (iconDrawable != null) {
+                DrawableCompat.setTint(iconDrawable, onBanner)
+                binding.ivStatusIcon.setImageDrawable(iconDrawable)
+            }
+            binding.ivStatusIcon.visibility = View.VISIBLE
+            binding.tvStatusValue.text = label
+            binding.tvStatusValue.setTextColor(onBanner)
+            binding.tvStatusValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            binding.tvStatusValue.setTypeface(binding.tvStatusValue.typeface, Typeface.BOLD)
+            binding.tvStatusDetail.visibility = View.VISIBLE
+            binding.tvStatusDetail.text = detail
+            binding.tvStatusDetail.setTextColor(onBanner)
+            binding.llStatusBanner.contentDescription = "${binding.tvStatusLabel.text}: $label. $detail"
+        }
+
+        private fun showPending(message: String) {
+            val context = binding.root.context
+            val pendingText = ContextCompat.getColor(context, R.color.tb_status_pending_text)
+            tintBanner(ContextCompat.getColor(context, R.color.tb_status_pending_bg))
+            binding.ivStatusIcon.visibility = View.GONE
+            binding.tvStatusValue.text = message
+            binding.tvStatusValue.setTextColor(pendingText)
+            binding.tvStatusValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            binding.tvStatusValue.setTypeface(binding.tvStatusValue.typeface, Typeface.NORMAL)
+            binding.tvStatusDetail.visibility = View.GONE
+            binding.llStatusBanner.contentDescription = "${binding.tvStatusLabel.text}. $message"
+        }
+
+        private fun tintBanner(color: Int) {
+            val background = AppCompatResources.getDrawable(
+                binding.root.context,
+                R.drawable.bg_symptom_status
+            )?.mutate()
+            if (background != null) {
+                DrawableCompat.setTint(background, color)
+                binding.llStatusBanner.background = background
+            }
+        }
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val inputTypes = values()
         val safeType = inputTypes.getOrNull(viewType) ?: TEXT_VIEW
@@ -1581,6 +1844,7 @@ class FormInputAdapter(
             InputType.FILE_UPLOAD -> FileUploadInputViewHolder.from(parent)
             InputType.NUMBER_PICKER -> NumberPickerInputViewHolder.from(parent)
             InputType.MULTIFILE_UPLOAD -> MultiFileUploadInputViewHolder.from(parent)
+            STATUS_INDICATOR -> StatusIndicatorViewHolder.from(parent)
         }
     }
 
@@ -1712,6 +1976,8 @@ class FormInputAdapter(
                 InputType.NUMBER_PICKER -> (holder as NumberPickerInputViewHolder).bind(
                     item, isEnabled, formValueListener
                 )
+
+                STATUS_INDICATOR -> (holder as StatusIndicatorViewHolder).bind(item)
             }
         } catch (e: Exception) {
             e.printStackTrace()

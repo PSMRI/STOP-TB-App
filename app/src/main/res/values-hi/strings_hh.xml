@@ -6,6 +6,8 @@
     <string name="no_records_found">कोई लाभार्थी प्रदर्शित करने के लिए नहीं है| कृपया लाभार्थी का पंजीकरण शुरू करें</string>
     <string name="household_search">ढूंढे</string>
     <string name="search_other_villages">अन्य गांवों में खोजें</string>
+    <string name="search_other_villages_failed">अन्य गांवों में खोज नहीं हो सकी। कृपया पुनः प्रयास करें।</string>
+    <string name="search_other_villages_retry">पुनः प्रयास करें</string>
 
     <string name="rv_item_hh_ph_1">H.H.I.D : </string>
     <string name="rv_item_hh_ph_2">परिवार के मुखिया का नाम :</string>
@@ -167,5 +169,9 @@
     <string name="hint_place_of_current_living">वर्तमान निवास का स्थान *</string>
     <string name="hint_other_place">अन्य स्थान *</string>
     <string name="hint_institution_name">संस्था का नाम *</string>
+
+    <string name="all_non_household_beneficiaries">सभी गैर-परिवार लाभार्थी</string>
+
+
 
 </resources>

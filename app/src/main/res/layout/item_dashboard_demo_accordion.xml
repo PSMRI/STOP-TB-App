@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/layoutDemographicDetails"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingBottom="6dp">
+
+    <include
+        android:id="@+id/rowMale"
+        layout="@layout/item_dashboard_demo_row" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/dashboard_row_divider" />
+
+    <include
+        android:id="@+id/rowFemale"
+        layout="@layout/item_dashboard_demo_row" />
+
+    <LinearLayout
+        android:id="@+id/pregnantSection"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/dashboard_row_divider" />
+
+        <include
+            android:id="@+id/rowPregnant"
+            layout="@layout/item_dashboard_demo_row" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/dashboard_row_divider" />
+
+    <include
+        android:id="@+id/rowChildren"
+        layout="@layout/item_dashboard_demo_row" />
+
+    <LinearLayout
+        android:id="@+id/seniorSection"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/dashboard_row_divider" />
+
+        <include
+            android:id="@+id/rowSenior"
+            layout="@layout/item_dashboard_demo_row" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/dashboard_row_divider" />
+
+    <include
+        android:id="@+id/rowTransgender"
+        layout="@layout/item_dashboard_demo_row" />
+</LinearLayout>

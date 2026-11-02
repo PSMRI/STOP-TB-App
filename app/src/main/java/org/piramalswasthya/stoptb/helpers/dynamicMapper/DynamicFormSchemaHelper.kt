@@ -184,6 +184,14 @@ suspend fun storeFormSchemaInDb(
     if (sectionsToInsert.isNotEmpty()) metadataDao.insertSections(sectionsToInsert)
     if (questionsToInsert.isNotEmpty()) metadataDao.insertQuestions(questionsToInsert)
     if (optionsToInsert.isNotEmpty()) metadataDao.insertOptions(optionsToInsert)
+
+    // Replace, don't merge, conditions/validations: with HASH_BASED ids a condition's id includes the server
+    // targetQuestionId, which changes between versions, so upserting v2 over v1 would leave v1's condition
+    // beside v2's (same option -> same question twice, e.g. a duplicated "Number of Friends" row).
+    // Nothing references these tables, so deleting them is safe.
+    if (optionsToInsert.isNotEmpty()) metadataDao.deleteConditionsForOptions(optionsToInsert.map { it.optionId })
+    if (questionsToInsert.isNotEmpty()) metadataDao.deleteValidationsForQuestions(questionsToInsert.map { it.questionId })
+
     if (conditionsToInsert.isNotEmpty()) metadataDao.insertConditions(conditionsToInsert)
     if (validationsToInsert.isNotEmpty()) metadataDao.insertValidations(validationsToInsert)
 }

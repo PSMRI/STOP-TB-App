@@ -248,16 +248,36 @@
         android:paddingBottom="120dp"
         app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
         app:layout_constraintTop_toBottomOf="@id/filterText"
-        app:layout_constraintBottom_toTopOf="@id/btn_next_page"
+        app:layout_constraintBottom_toBottomOf="parent"
         tools:itemCount="2"
         tools:listitem="@layout/rv_item_household" />
+
+    <!-- Loading state for the list. Kept distinct from fl_empty: before the first emission
+         neither was shown (blank screen), and an empty first emission rendered
+         "No records found" over a list that had not loaded yet. Default GONE, so the other
+         fragments sharing this layout are unaffected. -->
+    <FrameLayout
+        android:id="@+id/fl_loading"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/topLayout"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <ProgressBar
+            android:id="@+id/pb_list_loading"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="center"
+            android:indeterminateTint="?attr/colorPrimary" />
+    </FrameLayout>
 
     <FrameLayout
         android:id="@+id/fl_empty"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         app:layout_constraintTop_toBottomOf="@id/topLayout"
-        app:layout_constraintBottom_toTopOf="@id/btn_next_page">
+        app:layout_constraintBottom_toBottomOf="parent">
 
         <TextView
             android:id="@+id/tv_empty_content"
@@ -269,16 +289,18 @@
             android:textAppearance="@style/TextAppearance.Material3.TitleLarge" />
     </FrameLayout>
 
-    <com.google.android.material.button.MaterialButton
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/btn_next_page"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_margin="@dimen/margin_normal"
         android:layout_marginBottom="20dp"
-        android:padding="@dimen/padding_normal"
-        android:text="@string/btn_text_frag_home_nhhr"
-        android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
-        app:layout_constraintBottom_toBottomOf="parent" />
+        android:layout_marginEnd="20dp"
+        android:contentDescription="@string/saving_form"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:srcCompat="@drawable/ic_add_circle"
+        app:backgroundTint="@android:color/holo_green_dark"
+        app:tint="@android:color/white"/>
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab_edit"

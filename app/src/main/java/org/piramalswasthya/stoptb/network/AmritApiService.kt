@@ -2,9 +2,11 @@ package org.piramalswasthya.stoptb.network
 
 import okhttp3.ResponseBody
 import org.piramalswasthya.stoptb.model.*
+import org.piramalswasthya.stoptb.model.dynamicEntity.CompletedBeneficiaryStatus
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormNCDFollowUpSubmitRequest
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormSchemaDto
 import org.piramalswasthya.stoptb.model.dynamicEntity.FormSubmitRequest
+import org.piramalswasthya.stoptb.model.dynamicEntity.LatestFormVersionDto
 import org.piramalswasthya.stoptb.model.dynamicEntity.NCDFollowUpResponse
 import org.piramalswasthya.stoptb.model.dynamicModel.ApiResponse
 import org.piramalswasthya.stoptb.model.dynamicModel.HBNCVisitRequest
@@ -28,6 +30,24 @@ interface AmritApiService {
     suspend fun getUserDetailsById(
         @Query("userId") userId: Int
     ): UserNetworkResponse
+
+    @GET("mmu-api/master/get/visitReasonAndCategories")
+    suspend fun getVisitReasonAndCategories(): Response<HwcMasterResponse<VisitReasonAndCategoriesResponse>>
+
+    @GET("mmu-api/master/nurse/masterData/{visitCategoryId}/{providerServiceMapId}/Male")
+    suspend fun getChiefComplaintMaster(
+        @Path("visitCategoryId") visitCategoryId: Int,
+        @Path("providerServiceMapId") providerServiceMapId: Int
+    ): Response<HwcMasterResponse<NurseMasterDataResponse>>
+
+    @GET("tm-api/master/doctor/masterData/{visitCategoryId}/{providerServiceMapId}/{gender}/{vanId}/{facilityId}")
+    suspend fun getDrugMaster(
+        @Path("visitCategoryId") visitCategoryId: Int,
+        @Path("providerServiceMapId") providerServiceMapId: Int,
+        @Path("gender") gender: String,
+        @Path("vanId") vanId: Int,
+        @Path("facilityId") facilityId: Int
+    ): Response<HwcMasterResponse<DoctorDrugMasterData>>
 
     @POST("common-api/firebaseNotification/userToken")
     suspend fun saveFirebaseToken(@Body json: Map<String, Any>): Response<ResponseBody>
@@ -75,6 +95,10 @@ interface AmritApiService {
 
     @POST("flw-api/stoptb/nurse/tbScreening/getAll")
     suspend fun getTBScreeningData(@Body request: StopTbVillageRequest): Response<ResponseBody>
+
+    // Answers supported=false on servers without the change log (AMRIT-DB before V132).
+    @POST("flw-api/stoptb/sync/changes")
+    suspend fun getSyncChanges(@Body request: SyncChangesRequest): Response<ResponseBody>
 
     @POST("flw-api/tb/suspected/getAll")
     suspend fun getTBSuspectedData(@Body userDetail: GetDataPaginatedRequest): Response<ResponseBody>
@@ -180,6 +204,11 @@ interface AmritApiService {
         @Header("Authorization") authHeader: String,
     ): Response<ApiResponse<List<FormSchemaDto>>>
 
+    @GET("flw-api/dynamicForm/getLatestFormVersions")
+    suspend fun getLatestFormVersions(
+        @Header("Authorization") authHeader: String,
+    ): Response<ApiResponse<List<LatestFormVersionDto>>>
+
     @POST("flw-api/child-care/hbncVisit/saveAll")
     suspend fun submitForm(
         @Body request: List<FormSubmitRequest>
@@ -199,7 +228,7 @@ interface AmritApiService {
     suspend fun completeCounselling(
         @Header("Authorization") authHeader: String,
         @Body request: CounsellingBulkSubmitRequest
-    ): Response<okhttp3.ResponseBody>
+    ): Response<ResponseBody>
     @GET("flw-api/dynamicForm/response/getByBeneficiary")
     suspend fun getBeneficiaryFormResponses(
         @Header("Authorization") jwtToken: String,
@@ -215,7 +244,7 @@ interface AmritApiService {
         @Query("formType") formType: String,
         @Query("villageId") villageId: Int,
         @Query("providerServiceMapId") providerServiceMapId: Int
-    ): Response<ApiResponse<List<org.piramalswasthya.stoptb.model.dynamicEntity.CompletedBeneficiaryStatus>>>
+    ): Response<ApiResponse<List<CompletedBeneficiaryStatus>>>
 
 
     @POST("flw-api/disease/cdtfVisit/saveAll")

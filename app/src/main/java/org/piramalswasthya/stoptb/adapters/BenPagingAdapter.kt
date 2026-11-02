@@ -6,7 +6,8 @@ import androidx.paging.PagingDataAdapter
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.BenBasicDomain
-import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
+import org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields
+import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
 
 class BenPagingAdapter(
     private val clickListener: BenListAdapter.BenClickListener? = null,
@@ -49,7 +50,20 @@ class BenPagingAdapter(
     private val tptEligibleIds = mutableListOf<Long>()
     private val childCountMap = mutableMapOf<Long, Int>()
     private val householdMemberCountMap = mutableMapOf<Long, Int>()
-    private val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
+    private val householdHeadNameMap = mutableMapOf<Long, String>()
+    private val tbDiagnosticsList = mutableListOf<TbDiagnosticsCardFields>()
+
+    /**
+     * The same rows as [tbDiagnosticsList], keyed by benId, because that is the only shape
+     * bind() reads them in. Without it every card falls back to an empty map and the X-Ray and
+     * TrueNat tiles render "Unscreened" with a blank result for beneficiaries that do have one.
+     */
+    private val tbDiagnosticsByBenId = mutableMapOf<Long, TbDiagnosticsCardFields>()
+
+    /** Set by [submitTBDiagnostics]; until then a missing row means "not loaded yet". */
+    private var tbDiagnosticsLoaded = false
+
+    private val tbScreeningMap = mutableMapOf<Long, TbScreeningSymptoms>()
     private val retryingBenIds = mutableListOf<Long>()
 
     override fun onCreateViewHolder(
@@ -89,10 +103,13 @@ class BenPagingAdapter(
             showResultButton = showResultButton,
             showAnthropometryButton = showAnthropometryButton,
             showExamineButton = showExamineButton,
-            tbDiagnosticsList = tbDiagnosticsList,
+            tbDiagnosticsByBenId = tbDiagnosticsByBenId,
+            tbDiagnosticsLoaded = tbDiagnosticsLoaded,
+            tbScreeningMap = tbScreeningMap,
             showScreeningStatus = showScreeningStatus,   // ADD THIS
             showRedesignedCard = showRedesignedCard,
             householdMemberCountMap = householdMemberCountMap,
+            householdHeadNameMap = householdHeadNameMap,
             source = source,
             retryingBenIds = retryingBenIds,
             showContactTracingForms = showContactTracingForms,
@@ -101,7 +118,7 @@ class BenPagingAdapter(
         )
     }
 
-    fun submitTBDiagnostics(list: List<TBDiagnosticsCache>) {
+    fun submitTBDiagnostics(list: List<TbDiagnosticsCardFields>) {
         // Diff instead of notifyDataSetChanged(), same pattern as the submit*() functions below
         // — a blanket refresh here rebinds every visible row on every emission, which was the
         // root cause of cards needing multiple taps to register.
@@ -109,16 +126,34 @@ class BenPagingAdapter(
         val newByBenId = list.associateBy { it.benId }
         tbDiagnosticsList.clear()
         tbDiagnosticsList.addAll(list)
+        tbDiagnosticsByBenId.clear()
+        tbDiagnosticsByBenId.putAll(newByBenId)
+        // A beneficiary with no diagnostics row at all appears in neither map, so the diff below
+        // never names it; before the first emission such a card renders the "not loaded yet"
+        // placeholder and would stay on that disabled placeholder for good. Only those rows need
+        // the extra nudge - a blanket notifyDataSetChanged() here would rebind every visible row
+        // and swallow a tap in flight, which is what the targeted diff exists to avoid.
+        val firstLoad = !tbDiagnosticsLoaded
+        tbDiagnosticsLoaded = true
         val changedBenIds = (oldByBenId.keys + newByBenId.keys)
             .filterTo(mutableSetOf()) { benId -> oldByBenId[benId] != newByBenId[benId] }
-        if (changedBenIds.isNotEmpty()) {
+        if (changedBenIds.isNotEmpty() || firstLoad) {
             val items = snapshot()
             items.forEachIndexed { index, item ->
-                if (item != null && item.benId in changedBenIds) {
+                if (item != null &&
+                    (item.benId in changedBenIds || (firstLoad && item.benId !in newByBenId))
+                ) {
                     notifyItemChanged(index)
                 }
             }
         }
+    }
+
+
+    fun submitTbScreeningList(list: List<TbScreeningSymptoms>) {
+        tbScreeningMap.clear()
+        tbScreeningMap.putAll(list.associateBy { it.benId })
+        notifyDataSetChanged()
     }
 
     fun submitBenIds(list: List<Long>) {
@@ -233,6 +268,18 @@ class BenPagingAdapter(
         val old = householdMemberCountMap.toMap()
         householdMemberCountMap.clear()
         householdMemberCountMap.putAll(map)
+        val changedHouseholds = (old.keys + map.keys).filterTo(mutableSetOf()) { old[it] != map[it] }
+        if (changedHouseholds.isNotEmpty()) {
+            snapshot().forEachIndexed { index, item ->
+                if (item != null && item.hhId in changedHouseholds) notifyItemChanged(index)
+            }
+        }
+    }
+
+    fun submitHouseholdHeadNames(map: Map<Long, String>) {
+        val old = householdHeadNameMap.toMap()
+        householdHeadNameMap.clear()
+        householdHeadNameMap.putAll(map)
         val changedHouseholds = (old.keys + map.keys).filterTo(mutableSetOf()) { old[it] != map[it] }
         if (changedHouseholds.isNotEmpty()) {
             snapshot().forEachIndexed { index, item ->

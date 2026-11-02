@@ -88,7 +88,7 @@ interface SyncDao {
                 "    INNER JOIN beneficiary b ON b.beneficiaryId = diag.benId AND b.loc_village_id = :selectedVillage " +
 
                 "    UNION ALL " +
-                "    SELECT 23 as id, 'TB Confirmed' as name, confirmed.syncState as syncState " +
+                "    SELECT 25 as id, 'TB Confirmed' as name, confirmed.syncState as syncState " +
                 "    FROM ( " +
                 "        SELECT confirmed.benId, MIN(confirmed.syncState) as syncState " +
                 "        FROM TB_CONFIRMED_TREATMENT confirmed " +
