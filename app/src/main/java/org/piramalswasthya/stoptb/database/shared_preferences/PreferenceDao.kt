@@ -18,10 +18,6 @@ import javax.inject.Singleton
 @Singleton
 class PreferenceDao @Inject constructor(@ApplicationContext private val context: Context) {
 
-    private companion object {
-        const val VILLAGE_DEFAULTS_KEY = "village_defaults_by_village_id"
-    }
-
     private val pref = PreferenceManager.getInstance(context)
 
     private companion object {
@@ -29,6 +25,7 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         const val CHANGES_FEED_SCOPE = "changes_feed_scope"
         const val MASTERS_REFRESHED_AT = "masters_refreshed_at"
         const val CHANGES_FEED_ACTIVE = "changes_feed_active"
+        const val VILLAGE_DEFAULTS_KEY = "village_defaults_by_village_id"
     }
 
     fun deleteAmritToken() {
