@@ -723,17 +723,34 @@ class TBScreeningDataset(
             if (isPregnantBen) R.string.tb_presumptive_alert_refer_pregnant
             else R.string.tb_presumptive_alert_refer
         )
+        val liquidCultureText =
+            if (requiresLiquidCultureReferral())
+                "\n" + resources.getString(R.string.tb_presumptive_alert_liquid_culture)
+            else ""
         return when {
             hasDoubleStarYes() ->
                 resources.getString(R.string.tb_presumptive_alert_title) +
                     "\n" + referText +
+                    liquidCultureText +
                     "\n" + resources.getString(R.string.tb_presumptive_alert_family)
             hasSingleStarYes() ->
                 resources.getString(R.string.tb_presumptive_alert_title) +
-                    "\n" + referText
+                    "\n" + referText +
+                    liquidCultureText
             else -> null
         }
     }
+
+    /**
+     * Mirrors the TB_SCREENING branch of the Liquid Culture card queries in BenDao
+     * (historyOfTb / takingAntiTBDrugs / familySufferingFromTB = 1), so the popup
+     * mentions Liquid Culture exactly when the beneficiary will appear on that card.
+     */
+    private fun requiresLiquidCultureReferral(): Boolean = listOf(
+        historyOfTB,
+        currentlyTakingDrugs,
+        familyHistoryTB
+    ).any(::isYes)
 
     fun getFamilyContactAlert(): String? =
         if (requiresFamilyContactScreening())
