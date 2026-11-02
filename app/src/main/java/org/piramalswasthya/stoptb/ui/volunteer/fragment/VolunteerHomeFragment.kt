@@ -21,6 +21,7 @@ import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.work.WorkerUtils
+import org.piramalswasthya.stoptb.utils.sync.CampHubReachability
 import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -280,21 +281,10 @@ class VolunteerHomeFragment : Fragment() {
         }
     }
 
-    private fun pingCampHub(): Boolean {
-        return try {
-            val url = java.net.URL(pref.getCampHubUrl())
-            val conn = url.openConnection() as java.net.HttpURLConnection
-            conn.connectTimeout = 3000
-            conn.readTimeout = 3000
-            conn.requestMethod = "GET"
-            conn.connect()
-            val code = conn.responseCode
-            conn.disconnect()
-            code in 100..499
-        } catch (_: Exception) {
-            false
-        }
-    }
+    // Same reachability rule as the sign-in screen, interceptor and sync gate
+    // (GET /common-api/health, 2xx). Blocking: call off the main thread.
+    private fun pingCampHub(): Boolean =
+        CampHubReachability.isReachable(pref.getCampHubUrl())
 
     private fun setUpViewPager() {
         binding.vp2Home.offscreenPageLimit = 1

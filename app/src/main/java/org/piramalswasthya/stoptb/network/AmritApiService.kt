@@ -96,6 +96,10 @@ interface AmritApiService {
     @POST("flw-api/stoptb/nurse/tbScreening/getAll")
     suspend fun getTBScreeningData(@Body request: StopTbVillageRequest): Response<ResponseBody>
 
+    // Answers supported=false on servers without the change log (AMRIT-DB before V132).
+    @POST("flw-api/stoptb/sync/changes")
+    suspend fun getSyncChanges(@Body request: SyncChangesRequest): Response<ResponseBody>
+
     @POST("flw-api/tb/suspected/getAll")
     suspend fun getTBSuspectedData(@Body userDetail: GetDataPaginatedRequest): Response<ResponseBody>
 

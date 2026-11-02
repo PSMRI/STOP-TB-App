@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.helpers
 
 import android.content.Context
 import android.net.Uri
+import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.core.text.isDigitsOnly
 import id.zelory.compressor.Compressor
@@ -87,6 +88,20 @@ object ImageUtils {
         return withContext(Dispatchers.IO) {
             try {
                 val inputByteArray = Base64.decode(encodedString, Base64.DEFAULT)
+
+                // Validate the payload before touching the disk. Every pull was decoding a
+                // payload, creating a file, writing and flushing it, then handing it to
+                // Compressor - which threw IllegalStateException on every single beneficiary
+                // (BitmapFactory returns null for a non-image payload), so the whole thing was
+                // discarded and userImage ended up null anyway. Checking the bounds first costs
+                // nothing and skips that write entirely when there is no decodable image.
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeByteArray(inputByteArray, 0, inputByteArray.size, bounds)
+                if (inputByteArray.isEmpty() || bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                    Timber.d("Skipping image for benId=$benId: payload is not a decodable image")
+                    return@withContext null
+                }
+
                 val targetFile = File(context.filesDir, "${benId}.jpeg").also { it.createNewFile() }
                 FileOutputStream(targetFile).use {
                     it.write(inputByteArray)

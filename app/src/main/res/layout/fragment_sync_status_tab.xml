@@ -107,6 +107,58 @@
 
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- Records the server rejected; retried automatically -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_needs_attention"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/padding_normal"
+            android:visibility="gone"
+            app:cardElevation="2dp"
+            app:cardCornerRadius="12dp"
+            tools:visibility="visible">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/sync_dashboard_needs_attention_title"
+                    android:textAppearance="@style/TextAppearance.Material3.TitleMedium" />
+
+                <TextView
+                    android:id="@+id/tv_needs_attention_summary"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/padding_small"
+                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                    tools:text="2 record(s) not accepted by the server yet." />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rv_needs_attention"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/padding_small"
+                    android:nestedScrollingEnabled="false"
+                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+                    tools:itemCount="2"
+                    tools:listitem="@layout/rv_item_failed_worker" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_retry_now"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/padding_small"
+                    android:text="@string/sync_dashboard_retry_now" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- Per-Entity Table Header -->
         <LinearLayout
             android:layout_width="match_parent"
