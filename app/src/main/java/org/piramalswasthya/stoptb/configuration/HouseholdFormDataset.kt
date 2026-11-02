@@ -882,7 +882,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
 
             amenities.fuelUsedId = fuelForCooking.getPosition()
             amenities.fuelUsed = fuelForCooking.getEnglishStringFromPosition(amenities.fuelUsedId)
-            amenities.otherFuelUsed = otherFuelForCooking.value?.trim()?.takeIf { isOtherFuelSelected() }
+            amenities.otherFuelUsed = otherFuelForCooking.value.takeIf { isOtherFuelSelected() }
 
             amenities.sourceOfDrinkingWaterId = sourceOfWater.getPosition()
             amenities.sourceOfDrinkingWater =
