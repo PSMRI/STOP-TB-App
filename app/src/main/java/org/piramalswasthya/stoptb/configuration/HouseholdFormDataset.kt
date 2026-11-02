@@ -605,7 +605,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             availOfToilet.setSavedChoice(saved.availabilityOfToiletId, saved.availabilityOfToilet)
             otherAvailOfToilet.value = saved.otherAvailabilityOfToilet
         }
-        if (fuelForCooking.value == fuelForCooking.entries!!.last()) {
+        if (isOtherFuelSelected()) {
             list.add(list.indexOf(fuelForCooking) + 1, otherFuelForCooking)
         }
         if (sourceOfWater.value == sourceOfWater.entries!!.last()) {
