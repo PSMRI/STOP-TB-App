@@ -1,10 +1,13 @@
 package org.piramalswasthya.stoptb.repositories
 
+import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.VitalDao
@@ -15,6 +18,7 @@ import org.piramalswasthya.stoptb.network.GeneralExaminationGetRequest
 import org.piramalswasthya.stoptb.network.GeneralExaminationRecord
 import org.piramalswasthya.stoptb.network.GeneralExaminationSaveRequest
 import timber.log.Timber
+import java.io.IOException
 import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -25,8 +29,14 @@ class VitalRepo @Inject constructor(
     private val benDao: BenDao,
     private val preferenceDao: PreferenceDao,
     private val userRepo: UserRepo,
-    private val tmcNetworkApiService: AmritApiService
+    private val tmcNetworkApiService: AmritApiService,
+    private val database: InAppDb
 ) {
+
+    private companion object {
+        /** Records per write transaction in the general-examination pull. */
+        const val pullWriteChunkSize = 500
+    }
 
     suspend fun getVitals(benId: Long): VitalCache? {
         return withContext(Dispatchers.IO) {
@@ -34,9 +44,18 @@ class VitalRepo @Inject constructor(
         }
     }
 
-    val vitalBenIds: Flow<List<Long>> = vitalDao.getAllVitalBenIds()
-    val unsyncedVitalBenIds: Flow<List<Long>> = vitalDao.getVitalBenIdsBySyncState(SyncState.UNSYNCED)
-    val syncingVitalBenIds: Flow<List<Long>> = vitalDao.getVitalBenIdsBySyncState(SyncState.SYNCING)
+    /**
+     * One query for all three sets. Previously these were three Room Flows over the same table,
+     * so every write to BEN_VITALS re-ran three queries and woke three collectors.
+     */
+    private val vitalBenIdStates: Flow<List<org.piramalswasthya.stoptb.model.BenIdSyncState>> =
+        vitalDao.getVitalBenIdSyncStates()
+
+    val vitalBenIds: Flow<List<Long>> = vitalBenIdStates.map { rows -> rows.map { it.benId } }
+    val unsyncedVitalBenIds: Flow<List<Long>> =
+        vitalBenIdStates.map { rows -> rows.filter { it.syncState == SyncState.UNSYNCED }.map { it.benId } }
+    val syncingVitalBenIds: Flow<List<Long>> =
+        vitalBenIdStates.map { rows -> rows.filter { it.syncState == SyncState.SYNCING }.map { it.benId } }
 
     suspend fun saveVitals(vitalCache: VitalCache) {
         withContext(Dispatchers.IO) {
@@ -50,10 +69,16 @@ class VitalRepo @Inject constructor(
 
             vitalDao.saveVitals(localData)
 
-            val synced = pushSingleVital(localData)
+            // Network failures leave the record UNSYNCED for the background push.
+            val synced = try {
+                pushSingleVital(localData)
+            } catch (e: IOException) {
+                Timber.w(e, "Vital push deferred to background sync for benId=%s", localData.benId)
+                false
+            }
 
             if (synced) {
-                vitalDao.saveVitals(localData.copy(syncState = SyncState.SYNCED))
+                vitalDao.markSyncedIfUnchanged(localData)
             }
 
             synced
@@ -71,7 +96,7 @@ class VitalRepo @Inject constructor(
             vitals.forEach { vital ->
                 val synced = pushSingleVital(vital)
                 if (synced) {
-                    vitalDao.saveVitals(vital.copy(syncState = SyncState.SYNCED))
+                    vitalDao.markSyncedIfUnchanged(vital)
                     successCount += 1
                 } else {
                     failCount += 1
@@ -135,52 +160,7 @@ class VitalRepo @Inject constructor(
                     )
                 )
 
-                records.forEach { record ->
-                    val beneficiary = record.beneficiaryID?.let { benDao.getBen(it) }
-                        ?: record.beneficiaryRegID?.let { benDao.getBenByRegId(it) }
-                    val benId = beneficiary?.beneficiaryId ?: record.beneficiaryID ?: return@forEach
-                    val benRegId = record.beneficiaryRegID ?: beneficiary?.benRegId ?: return@forEach
-
-                    val existing = vitalDao.getVitals(benId)
-                    val serverUpdatedDate = parseServerUpdateDate(record.updateDate ?: record.createdDate)
-                    if (!shouldApplyServerRecord(
-                            existing?.syncState,
-                            existing?.serverUpdatedDate,
-                            existing?.capturedAt,
-                            serverUpdatedDate
-                        )
-                    ) {
-                        return@forEach
-                    }
-                    vitalDao.saveVitals(
-                        (existing ?: VitalCache(benId = benId, benRegId = benRegId)).copy(
-                            benRegId = benRegId,
-                            pulseRate = record.pulseRate,
-                            bpSystolic = record.systolicBP,
-                            bpDiastolic = record.diastolicBP,
-                            rbs = record.randomBloodSugar,
-                            pallorId = record.pallorId,
-                            pallor = record.pallor,
-                            icterusId = record.icterusId,
-                            icterus = record.icterus,
-                            cyanosisId = record.cyanosisId,
-                            cyanosis = record.cyanosis,
-                            clubbingId = record.clubbingId,
-                            clubbing = record.clubbing,
-                            lymphadenopathyId = record.lymphadenopathyId,
-                            lymphadenopathy = record.lymphadenopathy,
-                            oedemaId = record.oedemaId,
-                            oedema = record.oedema,
-                            keyPopulationRiskFactorIds = parseIntList(record.keyPopulationRiskFactorIds),
-                            keyPopulationRiskFactors = parseStringList(record.keyPopulationRiskFactors),
-                            hivStatusId = record.hivStatusId,
-                            hivStatus = record.hivStatus,
-                            referralToHwcNeeded = record.referralToHWCNeeded,
-                            serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
-                            syncState = SyncState.SYNCED
-                        )
-                    )
-                }
+                saveGeneralExaminationRecords(records)
 
                 if (records.isEmpty()) 0 else 1
             } catch (e: SocketTimeoutException) {
@@ -196,12 +176,23 @@ class VitalRepo @Inject constructor(
         }
     }
 
-    private suspend fun pushSingleVital(vitalCache: VitalCache): Boolean {
+    // Network failures (IOException) propagate so the push worker retries with
+    // backoff. A token refresh is retried at most once.
+    private suspend fun pushSingleVital(vitalCache: VitalCache, retriedAfterRefresh: Boolean = false): Boolean {
         val user = preferenceDao.getLoggedInUser() ?: return false
+
+        // The benRegId stored with the vital is the one known when the form was
+        // opened, which is 0 for a beneficiary not yet registered on the server.
+        // Use the current one, and wait until registration has assigned it.
+        val benRegId = benDao.getBen(vitalCache.benId)?.benRegId?.takeIf { it > 0L }
+        if (benRegId == null) {
+            Timber.d("Vital push waiting for beneficiary registration: benId=%s", vitalCache.benId)
+            return false
+        }
 
         return try {
             val response = tmcNetworkApiService.saveGeneralExamination(
-                listOf(GeneralExaminationSaveRequest.from(vitalCache, user))
+                listOf(GeneralExaminationSaveRequest.from(vitalCache.copy(benRegId = benRegId), user))
             )
 
             val responseBody = response.body()?.string()
@@ -216,8 +207,8 @@ class VitalRepo @Inject constructor(
                 200 -> true
 
                 401, 5002 -> {
-                    if (userRepo.refreshTokenTmc(user.userName, user.password)) {
-                        pushSingleVital(vitalCache)
+                    if (!retriedAfterRefresh && userRepo.refreshTokenTmc(user.userName, user.password)) {
+                        pushSingleVital(vitalCache, retriedAfterRefresh = true)
                     } else {
                         false
                     }
@@ -226,16 +217,11 @@ class VitalRepo @Inject constructor(
                 else -> false
             }
 
-        } catch (e: SocketTimeoutException) {
-            if (e.message == "Refreshed Token") {
-                pushSingleVital(vitalCache)
-            } else {
-                false
-            }
-
+        } catch (e: IOException) {
+            throw e
         } catch (e: Exception) {
-            if (shouldRetryWithRefresh(e, user.userName, user.password)) {
-                pushSingleVital(vitalCache)
+            if (!retriedAfterRefresh && shouldRetryWithRefresh(e, user.userName, user.password)) {
+                pushSingleVital(vitalCache, retriedAfterRefresh = true)
             } else {
                 Timber.e(e, "Vital sync failed for benId=%s", vitalCache.benId)
                 false
@@ -276,6 +262,71 @@ class VitalRepo @Inject constructor(
             List(jsonArray.length()) { index -> jsonArray.optString(index) }
                 .filter { it.isNotBlank() }
         }.getOrNull()
+    }
+
+    // Records from the changes feed, in the same JSON getAll returns.
+    suspend fun applyFeedGeneralExaminations(records: JSONArray) {
+        withContext(Dispatchers.IO) {
+            saveGeneralExaminationRecords(parseGeneralExaminationRecords(JSONObject().put("data", records)))
+        }
+    }
+
+    private suspend fun saveGeneralExaminationRecords(records: List<GeneralExaminationRecord>) {
+        // One transaction per [pullWriteChunkSize] records instead of one per record.
+        // Room's InvalidationTracker fires per transaction, so a 20,000-record payload
+        // used to invalidate VITALS - and every query observing it - twenty thousand
+        // times, each invalidation re-running the open screen's list queries while the
+        // next record waited behind them for the connection.
+        records.chunked(pullWriteChunkSize).forEach { chunk ->
+            database.withTransaction {
+                chunk.forEach perRecord@ { record ->
+                    val beneficiary = record.beneficiaryID?.let { benDao.getBen(it) }
+                        ?: record.beneficiaryRegID?.let { benDao.getBenByRegId(it) }
+                    val benId = beneficiary?.beneficiaryId ?: record.beneficiaryID ?: return@perRecord
+                    val benRegId = record.beneficiaryRegID ?: beneficiary?.benRegId ?: return@perRecord
+
+                    val existing = vitalDao.getVitals(benId)
+                    val serverUpdatedDate = parseServerUpdateDate(record.updateDate ?: record.createdDate)
+                    if (!shouldApplyServerRecord(
+                            existing?.syncState,
+                            existing?.serverUpdatedDate,
+                            existing?.capturedAt,
+                            serverUpdatedDate
+                        )
+                    ) {
+                        return@perRecord
+                    }
+                    vitalDao.saveVitals(
+                        (existing ?: VitalCache(benId = benId, benRegId = benRegId)).copy(
+                            benRegId = benRegId,
+                            pulseRate = record.pulseRate,
+                            bpSystolic = record.systolicBP,
+                            bpDiastolic = record.diastolicBP,
+                            rbs = record.randomBloodSugar,
+                            pallorId = record.pallorId,
+                            pallor = record.pallor,
+                            icterusId = record.icterusId,
+                            icterus = record.icterus,
+                            cyanosisId = record.cyanosisId,
+                            cyanosis = record.cyanosis,
+                            clubbingId = record.clubbingId,
+                            clubbing = record.clubbing,
+                            lymphadenopathyId = record.lymphadenopathyId,
+                            lymphadenopathy = record.lymphadenopathy,
+                            oedemaId = record.oedemaId,
+                            oedema = record.oedema,
+                            keyPopulationRiskFactorIds = parseIntList(record.keyPopulationRiskFactorIds),
+                            keyPopulationRiskFactors = parseStringList(record.keyPopulationRiskFactors),
+                            hivStatusId = record.hivStatusId,
+                            hivStatus = record.hivStatus,
+                            referralToHwcNeeded = record.referralToHWCNeeded,
+                            serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
+                            syncState = SyncState.SYNCED
+                        )
+                    )
+                }
+            }
+        }
     }
 
     private fun parseGeneralExaminationRecords(jsonObj: JSONObject): List<GeneralExaminationRecord> {

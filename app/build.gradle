@@ -91,6 +91,16 @@ android {
     }
     kapt {
         correctErrorTypes true
+        arguments {
+            // Room writes each database version's schema here (commit the files):
+            // the history migration tests need.
+            arg("room.schemaLocation", "$projectDir/schemas".toString())
+        }
+    }
+
+    sourceSets {
+        // Exported Room schemas, used by MigrationTestHelper in instrumented tests.
+        androidTest.assets.srcDirs += files("$projectDir/schemas".toString())
     }
 
     kotlinOptions {

@@ -50,7 +50,7 @@ class DrugMasterTest {
     @Test
     fun incompleteResponseDoesNotBecomeAnEmptyCache() {
         assertNull(DoctorDrugMasterData().toCache("scope"))
-        assertNotNull(DoctorDrugMasterData(emptyList(), emptyList(), emptyList(), emptyList()).toCache("scope"))
+        assertNull(DoctorDrugMasterData(emptyList(), emptyList(), emptyList(), emptyList()).toCache("scope"))
     }
 
     @Test

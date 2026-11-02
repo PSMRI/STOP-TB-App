@@ -35,6 +35,7 @@ class SyncStatusTabFragment : Fragment() {
 
     private var failedExpanded = false
     private lateinit var failedWorkerAdapter: FailedWorkerAdapter
+    private lateinit var needsAttentionAdapter: FailedWorkerAdapter
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -47,6 +48,19 @@ class SyncStatusTabFragment : Fragment() {
 
         failedWorkerAdapter = FailedWorkerAdapter()
         binding.rvFailedWorkers.adapter = failedWorkerAdapter
+
+        needsAttentionAdapter = FailedWorkerAdapter()
+        binding.rvNeedsAttention.adapter = needsAttentionAdapter
+        viewModel.needsAttention.observe(viewLifecycleOwner) { items ->
+            needsAttentionAdapter.submitList(items)
+            binding.cardNeedsAttention.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
+            binding.tvNeedsAttentionSummary.text =
+                getString(R.string.sync_dashboard_needs_attention_summary, items.size)
+        }
+        binding.btnRetryNow.setOnClickListener {
+            viewModel.retryNow(requireContext())
+            viewModel.refreshNeedsAttention(requireContext())
+        }
 
         val localNames = viewModel.getLocalNames(requireContext())
         val englishNames = viewModel.getEnglishNames(requireContext())
@@ -85,9 +99,10 @@ class SyncStatusTabFragment : Fragment() {
             }
         }
 
-        // Observe worker states
+        // Observe worker states; a finished sync may have changed what needs attention.
         viewModel.workerStates.observe(viewLifecycleOwner) { workInfoList ->
             updateWorkerStatus(workInfoList)
+            viewModel.refreshNeedsAttention(requireContext())
         }
 
         // Observe failed worker details
@@ -124,13 +139,22 @@ class SyncStatusTabFragment : Fragment() {
                 binding.tvWorkerDetails.visibility = View.GONE
                 binding.rvFailedWorkers.visibility = View.GONE
             }
-            // Treat mixed success+failure as completed for the current cycle when nothing is running/enqueued.
-            // This prevents stale failed workers from older sync attempts from showing as an active issue.
+            // The cycle finished. Show it as complete, but keep any failures in
+            // this cycle visible instead of hiding them behind "Complete".
             succeeded > 0 && enqueued == 0 -> {
                 binding.tvWorkerStatus.text = getString(R.string.sync_dashboard_worker_complete)
-                binding.tvWorkerDetails.visibility = View.GONE
-                binding.rvFailedWorkers.visibility = View.GONE
-                failedExpanded = false
+                if (failed.isNotEmpty()) {
+                    binding.tvWorkerDetails.text = getString(
+                        R.string.sync_dashboard_worker_failed, failed.size
+                    )
+                    binding.tvWorkerDetails.visibility = View.VISIBLE
+                    binding.rvFailedWorkers.visibility =
+                        if (failedExpanded) View.VISIBLE else View.GONE
+                } else {
+                    binding.tvWorkerDetails.visibility = View.GONE
+                    binding.rvFailedWorkers.visibility = View.GONE
+                    failedExpanded = false
+                }
             }
             failed.isNotEmpty() -> {
                 binding.tvWorkerStatus.text = getString(R.string.sync_dashboard_worker_idle)
