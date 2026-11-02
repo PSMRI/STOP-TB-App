@@ -734,11 +734,19 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             }
         }
 
-        // HoF / Non-HH (new or edit): Pincode & Residential Area come from the village (captured once on the
-        // location screen) and are locked. Runs after the saved record is restored so it isn't overwritten.
-        // Members other than HoF hide these fields and inherit from the HoF as before.
-        if (villageDefaults != null && (relToHeadId == 18 || isNonHH)) {
-            applyVillageDefaults(villageDefaults, includePinCode = !isNonHH)
+        // HoF / Non-HH only — members other than HoF hide these fields and inherit from the HoF as before.
+        if (relToHeadId == 18 || isNonHH) {
+            val savedRecord = ben?.takeIf { !it.isDraft }
+            if (savedRecord != null) {
+                // Edit: this record's own values are already saved/synced — keep them (locked) and never swap in
+                // the village's current values. They only change if the user changes the village (see villageHamlet).
+                savedRecordVillageId = savedRecord.locationRecord.village.id
+                savedRecordValues = getSavedRecordValues(savedRecord)
+                lockSavedRecordValues(includePinCode = !isNonHH)
+            } else if (villageDefaults != null) {
+                // New registration: Pincode & Residential Area come from the village (captured once on the location screen)
+                applyVillageDefaults(villageDefaults, includePinCode = !isNonHH)
+            }
         }
 
         addMaritalStatusIfApplicable(list)
@@ -910,8 +918,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         hofForDobRules: BenRegCache? = null,
         hofSpouseForDobRules: BenRegCache? = null,
         selectedMemberForDobRules: BenRegCache? = null,
-        showUpdateLocation: Boolean = false,
-        villageDefaults: VillageDefaults? = null
+        showUpdateLocation: Boolean = false
     ) = setUpPage(
         ben,
         familyHeadPhoneNo,
@@ -926,8 +933,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         hofForDobRules = hofForDobRules,
         hofSpouseForDobRules = hofSpouseForDobRules,
         selectedMemberForDobRules = selectedMemberForDobRules,
-        showUpdateLocation = showUpdateLocation,
-        villageDefaults = villageDefaults
+        showUpdateLocation = showUpdateLocation
     )
 
 
@@ -935,6 +941,21 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     private var villageEntities: List<LocationEntity> = emptyList()
     // True when the selected village had no saved Pincode / Residential Area, so the user typed them in
     private var isCapturingVillageDefaults = false
+    // Edit mode: the record's own village and values, restored if the user switches back to that village
+    private var savedRecordVillageId: Int? = null
+    private var savedRecordValues: VillageDefaults? = null
+
+    private fun getSavedRecordValues(saved: BenRegCache) = VillageDefaults(
+        pinCode = saved.pinCode?.trim(),
+        residentialAreaId = residentialAreaType.entries?.indexOf(getSavedResidentialAreaValue(saved))?.plus(1) ?: 0
+    )
+
+    /** Edit mode: locks Pincode / Residential Area that the record already has; a blank one stays editable. */
+    private fun lockSavedRecordValues(includePinCode: Boolean) {
+        val recordValues = savedRecordValues ?: return
+        if (includePinCode && recordValues.hasPinCode) pinCode.inputType = TEXT_VIEW
+        if (recordValues.hasResidentialArea) residentialAreaType.inputType = TEXT_VIEW
+    }
 
     /**
      * Fills Pincode / Residential Area from the village's saved values and locks them. A value the village
@@ -1312,10 +1333,11 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                 val isPinCodeShown = getIndexOfElement(pinCode) >= 0
                 if (!isPinCodeShown && getIndexOfElement(residentialAreaType) < 0) return -1
                 val selectedVillage = villageEntities.find { it.name == villageHamlet.value }
-                applyVillageDefaults(
-                    selectedVillage?.let { preferenceDao.getVillageDefaults(it.id) },
-                    includePinCode = isPinCodeShown
-                )
+                // Back to the record's own village (edit) → its own saved values, not the village's current ones
+                val valuesForVillage =
+                    if (selectedVillage != null && selectedVillage.id == savedRecordVillageId) savedRecordValues
+                    else selectedVillage?.let { preferenceDao.getVillageDefaults(it.id) }
+                applyVillageDefaults(valuesForVillage, includePinCode = isPinCodeShown)
                 return getIndexOfElement(villageHamlet)
             }
 

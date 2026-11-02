@@ -217,9 +217,7 @@ class NewBenRegViewModel @Inject constructor(
                 isNonHH = ben.isNonHH,
                 hofForDobRules = hofBen,
                 hofSpouseForDobRules = hofSpouse,
-                showUpdateLocation = isStandalone,
-                // Same village shown in the form above — its saved Pincode / Residential Area lock the fields
-                villageDefaults = preferenceDao.getVillageDefaults(locationRecord.village.id)
+                showUpdateLocation = isStandalone
             )
         } else {
             val villageNames = user.villages.map { it.name }.toTypedArray()

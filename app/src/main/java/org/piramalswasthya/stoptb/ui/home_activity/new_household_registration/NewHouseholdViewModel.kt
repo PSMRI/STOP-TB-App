@@ -117,8 +117,10 @@ class NewHouseholdViewModel @Inject constructor(
                     householdRepo.getAllBenOfHousehold(household.householdId).size
                 } else 0
 
-                // New or edit: the village's saved Residential Area fills and locks the field
-                val villageDefaults = preferenceDao.getVillageDefaults(household.locationRecord.village.id)
+                // Only a new household takes the village's Residential Area; a saved one keeps (and locks) its own
+                val villageDefaults = if (household.householdId == 0L)
+                    preferenceDao.getVillageDefaults(household.locationRecord.village.id)
+                else null
                 dataset.setupPage(household, villageNames, user.villages, registeredMemberCount, villageDefaults)
                 _isCampSite.value = dataset.isRegisteredAtCampSite()
 

@@ -31,6 +31,10 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
     private val preferenceDao = PreferenceDao(context)
     // True when the selected village had no saved Residential Area, so the user picked one here
     private var isCapturingVillageDefaults = false
+    // Edit mode: the household's own village and values, restored if the user switches back to that village
+    private var savedRecordVillageId: Int? = null
+    private var savedRecordValues: VillageDefaults? = null
+    private var savedRecordOtherResidentialArea: String? = null
     companion object {
         private fun getCurrentDate(): String {
             val calendar = Calendar.getInstance()
@@ -311,8 +315,18 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             otherTypeOfHouse.value = saved.otherHouseType
             houseOwnership.value = houseOwnership.getStringFromPosition(saved.isHouseOwnedId)
         }
-        // New household: Residential Area comes from the village (captured once on the location screen)
-        villageDefaults?.let { applyVillageDefaults(it) }
+        if (hh != null && hh.householdId != 0L) {
+            // Edit: the household's own Residential Area is already saved/synced — keep it (locked) and never swap
+            // in the village's current value. It only changes if the user changes the village (see villageHamlet).
+            val recordValues = VillageDefaults(residentialAreaId = hh.details?.residentialAreaId ?: 0)
+            savedRecordVillageId = hh.locationRecord.village.id
+            savedRecordValues = recordValues
+            savedRecordOtherResidentialArea = hh.details?.otherResidentialArea
+            if (recordValues.hasResidentialArea) residentialArea.inputType = TEXT_VIEW
+        } else {
+            // New household: Residential Area comes from the village (captured once on the location screen)
+            villageDefaults?.let { applyVillageDefaults(it) }
+        }
         if (residentialArea.value == residentialArea.entries!!.last()) {
             list.add(list.indexOf(residentialArea) + 1, otherResidentialArea)
         }
@@ -778,7 +792,13 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
                 // Residential Area belongs to the village: reset and refill from the new village's saved
                 // value, or leave blank for the user to capture.
                 val selectedVillage = villageEntities.find { it.name == villageHamlet.value }
-                applyVillageDefaults(selectedVillage?.let { preferenceDao.getVillageDefaults(it.id) })
+                if (selectedVillage != null && selectedVillage.id == savedRecordVillageId) {
+                    // Back to the household's own village (edit) → its own saved value, not the village's current one
+                    applyVillageDefaults(savedRecordValues)
+                    otherResidentialArea.value = savedRecordOtherResidentialArea
+                } else {
+                    applyVillageDefaults(selectedVillage?.let { preferenceDao.getVillageDefaults(it.id) })
+                }
                 triggerDependants(
                     source = residentialArea,
                     passedIndex = residentialArea.entries!!.indexOf(residentialArea.value),
