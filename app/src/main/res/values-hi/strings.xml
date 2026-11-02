@@ -616,6 +616,18 @@
         <item>अन्य</item>
     </string-array>
 
+    <string name="remarks">टिप्पणी</string>
+
+    <string-array name="tb_treatment_outcomes">
+        <item>उपचार पूरा हुआ</item>
+        <item>मृत्यु</item>
+        <item>उपचार विफल</item>
+        <item>अनुवर्ती जाँच के लिए संपर्क टूट गया</item>
+        <item>डुप्लिकेट के रूप में चिह्नित करें</item>
+        <item>रोगमुक्त</item>
+        <item>उपचार पद्धति बदली गई</item>
+    </string-array>
+
     <string-array name="body_part_female">
         <item>दाएं हाथ</item>
         <item>बाएं हाथ</item>
@@ -715,6 +727,7 @@
     <string name="tb_presumptive_alert_title">संभावित टीबी मामला!</string>
     <string name="tb_presumptive_alert_refer">एक्स-रे के लिए रेफर करें और ट्रूनैट टेस्ट के लिए थूक एकत्र करें</string>
     <string name="tb_presumptive_alert_refer_pregnant">ट्रूनैट टेस्ट के लिए थूक एकत्र करें</string>
+    <string name="tb_presumptive_alert_liquid_culture">लिक्विड कल्चर टेस्ट के लिए रेफर करें</string>
     <string name="tb_presumptive_alert_family">परिवार के सभी सदस्यों की स्क्रीनिंग की सलाह दें</string>
     <string name="referred_for_digital_chest_xray">डिजिटल चेस्ट एक्स-रे के लिए रेफर किया गया</string>
     <string name="referred_for_sputum_collection">स्पुटम कलेक्शन के लिए रेफर किया गया</string>
