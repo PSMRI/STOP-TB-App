@@ -711,8 +711,10 @@ class BenRepo @Inject constructor(
             // rejected as a unit. Groups with a rejected member that is still
             // waiting out its retry delay sit this cycle out (they stay UNSYNCED).
             fun groupKey(ben: BenRegCache) = ben.householdId?.takeIf { hh -> hh > 0L } ?: -ben.beneficiaryId
+            // A single-beneficiary push is user-initiated, so it doesn't wait out the retry delay.
             val (waiting, dueMembers) = readyBens.groupBy(::groupKey).values.partition { members ->
-                members.any { syncRetryStore.isWaiting(SyncRetryStore.ENTITY_BENEFICIARY, it.beneficiaryId) }
+                beneficiaryId == null &&
+                    members.any { syncRetryStore.isWaiting(SyncRetryStore.ENTITY_BENEFICIARY, it.beneficiaryId) }
             }
             if (waiting.isNotEmpty()) {
                 Timber.w("Beneficiary push: ${waiting.size} group(s) waiting to retry: ${waiting.flatten().map { it.beneficiaryId }}")
@@ -756,7 +758,10 @@ class BenRepo @Inject constructor(
                 Timber.e("Beneficiary push: ${rejected.size} group(s) rejected${if (serverWide) " (server rejected everything)" else ""}: $ids")
             }
             Timber.d("Beneficiary push: ${sent.size} group(s) sent, ${rejected.size} rejected, ${waiting.size} waiting")
-            return@withContext rejected.isEmpty()
+            // For a single beneficiary, succeed only if it actually reached the server: it may
+            // have been skipped (e.g. left SYNCING by an earlier failed push) without being rejected.
+            return@withContext rejected.isEmpty() &&
+                (beneficiaryId == null || benDao.getBen(beneficiaryId)?.syncState == SyncState.SYNCED)
         }
     }
 
@@ -782,18 +787,6 @@ class BenRepo @Inject constructor(
             } catch (e: Exception) {
                 Timber.e("caught error in adding kidDetails : $e")
             }
-
-            val uploadDone = postDataToAmritServer(benNetworkPostList, householdNetworkPostList, kidNetworkPostList)
-            if (!uploadDone) { // todo need to resolve this
-                benNetworkPostList.takeIf { it.isNotEmpty() }?.map { it.benId }?.let {
-                    benDao.benSyncWithServerFailed(*it.toLongArray())
-                }
-                Timber.e("Beneficiary batch push FAILED: ${benNetworkPostList.size} ben records, ${householdNetworkPostList.size} household records")
-            } else {
-                Timber.d("Beneficiary batch push succeeded: ${benNetworkPostList.size} ben records, ${householdNetworkPostList.size} household records")
-            }
-            val counsellingSyncDone = beneficiaryId != null || pushCounsellingData()
-            return@withContext uploadDone && counsellingSyncDone
         }
         return UploadGroup(members, bens, households.toList(), kids)
     }

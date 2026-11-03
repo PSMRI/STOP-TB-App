@@ -296,7 +296,7 @@ object WorkerUtils {
         )
 
         val groupMissingData = listOf(
-            (if (isCampHubSyncActive) {
+            (if (campMode) {
                 campSyncRequestBuilder<PullMissingDataFromAmritWorker>()
             } else {
                 syncRequestBuilder<PullMissingDataFromAmritWorker>()

@@ -1849,7 +1849,7 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_60_61 = object : Migration(60, 61) { // todo convert this to latest change
+        private val MIGRATION_64_65 = object : Migration(64, 65) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     """
@@ -2070,7 +2070,7 @@ abstract class InAppDb : RoomDatabase() {
 
 
         // Bump together with a new MIGRATION_x_y added to MIGRATIONS below.
-        const val DB_VERSION = 64
+        const val DB_VERSION = 65
 
         // Oldest schema version that can be migrated in place.
         const val OLDEST_MIGRATABLE_VERSION = 2
@@ -2140,7 +2140,7 @@ abstract class InAppDb : RoomDatabase() {
             MIGRATION_61_62,
             MIGRATION_62_63,
             MIGRATION_63_64,
-            // TODO add here the latest migration
+            MIGRATION_64_65
         )
 
         fun getInstance(appContext: Context): InAppDb {

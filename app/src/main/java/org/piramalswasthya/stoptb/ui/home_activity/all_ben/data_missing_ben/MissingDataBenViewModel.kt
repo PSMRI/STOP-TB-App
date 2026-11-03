@@ -20,8 +20,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
-import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
-import org.piramalswasthya.stoptb.model.TBScreeningCache
+import org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields
+import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
 import javax.inject.Inject
 
 @HiltViewModel
@@ -33,8 +33,8 @@ class MissingDataBenViewModel @Inject constructor(
     val uiState: StateFlow<MissingDataBenUiState> = _uiState.asStateFlow()
 
     val tbScreeningBenIds: Flow<List<Long>> = repository.tbScreeningBenIds
-    val allTbDiagnostics: Flow<List<TBDiagnosticsCache>> = repository.allTbDiagnostics
-    val allTbScreening: Flow<List<TBScreeningCache>> = repository.allTbScreening
+    val allTbDiagnostics: Flow<List<TbDiagnosticsCardFields>> = repository.allTbDiagnostics
+    val allTbScreening: Flow<List<TbScreeningSymptoms>> = repository.allTbScreening
     val householdMemberCounts: Flow<Map<Long, Int>> = repository.householdMemberCounts
     val householdHeadNames: Flow<Map<Long, String>> = repository.householdHeadNames
     val benPagingData: Flow<PagingData<MissingDataBenItem>> =

@@ -1227,7 +1227,7 @@ interface BenDao {
     suspend fun getSyncingBens(benIds: List<Long>): List<BenRegCache>
 
     @Query("SELECT * FROM BENEFICIARY WHERE isDraft = 0 AND processed = 'U' AND syncState =:unsynced AND beneficiaryId = :benId")
-    suspend fun getBenForSyncWithServerForBeneficiary(benId: Long, unsynced: SyncState = SyncState.UNSYNCED): List<BenRegCache> // TODO need to confirm this that is it needed or not
+    suspend fun getBenForSyncWithServerForBeneficiary(benId: Long, unsynced: SyncState = SyncState.UNSYNCED): List<BenRegCache>
 
     @Query("UPDATE BENEFICIARY SET processed = 'P' , syncState = 2 WHERE beneficiaryId in (:benId)")
     suspend fun benSyncedWithServer(vararg benId: Long)

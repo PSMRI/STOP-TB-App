@@ -9,8 +9,8 @@ import kotlinx.coroutines.flow.map
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.dao.DataMissingBenInfoDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
-import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
-import org.piramalswasthya.stoptb.model.TBScreeningCache
+import org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields
+import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
 import javax.inject.Inject
 
 class MissingDataRepository @Inject constructor(
@@ -28,8 +28,8 @@ class MissingDataRepository @Inject constructor(
             ?: listOf(selectedVillage)
 
     val tbScreeningBenIds: Flow<List<Long>> = db.tbDao.getAllTbScreeningBenIds()
-    val allTbDiagnostics: Flow<List<TBDiagnosticsCache>> = db.tbDao.getAllTbDiagnostics()
-    val allTbScreening: Flow<List<TBScreeningCache>> = db.tbDao.getAllTbScreening()
+    val allTbDiagnostics: Flow<List<TbDiagnosticsCardFields>> = db.tbDao.getAllTbDiagnosticsCardFields()
+    val allTbScreening: Flow<List<TbScreeningSymptoms>> = db.tbDao.getAllTbScreeningSymptoms()
     val householdMemberCounts: Flow<Map<Long, Int>> get() =
         db.benDao.getHouseholdMemberCounts(selectedVillage)
             .map { list -> list.associate { it.hhId to it.memberCount } }

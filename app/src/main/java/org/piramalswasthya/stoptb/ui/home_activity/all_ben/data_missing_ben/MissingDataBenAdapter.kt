@@ -28,17 +28,17 @@ import org.piramalswasthya.stoptb.helpers.getDateFromLong
 import org.piramalswasthya.stoptb.helpers.getPatientTypeByAge
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.Gender
-import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
-import org.piramalswasthya.stoptb.model.TBScreeningCache
+import org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields
+import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
 
 class MissingDataBenAdapter(val onItemClick: (MissingDataBenItem) -> Unit) :
     PagingDataAdapter<MissingDataBenItem, MissingDataBenAdapter.ViewHolder>(DiffCallback) {
 
     private val tbScreeningBenIds = mutableListOf<Long>()
     private val tbDiagnosticsList =
-        mutableListOf<TBDiagnosticsCache>()
+        mutableListOf<TbDiagnosticsCardFields>()
     private val tbScreeningMap =
-        mutableMapOf<Long, TBScreeningCache>()
+        mutableMapOf<Long, TbScreeningSymptoms>()
     private val householdMemberCountMap = mutableMapOf<Long, Int>()
     private val householdHeadNameMap = mutableMapOf<Long, String>()
 
@@ -370,7 +370,7 @@ class MissingDataBenAdapter(val onItemClick: (MissingDataBenItem) -> Unit) :
         }
     }
 
-    fun submitTBDiagnostics(list: List<TBDiagnosticsCache>) {
+    fun submitTBDiagnostics(list: List<TbDiagnosticsCardFields>) {
         val oldByBenId = tbDiagnosticsList.associateBy { it.benId }
         val newByBenId = list.associateBy { it.benId }
         tbDiagnosticsList.clear()
@@ -387,7 +387,7 @@ class MissingDataBenAdapter(val onItemClick: (MissingDataBenItem) -> Unit) :
         }
     }
 
-    fun submitTbScreeningList(list: List<TBScreeningCache>) {
+    fun submitTbScreeningList(list: List<TbScreeningSymptoms>) {
         tbScreeningMap.clear()
         tbScreeningMap.putAll(list.associateBy { it.benId })
         notifyDataSetChanged()
