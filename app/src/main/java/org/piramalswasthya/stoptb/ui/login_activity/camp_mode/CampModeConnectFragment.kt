@@ -181,6 +181,7 @@ class CampModeConnectFragment : Fragment() {
                 )
                 WorkerUtils.triggerAmritPushWorker(requireContext().applicationContext)
                 WorkerUtils.triggerCampQuickPullIfConnected(requireContext().applicationContext, pref, force = true)
+                WorkerUtils.reportTabletVersion(requireContext().applicationContext, force = true)
                 closeConnectScreen(refreshSignIn = true)
             }
 

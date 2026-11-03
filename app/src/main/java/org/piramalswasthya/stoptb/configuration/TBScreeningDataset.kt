@@ -11,6 +11,7 @@ import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.utils.Log
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.utils.CommonConstants
+import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
 
 
 class TBScreeningDataset(
@@ -316,28 +317,55 @@ class TBScreeningDataset(
         fun isPresumptive(saved: TBScreeningCache?): Boolean? {
             if (saved == null) return null
 
-            val answers = listOf(
-                saved.coughMoreThan2Weeks,
-                saved.bloodInSputum,
-                saved.feverMoreThan2Weeks,
-                saved.riseOfFever,
-                saved.lossOfAppetite,
-                saved.lossOfWeight,
-                saved.nightSweats,
-                saved.historyOfTb,
-                saved.takingAntiTBDrugs,
-                saved.familySufferingFromTB
+            return decide(
+                answers = listOf(
+                    saved.coughMoreThan2Weeks,
+                    saved.bloodInSputum,
+                    saved.feverMoreThan2Weeks,
+                    saved.riseOfFever,
+                    saved.lossOfAppetite,
+                    saved.lossOfWeight,
+                    saved.nightSweats,
+                    saved.historyOfTb,
+                    saved.takingAntiTBDrugs,
+                    saved.familySufferingFromTB
+                ),
+                asymptomatic = saved.asymptomatic
             )
+        }
 
-            return when {
-                answers.any { it == true } -> true
-                answers.all { it == false } -> false
-                // Fallback to the stored value (asymptomatic YES = not presumptive)
-                else -> when (saved.asymptomatic) {
-                    "NO" -> true
-                    "YES" -> false
-                    else -> null
-                }
+        /**
+         * Same rule, applied to the narrow [TbScreeningSymptoms] projection the beneficiary
+         * lists observe instead of the full row.
+         */
+        fun isPresumptive(saved: TbScreeningSymptoms?): Boolean? {
+            if (saved == null) return null
+
+            return decide(
+                answers = listOf(
+                    saved.coughMoreThan2Weeks,
+                    saved.bloodInSputum,
+                    saved.feverMoreThan2Weeks,
+                    saved.riseOfFever,
+                    saved.lossOfAppetite,
+                    saved.lossOfWeight,
+                    saved.nightSweats,
+                    saved.historyOfTb,
+                    saved.takingAntiTBDrugs,
+                    saved.familySufferingFromTB
+                ),
+                asymptomatic = saved.asymptomatic
+            )
+        }
+
+        private fun decide(answers: List<Boolean?>, asymptomatic: String?): Boolean? = when {
+            answers.any { answer -> answer == true } -> true
+            answers.all { answer -> answer == false } -> false
+            // Fallback to the stored value (asymptomatic YES = not presumptive)
+            else -> when (asymptomatic) {
+                "NO" -> true
+                "YES" -> false
+                else -> null
             }
         }
     }
@@ -723,17 +751,34 @@ class TBScreeningDataset(
             if (isPregnantBen) R.string.tb_presumptive_alert_refer_pregnant
             else R.string.tb_presumptive_alert_refer
         )
+        val liquidCultureText =
+            if (requiresLiquidCultureReferral())
+                "\n" + resources.getString(R.string.tb_presumptive_alert_liquid_culture)
+            else ""
         return when {
             hasDoubleStarYes() ->
                 resources.getString(R.string.tb_presumptive_alert_title) +
                     "\n" + referText +
+                    liquidCultureText +
                     "\n" + resources.getString(R.string.tb_presumptive_alert_family)
             hasSingleStarYes() ->
                 resources.getString(R.string.tb_presumptive_alert_title) +
-                    "\n" + referText
+                    "\n" + referText +
+                    liquidCultureText
             else -> null
         }
     }
+
+    /**
+     * Mirrors the TB_SCREENING branch of the Liquid Culture card queries in BenDao
+     * (historyOfTb / takingAntiTBDrugs / familySufferingFromTB = 1), so the popup
+     * mentions Liquid Culture exactly when the beneficiary will appear on that card.
+     */
+    private fun requiresLiquidCultureReferral(): Boolean = listOf(
+        historyOfTB,
+        currentlyTakingDrugs,
+        familyHistoryTB
+    ).any(::isYes)
 
     fun getFamilyContactAlert(): String? =
         if (requiresFamilyContactScreening())

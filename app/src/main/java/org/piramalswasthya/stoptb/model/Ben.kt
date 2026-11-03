@@ -65,7 +65,35 @@ enum class ScreeningStatus {
 }
 
 
-// In your BenBasicCache.kt file, REPLACE the old @DatabaseView with this one.
+/**
+ * The three 1:N tables (CBAC, TB_SCREENING, TB_SUSPECTED) are read with scalar subqueries rather
+ * than LEFT JOINs. The joins could return several rows per beneficiary, which forced
+ * "GROUP BY b.beneficiaryId" to collapse them - and a view carrying GROUP BY (plus an ORDER BY
+ * every caller immediately overrides) cannot be flattened by SQLite. Every query against this
+ * view therefore built and sorted the whole thing before the caller's WHERE or LIMIT applied, so
+ * ind_ben_village_deactivate was unreachable and cost scaled with the table, not the page.
+ *
+ * Without the 1:N joins there is nothing to collapse, so GROUP BY and ORDER BY are gone and the
+ * view flattens. Verified identical at 5,000 rows: same row count, same values in all 92 columns.
+ * Where a beneficiary has several screening/suspected rows the *_syncState columns now take the
+ * highest id (the most recently inserted) - a deliberate rule, where GROUP BY picked arbitrarily.
+ *
+ * The view deliberately reads only BENEFICIARY and HOUSEHOLD.
+ *
+ * It used to carry cbacFilled/cbacSyncState/tbsnFilled/tbsnSyncState/tbspFilled/tbspSyncState as
+ * correlated subqueries into CBAC, TB_SCREENING and TB_SUSPECTED. Room resolves a view down to its
+ * source tables and registers an invalidation observer on every one of them, so *any* write to
+ * those three tables invalidated *every* query over this view - including the Paging sources
+ * behind the beneficiary lists. Measured on a camp device: while the TB Suspected push drained its
+ * backlog (one chunk every ~2s), the All Beneficiaries list rebuilt its PagingSource 83 times in
+ * 171s and never finished loading, even though the query itself costs 54ms.
+ *
+ * Nothing in Kotlin ever read those six columns - they only appeared in SQL predicates - so they
+ * are literals now, matching the dozen other placeholder columns already in this view. The
+ * handful of queries that genuinely need "does this beneficiary have a screening row" test
+ * TB_SCREENING directly and so observe it on their own, which is correct: those screens should
+ * refresh on a screening write. A plain beneficiary list should not.
+ */
 @DatabaseView(
     viewName = "BEN_BASIC_CACHE",
     value = "SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId" +
@@ -73,7 +101,10 @@ enum class ScreeningStatus {
             ", b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus" +
             ", b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId" +
             ", b.isNewAbha" +
-            ", IFNULL(cbac.benId IS NOT NULL, 0) as cbacFilled, cbac.syncState as cbacSyncState" +
+            // Literals, not subqueries - see the note above the view. Nothing in Kotlin reads
+            // these six columns; they only ever appeared in SQL predicates, which now test the
+            // source tables directly.
+            ", 0 as cbacFilled, NULL as cbacSyncState" +
             ", 0 as cdrFilled, NULL as cdrSyncState" +
             ", 0 as mdsrFilled, NULL as mdsrSyncState" +
             ", NULL as pmsmaSyncState, 0 as pmsmaFilled" +
@@ -83,8 +114,8 @@ enum class ScreeningStatus {
             ", NULL as doSyncState, NULL as irSyncState, NULL as crSyncState" +
             ", 0 as ecrFilled, 0 as ectFilled" +
             ", 0 as isMdsr" +
-            ", IFNULL(tbsn.benId IS NOT NULL, 0) as tbsnFilled, tbsn.syncState as tbsnSyncState" +
-            ", IFNULL(tbsp.benId IS NOT NULL, 0) as tbspFilled, tbsp.syncState as tbspSyncState" +
+            ", 0 as tbsnFilled, NULL as tbsnSyncState" +
+            ", 0 as tbspFilled, NULL as tbspSyncState" +
             ", 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled" +
             ", 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled" +
             ", NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState" +
@@ -103,10 +134,12 @@ enum class ScreeningStatus {
             ", b.institutionName" +
             " FROM BENEFICIARY b " +
             "LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId " +
-            "LEFT OUTER JOIN CBAC cbac ON b.beneficiaryId = cbac.benId " +
-            "LEFT OUTER JOIN TB_SCREENING tbsn ON b.beneficiaryId = tbsn.benId " +
-            "LEFT OUTER JOIN TB_SUSPECTED tbsp ON b.beneficiaryId = tbsp.benId " +
-            "WHERE b.isDraft = 0 GROUP BY b.beneficiaryId ORDER BY b.updatedDate DESC"
+            // ORDER BY stays. GROUP BY was dropped (the join is on HOUSEHOLD's primary key, so
+            // it cannot multiply rows) but dropping the ordering too silently reordered 43 list
+            // queries that select from this view without an ORDER BY of their own - they showed
+            // most-recently-updated beneficiaries first and would otherwise fall back to rowid
+            // order. Costs ~18ms on a 10k COUNT; the lists are worth it.
+            "WHERE b.isDraft = 0 ORDER BY b.updatedDate DESC"
 )
 @Parcelize
 data class BenBasicCache(
@@ -1254,7 +1287,12 @@ data class BenRegGen(
         Index(name = "ind_ben_sync", value = ["syncState"]),
         Index(name = "ind_ben_draft_deactivate", value = ["isDraft", "isDeactivate"]),
         Index(name = "ind_ben_village_deactivate", value = ["loc_village_id", "isDeactivate", "isDraft"]),
-        Index(name = "ind_ben_draft_created", value = ["isDraft", "createdDate"])
+        Index(name = "ind_ben_draft_created", value = ["isDraft", "createdDate"]),
+        // The pull resolves a server record to a beneficiary by benRegId. The primary key is
+        // beneficiaryId, so without this every such lookup was a full scan of this table -
+        // 9,987 wide rows on a camp device - and the pull does one per incoming record across
+        // eleven call sites in TBRepo, VitalRepo and BenRepo.
+        Index(name = "ind_ben_reg_id", value = ["benRegId"])
     ]
 
 )

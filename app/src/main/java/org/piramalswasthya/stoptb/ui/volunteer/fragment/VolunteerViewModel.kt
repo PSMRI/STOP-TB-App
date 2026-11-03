@@ -44,6 +44,8 @@ class VolunteerViewModel @Inject constructor(
             val restoreUsernameOnly =
                 !rememberedUser.isNullOrBlank() && !rememberedPwd.isNullOrBlank()
             pref.deleteForLogout()
+            // Process-wide backfill cursors must not carry into the next user's village.
+            org.piramalswasthya.stoptb.repositories.TBRepo.resetOrderIdBackfillState()
             pref.setLastSyncedTimeStamp(Konstants.defaultTimeStamp)
             if (restoreUsernameOnly) {
                 pref.setRememberedUsernameOnly(rememberedUser!!.trim())

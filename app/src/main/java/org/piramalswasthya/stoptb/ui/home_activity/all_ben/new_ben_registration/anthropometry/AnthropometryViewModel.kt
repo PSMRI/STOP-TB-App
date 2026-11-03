@@ -22,7 +22,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AnthropometryViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
     private val benRepo: BenRepo,
     private val preferenceDao: PreferenceDao,
     private val referralStatusManager: ReferralStatusManager,
@@ -33,7 +33,14 @@ class AnthropometryViewModel @Inject constructor(
         IDLE, SAVING, SAVE_SUCCESS, SAVE_FAILED
     }
 
-    val benId = AnthropometryFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
+    // Re-resolved in init and before saving: the nav arg can be a temp ID the push has replaced.
+    var benId = AnthropometryFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
+        private set(value) {
+            if (field == value) return
+            field = value
+            // Saved so a form restored after process death uses the server ID, not the temp ID.
+            viewModelScope.launch(Dispatchers.Main) { savedStateHandle["benId"] = value }
+        }
     val autoFlow = AnthropometryFragmentArgs.fromSavedStateHandle(savedStateHandle).autoFlow
     val examineFlow: Boolean = savedStateHandle["examineFlow"] ?: false
 
@@ -53,6 +60,8 @@ class AnthropometryViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            // Resolve the current beneficiary ID to load the correct beneficiary's data when the form opens.
+            benId = benRepo.resolveCurrentBenId(benId)
             benRepo.getBenFromId(benId)?.let { ben ->
                 benCache = ben
                 _benName.value = listOfNotNull(ben.firstName, ben.lastName).joinToString(" ")
@@ -82,7 +91,10 @@ class AnthropometryViewModel @Inject constructor(
             withContext(Dispatchers.IO) {
                 try {
                     _state.postValue(State.SAVING)
-                    val ben = benCache ?: benRepo.getBenFromId(benId)
+                    // Re-resolve the current beneficiary ID before submitting to ensure data is saved against the correct beneficiary.
+                    benId = benRepo.resolveCurrentBenId(benId)
+                    // Reload if the ID was replaced while the form was open — benCache is the old row.
+                    val ben = benCache?.takeIf { it.beneficiaryId == benId } ?: benRepo.getBenFromId(benId)
                     if (ben == null) {
                         _state.postValue(State.SAVE_FAILED)
                         return@withContext

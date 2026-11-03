@@ -62,7 +62,7 @@ class HouseholdMembersViewModel @Inject constructor(
 
     /** Diagnosis = TB_DIAGNOSTICS (new) OR TB_SUSPECTED (legacy) */
     val diagnosisBenIds: Flow<List<Long>> = combine(
-        tbRepo.tbDiagnosticsBenIds,
+        tbRepo.tbDiagnosticsBenIdsFromCards,
         tbRepo.tbSuspectedBenIds
     ) { diagnostics, suspected -> (diagnostics + suspected).distinct() }
 

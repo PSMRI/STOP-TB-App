@@ -37,8 +37,8 @@ import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.MtbResult
 import org.piramalswasthya.stoptb.model.OrderStatus
 import org.piramalswasthya.stoptb.model.RifResult
-import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
-import org.piramalswasthya.stoptb.model.TBScreeningCache
+import org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields
+import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
 import org.piramalswasthya.stoptb.ui.setSyncStateForBen
 import timber.log.Timber
 
@@ -48,6 +48,9 @@ data class ButtonConfig(
     val action: String,
     val type: String
 )
+
+private fun String?.isMissingOrderId(): Boolean =
+    isNullOrBlank() || equals("N/A", ignoreCase = true)
 
 class BenListAdapter(
     private val clickListener: BenClickListener? = null,
@@ -165,6 +168,7 @@ class BenListAdapter(
 
         private fun bindPillAndCaptions(
             status: String?,
+            orderId: String?,
             benId: Long,
             testType: String,
             pref: PreferenceDao?,
@@ -203,6 +207,15 @@ class BenListAdapter(
                     setPillIcon(spinning = false, staticRes = R.drawable.ic_cloud_off_bottom_sheet, tintRes = android.R.color.darker_gray)
                     pillText.text = ctx.getString(R.string.order_status_saved_locally_syncing)
                     pillText.setTextColor(ContextCompat.getColor(ctx, android.R.color.darker_gray))
+                    statusDivider.visibility = View.GONE
+                    lastCheckedCaption.visibility = View.GONE
+                    pollingStoppedCaption.visibility = View.GONE
+                }
+                status.equals(OrderStatus.PENDING.name, ignoreCase = true) && orderId.isMissingOrderId() -> {
+                    pillContainer.visibility = View.VISIBLE
+                    setPillIcon(spinning = false, staticRes = R.drawable.ic_exclamation_circle, tintRes = R.color.md_theme_light_error)
+                    pillText.text = ctx.getString(R.string.order_status_order_not_created)
+                    pillText.setTextColor(ContextCompat.getColor(ctx, R.color.md_theme_light_error))
                     statusDivider.visibility = View.GONE
                     lastCheckedCaption.visibility = View.GONE
                     pollingStoppedCaption.visibility = View.GONE
@@ -261,7 +274,7 @@ class BenListAdapter(
         }
         private fun bindRifBlock(
             item: BenBasicDomain,
-            tbDiag: TBDiagnosticsCache?,
+            tbDiag: TbDiagnosticsCardFields?,
             canActOnReferral: Boolean,
             pref: PreferenceDao?,
             retryingBenIds: List<Long>,
@@ -287,7 +300,7 @@ class BenListAdapter(
                 tbDiag?.rifManualResultPendingSync == true -> {
                     binding.tvRifOrderStatus.visibility = View.GONE
                     bindPillAndCaptions(
-                        status, item.benId, "MDR_RIF", pref, true,
+                        status, tbDiag?.rifOrderId, item.benId, "MDR_RIF", pref, true,
                         binding.llRifOrderStatusPill, binding.ivRifOrderStatusPillIcon, binding.tvRifOrderStatusPillText,
                         binding.viewRifOrderStatusDivider, binding.tvRifLastCheckedCaption, binding.llRifPollingStoppedCaption,
                         binding.tvRifPollingStoppedCaptionTitle, binding.tvRifPollingStoppedCaptionText
@@ -335,7 +348,20 @@ class BenListAdapter(
                         clickListener?.onClickOrderAction(item, "REORDER", "MDR_RIF")
                     }
                 }
-                tbDiag?.rifOrderId.isNullOrBlank() -> {
+                // A missing order id on its own does NOT mean the referral failed. Every
+                // status this app stores for these three tests comes from the backend's own
+                // getBeneficiariesByStatus, which only ever reports beneficiaries that already
+                // HAVE an order - awaitingProviderResult, completed, awaitingManualEntry, failed
+                // and closed all imply one exists. A beneficiary referred from the registrar tab
+                // therefore arrives on the nurse tab with a real backend order, a status of
+                // PENDING or MANUAL_ENTRY, and no local order id yet, because that sweep carries
+                // benRegIds only. Offering "Retry Referral" there invites a duplicate order for
+                // a referral that already succeeded.
+                //
+                // A genuine failure is already caught by the FAILED branch above, so the only
+                // case left for retry is the one with no backend evidence at all: no status and
+                // no id, i.e. a referral this device never managed to push.
+                status.isNullOrBlank() && tbDiag?.rifOrderId.isMissingOrderId() -> {
                     clickListener?.onClickOrderAction(item, "CHECK_PUSH_ACTIVE", "MDR_RIF")
                     if (!tbDiag?.errorMsgRif.isNullOrBlank()) {
                         binding.tvRifErrorMsg.visibility = View.VISIBLE
@@ -354,7 +380,7 @@ class BenListAdapter(
                 else -> {
                     binding.tvRifOrderStatus.visibility = View.GONE
                     bindPillAndCaptions(
-                        status, item.benId, "MDR_RIF", pref, tbDiag?.rifManualResultPendingSync == true,
+                        status, tbDiag?.rifOrderId, item.benId, "MDR_RIF", pref, tbDiag?.rifManualResultPendingSync == true,
                         binding.llRifOrderStatusPill, binding.ivRifOrderStatusPillIcon, binding.tvRifOrderStatusPillText,
                         binding.viewRifOrderStatusDivider, binding.tvRifLastCheckedCaption, binding.llRifPollingStoppedCaption,
                         binding.tvRifPollingStoppedCaptionTitle, binding.tvRifPollingStoppedCaptionText
@@ -387,7 +413,7 @@ class BenListAdapter(
         private fun bindOrderStatusExtras(
             item: BenBasicDomain,
             source: Int,
-            tbDiag: TBDiagnosticsCache?,
+            tbDiag: TbDiagnosticsCardFields?,
             canActOnReferral: Boolean,
             pref: PreferenceDao?,
             retryingBenIds: List<Long>,
@@ -405,7 +431,7 @@ class BenListAdapter(
                 6 -> {
                     val status = tbDiag?.xrayOrderStatus
                     bindPillAndCaptions(
-                        status, item.benId, "XRAY_CHEST", pref, tbDiag?.xrayManualResultPendingSync == true,
+                        status, tbDiag?.xrayOrderId, item.benId, "XRAY_CHEST", pref, tbDiag?.xrayManualResultPendingSync == true,
                         binding.llOrderStatusPill, binding.ivOrderStatusPillIcon, binding.tvOrderStatusPillText,
                         binding.viewOrderStatusDivider, binding.tvLastCheckedCaption, binding.llPollingStoppedCaption,
                         binding.tvPollingStoppedCaptionTitle, binding.tvPollingStoppedCaptionText
@@ -423,7 +449,7 @@ class BenListAdapter(
                         }
                     } else {
                         bindPillAndCaptions(
-                            status, item.benId, "SPUTUM_TRUENAT", pref, isPendingTrueNatSync,
+                            status, tbDiag?.trueNatOrderId, item.benId, "SPUTUM_TRUENAT", pref, isPendingTrueNatSync,
                             binding.llOrderStatusPill, binding.ivOrderStatusPillIcon, binding.tvOrderStatusPillText,
                             binding.viewOrderStatusDivider, binding.tvLastCheckedCaption, binding.llPollingStoppedCaption,
                             binding.tvPollingStoppedCaptionTitle, binding.tvPollingStoppedCaptionText
@@ -471,8 +497,12 @@ class BenListAdapter(
             showAnthropometryButton: Boolean = false,
             showExamineButton: Boolean = true,
             showScreeningStatus: Boolean = false,   // NEW
-            tbDiagnosticsList: List<TBDiagnosticsCache> = emptyList(),
-            tbScreeningMap: Map<Long, TBScreeningCache> = emptyMap(),
+            tbDiagnosticsByBenId: Map<Long, TbDiagnosticsCardFields> = emptyMap(),
+            // False until the decoration flow has delivered its first emission. The map
+            // above starts empty, so without this a null row is indistinguishable from
+            // "this beneficiary has no order" - see the loading guards below.
+            tbDiagnosticsLoaded: Boolean = false,
+            tbScreeningMap: Map<Long, TbScreeningSymptoms> = emptyMap(),
             source: Int = 0,
             retryingBenIds: List<Long> = emptyList(),
             showContactTracingForms: Boolean = false,
@@ -629,7 +659,7 @@ class BenListAdapter(
                 binding.tvScreeningSectionTitle.visibility = View.GONE
                 binding.llScreeningStatus.visibility = View.VISIBLE
 
-                val tbDiagForStatus = tbDiagnosticsList.find { it.benId == item.benId }
+                val tbDiagForStatus = tbDiagnosticsByBenId[item.benId]
 
 
 
@@ -712,7 +742,7 @@ class BenListAdapter(
 
             if (binding.btnVitalScreen.visibility == View.VISIBLE) {
                 if (showResultButton) {
-                    val tbDiag = tbDiagnosticsList.find { it.benId == item.benId }
+                    val tbDiag = tbDiagnosticsByBenId[item.benId]
                     // Legacy, kept for reference:
 //                    val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
 //                    val isCounsellingOfficer = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
@@ -726,6 +756,16 @@ class BenListAdapter(
                             binding.btnVitalScreenSecondary.visibility = View.GONE
 
                             when {
+                                // The decoration map is filled by a separate flow and starts
+                                // empty, so on every return to this list a null row here means
+                                // "not loaded yet", not "no order". Falling through to the
+                                // Retry Referral branch below made the button flicker through
+                                // Retry Referral on each return - and that branch also fires
+                                // CHECK_PUSH_ACTIVE and offers an action that raises a second
+                                // order for a referral that already succeeded.
+                                tbDiag == null && !tbDiagnosticsLoaded -> {
+                                    ButtonConfig(context.getString(R.string.order_status_checking), android.R.color.darker_gray, "NONE", "XRAY_CHEST")
+                                }
                                 referred == false -> {
                                     ButtonConfig("TEST REFUSED", android.R.color.darker_gray, "NONE", "XRAY_CHEST")
                                 }
@@ -739,7 +779,10 @@ class BenListAdapter(
                                 status.equals(OrderStatus.CLOSED.name, ignoreCase = true) -> {
                                     ButtonConfig("Create New X-Ray Order", android.R.color.holo_blue_dark, "REORDER", "XRAY_CHEST")
                                 }
-                                tbDiag?.xrayOrderId.isNullOrBlank() -> {
+                                // See the note in bindRifBlock: a backend-reported status means
+                                // the order exists, so a missing local id is "not fetched yet",
+                                // not "referral failed".
+                                status.isNullOrBlank() && tbDiag?.xrayOrderId.isMissingOrderId() -> {
                                     clickListener?.onClickOrderAction(item, "CHECK_PUSH_ACTIVE", "XRAY_CHEST")
                                     bindErrorMsg(tbDiag?.errorMsgXray)
                                     ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, "RETRY_PUSH", "XRAY_CHEST")
@@ -769,6 +812,16 @@ class BenListAdapter(
                             binding.llMtbSummaryStrip.visibility = View.GONE
 
                             when {
+                                // The decoration map is filled by a separate flow and starts
+                                // empty, so on every return to this list a null row here means
+                                // "not loaded yet", not "no order". Falling through to the
+                                // Retry Referral branch below made the button flicker through
+                                // Retry Referral on each return - and that branch also fires
+                                // CHECK_PUSH_ACTIVE and offers an action that raises a second
+                                // order for a referral that already succeeded.
+                                tbDiag == null && !tbDiagnosticsLoaded -> {
+                                    ButtonConfig(context.getString(R.string.order_status_checking), android.R.color.darker_gray, "NONE", "SPUTUM_TRUENAT")
+                                }
                                 referredForSputum == false -> {
                                     ButtonConfig("TEST REFUSED", android.R.color.darker_gray, "NONE", "SPUTUM_TRUENAT")
                                 }
@@ -786,7 +839,10 @@ class BenListAdapter(
                                 status.equals(OrderStatus.CLOSED.name, ignoreCase = true) -> {
                                     ButtonConfig("Create New Order", android.R.color.holo_blue_dark, "REORDER", "SPUTUM_TRUENAT")
                                 }
-                                tbDiag?.trueNatOrderId.isNullOrBlank() -> {
+                                // See the note in bindRifBlock: a backend-reported status means
+                                // the order exists, so a missing local id is "not fetched yet",
+                                // not "referral failed".
+                                status.isNullOrBlank() && tbDiag?.trueNatOrderId.isMissingOrderId() -> {
                                     clickListener?.onClickOrderAction(item, "CHECK_PUSH_ACTIVE", "SPUTUM_TRUENAT")
                                     bindErrorMsg(tbDiag?.errorMsgTrueNat)
                                     ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, "RETRY_PUSH", "SPUTUM_TRUENAT")
@@ -1334,9 +1390,21 @@ class BenListAdapter(
     private val contactFollowUpDoneIds = mutableListOf<Long>()
     private val tptFollowUpDoneIds     = mutableListOf<Long>()
     private val tptEligibleIds         = mutableListOf<Long>()
-    private val tbDiagnosticsList = mutableListOf<TBDiagnosticsCache>()
+    private val tbDiagnosticsList = mutableListOf<TbDiagnosticsCardFields>()
 
-    private val tbScreeningMap = mutableMapOf<Long, TBScreeningCache>()
+    /**
+     * The same rows as [tbDiagnosticsList], keyed by benId. bind() used to locate a row with
+     * `tbDiagnosticsList.find { it.benId == item.benId }` - a linear scan of the whole diagnostics
+     * table (9,987 entities on a camp device) run twice for every row bound, on the main thread.
+     * bind() takes only this map now; the list is kept here purely to diff against the next
+     * emission.
+     */
+    private val tbDiagnosticsByBenId = mutableMapOf<Long, TbDiagnosticsCardFields>()
+
+    /** Set by [submitTBDiagnostics]; until then a missing row means "not loaded yet". */
+    private var tbDiagnosticsLoaded = false
+
+    private val tbScreeningMap = mutableMapOf<Long, TbScreeningSymptoms>()
     private val householdMemberCountMap = mutableMapOf<Long, Int>()
     private val householdHeadNameMap = mutableMapOf<Long, String>()
     var source: Int = 0
@@ -1373,7 +1441,8 @@ class BenListAdapter(
             showResultButton = showResultButton,
             showAnthropometryButton = showAnthropometryButton,
             showScreeningStatus = showScreeningStatus,
-            tbDiagnosticsList = tbDiagnosticsList,
+            tbDiagnosticsByBenId = tbDiagnosticsByBenId,
+            tbDiagnosticsLoaded = tbDiagnosticsLoaded,
             tbScreeningMap = tbScreeningMap,
             showRedesignedCard = showRedesignedCard,
             householdMemberCountMap = householdMemberCountMap,
@@ -1402,7 +1471,7 @@ class BenListAdapter(
         }
     }
 
-    fun submitTBDiagnostics(list: List<TBDiagnosticsCache>) {
+    fun submitTBDiagnostics(list: List<TbDiagnosticsCardFields>) {
         // Diff instead of notifyDataSetChanged() — a blanket refresh here rebinds every visible
         // row (including its click listeners) on every emission, which was the root cause of
         // cards needing multiple taps to register.
@@ -1410,16 +1479,30 @@ class BenListAdapter(
         val newByBenId = list.associateBy { it.benId }
         tbDiagnosticsList.clear()
         tbDiagnosticsList.addAll(list)
+        tbDiagnosticsByBenId.clear()
+        tbDiagnosticsByBenId.putAll(newByBenId)
+        // A beneficiary with no diagnostics row at all appears in neither map, so the diff below
+        // never names it. Before the first emission such a card renders the "not loaded yet"
+        // placeholder, and without a rebind here it would stay on that disabled placeholder for
+        // good. Only the first load needs the blanket refresh.
+        val firstLoad = !tbDiagnosticsLoaded
+        tbDiagnosticsLoaded = true
+        if (firstLoad) {
+            notifyDataSetChanged()
+            return
+        }
         val changedBenIds = (oldByBenId.keys + newByBenId.keys)
             .filterTo(mutableSetOf()) { benId -> oldByBenId[benId] != newByBenId[benId] }
-        if (changedBenIds.isNotEmpty()) {
+        if (changedBenIds.isNotEmpty() || firstLoad) {
             currentList.forEachIndexed { index, item ->
-                if (item.benId in changedBenIds) notifyItemChanged(index)
+                if (item.benId in changedBenIds || (firstLoad && item.benId !in newByBenId)) {
+                    notifyItemChanged(index)
+                }
             }
         }
     }
 
-    fun submitTbScreeningList(list: List<TBScreeningCache>) {
+    fun submitTbScreeningList(list: List<TbScreeningSymptoms>) {
         val old = tbScreeningMap.toMap()
         val new = list.associateBy { it.benId }
         tbScreeningMap.clear()

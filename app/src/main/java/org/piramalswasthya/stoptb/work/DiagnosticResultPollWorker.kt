@@ -64,10 +64,13 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 if (!tbRepo.isXrayIntegrated() && !tbRepo.isTruenatIntegrated()) {
                     Timber.d("Skipping automated result polling: no diagnostic devices are integrated")
                 } else {
-                if (tbRepo.isXrayIntegrated()) {
+                // The changes feed already brings every order's status on each pull, so the
+                // village-wide status sweeps are only needed when the hub has no feed.
+                val feedActive = preferenceDao.isChangesFeedActive()
+                if (!feedActive && tbRepo.isXrayIntegrated()) {
                     tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST")
                 }
-                if (tbRepo.isTruenatIntegrated()) {
+                if (!feedActive && tbRepo.isTruenatIntegrated()) {
                     tbRepo.fetchBeneficiariesByStatus("SPUTUM_TRUENAT")
                     tbRepo.fetchBeneficiariesByStatus("MDR_RIF")
                 }
@@ -84,13 +87,19 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 // reconciles it (and FAILED) every time this worker runs.
                 data class PendingOrder(val benId: Long, val xray: Boolean, val trueNat: Boolean, val rif: Boolean)
 
+                fun hasRealOrderId(orderId: String?) =
+                    !orderId.isNullOrBlank() && !orderId.equals("N/A", ignoreCase = true)
+
                 val pendingOrders = activeList.mapNotNull { diag ->
                     val xrayInProgress = tbRepo.isXrayIntegrated() &&
-                            diag.xrayOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true)
+                            diag.xrayOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) &&
+                            hasRealOrderId(diag.xrayOrderId)
                     val trueNatInProgress = tbRepo.isTruenatIntegrated() &&
-                            diag.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true)
+                            diag.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) &&
+                            hasRealOrderId(diag.trueNatOrderId)
                     val rifInProgress = tbRepo.isTruenatIntegrated() &&
-                            diag.rifOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true)
+                            diag.rifOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) &&
+                            hasRealOrderId(diag.rifOrderId)
                     if (xrayInProgress || trueNatInProgress || rifInProgress) {
                         PendingOrder(diag.benId, xrayInProgress, trueNatInProgress, rifInProgress)
                     } else null
