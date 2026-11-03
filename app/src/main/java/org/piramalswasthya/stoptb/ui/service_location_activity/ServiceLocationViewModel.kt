@@ -75,11 +75,15 @@ class ServiceTypeViewModel @Inject constructor(
         get() = selectedHealthFacility?.localizedName()
 
 
-    // Pincode / Residential Area remembered for the selected village (shown pre-filled, still editable here).
-    // TODO: once getUserDetailsById returns a pincode per village, prefer that master value.
+    // Pincode / Residential Area for the selected village: backend master value (getUserDetail) where it
+    // has one, otherwise the value entered earlier on this device (pre-filled, still editable here).
     private var _selectedVillageDefaults: VillageDefaults? = null
     val selectedVillageDefaults: VillageDefaults?
         get() = _selectedVillageDefaults
+
+    // Backend master values for the selected village; these are shown locked on the page.
+    val selectedVillageMasterDefaults: VillageDefaults?
+        get() = _selectedVillage?.let { village -> pref.getVillageMasterDefaults(village.id) }
 
     private val _state = MutableLiveData(State.LOADING)
     val state: LiveData<State>

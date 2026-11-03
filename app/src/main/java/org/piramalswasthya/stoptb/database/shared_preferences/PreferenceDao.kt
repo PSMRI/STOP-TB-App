@@ -26,6 +26,7 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         const val MASTERS_REFRESHED_AT = "masters_refreshed_at"
         const val CHANGES_FEED_ACTIVE = "changes_feed_active"
         const val VILLAGE_DEFAULTS_KEY = "village_defaults_by_village_id"
+        const val VILLAGE_MASTER_DEFAULTS_KEY = "village_master_defaults_by_village_id"
     }
 
     fun deleteAmritToken() {
@@ -191,11 +192,33 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         return Gson().fromJson(json, LocationRecord::class.java)
     }
 
-    fun getVillageDefaults(villageId: Int): VillageDefaults? =
-        getVillageDefaultsByVillageId()[villageId.toString()]
+    /**
+     * Pincode / Residential Area for a village: the backend master value (getUserDetail) where it has one,
+     * otherwise the value captured on the device.
+     */
+    fun getVillageDefaults(villageId: Int): VillageDefaults? {
+        val capturedDefaults = getVillageDefaultsByVillageId(VILLAGE_DEFAULTS_KEY)[villageId.toString()]
+        val masterDefaults = getVillageMasterDefaults(villageId) ?: return capturedDefaults
+        return VillageDefaults(
+            pinCode = masterDefaults.pinCode?.takeIf { masterDefaults.hasPinCode } ?: capturedDefaults?.pinCode,
+            residentialAreaId = masterDefaults.residentialAreaId.takeIf { masterDefaults.hasResidentialArea }
+                ?: capturedDefaults?.residentialAreaId ?: 0
+        )
+    }
 
+    /** Backend master Pincode / Residential Area for a village, or null when the backend sent none. */
+    fun getVillageMasterDefaults(villageId: Int): VillageDefaults? =
+        getVillageDefaultsByVillageId(VILLAGE_MASTER_DEFAULTS_KEY)[villageId.toString()]
+
+    /** Replaces the backend master values with those from the latest getUserDetail. */
+    fun saveVillageMasterDefaults(masterDefaultsByVillageId: Map<Int, VillageDefaults>) {
+        val json = Gson().toJson(masterDefaultsByVillageId.mapKeys { (villageId, _) -> villageId.toString() })
+        pref.edit().putString(VILLAGE_MASTER_DEFAULTS_KEY, json).apply()
+    }
+
+    /** Saves the values entered on the device for a village (used where the backend has none). */
     fun saveVillageDefaults(villageId: Int, villageDefaults: VillageDefaults) {
-        val defaultsByVillageId = getVillageDefaultsByVillageId().toMutableMap()
+        val defaultsByVillageId = getVillageDefaultsByVillageId(VILLAGE_DEFAULTS_KEY).toMutableMap()
         defaultsByVillageId[villageId.toString()] = villageDefaults
         pref.edit().putString(VILLAGE_DEFAULTS_KEY, Gson().toJson(defaultsByVillageId)).apply()
     }
@@ -216,8 +239,8 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         if (mergedDefaults != savedDefaults) saveVillageDefaults(villageId, mergedDefaults)
     }
 
-    private fun getVillageDefaultsByVillageId(): Map<String, VillageDefaults> {
-        val json = pref.getString(VILLAGE_DEFAULTS_KEY, null) ?: return emptyMap()
+    private fun getVillageDefaultsByVillageId(prefKey: String): Map<String, VillageDefaults> {
+        val json = pref.getString(prefKey, null) ?: return emptyMap()
         return runCatching {
             Gson().fromJson<Map<String, VillageDefaults>>(
                 json,

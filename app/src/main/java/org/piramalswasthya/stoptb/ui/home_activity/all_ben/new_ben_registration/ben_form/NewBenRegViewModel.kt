@@ -161,6 +161,10 @@ class NewBenRegViewModel @Inject constructor(
         }
     }
 
+    // The same village as it appears in the user's assigned list (what the dropdown shows), when assigned
+    private fun withAssignedVillageName(village: LocationEntity): LocationEntity =
+        user.villages.find { assignedVillage -> assignedVillage.id == village.id } ?: village
+
     suspend fun setUpPage() {
         if (isPageSetUp) return
         isPageSetUp = true
@@ -203,11 +207,13 @@ class NewBenRegViewModel @Inject constructor(
             _isDeath.postValue(ben.isDeath ?: false)
             isOtpVerified = ben.isConsent
             val villageNames = user.villages.map { it.name }.toTypedArray()
+            // The record's own village (not the village currently selected in the app)
+            val benVillage = withAssignedVillageName(ben.locationRecord.village)
             // View mode — show existing data read-only
             dataset.setFirstPageToRead(
                 ben,
                 familyHeadPhoneNo = household.family?.familyHeadPhoneNo,
-                villageName = locationRecord.village.name,
+                villageName = benVillage.name,
                 villageNames = villageNames,
                 villageEntityList = user.villages,
                 subCentreName = user.subCentre,
@@ -217,7 +223,9 @@ class NewBenRegViewModel @Inject constructor(
                 isNonHH = ben.isNonHH,
                 hofForDobRules = hofBen,
                 hofSpouseForDobRules = hofSpouse,
-                showUpdateLocation = isStandalone
+                showUpdateLocation = isStandalone,
+                // Household member: village locked (changed from the household form). Non-HH: editable.
+                fixedVillage = benVillage.takeIf { !isStandalone && !ben.isNonHH && benVillage.id > 0 }
             )
         } else {
             val villageNames = user.villages.map { it.name }.toTypedArray()
@@ -283,11 +291,16 @@ class NewBenRegViewModel @Inject constructor(
             )
 
             val prefillLocation = prefillBen?.locationRecord ?: locationRecord
+            // A new household member takes the household's village (locked); Non-HH uses the selected village
+            val householdVillage = household.locationRecord.village
+                .takeIf { village -> !isStandalone && !isNonHHArg && village.id > 0 }
+                ?.let { village -> withAssignedVillageName(village) }
+            val formVillage = householdVillage ?: prefillLocation.village
             dataset.setUpPage(
                 prefillBen,
                 household.family?.familyHeadPhoneNo,
                 familyHeadCommunityId = hofBen?.communityId ?: 0,
-                prefillLocation.village.name,
+                formVillage.name,
                 pinCodeValue = hofBen?.pinCode,
                 villageNames,
                 user.villages,
@@ -298,7 +311,8 @@ class NewBenRegViewModel @Inject constructor(
                 hofForDobRules = hofBen,
                 hofSpouseForDobRules = hofSpouse,
                 selectedMemberForDobRules = selectedSpouseMember,
-                villageDefaults = preferenceDao.getVillageDefaults(prefillLocation.village.id)
+                villageDefaults = preferenceDao.getVillageDefaults(formVillage.id),
+                fixedVillage = householdVillage
             )
         }
         // Restore/Inherit Location details

@@ -109,6 +109,19 @@ class BenRepo @Inject constructor(
         }
     }
 
+    /** Moves every member of a household to [village] (local only; call [updateBenToSync] to push it). */
+    suspend fun updateVillageOfHouseholdMembers(householdId: Long, village: LocationEntity) {
+        withContext(Dispatchers.IO) {
+            benDao.updateVillageOfHouseholdMembers(
+                householdId = householdId,
+                villageId = village.id,
+                villageName = village.name,
+                villageNameHindi = village.nameHindi,
+                villageNameAssamese = village.nameAssamese
+            )
+        }
+    }
+
     suspend fun updateHousehold(householdId: Long, unsynced: SyncState) {
         withContext(Dispatchers.IO) {
             benDao.updateHofSpouseAdded(householdId = householdId,unsynced,"U",2)

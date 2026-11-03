@@ -483,7 +483,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         hofSpouseForDobRules: BenRegCache? = null,
         selectedMemberForDobRules: BenRegCache? = null,
         showUpdateLocation: Boolean = false,
-        villageDefaults: VillageDefaults? = null
+        villageDefaults: VillageDefaults? = null,
+        fixedVillage: LocationEntity? = null
     ) {
         val list = mutableListOf(
             pic,
@@ -585,6 +586,13 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         healthFacility.value = healthFacility.entries?.firstOrNull() ?: ""
         villageNames?.let { villageHamlet.entries = it }
         villageHamlet.value = villageName ?: villageNames?.firstOrNull() ?: ""
+        // Household members take the household's village: shown, not editable. The village is changed on the
+        // household form, which moves every member. Non-HH beneficiaries keep an editable village.
+        this.fixedVillage = fixedVillage
+        if (fixedVillage != null) {
+            villageHamlet.value = fixedVillage.name
+            villageHamlet.inputType = TEXT_VIEW
+        }
         val resolvedSubCentre = subCentreName?.takeIf { it.isNotBlank() } ?: ""
         subCentre.entries = arrayOf(resolvedSubCentre)
         subCentre.value = resolvedSubCentre
@@ -918,7 +926,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         hofForDobRules: BenRegCache? = null,
         hofSpouseForDobRules: BenRegCache? = null,
         selectedMemberForDobRules: BenRegCache? = null,
-        showUpdateLocation: Boolean = false
+        showUpdateLocation: Boolean = false,
+        fixedVillage: LocationEntity? = null
     ) = setUpPage(
         ben,
         familyHeadPhoneNo,
@@ -933,12 +942,15 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         hofForDobRules = hofForDobRules,
         hofSpouseForDobRules = hofSpouseForDobRules,
         selectedMemberForDobRules = selectedMemberForDobRules,
-        showUpdateLocation = showUpdateLocation
+        showUpdateLocation = showUpdateLocation,
+        fixedVillage = fixedVillage
     )
 
 
     private var familyHeadPhoneNo: String? = null
     private var villageEntities: List<LocationEntity> = emptyList()
+    // Village of a household member (locked); null for Non-HH beneficiaries, whose village is editable
+    private var fixedVillage: LocationEntity? = null
     // True when the selected village had no saved Pincode / Residential Area, so the user typed them in
     private var isCapturingVillageDefaults = false
     // Edit mode: the record's own village and values, restored if the user switches back to that village
@@ -1626,7 +1638,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             // Village — update locationRecord if user changed village
             // Prefer matching by both name AND existing ID (preserves correct village when
             // two sub-villages share the same display name, e.g. both named "Adarsha Gaon")
-            villageHamlet.value?.let { selectedName ->
+            fixedVillage?.let { householdVillage ->
+                ben.locationRecord = ben.locationRecord.copy(village = householdVillage)
+            } ?: villageHamlet.value?.let { selectedName ->
                 val existingId = ben.locationRecord.village.id
                 val selectedVillage =
                     villageEntities.find { it.name == selectedName && it.id == existingId }

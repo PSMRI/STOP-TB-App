@@ -64,6 +64,9 @@ class NewHouseholdViewModel @Inject constructor(
 
     private lateinit var user: User
     private lateinit var household: HouseholdCache
+
+    // Village of a saved household when the form opened (null for a new household / draft)
+    private var savedHouseholdVillageId: Int? = null
     private val dataset = HouseholdFormDataset(context, preferenceDao.getCurrentLanguage())
     val formList = dataset.listFlow
 
@@ -109,6 +112,8 @@ class NewHouseholdViewModel @Inject constructor(
                         registrationType = isAshaFamily,
                         locationRecord = locationRecord
                     )
+                savedHouseholdVillageId =
+                    household.locationRecord.village.id.takeIf { household.householdId != 0L }
 
                 val villageNames = user.villages.map { it.name }.toTypedArray()
 
@@ -282,6 +287,13 @@ class NewHouseholdViewModel @Inject constructor(
                     householdRepo.persistRecord(household)
                     dataset.getCapturedVillageDefaults()?.let { capturedDefaults ->
                         preferenceDao.saveVillageDefaultsIfMissing(household.locationRecord.village.id, capturedDefaults)
+                    }
+                    // Village changed on a saved household: move its members too, otherwise they keep
+                    // pushing the old village and the next pull puts the household back there.
+                    val selectedVillage = household.locationRecord.village
+                    if (savedHouseholdVillageId != null && savedHouseholdVillageId != selectedVillage.id) {
+                        benRepo.updateVillageOfHouseholdMembers(household.householdId, selectedVillage)
+                        savedHouseholdVillageId = selectedVillage.id
                     }
                     benRepo.updateBenToSync(household.householdId, SyncState.UNSYNCED)
                     if (linkBenId != 0L) {

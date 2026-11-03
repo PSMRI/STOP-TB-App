@@ -306,6 +306,10 @@ class ServiceLocationActivity : AppCompatActivity() {
         )
         binding.tilPincode.error = null
         binding.tilResidentialAreaDropdown.error = null
+        // Values from the backend are master data: shown but not editable
+        val masterDefaults = viewModel.selectedVillageMasterDefaults
+        binding.tilPincode.isEnabled = masterDefaults?.hasPinCode != true
+        binding.tilResidentialAreaDropdown.isEnabled = masterDefaults?.hasResidentialArea != true
     }
 
     // 1-based, matching how the registration forms store residentialAreaId

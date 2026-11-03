@@ -13,4 +13,12 @@ data class VillageDefaults(
 
     val isComplete: Boolean
         get() = hasPinCode && hasResidentialArea
+
+    companion object {
+        const val PIN_CODE_LENGTH = 6
+
+        // Ids in R.array.nbr_residential_area_array; the server stores the same ids in
+        // i_beneficiarydetails.residentialAreaId
+        val RESIDENTIAL_AREA_IDS = 1..6
+    }
 }
