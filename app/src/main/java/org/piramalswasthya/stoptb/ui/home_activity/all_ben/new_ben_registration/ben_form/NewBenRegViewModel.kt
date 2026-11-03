@@ -574,13 +574,18 @@ class NewBenRegViewModel @Inject constructor(
                         if (hhId > 0L) {
                             householdId = hhId
                             isNonHH = false
-                        } else {
+                        } else if (benIdFromArgs == 0L) {
+                            // New registration: Non-HH place info comes from CurrentLivingInfoFragment args.
                             householdId = null
                             isNonHH = isNonHHArg
                             placeOfCurrentLiving = if (isNonHHArg) placeOfCurrentLivingArg else null
                             otherPlaceOfCurrentLiving = if (isNonHHArg) otherPlaceArg else null
                             institutionName = if (isNonHHArg) institutionNameArg else null
                         }
+                        // Edit (benIdFromArgs != 0L, no hhId): keep the stored householdId, isNonHH,
+                        // placeOfCurrentLiving, otherPlaceOfCurrentLiving and institutionName. Edit entry
+                        // points (All Ben / Non-HH / ABHA lists) never pass these args, so applying the
+                        // nav-arg defaults here wiped placeOfCurrentLiving to NULL on sync (STOP-752).
                         serverUpdatedStatus = if (beneficiaryId < 0L) 1 else 2
                         processed           = if (beneficiaryId < 0L) "N" else "U"
                         syncState           = SyncState.UNSYNCED
