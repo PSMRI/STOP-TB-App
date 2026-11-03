@@ -20,6 +20,10 @@ import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
 
+// Bump to force one re-download when the local counselling schema storage changes
+// (1 = STOP-504: several helper-text rows per question). Top-level, not a companion: a companion here breaks kapt.
+internal const val SCHEMA_STORE_FORMAT = 1
+
 @Singleton
 class CounsellingRepositoryImpl @Inject constructor(
     private val db: InAppDb,
@@ -75,6 +79,12 @@ class CounsellingRepositoryImpl @Inject constructor(
                         }
                     }
                 }
+                // Only the force path rewrites every form (the other skips forms already on their version), and only a
+                // response that actually carried the counselling form has repaired it.
+                val counsellingRestored = apiSchemas.any { apiSchema -> apiSchema.formUuid == FormType.TB_COUNSELLING_V2.name }
+                if (forceUpdate && counsellingRestored) {
+                    preferenceDao.setCounsellingSchemaStoreFormat(SCHEMA_STORE_FORMAT)
+                }
                 true
             } else {
                 false
@@ -111,7 +121,11 @@ class CounsellingRepositoryImpl @Inject constructor(
                     Timber.d("refreshFormsIfOutdated: ${latest.formUuid} local=$localVersion backend=${latest.currentVersionNumber}")
                     localVersion != latest.currentVersionNumber
                 }
-            if (outdated.isEmpty()) {
+            val storedInOlderFormat = preferenceDao.getCounsellingSchemaStoreFormat() < SCHEMA_STORE_FORMAT
+            if (storedInOlderFormat) {
+                Timber.d("refreshFormsIfOutdated: local schema predates store format $SCHEMA_STORE_FORMAT, re-downloading")
+            }
+            if (outdated.isEmpty() && !storedInOlderFormat) {
                 true
             } else {
                 // forceUpdate: the non-force path wipes old versions, which t_form_response RESTRICTs.

@@ -161,9 +161,17 @@ suspend fun storeFormSchemaInDb(
                 }
             }
 
-            questionDto.validations.forEach { validationDto ->
+
+            // Helper-text bullets display in server validationId order, so number them in that order rather than
+            // trusting the response list order (sortedBy is stable for equal ids).
+            val rowsSeenPerType = mutableMapOf<String, Int>()
+            questionDto.validations.sortedBy { validationDto -> validationDto.validationId }.forEach { validationDto ->
+                val indexWithinType = rowsSeenPerType.getOrDefault(validationDto.validationType, 0)
+                rowsSeenPerType[validationDto.validationType] = indexWithinType + 1
                 val validationIdInt = when (idStrategy) {
-                    QuestionIdStrategy.HASH_BASED -> (questionDto.fieldId + "_" + validationDto.validationType).hashCode()
+                    QuestionIdStrategy.HASH_BASED -> QuestionHelperText.hashValidationId(
+                        questionDto.fieldId, validationDto.validationType, indexWithinType
+                    )
                     QuestionIdStrategy.RAW_SERVER_ID -> validationDto.validationId
                         ?: (questionIdInt * 100 + validationsToInsert.size)
                 }
@@ -184,11 +192,6 @@ suspend fun storeFormSchemaInDb(
     if (sectionsToInsert.isNotEmpty()) metadataDao.insertSections(sectionsToInsert)
     if (questionsToInsert.isNotEmpty()) metadataDao.insertQuestions(questionsToInsert)
     if (optionsToInsert.isNotEmpty()) metadataDao.insertOptions(optionsToInsert)
-
-    // Replace, don't merge, conditions/validations: with HASH_BASED ids a condition's id includes the server
-    // targetQuestionId, which changes between versions, so upserting v2 over v1 would leave v1's condition
-    // beside v2's (same option -> same question twice, e.g. a duplicated "Number of Friends" row).
-    // Nothing references these tables, so deleting them is safe.
     if (optionsToInsert.isNotEmpty()) metadataDao.deleteConditionsForOptions(optionsToInsert.map { it.optionId })
     if (questionsToInsert.isNotEmpty()) metadataDao.deleteValidationsForQuestions(questionsToInsert.map { it.questionId })
 
