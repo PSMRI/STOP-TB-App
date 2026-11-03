@@ -56,6 +56,7 @@ data class CounsellingQuestionDto(
     @SerializedName("visibleByDefault") val visibleByDefault: Boolean = true,
     @SerializedName("validations") var validations: List<CounsellingValidationDto>? = null,
     @SerializedName("options") val options: List<CounsellingOptionDto>? = null,
+    @Transient val helperText: List<String> = emptyList(),
 
     // Runtime UI state — not from JSON
     @Transient var value: Any? = null,
