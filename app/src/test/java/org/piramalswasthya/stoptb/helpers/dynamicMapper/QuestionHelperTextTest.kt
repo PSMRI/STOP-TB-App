@@ -41,7 +41,9 @@ class QuestionHelperTextTest {
     }
 
     // Records insertValidations; every other DAO call is a no-op (they all return Unit here).
-    private fun ingest(reverseRows: Boolean = false): List<QuestionValidationEntity> = runBlocking {
+    private fun ingest(reverseRows: Boolean = false): List<QuestionValidationEntity> = ingestJson(schemaJson(reverseRows))
+
+    private fun ingestJson(json: String): List<QuestionValidationEntity> = runBlocking {
         val inserted = mutableListOf<QuestionValidationEntity>()
         val dao = Proxy.newProxyInstance(
             DynamicFormMetadataDao::class.java.classLoader,
@@ -56,7 +58,7 @@ class QuestionHelperTextTest {
         storeFormSchemaInDb(
             metadataDao = dao,
             gson = Gson(),
-            apiSchema = FormSchemaDto.fromJson(schemaJson(reverseRows)),
+            apiSchema = FormSchemaDto.fromJson(json),
             idStrategy = QuestionIdStrategy.HASH_BASED,
             wipeExistingVersions = false
         )
@@ -104,6 +106,29 @@ class QuestionHelperTextTest {
         val base = Int.MAX_VALUE - 1
         val ids = (0 until 3).map { index -> base + index } // MAX_VALUE - 1, MAX_VALUE, MIN_VALUE
         assertEquals(listOf(0, 1, 2), ids.map { id -> QuestionHelperText.positionWithinType(id, base) })
+    }
+
+    // Regression guard: Contact Tracing / TPT forms are stored through the same HASH_BASED path and have
+    // questions with several MANDATORY_IF rows (e.g. OCT_EMPLOYMENT_ADDRESS has 5). Before STOP-504 they all
+    // shared one id, so the upsert kept the last one, which is the only one the ViewModels' firstOrNull sees.
+    // STOP-504 must not change that.
+    @Test
+    fun `several rows of a non helper type keep the old shared id so the last row still wins`() {
+        val json = """
+            {"formId":"9","formUuid":"OCCUPATION_CONTACT_TRACING","formName":"OCT","versionNumber":2,
+             "sections":[{"sectionId":"1","sectionName":"S","questions":[{"questionUuid":"OCT_EMPLOYMENT_ADDRESS",
+               "questionId":7,"questionText":"Address","questionType":"TEXT","validations":[
+                 {"validationId":30,"validationType":"MANDATORY_IF","validationParam":"OCT_OCCUPATION=LABORER","errorMessage":"e"},
+                 {"validationId":10,"validationType":"MANDATORY_IF","validationParam":"OCT_OCCUPATION=GOVERNMENT","errorMessage":"e"},
+                 {"validationId":20,"validationType":"MANDATORY_IF","validationParam":"OCT_OCCUPATION=HEALTH_CARE_WORKER","errorMessage":"e"},
+                 {"validationId":40,"validationType":"MAX_LENGTH","validationParam":"200","errorMessage":"e"}]}]}]}
+        """.trimIndent()
+        val stored = ingestJson(json)
+        val mandatoryIfRows = stored.filter { row -> row.validationType == "MANDATORY_IF" }
+        assertEquals(setOf("OCT_EMPLOYMENT_ADDRESS_MANDATORY_IF".hashCode()), mandatoryIfRows.map { row -> row.validationId }.toSet())
+        // Upsert order = list order, so the row the database keeps is the last in the response, as before.
+        assertEquals("OCT_OCCUPATION=HEALTH_CARE_WORKER", mandatoryIfRows.last().validationValue)
+        assertEquals("OCT_EMPLOYMENT_ADDRESS_MAX_LENGTH".hashCode(), stored.single { row -> row.validationType == "MAX_LENGTH" }.validationId)
     }
 
     @Test
