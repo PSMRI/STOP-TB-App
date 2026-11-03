@@ -2614,6 +2614,11 @@ class BenRepo @Inject constructor(
                                 weight = serverBen.weight ?: existingBen.weight,
                                 bmi = serverBen.bmi ?: existingBen.bmi,
                                 temperature = serverBen.temperature ?: existingBen.temperature,
+                                // A pull without the Non-HH current-living fields must not erase the
+                                // values already on the tablet (STOP-752).
+                                placeOfCurrentLiving = serverBen.placeOfCurrentLiving ?: existingBen.placeOfCurrentLiving,
+                                otherPlaceOfCurrentLiving = serverBen.otherPlaceOfCurrentLiving ?: existingBen.otherPlaceOfCurrentLiving,
+                                institutionName = serverBen.institutionName ?: existingBen.institutionName,
                                 isConsent = serverBen.isConsent || existingBen.isConsent,
                                 syncState = SyncState.SYNCED,
                                 processed = "P"
