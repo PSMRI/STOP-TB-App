@@ -2168,11 +2168,13 @@ class BenRepo @Inject constructor(
 
                     val benGpsLatitude = demographicsObj.optDoubleOrNull("latitude")
                         ?: demographicsObj.optDoubleOrNull("gpsLatitude")
+                        ?: benDataObj.optDoubleOrNull("latitude")
                         ?: benDataObj.optDoubleOrNull("gpsLatitude")
                         ?: jsonObject.optDoubleOrNull("gpsLatitude")
 
                     val benGpsLongitude = demographicsObj.optDoubleOrNull("longitude")
                         ?: demographicsObj.optDoubleOrNull("gpsLongitude")
+                        ?: benDataObj.optDoubleOrNull("longitude")
                         ?: benDataObj.optDoubleOrNull("gpsLongitude")
                         ?: jsonObject.optDoubleOrNull("gpsLongitude")
 
@@ -2218,14 +2220,16 @@ class BenRepo @Inject constructor(
 
                                 isNonHH = resolvedHouseholdId == null,
 
-                                placeOfCurrentLiving = if (jsonObject.has("placeOfCurrentLiving") && !jsonObject.isNull("placeOfCurrentLiving")) {
-                                    val code = jsonObject.optString("placeOfCurrentLiving", "")
-                                    getPlaceOfCurrentLivingIndex(code.takeIf { it.isNotEmpty() })
-                                } else null,
+                                placeOfCurrentLiving = getPlaceOfCurrentLivingIndex(
+                                    benDataObj.optStringOrNull("placeOfCurrentLiving")
+                                        ?: jsonObject.optStringOrNull("placeOfCurrentLiving")
+                                ),
 
-                                otherPlaceOfCurrentLiving = jsonObject.optStringOrNull("otherPlaceOfCurrentLiving"),
+                                otherPlaceOfCurrentLiving = benDataObj.optStringOrNull("otherPlaceOfCurrentLiving")
+                                    ?: jsonObject.optStringOrNull("otherPlaceOfCurrentLiving"),
 
-                                institutionName = jsonObject.optStringOrNull("institutionName"),
+                                institutionName = benDataObj.optStringOrNull("institutionName")
+                                    ?: jsonObject.optStringOrNull("institutionName"),
 
                                 beneficiaryId = jsonObject.getLong("benficieryid"),
 
