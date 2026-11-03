@@ -20,7 +20,9 @@ import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
 
-private const val SCHEMA_STORE_FORMAT = 1
+// Bump to force one re-download when the local counselling schema storage changes
+// (1 = STOP-504: several helper-text rows per question). Top-level, not a companion: a companion here breaks kapt.
+internal const val SCHEMA_STORE_FORMAT = 1
 
 @Singleton
 class CounsellingRepositoryImpl @Inject constructor(
@@ -77,8 +79,12 @@ class CounsellingRepositoryImpl @Inject constructor(
                         }
                     }
                 }
-                // Only the force path rewrites every form; the other path skips forms already on their version.
-                if (forceUpdate) preferenceDao.setCounsellingSchemaStoreFormat(SCHEMA_STORE_FORMAT)
+                // Only the force path rewrites every form (the other skips forms already on their version), and only a
+                // response that actually carried the counselling form has repaired it.
+                val counsellingRestored = apiSchemas.any { apiSchema -> apiSchema.formUuid == FormType.TB_COUNSELLING_V2.name }
+                if (forceUpdate && counsellingRestored) {
+                    preferenceDao.setCounsellingSchemaStoreFormat(SCHEMA_STORE_FORMAT)
+                }
                 true
             } else {
                 false

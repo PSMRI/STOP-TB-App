@@ -162,8 +162,10 @@ suspend fun storeFormSchemaInDb(
             }
 
 
+            // Helper-text bullets display in server validationId order, so number them in that order rather than
+            // trusting the response list order (sortedBy is stable for equal ids).
             val rowsSeenPerType = mutableMapOf<String, Int>()
-            questionDto.validations.forEach { validationDto ->
+            questionDto.validations.sortedBy { validationDto -> validationDto.validationId }.forEach { validationDto ->
                 val indexWithinType = rowsSeenPerType.getOrDefault(validationDto.validationType, 0)
                 rowsSeenPerType[validationDto.validationType] = indexWithinType + 1
                 val validationIdInt = when (idStrategy) {

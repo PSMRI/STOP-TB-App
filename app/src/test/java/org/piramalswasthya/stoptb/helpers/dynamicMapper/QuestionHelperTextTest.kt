@@ -25,12 +25,13 @@ class QuestionHelperTextTest {
     )
     private val npyHindi = listOf("हिंदी 1", "हिंदी 2", "हिंदी 3", "हिंदी 4")
 
-    private fun schemaJson(): String {
+    private fun schemaJson(reverseRows: Boolean = false): String {
         fun row(id: Int, type: String, text: String) =
             """{"validationId":$id,"validationType":"$type","validationParam":"$text","errorMessage":"$text"}"""
-        val rows = npyEnglish.mapIndexed { index, text -> row(100 + index, "HELPER_TEXT_ENGLISH", text) } +
+        val inServerOrder = npyEnglish.mapIndexed { index, text -> row(100 + index, "HELPER_TEXT_ENGLISH", text) } +
             npyHindi.mapIndexed { index, text -> row(200 + index, "HELPER_TEXT_HINDI", text) } +
             row(300, "MAX_LENGTH", "10")
+        val rows = if (reverseRows) inServerOrder.reversed() else inServerOrder
         return """
             {"formId":"7","formUuid":"TB_COUNSELLING_V2","formName":"TB Counselling","versionNumber":2,
              "sections":[{"sectionId":"40","sectionUuid":"TB2_SEC_C","sectionName":"Government Schemes",
@@ -40,7 +41,7 @@ class QuestionHelperTextTest {
     }
 
     // Records insertValidations; every other DAO call is a no-op (they all return Unit here).
-    private fun ingest(): List<QuestionValidationEntity> = runBlocking {
+    private fun ingest(reverseRows: Boolean = false): List<QuestionValidationEntity> = runBlocking {
         val inserted = mutableListOf<QuestionValidationEntity>()
         val dao = Proxy.newProxyInstance(
             DynamicFormMetadataDao::class.java.classLoader,
@@ -55,7 +56,7 @@ class QuestionHelperTextTest {
         storeFormSchemaInDb(
             metadataDao = dao,
             gson = Gson(),
-            apiSchema = FormSchemaDto.fromJson(schemaJson()),
+            apiSchema = FormSchemaDto.fromJson(schemaJson(reverseRows)),
             idStrategy = QuestionIdStrategy.HASH_BASED,
             wipeExistingVersions = false
         )
@@ -79,6 +80,12 @@ class QuestionHelperTextTest {
     fun `english bullets come back in server order even when stored shuffled`() {
         val shuffled = ingest().sortedBy { row -> row.validationValue }.reversed()
         assertEquals(npyEnglish, QuestionHelperText.resolve("TB2_C_Q1", shuffled, isHindi = false))
+    }
+
+    @Test
+    fun `bullets follow server validationId order even when the response lists them out of order`() {
+        assertEquals(npyEnglish, QuestionHelperText.resolve("TB2_C_Q1", ingest(reverseRows = true), isHindi = false))
+        assertEquals(npyHindi, QuestionHelperText.resolve("TB2_C_Q1", ingest(reverseRows = true), isHindi = true))
     }
 
     @Test

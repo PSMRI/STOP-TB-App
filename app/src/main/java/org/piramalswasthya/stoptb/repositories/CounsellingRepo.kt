@@ -21,6 +21,7 @@ import javax.inject.Singleton
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.piramalswasthya.stoptb.helpers.dynamicMapper.QuestionHelperText
+import org.piramalswasthya.stoptb.repositories.dynamicRepo.SCHEMA_STORE_FORMAT
 import org.piramalswasthya.stoptb.helpers.isInternetAvailable
 import org.piramalswasthya.stoptb.ui.counselling_activity.ActionType
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
@@ -157,8 +158,11 @@ class CounsellingRepo @Inject constructor(
                 val hindiMissing = completeForm?.versions
                     ?.firstOrNull()?.sections
                     ?.any { it.section.sectionNameHindi.isNullOrEmpty() } ?: false
-                if (completeForm == null || hindiMissing) {
-                    val success = counsellingRepository.downloadAndStoreAllForms()
+                // Stored by a build older than SCHEMA_STORE_FORMAT (e.g. only the last helper bullet kept): repair now
+                // instead of waiting for the Counselling tab's background refresh. Offline, the cached form is used.
+                val storedInOlderFormat = preferenceDao.getCounsellingSchemaStoreFormat() < SCHEMA_STORE_FORMAT
+                if (completeForm == null || hindiMissing || storedInOlderFormat) {
+                    val success = counsellingRepository.downloadAndStoreAllForms(forceUpdate = storedInOlderFormat)
                     if (success) {
                         completeForm = counsellingRepository.getFormDefinition(FormType.TB_COUNSELLING_V2)
                     }
