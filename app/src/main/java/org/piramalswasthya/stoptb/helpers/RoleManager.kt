@@ -105,6 +105,7 @@ class RoleManager @Inject constructor(
         if (role == AppRole.LAB_TECHNICIAN) {
             if (AppRole.REGISTRAR in _assignedRoles) {
                 result = result - AppModule.BENEFICIARIES
+                result = result - AppModule.MISSING_DATA_BENEFICIARIES
             }
             if (AppRole.NURSE in _assignedRoles || AppRole.COUNSELING in _assignedRoles) {
                 result = result - setOf(AppModule.REFERRAL, AppModule.TUBERCULOSIS)

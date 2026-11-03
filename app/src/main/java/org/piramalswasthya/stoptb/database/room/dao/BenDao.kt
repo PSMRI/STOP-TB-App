@@ -1199,6 +1199,9 @@ interface BenDao {
     @Query("SELECT * FROM BENEFICIARY WHERE isDraft = 0 AND processed = 'N' AND syncState =:unsynced ")
     suspend fun getAllUnprocessedBen(unsynced: SyncState = SyncState.UNSYNCED): List<BenRegCache>
 
+    @Query("SELECT * FROM BENEFICIARY WHERE isDraft = 0 AND processed = 'N' AND syncState =:unsynced AND beneficiaryId = :benId")
+    suspend fun getUnprocessedBenForBeneficiary(benId: Long, unsynced: SyncState = SyncState.UNSYNCED): List<BenRegCache>
+
     @Query("SELECT * FROM BENEFICIARY WHERE isDraft = 0 AND (processed = 'N' OR processed = 'U') AND syncState =:unsynced ")
     suspend fun getAllUnsyncedBen(unsynced: SyncState = SyncState.UNSYNCED): List<BenRegCache>
 
@@ -1223,7 +1226,10 @@ interface BenDao {
     @Query("SELECT * FROM BENEFICIARY WHERE beneficiaryId IN (:benIds) AND syncState = 1")
     suspend fun getSyncingBens(benIds: List<Long>): List<BenRegCache>
 
-    @Query("UPDATE BENEFICIARY SET processed = 'P' , syncState = 2 WHERE beneficiaryId in (:benId) AND syncState = 1")
+    @Query("SELECT * FROM BENEFICIARY WHERE isDraft = 0 AND processed = 'U' AND syncState =:unsynced AND beneficiaryId = :benId")
+    suspend fun getBenForSyncWithServerForBeneficiary(benId: Long, unsynced: SyncState = SyncState.UNSYNCED): List<BenRegCache>
+
+    @Query("UPDATE BENEFICIARY SET processed = 'P' , syncState = 2 WHERE beneficiaryId in (:benId)")
     suspend fun benSyncedWithServer(vararg benId: Long)
 
     @Query("UPDATE BENEFICIARY SET processed = 'U' , syncState = 0 WHERE beneficiaryId in (:benId) AND syncState = 1")

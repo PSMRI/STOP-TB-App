@@ -23,10 +23,16 @@ class RoleModuleConfigTest {
     fun `registrar home modules and privileges match the product spec`() {
         val p = RoleModuleConfig.privilegeFor(AppRole.REGISTRAR)
         assertThat(p.homeModules).containsExactly(
-            AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.NON_HOUSEHOLD
+            AppModule.HOUSEHOLD,
+            AppModule.BENEFICIARIES,
+            AppModule.NON_HOUSEHOLD,
+            AppModule.MISSING_DATA_BENEFICIARIES
         )
         assertThat(p.multiRoleHomeModules).containsExactly(
-            AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.NON_HOUSEHOLD
+            AppModule.HOUSEHOLD,
+            AppModule.BENEFICIARIES,
+            AppModule.NON_HOUSEHOLD,
+            AppModule.MISSING_DATA_BENEFICIARIES
         )
         assertThat(p.canActOnReferral).isFalse()
         assertThat(p.examineDenominatorRule).isEqualTo(ExamineDenominatorRule.REGISTRAR_TWO)

@@ -59,6 +59,7 @@ class NewBenRegViewModel @Inject constructor(
     val hhId          = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).hhId
     val relToHeadId   = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).relToHeadId
     val benIdFromArgs = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
+    val isDataUpdateFlow = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).isEditModeUp
     private val genderFromArgs = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).gender
 
     // StopTB has no HoF / spouse / child concept — kept for nav-graph compat
@@ -640,6 +641,10 @@ class NewBenRegViewModel @Inject constructor(
                     spouseLinkBenId?.let { linkedBenId ->
                         benRepo.updateBeneficiarySpouseAdded(hhId, linkedBenId, SyncState.UNSYNCED)
                         updateLinkedSpouseNameIfBlank(linkedBenId, ben)
+                    }
+
+                    if (isDataUpdateFlow) {
+                        benRepo.updateBenMissingDataStatus(ben.beneficiaryId)
                     }
 
                     _state.postValue(State.SAVE_SUCCESS)
