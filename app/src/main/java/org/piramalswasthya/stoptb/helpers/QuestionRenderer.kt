@@ -348,6 +348,7 @@ object QuestionRenderer {
                 binding.llCheckboxes.addView(cb)
             }
         }
+        showHelperText(binding.tvHelperText, question)
         if (!question.errorMessage.isNullOrEmpty()) {
             binding.tvError.text = question.errorMessage
             binding.tvError.visibility = View.VISIBLE
@@ -800,6 +801,17 @@ object QuestionRenderer {
                 v.post { if (v.isAttachedToWindow) commit() }
             }
         }
+    }
+
+    // Shows the question's helper-text bullets (e.g. the NPY / DOTS guidance in Counselling Section C).
+    private fun showHelperText(tvHelperText: TextView, question: CounsellingQuestionDto) {
+        if (question.helperText.isEmpty()) {
+            tvHelperText.text = null
+            tvHelperText.visibility = View.GONE
+            return
+        }
+        tvHelperText.text = question.helperText.joinToString("\n") { bullet -> "\u2022 $bullet" }
+        tvHelperText.visibility = View.VISIBLE
     }
 
     // Shows the question's UNIT validation param (e.g. "sq. m.") after the value, once a value is present.

@@ -20,6 +20,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import org.piramalswasthya.stoptb.helpers.dynamicMapper.QuestionHelperText
 import org.piramalswasthya.stoptb.helpers.isInternetAvailable
 import org.piramalswasthya.stoptb.ui.counselling_activity.ActionType
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
@@ -235,6 +236,7 @@ class CounsellingRepo @Inject constructor(
                             visibleByDefault = defaultVisible,
                             validations = validationsList,
                             options = optionsList,
+                            helperText = QuestionHelperText.resolve(q.questionUuid, secQWithDetails.validations, isHindi),
                             value = null,
                             visible = defaultVisible,
                             errorMessage = null
