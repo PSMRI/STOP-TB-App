@@ -854,12 +854,13 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
     /** Shows the saved Non-HH place of living (and its free-text detail, if any) after Address. */
     private fun addCurrentLivingDetails(list: MutableList<FormElement>, saved: BenRegCache) {
-        val placeLabel = saved.placeOfCurrentLiving
+        val detailFields = mutableListOf<FormElement>()
+        saved.placeOfCurrentLiving
             ?.let { placeIndex -> resources.getStringArray(R.array.place_of_current_living_choices).getOrNull(placeIndex - 1) }
-            ?: return
-        placeOfCurrentLiving.value = placeLabel
-        val anchorIndex = list.indexOf(address).takeIf { it >= 0 } ?: (list.size - 1)
-        val detailFields = mutableListOf(placeOfCurrentLiving)
+            ?.let { placeLabel ->
+                placeOfCurrentLiving.value = placeLabel
+                detailFields.add(placeOfCurrentLiving)
+            }
         saved.otherPlaceOfCurrentLiving?.takeIf { it.isNotBlank() }?.let { otherPlace ->
             otherPlaceOfCurrentLiving.value = otherPlace
             detailFields.add(otherPlaceOfCurrentLiving)
@@ -868,6 +869,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             institutionName.value = institution
             detailFields.add(institutionName)
         }
+        if (detailFields.isEmpty()) return
+        val anchorIndex = list.indexOf(address).takeIf { it >= 0 } ?: (list.size - 1)
         list.addAll(anchorIndex + 1, detailFields)
     }
 

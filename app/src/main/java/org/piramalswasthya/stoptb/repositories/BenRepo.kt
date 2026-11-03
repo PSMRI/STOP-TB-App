@@ -2170,12 +2170,14 @@ class BenRepo @Inject constructor(
                         ?: demographicsObj.optDoubleOrNull("gpsLatitude")
                         ?: benDataObj.optDoubleOrNull("latitude")
                         ?: benDataObj.optDoubleOrNull("gpsLatitude")
+                        ?: jsonObject.optDoubleOrNull("latitude")
                         ?: jsonObject.optDoubleOrNull("gpsLatitude")
 
                     val benGpsLongitude = demographicsObj.optDoubleOrNull("longitude")
                         ?: demographicsObj.optDoubleOrNull("gpsLongitude")
                         ?: benDataObj.optDoubleOrNull("longitude")
                         ?: benDataObj.optDoubleOrNull("gpsLongitude")
+                        ?: jsonObject.optDoubleOrNull("longitude")
                         ?: jsonObject.optDoubleOrNull("gpsLongitude")
 
                     val benDigipin = demographicsObj.optStringOrNull("digipin")
@@ -2222,7 +2224,8 @@ class BenRepo @Inject constructor(
 
                                 placeOfCurrentLiving = getPlaceOfCurrentLivingIndex(
                                     benDataObj.optStringOrNull("placeOfCurrentLiving")
-                                        ?: jsonObject.optStringOrNull("placeOfCurrentLiving")
+                                ) ?: getPlaceOfCurrentLivingIndex(
+                                    jsonObject.optStringOrNull("placeOfCurrentLiving")
                                 ),
 
                                 otherPlaceOfCurrentLiving = benDataObj.optStringOrNull("otherPlaceOfCurrentLiving")
