@@ -49,5 +49,6 @@ data class FormElement(
     val showAsSingleSelectDialog: Boolean = false,
     val isAlphanumeric: Boolean = false,
     val isAlphabetsOnly: Boolean = false,
+    val showCharacterCounter: Boolean = false,
 
 )
