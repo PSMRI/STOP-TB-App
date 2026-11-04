@@ -1032,6 +1032,12 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.tptRegistrationDoneBenIds.collectLatest { benIds ->
+                benAdapter.submitTptRegistrationDoneBenIds(benIds)
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.tptEligibleBenIds.collectLatest { benIds ->
                 benAdapter.submitTptEligibleBenIds(benIds)
             }

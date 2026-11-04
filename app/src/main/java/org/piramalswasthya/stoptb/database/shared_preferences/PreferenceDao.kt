@@ -22,6 +22,7 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
 
     private companion object {
         const val CHANGES_FEED_TOKEN = "changes_feed_token"
+        const val COUNSELLING_SCHEMA_STORE_FORMAT_KEY = "counselling_schema_store_format"
         const val CHANGES_FEED_SCOPE = "changes_feed_scope"
         const val MASTERS_REFRESHED_AT = "masters_refreshed_at"
         const val CHANGES_FEED_ACTIVE = "changes_feed_active"
@@ -247,6 +248,12 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
                 object : TypeToken<Map<String, VillageDefaults>>() {}.type
             )
         }.getOrNull() ?: emptyMap()
+    }
+
+    fun getCounsellingSchemaStoreFormat(): Int = pref.getInt(COUNSELLING_SCHEMA_STORE_FORMAT_KEY, 0)
+
+    fun setCounsellingSchemaStoreFormat(format: Int) {
+        pref.edit().putInt(COUNSELLING_SCHEMA_STORE_FORMAT_KEY, format).apply()
     }
 
     fun setLastSyncedTimeStamp(lastSaved: Long) {

@@ -94,22 +94,25 @@ class TBConfirmedDataset(
         isEnabled = true
     )
 
-    private val adherenceToMedicines = FormElement(
-        id = 6,
-        inputType = InputType.RADIO,
-        title = resources.getString(R.string.adherence_to_medicines),
-        arrayId = R.array.adherence_options,
-        entries = resources.getStringArray(R.array.adherence_options),
-        required = true,
-        isEnabled = true
-    )
-
     private val anyDiscomfort = FormElement(
         id = 7,
         inputType = InputType.RADIO,
         title = resources.getString(R.string.any_discomfort),
         entries = resources.getStringArray(R.array.yes_no),
         required = true,
+        hasDependants = true,
+        isEnabled = true
+    )
+
+    private val sideEffects = FormElement(
+        id = 15,
+        inputType = InputType.CHECKBOXES,
+        title = resources.getString(R.string.side_effects),
+        arrayId = R.array.tb_side_effects,
+        entries = resources.getStringArray(R.array.tb_side_effects),
+        required = true,
+        showAsMultiSelectDialog = true,
+        enableSearchInMultiSelect = true,
         isEnabled = true
     )
 
@@ -207,7 +210,6 @@ class TBConfirmedDataset(
                     expectedTreatmentCompletionDate,
                     followUpDate,
                     monthlyFollowUpDone,
-                    adherenceToMedicines,
                     anyDiscomfort
                 )
             )
@@ -243,9 +245,8 @@ class TBConfirmedDataset(
             expectedTreatmentCompletionDate.value = saved.expectedTreatmentCompletionDate?.let { getDateFromLong(it) }
             followUpDate.value = saved.followUpDate?.let { getDateFromLong(it) }
             monthlyFollowUpDone.value = saved.monthlyFollowUpDone
-            adherenceToMedicines.value =
-                getLocalValueInArray(R.array.adherence_options, saved.adherenceToMedicines)
             anyDiscomfort.value = saved.anyDiscomfort?.let { if (it) yesValue else noValue }
+            sideEffects.value = getCheckboxIndexesFromValues(R.array.tb_side_effects, saved.sideEffects)
             treatmentCompleted.value = saved.treatmentCompleted?.let { if (it) yesValue else noValue }
             actualTreatmentCompletionDate.value =
                 saved.actualTreatmentCompletionDate?.let { getDateFromLong(it) }
@@ -278,10 +279,10 @@ class TBConfirmedDataset(
                     listOf(
                         followUpDate,
                         monthlyFollowUpDone,
-                        adherenceToMedicines,
                         anyDiscomfort
                     )
                 )
+                if (saved.anyDiscomfort == true) baseList.add(sideEffects)
             } else {
                 baseList.add(followUpDate)
             }
@@ -318,6 +319,9 @@ class TBConfirmedDataset(
             treatmentOutcome.value?.let { outcome ->
                 if (outcome == treatmentOutcome.entries!![5] || outcome == treatmentOutcome.entries!![1]) {
                     baseList.forEach { it.isEnabled = false }
+                    // A record saved before Side Effects existed has none, and a locked form can't
+                    // fill it, so don't let the empty field block the save (Confirmed with Rohit).
+                    if (sideEffects.value.isNullOrEmpty()) sideEffects.required = false
                 }
             }
         }
@@ -347,6 +351,26 @@ class TBConfirmedDataset(
                 updateMonthlyFollowUpCount(dateLong)
                 followUpDate.errorText = validateFollowUpDate(dateLong)
                 checkAndEnableTreatmentCompletion()
+            }
+
+            anyDiscomfort.id -> {
+                return if (index == 0) {
+                    triggerDependants(
+                        source = anyDiscomfort,
+                        removeItems = listOf(),
+                        addItems = listOf(sideEffects),
+                        position = -2
+                    )
+                } else {
+                    sideEffects.value = null
+                    sideEffects.errorText = null
+                    triggerDependants(
+                        source = anyDiscomfort,
+                        removeItems = listOf(sideEffects),
+                        addItems = listOf(),
+                        position = -2
+                    )
+                }
             }
 
             treatmentCompleted.id -> {
@@ -437,17 +461,17 @@ class TBConfirmedDataset(
             isValid = false
         }
 
-        if (adherenceToMedicines.required &&
-            listFlow.value.contains(adherenceToMedicines) &&
-            adherenceToMedicines.value.isNullOrEmpty()) {
-            adherenceToMedicines.errorText = "Adherence to medicines is required"
-            isValid = false
-        }
-
         if (anyDiscomfort.required &&
             listFlow.value.contains(anyDiscomfort) &&
             anyDiscomfort.value.isNullOrEmpty()) {
             anyDiscomfort.errorText = "This field is required"
+            isValid = false
+        }
+
+        if (sideEffects.required &&
+            listFlow.value.contains(sideEffects) &&
+            sideEffects.value.isNullOrEmpty()) {
+            sideEffects.errorText = "Side effects is required"
             isValid = false
         }
 
@@ -683,9 +707,10 @@ class TBConfirmedDataset(
             form.expectedTreatmentCompletionDate = getLongFromDate(expectedTreatmentCompletionDate.value)
             form.followUpDate = getLongFromDate(followUpDate.value)
             form.monthlyFollowUpDone = monthlyFollowUpDone.value
-            form.adherenceToMedicines =
-                getEnglishValueInArray(R.array.adherence_options, adherenceToMedicines.value)
             form.anyDiscomfort = anyDiscomfort.value == anyDiscomfort.entries!![0]
+            form.sideEffects = if (form.anyDiscomfort == true)
+                getEnglishCheckboxValues(R.array.tb_side_effects, sideEffects.value)
+            else null
             form.treatmentCompleted = treatmentCompleted.value?.let {
                 it == treatmentCompleted.entries!![0]
             }
