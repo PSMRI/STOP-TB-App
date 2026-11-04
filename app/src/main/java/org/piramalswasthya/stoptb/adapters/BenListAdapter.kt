@@ -504,6 +504,7 @@ class BenListAdapter(
             tptFollowUpDoneBenIds: List<Long> = emptyList(),
             tptEligibleBenIds: List<Long> = emptyList(),
             childCountMap: Map<Long, Int> = emptyMap(),
+            tptRegistrationDoneBenIds: List<Long> = emptyList(),
             showActionButtons: Boolean = true,
             showResultButton: Boolean = false,
             showAnthropometryButton: Boolean = false,
@@ -573,6 +574,7 @@ class BenListAdapter(
             val hasDiagnosis = tbSuspectedBenIds.contains(item.benId)
             val hasContactFollowUpDone = contactFollowUpDoneBenIds.contains(item.benId)
             val hasTptFollowUpDone = tptFollowUpDoneBenIds.contains(item.benId)
+            val hasTptRegistrationDone = tptRegistrationDoneBenIds.contains(item.benId)
             val isTptEligible = tptEligibleBenIds.contains(item.benId)
             binding.isGeneralOpdDone = hasGeneralOpd
             binding.isAnthropometryDone = hasAnthropometry
@@ -1146,9 +1148,10 @@ class BenListAdapter(
             // Registrar: Anthropometry + TB Screening
             // Nurse: Diagnosis hidden, so total stays 4
             // Counselling Officer: Anthropometry + TB Screening + Contact Follow Up are always required (total = 3);
-            // TPT Follow Up becomes a 4th required item (total = 4) only when this beneficiary's
-            // ClinicalScreeningStatus answer is TPT_ELIGIBLE (see IContactTracingRepository.observeTptEligibleBenIds) ?
-            // otherwise FULL_TREATMENT/NO_TREATMENT beneficiaries would incorrectly get stuck at x/4.
+            // Start TPT (TPT registration) and TPT Follow Up become the 4th and 5th required items (total = 5)
+            // only when this beneficiary's ClinicalScreeningStatus answer is TPT_ELIGIBLE (see
+            // IContactTracingRepository.observeTptEligibleBenIds) ? otherwise FULL_TREATMENT/NO_TREATMENT
+            // beneficiaries would incorrectly get stuck at x/5.
             // Others: all 5 forms
             // Legacy, kept for reference:
 //            val currentRole = pref?.getLoggedInUser()?.role
@@ -1208,7 +1211,7 @@ class BenListAdapter(
                 ExamineDenominatorRule.COUNSELLING_DYNAMIC -> {
                     if (showContactTracingForms) {
                         val requiredItems = if (isTptEligible) {
-                            listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone, hasTptFollowUpDone)
+                            listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone, hasTptRegistrationDone, hasTptFollowUpDone)
                         } else {
                             listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone)
                         }
@@ -1247,12 +1250,14 @@ class BenListAdapter(
             )
 
 
-            val isExamineFilled = examineFilledCount > 0
+            // Red → none filled, Orange → partially filled, Green → all filled
+            val examineTint = when {
+                examineFilledCount <= 0 -> android.R.color.holo_red_dark
+                examineFilledCount >= examineTotal -> android.R.color.holo_green_dark
+                else -> android.R.color.holo_orange_dark
+            }
             binding.btnExamine.setBackgroundTintList(
-                ContextCompat.getColorStateList(
-                    binding.root.context,
-                    if (isExamineFilled) android.R.color.holo_green_dark else android.R.color.holo_red_dark
-                )
+                ContextCompat.getColorStateList(binding.root.context, examineTint)
             )
             binding.btnExamine.setTextColor(
                 ContextCompat.getColor(binding.root.context, android.R.color.white)
@@ -1413,6 +1418,7 @@ class BenListAdapter(
     private val contactFollowUpDoneIds = mutableListOf<Long>()
     private val tptFollowUpDoneIds     = mutableListOf<Long>()
     private val tptEligibleIds         = mutableListOf<Long>()
+    private val tptRegistrationDoneIds = mutableListOf<Long>()
     private val tbDiagnosticsList = mutableListOf<TbDiagnosticsCardFields>()
 
     /**
@@ -1460,6 +1466,7 @@ class BenListAdapter(
             contactFollowUpDoneIds,
             tptFollowUpDoneIds,
             tptEligibleIds,
+            tptRegistrationDoneBenIds = tptRegistrationDoneIds,
             showActionButtons = showActionButtons,
             showResultButton = showResultButton,
             showAnthropometryButton = showAnthropometryButton,
@@ -1552,6 +1559,7 @@ class BenListAdapter(
     fun submitContactFollowUpDoneBenIds(list: List<Long>) = applyIdList(contactFollowUpDoneIds, list)
     fun submitTptFollowUpDoneBenIds(list: List<Long>)      = applyIdList(tptFollowUpDoneIds, list)
     fun submitTptEligibleBenIds(list: List<Long>)          = applyIdList(tptEligibleIds, list)
+    fun submitTptRegistrationDoneBenIds(list: List<Long>)  = applyIdList(tptRegistrationDoneIds, list)
 
     fun submitHouseholdMemberCounts(map: Map<Long, Int>) {
         val old = householdMemberCountMap.toMap()

@@ -425,8 +425,30 @@
     <string name="oldAbha">पुराना</string>
     <string name="regimen_type">उपचार रेजीमेन का प्रकार</string>
     <string name="monthly_follow_up_done">मासिक फॉलो-अप किया गया</string>
-    <string name="adherence_to_medicines">दवाओं का नियमित सेवन</string>
     <string name="any_discomfort">कोई असुविधा</string>
+    <string name="side_effects">दुष्प्रभाव</string>
+    <string-array name="tb_side_effects">
+        <item>जी मिचलाना</item>
+        <item>उल्टी</item>
+        <item>पेट दर्द</item>
+        <item>त्वचा का पीलापन</item>
+        <item>गहरे रंग का पेशाब</item>
+        <item>दिन में 4 से अधिक बार दस्त</item>
+        <item>खुजली</item>
+        <item>चकत्ते</item>
+        <item>हाथों और पैरों में झुनझुनी/जलन/सुन्नपन</item>
+        <item>जोड़ों में दर्द</item>
+        <item>दृष्टि में कमी: दर्द, धुंधला दिखना, रंग पहचानने में गड़बड़ी</item>
+        <item>फ्लू जैसे लक्षण- ठंड लगना, सूखी खांसी, सांस फूलना, भूख न लगना, बदन दर्द और कमजोरी</item>
+        <item>चेहरे या पैरों में सूजन, कम या बिल्कुल पेशाब न आना</item>
+        <item>असामान्य चीज़ें दिखना, विचारों में बदलाव, आत्महत्या के विचार</item>
+        <item>थकान, सुस्ती, सिरदर्द, चक्कर आना, पीलापन, दिल की धड़कन तेज़ होना</item>
+        <item>कानों में घंटी बजना, सुनने में कमी, चक्कर आना और संतुलन खोने से बार-बार गिरना</item>
+        <item>कार्यों में धीमापन, चेहरे या गर्दन में सूजन, असामान्य रूप से वज़न बढ़ना</item>
+        <item>मांसपेशियों और नसों (टेंडन) में दर्द और सूजन, चलने-फिरने में कठिनाई</item>
+        <item>दौरे पड़ना</item>
+        <item>पेशाब, पसीना, बलगम, लार या आंसुओं का नारंगी-लाल रंग</item>
+    </string-array>
     <string name="treatment_completed">क्या मरीज ने उपचार का पूरा कोर्स पूरा किया?</string>
     <string name="treatment_outcome">टीबी उपचार परिणाम</string>
     <string name="reason_for_not_completing">उपचार पूरा न करने का कारण</string>
@@ -502,10 +524,6 @@
         <item>सरकारी मेडिकल कॉलेज</item>
     </string-array>
 
-    <string-array name="adherence_options">
-        <item>नियमित</item>
-        <item>अनियमित</item>
-    </string-array>
 
     <string-array name="dc_case_status">
         <item name="dc_suspected">संदिग्ध</item>

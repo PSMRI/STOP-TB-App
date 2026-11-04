@@ -238,6 +238,8 @@ class CounsellingRepo @Inject constructor(
                             defaultValue = null,
                             containsPii = false,
                             visibleByDefault = defaultVisible,
+                            requiresBackFill = q.requiresBackFill,
+                            editableAfterSubmit = q.editableAfterSubmit,
                             validations = validationsList,
                             options = optionsList,
                             helperText = QuestionHelperText.resolve(q.questionUuid, secQWithDetails.validations, isHindi),
@@ -311,7 +313,8 @@ class CounsellingRepo @Inject constructor(
                                         }
                                         q.value = selectedVals
                                     }
-                                    QuestionType.TEXT, QuestionType.DATE, QuestionType.NUMBER -> {
+                                    QuestionType.TEXT, QuestionType.DATE, QuestionType.NUMBER,
+                                    QuestionType.AUTO_FILL -> {
                                         q.value = qResponses.first().answerText
                                     }
 

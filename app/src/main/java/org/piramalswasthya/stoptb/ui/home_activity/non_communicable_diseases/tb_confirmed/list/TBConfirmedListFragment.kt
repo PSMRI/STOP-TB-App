@@ -106,7 +106,8 @@ class TBConfirmedListFragment : Fragment() {
                         TBConfirmedListFragmentDirections
                             .actionTBConfirmedListFragmentToHouseholdMembersFragment(
                                 hhId = item.ben.hhId ?: 0L,
-                                fromContactTracing = isCounsellingWorkflow
+                                fromContactTracing = isCounsellingWorkflow,
+                                excludeBenId = item.ben.benId
                             )
                     )
                 },

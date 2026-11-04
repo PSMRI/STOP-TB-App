@@ -10,6 +10,7 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.*
 import org.piramalswasthya.stoptb.network.AmritApiService
 import org.piramalswasthya.stoptb.helpers.dynamicMapper.PayloadBuilder
 import org.piramalswasthya.stoptb.helpers.dynamicMapper.QuestionIdStrategy
+import org.piramalswasthya.stoptb.helpers.dynamicMapper.VERSION_SCOPED_ID_FORMS
 import org.piramalswasthya.stoptb.helpers.dynamicMapper.storeFormSchemaInDb
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
@@ -65,6 +66,17 @@ class CounsellingRepositoryImpl @Inject constructor(
 
                     apiSchemas.forEach { apiSchema ->
                         val formId = apiSchema.formId.toIntOrNull() ?: 0
+                        // CFU / TPT: getAllForms only stores schemas (every version, never wiped);
+                        // the active version is getLatestFormVersions' call (refreshFormsIfOutdated).
+                        if (apiSchema.formType in VERSION_SCOPED_ID_FORMS) {
+                            val activeVersion = metadataDao.getActiveVersionNumber(formId)
+                            if (forceUpdate || forceRefresh || activeVersion == null ||
+                                !metadataDao.hasVersion(formId, apiSchema.versionNumber)
+                            ) {
+                                storeAllFormVersions(formId, apiSchema, activeVersion)
+                            }
+                            return@forEach
+                        }
                         if (forceUpdate) {
                             // Login refresh: overwrite in place so same-version backend edits apply. No wipe —
                             // t_form_response RESTRICTs deleting a version that has responses, and upsert keeps answers.
@@ -125,12 +137,26 @@ class CounsellingRepositoryImpl @Inject constructor(
             if (storedInOlderFormat) {
                 Timber.d("refreshFormsIfOutdated: local schema predates store format $SCHEMA_STORE_FORMAT, re-downloading")
             }
-            if (outdated.isEmpty() && !storedInOlderFormat) {
-                true
-            } else {
-                // forceUpdate: the non-force path wipes old versions, which t_form_response RESTRICTs.
-                downloadAndStoreAllForms(forceUpdate = true)
+            if (outdated.isEmpty() && !storedInOlderFormat) return true
+
+            // CFU / TPT switch to the backend's current version, higher or lower, downloading only
+            // when that version isn't stored yet. Other forms re-pull as before; an older local
+            // store format always forces one re-download.
+            val (versionSwitchable, others) = outdated.partition { it.formUuid in VERSION_SCOPED_ID_FORMS }
+            val needsDownload = storedInOlderFormat || others.isNotEmpty() ||
+                    versionSwitchable.any { !metadataDao.hasVersion(it.formId, it.currentVersionNumber) }
+            // forceUpdate: the non-force path wipes old versions, which t_form_response RESTRICTs.
+            val downloaded = !needsDownload || downloadAndStoreAllForms(forceUpdate = true)
+            db.withTransaction {
+                versionSwitchable.forEach { latest ->
+                    if (metadataDao.hasVersion(latest.formId, latest.currentVersionNumber)) {
+                        metadataDao.setActiveVersion(latest.formId, latest.currentVersionNumber)
+                    } else {
+                        Timber.w("refreshFormsIfOutdated: ${latest.formUuid} v${latest.currentVersionNumber} not in getAllForms, active version unchanged")
+                    }
+                }
             }
+            downloaded
         } catch (e: Exception) {
             Timber.e(e, "refreshFormsIfOutdated failed")
             false
@@ -147,6 +173,29 @@ class CounsellingRepositoryImpl @Inject constructor(
             idStrategy = QuestionIdStrategy.HASH_BASED,
             wipeExistingVersions = wipeExistingVersions
         )
+    }
+
+    /** CFU / TPT: stores every version in apiSchema.versions (plus the top-level one) and never
+     * wipes, so answers saved against any version stay readable. An already-active stored version
+     * stays active; only when none is active yet does getAllForms' top-level version become active. */
+    private suspend fun storeAllFormVersions(formId: Int, apiSchema: FormSchemaDto, currentActiveVersion: Int?) {
+        val allVersions = apiSchema.versions.orEmpty()
+            .filter { it.versionNumber != apiSchema.versionNumber } + apiSchema
+        allVersions.sortedBy { it.versionNumber }.forEach { version ->
+            storeFormSchemaInDb(
+                version.copy(
+                    formId = apiSchema.formId,
+                    formUuid = apiSchema.formUuid,
+                    formName = apiSchema.formName,
+                    formType = apiSchema.formType,
+                    versions = null
+                ),
+                wipeExistingVersions = false
+            )
+        }
+        val active = currentActiveVersion?.takeIf { metadataDao.hasVersion(formId, it) }
+            ?: apiSchema.versionNumber
+        metadataDao.setActiveVersion(formId, active)
     }
 
 

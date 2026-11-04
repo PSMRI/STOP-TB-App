@@ -182,6 +182,7 @@ class AllBenViewModel @Inject constructor(
     val contactFollowUpDoneBenIds: Flow<List<Long>> = contactTracingRepo.observeContactFollowUpDoneBenIds()
     val tptFollowUpDoneBenIds: Flow<List<Long>> = contactTracingRepo.observeTptFollowUpTargetReachedBenIds()
     val tptEligibleBenIds: Flow<List<Long>> = contactTracingRepo.observeTptEligibleBenIds()
+    val tptRegistrationDoneBenIds: Flow<List<Long>> = contactTracingRepo.observeTptRegistrationDoneBenIds()
 
     /**
      * Diagnosis = TB_DIAGNOSTICS (new saves) OR TB_SUSPECTED (legacy saves)

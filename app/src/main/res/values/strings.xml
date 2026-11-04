@@ -620,8 +620,30 @@
 
     <string name="regimen_type">Regimen Type</string>
     <string name="monthly_follow_up_done">Monthly follow up done</string>
-    <string name="adherence_to_medicines">Adherence to Medicines</string>
     <string name="any_discomfort">Any discomfort</string>
+    <string name="side_effects">Side Effects</string>
+    <string-array name="tb_side_effects">
+        <item>Nausea</item>
+        <item>Vomiting</item>
+        <item>Abdominal Pain</item>
+        <item>Yellowness of Skin</item>
+        <item>Dark colour Urine</item>
+        <item>Loose motions &gt;4 times in a day</item>
+        <item>Itching</item>
+        <item>Rashes</item>
+        <item>Tingling/burning/numbness in hands and feet</item>
+        <item>Pain in Joints</item>
+        <item>Impaired vision: Pain, Blurring of vision, Disturbance in colour vision</item>
+        <item>Flue like syndrome- Chills, Dry cough, Shortness of breath, loss of appetite, body ache and malaise</item>
+        <item>Swelling of face or legs, Less or no urine</item>
+        <item>Seeing abnormal things, changes of thoughts, suicidal thoughts</item>
+        <item>Tiredness, lethargy, headache, giddiness, pale look, palpitations</item>
+        <item>Ringing in ears, Loss of hearing, dizziness and loss of balance leading to recurrent fall</item>
+        <item>Slowness of activities, Swelling of face or neck, dis-appropriate weight gain</item>
+        <item>Pain and swelling in muscles and Tendons, difficulty in movement</item>
+        <item>Convulsion</item>
+        <item>Orange and red color of urine, sweat, sputum, saliva or tears</item>
+    </string-array>
     <string name="treatment_completed">Did the patient complete the full course of Treatment?</string>
     <string name="treatment_outcome">TB Treatment outcomes</string>
     <string name="reason_for_not_completing">Reason for not completing treatment</string>
@@ -637,10 +659,6 @@
         <item>INH Mono (6 Month)</item>
     </string-array>
 
-    <string-array name="adherence_options">
-        <item>Regular</item>
-        <item>Irregular</item>
-    </string-array>
 
     <string name="remarks">Remarks</string>
 
