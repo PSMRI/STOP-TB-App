@@ -1853,6 +1853,9 @@ abstract class InAppDb : RoomDatabase() {
                     columnExists(database, "TB_CONFIRMED_TREATMENT", "adherenceToMedicines")
                 val hasSideEffectsColumn =
                     columnExists(database, "TB_CONFIRMED_TREATMENT", "sideEffects")
+                // Added by MIGRATION_63_64; the rebuild must keep it or Room's schema check fails.
+                val hasRemarksColumn =
+                    columnExists(database, "TB_CONFIRMED_TREATMENT", "remarks")
 
                 if (!hasAdherenceColumn) {
                     if (!hasSideEffectsColumn) {
@@ -1878,6 +1881,7 @@ abstract class InAppDb : RoomDatabase() {
                 `treatmentCompleted` INTEGER,
                 `actualTreatmentCompletionDate` INTEGER,
                 `treatmentOutcome` TEXT,
+                `remarks` TEXT,
                 `dateOfDeath` INTEGER,
                 `placeOfDeath` TEXT,
                 `reasonForDeath` TEXT NOT NULL,
@@ -1898,7 +1902,9 @@ abstract class InAppDb : RoomDatabase() {
             `monthlyFollowUpDone`, `anyDiscomfort`,
             ${if (hasSideEffectsColumn) "`sideEffects`" else "NULL"},
             `treatmentCompleted`, `actualTreatmentCompletionDate`,
-            `treatmentOutcome`, `dateOfDeath`, `placeOfDeath`,
+            `treatmentOutcome`,
+            ${if (hasRemarksColumn) "`remarks`" else "NULL"},
+            `dateOfDeath`, `placeOfDeath`,
             `reasonForDeath`, `reasonForNotCompleting`,
             `syncState`, `createdAt`, `updatedAt`, `serverUpdatedDate`
         """.trimIndent().replace("\n", " ")
@@ -1910,7 +1916,7 @@ abstract class InAppDb : RoomDatabase() {
                 `expectedTreatmentCompletionDate`, `followUpDate`,
                 `monthlyFollowUpDone`, `anyDiscomfort`, `sideEffects`,
                 `treatmentCompleted`, `actualTreatmentCompletionDate`,
-                `treatmentOutcome`, `dateOfDeath`, `placeOfDeath`,
+                `treatmentOutcome`, `remarks`, `dateOfDeath`, `placeOfDeath`,
                 `reasonForDeath`, `reasonForNotCompleting`,
                 `syncState`, `createdAt`, `updatedAt`, `serverUpdatedDate`
             )

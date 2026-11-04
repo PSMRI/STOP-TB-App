@@ -319,6 +319,9 @@ class TBConfirmedDataset(
             treatmentOutcome.value?.let { outcome ->
                 if (outcome == treatmentOutcome.entries!![5] || outcome == treatmentOutcome.entries!![1]) {
                     baseList.forEach { it.isEnabled = false }
+                    // A record saved before Side Effects existed has none, and a locked form can't
+                    // fill it, so don't let the empty field block the save (Confirmed with Rohit).
+                    if (sideEffects.value.isNullOrEmpty()) sideEffects.required = false
                 }
             }
         }

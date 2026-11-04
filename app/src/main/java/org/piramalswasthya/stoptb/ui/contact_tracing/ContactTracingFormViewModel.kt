@@ -64,6 +64,13 @@ private val CFU_ATT_XRAY_RESULTS = setOf(
 )
 private val CFU_ATT_NAAT_RESULTS = setOf("MTB_DETECTED", "MTB DETECTED", "MTB POSITIVE")
 
+// Forms whose section is re-evaluated (conditions + hidden answers) right before Next/Submit validate.
+private val REFRESH_BEFORE_SAVE_FORMS = setOf(
+    FormType.CONTACT_FOLLOW_UP,
+    FormType.COMMUNITY_CONTACT_TRACING,
+    FormType.OCCUPATION_CONTACT_TRACING
+)
+
 // TPT_FOLLOW_UP isn't listed: its older-version rows are migrated up front instead
 // (see IContactTracingRepository.migrateTptResponsesToVersion).
 private val VERSION_COMPATIBLE_FORMS = setOf(
@@ -312,11 +319,15 @@ class ContactTracingFormViewModel @Inject constructor(
     private fun ensureContactFollowUpDate(questions: List<CounsellingQuestionDto>) {
         if (currentFormType != FormType.CONTACT_FOLLOW_UP) return
         val dateQuestion = questions.firstOrNull { it.questionUuid == QUESTION_UUID_CFU_FOLLOW_UP_DATE } ?: return
-        if (persistedStatus != "SUBMITTED" || dateQuestion.value == null) {
+        if (!isCfuSubmitted() || dateQuestion.value == null) {
             dateQuestion.value = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).format(Date())
         }
         dateQuestion.lockedAnswer = true
     }
+
+    /** The open CFU response is already submitted; a server copy can be stored as COMPLETE/COMPLETED. */
+    private fun isCfuSubmitted(): Boolean =
+        persistedStatus == "SUBMITTED" || persistedStatus == "COMPLETE" || persistedStatus == "COMPLETED"
 
     /** Camp X-ray / NAAT results for the CONTACT_FOLLOW_UP beneficiary, from the latest TB_DIAGNOSTICS row. */
     private suspend fun loadCampResults(benId: Long) {
@@ -351,7 +362,10 @@ class ContactTracingFormViewModel @Inject constructor(
         resultUuid: String
     ) {
         val campQuestion = byUuid[campUuid] ?: return
-        if (campValue != null) campQuestion.value = campValue
+        // Unsubmitted: always mirror the current diagnostics, so a result cleared by a new order clears
+        // here too. Submitted: keep the saved result; only an empty one (e.g. an older-version response
+        // without this field) is filled.
+        if (!isCfuSubmitted() || campQuestion.value?.toString().isNullOrBlank()) campQuestion.value = campValue
         if (isInvalidCampResult(campUuid, campQuestion.value?.toString())) campQuestion.value = null
         val doneAtCamp = !campQuestion.value?.toString().isNullOrBlank()
         campQuestion.visible = doneAtCamp
@@ -416,6 +430,21 @@ class ContactTracingFormViewModel @Inject constructor(
             evaluateAllConditions(questions)
             applyContactFollowUpRules(questions)
         }
+    }
+
+    /** CFU / Community / Occupational, before Next/Submit validate: a TEXT edit skips condition
+     * reevaluation, so re-run it over the whole section (same order as onQuestionValueChanged) and, for
+     * CFU, clear answers that became hidden. Returns the now-visible questions to validate and save, so
+     * a newly shown field is validated and a newly hidden one isn't saved; other forms get [current] back. */
+    private fun refreshSectionBeforeSave(current: List<CounsellingQuestionDto>): List<CounsellingQuestionDto> {
+        if (currentFormType !in REFRESH_BEFORE_SAVE_FORMS) return current
+        val allSectionQuestions = sections.getOrNull(currentSectionIndex)?.questions
+            ?.mapNotNull { questionsByUuid[it.question.questionUuid ?: it.question.questionId.toString()] }
+            ?: return current
+        evaluateAllConditions(allSectionQuestions)
+        applyContactFollowUpRules(allSectionQuestions)        // CFU only (guarded inside)
+        clearHiddenContactFollowUpAnswers(allSectionQuestions) // CFU only (guarded inside)
+        return allSectionQuestions.filter { it.visible }
     }
 
     fun enterEditMode() {
@@ -679,7 +708,7 @@ class ContactTracingFormViewModel @Inject constructor(
             return
         }
 
-        val current = _activeQuestions.value ?: return
+        val current = refreshSectionBeforeSave(_activeQuestions.value ?: return)
         if (!validateSection(current)) {
             _activeQuestions.value = current
             return
@@ -700,7 +729,7 @@ class ContactTracingFormViewModel @Inject constructor(
             }
             return
         }
-        val current = _activeQuestions.value ?: return
+        val current = refreshSectionBeforeSave(_activeQuestions.value ?: return)
         if (!validateSection(current)) {
             _activeQuestions.value = current
             return
