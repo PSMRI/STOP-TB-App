@@ -17,7 +17,9 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.CheckBox
+import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ListView
 import android.widget.RadioButton
 import android.widget.TextView
 import androidx.core.content.ContextCompat
@@ -48,6 +50,8 @@ object QuestionRenderer {
     private const val NUMBER_PICKER_PROBE_MAX = 5000
     // Matches both OCT_AREA_OF_SHARED_SPACE (Occupational) and CCT_AREA_OF_SHARED_SPACE_* (per relationship).
     private const val AREA_OF_SHARED_SPACE_UUID_PART = "AREA_OF_SHARED_SPACE"
+    // DROPDOWN_MULTI fields whose picker gets a search box; every other one keeps the plain checkbox dialog.
+    private val SEARCHABLE_MULTI_SELECT_UUIDS = setOf("TFU_ADR")
 
     fun showLabel(tvQuestion: TextView, question: CounsellingQuestionDto, prefix: String = "") {
         tvQuestion.text = buildLabel(question, prefix)
@@ -255,7 +259,7 @@ object QuestionRenderer {
                 text = opt.optionLabel
                 tag = opt.optionValue
                 isChecked = question.value == opt.optionValue
-                isEnabled = isEditable
+                isEnabled = isEditable && opt.enabled
                 layoutParams = FlexboxLayout.LayoutParams(
                     FlexboxLayout.LayoutParams.WRAP_CONTENT,
                     FlexboxLayout.LayoutParams.WRAP_CONTENT
@@ -263,7 +267,7 @@ object QuestionRenderer {
                     lp.setMargins(0, 0, marginEndPx, marginBottomPx)
                 }
                 setOnClickListener {
-                    if (!isEditable) return@setOnClickListener
+                    if (!isEditable || !opt.enabled) return@setOnClickListener
                     // Deselect every sibling, then mark this one checked
                     for (i in 0 until container.childCount) {
                         (container.getChildAt(i) as? RadioButton)?.isChecked = false
@@ -556,6 +560,16 @@ object QuestionRenderer {
                 val latestValues = (question.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
                 val checkedItems = BooleanArray(options.size) { i -> options[i].optionValue in latestValues }
 
+                if (question.questionUuid in SEARCHABLE_MULTI_SELECT_UUIDS) {
+                    showSearchableMultiSelectDialog(binding.root.context, buildLabel(question, prefix), options, checkedItems) {
+                        val selected = options.filterIndexed { i, _ -> checkedItems[i] }
+                        question.value = selected.map { it.optionValue }
+                        binding.actDropdown.setText(selected.joinToString(", ") { it.optionLabel }, false)
+                        onValueChanged(question)
+                    }
+                    return@setOnClickListener
+                }
+
                 AlertDialog.Builder(binding.root.context)
                     .setTitle(buildLabel(question, prefix))
                     .setMultiChoiceItems(options.map { it.optionLabel }.toTypedArray(), checkedItems) { _, which, checked ->
@@ -597,6 +611,67 @@ object QuestionRenderer {
         binding.tvError.visibility = View.GONE
 
         showDropdownInlineTargets(binding, question, options, allQuestions, isEditable, onValueChanged)
+    }
+
+    /** Multi-select dialog with a search box above the checkbox list (same pattern as the village picker).
+     * Ticks are kept in [checkedItems] by original index, so they survive filtering; [onOk] runs on OK only. */
+    private fun showSearchableMultiSelectDialog(
+        context: Context,
+        title: CharSequence,
+        options: List<CounsellingOptionDto>,
+        checkedItems: BooleanArray,
+        onOk: () -> Unit
+    ) {
+        val density = context.resources.displayMetrics.density
+        val container = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((20 * density).toInt(), (8 * density).toInt(), (20 * density).toInt(), 0)
+        }
+        val searchInput = EditText(context).apply {
+            hint = context.getString(org.piramalswasthya.stoptb.R.string.household_search)
+            setSingleLine(true)
+        }
+        val listView = ListView(context).apply { choiceMode = ListView.CHOICE_MODE_MULTIPLE }
+        container.addView(
+            searchInput,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        )
+        // Fixed share of the screen so the OK/Cancel buttons stay visible however long the list is.
+        container.addView(
+            listView,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (context.resources.displayMetrics.heightPixels * 0.5f).toInt()
+            )
+        )
+
+        var filteredIndices = options.indices.toList()
+        fun refreshList(query: String) {
+            filteredIndices = options.indices.filter { options[it].optionLabel.contains(query.trim(), ignoreCase = true) }
+            listView.adapter = ArrayAdapter(
+                context,
+                android.R.layout.simple_list_item_multiple_choice,
+                filteredIndices.map { options[it].optionLabel }
+            )
+            filteredIndices.forEachIndexed { position, index -> listView.setItemChecked(position, checkedItems[index]) }
+        }
+        refreshList("")
+
+        listView.setOnItemClickListener { _, _, position, _ ->
+            checkedItems[filteredIndices[position]] = listView.isItemChecked(position)
+        }
+        searchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) = refreshList(s?.toString().orEmpty())
+        })
+
+        AlertDialog.Builder(context)
+            .setTitle(title)
+            .setView(container)
+            .setPositiveButton(android.R.string.ok) { _, _ -> onOk() }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     // DROPDOWN_MULTI counterpart of showMCQ's inline rows: the adapter keeps CCT_RELATIONSHIP's dependants out of the

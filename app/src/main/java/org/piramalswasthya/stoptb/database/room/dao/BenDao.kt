@@ -375,6 +375,19 @@ interface BenDao {
                         OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
                         OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
                   )
+            ) AND NOT EXISTS (
+                -- TPT is for household contacts only: exclude the confirmed TB patient(s) themselves
+                SELECT 1
+                FROM BEN_BASIC_CACHE b3
+                LEFT JOIN TB_SUSPECTED ts ON b3.benId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON b3.benId = td.benId
+                WHERE b3.benId = BEN_BASIC_CACHE.benId
+                  AND (
+                        ts.isTbConfirmed = 1
+                        OR td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
             ))
             OR (:source = 10 AND isDeath = 0 AND benId IN (
                 -- TB_SUSPECTED has no RIF field of its own (mdrRifResult is only ever mirrored
@@ -536,6 +549,19 @@ interface BenDao {
                 WHERE b2.hhId = BEN_BASIC_CACHE.hhId
                   AND b2.isDeactivate = 0
                   AND b2.isDeath = 0
+                  AND (
+                        ts.isTbConfirmed = 1
+                        OR td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
+            ) AND NOT EXISTS (
+                -- TPT is for household contacts only: exclude the confirmed TB patient(s) themselves
+                SELECT 1
+                FROM BEN_BASIC_CACHE b3
+                LEFT JOIN TB_SUSPECTED ts ON b3.benId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON b3.benId = td.benId
+                WHERE b3.benId = BEN_BASIC_CACHE.benId
                   AND (
                         ts.isTbConfirmed = 1
                         OR td.isTbConfirmed = 1
@@ -828,6 +854,19 @@ interface BenDao {
                 WHERE b2.hhId = BEN_BASIC_CACHE.hhId
                   AND b2.isDeactivate = 0
                   AND b2.isDeath = 0
+                  AND (
+                        ts.isTbConfirmed = 1
+                        OR td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
+            ) AND NOT EXISTS (
+                -- TPT is for household contacts only: exclude the confirmed TB patient(s) themselves
+                SELECT 1
+                FROM BEN_BASIC_CACHE b3
+                LEFT JOIN TB_SUSPECTED ts ON b3.benId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON b3.benId = td.benId
+                WHERE b3.benId = BEN_BASIC_CACHE.benId
                   AND (
                         ts.isTbConfirmed = 1
                         OR td.isTbConfirmed = 1

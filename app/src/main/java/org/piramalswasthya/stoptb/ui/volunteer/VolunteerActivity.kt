@@ -332,6 +332,11 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         navController.addOnDestinationChangedListener { _, destination, _ ->
             binding.bottomNavRole.visibility =
                 if (destination.id == R.id.volunteerHomeFragment) View.VISIBLE else View.GONE
+            // Back on Home from any in-app module: re-check form versions, so a single-role
+            // Counselling user (who never switches tabs) still picks up a server-side upgrade.
+            if (destination.id == R.id.volunteerHomeFragment && roleManager.activeRole.value == AppRole.COUNSELING) {
+                viewModel.checkFormVersions()
+            }
         }
     }
 
@@ -575,6 +580,9 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     override fun onResume() {
         super.onResume()
         pref.addOnPreferenceChangeListener(campHubPrefListener)
+
+        // Back from a form screen, another app or screen-off: re-check form versions for Counselling.
+        if (roleManager.activeRole.value == AppRole.COUNSELING) viewModel.checkFormVersions()
 
         // If WiFi was lost while the app was in the background, the NetworkCallback
         // couldn't fire (it was unregistered). Catch that case here on resume.

@@ -382,8 +382,30 @@
     <string name="oldAbha">পুৰণি</string>
     <string name="regimen_type">ঔষধ পদ্ধতিৰ প্ৰকাৰ</string>
     <string name="monthly_follow_up_done">মাহেকীয়া ফল\' আপ কৰা হৈছে</string>
-    <string name="adherence_to_medicines">ঔষধ পালন</string>
     <string name="any_discomfort">কোনো অসুবিধা</string>
+    <string name="side_effects">পাৰ্শ্বক্ৰিয়া</string>
+    <string-array name="tb_side_effects">
+        <item>বমি ভাব</item>
+        <item>বমি</item>
+        <item>পেটৰ বিষ</item>
+        <item>ছালৰ হালধীয়া ৰং</item>
+        <item>গাঢ় ৰঙৰ প্ৰস্ৰাৱ</item>
+        <item>দিনটোত ৪ বাৰতকৈ অধিক পাতল পায়খানা</item>
+        <item>খজুৱতি</item>
+        <item>ফুকা-ফুটা (ৰেচ)</item>
+        <item>হাত আৰু ভৰিত জিনজিননি/জ্বলা/অসাৰতা</item>
+        <item>গাঁঠিৰ বিষ</item>
+        <item>দৃষ্টিশক্তিৰ সমস্যা: বিষ, ধূসৰ দেখা, ৰং চিনাক্তকৰণত বিসংগতি</item>
+        <item>ফ্লুৰ দৰে লক্ষণ- কঁপনি, শুকান কাহ, উশাহ-নিশাহত কষ্ট, ভোক নোহোৱা, গা বিষ আৰু দুৰ্বলতা</item>
+        <item>মুখ বা ভৰি উখহা, কম বা প্ৰস্ৰাৱ নোহোৱা</item>
+        <item>অস্বাভাৱিক বস্তু দেখা, চিন্তাত পৰিৱৰ্তন, আত্মহত্যাৰ চিন্তা</item>
+        <item>ভাগৰ, এলাহ, মূৰৰ বিষ, মূৰ ঘূৰোৱা, শেঁতা দেখা, বুকু ধপধপোৱা</item>
+        <item>কাণত শব্দ শুনা, শ্ৰৱণশক্তি হ্ৰাস, মূৰ ঘূৰোৱা আৰু ভাৰসাম্য হেৰুৱাই বাৰে বাৰে পৰি যোৱা</item>
+        <item>কামত লেহেমীয়া ভাৱ, মুখ বা ডিঙি উখহা, অস্বাভাৱিক ওজন বৃদ্ধি</item>
+        <item>মাংসপেশী আৰু টেণ্ডনত বিষ আৰু উখহা, চলাফুৰা কৰাত অসুবিধা</item>
+        <item>খিঁচুনি</item>
+        <item>প্ৰস্ৰাৱ, ঘাম, খেকাৰ, লালটি বা চকুপানীৰ কমলা-ৰঙা ৰং</item>
+    </string-array>
     <string name="treatment_completed">ৰোগীয়ে সম্পূৰ্ণ চিকিৎসা কৰিছে নেকি?</string>
     <string name="treatment_outcome">টিবি চিকিৎসাৰ ফলাফল</string>
     <string name="reason_for_not_completing">চিকিৎসা সম্পূৰ্ণ নকৰাৰ কাৰণ</string>
