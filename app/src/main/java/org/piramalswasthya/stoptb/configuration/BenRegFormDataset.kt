@@ -754,6 +754,10 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             } else if (villageDefaults != null) {
                 // New registration: Pincode & Residential Area come from the village (captured once on the location screen)
                 applyVillageDefaults(villageDefaults, includePinCode = !isNonHH)
+                if (isNonHH) {
+                    // Non-HH: Pincode is hidden but still saved (mapValues), so take it from the village
+                    pinCode.value = villageDefaults.pinCode?.takeIf { villageDefaults.hasPinCode }
+                }
             } else {
                 isCapturingVillageDefaults = true
             }
