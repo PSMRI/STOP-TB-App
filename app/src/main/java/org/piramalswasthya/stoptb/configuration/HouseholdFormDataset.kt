@@ -215,6 +215,14 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         }
     }
 
+    // Position of "Other" in nhhr_fuel_cooking_array (ID 8). Keep fixed: new fuels are appended after it.
+    private val OTHER_FUEL_INDEX = 7
+
+    private fun isOtherFuelSelected(): Boolean {
+        val otherLabel = fuelForCooking.entries?.getOrNull(OTHER_FUEL_INDEX) ?: return false
+        return fuelForCooking.value == otherLabel
+    }
+
     private fun setDefaultRegisteredAtCampSiteIfNeeded() {
         if (registeredAtCampSite.value.isNullOrBlank()) {
             // entries = ["Yes", "No"] — default to "No"
@@ -295,11 +303,20 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         hh?.details?.let { saved ->
             residentialArea.value = residentialArea.getStringFromPosition(saved.residentialAreaId)
             otherResidentialArea.value = saved.otherResidentialArea
-            typeOfHouse.value = typeOfHouse.getStringFromPosition(saved.houseTypeId)
+            // Legacy: pehle index 3 = "Other". Ab 3 = Pucca Stone and Mortar, Other = index 4.
+            val isLegacyOther = saved.houseTypeId == 3 &&
+                    saved.houseType.equals("Other", ignoreCase = true)
+            typeOfHouse.value =
+                if (isLegacyOther) typeOfHouse.entries?.last()
+                else typeOfHouse.getStringFromPosition(saved.houseTypeId)
+            otherTypeOfHouse.value = saved.otherHouseType
             houseOwnership.value = houseOwnership.getStringFromPosition(saved.isHouseOwnedId)
         }
         if (residentialArea.value == residentialArea.entries!!.last()) {
             list.add(list.indexOf(residentialArea) + 1, otherResidentialArea)
+        }
+        if (typeOfHouse.value == typeOfHouse.entries!!.last()) {
+            list.add(list.indexOf(typeOfHouse) + 1, otherTypeOfHouse)
         }
         val thirdPage =
             listOf(
@@ -315,15 +332,17 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             separateKitchen.value = separateKitchen.getStringFromPosition(saved.separateKitchenId)
             fuelForCooking.value = fuelForCooking.getStringFromPosition(saved.fuelUsedId)
             otherFuelForCooking.value = saved.otherFuelUsed
-            sourceOfWater.value = sourceOfWater.getStringFromPosition(saved.sourceOfDrinkingWaterId)
+            sourceOfWater.setSavedChoice(saved.sourceOfDrinkingWaterId, saved.sourceOfDrinkingWater)
             otherSourceOfWater.value = saved.otherSourceOfDrinkingWater
-            sourceOfElectricity.value =
-                sourceOfElectricity.getStringFromPosition(saved.availabilityOfElectricityId)
+            sourceOfElectricity.setSavedChoice(
+                saved.availabilityOfElectricityId,
+                saved.availabilityOfElectricity
+            )
             otherSourceOfElectricity.value = saved.otherAvailabilityOfElectricity
-            availOfToilet.value = availOfToilet.getStringFromPosition(saved.availabilityOfToiletId)
+            availOfToilet.setSavedChoice(saved.availabilityOfToiletId, saved.availabilityOfToilet)
             otherAvailOfToilet.value = saved.otherAvailabilityOfToilet
         }
-        if (fuelForCooking.value == fuelForCooking.entries!!.last()) {
+        if (isOtherFuelSelected()) {
             list.add(list.indexOf(fuelForCooking) + 1, otherFuelForCooking)
         }
         if (sourceOfWater.value == sourceOfWater.entries!!.last()) {
@@ -332,7 +351,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         if (sourceOfElectricity.value == sourceOfElectricity.entries!!.last()) {
             list.add(list.indexOf(sourceOfElectricity) + 1, otherSourceOfElectricity)
         }
-        if (availOfToilet.value == availOfToilet.entries!!.let { it[it.size - 2] }) {
+        if (availOfToilet.value == availOfToilet.entries!!.last()) {
             list.add(list.indexOf(availOfToilet) + 1, otherAvailOfToilet)
         }
         // Only for already-saved households: ask whether to update the location (default "No")
@@ -408,8 +427,21 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_type_of_house),
         arrayId = R.array.nhhr_type_of_house_array,
         entries = resources.getStringArray(R.array.nhhr_type_of_house_array),
-        required = true
+        required = true,
+        hasDependants = true
     )
+
+    private val otherTypeOfHouse = FormElement(
+        id = 1061,
+        inputType = EDIT_TEXT,
+        title = resources.getString(R.string.nhhr_type_of_house_other),
+        arrayId = -1,
+        required = true,
+        hasSpeechToText = true,
+        etMaxLength = 50,
+        etInputType = InputType.TYPE_CLASS_TEXT
+    )
+
     private val houseOwnership = FormElement(
         id = 11,
         inputType = RADIO,
@@ -430,11 +462,20 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         details?.let { saved ->
             residentialArea.value = residentialArea.getStringFromPosition(saved.residentialAreaId)
             otherResidentialArea.value = saved.otherResidentialArea
-            typeOfHouse.value = typeOfHouse.getStringFromPosition(saved.houseTypeId)
+            // Legacy: pehle index 3 = "Other". Ab 3 = Pucca Stone and Mortar, Other = index 4.
+            val isLegacyOther = saved.houseTypeId == 3 &&
+                    saved.houseType.equals("Other", ignoreCase = true)
+            typeOfHouse.value =
+                if (isLegacyOther) typeOfHouse.entries?.last()
+                else typeOfHouse.getStringFromPosition(saved.houseTypeId)
+            otherTypeOfHouse.value = saved.otherHouseType
             houseOwnership.value = houseOwnership.getStringFromPosition(saved.isHouseOwnedId)
         }
         if (residentialArea.value == residentialArea.entries!!.last()) {
             list.add(list.indexOf(residentialArea) + 1, otherResidentialArea)
+        }
+        if (typeOfHouse.value == typeOfHouse.entries!!.last()) {
+            list.add(list.indexOf(typeOfHouse) + 1, otherTypeOfHouse)
         }
         setUpPage(list)
     }
@@ -494,7 +535,9 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_primary_water_other),
         arrayId = -1,
         required = true,
-        etMaxLength = 100
+        hasSpeechToText = true,
+        isAlphabetsOnly = true,
+        etMaxLength = 50
     )
 
 
@@ -514,7 +557,9 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_avail_electricity_other),
         arrayId = -1,
         required = true,
-        etMaxLength = 100
+        hasSpeechToText = true,
+        isAlphabetsOnly = true,
+        etMaxLength = 50
     )
 
 
@@ -534,7 +579,9 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_avail_toilet_other),
         arrayId = -1,
         required = true,
-        etMaxLength = 100
+        hasSpeechToText = true,
+        isAlphabetsOnly = true,
+        etMaxLength = 50
     )
 
 
@@ -548,15 +595,17 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             separateKitchen.value = separateKitchen.getStringFromPosition(saved.separateKitchenId)
             fuelForCooking.value = fuelForCooking.getStringFromPosition(saved.fuelUsedId)
             otherFuelForCooking.value = saved.otherFuelUsed
-            sourceOfWater.value = sourceOfWater.getStringFromPosition(saved.sourceOfDrinkingWaterId)
+            sourceOfWater.setSavedChoice(saved.sourceOfDrinkingWaterId, saved.sourceOfDrinkingWater)
             otherSourceOfWater.value = saved.otherSourceOfDrinkingWater
-            sourceOfElectricity.value =
-                sourceOfElectricity.getStringFromPosition(saved.availabilityOfElectricityId)
+            sourceOfElectricity.setSavedChoice(
+                saved.availabilityOfElectricityId,
+                saved.availabilityOfElectricity
+            )
             otherSourceOfElectricity.value = saved.otherAvailabilityOfElectricity
-            availOfToilet.value = availOfToilet.getStringFromPosition(saved.availabilityOfToiletId)
+            availOfToilet.setSavedChoice(saved.availabilityOfToiletId, saved.availabilityOfToilet)
             otherAvailOfToilet.value = saved.otherAvailabilityOfToilet
         }
-        if (fuelForCooking.value == fuelForCooking.entries!!.last()) {
+        if (isOtherFuelSelected()) {
             list.add(list.indexOf(fuelForCooking) + 1, otherFuelForCooking)
         }
         if (sourceOfWater.value == sourceOfWater.entries!!.last()) {
@@ -565,11 +614,57 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         if (sourceOfElectricity.value == sourceOfElectricity.entries!!.last()) {
             list.add(list.indexOf(sourceOfElectricity) + 1, otherSourceOfElectricity)
         }
-        if (availOfToilet.value == availOfToilet.entries!!.let { it[it.size - 2] }) {
+        if (availOfToilet.value == availOfToilet.entries!!.last()) {
             list.add(list.indexOf(availOfToilet) + 1, otherAvailOfToilet)
         }
 
         setUpPage(list)
+    }
+
+    private val legacyChoiceLabels = mapOf(
+        "hand pump inside house" to "Handpump Inside House",
+        "hand pump outside of house" to "Handpump Outside House"
+    )
+
+    private fun FormElement.isLastSelected(): Boolean = value != null && value == entries?.lastOrNull()
+
+    private fun FormElement.setSavedChoice(position: Int, savedLabel: String?) {
+        value = savedLabel
+            ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+            ?.let { resolveLocalizedChoice(arrayId, it) }
+            ?: getStringFromPosition(position)
+    }
+
+    private fun resolveLocalizedChoice(arrayId: Int, label: String): String? {
+        if (arrayId <= 0) return null
+        val englishArray = englishResources.getStringArray(arrayId)
+        val localizedArray = resources.getStringArray(arrayId)
+        val candidates = listOf(label, legacyChoiceLabels[label.trim().lowercase()]).filterNotNull()
+        for (candidate in candidates) {
+            val englishIndex = englishArray.indexOfFirst { it.equals(candidate, ignoreCase = true) }
+            if (englishIndex >= 0) return localizedArray.getOrNull(englishIndex)
+            val localIndex = localizedArray.indexOfFirst { it.equals(candidate, ignoreCase = true) }
+            if (localIndex >= 0) return localizedArray[localIndex]
+        }
+        return null
+    }
+
+    private fun validateAlphabetsOnly(formElement: FormElement): Int {
+        val value = formElement.value
+        if (value.isNullOrBlank() || value.none { it.isLetter() }) {
+            formElement.errorText = if (formElement.required) {
+                resources.getString(R.string.form_input_empty_error)
+            } else {
+                null
+            }
+            return -1
+        }
+        formElement.errorText = if (value.all { it.isAlphabetOrSpace() }) {
+            null
+        } else {
+            resources.getString(R.string.form_input_alphabet_space_only_error)
+        }
+        return -1
     }
 
     override suspend fun handleListOnValueChanged(formId: Int, index: Int): Int {
@@ -630,7 +725,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             fuelForCooking.id -> triggerDependants(
                 source = fuelForCooking,
                 passedIndex = index,
-                triggerIndex = fuelForCooking.entries!!.size - 1,
+                triggerIndex = OTHER_FUEL_INDEX,
                 target = otherFuelForCooking
             )
 
@@ -651,7 +746,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             availOfToilet.id -> triggerDependants(
                 source = availOfToilet,
                 passedIndex = index,
-                triggerIndex = availOfToilet.entries!!.size - 2,
+                triggerIndex = availOfToilet.entries!!.size - 1,
                 target = otherAvailOfToilet
             )
 
@@ -665,20 +760,11 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
                 //validateAllAlphabetsSpaceOnEditText(otherFuelForCooking)
             }
 
-            otherSourceOfWater.id -> {
-                validateEmptyOnEditText(otherSourceOfWater)
-                // validateAllAlphabetsSpaceOnEditText(otherSourceOfWater)
-            }
+            otherSourceOfWater.id -> validateAlphabetsOnly(otherSourceOfWater)
 
-            otherSourceOfElectricity.id -> {
-                validateEmptyOnEditText(otherSourceOfElectricity)
-                //  validateAllAlphabetsSpaceOnEditText(otherSourceOfElectricity)
-            }
+            otherSourceOfElectricity.id -> validateAlphabetsOnly(otherSourceOfElectricity)
 
-            otherAvailOfToilet.id -> {
-                validateEmptyOnEditText(otherAvailOfToilet)
-                // validateAllAlphabetsSpaceOnEditText(otherAvailOfToilet)
-            }
+            otherAvailOfToilet.id -> validateAlphabetsOnly(otherAvailOfToilet)
 
             address.id -> validateEmptyOnEditText(address)
            // pinCode.id -> validatePincodeOnEditText(pinCode)
@@ -689,6 +775,26 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
                 validateEmptyOnEditText(address)
 
                 return getIndexOfElement(address)
+            }
+
+            typeOfHouse.id -> triggerDependants(
+                source = typeOfHouse,
+                passedIndex = index,
+                triggerIndex = typeOfHouse.entries!!.size - 1,
+                target = otherTypeOfHouse
+            )
+
+            otherTypeOfHouse.id -> {
+                validateEmptyOnEditText(otherTypeOfHouse)
+                val text = otherTypeOfHouse.value.orEmpty()
+                if (text.isNotEmpty() && !Regex("^[\\p{L}\\p{M} ]+$").matches(text)) {
+                    otherTypeOfHouse.errorText =
+                        resources.getString(R.string.form_input_alphabet_space_only_error)
+                    -1
+                } else {
+                    otherTypeOfHouse.errorText = null
+                    -1
+                }
             }
 
             else -> -1
@@ -755,6 +861,10 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             details.otherResidentialArea = otherResidentialArea.value
             details.houseTypeId = typeOfHouse.getPosition()
             details.houseType = typeOfHouse.getEnglishStringFromPosition(details.houseTypeId)
+            details.otherHouseType =
+                if (typeOfHouse.value == typeOfHouse.entries!!.last())
+                    otherTypeOfHouse.value?.trim()
+                else null
             details.isHouseOwnedId = houseOwnership.getPosition()
             details.isHouseOwned =
                 houseOwnership.getEnglishStringFromPosition(details.isHouseOwnedId)
@@ -772,22 +882,25 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
 
             amenities.fuelUsedId = fuelForCooking.getPosition()
             amenities.fuelUsed = fuelForCooking.getEnglishStringFromPosition(amenities.fuelUsedId)
-            amenities.otherFuelUsed = otherFuelForCooking.value
+            amenities.otherFuelUsed = otherFuelForCooking.value.takeIf { isOtherFuelSelected() }
 
             amenities.sourceOfDrinkingWaterId = sourceOfWater.getPosition()
             amenities.sourceOfDrinkingWater =
                 sourceOfWater.getEnglishStringFromPosition(amenities.sourceOfDrinkingWaterId)
-            amenities.otherSourceOfDrinkingWater = otherSourceOfWater.value
+            amenities.otherSourceOfDrinkingWater =
+                otherSourceOfWater.value.takeIf { sourceOfWater.isLastSelected() }
 
             amenities.availabilityOfElectricityId = sourceOfElectricity.getPosition()
             amenities.availabilityOfElectricity =
                 sourceOfElectricity.getEnglishStringFromPosition(amenities.availabilityOfElectricityId)
-            amenities.otherAvailabilityOfElectricity = otherSourceOfElectricity.value
+            amenities.otherAvailabilityOfElectricity =
+                otherSourceOfElectricity.value.takeIf { sourceOfElectricity.isLastSelected() }
 
             amenities.availabilityOfToiletId = availOfToilet.getPosition()
             amenities.availabilityOfToilet =
                 availOfToilet.getEnglishStringFromPosition(amenities.availabilityOfToiletId)
-            amenities.otherAvailabilityOfToilet = otherAvailOfToilet.value
+            amenities.otherAvailabilityOfToilet =
+                otherAvailOfToilet.value.takeIf { availOfToilet.isLastSelected() }
         }
         (cacheModel as HouseholdCache).apply {
             this.amenities = amenity

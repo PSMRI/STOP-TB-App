@@ -37,6 +37,14 @@ class TBConfirmedDataset(
     private var treatmentStartDateValue: Long? = null
     private var regimenTypeValue: String? = null
 
+
+    // Old stored outcome -> new outcome (English). Cured is unchanged.
+    private val legacyOutcomeMap = mapOf(
+        "Death" to "Died",
+        "Failed" to "Treatment Failure",
+        "Lost to Follow-up (LFU)" to "Lost to Follow Up"
+    )
+
     private val regimenType = FormElement(
         id = 1,
         inputType = InputType.DROPDOWN,
@@ -86,22 +94,25 @@ class TBConfirmedDataset(
         isEnabled = true
     )
 
-    private val adherenceToMedicines = FormElement(
-        id = 6,
-        inputType = InputType.RADIO,
-        title = resources.getString(R.string.adherence_to_medicines),
-        arrayId = R.array.adherence_options,
-        entries = resources.getStringArray(R.array.adherence_options),
-        required = true,
-        isEnabled = true
-    )
-
     private val anyDiscomfort = FormElement(
         id = 7,
         inputType = InputType.RADIO,
         title = resources.getString(R.string.any_discomfort),
         entries = resources.getStringArray(R.array.yes_no),
         required = true,
+        hasDependants = true,
+        isEnabled = true
+    )
+
+    private val sideEffects = FormElement(
+        id = 15,
+        inputType = InputType.CHECKBOXES,
+        title = resources.getString(R.string.side_effects),
+        arrayId = R.array.tb_side_effects,
+        entries = resources.getStringArray(R.array.tb_side_effects),
+        required = true,
+        showAsMultiSelectDialog = true,
+        enableSearchInMultiSelect = true,
         isEnabled = true
     )
 
@@ -171,6 +182,15 @@ class TBConfirmedDataset(
 
     )
 
+    private val remarks = FormElement(
+        id = 15,
+        inputType = InputType.EDIT_TEXT,
+        title = resources.getString(R.string.remarks),
+        required = false,
+        etMaxLength = 400,
+        isEnabled = true
+    )
+
     suspend fun setUpPage(
         ben: BenRegCache?,
         saved: TBConfirmedTreatmentCache?,
@@ -190,7 +210,6 @@ class TBConfirmedDataset(
                     expectedTreatmentCompletionDate,
                     followUpDate,
                     monthlyFollowUpDone,
-                    adherenceToMedicines,
                     anyDiscomfort
                 )
             )
@@ -226,18 +245,19 @@ class TBConfirmedDataset(
             expectedTreatmentCompletionDate.value = saved.expectedTreatmentCompletionDate?.let { getDateFromLong(it) }
             followUpDate.value = saved.followUpDate?.let { getDateFromLong(it) }
             monthlyFollowUpDone.value = saved.monthlyFollowUpDone
-            adherenceToMedicines.value =
-                getLocalValueInArray(R.array.adherence_options, saved.adherenceToMedicines)
             anyDiscomfort.value = saved.anyDiscomfort?.let { if (it) yesValue else noValue }
+            sideEffects.value = getCheckboxIndexesFromValues(R.array.tb_side_effects, saved.sideEffects)
             treatmentCompleted.value = saved.treatmentCompleted?.let { if (it) yesValue else noValue }
             actualTreatmentCompletionDate.value =
                 saved.actualTreatmentCompletionDate?.let { getDateFromLong(it) }
+            val outcomeEn = legacyOutcomeMap[saved.treatmentOutcome] ?: saved.treatmentOutcome
             treatmentOutcome.value =
-                getLocalValueInArray(R.array.tb_treatment_outcomes, saved.treatmentOutcome)
+                getLocalValueInArray(R.array.tb_treatment_outcomes, outcomeEn)
             dateOfDeath.value = saved.dateOfDeath?.let { getDateFromLong(it) }
             placeOfDeath.value = getLocalValueInArray(R.array.place_of_death, saved.placeOfDeath)
             reasonForDeath.value = saved.reasonForDeath ?: resources.getString(R.string.tuberculosis)
             reasonForNotCompleting.value = saved.reasonForNotCompleting
+            remarks.value = saved.remarks
 
             treatmentStartDateValue =
                 if (saved.treatmentStartDate > 0) millisAtStartOfDay(saved.treatmentStartDate) else null
@@ -259,10 +279,10 @@ class TBConfirmedDataset(
                     listOf(
                         followUpDate,
                         monthlyFollowUpDone,
-                        adherenceToMedicines,
                         anyDiscomfort
                     )
                 )
+                if (saved.anyDiscomfort == true) baseList.add(sideEffects)
             } else {
                 baseList.add(followUpDate)
             }
@@ -275,16 +295,21 @@ class TBConfirmedDataset(
 
                     if (saved.treatmentOutcome != null) {
                         baseList.add(treatmentOutcome)
+                    }
 
-                        if (treatmentOutcome.value == treatmentOutcome.entries!![3]) {
-                            baseList.addAll(
-                                listOf(
-                                    dateOfDeath,
-                                    placeOfDeath,
-                                    reasonForDeath
-                                )
+                    // Remarks is independent of the outcome, so it is always shown
+                    baseList.add(remarks)
+
+                    if (saved.treatmentOutcome != null &&
+                        treatmentOutcome.value == treatmentOutcome.entries!![1]
+                    ) {
+                        baseList.addAll(
+                            listOf(
+                                dateOfDeath,
+                                placeOfDeath,
+                                reasonForDeath
                             )
-                        }
+                        )
                     }
                 } else {
                     baseList.add(reasonForNotCompleting)
@@ -292,8 +317,11 @@ class TBConfirmedDataset(
             }
 
             treatmentOutcome.value?.let { outcome ->
-                if (outcome == treatmentOutcome.entries!![0] || outcome == treatmentOutcome.entries!!.last()) {
+                if (outcome == treatmentOutcome.entries!![5] || outcome == treatmentOutcome.entries!![1]) {
                     baseList.forEach { it.isEnabled = false }
+                    // A record saved before Side Effects existed has none, and a locked form can't
+                    // fill it, so don't let the empty field block the save (Confirmed with Rohit).
+                    if (sideEffects.value.isNullOrEmpty()) sideEffects.required = false
                 }
             }
         }
@@ -325,12 +353,32 @@ class TBConfirmedDataset(
                 checkAndEnableTreatmentCompletion()
             }
 
+            anyDiscomfort.id -> {
+                return if (index == 0) {
+                    triggerDependants(
+                        source = anyDiscomfort,
+                        removeItems = listOf(),
+                        addItems = listOf(sideEffects),
+                        position = -2
+                    )
+                } else {
+                    sideEffects.value = null
+                    sideEffects.errorText = null
+                    triggerDependants(
+                        source = anyDiscomfort,
+                        removeItems = listOf(sideEffects),
+                        addItems = listOf(),
+                        position = -2
+                    )
+                }
+            }
+
             treatmentCompleted.id -> {
                 return if (index == 0) {
                     triggerDependants(
                         source = treatmentCompleted,
                         removeItems = listOf(reasonForNotCompleting),
-                        addItems = listOf(actualTreatmentCompletionDate, treatmentOutcome),
+                        addItems = listOf(actualTreatmentCompletionDate, treatmentOutcome,remarks),
                         position = -2
                     )
                 } else {
@@ -339,6 +387,7 @@ class TBConfirmedDataset(
                         removeItems = listOf(
                             actualTreatmentCompletionDate,
                             treatmentOutcome,
+                            remarks,
                             dateOfDeath,
                             placeOfDeath,
                             reasonForDeath
@@ -351,7 +400,7 @@ class TBConfirmedDataset(
 
             treatmentOutcome.id -> {
                 val treatmentOutcomes = resources.getStringArray(R.array.tb_treatment_outcomes)
-                return if (treatmentOutcome.value == treatmentOutcomes[3]) {
+                return if (treatmentOutcome.value == treatmentOutcomes[1]) {
                     triggerDependants(
                         source = treatmentOutcome,
                         removeItems = listOf(),
@@ -412,17 +461,17 @@ class TBConfirmedDataset(
             isValid = false
         }
 
-        if (adherenceToMedicines.required &&
-            listFlow.value.contains(adherenceToMedicines) &&
-            adherenceToMedicines.value.isNullOrEmpty()) {
-            adherenceToMedicines.errorText = "Adherence to medicines is required"
-            isValid = false
-        }
-
         if (anyDiscomfort.required &&
             listFlow.value.contains(anyDiscomfort) &&
             anyDiscomfort.value.isNullOrEmpty()) {
             anyDiscomfort.errorText = "This field is required"
+            isValid = false
+        }
+
+        if (sideEffects.required &&
+            listFlow.value.contains(sideEffects) &&
+            sideEffects.value.isNullOrEmpty()) {
+            sideEffects.errorText = "Side effects is required"
             isValid = false
         }
 
@@ -457,6 +506,12 @@ class TBConfirmedDataset(
             reasonForNotCompleting.value.isNullOrEmpty()) {
             reasonForNotCompleting.errorText = "Reason for not completing is required"
             isValid = false
+        }
+        if (!remarks.value.isNullOrEmpty() && remarks.value!!.length > 400) {
+            remarks.errorText = "Remarks cannot exceed 400 characters"
+            isValid = false
+        } else {
+            remarks.errorText = null
         }
 
         return isValid
@@ -605,6 +660,7 @@ class TBConfirmedDataset(
                 removeItems = listOf(
                     actualTreatmentCompletionDate,
                     treatmentOutcome,
+                    remarks,
                     reasonForNotCompleting,
                     dateOfDeath,
                     placeOfDeath,
@@ -651,19 +707,22 @@ class TBConfirmedDataset(
             form.expectedTreatmentCompletionDate = getLongFromDate(expectedTreatmentCompletionDate.value)
             form.followUpDate = getLongFromDate(followUpDate.value)
             form.monthlyFollowUpDone = monthlyFollowUpDone.value
-            form.adherenceToMedicines =
-                getEnglishValueInArray(R.array.adherence_options, adherenceToMedicines.value)
             form.anyDiscomfort = anyDiscomfort.value == anyDiscomfort.entries!![0]
+            form.sideEffects = if (form.anyDiscomfort == true)
+                getEnglishCheckboxValues(R.array.tb_side_effects, sideEffects.value)
+            else null
             form.treatmentCompleted = treatmentCompleted.value?.let {
                 it == treatmentCompleted.entries!![0]
             }
             form.actualTreatmentCompletionDate = getLongFromDate(actualTreatmentCompletionDate.value)
             form.treatmentOutcome =
                 getEnglishValueInArray(R.array.tb_treatment_outcomes, treatmentOutcome.value)
-            form.dateOfDeath = getLongFromDate(dateOfDeath.value)
-            form.placeOfDeath = getEnglishValueInArray(R.array.place_of_death, placeOfDeath.value)
+            val died = form.treatmentOutcome == "Died"
+            form.dateOfDeath = if (died) getLongFromDate(dateOfDeath.value).takeIf { it > 0 } else null
+            form.placeOfDeath = if (died) getEnglishValueInArray(R.array.place_of_death, placeOfDeath.value) else null
             form.reasonForDeath = reasonForDeath.value ?: resources.getString(R.string.tuberculosis)
             form.reasonForNotCompleting = reasonForNotCompleting.value
+            form.remarks = remarks.value?.takeIf { it.isNotBlank() }
         }
     }
 

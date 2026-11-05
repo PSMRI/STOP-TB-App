@@ -122,7 +122,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         QuestionResponseEntity::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
-    version = 59, exportSchema = false
+    version = InAppDb.DB_VERSION, exportSchema = true
 )
 @TypeConverters(
     LocationEntityListConverter::class,
@@ -161,6 +161,26 @@ abstract class InAppDb : RoomDatabase() {
     companion object {
         @Volatile
         private var INSTANCE: InAppDb? = null
+
+        /**
+         * Reads, and every suspend DAO call outside a transaction, run here.
+         * Sized above the pull's write concurrency so a pull in progress can never consume
+         * every thread and leave UI queries - Paging's load() in particular - unscheduled.
+         */
+        private val queryExecutor: java.util.concurrent.ExecutorService =
+            java.util.concurrent.Executors.newFixedThreadPool(8) { runnable ->
+                Thread(runnable, "stoptb-room-query").apply { isDaemon = true }
+            }
+
+        /**
+         * withTransaction blocks run here, on their own pool, so a page-long write transaction
+         * blocks only other transactions and never a read. Must stay above 1: Room can deadlock
+         * on a single-threaded transaction executor if a transaction ever awaits another.
+         */
+        private val transactionExecutor: java.util.concurrent.ExecutorService =
+            java.util.concurrent.Executors.newFixedThreadPool(4) { runnable ->
+                Thread(runnable, "stoptb-room-txn").apply { isDaemon = true }
+            }
 
         fun tableExists(db: SupportSQLiteDatabase, tableName: String): Boolean {
             val cursor = db.query(
@@ -1711,6 +1731,79 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        /**
+         * Rebuilds BEN_BASIC_CACHE without GROUP BY / ORDER BY so SQLite can flatten it.
+         *
+         * View-only change: no table is touched, so there is no data to migrate and the step is
+         * safe to re-run. The CREATE VIEW text is copied verbatim from Room's generated
+         * InAppDb_Impl so the schema hash Room validates on open matches exactly - a mismatch
+         * here would fall through to fallbackToDestructiveMigration() and wipe local data.
+         */
+        /**
+         * Drops the CBAC / TB_SCREENING / TB_SUSPECTED correlated subqueries out of
+         * BEN_BASIC_CACHE, leaving the six columns they fed as literals. See the note on the
+         * @DatabaseView in model/Ben.kt for why: Room registers an invalidation observer on every
+         * table a view reads, so those subqueries made each beneficiary list reload on any TB or
+         * CBAC write.
+         *
+         * View-only change, same as MIGRATION_57_58 - no table is touched, nothing to migrate, and
+         * the step is safe to re-run. The CREATE VIEW text is copied verbatim from Room's generated
+         * InAppDb_Impl so the schema hash Room validates on open matches exactly.
+         */
+        /**
+         * Indexes BENEFICIARY.benRegId. Pure addition - no table or view is rewritten and no
+         * row is touched, so there is nothing for a partially-synced device to lose.
+         */
+        /**
+         * Restores `ORDER BY b.updatedDate DESC` on BEN_BASIC_CACHE.
+         *
+         * MIGRATION_58_59 dropped GROUP BY *and* ORDER BY so SQLite could flatten the view.
+         * Dropping GROUP BY is safe (the join is on HOUSEHOLD's primary key, so it cannot
+         * multiply rows), but dropping the ordering silently reordered 43 list queries that
+         * select from this view with no ORDER BY of their own - they showed most-recently-
+         * updated beneficiaries first and fell back to rowid order.
+         *
+         * This is a separate, appended step rather than an edit to MIGRATION_58_59 because any
+         * device that already ran 58->59 would otherwise sit on a schema whose identity hash no
+         * longer matches and no migration would ever correct it - Room would throw
+         * "cannot verify the data integrity" on open.
+         *
+         * Costs ~18ms on a 10k COUNT (the view's ORDER BY forces a sort for Paging's count
+         * query); the correct list order is worth it.
+         */
+        val MIGRATION_60_61 = object : Migration(60, 61) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
+                database.execSQL(
+                    "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId, b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod, b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus, b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId, b.isNewAbha, 0 as cbacFilled, NULL as cbacSyncState, 0 as cdrFilled, NULL as cdrSyncState, 0 as mdsrFilled, NULL as mdsrSyncState, NULL as pmsmaSyncState, 0 as pmsmaFilled, 0 as hbncFilled, 0 as hbycFilled, 0 as pwrFilled, NULL as pwrSyncState, NULL as doSyncState, NULL as irSyncState, NULL as crSyncState, 0 as ecrFilled, 0 as ectFilled, 0 as isMdsr, 0 as tbsnFilled, NULL as tbsnSyncState, 0 as tbspFilled, NULL as tbspSyncState, 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled, 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled, NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState, 0 as isDelivered, 0 as pwHrp, 0 as irFilled, 0 as crFilled, 0 as doFilled, b.isNonHH, b.isAvailableForCamp, b.reasonForNotAttendingCamp, b.otherReasonForNotAttendingCamp, b.screeningStatus, b.symptomsScreenedDate, b.chestXrayDoneDate, b.trunatTestDoneDate, b.placeOfCurrentLiving, b.otherPlaceOfCurrentLiving, b.institutionName FROM BENEFICIARY b LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId WHERE b.isDraft = 0 ORDER BY b.updatedDate DESC"
+                )
+            }
+        }
+
+        val MIGRATION_59_60 = object : Migration(59, 60) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_ben_reg_id` ON `BENEFICIARY` (`benRegId`)")
+            }
+        }
+
+        val MIGRATION_58_59 = object : Migration(58, 59) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
+                database.execSQL(
+                    "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId, b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod, b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus, b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId, b.isNewAbha, 0 as cbacFilled, NULL as cbacSyncState, 0 as cdrFilled, NULL as cdrSyncState, 0 as mdsrFilled, NULL as mdsrSyncState, NULL as pmsmaSyncState, 0 as pmsmaFilled, 0 as hbncFilled, 0 as hbycFilled, 0 as pwrFilled, NULL as pwrSyncState, NULL as doSyncState, NULL as irSyncState, NULL as crSyncState, 0 as ecrFilled, 0 as ectFilled, 0 as isMdsr, 0 as tbsnFilled, NULL as tbsnSyncState, 0 as tbspFilled, NULL as tbspSyncState, 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled, 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled, NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState, 0 as isDelivered, 0 as pwHrp, 0 as irFilled, 0 as crFilled, 0 as doFilled, b.isNonHH, b.isAvailableForCamp, b.reasonForNotAttendingCamp, b.otherReasonForNotAttendingCamp, b.screeningStatus, b.symptomsScreenedDate, b.chestXrayDoneDate, b.trunatTestDoneDate, b.placeOfCurrentLiving, b.otherPlaceOfCurrentLiving, b.institutionName FROM BENEFICIARY b LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId WHERE b.isDraft = 0"
+                )
+            }
+        }
+
+        val MIGRATION_57_58 = object : Migration(57, 58) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
+                database.execSQL(
+                    "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId, b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod, b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus, b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId, b.isNewAbha, (SELECT COUNT(*) > 0 FROM CBAC c2 WHERE c2.benId = b.beneficiaryId) as cbacFilled, (SELECT c2.syncState FROM CBAC c2 WHERE c2.benId = b.beneficiaryId ORDER BY c2.id DESC LIMIT 1) as cbacSyncState, 0 as cdrFilled, NULL as cdrSyncState, 0 as mdsrFilled, NULL as mdsrSyncState, NULL as pmsmaSyncState, 0 as pmsmaFilled, 0 as hbncFilled, 0 as hbycFilled, 0 as pwrFilled, NULL as pwrSyncState, NULL as doSyncState, NULL as irSyncState, NULL as crSyncState, 0 as ecrFilled, 0 as ectFilled, 0 as isMdsr, (SELECT COUNT(*) > 0 FROM TB_SCREENING s2 WHERE s2.benId = b.beneficiaryId) as tbsnFilled, (SELECT s2.syncState FROM TB_SCREENING s2 WHERE s2.benId = b.beneficiaryId ORDER BY s2.id DESC LIMIT 1) as tbsnSyncState, (SELECT COUNT(*) > 0 FROM TB_SUSPECTED p2 WHERE p2.benId = b.beneficiaryId) as tbspFilled, (SELECT p2.syncState FROM TB_SUSPECTED p2 WHERE p2.benId = b.beneficiaryId ORDER BY p2.id DESC LIMIT 1) as tbspSyncState, 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled, 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled, NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState, 0 as isDelivered, 0 as pwHrp, 0 as irFilled, 0 as crFilled, 0 as doFilled, b.isNonHH, b.isAvailableForCamp, b.reasonForNotAttendingCamp, b.otherReasonForNotAttendingCamp, b.screeningStatus, b.symptomsScreenedDate, b.chestXrayDoneDate, b.trunatTestDoneDate, b.placeOfCurrentLiving, b.otherPlaceOfCurrentLiving, b.institutionName FROM BENEFICIARY b LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId WHERE b.isDraft = 0"
+                )
+            }
+        }
+
         val MIGRATION_56_57 = object : Migration(56, 57) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE `GENERAL_OPD_PRESCRIPTION` ADD COLUMN `itemFormId` INTEGER")
@@ -1718,19 +1811,153 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_57_58 = object : Migration(57, 58) {
+        /*
+         * release-2.4's schema changes, appended after main's 57->61 steps. On release-2.4 they
+         * were numbered 57->58, 58->59 and 59->60, but main had already shipped different
+         * migrations under those numbers, so they get new version numbers here. Each step checks
+         * before it changes anything, so a device that ran the old 2.4 numbering (a UAT build)
+         * can also run these safely.
+         */
+        val MIGRATION_61_62 = object : Migration(61, 62) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE `TB_SCREENING` ADD COLUMN `otherSymptomsDetails` TEXT")
+                if (!columnExists(database, "TB_SCREENING", "otherSymptomsDetails")) {
+                    database.execSQL("ALTER TABLE `TB_SCREENING` ADD COLUMN `otherSymptomsDetails` TEXT")
+                }
+                // A device on an old release-2.4 build never ran main's 59->60, so it does not
+                // have this index. IF NOT EXISTS does nothing on devices that already have it.
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_ben_reg_id` ON `BENEFICIARY` (`benRegId`)")
             }
         }
 
-        private val MIGRATION_58_59 = object : Migration(58, 59) {
+        val MIGRATION_62_63 = object : Migration(62, 63) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                if (!columnExists(database, "TB_DIAGNOSTICS", "sputumCollectionDate")
+                if (!columnExists(database, "TB_DIAGNOSTICS", "sputumCollectionDate")) {
+                    database.execSQL("ALTER TABLE TB_DIAGNOSTICS ADD COLUMN sputumCollectionDate INTEGER")
+                }
+            }
+        }
+
+        val MIGRATION_63_64 = object : Migration(63, 64) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "TB_CONFIRMED_TREATMENT", "remarks")) {
+                    database.execSQL("ALTER TABLE TB_CONFIRMED_TREATMENT ADD COLUMN remarks TEXT DEFAULT NULL")
+                }
+            }
+        }
+        // TB confirmed treatment form: "Adherence to Medicines" removed and "Side Effects" added.
+        // minSdk 25 has no ALTER TABLE ... DROP COLUMN, so rebuild TB_CONFIRMED_TREATMENT.
+        private val MIGRATION_64_65 = object : Migration(64, 65) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!tableExists(database, "TB_CONFIRMED_TREATMENT")) return
+
+                val hasAdherenceColumn =
+                    columnExists(database, "TB_CONFIRMED_TREATMENT", "adherenceToMedicines")
+                val hasSideEffectsColumn =
+                    columnExists(database, "TB_CONFIRMED_TREATMENT", "sideEffects")
+                // Added by MIGRATION_63_64; the rebuild must keep it or Room's schema check fails.
+                val hasRemarksColumn =
+                    columnExists(database, "TB_CONFIRMED_TREATMENT", "remarks")
+
+                if (!hasAdherenceColumn) {
+                    if (!hasSideEffectsColumn) {
+                        database.execSQL(
+                            "ALTER TABLE TB_CONFIRMED_TREATMENT ADD COLUMN sideEffects TEXT"
+                        )
+                    }
+                    return
+                }
+
+                database.execSQL(
+                    """
+            CREATE TABLE IF NOT EXISTS `TB_CONFIRMED_TREATMENT_new` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `benId` INTEGER NOT NULL,
+                `regimenType` TEXT,
+                `treatmentStartDate` INTEGER NOT NULL,
+                `expectedTreatmentCompletionDate` INTEGER,
+                `followUpDate` INTEGER,
+                `monthlyFollowUpDone` TEXT,
+                `anyDiscomfort` INTEGER,
+                `sideEffects` TEXT,
+                `treatmentCompleted` INTEGER,
+                `actualTreatmentCompletionDate` INTEGER,
+                `treatmentOutcome` TEXT,
+                `remarks` TEXT,
+                `dateOfDeath` INTEGER,
+                `placeOfDeath` TEXT,
+                `reasonForDeath` TEXT NOT NULL,
+                `reasonForNotCompleting` TEXT,
+                `syncState` INTEGER NOT NULL,
+                `createdAt` INTEGER NOT NULL,
+                `updatedAt` INTEGER NOT NULL,
+                `serverUpdatedDate` INTEGER,
+                FOREIGN KEY(`benId`) REFERENCES `BENEFICIARY`(`beneficiaryId`)
+                    ON UPDATE CASCADE ON DELETE CASCADE
+            )
+            """.trimIndent()
+                )
+
+                val columns = """
+            `id`, `benId`, `regimenType`, `treatmentStartDate`,
+            `expectedTreatmentCompletionDate`, `followUpDate`,
+            `monthlyFollowUpDone`, `anyDiscomfort`,
+            ${if (hasSideEffectsColumn) "`sideEffects`" else "NULL"},
+            `treatmentCompleted`, `actualTreatmentCompletionDate`,
+            `treatmentOutcome`,
+            ${if (hasRemarksColumn) "`remarks`" else "NULL"},
+            `dateOfDeath`, `placeOfDeath`,
+            `reasonForDeath`, `reasonForNotCompleting`,
+            `syncState`, `createdAt`, `updatedAt`, `serverUpdatedDate`
+        """.trimIndent().replace("\n", " ")
+
+                database.execSQL(
+                    """
+            INSERT INTO `TB_CONFIRMED_TREATMENT_new` (
+                `id`, `benId`, `regimenType`, `treatmentStartDate`,
+                `expectedTreatmentCompletionDate`, `followUpDate`,
+                `monthlyFollowUpDone`, `anyDiscomfort`, `sideEffects`,
+                `treatmentCompleted`, `actualTreatmentCompletionDate`,
+                `treatmentOutcome`, `remarks`, `dateOfDeath`, `placeOfDeath`,
+                `reasonForDeath`, `reasonForNotCompleting`,
+                `syncState`, `createdAt`, `updatedAt`, `serverUpdatedDate`
+            )
+            SELECT $columns FROM `TB_CONFIRMED_TREATMENT`
+            """.trimIndent()
+                )
+
+                database.execSQL("DROP TABLE `TB_CONFIRMED_TREATMENT`")
+
+                database.execSQL(
+                    "ALTER TABLE `TB_CONFIRMED_TREATMENT_new` RENAME TO `TB_CONFIRMED_TREATMENT`"
+                )
+
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `ind_tb_confirmed` ON `TB_CONFIRMED_TREATMENT` (`benId`)"
+                )
+            }
+        }
+
+        // Dynamic forms: option's stable optionUuid, used to carry answers across form versions
+        // even when an option's optionValue is renamed. Filled on the next schema store.
+        private val MIGRATION_65_66 = object : Migration(65, 66) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (tableExists(database, "t_question_option") &&
+                    !columnExists(database, "t_question_option", "optionUuid")
                 ) {
-                    database.execSQL(
-                        "ALTER TABLE TB_DIAGNOSTICS ADD COLUMN sputumCollectionDate INTEGER"
-                    )
+                    database.execSQL("ALTER TABLE t_question_option ADD COLUMN optionUuid TEXT")
+                }
+            }
+        }
+
+        // Dynamic forms: requiresBackFill and editableAfterSubmit flags in t_section_question
+        private val MIGRATION_66_67 = object : Migration(66,67) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!tableExists(database, "t_section_question")) return
+                if (!columnExists(database, "t_section_question", "requiresBackFill")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN requiresBackFill INTEGER NOT NULL DEFAULT 0")
+                }
+                if (!columnExists(database, "t_section_question", "editableAfterSubmit")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN editableAfterSubmit INTEGER NOT NULL DEFAULT 0")
                 }
             }
         }
@@ -1939,6 +2166,83 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+
+        // Bump together with a new MIGRATION_x_y added to MIGRATIONS below.
+        const val DB_VERSION = 67
+
+        // Oldest schema version that can be migrated in place.
+        const val OLDEST_MIGRATABLE_VERSION = 2
+
+        // Every migration, in order. InAppDbMigrationsTest checks that it covers each
+        // step from OLDEST_MIGRATABLE_VERSION to DB_VERSION.
+        internal val MIGRATIONS: Array<Migration> = arrayOf(
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+            MIGRATION_4_5,
+            MIGRATION_5_6,
+            MIGRATION_6_7,
+            MIGRATION_7_8,
+            MIGRATION_8_9,
+            MIGRATION_9_10,
+            MIGRATION_10_11,
+            MIGRATION_11_12,
+            MIGRATION_12_13,
+            MIGRATION_13_14,
+            MIGRATION_14_15,
+            MIGRATION_15_16,
+            MIGRATION_16_17,
+            MIGRATION_17_18,
+            MIGRATION_18_19,
+            MIGRATION_19_20,
+            MIGRATION_20_21,
+            MIGRATION_21_22,
+            MIGRATION_22_23,
+            MIGRATION_23_24,
+            MIGRATION_24_25,
+            MIGRATION_25_26,
+            MIGRATION_26_27,
+            MIGRATION_27_28,
+            MIGRATION_28_29,
+            MIGRATION_29_30,
+            MIGRATION_30_31,
+            MIGRATION_31_32,
+            MIGRATION_32_33,
+            MIGRATION_33_34,
+            MIGRATION_34_35,
+            MIGRATION_35_36,
+            MIGRATION_36_37,
+            MIGRATION_37_38,
+            MIGRATION_38_39,
+            MIGRATION_39_40,
+            MIGRATION_40_41,
+            MIGRATION_41_42,
+            MIGRATION_42_43,
+            MIGRATION_43_44,
+            MIGRATION_44_45,
+            MIGRATION_45_46,
+            MIGRATION_46_47,
+            MIGRATION_47_48,
+            MIGRATION_48_49,
+            MIGRATION_49_50,
+            MIGRATION_50_51,
+            MIGRATION_51_52,
+            MIGRATION_52_53,
+            MIGRATION_53_54,
+            MIGRATION_54_55,
+            MIGRATION_55_56,
+            MIGRATION_56_57,
+            MIGRATION_57_58,
+            MIGRATION_58_59,
+            MIGRATION_59_60,
+            MIGRATION_60_61,
+            MIGRATION_61_62,
+            MIGRATION_62_63,
+            MIGRATION_63_64,
+            MIGRATION_64_65,
+            MIGRATION_65_66,
+            MIGRATION_66_67
+        )
+
         fun getInstance(appContext: Context): InAppDb {
 
             synchronized(this) {
@@ -1964,64 +2268,27 @@ abstract class InAppDb : RoomDatabase() {
                     }
 
                     instance = builder
-                        .addMigrations(MIGRATION_2_3)
-                        .addMigrations(MIGRATION_3_4)
-                        .addMigrations(MIGRATION_4_5)
-                        .addMigrations(MIGRATION_5_6)
-                        .addMigrations(MIGRATION_6_7)
-                        .addMigrations(MIGRATION_7_8)
-                        .addMigrations(MIGRATION_8_9)
-                        .addMigrations(MIGRATION_9_10)
-                        .addMigrations(MIGRATION_10_11)
-                        .addMigrations(MIGRATION_11_12)
-                        .addMigrations(MIGRATION_12_13)
-                        .addMigrations(MIGRATION_13_14)
-                        .addMigrations(MIGRATION_14_15)
-                        .addMigrations(MIGRATION_15_16)
-                        .addMigrations(MIGRATION_16_17)
-                        .addMigrations(MIGRATION_17_18)
-                        .addMigrations(MIGRATION_18_19)
-                        .addMigrations(MIGRATION_19_20)
-                        .addMigrations(MIGRATION_20_21)
-                        .addMigrations(MIGRATION_21_22)
-                        .addMigrations(MIGRATION_22_23)
-                        .addMigrations(MIGRATION_23_24)
-                        .addMigrations(MIGRATION_24_25)
-                        .addMigrations(MIGRATION_25_26)
-                        .addMigrations(MIGRATION_26_27)
-                        .addMigrations(MIGRATION_27_28)
-                        .addMigrations(MIGRATION_28_29)
-                        .addMigrations(MIGRATION_29_30)
-                        .addMigrations(MIGRATION_30_31)
-                        .addMigrations(MIGRATION_31_32)
-                        .addMigrations(MIGRATION_32_33)
-                        .addMigrations(MIGRATION_33_34)
-                        .addMigrations(MIGRATION_34_35)
-                        .addMigrations(MIGRATION_35_36)
-                        .addMigrations(MIGRATION_36_37)
-                        .addMigrations(MIGRATION_37_38)
-                        .addMigrations(MIGRATION_38_39)
-                        .addMigrations(MIGRATION_39_40)
-                        .addMigrations(MIGRATION_40_41)
-                        .addMigrations(MIGRATION_41_42)
-                        .addMigrations(MIGRATION_42_43)
-                        .addMigrations(MIGRATION_43_44)
-                        .addMigrations(MIGRATION_44_45)
-                        .addMigrations(MIGRATION_45_46)
-                        .addMigrations(MIGRATION_46_47)
-                        .addMigrations(MIGRATION_47_48)
-                        .addMigrations(MIGRATION_48_49)
-                        .addMigrations(MIGRATION_49_50)
-                        .addMigrations(MIGRATION_50_51)
-                        .addMigrations(MIGRATION_51_52)
-                        .addMigrations(MIGRATION_52_53)
-                        .addMigrations(MIGRATION_53_54)
-                        .addMigrations(MIGRATION_54_55)
-                        .addMigrations(MIGRATION_55_56)
-                        .addMigrations(MIGRATION_56_57)
-                        .addMigrations(MIGRATION_57_58)
-                        .addMigrations(MIGRATION_58_59)
-                        .fallbackToDestructiveMigration()
+                        .addMigrations(*MIGRATIONS)
+                        // Room's default is transactionExecutor = ArchTaskExecutor's IO pool and
+                        // queryExecutor = that same object - ONE pool of 4 threads shared by every
+                        // query, every suspend DAO call and every withTransaction block.
+                        //
+                        // The pull runs several page coroutines in parallel and each wraps its
+                        // page in a transaction, so all 4 threads were held for the length of a
+                        // page (measured at 12-14s). Anything that needed the pool during that
+                        // window - notably Paging's load() - was queued, then cancelled by the
+                        // next invalidation before it ever ran. A trace of an X-ray list open
+                        // showed 383 PagingSource creations and zero load() calls: the list was
+                        // not slow, its query was never executed.
+                        //
+                        // Separate pools mean a long write transaction can no longer starve reads.
+                        .setQueryExecutor(queryExecutor)
+                        .setTransactionExecutor(transactionExecutor)
+                        // Never wipe the database for a missing migration: it holds records not
+                        // yet synced. A missing migration now fails at launch (and in
+                        // InAppDbMigrationsTest) instead of silently deleting field data. Only
+                        // version 1, which has no migration and is not in the field, may be reset.
+                        .fallbackToDestructiveMigrationFrom(1)
                         .build()
 
                     INSTANCE = instance

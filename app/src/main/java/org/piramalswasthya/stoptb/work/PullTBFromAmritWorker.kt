@@ -13,9 +13,12 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.database.room.InAppDb
@@ -46,7 +49,13 @@ class PullTBFromAmritWorker @AssistedInject constructor(
     companion object {
         const val name = "PullTBFromAmritWorker"
         const val Progress = "Progress"
+        private const val MAX_RUN_ATTEMPTS = 5
+        private const val MASTERS_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000L
 
+        // How many of the nine domain pulls may hold the database at once. Sized below the
+        // transaction executor's 4 threads so a pull in progress can never own every one of
+        // them and leave UI queries - Paging's load() in particular - unscheduled.
+        private const val MAX_CONCURRENT_DOMAIN_PULLS = 3
     }
 
 
@@ -59,10 +68,11 @@ class PullTBFromAmritWorker @AssistedInject constructor(
     }
 
     private suspend fun doLoggedWork(): Result {
-        setForeground(getForegroundInfo())
         val triggerSource = inputData.getString(WorkerUtils.pullTriggerSourceKey) ?: "DIRECT"
         val startedAt = inputData.getLong(WorkerUtils.pullStartedAtKey, SystemClock.elapsedRealtime())
-        Timber.i("Pull [$triggerSource] TB data started")
+        // Set by PullFromAmritWorker when the changes feed already brought these datasets up to date.
+        val feedApplied = inputData.getBoolean(WorkerUtils.changesFeedAppliedKey, false)
+        Timber.i("Pull [$triggerSource] TB data started${if (feedApplied) " (TB datasets from the changes feed)" else ""}")
 
         return try {
             withContext(Dispatchers.IO) {
@@ -74,18 +84,41 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                     else 0
 
                 try {
-                    val result1 =
-                        awaitAll(
-                            async { getGeneralExaminationDetails() },
-                            async { getTbScreeningDetails() },
-                            async { getGeneralOpdDetails() },
-                            async { getTbDiagnosticsDetails() },
-                            async { getTbSuspectedDetails() },
-                            async { getTbConfirmedDetails() },
-                            async { getCounsellingCompletedDetails() },
-                            async { getContactAndTptFollowUpDetails() },
-                            async { refreshVisitCategories() }
-                        )
+                    // All nine domain pulls used to run at once against one database. Measured
+                    // on a 9,987-beneficiary camp device, that is what makes the app feel slow:
+                    // with a sync running, All Beneficiaries took a median 4,394 ms to show
+                    // content and half the opens never showed any, while the same build offline
+                    // took 772 ms and presented every time. A no-op `SELECT 1` waited up to
+                    // 5,423 ms during the pull against 84-244 ms offline.
+                    //
+                    // Bounding the fan-out keeps every domain in the same pull and the same
+                    // result ordering - it only stops them all holding the database at once, so
+                    // reads the UI is waiting on can still be scheduled.
+                    //
+                    // When the changes feed already brought the six TB datasets up to date, only
+                    // counselling, contact tracing / TPT and masters are pulled here.
+                    val domainPullSemaphore = Semaphore(MAX_CONCURRENT_DOMAIN_PULLS)
+                    val datasetPulls = if (feedApplied) emptyList() else listOf<suspend () -> Boolean>(
+                        ::getGeneralExaminationDetails,
+                        ::getTbScreeningDetails,
+                        ::getGeneralOpdDetails,
+                        ::getTbDiagnosticsDetails,
+                        ::getTbSuspectedDetails,
+                        ::getTbConfirmedDetails,
+                    )
+                    // Counselling, contact tracing / TPT responses also come from the feed.
+                    val formPulls = if (feedApplied) emptyList() else listOf<suspend () -> Boolean>(
+                        ::getCounsellingCompletedDetails,
+                        ::getContactAndTptFollowUpDetails,
+                    )
+                    val domainPulls = datasetPulls + formPulls + listOf<suspend () -> Boolean>(
+                        { refreshVisitCategories(triggerSource) }
+                    )
+                    val result1 = awaitAll(
+                        *domainPulls
+                            .map { domainPull -> async { domainPullSemaphore.withPermit { domainPull() } } }
+                            .toTypedArray()
+                    )
 
                     try {
                         tbRepo.applyKnownTbContactRiskFactors()
@@ -102,9 +135,13 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                     )
 
                     if (result1.all { it }) {
-                        syncDiagnosticOrderStatuses()
+                        // Order statuses and results come from the feed when it was applied.
+                        if (!feedApplied) syncDiagnosticOrderStatuses()
                         return@withContext Result.success()
                     }
+                    // Some TB datasets failed (network or server): try again with
+                    // backoff rather than reporting the pull as complete.
+                    if (runAttemptCount < MAX_RUN_ATTEMPTS) return@withContext Result.retry()
                     return@withContext Result.failure(workDataOf("worker_name" to "PullTBFromAmritWorker", "error" to "Pull operation returned incomplete results"))
                 } catch (e: SQLiteConstraintException) {
                     Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
@@ -113,6 +150,8 @@ class PullTBFromAmritWorker @AssistedInject constructor(
 
             }
 
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: java.lang.Exception) {
             Timber.e("Error occurred in PullTBFromAmritWorker $e ${e.stackTrace}")
 
@@ -146,10 +185,12 @@ class PullTBFromAmritWorker @AssistedInject constructor(
             try {
                 val res = tbRepo.getTBScreeningDetailsFromServer()
                 return@withContext res == 1 || res == 0
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
             }
-            true
+            false
         }
     }
 
@@ -158,17 +199,29 @@ class PullTBFromAmritWorker @AssistedInject constructor(
             try {
                 val res = vitalRepo.getGeneralExaminationDetailsFromServer()
                 return@withContext res == 1 || res == 0
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
             }
-            true
+            false
         }
     }
 
-    private suspend fun refreshVisitCategories(): Boolean {
-        tbRepo.refreshVisitCategories()
-        tbRepo.refreshChiefComplaintMasters()
-        drugMasterRepo.refreshMasters()
+    // Masters change rarely but were deleted and re-downloaded on every pull (every 10 s in camp).
+    // Refresh them after login, on a manual Sync Records, and otherwise at most once a day.
+    private suspend fun refreshVisitCategories(triggerSource: String): Boolean {
+        val now = System.currentTimeMillis()
+        val refreshedAt = preferenceDao.getMastersRefreshedAt()
+        if (triggerSource != "MANUAL_REFRESH" && refreshedAt > 0L && now - refreshedAt < MASTERS_REFRESH_INTERVAL_MS) {
+            return true
+        }
+        val categories = tbRepo.refreshVisitCategories()
+        val complaints = tbRepo.refreshChiefComplaintMasters()
+        val drugs = drugMasterRepo.refreshMasters()
+        // Only a complete refresh counts; a partial one is tried again on the next pull.
+        if (categories && complaints && drugs) preferenceDao.setMastersRefreshedAt(now)
+        Timber.d("Masters refreshed [$triggerSource]: categories=$categories complaints=$complaints drugs=$drugs")
         // A failed master refresh must not block the core beneficiary/form pull.
         return true
     }
@@ -178,10 +231,12 @@ class PullTBFromAmritWorker @AssistedInject constructor(
             try {
                 val res = tbRepo.getTbSuspectedDetailsFromServer()
                 return@withContext res == 1 || res == 0
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
             }
-            true
+            false
         }
     }
 
@@ -190,7 +245,7 @@ class PullTBFromAmritWorker @AssistedInject constructor(
             try {
                 val res = tbRepo.getGeneralOpdDetailsFromServer()
                 return@withContext res == 1 || res == 0
-            } catch (e: kotlinx.coroutines.CancellationException) {
+            } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
@@ -204,10 +259,12 @@ class PullTBFromAmritWorker @AssistedInject constructor(
             try {
                 val res = tbRepo.getTbDiagnosticsDetailsFromServer()
                 return@withContext res == 1 || res == 0
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
             }
-            true
+            false
         }
     }
 
@@ -216,12 +273,13 @@ class PullTBFromAmritWorker @AssistedInject constructor(
         return  withContext(Dispatchers.IO) {
             try {
                 val res = tbRepo.getTbConfirmedDetailsFromServer()
-                res == 1 || res == 0
+                return@withContext res == 1 || res == 0
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.e("exception $e raised ${e.message} with stacktrace : ${e.stackTrace}")
-
             }
-            true
+            false
         }
     }
 

@@ -266,6 +266,26 @@
         tools:itemCount="2"
         tools:listitem="@layout/rv_item_household" />
 
+    <!-- Loading state for the list. Kept distinct from fl_empty: before the first emission
+         neither was shown (blank screen), and an empty first emission rendered
+         "No records found" over a list that had not loaded yet. Default GONE, so the other
+         fragments sharing this layout are unaffected. -->
+    <FrameLayout
+        android:id="@+id/fl_loading"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/topLayout"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <ProgressBar
+            android:id="@+id/pb_list_loading"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="center"
+            android:indeterminateTint="?attr/colorPrimary" />
+    </FrameLayout>
+
     <FrameLayout
         android:id="@+id/fl_empty"
         android:layout_width="0dp"

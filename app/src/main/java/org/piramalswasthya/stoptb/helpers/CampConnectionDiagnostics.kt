@@ -28,6 +28,11 @@ internal object CampConnectionDiagnostics {
     private var helper: Journal? = null
     @Volatile private var writeFailed = false
     private val queued = linkedMapOf<String, CampConnectionObservation>()
+    fun checkReachability(context: Context, hub: String, source: String): Boolean =
+        org.piramalswasthya.stoptb.utils.sync.CampHubReachability.check(hub,
+            onResponse = { code -> observe(context, hub, code in 200..299, "HTTP_$code", source) },
+            onFailure = { error -> failure(context, hub, error, source) })
+
     fun failure(context: Context, hub: String?, error: Throwable, source: String) {
         if (error is kotlinx.coroutines.CancellationException || error is InterruptedException ||
             (error is java.io.InterruptedIOException && error !is java.net.SocketTimeoutException)) return

@@ -18,6 +18,7 @@ import org.piramalswasthya.stoptb.adapters.BenListAdapter
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentUnScreenedPeopleBinding
 import org.piramalswasthya.stoptb.helpers.RoleManager
+import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import javax.inject.Inject
@@ -32,6 +33,9 @@ class UnScreenedPeople : Fragment(),
     @Inject
     lateinit var roleManager: RoleManager
 
+    @Inject
+    lateinit var benRepo: BenRepo
+
     private var _binding: FragmentUnScreenedPeopleBinding? = null
     private val binding get() = _binding!!
 
@@ -40,6 +44,8 @@ class UnScreenedPeople : Fragment(),
     private lateinit var benAdapter: BenListAdapter
 
     private var pendingExamineBenId: Long? = null
+    // Latest showExamineBottomSheet call; an older call whose ID lookup finishes late is dropped.
+    private var examineRequestId = 0
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -160,9 +166,20 @@ class UnScreenedPeople : Fragment(),
             childFragmentManager.findFragmentByTag(ExamineBottomSheetFragment.TAG)
         if (existing != null) return
 
-        ExamineBottomSheetFragment
-            .newInstance(benId, autoFlow = false)
-            .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
+        val requestId = ++examineRequestId
+        viewLifecycleOwner.lifecycleScope.launch {
+            // In Camp Mode the push can replace a temp benId after this screen captured it;
+            // open the sheet (and the forms it launches) with the current ID.
+            val currentBenId = benRepo.resolveCurrentBenId(benId)
+            if (requestId != examineRequestId) return@launch
+            if (pendingExamineBenId == benId) pendingExamineBenId = currentBenId
+            if (childFragmentManager.isStateSaved ||
+                childFragmentManager.findFragmentByTag(ExamineBottomSheetFragment.TAG) != null
+            ) return@launch
+            ExamineBottomSheetFragment
+                .newInstance(currentBenId, autoFlow = false)
+                .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
+        }
     }
 
     override fun onNavigateToExamineForm(

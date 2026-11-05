@@ -61,6 +61,7 @@ class IconGridAdapter(
                 icon.disabledMessage?.let { disabledClickListener?.invoke(it) }
                 return
             }
+            // TEMPORARY PERF INSTRUMENTATION - starts the clock at the tap.
             icon.navAction?.let(selectedListener)
         }
     }

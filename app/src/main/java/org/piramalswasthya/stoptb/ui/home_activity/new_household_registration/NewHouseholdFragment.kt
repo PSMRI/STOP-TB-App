@@ -85,8 +85,7 @@ class NewHouseholdFragment : Fragment() {
     private var originalLocationState: LocationState? = null
 
     private val sttContract = registerForActivityResult(SpeechToTextContract()) { value ->
-        val formatted = value.uppercase()
-        viewModel.updateValueByIdAndReturnListIndex(micClickedElementId, formatted)
+        viewModel.updateValueByIdAndReturnListIndex(micClickedElementId, value)
             .takeIf { it >= 0 }
             ?.let { binding.form.rvInputForm.adapter?.notifyItemChanged(it) }
     }

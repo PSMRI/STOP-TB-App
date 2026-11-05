@@ -14,13 +14,13 @@ import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.utils.CampHubUrlValidator
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.User
 import org.piramalswasthya.stoptb.repositories.UserRepo
 import org.piramalswasthya.stoptb.work.WorkerUtils
-import java.net.HttpURLConnection
-import java.net.URL
+import org.piramalswasthya.stoptb.utils.sync.CampHubReachability
 import javax.inject.Inject
 
 @HiltViewModel
@@ -89,7 +89,20 @@ class SignInViewModel @Inject constructor(
     fun getCampHubUrl(): String = pref.getCampHubUrl()
 
     fun updateCampHubUrl(url: String) {
-        val normalizedUrl = normalizeCampHubUrl(url)
+        // Same rule as the connect screen: the stored URL re-points authenticated requests, so
+        // validate before storing. Store the VALIDATOR'S output, not the locally normalised
+        // string - the local one keeps credentials, path, query and fragment, so
+        // `http://user:pass@host/some/path` would be written to preferences verbatim and
+        // pingCampHub would then probe `/some/path/common-api/health`.
+        val normalizedUrl = CampHubUrlValidator.normalizeOrNull(
+            normalizeCampHubUrl(url),
+            extraAllowedHost = configuredHubHost()
+        )
+        if (normalizedUrl == null) {
+            Log.w(TAG, "Rejected camp hub URL from login screen: not an allowed host")
+            _campHubStatus.value = CampHubStatus.NOT_CONNECTED
+            return
+        }
         if (normalizedUrl == pref.getCampHubUrl()) return
 
         Log.d(TAG, "Login camp URL changed. inputUrl=$url, normalizedUrl=$normalizedUrl")
@@ -147,6 +160,11 @@ class SignInViewModel @Inject constructor(
         }
     }
 
+    /** Host of the URL baked into this build - always acceptable, even when it is public. */
+    private fun configuredHubHost(): String? =
+        pref.configuredCampHubUrl().takeIf { it.isNotBlank() }
+            ?.let { runCatching { java.net.URI(it).host }.getOrNull() }
+
     private fun normalizeCampHubUrl(url: String): String {
         val trimmedUrl = url.trim()
         val resolvedUrl = when {
@@ -158,27 +176,7 @@ class SignInViewModel @Inject constructor(
     }
 
     private suspend fun pingCampHub(rawUrl: String): Boolean = withContext(Dispatchers.IO) {
-        val baseUrl = rawUrl.trim().trimEnd('/')
-        val healthUrl = "$baseUrl/common-api/health"
-        var connection: HttpURLConnection? = null
-        runCatching {
-            Log.d(TAG, "Login health check started. url=$healthUrl")
-            connection = URL(healthUrl).openConnection() as HttpURLConnection
-            connection?.connectTimeout = 3000
-            connection?.readTimeout = 3000
-            connection?.requestMethod = "GET"
-            connection?.useCaches = false
-            val responseCode = connection?.responseCode ?: return@runCatching false
-            Log.d(TAG, "Login health check response. url=$healthUrl, code=$responseCode")
-            org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.observe(context, rawUrl,
-                responseCode in 200..299, "HTTP_$responseCode", "LOGIN_HEALTH")
-            responseCode in 200..299
-        }.onFailure { error ->
-            org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.failure(context, rawUrl, error, "LOGIN_HEALTH")
-            Log.e(TAG, "Login health check failed. url=$healthUrl, error=${error.javaClass.simpleName}: ${error.message}", error)
-        }.also {
-            connection?.disconnect()
-        }.getOrDefault(false)
+        org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.checkReachability(context, rawUrl, "LOGIN_HEALTH")
     }
 
     /**
@@ -198,6 +196,8 @@ class SignInViewModel @Inject constructor(
                 database.clearAllTables()
             }
             pref.deleteForLogout()
+            // Process-wide backfill cursors must not carry into the next user's village.
+            org.piramalswasthya.stoptb.repositories.TBRepo.resetOrderIdBackfillState()
             pref.setLastSyncedTimeStamp(Konstants.defaultTimeStamp)
             if (restoreUsernameOnly) {
                 pref.setRememberedUsernameOnly(rememberedUser!!.trim())

@@ -4,8 +4,8 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.Response
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
-import java.net.HttpURLConnection
-import java.net.URL
+import org.piramalswasthya.stoptb.utils.CampHubUrlValidator
+import org.piramalswasthya.stoptb.utils.sync.CampHubReachability
 import java.io.IOException
 import java.io.InterruptedIOException
 import javax.inject.Inject
@@ -18,6 +18,13 @@ class CampModeUrlInterceptor @Inject constructor(
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
 
+        // Only redirect while camp mode is actually on. This used to key off the stored URL
+        // alone, so a URL left behind by a failed connect kept re-pointing every request even
+        // after the user turned camp mode off.
+        if (!preferenceDao.isCampModeEnabled()) {
+            return chain.proceed(originalRequest)
+        }
+
         val storedCampHubUrl = preferenceDao.getStoredCampHubUrl()
             ?.trim()
             ?.takeIf { it.isNotBlank() }
@@ -26,12 +33,13 @@ class CampModeUrlInterceptor @Inject constructor(
             throw IOException("Camp hub URL not configured")
         }
 
-        val campHubUrl = storedCampHubUrl
-            .trim()
-            .trimEnd('/')
-            .plus("/")
-            .toHttpUrlOrNull()
-            ?: throw IOException("Invalid camp hub URL: $storedCampHubUrl")
+        // Re-validate at request time, not just at storage time: this request already carries
+        // the Jwttoken/userId headers, and on the auth client it is the refresh-token call.
+        // A stored value that is not a local-network address must never receive either.
+        val campHubUrl = CampHubUrlValidator
+            .normalizeOrNull(storedCampHubUrl, extraAllowedHost = configuredCampHubHost())
+            ?.toHttpUrlOrNull()
+            ?: throw IOException("Refusing to route request to non-local camp hub URL")
 
         val campUrl = originalRequest.url.newBuilder()
             .scheme(campHubUrl.scheme)
@@ -62,25 +70,11 @@ class CampModeUrlInterceptor @Inject constructor(
         }
     }
 
-    private fun isCampHubReachable(rawUrl: String): Boolean {
-        val baseUrl = rawUrl.trim().trimEnd('/')
-        val healthUrl = "$baseUrl/common-api/health"
-        var connection: HttpURLConnection? = null
+    /** Host of the URL baked into this build, which is always an acceptable hub. */
+    private fun configuredCampHubHost(): String? =
+        preferenceDao.configuredCampHubUrl().takeIf { it.isNotBlank() }
+            ?.let { runCatching { java.net.URI(it).host }.getOrNull() }
 
-        return runCatching {
-            connection = URL(healthUrl).openConnection() as HttpURLConnection
-            connection?.connectTimeout = 3000
-            connection?.readTimeout = 3000
-            connection?.requestMethod = "GET"
-            connection?.useCaches = false
-            val responseCode = connection?.responseCode ?: return@runCatching false
-            org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.observe(context, rawUrl,
-                responseCode in 200..299, "HTTP_$responseCode", "API_FAILURE_HEALTH")
-            responseCode in 200..299
-        }.onFailure { error ->
-            org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.failure(context, rawUrl, error, "API_FAILURE_HEALTH")
-        }.getOrDefault(false).also {
-            connection?.disconnect()
-        }
-    }
+    private fun isCampHubReachable(rawUrl: String): Boolean =
+        org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.checkReachability(context, rawUrl, "API_FAILURE_HEALTH")
 }

@@ -322,6 +322,16 @@
     <string name="abha_ids">ABHA IDs</string>
     <string name="pending_sync">Pending Sync</string>
     <string name="loading_form">Loading form...</string>
+    <string name="checking_newer_result">Checking for a newer result…</string>
+    <string name="check_newer_result_failed">Couldn\'t check for a newer result. You can still enter one.</string>
+    <string name="submitting">Submitting…</string>
+    <string name="result_newer_available">A newer result arrived for this order.</string>
+    <string name="manual_result_rejected_fallback_name">A beneficiary</string>
+    <string name="manual_result_rejected_title">A result you entered was not accepted</string>
+    <string name="manual_result_rejected_with_result">%1$s: the order already had a result (%2$s). Your entry was replaced by it.</string>
+    <string name="manual_result_rejected_generic">%1$s: the hub refused the result you entered offline. Open the record to re-enter it.</string>
+    <string name="result_already_recorded_title">Result already recorded</string>
+    <string name="result_already_recorded_message">A result has already been recorded for this order: %1$s.\n\nYour entry was not saved. The recorded result is now shown on the card.</string>
     <string name="filter_time_period">Time Period</string>
     <string name="filter_village">Village / Hamlet</string>
     <string name="filter_village_label">Village</string>
@@ -611,8 +621,30 @@
 
     <string name="regimen_type">Regimen Type</string>
     <string name="monthly_follow_up_done">Monthly follow up done</string>
-    <string name="adherence_to_medicines">Adherence to Medicines</string>
     <string name="any_discomfort">Any discomfort</string>
+    <string name="side_effects">Side Effects</string>
+    <string-array name="tb_side_effects">
+        <item>Nausea</item>
+        <item>Vomiting</item>
+        <item>Abdominal Pain</item>
+        <item>Yellowness of Skin</item>
+        <item>Dark colour Urine</item>
+        <item>Loose motions &gt;4 times in a day</item>
+        <item>Itching</item>
+        <item>Rashes</item>
+        <item>Tingling/burning/numbness in hands and feet</item>
+        <item>Pain in Joints</item>
+        <item>Impaired vision: Pain, Blurring of vision, Disturbance in colour vision</item>
+        <item>Flue like syndrome- Chills, Dry cough, Shortness of breath, loss of appetite, body ache and malaise</item>
+        <item>Swelling of face or legs, Less or no urine</item>
+        <item>Seeing abnormal things, changes of thoughts, suicidal thoughts</item>
+        <item>Tiredness, lethargy, headache, giddiness, pale look, palpitations</item>
+        <item>Ringing in ears, Loss of hearing, dizziness and loss of balance leading to recurrent fall</item>
+        <item>Slowness of activities, Swelling of face or neck, dis-appropriate weight gain</item>
+        <item>Pain and swelling in muscles and Tendons, difficulty in movement</item>
+        <item>Convulsion</item>
+        <item>Orange and red color of urine, sweat, sputum, saliva or tears</item>
+    </string-array>
     <string name="treatment_completed">Did the patient complete the full course of Treatment?</string>
     <string name="treatment_outcome">TB Treatment outcomes</string>
     <string name="reason_for_not_completing">Reason for not completing treatment</string>
@@ -628,16 +660,17 @@
         <item>INH Mono (6 Month)</item>
     </string-array>
 
-    <string-array name="adherence_options">
-        <item>Regular</item>
-        <item>Irregular</item>
-    </string-array>
+
+    <string name="remarks">Remarks</string>
 
     <string-array name="tb_treatment_outcomes">
+        <item>Treatment completed</item>
+        <item>Died</item>
+        <item>Treatment Failure</item>
+        <item>Lost to Follow Up</item>
+        <item>Mark as Duplicate</item>
         <item>Cured</item>
-        <item>Failed</item>
-        <item>Lost to Follow-up (LFU)</item>
-        <item>Death</item>
+        <item>Treatment Regimen Changed</item>
     </string-array>
 
     <string-array name="place_of_death">
@@ -1008,6 +1041,20 @@
     <string name="sync_dashboard_worker_idle">Idle</string>
     <string name="sync_dashboard_worker_complete">Complete</string>
     <string name="sync_dashboard_worker_failed">Failed: %1$d worker(s) - tap to see details</string>
+    <string name="sync_dashboard_needs_attention_title">Needs attention</string>
+    <string name="sync_dashboard_needs_attention_summary">%1$d record(s) not accepted by the server yet. They are retried automatically. Tap Retry now once the problem is fixed.</string>
+    <string name="sync_dashboard_retry_now">Retry now</string>
+    <string name="sync_dashboard_retry_detail">Not synced for %1$s, %2$d attempt(s). Last error: %3$s</string>
+    <string name="sync_dashboard_orphan_responses_title">Counselling / contact tracing</string>
+    <string name="sync_dashboard_orphan_responses_detail">%1$d response(s) were saved before their beneficiary was registered and cannot be matched to the registered beneficiary. Please report to support.</string>
+    <string name="sync_dashboard_age_minutes">%1$d min</string>
+    <string name="sync_dashboard_age_hours">%1$d h</string>
+    <string name="sync_dashboard_age_days">%1$d days</string>
+    <string name="sync_entity_beneficiary">Beneficiary</string>
+    <string name="sync_entity_registration">Beneficiary registration</string>
+    <string name="sync_entity_tb_diagnostics">TB diagnostics</string>
+    <string name="sync_entity_tb_suspected">TB suspected</string>
+    <string name="sync_entity_tb_confirmed">TB confirmed</string>
     <string name="sync_dashboard_no_logs">No sync logs yet. Trigger a sync to see activity.</string>
     <string name="sync_dashboard_clear_logs">Clear Logs</string>
     <string name="sync_dashboard_export_logs">Share sync diagnostics</string>
@@ -1053,6 +1100,7 @@
     <string name="tb_presumptive_alert_title">A Presumptive TB case!</string>
     <string name="tb_presumptive_alert_refer">Refer to X-ray and collect sputum for Truenat test</string>
     <string name="tb_presumptive_alert_refer_pregnant">Collect sputum for Truenat test</string>
+    <string name="tb_presumptive_alert_liquid_culture">Refer for Liquid Culture test</string>
     <string name="tb_presumptive_alert_family">Advise screening of all family members</string>
     <string name="referred_for_digital_chest_xray">Referred for digital chest x-ray</string>
     <string name="referred_for_sputum_collection">Referred for Sputum Collection</string>
@@ -1315,41 +1363,26 @@
 
     <string-array name="general_opd_chief_complaint_array">
         <item>Fever</item>
-        <item>Mild to moderate body pain</item>
         <item>Headache</item>
-        <item>General weakness with fever</item>
-        <item>Acidity</item>
-        <item>Burning sensation in stomach</item>
-        <item>Indigestion</item>
-        <item>Gas</item>
-        <item>Bloating</item>
-        <item>Upper abdominal discomfort</item>
-        <item>Allergic symptoms</item>
-        <item>Sneezing</item>
+        <item>Body aches</item>
         <item>Runny nose</item>
-        <item>Itching (skin or eyes)</item>
-        <item>Mild allergic rash</item>
-        <item>Diarrhea</item>
+        <item>Sneezing</item>
+        <item>Nasal congestion</item>
+        <item>Itching</item>
+        <item>Sore throat</item>
+        <item>Cough</item>
         <item>Loose stools</item>
-        <item>Gut imbalance</item>
-        <item>Indigestion with loose motion</item>
-        <item>Dehydration</item>
-        <item>Vomiting with weakness</item>
-        <item>Heat exhaustion</item>
-        <item>General weakness</item>
-        <item>Fatigue</item>
-        <item>Nutritional deficiency</item>
-        <item>Poor appetite</item>
-        <item>Fever in children</item>
-        <item>Body ache in children</item>
-        <item>Post-vaccination fever</item>
-        <item>Allergies in children</item>
-        <item>Cold with sneezing</item>
-        <item>Itching in children</item>
-        <item>Mild skin allergy</item>
-        <item>Diarrhea in children</item>
-        <item>Weak immunity</item>
-        <item>Recovery from illness</item>
+        <item>Vomiting</item>
+        <item>Abdominal pain</item>
+        <item>Epigastric pain</item>
+        <item>Burning sensation in chest</item>
+        <item>Indigestion</item>
+        <item>Bloating</item>
+        <item>Nausea</item>
+        <item>Weakness/fatigue</item>
+        <item>Loss of appetite</item>
+        <item>Regurgitation of food</item>
+        <item>Others</item>
     </string-array>
 
     <string-array name="general_opd_medication_array">
@@ -1390,6 +1423,7 @@
     <!-- TrueNat & RIF order lifecycle redesign — Order Status area pill/caption/button copy,
          reused identically by Chest X-Ray's own retrofit of the same design language. -->
     <string name="order_status_fetching_from_device">Fetching result from device…</string>
+    <string name="order_status_order_not_created">Referral order not created — tap Retry Referral</string>
     <string name="order_status_manual_action_required">Manual Action Required</string>
     <string name="order_status_polling_stopped">Device polling has stopped — results won\'t be fetched automatically.</string>
     <string name="order_status_manual_unavailable">Automatic device result is unavailable. Please record the test result manually.</string>
@@ -1402,13 +1436,9 @@
     <string name="order_status_hub_disconnected_title">Camp Hub is disconnected.</string>
     <string name="order_status_hub_disconnected_desc">Not polling for result — please connect to Camp Hub.</string>
     <string name="order_status_last_checked_caption">Last checked %1$s ago · Auto-refresh every %2$d seconds</string>
-    <!-- Deliberately vague rather than an exact elapsed-seconds count — when a poll cycle runs
-         long, showing e.g. "84s ago" next to "every 60 seconds" looks broken even though it
-         isn't. -->
+
     <string name="order_status_few_seconds">a few seconds</string>
-    <!-- Kept short deliberately: these sit side-by-side in two half-width buttons with an
-         icon, and "Enter Result Manually"/"Mark Test Not Conducted" truncate on narrower
-         phone widths. -->
+
     <string name="order_status_enter_result">Enter Result</string>
     <string name="order_status_not_conducted">Not Conducted</string>
     <string name="order_status_view_mtb_result">View MTB Result</string>
@@ -1417,6 +1447,7 @@
     <string name="order_status_create_new_order">Create New Order</string>
     <string name="order_status_clinical_assessment_referred">Referred for Clinical Assessment &amp; Diagnosis</string>
     <string name="order_status_retry_referral">Retry Referral</string>
+    <string name="order_status_checking">Checking…</string>
     <string name="diagnostic_manual_result_success">Result submitted successfully</string>
     <string name="diagnostic_order_creation_failed">Unable to submit result: order could not be created (%1$s)</string>
     <string name="error_beneficiary_not_found">Beneficiary not found</string>
