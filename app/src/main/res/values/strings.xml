@@ -1639,6 +1639,33 @@
     <string name="sync_counselling">Counselling</string>
 
 
+
+    <!-- Order Status -->
+    <string name="order_status_pending">Pending</string>
+    <string name="order_status_completed">Completed</string>
+    <string name="order_status_failed">Failed</string>
+    <string name="order_status_closed">Closed</string>
+    <string name="order_status_manual_entry">Manual Entry</string>
+
+    <!-- Chest X-Ray Results -->
+    <string name="chest_xray_normal">Normal</string>
+    <string name="chest_xray_abnormal">Abnormal but not TB Presumptive</string>
+    <string name="chest_xray_tb_presumptive">TB Presumptive</string>
+    <string name="chest_xray_ai_invalid">AI Invalid Result</string>
+
+    <!-- MTB Results -->
+    <string name="mtb_result_positive">TB Positive</string>
+    <string name="mtb_result_negative">TB Negative</string>
+    <string name="mtb_result_invalid_error">Invalid/Error</string>
+
+    <!-- RIF Results -->
+    <string name="rif_result_dr_tb">DR TB</string>
+    <string name="rif_result_non_dr_tb">Non DR TB</string>
+    <string name="rif_result_indeterminate">Indeterminate</string>
+    <string name="rif_result_invalid_error">Invalid/Error</string>
+
+
+
     <string name="loc_cb_update_location">Do you want to update the location details?</string>
 
     <!-- TODO: Remove or change this placeholder text -->

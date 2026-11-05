@@ -187,6 +187,7 @@
     <string name="not_screened">जांच नहीं हुई</string>
     <string name="tb_suspected_sputum_test">संदिग्ध टीबी के लिए बलगम जांच</string>
     <string name="tb_tracking_submitted">टीबी ट्रैकिंग जमा हो गई</string>
+    <string name="tb_followup_already_submitted_this_month">इस महीने का आपका फॉलो-अप पहले ही जमा हो चुका है</string>
     <string name="track">ट्रैक करें</string>
     <string name="filled_on">भरा गया दिनांक</string>
     <string name="save">सहेजें (Save)</string>
