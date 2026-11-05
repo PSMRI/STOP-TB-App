@@ -79,6 +79,7 @@
     <string name="form_input_alph_numeric_space_only_error">केवल अक्षर और अंक मान्य</string>
     <string name="form_input__no_alpha_space_error">अक्षर या खाली जगह मान्य नहीं</string>
     <string name="form_input_digit_only_error">केवल अंक मान्य</string>
+    <string name="form_input_invalid_pincode">पिनकोड 0 से शुरू नहीं हो सकता</string>
     <string name="form_input_min_limit_error_decimal">%1$s %2$.1f से अधिक या बराबर होना चाहिए</string>
     <string name="form_input_max_limit_error">%1$s %2$d से कम या बराबर होना चाहिए</string>
     <string name="form_input_max_limit_error_decimal">%1$s %2$.1f से कम या बराबर होना चाहिए</string>

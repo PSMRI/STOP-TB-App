@@ -69,6 +69,18 @@ interface BenDao {
     @Query("UPDATE BENEFICIARY SET nikshayId = :nikshayId WHERE beneficiaryId = :benId")
     suspend fun updateNikshayId(benId: Long, nikshayId: String)
 
+    @Query("UPDATE BENEFICIARY SET loc_village_id = :villageId, loc_village_name = :villageName, loc_village_nameHindi = :villageNameHindi, loc_village_nameAssamese = :villageNameAssamese, pinCode = :pinCode, residentialAreaId = :residentialAreaId, residentialArea = :residentialArea WHERE householdId = :householdId")
+    suspend fun updateVillageOfHouseholdMembers(
+        householdId: Long,
+        villageId: Int,
+        villageName: String,
+        villageNameHindi: String?,
+        villageNameAssamese: String?,
+        pinCode: String?,
+        residentialAreaId: Int,
+        residentialArea: String?
+    )
+
     @Query("UPDATE  BENEFICIARY SET syncState = :unsynced ,processed = :proccess , serverUpdatedStatus =:updateStatus WHERE householdId = :householdId")
     suspend fun updateBenToSync(
         householdId: Long,
