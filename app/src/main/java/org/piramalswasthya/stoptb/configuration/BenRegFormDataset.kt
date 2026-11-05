@@ -461,6 +461,21 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         required = false,
         hasDependants = true
     )
+    private val placeOfCurrentLiving = FormElement(
+        id = 1061, inputType = TEXT_VIEW,
+        title = resources.getString(R.string.ben_reg_place_of_current_living),
+        arrayId = -1, required = false, isEnabled = false,
+    )
+    private val otherPlaceOfCurrentLiving = FormElement(
+        id = 1062, inputType = TEXT_VIEW,
+        title = resources.getString(R.string.ben_reg_other_place_of_current_living),
+        arrayId = -1, required = false, isEnabled = false,
+    )
+    private val institutionName = FormElement(
+        id = 1063, inputType = TEXT_VIEW,
+        title = resources.getString(R.string.ben_reg_institution_name),
+        arrayId = -1, required = false, isEnabled = false,
+    )
 
     // ─────────────────────────── PAGE SETUP ───────────────────────────
 
@@ -863,6 +878,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             // Non-HH: Pincode comes from the village. HoF: from the household form.
             list.remove(pinCode)
             pinCode.required = false
+            ben?.takeIf { !it.isDraft }?.let { saved -> addCurrentLivingDetails(list, saved) }
         } else if (relToHeadId >= 0 && relToHeadId != 18) {
             list.removeAll(
                 listOf( address,pinCode, villageHamlet, residentialAreaType, economicStatus)
@@ -893,6 +909,28 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
 
     }
 
+
+    /** Shows the saved Non-HH place of living (and its free-text detail, if any) after Address. */
+    private fun addCurrentLivingDetails(list: MutableList<FormElement>, saved: BenRegCache) {
+        val detailFields = mutableListOf<FormElement>()
+        saved.placeOfCurrentLiving
+            ?.let { placeIndex -> resources.getStringArray(R.array.place_of_current_living_choices).getOrNull(placeIndex - 1) }
+            ?.let { placeLabel ->
+                placeOfCurrentLiving.value = placeLabel
+                detailFields.add(placeOfCurrentLiving)
+            }
+        saved.otherPlaceOfCurrentLiving?.takeIf { it.isNotBlank() }?.let { otherPlace ->
+            otherPlaceOfCurrentLiving.value = otherPlace
+            detailFields.add(otherPlaceOfCurrentLiving)
+        }
+        saved.institutionName?.takeIf { it.isNotBlank() }?.let { institution ->
+            institutionName.value = institution
+            detailFields.add(institutionName)
+        }
+        if (detailFields.isEmpty()) return
+        val anchorIndex = list.indexOf(address).takeIf { it >= 0 } ?: (list.size - 1)
+        list.addAll(anchorIndex + 1, detailFields)
+    }
 
     private fun applyDraftPrefill(prefill: BenRegCache) {
         prefill.firstName?.takeIf { it.isNotBlank() }?.let { firstName.value = it }

@@ -2201,12 +2201,14 @@ class BenRepo @Inject constructor(
                         // Server sends beneficiaryDetails.latitude (FLW-API BeneficiaryServiceImpl).
                         ?: benDataObj.optDoubleOrNull("latitude")
                         ?: benDataObj.optDoubleOrNull("gpsLatitude")
+                        ?: jsonObject.optDoubleOrNull("latitude")
                         ?: jsonObject.optDoubleOrNull("gpsLatitude")
 
                     val benGpsLongitude = demographicsObj.optDoubleOrNull("longitude")
                         ?: demographicsObj.optDoubleOrNull("gpsLongitude")
                         ?: benDataObj.optDoubleOrNull("longitude")
                         ?: benDataObj.optDoubleOrNull("gpsLongitude")
+                        ?: jsonObject.optDoubleOrNull("longitude")
                         ?: jsonObject.optDoubleOrNull("gpsLongitude")
 
                     val benDigipin = demographicsObj.optStringOrNull("digipin")
@@ -2251,14 +2253,17 @@ class BenRepo @Inject constructor(
 
                                 isNonHH = resolvedHouseholdId == null,
 
-                                placeOfCurrentLiving = if (jsonObject.has("placeOfCurrentLiving") && !jsonObject.isNull("placeOfCurrentLiving")) {
-                                    val code = jsonObject.optString("placeOfCurrentLiving", "")
-                                    getPlaceOfCurrentLivingIndex(code.takeIf { it.isNotEmpty() })
-                                } else null,
+                                placeOfCurrentLiving = getPlaceOfCurrentLivingIndex(
+                                    benDataObj.optStringOrNull("placeOfCurrentLiving")
+                                ) ?: getPlaceOfCurrentLivingIndex(
+                                    jsonObject.optStringOrNull("placeOfCurrentLiving")
+                                ),
 
-                                otherPlaceOfCurrentLiving = jsonObject.optStringOrNull("otherPlaceOfCurrentLiving"),
+                                otherPlaceOfCurrentLiving = benDataObj.optStringOrNull("otherPlaceOfCurrentLiving")
+                                    ?: jsonObject.optStringOrNull("otherPlaceOfCurrentLiving"),
 
-                                institutionName = jsonObject.optStringOrNull("institutionName"),
+                                institutionName = benDataObj.optStringOrNull("institutionName")
+                                    ?: jsonObject.optStringOrNull("institutionName"),
 
                                 beneficiaryId = jsonObject.getLong("benficieryid"),
 
@@ -2636,6 +2641,10 @@ class BenRepo @Inject constructor(
                             }
 
                             // The row exactly as it would be persisted, merge rules included.
+                            val serverHasLivingInfo = serverBen.placeOfCurrentLiving != null ||
+                                !serverBen.otherPlaceOfCurrentLiving.isNullOrBlank() ||
+                                !serverBen.institutionName.isNullOrBlank()
+                            val livingSource = if (serverHasLivingInfo) serverBen else existingBen
                             val mergedBen = serverBen.copy(
                                 userImage = serverBen.userImage ?: existingBen.userImage,
                                 healthIdDetails = serverBen.healthIdDetails ?: existingBen.healthIdDetails,
@@ -2643,6 +2652,9 @@ class BenRepo @Inject constructor(
                                 weight = serverBen.weight ?: existingBen.weight,
                                 bmi = serverBen.bmi ?: existingBen.bmi,
                                 temperature = serverBen.temperature ?: existingBen.temperature,
+                                placeOfCurrentLiving = livingSource.placeOfCurrentLiving,
+                                otherPlaceOfCurrentLiving = livingSource.otherPlaceOfCurrentLiving,
+                                institutionName = livingSource.institutionName,
                                 isConsent = serverBen.isConsent || existingBen.isConsent,
                                 syncState = SyncState.SYNCED,
                                 processed = "P"
