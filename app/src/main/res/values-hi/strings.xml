@@ -13,11 +13,20 @@
 <string name="long_to_string">%d</string>
     <string name="preview_title">पूर्वावलोकन</string>
     <string name="contact_tracing">संपर्क अनुरेखण</string>
+    <string name="contact_tracing_load_error">यह फ़ॉर्म लोड नहीं हो सका।</string>
+    <string name="community_contact_tracing">सामुदायिक संपर्क</string>
+    <string name="occupational_contact_tracing">कार्यस्थल के संपर्क</string>
+    <string name="contact_tracing_section_progress">अनुभाग %1$d / %2$d</string>
+    <string name="contact_tracing_number_picker_decrement">कम करें</string>
+    <string name="contact_tracing_number_picker_increment">बढ़ाएँ</string>
+    <string name="contact_tracing_number_picker_value">मान</string>
+    <string name="contact_tracing_type_bottomsheet_title">संपर्क अनुरेखण शुरू करें</string>
     <string name="tv_reg_date_ph">पंजीकरण तिथि</string>
     <string name="reg_date">पंजी. तिथि</string>
     <string name="tv_ben_name_ph">लाभार्थी का नाम</string>
     <string name="tv_type_of_list">सूची का प्रकार</string>
     <string name="tv_rch_id">RCH ID</string>
+    <string name="not_available_short">उपलब्ध नहीं</string>
     <string name="tv_ben_surname">लाभार्थी का उपनाम</string>
     <string name="tv_gender_ph">लिंग</string>
     <string name="tv_father_name_ph">पिता का नाम</string>
@@ -236,6 +245,10 @@
     <string name="dashboard_class_tpt_completed">टीपीटी पूर्ण</string>
     <string name="dashboard_class_tpt_discontinued">टीपीटी बंद/डिफॉल्ट</string>
     <string name="dashboard_class_tpt_not_eligible">टीपीटी के लिए अपात्र</string>
+    <string name="dashboard_row_male_pos_neg">पुरुष: पॉज़िटिव %1$d / नेगेटिव %2$d</string>
+    <string name="dashboard_row_female_pos_neg">महिला: पॉज़िटिव %1$d / नेगेटिव %2$d</string>
+    <string name="dashboard_row_children_pos_neg">बच्चे (15 वर्ष से कम): पॉज़िटिव %1$d / नेगेटिव %2$d</string>
+    <string name="dashboard_row_others_pos_neg">अन्य: पॉज़िटिव %1$d / नेगेटिव %2$d</string>
     <string name="filter_village_label">गाँव</string>
     <string name="filter_village_name">गाँव का नाम</string>
     <string name="filter_district">जिला</string>
@@ -253,6 +266,7 @@
     <string name="dashboard_filter_reset">रीसेट</string>
     <string name="dashboard_filter_apply">लागू करें</string>
     <string name="sign_in">साइन इन</string>
+    <string name="email">ईमेल</string>
     <string name="save_successful">सफलतापूर्वक सहेजें</string>
     <string name="something_wend_wong_contact_testing">कुछ गड़बड़ है! संपर्क परीक्षण!</string>
     <string name="error_input">त्रुटि इनपुट</string>
@@ -276,6 +290,7 @@
     <string name="name_of_pregnant_woman">गर्भवती महिला का नाम</string>
     <string name="husband_name">पति का नाम</string>
     <string name="last_home_visit_date">अंतिम गृह भ्रमण की तिथि</string>
+    <string name="home_health_id_section">स्वास्थ्य आईडी</string>
     <string name="mda_form_campagain_title">लिम्फैटिक फाइलेरियासिस (LF) सामूहिक औषधि वितरण (MDA) अभियान</string>
     <string name="screening">जांच</string>
     <string name="suspected">संदिग्ध</string>
@@ -288,6 +303,7 @@
     <string name="actual_treatment_completion_date">वास्तविक उपचार समाप्ति तिथि</string>
     <string name="treatment_status">उपचार की स्थिति</string>
     <string name="follow_up_date">फॉलो-अप तिथि</string>
+    <string name="followupdate">फॉलो-अप की तारीख</string>
     <string name="follow_up_history">फॉलो-अप रिकॉर्ड </string>
 
     <string name="risk_factors">जोखिम कारक</string>
@@ -295,6 +311,18 @@
     <string name="total_presumptive_tb">प्रकल्पित टीबी मामले</string>
 
     <string name="pending">बाकी है</string>
+
+
+    <string name="checking_newer_result">नए परिणाम की जाँच की जा रही है…</string>
+    <string name="check_newer_result_failed">नए परिणाम की जाँच नहीं हो सकी। आप फिर भी परिणाम दर्ज कर सकते हैं।</string>
+    <string name="submitting">जमा किया जा रहा है…</string>
+    <string name="result_newer_available">इस ऑर्डर के लिए एक नया परिणाम प्राप्त हुआ है।</string>
+    <string name="manual_result_rejected_fallback_name">एक लाभार्थी</string>
+    <string name="manual_result_rejected_title">आपके द्वारा दर्ज किया गया परिणाम स्वीकार नहीं किया गया</string>
+    <string name="manual_result_rejected_with_result">%1$s: इस ऑर्डर के लिए पहले से ही एक परिणाम (%2$s) दर्ज था। आपकी प्रविष्टि को उससे बदल दिया गया है।</string>
+    <string name="manual_result_rejected_generic">%1$s: हब ने आपके द्वारा ऑफ़लाइन दर्ज किए गए परिणाम को अस्वीकार कर दिया। इसे दोबारा दर्ज करने के लिए रिकॉर्ड खोलें।</string>
+    <string name="result_already_recorded_title">परिणाम पहले से दर्ज है</string>
+    <string name="result_already_recorded_message">इस ऑर्डर के लिए परिणाम पहले से दर्ज है: %1$s.\n\nआपकी प्रविष्टि सहेजी नहीं गई। दर्ज किया गया परिणाम अब कार्ड पर दिखाया जा रहा है।</string>
 
     <string-array name="leprosy_status">
         <item>जांच</item>
@@ -371,6 +399,10 @@
     <string name="form_input_alphabet_special__digit_only_error">केवल अक्षर, विशेष अक्षर और अंक अनुमत हैं!</string>
     <string name="abha_number_digit">ABHA नंबर 14 अंकों का होना चाहिए</string>
     <string name="ifsc">4 अक्षर और उसके बाद 7 अंक (उदा., ABCD1234567)!</string>
+    <string name="ifsc_code">IFSC कोड</string>
+    <string name="app_settings">ऐप सेटिंग्स</string>
+    <string name="incentive_dashboard">प्रोत्साहन डैशबोर्ड</string>
+    <string name="facilitator">सुविधाकर्ता</string>
     <string name="other_place">मृत्यु का अन्य स्थान</string>
     <string name="other_reason">मृत्यु का अन्य कारण</string>
     <string name="no_of_elderly_children">वयस्क बच्चों की संख्या (15 वर्ष से ऊपर)</string>
@@ -378,6 +410,7 @@
     <string name="add">जोड़ें</string>
     <string name="asha_profile">प्रोफाइल</string>
     <string name="sync_status">सिंक स्थिति</string>
+    <string name="pending_sync">सिंक होना बाकी है</string>
     <string name="ncd_refer_form">एनसीडी रेफर फॉर्म</string>
     <string name="ncd_refer_list">रेफरल</string>
     <string name="hwc_refer_form">एचडब्ल्यूसी रेफर फॉर्म</string>
@@ -473,6 +506,20 @@
     <string name="sync_dashboard_clear_logs">लॉग साफ़ करें</string>
     <string name="sync_dashboard_export_logs">लॉग निर्यात करें</string>
     <string name="sync_dashboard_no_log_files">निर्यात करने के लिए कोई लॉग फ़ाइल नहीं</string>
+    <string name="sync_dashboard_needs_attention_title">ध्यान देने की आवश्यकता है</string>
+    <string name="sync_dashboard_needs_attention_summary">%1$d रिकॉर्ड अभी तक सर्वर द्वारा स्वीकार नहीं किए गए हैं। उन्हें स्वचालित रूप से दोबारा भेजने का प्रयास किया जाएगा। समस्या ठीक होने के बाद अभी पुनः प्रयास करें पर टैप करें।</string>
+    <string name="sync_dashboard_retry_now">अभी पुनः प्रयास करें</string>
+    <string name="sync_dashboard_retry_detail">%1$s से सिंक नहीं हुआ, %2$d प्रयास किए गए। अंतिम त्रुटि: %3$s</string>
+    <string name="sync_dashboard_orphan_responses_title">परामर्श / संपर्क अनुरेखण</string>
+    <string name="sync_dashboard_orphan_responses_detail">%1$d प्रतिक्रियाएँ लाभार्थी के पंजीकरण से पहले सहेजी गई थीं और उनका पंजीकृत लाभार्थी से मिलान नहीं किया जा सकता। कृपया सहायता टीम को इसकी सूचना दें।</string>
+    <string name="sync_dashboard_age_minutes">%1$d मिनट</string>
+    <string name="sync_dashboard_age_hours">%1$d घंटे</string>
+    <string name="sync_dashboard_age_days">%1$d दिन</string>
+    <string name="sync_entity_beneficiary">लाभार्थी</string>
+    <string name="sync_entity_registration">लाभार्थी पंजीकरण</string>
+    <string name="sync_entity_tb_diagnostics">टीबी निदान</string>
+    <string name="sync_entity_tb_suspected">टीबी संदिग्ध</string>
+    <string name="sync_entity_tb_confirmed">टीबी की पुष्टि</string>
     <string name="check_if_the_person_has_any_of_these_symptoms">जांचें कि व्यक्ति में इनमें से कोई लक्षण है या नहीं</string>
     <string name="symptomatic_tb_screening">टीबी के लक्षणों की जांच</string>
     <string name="tb_asymptomatic_symptoms">बिना लक्षण वाले लोगों की टीबी जांच</string>
@@ -779,6 +826,10 @@
     <string name="tb_ai_cough_assessment_result">एआई कफ असेसमेंट का परिणाम</string>
     <string name="tb_naat_conducted">क्या True NAT किया गया?</string>
     <string name="tb_naat_result">True NAT का परिणाम</string>
+    <string name="tb_quick_naat_conducted">क्या Truenat - MTB परीक्षण किया गया है?</string>
+    <string name="tb_quick_naat_result">Truenat - MTB परीक्षण का परिणाम</string>
+    <string name="tb_quick_rif_conducted">क्या Truenat - RIF परीक्षण किया गया है?</string>
+    <string name="tb_quick_rif_result">Truenat - RIF परीक्षण का परिणाम</string>
     <string name="tb_suspected_alert_confirmed">यह लाभार्थी अब पुष्ट टीबी मामलों में जाएगा।</string>
 
     <string-array name="tb_suspected_sample_submitted_at">
@@ -814,6 +865,7 @@
     <string name="referral_true_nat">ट्रू नॉट</string>
     <string name="referral_hwc">हेल्थ एंड वेलनेस सेंटर</string>
     <string name="referral_liquid_culture">लिक्विड कल्चर</string>
+    <string name="referral_clinical_assessment">नैदानिक मूल्यांकन और निदान</string>
     <string name="tb_liquid_culture_conducted">क्या लिक्विड कल्चर किया गया?</string>
     <string name="tb_liquid_culture_result">लिक्विड कल्चर का परिणाम</string>
     <string name="result">परिणाम</string>
@@ -823,7 +875,17 @@
     <string name="temperature_hypothermia">&lt;97 - हाइपोथर्मिया</string>
     <string name="normal_temperature_range">97-99 - सामान्य</string>
     <string name="temperature_100_or_more">&gt;99 - बुखार</string>
+    <string name="enter_weight_between_1_250_kg">वज़न 1 से 250 किलोग्राम के बीच दर्ज करें</string>
+    <string name="enter_height_between_30_250_cm">ऊँचाई 30 से 250 सेंटीमीटर के बीच दर्ज करें</string>
+    <string name="enter_temperature_between_90_110_f">तापमान 90 से 110 &#176;F के बीच दर्ज करें</string>
     <string name="anthropometry_age_gender_format">%1$d %2$s | %3$s</string>
+    <string name="total_past_history_tb">टीबी का पूर्व इतिहास रखने वाले कुल लाभार्थी</string>
+    <string name="total_currently_on_anti_tb_drugs">वर्तमान में टीबी-रोधी दवाएँ लेने वाले कुल लाभार्थी</string>
+    <string name="total_digital_chest_xrays">कुल डिजिटल चेस्ट एक्स-रे किए गए</string>
+    <string name="total_sputum_collection">कुल बलगम के नमूने एकत्र किए गए</string>
+    <string name="total_true_nat_tests">कुल Truenat परीक्षण किए गए</string>
+    <string name="total_liquid_culture_samples">लिक्विड कल्चर के लिए भेजे गए कुल बलगम के नमूने</string>
+    <string name="total_hwc_referrals">स्वास्थ्य एवं कल्याण केंद्रों को रेफर किए गए कुल मामले</string>
     <string name="age_unit_years">वर्ष</string>
     <string name="age_unit_months">महीने</string>
     <string name="age_unit_days">दिन</string>
@@ -859,11 +921,39 @@
     <string name="negative">नेगेटिव</string>
     <string name="unknown">अज्ञात</string>
     <string name="not_applicable">लागू नहीं</string>
+    <string name="high_bp_trigger">उच्च रक्तचाप: %1$d/%2$d mmHg</string>
+    <string name="low_bp_trigger">निम्न रक्तचाप: %1$d/%2$d mmHg</string>
+    <string name="high_rbs_trigger">उच्च RBS: %1$s mg/dl</string>
+    <string name="high_pulse_trigger">तेज़ नाड़ी: %1$d BPM</string>
+    <string name="low_pulse_trigger">धीमी नाड़ी: %1$d BPM</string>
+    <string name="high_temperature_trigger">उच्च तापमान: %1$s F</string>
+    <string name="temperature_option_97_5">97.5</string>
+    <string name="temperature_option_98_5">98.5</string>
+    <string name="temperature_option_99_5">99.5</string>
+    <string name="temperature_option_100_or_more">&gt;= 100</string>
+    <string name="pulse_option_below_60">60 से कम</string>
+    <string name="pulse_option_60_70">60-70</string>
+    <string name="pulse_option_70_80">70-80</string>
+    <string name="pulse_option_above_90">90 से अधिक</string>
     <string name="diagnostics_submitted">जांच जमा की गई</string>
     <string name="diagnostics_saved_offline_pending_sync">परिणाम स्थानीय रूप से सहेजा गया — कैंप हब पुनः जुड़ने पर सिंक होगा</string>
     <string name="general_opd">जनरल ओपीडी</string>
     <string name="enter_value_between">%1$s %2$s और %3$s के बीच दर्ज करें</string>
     <string name="chief_complaint">मुख्य शिकायत</string>
+    <string name="prescription">प्रिस्क्रिप्शन</string>
+    <string name="opd_medicine_title">दवा-%1$d</string>
+    <string name="opd_medicine_hint">दवा</string>
+    <string name="opd_drug_form">दवा का रूप</string>
+    <string name="opd_no_medicine_matches">कोई दवा नहीं मिली</string>
+    <string name="opd_drug_master_unavailable">दवाओं की सूची उपलब्ध नहीं है। दवाओं की सूची लोड करने के लिए इंटरनेट से कनेक्ट करें और सिंक करें।</string>
+    <string name="opd_out_of_stock">स्टॉक में उपलब्ध नहीं</string>
+    <string name="opd_duration_unit">इकाई</string>
+    <string name="opd_instruction">निर्देश</string>
+    <string name="opd_reset_medicine">दवा रीसेट करें</string>
+    <string name="opd_add_medicine">दवा जोड़ें</string>
+    <string name="opd_remove_medicine">दवा हटाएँ</string>
+    <string name="opd_increase_duration">अवधि बढ़ाएँ</string>
+    <string name="opd_decrease_duration">अवधि घटाएँ</string>
     <string name="medication">दवा</string>
     <string name="dosage">खुराक</string>
     <string name="frequency">आवृत्ति</string>
@@ -1017,6 +1107,22 @@
     <string name="order_status_rif_block_label">आरआईएफ परीक्षण · एमटीबी पॉजिटिव द्वारा ट्रिगर</string>
     <string name="order_status_create_new_order">नया ऑर्डर बनाएं</string>
     <string name="order_status_clinical_assessment_referred">क्लिनिकल आकलन एवं निदान हेतु संदर्भित</string>
+    <string name="order_status_retry_referral">रेफरल का पुनः प्रयास करें</string>
+    <string name="order_status_checking">जाँच की जा रही है…</string>
+    <string name="diagnostic_manual_result_success">परिणाम सफलतापूर्वक जमा किया गया</string>
+    <string name="diagnostic_order_creation_failed">परिणाम जमा नहीं हो सका: ऑर्डर नहीं बनाया जा सका (%1$s)</string>
+    <string name="error_beneficiary_not_found">लाभार्थी नहीं मिला</string>
+    <string name="error_beneficiary_id_invalid">लाभार्थी आईडी मान्य नहीं है</string>
+    <string name="error_no_user_logged_in">कोई उपयोगकर्ता लॉग इन नहीं है!!</string>
+    <string name="error_camp_hub_not_connected">कैंप हब कनेक्ट नहीं है</string>
+    <string name="error_http_code">HTTP त्रुटि %1$d</string>
+    <string name="error_no_location_record_found">स्थान का कोई रिकॉर्ड नहीं मिला</string>
+    <string name="error_camp_mode_disabled">कैंप मोड बंद है</string>
+    <string name="error_camp_hub_disconnected">कैंप हब डिस्कनेक्ट हो गया है</string>
+    <string name="error_manual_result_rejected">मैन्युअल परिणाम जमा करने का अनुरोध अस्वीकार कर दिया गया</string>
+    <string name="error_push_order_failed">ऑर्डर भेजने में विफल</string>
+    <string name="error_retry_order_failed">ऑर्डर दोबारा भेजने में विफल</string>
+    <string name="error_fetch_result_failed">परिणाम प्राप्त करने में विफल</string>
     <string name="btn_examine">जांचें</string>
     <string name="btn_examine_count">जांचें %1$d/4</string>
     <string name="examine_bottomsheet_title">परीक्षण फॉर्म</string>
@@ -1026,7 +1132,6 @@
     <string name="tb_screening_locked_msg">कृपया पहले टीबी स्क्रीनिंग फॉर्म भरें</string>
     <string name="examine_form_view_only_msg">आपके पास इस फॉर्म को केवल देखने की अनुमति है</string>
     <string name="tb_screening_no_permission_msg">आपके पास टीबी स्क्रीनिंग तक पहुँचने की अनुमति नहीं है</string>
-    <string name="contact_tracing_load_error">यह फॉर्म लोड नहीं हो सका।</string>
     <string name="examine_btn_history">पिछला रिकॉर्ड</string>
     <string name="tb_screening_legend_xray_sputum">* डिजिटल छाती एक्स-रे या थूक संग्रह के लिए रेफर करें</string>
     <string name="tb_screening_legend_family_members">** सभी परिवार के सदस्यों की जांच की सलाह दें</string>
@@ -1175,11 +1280,50 @@
     <string name="role_tab_counseling">परामर्श</string>
     <string name="role_tab_lab_technician">निदान</string>
 
+    <!-- Multi-role Home screen — Counselling tab "Coming soon" placeholder cards -->
+    <string name="home_card_counselling_title">परामर्श</string>
+    <string name="home_card_contact_tracing_title">संपर्क अनुरेखण</string>
+    <string name="home_card_tb_treatment_followup_title">टीबी उपचार फॉलो-अप</string>
+    <string name="home_card_tpt_title">टीपीटी</string>
+    <string name="home_card_coming_soon_subtitle">जल्द आ रहा है</string>
+
+    <string name="sync_beneficiary">लाभार्थी</string>
+    <string name="sync_anthropometric">मानवमितीय माप</string>
+    <string name="sync_tb_screening">टीबी स्क्रीनिंग</string>
+    <string name="sync_tb_confirmed">टीबी की पुष्टि</string>
+    <string name="sync_counselling">परामर्श</string>
+
 
     <string name="home_village_at_a_glance">गाँव %1$s एक नज़र में</string>
     <string name="home_glance_households">कुल परिवार</string>
     <string name="home_glance_population">कुल जनसंख्या</string>
     <string name="home_glance_unscreened">अस्क्रीन की गई जनसंख्या</string>
+
+
+
+    <!-- Order Status -->
+    <string name="order_status_pending">लंबित</string>
+    <string name="order_status_completed">पूर्ण</string>
+    <string name="order_status_failed">विफल</string>
+    <string name="order_status_closed">बंद</string>
+    <string name="order_status_manual_entry">मैन्युअल प्रविष्टि</string>
+
+    <!-- Chest X-Ray Results -->
+    <string name="chest_xray_normal">सामान्य</string>
+    <string name="chest_xray_abnormal">असामान्य, लेकिन टीबी संभावित नहीं</string>
+    <string name="chest_xray_tb_presumptive">टीबी संभावित</string>
+    <string name="chest_xray_ai_invalid">AI अमान्य परिणाम</string>
+
+    <!-- MTB Results -->
+    <string name="mtb_result_positive">टीबी पॉज़िटिव</string>
+    <string name="mtb_result_negative">टीबी नेगेटिव</string>
+    <string name="mtb_result_invalid_error">अमान्य/त्रुटि</string>
+
+    <!-- RIF Results -->
+    <string name="rif_result_dr_tb">ड्रग-प्रतिरोधी टीबी</string>
+    <string name="rif_result_non_dr_tb">गैर-ड्रग-प्रतिरोधी टीबी</string>
+    <string name="rif_result_indeterminate">अनिश्चित</string>
+    <string name="rif_result_invalid_error">अमान्य/त्रुटि</string>
 
 
     <string name="loc_cb_update_location">क्या आप स्थान का विवरण अपडेट करना चाहते हैं?</string>
