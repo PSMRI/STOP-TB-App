@@ -754,6 +754,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             } else if (villageDefaults != null) {
                 // New registration: Pincode & Residential Area come from the village (captured once on the location screen)
                 applyVillageDefaults(villageDefaults, includePinCode = !isNonHH)
+            } else {
+                isCapturingVillageDefaults = true
             }
         }
 
@@ -956,6 +958,9 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     // Edit mode: the record's own village and values, restored if the user switches back to that village
     private var savedRecordVillageId: Int? = null
     private var savedRecordValues: VillageDefaults? = null
+    // Village resolved when the user changed the dropdown; mapValues saves this same one so the
+    // Pincode / Residential Area shown always belong to the village that is saved
+    private var villageChosenInForm: LocationEntity? = null
 
     private fun getSavedRecordValues(saved: BenRegCache) = VillageDefaults(
         pinCode = saved.pinCode?.trim(),
@@ -1344,12 +1349,22 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                 // from the new village's saved values (or leave blank for the user to capture).
                 val isPinCodeShown = getIndexOfElement(pinCode) >= 0
                 if (!isPinCodeShown && getIndexOfElement(residentialAreaType) < 0) return -1
-                val selectedVillage = villageEntities.find { it.name == villageHamlet.value }
+                // Same resolution as mapValues (name + the record's own village id first), so two villages
+                // with the same name never read one village's values and save them on the other
+                val selectedVillage =
+                    villageEntities.find { it.name == villageHamlet.value && it.id == savedRecordVillageId }
+                        ?: villageEntities.find { it.name == villageHamlet.value }
+                villageChosenInForm = selectedVillage
                 // Back to the record's own village (edit) → its own saved values, not the village's current ones
                 val valuesForVillage =
                     if (selectedVillage != null && selectedVillage.id == savedRecordVillageId) savedRecordValues
                     else selectedVillage?.let { preferenceDao.getVillageDefaults(it.id) }
                 applyVillageDefaults(valuesForVillage, includePinCode = isPinCodeShown)
+                if (!isPinCodeShown) {
+                    // Non-HH: Pincode is hidden but still saved (mapValues), so it must follow the village
+                    // instead of keeping the previous village's value
+                    pinCode.value = valuesForVillage?.pinCode?.takeIf { valuesForVillage.hasPinCode }
+                }
                 return getIndexOfElement(villageHamlet)
             }
 
@@ -1643,7 +1658,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             } ?: villageHamlet.value?.let { selectedName ->
                 val existingId = ben.locationRecord.village.id
                 val selectedVillage =
-                    villageEntities.find { it.name == selectedName && it.id == existingId }
+                    villageChosenInForm?.takeIf { it.name == selectedName }
+                        ?: villageEntities.find { it.name == selectedName && it.id == existingId }
                         ?: villageEntities.find { it.name == selectedName }
                 selectedVillage?.let {
                     ben.locationRecord = ben.locationRecord.copy(village = it)

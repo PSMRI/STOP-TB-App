@@ -292,10 +292,20 @@ class NewHouseholdViewModel @Inject constructor(
                     // pushing the old village and the next pull puts the household back there.
                     val selectedVillage = household.locationRecord.village
                     if (savedHouseholdVillageId != null && savedHouseholdVillageId != selectedVillage.id) {
-                        benRepo.updateVillageOfHouseholdMembers(household.householdId, selectedVillage)
+                        // Members take the new village's Pincode (none → cleared, not the old village's) and
+                        // the household's Residential Area; also marks them UNSYNCED, in the same transaction
+                        val newVillageDefaults = preferenceDao.getVillageDefaults(selectedVillage.id)
+                        benRepo.moveHouseholdMembersToVillage(
+                            householdId = household.householdId,
+                            village = selectedVillage,
+                            pinCode = newVillageDefaults?.pinCode?.takeIf { newVillageDefaults.hasPinCode },
+                            residentialAreaId = household.details?.residentialAreaId ?: 0,
+                            residentialArea = household.details?.residentialArea
+                        )
                         savedHouseholdVillageId = selectedVillage.id
+                    } else {
+                        benRepo.updateBenToSync(household.householdId, SyncState.UNSYNCED)
                     }
-                    benRepo.updateBenToSync(household.householdId, SyncState.UNSYNCED)
                     if (linkBenId != 0L) {
                         benRepo.linkBenToHousehold(linkBenId, household.householdId, 19, "Self")
                     }

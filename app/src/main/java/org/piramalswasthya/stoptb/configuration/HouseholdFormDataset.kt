@@ -35,6 +35,8 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
     private var savedRecordVillageId: Int? = null
     private var savedRecordValues: VillageDefaults? = null
     private var savedRecordOtherResidentialArea: String? = null
+    // Village resolved when the user changed the dropdown; mapValues saves this same one
+    private var villageChosenInForm: LocationEntity? = null
     companion object {
         private fun getCurrentDate(): String {
             val calendar = Calendar.getInstance()
@@ -333,7 +335,14 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             if (recordValues.hasResidentialArea) residentialArea.inputType = TEXT_VIEW
         } else {
             // New household: Residential Area comes from the village (captured once on the location screen)
-            villageDefaults?.let { applyVillageDefaults(it) }
+            if (villageDefaults?.hasResidentialArea == true || residentialArea.value == null) {
+                applyVillageDefaults(villageDefaults)
+            } else {
+                // Village has nothing saved but a draft restored a value: keep it, still required and
+                // remembered for the village on save (applyVillageDefaults would clear it)
+                residentialArea.required = true
+                isCapturingVillageDefaults = true
+            }
         }
         if (residentialArea.value == residentialArea.entries!!.last()) {
             list.add(list.indexOf(residentialArea) + 1, otherResidentialArea)
@@ -799,7 +808,11 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
 
                 // Residential Area belongs to the village: reset and refill from the new village's saved
                 // value, or leave blank for the user to capture.
-                val selectedVillage = villageEntities.find { it.name == villageHamlet.value }
+                // Same resolution as mapValues: the household's own village first when names repeat
+                val selectedVillage =
+                    villageEntities.find { it.name == villageHamlet.value && it.id == savedRecordVillageId }
+                        ?: villageEntities.find { it.name == villageHamlet.value }
+                villageChosenInForm = selectedVillage
                 if (selectedVillage != null && selectedVillage.id == savedRecordVillageId) {
                     // Back to the household's own village (edit) → its own saved value, not the village's current one
                     applyVillageDefaults(savedRecordValues)
@@ -885,7 +898,13 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
 
         // ADD — resolve village name back to its entity, update locationRecord
         villageHamlet.value?.let { selectedName ->
-            val selectedVillage = villageEntities.find { it.name == selectedName }
+            // Prefer the village resolved in the form, then the household's own village with that name:
+            // two villages can share a name, and the first match would silently move the household
+            val existingId = cacheModel.locationRecord.village.id
+            val selectedVillage =
+                villageChosenInForm?.takeIf { it.name == selectedName }
+                    ?: villageEntities.find { it.name == selectedName && it.id == existingId }
+                    ?: villageEntities.find { it.name == selectedName }
             selectedVillage?.let {
                 cacheModel.locationRecord = cacheModel.locationRecord.copy(village = it)
             }

@@ -109,16 +109,33 @@ class BenRepo @Inject constructor(
         }
     }
 
-    /** Moves every member of a household to [village] (local only; call [updateBenToSync] to push it). */
-    suspend fun updateVillageOfHouseholdMembers(householdId: Long, village: LocationEntity) {
+    /**
+     * Moves every member of a household to [village] — with that village's [pinCode] and the household's
+     * Residential Area — and marks them UNSYNCED, in one transaction. The pull only overwrites SYNCED
+     * members, so the writes must commit together: a pull landing between them would put the old
+     * village back and the sync-state update would then push it.
+     */
+    suspend fun moveHouseholdMembersToVillage(
+        householdId: Long,
+        village: LocationEntity,
+        pinCode: String?,
+        residentialAreaId: Int,
+        residentialArea: String?
+    ) {
         withContext(Dispatchers.IO) {
-            benDao.updateVillageOfHouseholdMembers(
-                householdId = householdId,
-                villageId = village.id,
-                villageName = village.name,
-                villageNameHindi = village.nameHindi,
-                villageNameAssamese = village.nameAssamese
-            )
+            db.withTransaction {
+                benDao.updateVillageOfHouseholdMembers(
+                    householdId = householdId,
+                    villageId = village.id,
+                    villageName = village.name,
+                    villageNameHindi = village.nameHindi,
+                    villageNameAssamese = village.nameAssamese,
+                    pinCode = pinCode,
+                    residentialAreaId = residentialAreaId,
+                    residentialArea = residentialArea
+                )
+                benDao.updateBenToSync(householdId = householdId, SyncState.UNSYNCED, "U", 2)
+            }
         }
     }
 
@@ -2181,11 +2198,14 @@ class BenRepo @Inject constructor(
 
                     val benGpsLatitude = demographicsObj.optDoubleOrNull("latitude")
                         ?: demographicsObj.optDoubleOrNull("gpsLatitude")
+                        // Server sends beneficiaryDetails.latitude (FLW-API BeneficiaryServiceImpl).
+                        ?: benDataObj.optDoubleOrNull("latitude")
                         ?: benDataObj.optDoubleOrNull("gpsLatitude")
                         ?: jsonObject.optDoubleOrNull("gpsLatitude")
 
                     val benGpsLongitude = demographicsObj.optDoubleOrNull("longitude")
                         ?: demographicsObj.optDoubleOrNull("gpsLongitude")
+                        ?: benDataObj.optDoubleOrNull("longitude")
                         ?: benDataObj.optDoubleOrNull("gpsLongitude")
                         ?: jsonObject.optDoubleOrNull("gpsLongitude")
 
