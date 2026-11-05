@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.configuration.HouseholdSpouseRelations
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.adapters.BenListAdapter
 import org.piramalswasthya.stoptb.adapters.BenPagingAdapter
@@ -985,7 +986,9 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         val fatherRegistered: Boolean,
         val motherRegistered: Boolean,
         val unmarried: Boolean,
-        val married: Boolean
+        val married: Boolean,
+        val wifeRegistered: Boolean,
+        val husbandRegistered: Boolean
     )
 
     private fun computeHofContextForAddMember(): HofContext {
@@ -995,7 +998,15 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         val motherRegistered = list.any { it.familyHeadRelationPosition == 1 }
         val unmarried = hof?.genDetails?.maritalStatusId == 1
         val married = hof?.genDetails?.maritalStatusId == 2
-        return HofContext(hof, fatherRegistered, motherRegistered, unmarried, married)
+        val wifeRegistered = list.any {
+            HouseholdSpouseRelations.isWife(it.familyHeadRelationPosition)
+        }
+        val husbandRegistered = list.any {
+            HouseholdSpouseRelations.isHusband(it.familyHeadRelationPosition)
+        }
+        return HofContext(
+            hof, fatherRegistered, motherRegistered, unmarried, married, wifeRegistered, husbandRegistered
+        )
     }
 
     private fun baseRelationDropdownForAddMember(selectedGender: org.piramalswasthya.stoptb.model.Gender?): List<String> {
@@ -1012,7 +1023,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         baseList: List<String>,
         context: HofContext
     ): List<String> {
-        if (context.hof == null) return baseList
+        if (context.hof == null) return withoutRegisteredSpouseForAddMember(baseList, context)
 
         val relationList = baseList.toMutableList()
         val commonRelations = resources.getStringArray(R.array.nbr_relationship_to_head)
@@ -1037,7 +1048,18 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             relationList.remove(commonRelations[4])
         }
 
-        return relationList
+        return withoutRegisteredSpouseForAddMember(relationList, context)
+    }
+
+    private fun withoutRegisteredSpouseForAddMember(relations: List<String>, context: HofContext): List<String> {
+        val labels = resources.getStringArray(R.array.nbr_relationship_to_head)
+        return HouseholdSpouseRelations.withoutRegisteredSpouse(
+            relations,
+            wifeLabel = labels.getOrNull(4),
+            husbandLabel = labels.getOrNull(5),
+            wifeRegistered = context.wifeRegistered,
+            husbandRegistered = context.husbandRegistered
+        )
     }
 
     private fun genderFromRadioIdForAddMember(alertBinding: AlertNewBenBinding, checkedId: Int): org.piramalswasthya.stoptb.model.Gender? =

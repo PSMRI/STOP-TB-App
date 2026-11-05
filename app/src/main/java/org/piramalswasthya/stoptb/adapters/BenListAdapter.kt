@@ -1255,42 +1255,10 @@ class BenListAdapter(
 
             binding.llBenDetails4.visibility = View.GONE
             binding.btnAddChildren.visibility = View.GONE
-
-            // Register Wife / Register Husband ? Registrar tab only (hidden when on Nurse or Counselling tab,
-            // or in TPT/Referral workflows)
-            val showRegisterSpouseButtons =
-                roleManager?.privilegesForActiveRole()?.showRegisterSpouseButtons == true &&
-                !showContactTracingForms &&
-                source !in 5..8
-            Timber.d("RoleManager: showRegisterSpouseButtons=$showRegisterSpouseButtons")
-            when {
-//                !isNurseRole && !isCounsellingOfficer && !item.isNonHH && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
-//                        && !item.isDeath && !item.isDeactivate -> {
-                showRegisterSpouseButtons && !item.isNonHH && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
-                        && !item.isDeath && !item.isDeactivate -> {
-                    binding.llAddSpouseBtn.visibility = View.VISIBLE
-                    binding.btnAddSpouse.visibility = View.VISIBLE
-                    binding.btnAddSpouse.text = context.getString(R.string.add_wife)
-                    binding.btnAddSpouse.setOnClickListener {
-                        clickListener?.onClickedWifeBen(item)
-                    }
-                }
-//                (!isNurseRole && !isCounsellingOfficer) && !item.isNonHH && item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
-//                        && !item.isDeath && !item.isDeactivate -> {
-                showRegisterSpouseButtons && !item.isNonHH && item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
-                        && !item.isDeath && !item.isDeactivate -> {
-                    binding.llAddSpouseBtn.visibility = View.VISIBLE
-                    binding.btnAddSpouse.visibility = View.VISIBLE
-                    binding.btnAddSpouse.text = context.getString(R.string.add_husband)
-                    binding.btnAddSpouse.setOnClickListener {
-                        clickListener?.onClickedHusbandBen(item)
-                    }
-                }
-                else -> {
-                    binding.llAddSpouseBtn.visibility = View.GONE
-                    binding.btnAddSpouse.visibility = View.GONE
-                }
-            }
+            // Register Wife / Register Husband is not used in this app.
+            // A spouse is added once, from Add Member, and that option is hidden after registration.
+            binding.llAddSpouseBtn.visibility = View.GONE
+            binding.btnAddSpouse.visibility = View.GONE
             binding.ivSoftDelete.visibility = View.GONE
             binding.tvTitleDuplicaterecord.visibility = View.GONE
 

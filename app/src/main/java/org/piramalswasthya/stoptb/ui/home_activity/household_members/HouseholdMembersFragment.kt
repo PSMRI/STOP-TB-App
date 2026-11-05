@@ -22,6 +22,8 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.BenListAdapter
+import org.piramalswasthya.stoptb.configuration.HouseholdSpouseRelations
+import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertNewBenBinding
 import org.piramalswasthya.stoptb.databinding.FragmentHouseholdMembersBinding
@@ -51,6 +53,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
     private var addBenAlert: AlertDialog? = null
     private var addBenAlertBinding: AlertNewBenBinding? = null
     private var selectedRelationIndex = -1
+    private var householdMembers: List<BenBasicDomain> = emptyList()
     private var pendingExamineBenId: Long? = null
     private var isMemberLimitReached = false
 
@@ -147,6 +150,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.benList.collect { list ->
+                    householdMembers = list
                     binding.flEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
                     benAdapter.submitHouseholdMemberCounts(
                         list.groupingBy { it.hhId }.eachCount()
@@ -368,21 +372,29 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
             alertBinding.actvRth.text = null
             alertBinding.btnOk.isEnabled = false
             selectedRelationIndex = -1
-            val sourceItems = resources.getStringArray(R.array.nbr_relationship_to_head_src)
-            val items = when (selectedGender) {
-                Gender.FEMALE -> resources.getStringArray(R.array.nbr_relationship_to_head_female)
-                else -> resources.getStringArray(R.array.nbr_relationship_to_head_male)
-            }.map { item -> item to sourceItems.indexOf(item) }
-            val visibleItems = items.map { it.first }
+            val relationLabels = resources.getStringArray(R.array.nbr_relationship_to_head)
+            val visibleItems = HouseholdSpouseRelations.withoutRegisteredSpouse(
+                relations = when (selectedGender) {
+                    Gender.FEMALE -> resources.getStringArray(R.array.nbr_relationship_to_head_female).toList()
+                    else -> resources.getStringArray(R.array.nbr_relationship_to_head_male).toList()
+                },
+                wifeLabel = relationLabels.getOrNull(4),
+                husbandLabel = relationLabels.getOrNull(5),
+                wifeRegistered = householdMembers.any {
+                    HouseholdSpouseRelations.isWife(it.relToHeadId)
+                },
+                husbandRegistered = householdMembers.any {
+                    HouseholdSpouseRelations.isHusband(it.relToHeadId)
+                }
+            )
             alertBinding.actvRth.setAdapter(
                 ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, visibleItems)
             )
         }
 
-        alertBinding.actvRth.setOnItemClickListener { _, _, position, _ ->
-            val selectedGender = genderFromRadioId(alertBinding, alertBinding.rgGender.checkedRadioButtonId)
-            selectedRelationIndex = getRelationIndex(selectedGender, position)
-            alertBinding.btnOk.isEnabled = true
+        alertBinding.actvRth.setOnItemClickListener { parent, _, position, _ ->
+            selectedRelationIndex = relationIndexForLabel(parent.getItemAtPosition(position)?.toString())
+            alertBinding.btnOk.isEnabled = selectedRelationIndex >= 0
         }
 
         addBenAlert = MaterialAlertDialogBuilder(requireContext())
@@ -422,15 +434,9 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
         selectedRelationIndex = -1
     }
 
-    private fun getRelationIndex(selectedGender: Gender?, position: Int): Int {
-        val sourceItems = resources.getStringArray(R.array.nbr_relationship_to_head_src)
-        val selectedItems = when (selectedGender) {
-            Gender.FEMALE -> resources.getStringArray(R.array.nbr_relationship_to_head_female)
-            Gender.MALE, Gender.TRANSGENDER, Gender.PREFER_NOT_TO_SAY ->
-                resources.getStringArray(R.array.nbr_relationship_to_head_male)
-            null -> return -1
-        }
-        return sourceItems.indexOf(selectedItems.getOrNull(position))
+    private fun relationIndexForLabel(label: String?): Int {
+        if (label.isNullOrBlank()) return -1
+        return resources.getStringArray(R.array.nbr_relationship_to_head_src).indexOf(label)
     }
 
     private fun genderFromRadioId(alertBinding: AlertNewBenBinding, checkedId: Int): Gender? =

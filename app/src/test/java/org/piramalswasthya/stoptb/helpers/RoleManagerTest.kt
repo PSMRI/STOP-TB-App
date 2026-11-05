@@ -100,18 +100,15 @@ class RoleManagerTest {
     }
 
     @Test
-    fun `showRegisterSpouseButtons is only true for activeRole REGISTRAR`() {
+    fun `showRegisterSpouseButtons is false for every active role`() {
         mockUserWithScreenNames(listOf("Registrar", "Nurse", "Counseling"))
         roleManager.initializeFromLoggedInUser()
 
-        // Default tab is REGISTRAR
-        assertThat(roleManager.privilegesForActiveRole().showRegisterSpouseButtons).isTrue()
+        assertThat(roleManager.privilegesForActiveRole().showRegisterSpouseButtons).isFalse()
 
-        // Switch to NURSE tab
         roleManager.setActiveRole(AppRole.NURSE)
         assertThat(roleManager.privilegesForActiveRole().showRegisterSpouseButtons).isFalse()
 
-        // Switch to COUNSELING tab
         roleManager.setActiveRole(AppRole.COUNSELING)
         assertThat(roleManager.privilegesForActiveRole().showRegisterSpouseButtons).isFalse()
     }
