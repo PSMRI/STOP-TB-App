@@ -2641,6 +2641,10 @@ class BenRepo @Inject constructor(
                             }
 
                             // The row exactly as it would be persisted, merge rules included.
+                            val serverHasLivingInfo = serverBen.placeOfCurrentLiving != null ||
+                                !serverBen.otherPlaceOfCurrentLiving.isNullOrBlank() ||
+                                !serverBen.institutionName.isNullOrBlank()
+                            val livingSource = if (serverHasLivingInfo) serverBen else existingBen
                             val mergedBen = serverBen.copy(
                                 userImage = serverBen.userImage ?: existingBen.userImage,
                                 healthIdDetails = serverBen.healthIdDetails ?: existingBen.healthIdDetails,
@@ -2648,11 +2652,9 @@ class BenRepo @Inject constructor(
                                 weight = serverBen.weight ?: existingBen.weight,
                                 bmi = serverBen.bmi ?: existingBen.bmi,
                                 temperature = serverBen.temperature ?: existingBen.temperature,
-                                // A pull without the Non-HH current-living fields must not erase the
-                                // values already on the tablet (STOP-752).
-                                placeOfCurrentLiving = serverBen.placeOfCurrentLiving ?: existingBen.placeOfCurrentLiving,
-                                otherPlaceOfCurrentLiving = serverBen.otherPlaceOfCurrentLiving ?: existingBen.otherPlaceOfCurrentLiving,
-                                institutionName = serverBen.institutionName ?: existingBen.institutionName,
+                                placeOfCurrentLiving = livingSource.placeOfCurrentLiving,
+                                otherPlaceOfCurrentLiving = livingSource.otherPlaceOfCurrentLiving,
+                                institutionName = livingSource.institutionName,
                                 isConsent = serverBen.isConsent || existingBen.isConsent,
                                 syncState = SyncState.SYNCED,
                                 processed = "P"
