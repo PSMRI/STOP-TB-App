@@ -21,6 +21,7 @@ import org.piramalswasthya.stoptb.model.LocationState
 import org.piramalswasthya.stoptb.helpers.DigiPinHelper
 import org.piramalswasthya.stoptb.helpers.GpsDiagnostics
 import org.piramalswasthya.stoptb.configuration.BenRegFormDataset
+import org.piramalswasthya.stoptb.configuration.SpouseLinkSelector
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.BenRegCache
@@ -601,6 +602,7 @@ class NewBenRegViewModel @Inject constructor(
                     val spouseLinkBenId = findExistingSpouseLinkForFamilyMember(ben)
                     if (spouseLinkBenId != null) {
                         ben.isSpouseAdded = true
+                        copyLinkedMemberNameAsSpouse(spouseLinkBenId, ben)
                     }
 
                     benRepo.persistRecord(ben, updateIfExists = benIdFromArgs != 0L)
@@ -697,47 +699,38 @@ class NewBenRegViewModel @Inject constructor(
         if (isAddSpouseFromArgs == 1 || hhId <= 0L || benIdFromArgs != 0L) return null
         if (relToHeadId != 4 && relToHeadId != 5) return null
 
-        val newFirstName = newBen.firstName.normalizeNameForMatch()
-        val newFullName = newBen.fullName().normalizeNameForMatch()
-        if (newFirstName.isBlank() && newFullName.isBlank()) return null
-
-        val expectedExistingGenderId = if (relToHeadId == 4) 1 else 2
-        val matches = benRepo.getBenListFromHousehold(hhId).filter { existing ->
-            existing.beneficiaryId != newBen.beneficiaryId &&
-                existing.genderId == expectedExistingGenderId &&
-                existing.isMarried &&
-                (relToHeadId == 4 || !existing.isSpouseAdded) &&
-                existing.genDetails?.spouseName.normalizeNameForMatch().let { spouseName ->
-                    spouseName.isNotBlank() &&
-                        (spouseName == newFirstName || spouseName == newFullName)
-                }
+        val members = benRepo.getBenListFromHousehold(hhId).map { existing ->
+            SpouseLinkSelector.Member(
+                beneficiaryId = existing.beneficiaryId,
+                genderId = existing.genderId,
+                isSpouseAdded = existing.isSpouseAdded,
+                isHouseholdHead = existing.familyHeadRelationPosition == 19,
+                spouseName = existing.genDetails?.spouseName
+            )
         }
-
-        matches.singleOrNull()?.beneficiaryId?.let { return it }
-
-        return findHouseholdHeadSpouseFallback()
+        return SpouseLinkSelector.selectPartnerId(
+            newBeneficiaryId = newBen.beneficiaryId,
+            registeringWife = relToHeadId == 4,
+            newSpouseFirstName = newBen.firstName,
+            newSpouseFullName = newBen.fullName(),
+            members = members
+        )
     }
 
-    private fun String?.normalizeNameForMatch(): String =
-        this?.trim()
-            ?.replace(Regex("\\s+"), " ")
-            ?.uppercase()
-            .orEmpty()
-
-    private suspend fun findHouseholdHeadSpouseFallback(): Long? {
-        val expectedGenderId = if (relToHeadId == 4) 1 else 2
-        val householdHead = benRepo.getBenListFromHousehold(hhId).singleOrNull { existing ->
-            existing.familyHeadRelationPosition == 19 &&
-                existing.genderId == expectedGenderId &&
-                existing.isMarried &&
-                !existing.isSpouseAdded
+    private suspend fun copyLinkedMemberNameAsSpouse(linkedBenId: Long, newBen: BenRegCache) {
+        if (!newBen.genDetails?.spouseName.isNullOrBlank()) return
+        val linkedName = benRepo.getBeneficiaryRecord(linkedBenId, hhId)?.fullName() ?: return
+        if (newBen.genDetails == null) {
+            newBen.genDetails = BenRegGen(spouseName = linkedName)
+        } else {
+            newBen.genDetails!!.spouseName = linkedName
         }
-        return householdHead?.beneficiaryId
     }
 
     private suspend fun updateLinkedSpouseNameIfBlank(linkedBenId: Long, newBen: BenRegCache) {
         val newSpouseName = newBen.fullName()?.takeIf { it.isNotBlank() } ?: return
         benRepo.getBeneficiaryRecord(linkedBenId, hhId)?.let { linkedBen ->
+            linkedBen.isSpouseAdded = true
             if (linkedBen.genDetails?.spouseName.isNullOrBlank()) {
                 if (linkedBen.genDetails == null) {
                     linkedBen.genDetails = BenRegGen(spouseName = newSpouseName)

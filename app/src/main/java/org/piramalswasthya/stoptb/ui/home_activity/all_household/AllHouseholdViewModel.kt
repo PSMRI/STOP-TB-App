@@ -80,6 +80,8 @@ class AllHouseholdViewModel @Inject constructor(
         val members = withContext(Dispatchers.IO) {
             householdRepo.getAllBenOfHousehold(id)
         }
+        // A newer selection, or a reset, happened while this lookup was running.
+        if (_selectedHouseholdId != id) return
         _householdBenList.clear()
         _householdBenList.addAll(members)
     }

@@ -241,7 +241,12 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
         val canAddMember = privilege.beneficiaryPermission == Permission.FULL
         binding.fabAddMember.visibility = if (canAddMember) View.VISIBLE else View.GONE
         binding.fabAddMember.setOnClickListener {
-            if (isMemberLimitReached) showMemberLimitReachedMessage() else addBenAlert?.show()
+            if (isMemberLimitReached) {
+                showMemberLimitReachedMessage()
+            } else {
+                addBenAlertBinding?.let { resetAddBenDialog(it) }
+                addBenAlert?.show()
+            }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -422,6 +427,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
         }
 
         alertBinding.btnCancel.setOnClickListener {
+            resetAddBenDialog(alertBinding)
             addBenAlert?.dismiss()
         }
     }
