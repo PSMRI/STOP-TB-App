@@ -19,7 +19,6 @@ import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.Gender.FEMALE
 import org.piramalswasthya.stoptb.model.Gender.MALE
 import org.piramalswasthya.stoptb.model.Gender.TRANSGENDER
-import org.piramalswasthya.stoptb.model.Gender.PREFER_NOT_TO_SAY
 import org.piramalswasthya.stoptb.model.InputType.DATE_PICKER
 import org.piramalswasthya.stoptb.model.InputType.DROPDOWN
 import org.piramalswasthya.stoptb.model.InputType.EDIT_TEXT
@@ -634,7 +633,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             firstName.value  = saved.firstName
             lastName.value   = saved.lastName
             agePopup.value   = getDateFromLong(saved.dob)
-            gender.value     = gender.getStringFromPosition(saved.genderId)
+            gender.value     = genderLabelFromId(saved.genderId)
             gender.inputType = TEXT_VIEW         // edit mode — gender not changeable
 
             maritalStatus.entries = when (saved.gender) {
@@ -659,7 +658,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
                 when (saved.genderId) {
                     1 -> wifeName.value = it
                     2 -> husbandName.value = it
-                    3 -> spouseName.value = it
+                    3, 4 -> spouseName.value = it
                 }
             }
             fatherName.value = saved.fatherName
@@ -857,7 +856,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             lastName.isEnabled = false
             lastName.hasPencilEdit = true
         }
-        prefill.genderId.takeIf { it > 0 }?.let { gender.value = gender.getStringFromPosition(it) }
+        prefill.genderId.takeIf { it > 0 }?.let { gender.value = genderLabelFromId(it) }
         prefill.fatherName?.takeIf { it.isNotBlank() }?.let { fatherName.value = it }
         prefill.motherName?.takeIf { it.isNotBlank() }?.let { motherName.value = it }
         prefill.contactNumber?.let {
@@ -1457,6 +1456,12 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         }
     }
 
+    /** 1=Male, 2=Female, 3=Transgender. Old id 4 (Prefer not to say) shows as Transgender. */
+    private fun genderLabelFromId(genderId: Int): String? {
+        val position = if (genderId == 4) 3 else genderId
+        return gender.getStringFromPosition(position)
+    }
+
     // ─────────────────────────── MAP VALUES ───────────────────────────
 
     override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
@@ -1485,15 +1490,15 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             ben.isAdult    = ben.age >= 15
             ben.isKid      = false // StopTB has no kid concept
 
-            ben.genderId = when (gender.value) {
-                gender.entries!![0] -> 1
-                gender.entries!![1] -> 2
-                gender.entries!![2] -> 3
-                gender.entries!![3] -> 4
-                else -> 0
-            }
+            // nbr_gender_array is Male, Female, Transgender. Do not read index 3;
+            // "Prefer not to say" was removed and that lookup crashes on save.
+            val genderIndex = gender.entries.orEmpty().indexOf(gender.value)
+            ben.genderId = if (genderIndex in 0..2) genderIndex + 1 else 0
             ben.gender = when (ben.genderId) {
-                1 -> MALE; 2 -> FEMALE; 3 -> TRANSGENDER; 4 -> PREFER_NOT_TO_SAY; else -> null
+                1 -> MALE
+                2 -> FEMALE
+                3 -> TRANSGENDER
+                else -> null
             }
 
             ben.fatherName = fatherName.value
