@@ -3048,6 +3048,19 @@ class TBRepo @Inject constructor(
                 Timber.w("TB_SUSPECTED_DIRTY: benId=$benId creating new tb_suspected record from diagnostics")
             }
 
+            // hasSymptoms, isNaatConducted and naatResult live only on the tablet: the server's
+            // tb_suspected has no columns for them, so they are dropped on upload and come back
+            // false/null in the next changes-feed page. Re-deriving them here then looked like a
+            // change every time, so the record was marked UNSYNCED, uploaded, pulled back without
+            // them and marked again. Keep them locally, but only queue an upload when a field the
+            // server stores has changed.
+            if (existing != null &&
+                provisionalCache.withoutTabletOnlyFields() == existing.withoutTabletOnlyFields()
+            ) {
+                saveTBSuspected(provisionalCache.copy(syncState = existing.syncState))
+                return@withBenIdLock
+            }
+
             saveTBSuspected(provisionalCache.copy(syncState = SyncState.UNSYNCED))
             }
         } catch (e: Exception) {
