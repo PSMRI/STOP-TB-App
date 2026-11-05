@@ -744,6 +744,11 @@ class CounsellingRepo @Inject constructor(
                 val draftResponse = counsellingRepository.getOrCreateDraft(benId, versionId)
                 val responseId = draftResponse.formResponse.responseId
 
+                // Consent is locked; don't save or re-submit General Info to backend.
+                if (draftResponse.formResponse.status in setOf("SUBMITTED", "COMPLETE", "COMPLETED")) {
+                    return@withContext null
+                }
+
                 val answers = mutableListOf<QuestionResponseEntity>()
                 section.questions.filter { it.visible }.forEach { q ->
                     val valObj = q.value

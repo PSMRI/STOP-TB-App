@@ -172,7 +172,9 @@ class CounsellingActivity : AppCompatActivity() {
         }
 
         val overviewData = (viewModel.overview.value as? NetworkResponse.Success)?.data
-        val formFullySubmitted = overviewData?.status in setOf("COMPLETE", "COMPLETED")
+        // Consent locks once Sections A–E are submitted (status SUBMITTED), not only after follow-up.
+        val formFullySubmitted = overviewData?.status in setOf("SUBMITTED", "COMPLETE", "COMPLETED") ||
+                overviewData?.preSubmitSubmitted == true
         val isEditable = !formFullySubmitted
 //        binding.etCounsellingDate.isEnabled = isEditable
 

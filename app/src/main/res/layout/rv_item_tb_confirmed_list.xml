@@ -321,6 +321,18 @@
                     android:layout_marginBottom="@dimen/margin_normal"
                     app:layout_constraintTop_toBottomOf="@id/linear_tb_suspected_list_Layout" />
 
+                <TextView
+                    android:id="@+id/tv_counselling_sections_completed"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="@dimen/padding_normal"
+                    android:layout_marginBottom="@dimen/margin_normal"
+                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                    android:textColor="?attr/colorOnPrimary"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@id/counselling_section_progress"
+                    tools:text="2 of 5 sections completed" />
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_counselling"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
@@ -334,7 +346,7 @@
                     android:backgroundTint="@android:color/holo_green_dark"
                     app:layout_constraintBottom_toTopOf="@id/btn_contact_tracing"
                     app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toBottomOf="@id/counselling_section_progress" />
+                    app:layout_constraintTop_toBottomOf="@id/tv_counselling_sections_completed" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_counselled"
@@ -349,7 +361,7 @@
                     android:backgroundTint="@android:color/holo_green_dark"
                     app:layout_constraintBottom_toTopOf="@id/btn_contact_tracing"
                     app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toBottomOf="@id/counselling_section_progress" />
+                    app:layout_constraintTop_toBottomOf="@id/tv_counselling_sections_completed" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/iv_view_member"
@@ -364,7 +376,7 @@
                     android:layout_gravity="center_vertical|end"
                     app:layout_constraintBottom_toTopOf="@id/btn_contact_tracing"
                     app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintTop_toBottomOf="@id/counselling_section_progress"
+                    app:layout_constraintTop_toBottomOf="@id/tv_counselling_sections_completed"
                     android:onClick="@{()->clickListener.onClickViewMember(benWithTb)}"
                     android:textColor="?attr/colorOnPrimary"
                     android:backgroundTint="@android:color/holo_green_dark"
@@ -381,7 +393,7 @@
                     android:textColor="?attr/colorOnPrimary"
                     app:layout_constraintBottom_toTopOf="@id/btn_contact_tracing"
                     app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintTop_toBottomOf="@id/counselling_section_progress"
+                    app:layout_constraintTop_toBottomOf="@id/tv_counselling_sections_completed"
                     tools:backgroundTint="@android:color/holo_red_dark" />
 
                 <com.google.android.material.button.MaterialButton
