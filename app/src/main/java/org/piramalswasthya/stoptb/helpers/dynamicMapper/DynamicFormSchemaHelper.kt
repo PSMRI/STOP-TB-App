@@ -10,9 +10,21 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.OptionConditionEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionOptionEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionValidationEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.SectionQuestionEntity
+import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
 import timber.log.Timber
 
 enum class QuestionIdStrategy { HASH_BASED, RAW_SERVER_ID }
+
+// Forms whose versions are stored side by side (see FormSchemaDto.versions). Their versions share
+// questionUuids, so HASH_BASED ids get a version prefix from version 2 on; otherwise V1 and V2 would
+// share one question row and its options would be both versions' options combined. Version 1 keeps
+// the plain ids, so rows and answers already saved against it stay valid.
+val VERSION_SCOPED_ID_FORMS = setOf(FormType.CONTACT_FOLLOW_UP.name, FormType.TPT_FOLLOW_UP.name)
+
+private fun hashIdPrefix(apiSchema: FormSchemaDto): String =
+    if (apiSchema.formType in VERSION_SCOPED_ID_FORMS && apiSchema.versionNumber > 1) {
+        "v${apiSchema.versionNumber}|"
+    } else ""
 
 /**
  * Shared schema-seeding helper for every dynamic form module (Counselling, Contact Tracing, ...):
@@ -29,6 +41,8 @@ suspend fun storeFormSchemaInDb(
 ) {
     val formId = apiSchema.formId.toIntOrNull() ?: 0
     val formUuid = apiSchema.formUuid ?: "FORM_$formId"
+    val idPrefix = hashIdPrefix(apiSchema)
+    fun hashId(key: String): Int = (idPrefix + key).hashCode()
     Timber.d("storeFormSchemaInDb: Inserting formId=$formId, formUuid=$formUuid, formName=${apiSchema.formName}, strategy=$idStrategy")
 
     if (wipeExistingVersions) {
@@ -89,7 +103,7 @@ suspend fun storeFormSchemaInDb(
 
         sectionDto.questions.forEach { questionDto ->
             val questionIdInt = when (idStrategy) {
-                QuestionIdStrategy.HASH_BASED -> questionDto.fieldId.hashCode()
+                QuestionIdStrategy.HASH_BASED -> hashId(questionDto.fieldId)
                 QuestionIdStrategy.RAW_SERVER_ID -> questionDto.questionId
                     ?: error("RAW_SERVER_ID strategy requires questionId, missing for fieldId=${questionDto.fieldId}")
             }
@@ -105,6 +119,8 @@ suspend fun storeFormSchemaInDb(
                     questionUuid = questionDto.fieldId,
                     serverQuestionId = questionDto.questionId,
                     visibleByDefault = questionDto.visibleByDefault,
+                    requiresBackFill = questionDto.requiresBackFill,
+                    editableAfterSubmit = questionDto.editableAfterSubmit,
                     enabledIfJson = questionDto.enabledIf?.let { gson.toJson(it) },
                     disabledIfJson = questionDto.disabledIf?.let { gson.toJson(it) },
                     mandatoryIfJson = questionDto.mandatoryIf?.let { gson.toJson(it) }
@@ -113,7 +129,7 @@ suspend fun storeFormSchemaInDb(
 
             questionDto.getOptionItems().forEach { optionDto ->
                 val optionIdInt = when (idStrategy) {
-                    QuestionIdStrategy.HASH_BASED -> (questionDto.fieldId + "_" + optionDto.optionValue).hashCode()
+                    QuestionIdStrategy.HASH_BASED -> hashId(questionDto.fieldId + "_" + optionDto.optionValue)
                     QuestionIdStrategy.RAW_SERVER_ID -> optionDto.optionId
                 }
                 optionsToInsert.add(
@@ -124,7 +140,8 @@ suspend fun storeFormSchemaInDb(
                         optionTextHindi = optionDto.optionLabelHindi,
                         optionValue = optionDto.optionValue,
                         optionOrder = optionDto.displayOrder,
-                        serverOptionId = optionDto.optionId
+                        serverOptionId = optionDto.optionId,
+                        optionUuid = optionDto.optionUuid
                     )
                 )
 
@@ -132,8 +149,8 @@ suspend fun storeFormSchemaInDb(
                     val resolvedTargetQuestionId = when (idStrategy) {
                         QuestionIdStrategy.HASH_BASED -> {
                             val targetQId = conditionDto.targetQuestionId ?: return@conditionLoop
-                            conditionDto.targetQuestionUuid?.hashCode()
-                                ?: questionIdToFieldIdMap[targetQId]?.hashCode()
+                            conditionDto.targetQuestionUuid?.let { hashId(it) }
+                                ?: questionIdToFieldIdMap[targetQId]?.let { hashId(it) }
                                 ?: run {
                                     Timber.w("storeFormSchemaInDb: cannot map targetQId=$targetQId for option ${optionDto.optionValue}, skipping condition")
                                     return@conditionLoop
@@ -143,7 +160,7 @@ suspend fun storeFormSchemaInDb(
                     }
                     val conditionIdInt = when (idStrategy) {
                         QuestionIdStrategy.HASH_BASED ->
-                            (questionDto.fieldId + "_" + optionDto.optionValue + "_" + (conditionDto.targetQuestionId ?: 0)).hashCode()
+                            hashId(questionDto.fieldId + "_" + optionDto.optionValue + "_" + (conditionDto.targetQuestionId ?: 0))
                         QuestionIdStrategy.RAW_SERVER_ID -> conditionDto.conditionId
                     }
                     conditionsToInsert.add(
@@ -161,16 +178,14 @@ suspend fun storeFormSchemaInDb(
                 }
             }
 
-
-            // Helper-text bullets display in server validationId order, so number them in that order rather than
-            // trusting the response list order (sortedBy is stable for equal ids).
-            val rowsSeenPerType = mutableMapOf<String, Int>()
-            questionDto.validations.sortedBy { validationDto -> validationDto.validationId }.forEach { validationDto ->
-                val indexWithinType = rowsSeenPerType.getOrDefault(validationDto.validationType, 0)
-                rowsSeenPerType[validationDto.validationType] = indexWithinType + 1
+            val helperIndexByPosition = QuestionHelperText.helperRowIndexes(questionDto.validations) { validationDto ->
+                validationDto.validationType to validationDto.validationId
+            }
+            questionDto.validations.forEachIndexed { position, validationDto ->
+                val indexWithinType = helperIndexByPosition[position] ?: 0
                 val validationIdInt = when (idStrategy) {
                     QuestionIdStrategy.HASH_BASED -> QuestionHelperText.hashValidationId(
-                        questionDto.fieldId, validationDto.validationType, indexWithinType
+                        idPrefix + questionDto.fieldId, validationDto.validationType, indexWithinType
                     )
                     QuestionIdStrategy.RAW_SERVER_ID -> validationDto.validationId
                         ?: (questionIdInt * 100 + validationsToInsert.size)

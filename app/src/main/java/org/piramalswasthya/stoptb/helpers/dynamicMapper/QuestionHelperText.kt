@@ -24,6 +24,22 @@ object QuestionHelperText {
     fun hashValidationId(fieldId: String, validationType: String, indexWithinType: Int): Int =
         baseHash(fieldId, validationType) + indexWithinType
 
+    fun isHelperText(validationType: String): Boolean =
+        validationType == HELPER_TEXT_ENGLISH || validationType == HELPER_TEXT_HINDI
+
+    fun <T> helperRowIndexes(rows: List<T>, typeAndId: (T) -> Pair<String, Int>): Map<Int, Int> {
+        val indexByPosition = mutableMapOf<Int, Int>()
+        rows.withIndex()
+            .filter { indexedRow -> isHelperText(typeAndId(indexedRow.value).first) }
+            .groupBy { indexedRow -> typeAndId(indexedRow.value).first }
+            .values
+            .forEach { sameTypeRows ->
+                sameTypeRows.sortedBy { indexedRow -> typeAndId(indexedRow.value).second }
+                    .forEachIndexed { rank, indexedRow -> indexByPosition[indexedRow.index] = rank }
+            }
+        return indexByPosition
+    }
+
     /** Inverse of [hashValidationId]; Int arithmetic wraps both ways, so this is exact near Int.MAX_VALUE. */
     internal fun positionWithinType(validationId: Int, baseHash: Int): Int = validationId - baseHash
 

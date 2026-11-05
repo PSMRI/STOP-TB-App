@@ -69,6 +69,18 @@ interface BenDao {
     @Query("UPDATE BENEFICIARY SET nikshayId = :nikshayId WHERE beneficiaryId = :benId")
     suspend fun updateNikshayId(benId: Long, nikshayId: String)
 
+    @Query("UPDATE BENEFICIARY SET loc_village_id = :villageId, loc_village_name = :villageName, loc_village_nameHindi = :villageNameHindi, loc_village_nameAssamese = :villageNameAssamese, pinCode = :pinCode, residentialAreaId = :residentialAreaId, residentialArea = :residentialArea WHERE householdId = :householdId")
+    suspend fun updateVillageOfHouseholdMembers(
+        householdId: Long,
+        villageId: Int,
+        villageName: String,
+        villageNameHindi: String?,
+        villageNameAssamese: String?,
+        pinCode: String?,
+        residentialAreaId: Int,
+        residentialArea: String?
+    )
+
     @Query("UPDATE  BENEFICIARY SET syncState = :unsynced ,processed = :proccess , serverUpdatedStatus =:updateStatus WHERE householdId = :householdId")
     suspend fun updateBenToSync(
         householdId: Long,
@@ -375,6 +387,19 @@ interface BenDao {
                         OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
                         OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
                   )
+            ) AND NOT EXISTS (
+                -- TPT is for household contacts only: exclude the confirmed TB patient(s) themselves
+                SELECT 1
+                FROM BEN_BASIC_CACHE b3
+                LEFT JOIN TB_SUSPECTED ts ON b3.benId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON b3.benId = td.benId
+                WHERE b3.benId = BEN_BASIC_CACHE.benId
+                  AND (
+                        ts.isTbConfirmed = 1
+                        OR td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
             ))
             OR (:source = 10 AND isDeath = 0 AND benId IN (
                 -- TB_SUSPECTED has no RIF field of its own (mdrRifResult is only ever mirrored
@@ -536,6 +561,19 @@ interface BenDao {
                 WHERE b2.hhId = BEN_BASIC_CACHE.hhId
                   AND b2.isDeactivate = 0
                   AND b2.isDeath = 0
+                  AND (
+                        ts.isTbConfirmed = 1
+                        OR td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
+            ) AND NOT EXISTS (
+                -- TPT is for household contacts only: exclude the confirmed TB patient(s) themselves
+                SELECT 1
+                FROM BEN_BASIC_CACHE b3
+                LEFT JOIN TB_SUSPECTED ts ON b3.benId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON b3.benId = td.benId
+                WHERE b3.benId = BEN_BASIC_CACHE.benId
                   AND (
                         ts.isTbConfirmed = 1
                         OR td.isTbConfirmed = 1
@@ -828,6 +866,19 @@ interface BenDao {
                 WHERE b2.hhId = BEN_BASIC_CACHE.hhId
                   AND b2.isDeactivate = 0
                   AND b2.isDeath = 0
+                  AND (
+                        ts.isTbConfirmed = 1
+                        OR td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
+            ) AND NOT EXISTS (
+                -- TPT is for household contacts only: exclude the confirmed TB patient(s) themselves
+                SELECT 1
+                FROM BEN_BASIC_CACHE b3
+                LEFT JOIN TB_SUSPECTED ts ON b3.benId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON b3.benId = td.benId
+                WHERE b3.benId = BEN_BASIC_CACHE.benId
                   AND (
                         ts.isTbConfirmed = 1
                         OR td.isTbConfirmed = 1

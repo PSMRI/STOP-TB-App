@@ -33,6 +33,8 @@ data class SectionQuestionEntity(
     val allowMultiple: Boolean = false,
     val containsPii: Boolean = false,
     val visibleByDefault: Boolean = true,
+    val requiresBackFill: Boolean = false,
+    val editableAfterSubmit: Boolean = false,
     val maxLength: Int? = null,
     val enabledIfJson: String? = null,
     val disabledIfJson: String? = null,

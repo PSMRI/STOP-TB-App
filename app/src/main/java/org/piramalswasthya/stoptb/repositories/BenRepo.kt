@@ -109,6 +109,36 @@ class BenRepo @Inject constructor(
         }
     }
 
+    /**
+     * Gives every member of a household the household's [village], [pinCode] and Residential Area, and
+     * marks them UNSYNCED, in one transaction. The pull only overwrites SYNCED
+     * members, so the writes must commit together: a pull landing between them would put the old
+     * village back and the sync-state update would then push it.
+     */
+    suspend fun applyHouseholdLocationToMembers(
+        householdId: Long,
+        village: LocationEntity,
+        pinCode: String?,
+        residentialAreaId: Int,
+        residentialArea: String?
+    ) {
+        withContext(Dispatchers.IO) {
+            db.withTransaction {
+                benDao.updateVillageOfHouseholdMembers(
+                    householdId = householdId,
+                    villageId = village.id,
+                    villageName = village.name,
+                    villageNameHindi = village.nameHindi,
+                    villageNameAssamese = village.nameAssamese,
+                    pinCode = pinCode,
+                    residentialAreaId = residentialAreaId,
+                    residentialArea = residentialArea
+                )
+                benDao.updateBenToSync(householdId = householdId, SyncState.UNSYNCED, "U", 2)
+            }
+        }
+    }
+
     suspend fun updateHousehold(householdId: Long, unsynced: SyncState) {
         withContext(Dispatchers.IO) {
             benDao.updateHofSpouseAdded(householdId = householdId,unsynced,"U",2)
@@ -2168,6 +2198,7 @@ class BenRepo @Inject constructor(
 
                     val benGpsLatitude = demographicsObj.optDoubleOrNull("latitude")
                         ?: demographicsObj.optDoubleOrNull("gpsLatitude")
+                        // Server sends beneficiaryDetails.latitude (FLW-API BeneficiaryServiceImpl).
                         ?: benDataObj.optDoubleOrNull("latitude")
                         ?: benDataObj.optDoubleOrNull("gpsLatitude")
                         ?: jsonObject.optDoubleOrNull("latitude")
@@ -2756,7 +2787,9 @@ class BenRepo @Inject constructor(
                                 povertyLine = houseDataObj.optStringOrNull("type_bpl_apl"),
                                 povertyLineId = houseDataObj.optInt("bpl_aplId"),
                                 address = houseDataObj.optStringOrNull("address"),
-                             //   pinCode = houseDataObj.optInt("Pincode").takeIf { it > 0 }?.toString(),
+                                // Server field is "pincode" (FLW-API RMNCHHouseHoldDetails); 0 = not captured
+                                pinCode = (houseDataObj.optInt("pincode").takeIf { it > 0 }
+                                    ?: houseDataObj.optInt("Pincode").takeIf { it > 0 })?.toString(),
                             ),
                             details = HouseholdDetails(
                                 residentialArea = houseDataObj.optStringOrNull("residentialArea"),

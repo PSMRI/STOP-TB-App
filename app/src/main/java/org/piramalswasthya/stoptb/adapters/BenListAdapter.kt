@@ -40,12 +40,14 @@ import org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields
 import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
 import org.piramalswasthya.stoptb.ui.setSyncStateForBen
 import timber.log.Timber
+import org.piramalswasthya.stoptb.model.DiagnosticOrderType
+import org.piramalswasthya.stoptb.model.OrderAction
 
 data class ButtonConfig(
     val text: String,
     val colorRes: Int,
-    val action: String,
-    val type: String
+    val action: OrderAction,
+    val type: DiagnosticOrderType?
 )
 
 private fun String?.isMissingOrderId(): Boolean =
@@ -182,7 +184,7 @@ class BenListAdapter(
             status: String?,
             orderId: String?,
             benId: Long,
-            testType: String,
+            testType: DiagnosticOrderType,
             pref: PreferenceDao?,
             isPendingManualResultSync: Boolean,
             pillContainer: View,
@@ -249,7 +251,7 @@ class BenListAdapter(
                         pillText.text = ctx.getString(R.string.order_status_fetching_from_device)
                         pillText.setTextColor(ContextCompat.getColor(ctx, android.R.color.holo_orange_dark))
 
-                        val lastChecked = pref?.getLastCheckedTime(benId, testType) ?: 0L
+                        val lastChecked = pref?.getLastCheckedTime(benId, testType.wireValue) ?: 0L
                         if (lastChecked > 0L) {
                             statusDivider.visibility = View.VISIBLE
                             lastCheckedCaption.visibility = View.VISIBLE
@@ -312,7 +314,7 @@ class BenListAdapter(
                 tbDiag?.rifManualResultPendingSync == true -> {
                     binding.tvRifOrderStatus.visibility = View.GONE
                     bindPillAndCaptions(
-                        status, tbDiag?.rifOrderId, item.benId, "MDR_RIF", pref, true,
+                        status, tbDiag?.rifOrderId, item.benId, DiagnosticOrderType.MDR_RIF, pref, true,
                         binding.llRifOrderStatusPill, binding.ivRifOrderStatusPillIcon, binding.tvRifOrderStatusPillText,
                         binding.viewRifOrderStatusDivider, binding.tvRifLastCheckedCaption, binding.llRifPollingStoppedCaption,
                         binding.tvRifPollingStoppedCaptionTitle, binding.tvRifPollingStoppedCaptionText
@@ -330,7 +332,7 @@ class BenListAdapter(
                     binding.btnRifPrimary.isEnabled = enabled
                     binding.btnRifPrimary.alpha = if (enabled) 1.0f else 0.5f
                     binding.btnRifPrimary.setOnClickListener {
-                        clickListener?.onClickOrderAction(item, "RETRY_PUSH", "MDR_RIF")
+                        clickListener?.onClickOrderAction(item, OrderAction.RETRY_PUSH, DiagnosticOrderType.MDR_RIF)
                     }
                 }
                 status.equals(OrderStatus.COMPLETED.name, ignoreCase = true) -> {
@@ -339,7 +341,7 @@ class BenListAdapter(
                     val displayVal = standardized?.displayValue ?: tbDiag?.trueNatRifResult ?: "Available"
                     binding.tvRifSummaryText.text = "RIF Result: $displayVal"
                     binding.btnViewRifResult.setOnClickListener {
-                        clickListener?.onClickOrderAction(item, "VIEW_RIF", "MDR_RIF")
+                        clickListener?.onClickOrderAction(item, OrderAction.VIEW_RIF, DiagnosticOrderType.MDR_RIF)
                     }
                 }
                 status.equals(OrderStatus.CLOSED.name, ignoreCase = true) -> {
@@ -357,7 +359,7 @@ class BenListAdapter(
                     binding.btnRifPrimary.isEnabled = reorderEnabled
                     binding.btnRifPrimary.alpha = if (reorderEnabled) 1.0f else 0.5f
                     binding.btnRifPrimary.setOnClickListener {
-                        clickListener?.onClickOrderAction(item, "REORDER", "MDR_RIF")
+                        clickListener?.onClickOrderAction(item, OrderAction.REORDER, DiagnosticOrderType.MDR_RIF)
                     }
                 }
                 // A missing order id on its own does NOT mean the referral failed. Every
@@ -374,7 +376,7 @@ class BenListAdapter(
                 // case left for retry is the one with no backend evidence at all: no status and
                 // no id, i.e. a referral this device never managed to push.
                 status.isNullOrBlank() && tbDiag?.rifOrderId.isMissingOrderId() -> {
-                    clickListener?.onClickOrderAction(item, "CHECK_PUSH_ACTIVE", "MDR_RIF")
+                    clickListener?.onClickOrderAction(item, OrderAction.CHECK_PUSH_ACTIVE, DiagnosticOrderType.MDR_RIF)
                     if (!tbDiag?.errorMsgRif.isNullOrBlank()) {
                         binding.tvRifErrorMsg.visibility = View.VISIBLE
                         binding.tvRifErrorMsg.text = ctx.getString(R.string.error_message) + tbDiag?.errorMsgRif
@@ -386,13 +388,13 @@ class BenListAdapter(
                     binding.btnRifPrimary.isEnabled = enabled
                     binding.btnRifPrimary.alpha = if (enabled) 1.0f else 0.5f
                     binding.btnRifPrimary.setOnClickListener {
-                        clickListener?.onClickOrderAction(item, "RETRY_PUSH", "MDR_RIF")
+                        clickListener?.onClickOrderAction(item, OrderAction.RETRY_PUSH, DiagnosticOrderType.MDR_RIF)
                     }
                 }
                 else -> {
                     binding.tvRifOrderStatus.visibility = View.GONE
                     bindPillAndCaptions(
-                        status, tbDiag?.rifOrderId, item.benId, "MDR_RIF", pref, tbDiag?.rifManualResultPendingSync == true,
+                        status, tbDiag?.rifOrderId, item.benId, DiagnosticOrderType.MDR_RIF, pref, tbDiag?.rifManualResultPendingSync == true,
                         binding.llRifOrderStatusPill, binding.ivRifOrderStatusPillIcon, binding.tvRifOrderStatusPillText,
                         binding.viewRifOrderStatusDivider, binding.tvRifLastCheckedCaption, binding.llRifPollingStoppedCaption,
                         binding.tvRifPollingStoppedCaptionTitle, binding.tvRifPollingStoppedCaptionText
@@ -406,7 +408,7 @@ class BenListAdapter(
                     binding.btnRifPrimary.isEnabled = canActOnReferral
                     binding.btnRifPrimary.alpha = if (canActOnReferral) 1.0f else 0.5f
                     binding.btnRifPrimary.setOnClickListener {
-                        clickListener?.onClickOrderAction(item, "COMPLETE_RIF", "MDR_RIF")
+                        clickListener?.onClickOrderAction(item, OrderAction.COMPLETE_RIF, DiagnosticOrderType.MDR_RIF)
                     }
 
                     binding.btnRifSecondary.visibility = View.VISIBLE
@@ -417,7 +419,7 @@ class BenListAdapter(
                     binding.btnRifSecondary.isEnabled = canActOnReferral
                     binding.btnRifSecondary.alpha = if (canActOnReferral) 1.0f else 0.5f
                     binding.btnRifSecondary.setOnClickListener {
-                        clickListener?.onClickOrderAction(item, "NOT_CONDUCTED", "MDR_RIF")
+                        clickListener?.onClickOrderAction(item, OrderAction.NOT_CONDUCTED, DiagnosticOrderType.MDR_RIF)
                     }
                 }
             }
@@ -443,7 +445,7 @@ class BenListAdapter(
                 6 -> {
                     val status = tbDiag?.xrayOrderStatus
                     bindPillAndCaptions(
-                        status, tbDiag?.xrayOrderId, item.benId, "XRAY_CHEST", pref, tbDiag?.xrayManualResultPendingSync == true,
+                        status, tbDiag?.xrayOrderId, item.benId, DiagnosticOrderType.XRAY_CHEST, pref, tbDiag?.xrayManualResultPendingSync == true,
                         binding.llOrderStatusPill, binding.ivOrderStatusPillIcon, binding.tvOrderStatusPillText,
                         binding.viewOrderStatusDivider, binding.tvLastCheckedCaption, binding.llPollingStoppedCaption,
                         binding.tvPollingStoppedCaptionTitle, binding.tvPollingStoppedCaptionText
@@ -457,11 +459,11 @@ class BenListAdapter(
                         binding.llMtbSummaryStrip.visibility = View.VISIBLE
                         binding.tvMtbSummaryText.text = "MTB Test Completed"
                         binding.btnViewMtbResult.setOnClickListener {
-                            clickListener?.onClickOrderAction(item, "VIEW", "SPUTUM_TRUENAT")
+                            clickListener?.onClickOrderAction(item, OrderAction.VIEW, DiagnosticOrderType.SPUTUM_TRUENAT)
                         }
                     } else {
                         bindPillAndCaptions(
-                            status, tbDiag?.trueNatOrderId, item.benId, "SPUTUM_TRUENAT", pref, isPendingTrueNatSync,
+                            status, tbDiag?.trueNatOrderId, item.benId, DiagnosticOrderType.SPUTUM_TRUENAT, pref, isPendingTrueNatSync,
                             binding.llOrderStatusPill, binding.ivOrderStatusPillIcon, binding.tvOrderStatusPillText,
                             binding.viewOrderStatusDivider, binding.tvLastCheckedCaption, binding.llPollingStoppedCaption,
                             binding.tvPollingStoppedCaptionTitle, binding.tvPollingStoppedCaptionText
@@ -504,6 +506,7 @@ class BenListAdapter(
             tptFollowUpDoneBenIds: List<Long> = emptyList(),
             tptEligibleBenIds: List<Long> = emptyList(),
             childCountMap: Map<Long, Int> = emptyMap(),
+            tptRegistrationDoneBenIds: List<Long> = emptyList(),
             showActionButtons: Boolean = true,
             showResultButton: Boolean = false,
             showAnthropometryButton: Boolean = false,
@@ -573,6 +576,7 @@ class BenListAdapter(
             val hasDiagnosis = tbSuspectedBenIds.contains(item.benId)
             val hasContactFollowUpDone = contactFollowUpDoneBenIds.contains(item.benId)
             val hasTptFollowUpDone = tptFollowUpDoneBenIds.contains(item.benId)
+            val hasTptRegistrationDone = tptRegistrationDoneBenIds.contains(item.benId)
             val isTptEligible = tptEligibleBenIds.contains(item.benId)
             binding.isGeneralOpdDone = hasGeneralOpd
             binding.isAnthropometryDone = hasAnthropometry
@@ -787,28 +791,28 @@ class BenListAdapter(
                                 // CHECK_PUSH_ACTIVE and offers an action that raises a second
                                 // order for a referral that already succeeded.
                                 tbDiag == null && !tbDiagnosticsLoaded -> {
-                                    ButtonConfig(context.getString(R.string.order_status_checking), android.R.color.darker_gray, "NONE", "XRAY_CHEST")
+                                    ButtonConfig(context.getString(R.string.order_status_checking), android.R.color.darker_gray, OrderAction.NONE, DiagnosticOrderType.XRAY_CHEST)
                                 }
                                 referred == false -> {
-                                    ButtonConfig("TEST REFUSED", android.R.color.darker_gray, "NONE", "XRAY_CHEST")
+                                    ButtonConfig("TEST REFUSED", android.R.color.darker_gray, OrderAction.NONE, DiagnosticOrderType.XRAY_CHEST)
                                 }
                                 status.equals(OrderStatus.FAILED.name, ignoreCase = true) -> {
                                     bindErrorMsg(tbDiag?.errorMsgXray)
-                                    ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, "RETRY_PUSH", "XRAY_CHEST")
+                                    ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, OrderAction.RETRY_PUSH, DiagnosticOrderType.XRAY_CHEST)
                                 }
                                 status.equals(OrderStatus.COMPLETED.name, ignoreCase = true) -> {
-                                    ButtonConfig("VIEW RESULT", android.R.color.holo_green_dark, "VIEW", "XRAY_CHEST")
+                                    ButtonConfig("VIEW RESULT", android.R.color.holo_green_dark, OrderAction.VIEW, DiagnosticOrderType.XRAY_CHEST)
                                 }
                                 status.equals(OrderStatus.CLOSED.name, ignoreCase = true) -> {
-                                    ButtonConfig("Create New X-Ray Order", android.R.color.holo_blue_dark, "REORDER", "XRAY_CHEST")
+                                    ButtonConfig("Create New X-Ray Order", android.R.color.holo_blue_dark, OrderAction.REORDER, DiagnosticOrderType.XRAY_CHEST)
                                 }
                                 // See the note in bindRifBlock: a backend-reported status means
                                 // the order exists, so a missing local id is "not fetched yet",
                                 // not "referral failed".
                                 status.isNullOrBlank() && tbDiag?.xrayOrderId.isMissingOrderId() -> {
-                                    clickListener?.onClickOrderAction(item, "CHECK_PUSH_ACTIVE", "XRAY_CHEST")
+                                    clickListener?.onClickOrderAction(item, OrderAction.CHECK_PUSH_ACTIVE, DiagnosticOrderType.XRAY_CHEST)
                                     bindErrorMsg(tbDiag?.errorMsgXray)
-                                    ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, "RETRY_PUSH", "XRAY_CHEST")
+                                    ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, OrderAction.RETRY_PUSH, DiagnosticOrderType.XRAY_CHEST)
                                 }
                                 else -> {
                                     binding.btnVitalScreenSecondary.visibility = View.VISIBLE
@@ -821,9 +825,9 @@ class BenListAdapter(
                                     binding.btnVitalScreenSecondary.icon = ContextCompat.getDrawable(binding.root.context, R.drawable.ic_block)
                                     binding.btnVitalScreenSecondary.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
                                     binding.btnVitalScreenSecondary.setOnClickListener {
-                                        clickListener?.onClickOrderAction(item, "NOT_CONDUCTED", "XRAY_CHEST")
+                                        clickListener?.onClickOrderAction(item, OrderAction.NOT_CONDUCTED, DiagnosticOrderType.XRAY_CHEST)
                                     }
-                                    ButtonConfig(context.getString(R.string.order_status_enter_result), android.R.color.holo_red_dark, "COMPLETE", "XRAY_CHEST")
+                                    ButtonConfig(context.getString(R.string.order_status_enter_result), android.R.color.holo_red_dark, OrderAction.COMPLETE, DiagnosticOrderType.XRAY_CHEST)
                                 }
                             }
                         }
@@ -843,32 +847,32 @@ class BenListAdapter(
                                 // CHECK_PUSH_ACTIVE and offers an action that raises a second
                                 // order for a referral that already succeeded.
                                 tbDiag == null && !tbDiagnosticsLoaded -> {
-                                    ButtonConfig(context.getString(R.string.order_status_checking), android.R.color.darker_gray, "NONE", "SPUTUM_TRUENAT")
+                                    ButtonConfig(context.getString(R.string.order_status_checking), android.R.color.darker_gray, OrderAction.NONE, DiagnosticOrderType.SPUTUM_TRUENAT)
                                 }
                                 referredForSputum == false -> {
-                                    ButtonConfig("TEST REFUSED", android.R.color.darker_gray, "NONE", "SPUTUM_TRUENAT")
+                                    ButtonConfig("TEST REFUSED", android.R.color.darker_gray, OrderAction.NONE, DiagnosticOrderType.SPUTUM_TRUENAT)
                                 }
                                 status.equals(OrderStatus.FAILED.name, ignoreCase = true) -> {
                                     bindErrorMsg(tbDiag?.errorMsgTrueNat)
-                                    ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, "RETRY_PUSH", "SPUTUM_TRUENAT")
+                                    ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, OrderAction.RETRY_PUSH, DiagnosticOrderType.SPUTUM_TRUENAT)
                                 }
                                 status.equals(OrderStatus.COMPLETED.name, ignoreCase = true) -> {
                                     // Collapses to the compact one-line summary strip (bound
                                     // below) — deliberately quiet, no pill, no full-size button,
                                     // so it doesn't compete with the RIF block once RIF is active.
                                     binding.btnVitalScreen.visibility = View.GONE
-                                    ButtonConfig("", android.R.color.holo_green_dark, "NONE", "SPUTUM_TRUENAT")
+                                    ButtonConfig("", android.R.color.holo_green_dark, OrderAction.NONE, DiagnosticOrderType.SPUTUM_TRUENAT)
                                 }
                                 status.equals(OrderStatus.CLOSED.name, ignoreCase = true) -> {
-                                    ButtonConfig("Create New Order", android.R.color.holo_blue_dark, "REORDER", "SPUTUM_TRUENAT")
+                                    ButtonConfig("Create New Order", android.R.color.holo_blue_dark, OrderAction.REORDER, DiagnosticOrderType.SPUTUM_TRUENAT)
                                 }
                                 // See the note in bindRifBlock: a backend-reported status means
                                 // the order exists, so a missing local id is "not fetched yet",
                                 // not "referral failed".
                                 status.isNullOrBlank() && tbDiag?.trueNatOrderId.isMissingOrderId() -> {
-                                    clickListener?.onClickOrderAction(item, "CHECK_PUSH_ACTIVE", "SPUTUM_TRUENAT")
+                                    clickListener?.onClickOrderAction(item, OrderAction.CHECK_PUSH_ACTIVE, DiagnosticOrderType.SPUTUM_TRUENAT)
                                     bindErrorMsg(tbDiag?.errorMsgTrueNat)
-                                    ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, "RETRY_PUSH", "SPUTUM_TRUENAT")
+                                    ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, OrderAction.RETRY_PUSH, DiagnosticOrderType.SPUTUM_TRUENAT)
                                 }
                                 else -> {
                                     // PENDING / MANUAL_ENTRY (or no order status yet) —
@@ -882,9 +886,9 @@ class BenListAdapter(
                                     binding.btnVitalScreenSecondary.alpha = if (canActOnReferral) 1.0f else 0.5f
                                     binding.btnVitalScreenSecondary.icon = ContextCompat.getDrawable(binding.root.context, R.drawable.ic_block)
                                     binding.btnVitalScreenSecondary.setOnClickListener {
-                                        clickListener?.onClickOrderAction(item, "NOT_CONDUCTED", "SPUTUM_TRUENAT")
+                                        clickListener?.onClickOrderAction(item, OrderAction.NOT_CONDUCTED, DiagnosticOrderType.SPUTUM_TRUENAT)
                                     }
-                                    ButtonConfig(context.getString(R.string.order_status_enter_result), android.R.color.holo_red_dark, "COMPLETE", "SPUTUM_TRUENAT")
+                                    ButtonConfig(context.getString(R.string.order_status_enter_result), android.R.color.holo_red_dark, OrderAction.COMPLETE, DiagnosticOrderType.SPUTUM_TRUENAT)
                                 }
                             }
                         }
@@ -893,12 +897,12 @@ class BenListAdapter(
                             // aren't meant to be re-edited from here, so no "/EDIT" in the label.
                             val hasLc = !tbDiag?.liquidCultureResult.isNullOrBlank()
                             if (hasLc) {
-                                ButtonConfig("VIEW RESULT", android.R.color.holo_green_dark, "VIEW_LC", "LIQUID_CULTURE")
+                                ButtonConfig("VIEW RESULT", android.R.color.holo_green_dark, OrderAction.VIEW_LC, DiagnosticOrderType.LIQUID_CULTURE)
                             } else {
-                                ButtonConfig("ENTER RESULT", android.R.color.holo_red_dark, "ENTER_LC", "LIQUID_CULTURE")
+                                ButtonConfig("ENTER RESULT", android.R.color.holo_red_dark, OrderAction.ENTER_LC, DiagnosticOrderType.LIQUID_CULTURE)
                             }
                         }
-                        else -> ButtonConfig("RESULT", android.R.color.holo_green_dark, "VIEW", "")
+                        else -> ButtonConfig("RESULT", android.R.color.holo_green_dark, OrderAction.VIEW, null)
                     }
 
                     binding.btnVitalScreen.text = config.text
@@ -909,8 +913,8 @@ class BenListAdapter(
                         ContextCompat.getColor(binding.root.context, android.R.color.white)
                     )
 
-                    val isViewAction = config.action == "VIEW" || config.action == "VIEW_LC" || config.action == "ENTER_LC"
-                    if (config.action == "POLL" || config.action == "NO_RESULT" || config.action == "NONE") {
+                    val isViewAction = config.action == OrderAction.VIEW || config.action == OrderAction.VIEW_LC || config.action == OrderAction.ENTER_LC
+                    if (config.action == OrderAction.POLL || config.action == OrderAction.NO_RESULT || config.action == OrderAction.NONE) {
                         binding.btnVitalScreen.isEnabled = false
                         binding.btnVitalScreen.alpha = 0.5f
                     } else if (!canActOnReferral && !isViewAction) {
@@ -921,7 +925,7 @@ class BenListAdapter(
                         binding.btnVitalScreen.alpha = 1.0f
                     }
 
-                    val isRetryPushInFlight = (config.action == "RETRY_PUSH" || config.action == "REORDER") &&
+                    val isRetryPushInFlight = (config.action == OrderAction.RETRY_PUSH || config.action == OrderAction.REORDER) &&
                             retryingBenIds.contains(item.benId)
                     if (isRetryPushInFlight) {
                         binding.btnVitalScreen.isEnabled = false
@@ -934,7 +938,7 @@ class BenListAdapter(
                         binding.btnVitalScreen.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
                     } else {
                         (binding.btnVitalScreen.icon as? androidx.swiperefreshlayout.widget.CircularProgressDrawable)?.stop()
-                        binding.btnVitalScreen.icon = if (config.action == "COMPLETE")
+                        binding.btnVitalScreen.icon = if (config.action == OrderAction.COMPLETE)
                             ContextCompat.getDrawable(binding.root.context, R.drawable.ic_pencil) else null
                         binding.btnVitalScreen.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
                     }
@@ -1146,9 +1150,10 @@ class BenListAdapter(
             // Registrar: Anthropometry + TB Screening
             // Nurse: Diagnosis hidden, so total stays 4
             // Counselling Officer: Anthropometry + TB Screening + Contact Follow Up are always required (total = 3);
-            // TPT Follow Up becomes a 4th required item (total = 4) only when this beneficiary's
-            // ClinicalScreeningStatus answer is TPT_ELIGIBLE (see IContactTracingRepository.observeTptEligibleBenIds) ?
-            // otherwise FULL_TREATMENT/NO_TREATMENT beneficiaries would incorrectly get stuck at x/4.
+            // Start TPT (TPT registration) and TPT Follow Up become the 4th and 5th required items (total = 5)
+            // only when this beneficiary's ClinicalScreeningStatus answer is TPT_ELIGIBLE (see
+            // IContactTracingRepository.observeTptEligibleBenIds) ? otherwise FULL_TREATMENT/NO_TREATMENT
+            // beneficiaries would incorrectly get stuck at x/5.
             // Others: all 5 forms
             // Legacy, kept for reference:
 //            val currentRole = pref?.getLoggedInUser()?.role
@@ -1208,7 +1213,7 @@ class BenListAdapter(
                 ExamineDenominatorRule.COUNSELLING_DYNAMIC -> {
                     if (showContactTracingForms) {
                         val requiredItems = if (isTptEligible) {
-                            listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone, hasTptFollowUpDone)
+                            listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone, hasTptRegistrationDone, hasTptFollowUpDone)
                         } else {
                             listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone)
                         }
@@ -1247,12 +1252,14 @@ class BenListAdapter(
             )
 
 
-            val isExamineFilled = examineFilledCount > 0
+            // Red → none filled, Orange → partially filled, Green → all filled
+            val examineTint = when {
+                examineFilledCount <= 0 -> android.R.color.holo_red_dark
+                examineFilledCount >= examineTotal -> android.R.color.holo_green_dark
+                else -> android.R.color.holo_orange_dark
+            }
             binding.btnExamine.setBackgroundTintList(
-                ContextCompat.getColorStateList(
-                    binding.root.context,
-                    if (isExamineFilled) android.R.color.holo_green_dark else android.R.color.holo_red_dark
-                )
+                ContextCompat.getColorStateList(binding.root.context, examineTint)
             )
             binding.btnExamine.setTextColor(
                 ContextCompat.getColor(binding.root.context, android.R.color.white)
@@ -1413,6 +1420,7 @@ class BenListAdapter(
     private val contactFollowUpDoneIds = mutableListOf<Long>()
     private val tptFollowUpDoneIds     = mutableListOf<Long>()
     private val tptEligibleIds         = mutableListOf<Long>()
+    private val tptRegistrationDoneIds = mutableListOf<Long>()
     private val tbDiagnosticsList = mutableListOf<TbDiagnosticsCardFields>()
 
     /**
@@ -1460,6 +1468,7 @@ class BenListAdapter(
             contactFollowUpDoneIds,
             tptFollowUpDoneIds,
             tptEligibleIds,
+            tptRegistrationDoneBenIds = tptRegistrationDoneIds,
             showActionButtons = showActionButtons,
             showResultButton = showResultButton,
             showAnthropometryButton = showAnthropometryButton,
@@ -1552,6 +1561,7 @@ class BenListAdapter(
     fun submitContactFollowUpDoneBenIds(list: List<Long>) = applyIdList(contactFollowUpDoneIds, list)
     fun submitTptFollowUpDoneBenIds(list: List<Long>)      = applyIdList(tptFollowUpDoneIds, list)
     fun submitTptEligibleBenIds(list: List<Long>)          = applyIdList(tptEligibleIds, list)
+    fun submitTptRegistrationDoneBenIds(list: List<Long>)  = applyIdList(tptRegistrationDoneIds, list)
 
     fun submitHouseholdMemberCounts(map: Map<Long, Int>) {
         val old = householdMemberCountMap.toMap()
@@ -1589,7 +1599,7 @@ class BenListAdapter(
         private val softDeleteBen: (ben: BenBasicDomain) -> Unit,
         private val clickedVitalScreen: (item: BenBasicDomain, benId: Long, hhId: Long) -> Unit = { _, _, _ -> },
         private val clickedResult: (item: BenBasicDomain, benId: Long, hhId: Long) -> Unit = { _, _, _ -> },
-        private val clickedOrderAction: (item: BenBasicDomain, action: String, orderType: String) -> Unit = { _, _, _ -> },
+        private val clickedOrderAction: (item: BenBasicDomain, action: OrderAction, orderType: DiagnosticOrderType?) -> Unit = { _, _, _ -> },
         private val clickedGeneralOpd: (item: BenBasicDomain, benId: Long, hhId: Long, viewOnly: Boolean) -> Unit = { _, _, _, _ -> },
         private val clickedAnthropometry: (item: BenBasicDomain, benId: Long, hhId: Long, viewOnly: Boolean) -> Unit = { _, _, _, _ -> },
         private val clickedExamine: (item: BenBasicDomain, benId: Long) -> Unit = { _, _ -> },
@@ -1634,7 +1644,7 @@ class BenListAdapter(
             clickedVitalScreen(item, item.benId, item.hhId)
         fun onClickResult(item: BenBasicDomain) =
             clickedResult(item, item.benId, item.hhId)
-        fun onClickOrderAction(item: BenBasicDomain, action: String, orderType: String) =
+        fun onClickOrderAction(item: BenBasicDomain, action: OrderAction, orderType: DiagnosticOrderType?) =
             clickedOrderAction(item, action, orderType)
         fun onClickGeneralOpd(item: BenBasicDomain, viewOnly: Boolean) =
             clickedGeneralOpd(item, item.benId, item.hhId, viewOnly)
