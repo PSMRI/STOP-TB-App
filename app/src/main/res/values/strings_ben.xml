@@ -123,7 +123,6 @@ personal health profile.</string>
         <item name="nbr_gender_1">Male</item>
         <item name="nbr_gender_2">Female</item>
         <item name="nbr_gender_3">Transgender</item>
-<!--        <item name="nbr_gender_4">Prefer not to say</item>-->
     </string-array>
 
     <string-array name="nbr_reproductive_status_array1">
