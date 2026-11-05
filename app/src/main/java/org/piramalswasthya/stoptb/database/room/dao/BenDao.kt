@@ -1768,22 +1768,22 @@ interface BenDao {
      * a different index chosen once the search term is non-empty, say - can silently hand the
      * adapter a row it has already shown or skip one it has not.
      *
-     * benId ASC is what the current plan already yields (verified identical, same rows in the
-     * same order, browsing and searching), so this pins today's behaviour rather than changing
-     * it. It is also free: beneficiaryId is the rowid and all three WHERE terms are equalities,
-     * so ind_ben_village_deactivate already returns rows in this order and no sort is added -
-     * measured at 25k rows, 0.34ms page 0 either way, with no temp B-tree in the plan.
+     * Recently created first, the same order as the All Beneficiaries list
+     * (searchBenPagedWithoutTbTables), so a worker finds the person they just registered at the
+     * top. benId DESC breaks ties so the order is total.
      *
-     * ASC specifically, not DESC. Pulled beneficiaries arrive with ascending ids, so ASC appends
-     * them past the pages already read while DESC would insert them at the front and shift every
-     * offset underneath the adapter: paging 40 pages while a pull committed 50 rows between each
-     * returned 390 duplicates under DESC and 0 under ASC.
+     * This replaces the earlier benId ASC order. benId is a server-assigned id, not a date, so
+     * ASC put new registrations at the bottom. ASC was chosen because rows inserted ahead of the
+     * pages already read shift the offsets under the adapter (a pull test showed duplicates under
+     * benId DESC). Pulled rows carry their server createdDate, so they mostly sort below the
+     * worker's recent registrations, and Room's PagingSource invalidates and reloads around the
+     * anchor on every table change, so this matches the trade-off All Beneficiaries already makes.
      */
     @Query("""
         SELECT * FROM BEN_BASIC_CACHE
         WHERE villageId = :selectedVillage AND isDeactivate = 0 AND isNonHH = 1
         AND (:query = '' OR benName LIKE '%' || :query || '%' OR benSurname LIKE '%' || :query || '%' OR (IFNULL(benName, '') || ' ' || IFNULL(benSurname, '')) LIKE '%' || :query || '%' OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%')
-        ORDER BY benId ASC
+        ORDER BY COALESCE(createdDate, regDate, 0) DESC, benId DESC
     """)
     fun searchNonHHBeneficiariesPaged(selectedVillage: Int, query: String): PagingSource<Int, BenBasicCache>
 
