@@ -323,7 +323,7 @@ data class UserDetailsInResponse(
         villageDetails.orEmpty().mapNotNull { villageDetail ->
             val villageId = villageDetail.villageId.toPlainString()?.toIntOrNull() ?: return@mapNotNull null
             val pinCode = villageDetail.pinCode.toPlainString()
-                ?.takeIf { pin -> pin.length == VillageDefaults.PIN_CODE_LENGTH && pin.all(Char::isDigit) }
+                ?.takeIf { pin -> VillageDefaults.isValidPinCode(pin) }
             val residentialAreaId = villageDetail.residentialAreaId.toPlainString()?.toIntOrNull()
                 ?.takeIf { areaId -> areaId in VillageDefaults.RESIDENTIAL_AREA_IDS } ?: 0
             VillageDefaults(pinCode = pinCode, residentialAreaId = residentialAreaId)

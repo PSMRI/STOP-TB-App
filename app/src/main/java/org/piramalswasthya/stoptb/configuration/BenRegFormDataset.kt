@@ -1015,7 +1015,7 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
     fun getCapturedVillageDefaults(): VillageDefaults? {
         if (!isCapturingVillageDefaults) return null
         return VillageDefaults(
-            pinCode = pinCode.value?.trim()?.takeIf { it.isNotEmpty() && getIndexOfElement(pinCode) >= 0 },
+            pinCode = pinCode.value?.trim()?.takeIf { VillageDefaults.isValidPinCode(it) && getIndexOfElement(pinCode) >= 0 },
             residentialAreaId = if (getIndexOfElement(residentialAreaType) >= 0) residentialAreaType.getPosition() else 0
         )
     }

@@ -17,6 +17,13 @@ data class VillageDefaults(
     companion object {
         const val PIN_CODE_LENGTH = 6
 
+        // Indian pincodes: six digits, first digit 1-9
+        val PIN_CODE_RANGE = 100000..999999
+
+        fun isValidPinCode(pinCode: String?): Boolean =
+            pinCode != null && pinCode.length == PIN_CODE_LENGTH && pinCode.all(Char::isDigit) &&
+                    pinCode.toInt() in PIN_CODE_RANGE
+
         // Ids in R.array.nbr_residential_area_array; the server stores the same ids in
         // i_beneficiarydetails.residentialAreaId
         val RESIDENTIAL_AREA_IDS = 1..6

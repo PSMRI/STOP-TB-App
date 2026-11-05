@@ -29,6 +29,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.ActivityServiceTypeBinding
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
 import org.piramalswasthya.stoptb.helpers.TapjackingProtectionHelper
+import org.piramalswasthya.stoptb.model.VillageDefaults
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import timber.log.Timber
 
@@ -322,6 +323,7 @@ class ServiceLocationActivity : AppCompatActivity() {
             pinCode.isEmpty() -> getString(R.string.form_input_empty_error)
             pinCode.any { !it.isDigit() } -> getString(R.string.form_input_digit_only_error)
             pinCode.length != PIN_CODE_LENGTH -> getString(R.string.form_input_missing_entry_error, PIN_CODE_LENGTH)
+            !VillageDefaults.isValidPinCode(pinCode) -> getString(R.string.form_input_invalid_pincode)
             else -> null
         }
         binding.tilResidentialAreaDropdown.error =

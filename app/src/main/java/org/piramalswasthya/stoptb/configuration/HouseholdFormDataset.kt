@@ -338,6 +338,8 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             pinCode.value = recordPinCode
             if (recordValues.hasPinCode) pinCode.inputType = TEXT_VIEW
             if (recordValues.hasResidentialArea) residentialArea.inputType = TEXT_VIEW
+            // Saved before Residential Area was required: ask for it, otherwise saving would clear it on every member
+            else residentialArea.required = true
             isCapturingVillageDefaults = !recordValues.hasPinCode || !recordValues.hasResidentialArea
         } else {
             // New household: Pincode & Residential Area come from the village (captured once on the location screen).
@@ -940,7 +942,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
     fun getCapturedVillageDefaults(): VillageDefaults? {
         if (!isCapturingVillageDefaults) return null
         return VillageDefaults(
-            pinCode = pinCode.value?.trim()?.takeIf { it.length == VillageDefaults.PIN_CODE_LENGTH },
+            pinCode = pinCode.value?.trim()?.takeIf { VillageDefaults.isValidPinCode(it) },
             residentialAreaId = residentialArea.getPosition()
         )
     }

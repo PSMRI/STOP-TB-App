@@ -168,6 +168,7 @@
     <string name="form_input_alphabet_special_only_error">কেৱল বৰ্ণমালা আৰু বিশেষ চিহ্নসমূহ অনুমোদিত!</string>
     <string name="form_input__no_alpha_space_error">বৰ্ণমালা বা খালী ঠাই অনুমোদিত নহয়!</string>
     <string name="form_input_digit_only_error">কেৱল সংখ্যা অনুমোদিত!</string>
+    <string name="form_input_invalid_pincode">পিনকোড 0ৰে আৰম্ভ হ\'ব নোৱাৰে</string>
     <string name="full_name">সম্পূৰ্ণ নাম</string>
     <string name="other">অন্যান্য</string>
     <string name="district">জিলা</string>
