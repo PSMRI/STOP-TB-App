@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.model.LocationState
 import org.piramalswasthya.stoptb.helpers.DigiPinHelper
+import org.piramalswasthya.stoptb.model.VillageDefaults
 import org.piramalswasthya.stoptb.helpers.GpsDiagnostics
 import org.piramalswasthya.stoptb.configuration.BenRegFormDataset
 import org.piramalswasthya.stoptb.database.room.SyncState
@@ -312,7 +313,14 @@ class NewBenRegViewModel @Inject constructor(
                 hofSpouseForDobRules = hofSpouse,
                 selectedMemberForDobRules = selectedSpouseMember,
                 villageDefaults = preferenceDao.getVillageDefaults(formVillage.id),
-                fixedVillage = householdVillage
+                fixedVillage = householdVillage,
+                // Household members take the household's Pincode & Residential Area
+                householdValues = householdVillage?.let {
+                    VillageDefaults(
+                        pinCode = household.family?.pinCode,
+                        residentialAreaId = household.details?.residentialAreaId ?: 0
+                    )
+                }
             )
         }
         // Restore/Inherit Location details

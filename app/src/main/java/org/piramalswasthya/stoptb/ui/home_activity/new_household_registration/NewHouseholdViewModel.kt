@@ -122,10 +122,9 @@ class NewHouseholdViewModel @Inject constructor(
                     householdRepo.getAllBenOfHousehold(household.householdId).size
                 } else 0
 
-                // Only a new household takes the village's Residential Area; a saved one keeps (and locks) its own
-                val villageDefaults = if (household.householdId == 0L)
-                    preferenceDao.getVillageDefaults(household.locationRecord.village.id)
-                else null
+                // A new household takes the village's Pincode / Residential Area; a saved one keeps (and locks) its
+                // own and only uses the village's Pincode when it has none yet (saved before Pincode was on this form)
+                val villageDefaults = preferenceDao.getVillageDefaults(household.locationRecord.village.id)
                 dataset.setupPage(household, villageNames, user.villages, registeredMemberCount, villageDefaults)
                 _isCampSite.value = dataset.isRegisteredAtCampSite()
 
@@ -288,17 +287,16 @@ class NewHouseholdViewModel @Inject constructor(
                     dataset.getCapturedVillageDefaults()?.let { capturedDefaults ->
                         preferenceDao.saveVillageDefaultsIfMissing(household.locationRecord.village.id, capturedDefaults)
                     }
-                    // Village changed on a saved household: move its members too, otherwise they keep
-                    // pushing the old village and the next pull puts the household back there.
+                    // Saved household: its members (HoF included) always carry the household's village, Pincode
+                    // and Residential Area, so one household never has different values. When the village changed
+                    // this also moves them, otherwise they keep pushing the old village and the next pull puts
+                    // the household back there. Marks them UNSYNCED in the same transaction.
                     val selectedVillage = household.locationRecord.village
-                    if (savedHouseholdVillageId != null && savedHouseholdVillageId != selectedVillage.id) {
-                        // Members take the new village's Pincode (none → cleared, not the old village's) and
-                        // the household's Residential Area; also marks them UNSYNCED, in the same transaction
-                        val newVillageDefaults = preferenceDao.getVillageDefaults(selectedVillage.id)
-                        benRepo.moveHouseholdMembersToVillage(
+                    if (savedHouseholdVillageId != null) {
+                        benRepo.applyHouseholdLocationToMembers(
                             householdId = household.householdId,
                             village = selectedVillage,
-                            pinCode = newVillageDefaults?.pinCode?.takeIf { newVillageDefaults.hasPinCode },
+                            pinCode = household.family?.pinCode,
                             residentialAreaId = household.details?.residentialAreaId ?: 0,
                             residentialArea = household.details?.residentialArea
                         )

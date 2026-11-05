@@ -484,7 +484,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
         selectedMemberForDobRules: BenRegCache? = null,
         showUpdateLocation: Boolean = false,
         villageDefaults: VillageDefaults? = null,
-        fixedVillage: LocationEntity? = null
+        fixedVillage: LocationEntity? = null,
+        householdValues: VillageDefaults? = null
     ) {
         val list = mutableListOf(
             pic,
@@ -763,6 +764,17 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             }
         }
 
+        if (householdValues != null && !isNonHH) {
+            householdValues.pinCode?.trim()?.takeIf { householdValues.hasPinCode }?.let { pinCode.value = it }
+            if (householdValues.hasResidentialArea) {
+                residentialAreaType.value =
+                    residentialAreaType.getStringFromPosition(householdValues.residentialAreaId)
+                residentialAreaType.inputType = TEXT_VIEW
+                residentialAreaType.errorText = null
+                isCapturingVillageDefaults = false
+            }
+        }
+
         addMaritalStatusIfApplicable(list)
 
         // Add spouse name field if married
@@ -847,7 +859,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             healthFacility.value = it.healthFacility?.name ?: ""
         }
 
-        if (isNonHH) {
+        if (isNonHH || relToHeadId == 18) {
+            // Non-HH: Pincode comes from the village. HoF: from the household form.
             list.remove(pinCode)
             pinCode.required = false
         } else if (relToHeadId >= 0 && relToHeadId != 18) {

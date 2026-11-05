@@ -208,13 +208,13 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.ben_reg_address),
         arrayId = -1, required = true, etMaxLength = 2000
     )
-//    private val pinCode = FormElement(
-//        id = 22, inputType = EDIT_TEXT,
-//        title = resources.getString(R.string.str_pincode),
-//        arrayId = -1, required = true,
-//        etInputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL,
-//        etMaxLength = 6, min = 100000, max = 999999
-//    )
+    private val pinCode = FormElement(
+        id = 25, inputType = EDIT_TEXT,
+        title = resources.getString(R.string.str_pincode),
+        arrayId = -1, required = true,
+        etInputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL,
+        etMaxLength = 6, min = 100000, max = 999999
+    )
     private val villageHamlet = FormElement(
         id = 23, inputType = DROPDOWN,
         title = resources.getString(R.string.nbr_village),
@@ -265,7 +265,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
               //  mohallaName,
                 povertyLine,
                 address,
-            //    pinCode,
+                pinCode,
                 villageHamlet,
                 residentialArea
             )
@@ -302,7 +302,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
 //            mohallaName.value = saved.mohallaName
             povertyLine.value = povertyLine.getStringFromPosition(saved.povertyLineId)
             address.value = saved.address?.takeIf { it.isNotBlank() } ?: villageHamlet.value
-           // pinCode.value = saved.pinCode
+            pinCode.value = saved.pinCode?.trim()?.takeIf { it.isNotEmpty() }
         }
         setDefaultPovertyLineIfNeeded()
         setDefaultRegisteredAtCampSiteIfNeeded()
@@ -326,23 +326,23 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             houseOwnership.value = houseOwnership.getStringFromPosition(saved.isHouseOwnedId)
         }
         if (hh != null && hh.householdId != 0L) {
-            // Edit: the household's own Residential Area is already saved/synced — keep it (locked) and never swap
-            // in the village's current value. It only changes if the user changes the village (see villageHamlet).
-            val recordValues = VillageDefaults(residentialAreaId = hh.details?.residentialAreaId ?: 0)
+            val recordPinCode = hh.family?.pinCode?.trim()?.takeIf { it.isNotEmpty() }
+                ?: villageDefaults?.pinCode?.trim()?.takeIf { villageDefaults.hasPinCode }
+            val recordValues = VillageDefaults(
+                pinCode = recordPinCode,
+                residentialAreaId = hh.details?.residentialAreaId ?: 0
+            )
             savedRecordVillageId = hh.locationRecord.village.id
             savedRecordValues = recordValues
             savedRecordOtherResidentialArea = hh.details?.otherResidentialArea
+            pinCode.value = recordPinCode
+            if (recordValues.hasPinCode) pinCode.inputType = TEXT_VIEW
             if (recordValues.hasResidentialArea) residentialArea.inputType = TEXT_VIEW
+            isCapturingVillageDefaults = !recordValues.hasPinCode || !recordValues.hasResidentialArea
         } else {
-            // New household: Residential Area comes from the village (captured once on the location screen)
-            if (villageDefaults?.hasResidentialArea == true || residentialArea.value == null) {
-                applyVillageDefaults(villageDefaults)
-            } else {
-                // Village has nothing saved but a draft restored a value: keep it, still required and
-                // remembered for the village on save (applyVillageDefaults would clear it)
-                residentialArea.required = true
-                isCapturingVillageDefaults = true
-            }
+            // New household: Pincode & Residential Area come from the village (captured once on the location screen).
+            // A value the village doesn't have yet but a draft restored is kept, and remembered for the village on save.
+            applyVillageDefaults(villageDefaults, keepEnteredValues = true)
         }
         if (residentialArea.value == residentialArea.entries!!.last()) {
             list.add(list.indexOf(residentialArea) + 1, otherResidentialArea)
@@ -799,15 +799,15 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             otherAvailOfToilet.id -> validateAlphabetsOnly(otherAvailOfToilet)
 
             address.id -> validateEmptyOnEditText(address)
-           // pinCode.id -> validatePincodeOnEditText(pinCode)
+            pinCode.id -> validatePincodeOnEditText(pinCode)
             villageHamlet.id -> {
                 Timber.d("Selected village = ${villageHamlet.value}")
 
                 address.value = villageHamlet.value
                 validateEmptyOnEditText(address)
 
-                // Residential Area belongs to the village: reset and refill from the new village's saved
-                // value, or leave blank for the user to capture.
+                // Pincode & Residential Area belong to the village: reset and refill from the new village's saved
+                // values, or leave blank for the user to capture.
                 // Same resolution as mapValues: the household's own village first when names repeat
                 val selectedVillage =
                     villageEntities.find { it.name == villageHamlet.value && it.id == savedRecordVillageId }
@@ -889,7 +889,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             family.povertyLine =
                 povertyLine.getEnglishStringFromPosition(family.povertyLineId)
             family.address = address.value              // ADD
-           // family.pinCode = pinCode.value               // ADD
+            family.pinCode = pinCode.value?.trim()?.takeIf { it.isNotEmpty() }
         }
         (cacheModel as HouseholdCache).family = family
 
@@ -912,24 +912,37 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
     }
 
     /**
-     * Fills Residential Area from the village's saved value and locks it; when the village has none
-     * it's left blank, editable and required (remembered for the village on save).
+     * Fills Pincode / Residential Area from the village's saved values and locks them; a value the village
+     * doesn't have is left blank (or, with [keepEnteredValues], as restored from a draft), editable and
+     * required, and remembered for the village on save.
      */
-    private fun applyVillageDefaults(villageDefaults: VillageDefaults?) {
-        val savedResidentialArea =
-            villageDefaults?.residentialAreaId?.let { residentialArea.getStringFromPosition(it) }
-        residentialArea.value = savedResidentialArea
+    private fun applyVillageDefaults(villageDefaults: VillageDefaults?, keepEnteredValues: Boolean = false) {
+        val savedPinCode = villageDefaults?.pinCode?.trim()?.takeIf { villageDefaults.hasPinCode }
+        pinCode.value = savedPinCode ?: pinCode.value?.takeIf { keepEnteredValues }
+        pinCode.errorText = null
+        pinCode.inputType = if (savedPinCode != null) TEXT_VIEW else EDIT_TEXT
+        pinCode.required = true
+
+        val savedResidentialArea = villageDefaults?.residentialAreaId
+            ?.takeIf { villageDefaults.hasResidentialArea }
+            ?.let { residentialArea.getStringFromPosition(it) }
+        if (savedResidentialArea != null || !keepEnteredValues) {
+            residentialArea.value = savedResidentialArea
+            otherResidentialArea.value = null
+        }
         residentialArea.errorText = null
         residentialArea.inputType = if (savedResidentialArea != null) TEXT_VIEW else DROPDOWN
         residentialArea.required = true
-        otherResidentialArea.value = null
-        isCapturingVillageDefaults = savedResidentialArea == null
+        isCapturingVillageDefaults = savedPinCode == null || savedResidentialArea == null
     }
 
-    /** Residential Area the user captured for a village that had none saved; null when nothing new was captured. */
+    /** Values the user captured for a village that had none saved; null when nothing new was captured. */
     fun getCapturedVillageDefaults(): VillageDefaults? {
         if (!isCapturingVillageDefaults) return null
-        return VillageDefaults(residentialAreaId = residentialArea.getPosition())
+        return VillageDefaults(
+            pinCode = pinCode.value?.trim()?.takeIf { it.length == VillageDefaults.PIN_CODE_LENGTH },
+            residentialAreaId = residentialArea.getPosition()
+        )
     }
 
     private fun mapValuesForPage2(cacheModel: FormDataModel) {

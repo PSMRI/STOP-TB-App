@@ -317,7 +317,7 @@ class NewHouseholdFragment : Fragment() {
     // field's text (e.g. village name inside Mobile No).
     private fun hardCodedListUpdate(formId: Int) {
         val targetIds = when (formId) {
-            23 -> listOf(24, 8) // villageHamlet changed → address auto-filled, residential area reset
+            23 -> listOf(24, 25, 8) // villageHamlet changed → address auto-filled, pincode & residential area reset
             1002 -> listOf(2)   // mobileNotAvailable toggled → mobileNoHeadOfFamily cleared/enabled/disabled
             else -> return // address (24) edits: its own watcher already shows the validation error
         }

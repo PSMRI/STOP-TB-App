@@ -110,12 +110,12 @@ class BenRepo @Inject constructor(
     }
 
     /**
-     * Moves every member of a household to [village] — with that village's [pinCode] and the household's
-     * Residential Area — and marks them UNSYNCED, in one transaction. The pull only overwrites SYNCED
+     * Gives every member of a household the household's [village], [pinCode] and Residential Area, and
+     * marks them UNSYNCED, in one transaction. The pull only overwrites SYNCED
      * members, so the writes must commit together: a pull landing between them would put the old
      * village back and the sync-state update would then push it.
      */
-    suspend fun moveHouseholdMembersToVillage(
+    suspend fun applyHouseholdLocationToMembers(
         householdId: Long,
         village: LocationEntity,
         pinCode: String?,
@@ -2777,7 +2777,9 @@ class BenRepo @Inject constructor(
                                 povertyLine = houseDataObj.optStringOrNull("type_bpl_apl"),
                                 povertyLineId = houseDataObj.optInt("bpl_aplId"),
                                 address = houseDataObj.optStringOrNull("address"),
-                             //   pinCode = houseDataObj.optInt("Pincode").takeIf { it > 0 }?.toString(),
+                                // Server field is "pincode" (FLW-API RMNCHHouseHoldDetails); 0 = not captured
+                                pinCode = (houseDataObj.optInt("pincode").takeIf { it > 0 }
+                                    ?: houseDataObj.optInt("Pincode").takeIf { it > 0 })?.toString(),
                             ),
                             details = HouseholdDetails(
                                 residentialArea = houseDataObj.optStringOrNull("residentialArea"),
