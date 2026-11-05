@@ -122,6 +122,12 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                     // delta pull instead; it is debounced and costs one small request.
                     Timber.d("Pending diagnostic orders: ${pendingOrders.size}, results come from the changes feed")
                     WorkerUtils.triggerCampQuickPullIfConnected(appContext, preferenceDao)
+                    // Keeps the "Last checked" caption current, as the per-order path does.
+                    pendingOrders.forEach { order ->
+                        if (order.xray) preferenceDao.setLastCheckedTime(order.benId, "XRAY_CHEST", now)
+                        if (order.trueNat) preferenceDao.setLastCheckedTime(order.benId, "SPUTUM_TRUENAT", now)
+                        if (order.rif) preferenceDao.setLastCheckedTime(order.benId, "MDR_RIF", now)
+                    }
                 } else if (hasInProgress) {
                     val pollSemaphore = Semaphore(MAX_CONCURRENT_POLLS)
                     coroutineScope {

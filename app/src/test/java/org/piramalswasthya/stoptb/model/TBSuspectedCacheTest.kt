@@ -27,6 +27,8 @@ class TBSuspectedCacheTest {
             naatResult = "TB Negative",
             syncState = SyncState.UNSYNCED,
             serverUpdatedDate = null,
+            latitude = 18.1,
+            longitude = 80.9,
         )
         assertThat(derived).isNotEqualTo(fromServer)
         assertThat(derived.withoutTabletOnlyFields()).isEqualTo(fromServer.withoutTabletOnlyFields())

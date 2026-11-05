@@ -266,11 +266,13 @@ object WorkerUtils {
         }
         // A forced pull (Refresh) used to REPLACE the chain even while it was downloading, which
         // cancelled the run in progress, so repeated presses during a long first download kept
-        // throwing work away. A running pull already brings everything up to now, so keep it;
-        // force only replaces a chain that is queued or backing off.
-        if (force && activePullInfos.any { it.state == WorkInfo.State.RUNNING }) {
-            Timber.i("Pull [$triggerSource] kept the pull already running instead of restarting it")
-            return activePullInfos.map { it.id }
+        // throwing work away. When a pull is running, queue one follow-up after it instead, so a
+        // feed read still starts after the press; force replaces only a queued or backing-off chain.
+        val pullRunning = activePullInfos.any { it.state == WorkInfo.State.RUNNING }
+        val policy = when {
+            force && pullRunning -> ExistingWorkPolicy.APPEND_OR_REPLACE
+            force -> ExistingWorkPolicy.REPLACE
+            else -> ExistingWorkPolicy.KEEP
         }
 
         Timber.i("Pull [$triggerSource] enqueued")
@@ -290,7 +292,7 @@ object WorkerUtils {
 
         val afterFoundation = workManager.beginUniqueWork(
             pullWorkerUniqueName,
-            if (force) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
+            policy,
             pullWorkRequest
         )
 
