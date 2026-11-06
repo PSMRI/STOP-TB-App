@@ -85,6 +85,9 @@ class TBRepo @Inject constructor(
 ) {
     private val orderCreatedTimestamps = java.util.concurrent.ConcurrentHashMap<String, Long>()
     private val ORDER_STATUS_GRACE_PERIOD_MS = 90_000L
+    // Orders whose feed row was skipped inside the grace period. The feed token moves past that
+    // row, so DiagnosticResultPollWorker asks order/result for them once the grace period ends.
+    private val feedSkippedOrders = java.util.concurrent.ConcurrentHashMap.newKeySet<Pair<Long, String>>()
 
     // Per-beneficiary lock for every TB_DIAGNOSTICS/TB_SUSPECTED read-modify-write below, so
     // concurrent calls for the same benId (e.g. parallel X-ray/TrueNat polling) can't clobber
@@ -660,7 +663,11 @@ class TBRepo @Inject constructor(
             // An order this tablet created in the last moments may not be on the hub's feed yet;
             // the older server row must not overwrite it.
             val createdAt = orderCreatedTimestamps["${ben.beneficiaryId}_$localType"]
-            if (createdAt != null && System.currentTimeMillis() - createdAt < ORDER_STATUS_GRACE_PERIOD_MS) continue
+            if (createdAt != null && System.currentTimeMillis() - createdAt < ORDER_STATUS_GRACE_PERIOD_MS) {
+                feedSkippedOrders.add(ben.beneficiaryId to localType)
+                continue
+            }
+            feedSkippedOrders.remove(ben.beneficiaryId to localType)
             val current = tbDao.getTbDiagnosticsByBenId(ben.beneficiaryId)?.let {
                 when (localType) {
                     "XRAY_CHEST" -> it.xrayOrderId
@@ -684,6 +691,20 @@ class TBRepo @Inject constructor(
             }
         }
         applied
+    }
+
+    /**
+     * Removes and returns the orders the feed skipped inside the grace period whose grace period
+     * has now ended, as (benId, order type) pairs ready for [fetchOrderResult].
+     */
+    fun takeFeedSkippedOrdersPastGrace(): List<Pair<Long, String>> {
+        val now = System.currentTimeMillis()
+        val due = feedSkippedOrders.filter { (benId, type) ->
+            val createdAt = orderCreatedTimestamps["${benId}_$type"]
+            createdAt == null || now - createdAt >= ORDER_STATUS_GRACE_PERIOD_MS
+        }
+        feedSkippedOrders.removeAll(due.toSet())
+        return due
     }
 
     private fun feedResponse(records: JSONArray): JSONObject =
@@ -1139,7 +1160,9 @@ class TBRepo @Inject constructor(
                                 visitLabel = incoming.visitLabel,
                                 typeOfTBCase = incoming.typeOfTBCase,
                                 reasonForSuspicion = incoming.reasonForSuspicion,
-                                hasSymptoms = incoming.hasSymptoms,
+                                // The server keeps no column for these, so a pulled record
+                                // carries null; keep what the tablet derived.
+                                hasSymptoms = tbSuspectedDTO.hasSymptoms ?: tbSuspectedCache.hasSymptoms,
                                 isSputumCollected = incoming.isSputumCollected,
                                 sputumSubmittedAt = incoming.sputumSubmittedAt,
                                 nikshayId = incoming.nikshayId,
@@ -1148,8 +1171,8 @@ class TBRepo @Inject constructor(
                                 chestXRayResult = incoming.chestXRayResult,
                                 isAICoughAssessmentDone = incoming.isAICoughAssessmentDone,
                                 aiCoughAssessmentResult = incoming.aiCoughAssessmentResult,
-                                isNaatConducted = incoming.isNaatConducted,
-                                naatResult = incoming.naatResult,
+                                isNaatConducted = incoming.isNaatConducted ?: tbSuspectedCache.isNaatConducted,
+                                naatResult = incoming.naatResult ?: tbSuspectedCache.naatResult,
                                 recommendedForLiquidCultureTest = incoming.recommendedForLiquidCultureTest,
                                 isLiquidCultureConducted = incoming.isLiquidCultureConducted,
                                 liquidCultureResult = incoming.liquidCultureResult,
@@ -1158,9 +1181,9 @@ class TBRepo @Inject constructor(
                                 isDRTBConfirmed = incoming.isDRTBConfirmed,
                                 otherReasonForSuspicion = incoming.otherReasonForSuspicion,
                                 isConfirmed = incoming.isConfirmed,
-                                latitude = incoming.latitude,
-                                longitude = incoming.longitude,
-                                address = incoming.address,
+                                latitude = incoming.latitude ?: tbSuspectedCache.latitude,
+                                longitude = incoming.longitude ?: tbSuspectedCache.longitude,
+                                address = incoming.address ?: tbSuspectedCache.address,
                                 referred = incoming.referred,
                                 followUps = incoming.followUps,
                                 serverUpdatedDate = incoming.serverUpdatedDate,

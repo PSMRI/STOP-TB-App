@@ -122,6 +122,12 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                     // delta pull instead; it is debounced and costs one small request.
                     Timber.d("Pending diagnostic orders: ${pendingOrders.size}, results come from the changes feed")
                     WorkerUtils.triggerCampQuickPullIfConnected(appContext, preferenceDao)
+                    // The feed skips a row for an order this tablet created moments ago and moves
+                    // past it, so a result that arrived then has to be asked for directly.
+                    tbRepo.takeFeedSkippedOrdersPastGrace().forEach { (benId, type) ->
+                        Timber.d("Polling $type result for benId=$benId skipped by the feed")
+                        tbRepo.fetchOrderResult(benId, type)
+                    }
                     // Keeps the "Last checked" caption current, as the per-order path does.
                     pendingOrders.forEach { order ->
                         if (order.xray) preferenceDao.setLastCheckedTime(order.benId, "XRAY_CHEST", now)
