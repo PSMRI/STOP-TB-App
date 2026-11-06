@@ -25,10 +25,16 @@ class SyncLogManager @Inject constructor(
 
     private val scope = CoroutineScope(Dispatchers.Default)
     private val buffer = ArrayDeque<SyncLogEntry>(MAX_BUFFER_SIZE)
+    private val interactiveBuffer = ArrayDeque<SyncLogEntry>(MAX_BUFFER_SIZE)
+    private val liveFilter = SyncLiveLogFilter()
     private var nextId = 0L
     private var emitJob: Job? = null
     private val _logs = MutableStateFlow<List<SyncLogEntry>>(emptyList())
     val logs: StateFlow<List<SyncLogEntry>> = _logs.asStateFlow()
+    private val _interactiveLogs = MutableStateFlow<List<SyncLogEntry>>(emptyList())
+    val interactiveLogs: StateFlow<List<SyncLogEntry>> = _interactiveLogs.asStateFlow()
+
+    fun interactiveSnapshot(): List<SyncLogEntry> = synchronized(buffer) { interactiveBuffer.toList() }
 
     fun addLog(level: LogLevel, tag: String, message: String) {
         synchronized(buffer) {
@@ -44,6 +50,10 @@ class SyncLogManager @Inject constructor(
                     message = message
                 )
             )
+            if (liveFilter.accepts(tag, message)) {
+                if (interactiveBuffer.size >= MAX_BUFFER_SIZE) interactiveBuffer.removeFirst()
+                interactiveBuffer.addLast(buffer.last())
+            }
             scheduleEmit()
         }
         fileWriter.writeLog(level, tag, message)
@@ -53,8 +63,11 @@ class SyncLogManager @Inject constructor(
         if (emitJob?.isActive == true) return
         emitJob = scope.launch {
             delay(EMIT_DELAY_MS)
-            val snapshot = synchronized(buffer) { buffer.toList() }
-            _logs.value = snapshot
+            synchronized(buffer) {
+                _logs.value = buffer.toList()
+                _interactiveLogs.value = interactiveBuffer.toList()
+                emitJob = null
+            }
         }
     }
 
@@ -62,7 +75,9 @@ class SyncLogManager @Inject constructor(
         synchronized(buffer) {
             emitJob?.cancel()
             buffer.clear()
+            interactiveBuffer.clear()
             _logs.value = emptyList()
+            _interactiveLogs.value = emptyList()
         }
     }
 }

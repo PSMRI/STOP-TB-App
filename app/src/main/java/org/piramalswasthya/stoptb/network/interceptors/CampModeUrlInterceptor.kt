@@ -11,7 +11,8 @@ import java.io.InterruptedIOException
 import javax.inject.Inject
 
 class CampModeUrlInterceptor @Inject constructor(
-    private val preferenceDao: PreferenceDao
+    private val preferenceDao: PreferenceDao,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
 ) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
@@ -47,11 +48,17 @@ class CampModeUrlInterceptor @Inject constructor(
             .build()
 
         return try {
-            chain.proceed(
+            val response = chain.proceed(
                 originalRequest.newBuilder()
                     .url(campUrl)
                     .build()
             )
+            // An API rejection is not proof that the hub itself is unreachable.
+            if (preferenceDao.isCampHubConnected()) {
+                org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.observe(context, storedCampHubUrl,
+                    true, "REACHABLE", "HUB_HTTP_RESPONSE")
+            }
+            response
         } catch (e: IOException) {
             if (e is InterruptedIOException || e.message.equals("Canceled", ignoreCase = true)) {
                 throw e
@@ -69,5 +76,5 @@ class CampModeUrlInterceptor @Inject constructor(
             ?.let { runCatching { java.net.URI(it).host }.getOrNull() }
 
     private fun isCampHubReachable(rawUrl: String): Boolean =
-        CampHubReachability.isReachable(rawUrl)
+        org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.checkReachability(context, rawUrl, "API_FAILURE_HEALTH")
 }

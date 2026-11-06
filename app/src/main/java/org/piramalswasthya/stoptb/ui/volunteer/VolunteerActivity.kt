@@ -79,7 +79,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
                     refreshCampHubOfflineBanner()
                     if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
                         syncRetryStore.resetBackoff()
-                        WorkerUtils.triggerAmritPushWorker(applicationContext)
+                        WorkerUtils.triggerAmritPushWorker(applicationContext, "AUTO_RECONNECT")
                         WorkerUtils.triggerCampQuickPullIfConnected(applicationContext, pref, force = true)
                     }
                 }
@@ -108,6 +108,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             campHubReconnectJob = null
             // WiFi dropped — if camp mode was active, mark disconnected at once
             if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
+                org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.observe(applicationContext, pref.getCampHubUrl(), false, "WIFI_UNAVAILABLE", "WIFI_CALLBACK")
                 pref.setCampHubConnected(false)
                 runOnUiThread { refreshCampHubOfflineBanner() }
             }
@@ -442,9 +443,9 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
                 return@setOnMenuItemClickListener true
             }
             lastClickTime = SystemClock.elapsedRealtime()
-            WorkerUtils.triggerAmritPushWorker(this)
+            WorkerUtils.triggerAmritPushWorker(this, "MANUAL_REFRESH")
             if (!pref.isFullPullComplete)
-                WorkerUtils.triggerAmritPullWorker(this)
+                WorkerUtils.triggerAmritPullWorker(this, triggerSource = "MANUAL_REFRESH")
             binding.drawerLayout.close()
             true
         }
@@ -593,7 +594,10 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
                 connectivityManager.getNetworkCapabilities(it)
                     ?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
             } ?: false
-            if (!hasWifi) pref.setCampHubConnected(false)
+            if (!hasWifi) {
+                org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.observe(applicationContext, pref.getCampHubUrl(), false, "WIFI_UNAVAILABLE", "RESUME_NETWORK_CHECK")
+                pref.setCampHubConnected(false)
+            }
         }
 
         // Register WiFi callback (guard against double-registration)
@@ -706,15 +710,10 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         )
     }
 
-    /**
-     * Tries to reach the camp hub URL over HTTP (3 s timeout).
-     * Any HTTP response (even 4xx) means the server is up.
-     * Must be called from a background thread.
-     */
     // Same reachability rule as the sign-in screen, interceptor and sync gate
     // (GET /common-api/health, 2xx). Blocking: call off the main thread.
     private fun pingCampHub(): Boolean =
-        CampHubReachability.isReachable(pref.getCampHubUrl())
+        org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.checkReachability(applicationContext, pref.getCampHubUrl(), "RECONNECT_CHECK")
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {

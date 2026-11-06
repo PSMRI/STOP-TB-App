@@ -103,7 +103,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
                     refreshCampHubOfflineBanner()
                     if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
                         syncRetryStore.resetBackoff()
-                        WorkerUtils.triggerAmritPushWorker(applicationContext)
+                        WorkerUtils.triggerAmritPushWorker(applicationContext, "AUTO_RECONNECT")
                         WorkerUtils.triggerCampQuickPullIfConnected(applicationContext, pref, force = true)
                     }
                 }
@@ -373,7 +373,7 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
                     // No internet check: camp Wi-Fi reaches the hub without internet, and the
                     // push gate checks the hub itself.
                     lastAutoTriggerPushTime = now
-                    WorkerUtils.triggerAmritPushWorker(this)
+                    WorkerUtils.triggerAmritPushWorker(this, "AUTO_PUSH")
                 }
             }
         }
@@ -753,9 +753,9 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
             // Save the click time
             lastClickTime = SystemClock.elapsedRealtime()
 
-            WorkerUtils.triggerAmritPushWorker(this)
+            WorkerUtils.triggerAmritPushWorker(this, "MANUAL_REFRESH")
             if (!pref.isFullPullComplete)
-                WorkerUtils.triggerAmritPullWorker(this)
+                WorkerUtils.triggerAmritPullWorker(this, triggerSource = "MANUAL_REFRESH")
             binding.drawerLayout.close()
             true
 

@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.dao.SyncDao
@@ -122,7 +123,7 @@ class SyncDashboardViewModel @Inject constructor(
     /** Makes every waiting record due now and starts a push. */
     fun retryNow(context: Context) {
         syncRetryStore.resetBackoff()
-        WorkerUtils.triggerAmritPushWorker(context.applicationContext)
+        WorkerUtils.triggerAmritPushWorker(context.applicationContext, "MANUAL_REFRESH")
     }
 
     private fun entityLabel(context: Context, entity: String): String = when (entity) {
@@ -144,7 +145,7 @@ class SyncDashboardViewModel @Inject constructor(
     }
 
     // Tab 2: Logs
-    val syncLogs: StateFlow<List<SyncLogEntry>> = syncLogManager.logs
+    val syncLogs: StateFlow<List<SyncLogEntry>> = syncLogManager.interactiveLogs
 
     fun clearLogs() = syncLogManager.clearLogs()
 
@@ -169,20 +170,51 @@ class SyncDashboardViewModel @Inject constructor(
         return result
     }
 
-    // Tab 2: Log export
+    // Shared export for Logs and Summary.
     private val _exportIntent = MutableStateFlow<Intent?>(null)
     val exportIntent: StateFlow<Intent?> = _exportIntent.asStateFlow()
 
     private val _exportEmpty = MutableStateFlow(false)
     val exportEmpty: StateFlow<Boolean> = _exportEmpty.asStateFlow()
 
-    fun exportLogs() {
+    private val _shareSummary = MutableStateFlow<String?>(null)
+    val shareSummary: StateFlow<String?> = _shareSummary.asStateFlow()
+    private var shareSummaryScope: String? = null
+    internal fun summaryScope(): String {
+        val user = preferenceDao.getLoggedInUser()
+        return "${user?.userId}/${user?.serviceMapId}/$selectedVillage"
+    }
+    fun updateShareSummary(summary: String?, scope: String? = null) {
+        shareSummaryScope = scope
+        _shareSummary.value = summary
+    }
+    private val _exportBusy = MutableStateFlow(false)
+    val exportBusy: StateFlow<Boolean> = _exportBusy.asStateFlow()
+
+    fun exportLogs(includeLogs: Boolean = true, includeSummary: Boolean = false) {
+        if (_exportBusy.value || (!includeLogs && !includeSummary)) return
+        val summary = if (includeSummary) _shareSummary.value else null
+        if (includeSummary && summary == null) return
+        if (includeSummary && shareSummaryScope != summaryScope()) {
+            updateShareSummary(null)
+            _exportEmpty.value = true
+            return
+        }
+        _exportBusy.value = true
         viewModelScope.launch(Dispatchers.IO) {
-            val intent = syncLogExporter.createShareIntent(getApplication())
-            if (intent != null) {
-                _exportIntent.value = intent
-            } else {
+            try {
+                val intent = syncLogExporter.createShareIntent(getApplication(), includeLogs, summary)
+                if (intent != null) {
+                    _exportIntent.value = intent
+                } else {
+                    _exportEmpty.value = true
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
                 _exportEmpty.value = true
+            } finally {
+                _exportBusy.value = false
             }
         }
     }
