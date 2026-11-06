@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.model.LocationState
 import org.piramalswasthya.stoptb.helpers.DigiPinHelper
+import org.piramalswasthya.stoptb.model.VillageDefaults
 import org.piramalswasthya.stoptb.helpers.GpsDiagnostics
 import org.piramalswasthya.stoptb.configuration.BenRegFormDataset
 import org.piramalswasthya.stoptb.database.room.SyncState
@@ -161,6 +162,10 @@ class NewBenRegViewModel @Inject constructor(
         }
     }
 
+    // The same village as it appears in the user's assigned list (what the dropdown shows), when assigned
+    private fun withAssignedVillageName(village: LocationEntity): LocationEntity =
+        user.villages.find { assignedVillage -> assignedVillage.id == village.id } ?: village
+
     suspend fun setUpPage() {
         if (isPageSetUp) return
         isPageSetUp = true
@@ -203,11 +208,13 @@ class NewBenRegViewModel @Inject constructor(
             _isDeath.postValue(ben.isDeath ?: false)
             isOtpVerified = ben.isConsent
             val villageNames = user.villages.map { it.name }.toTypedArray()
+            // The record's own village (not the village currently selected in the app)
+            val benVillage = withAssignedVillageName(ben.locationRecord.village)
             // View mode — show existing data read-only
             dataset.setFirstPageToRead(
                 ben,
                 familyHeadPhoneNo = household.family?.familyHeadPhoneNo,
-                villageName = locationRecord.village.name,
+                villageName = benVillage.name,
                 villageNames = villageNames,
                 villageEntityList = user.villages,
                 subCentreName = user.subCentre,
@@ -217,7 +224,9 @@ class NewBenRegViewModel @Inject constructor(
                 isNonHH = ben.isNonHH,
                 hofForDobRules = hofBen,
                 hofSpouseForDobRules = hofSpouse,
-                showUpdateLocation = isStandalone
+                showUpdateLocation = isStandalone,
+                // Household member: village locked (changed from the household form). Non-HH: editable.
+                fixedVillage = benVillage.takeIf { !isStandalone && !ben.isNonHH && benVillage.id > 0 }
             )
         } else {
             val villageNames = user.villages.map { it.name }.toTypedArray()
@@ -283,11 +292,16 @@ class NewBenRegViewModel @Inject constructor(
             )
 
             val prefillLocation = prefillBen?.locationRecord ?: locationRecord
+            // A new household member takes the household's village (locked); Non-HH uses the selected village
+            val householdVillage = household.locationRecord.village
+                .takeIf { village -> !isStandalone && !isNonHHArg && village.id > 0 }
+                ?.let { village -> withAssignedVillageName(village) }
+            val formVillage = householdVillage ?: prefillLocation.village
             dataset.setUpPage(
                 prefillBen,
                 household.family?.familyHeadPhoneNo,
                 familyHeadCommunityId = hofBen?.communityId ?: 0,
-                prefillLocation.village.name,
+                formVillage.name,
                 pinCodeValue = hofBen?.pinCode,
                 villageNames,
                 user.villages,
@@ -297,7 +311,16 @@ class NewBenRegViewModel @Inject constructor(
                 isNonHH = isNonHHArg,
                 hofForDobRules = hofBen,
                 hofSpouseForDobRules = hofSpouse,
-                selectedMemberForDobRules = selectedSpouseMember
+                selectedMemberForDobRules = selectedSpouseMember,
+                villageDefaults = preferenceDao.getVillageDefaults(formVillage.id),
+                fixedVillage = householdVillage,
+                // Household members take the household's Pincode & Residential Area
+                householdValues = householdVillage?.let {
+                    VillageDefaults(
+                        pinCode = household.family?.pinCode,
+                        residentialAreaId = household.details?.residentialAreaId ?: 0
+                    )
+                }
             )
         }
         // Restore/Inherit Location details
@@ -574,13 +597,18 @@ class NewBenRegViewModel @Inject constructor(
                         if (hhId > 0L) {
                             householdId = hhId
                             isNonHH = false
-                        } else {
+                        } else if (benIdFromArgs == 0L) {
+                            // New registration: Non-HH place info comes from CurrentLivingInfoFragment args.
                             householdId = null
                             isNonHH = isNonHHArg
                             placeOfCurrentLiving = if (isNonHHArg) placeOfCurrentLivingArg else null
                             otherPlaceOfCurrentLiving = if (isNonHHArg) otherPlaceArg else null
                             institutionName = if (isNonHHArg) institutionNameArg else null
                         }
+                        // Edit (benIdFromArgs != 0L, no hhId): keep the stored householdId, isNonHH,
+                        // placeOfCurrentLiving, otherPlaceOfCurrentLiving and institutionName. Edit entry
+                        // points (All Ben / Non-HH / ABHA lists) never pass these args, so applying the
+                        // nav-arg defaults here wiped placeOfCurrentLiving to NULL on sync (STOP-752).
                         serverUpdatedStatus = if (beneficiaryId < 0L) 1 else 2
                         processed           = if (beneficiaryId < 0L) "N" else "U"
                         syncState           = SyncState.UNSYNCED
@@ -604,6 +632,9 @@ class NewBenRegViewModel @Inject constructor(
                     }
 
                     benRepo.persistRecord(ben, updateIfExists = benIdFromArgs != 0L)
+                    dataset.getCapturedVillageDefaults()?.let { capturedDefaults ->
+                        preferenceDao.saveVillageDefaultsIfMissing(ben.locationRecord.village.id, capturedDefaults)
+                    }
 
                     // Mark both members' isSpouseAdded = true (hides "Register Wife/Husband" on both cards)
                     if (isAddSpouseFromArgs == 1 && selectedBenIdFromArgs != 0L && hhId > 0L) {

@@ -938,6 +938,7 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
                 R.string.form_input_missing_entry_error,
                 formElement.etMaxLength
             )
+            value.startsWith('0') -> resources.getString(R.string.form_input_invalid_pincode)
             else -> null
         }
 

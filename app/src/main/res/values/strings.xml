@@ -214,6 +214,7 @@
     <string name="facilitator">Facilitator</string>
     <string name="form_input__no_alpha_space_error">No Alphabets or spaces allowed!</string>
     <string name="form_input_digit_only_error">Only Digits allowed!</string>
+    <string name="form_input_invalid_pincode">Pincode cannot start with 0</string>
     <string name="form_input_min_limit_error_decimal">%1$s should be greater than or equal to %2$.1f</string>
     <string name="form_input_max_limit_error">%1$s should be lesser than or equal to %2$d</string>
     <string name="form_input_max_limit_error_decimal">%1$s should be lesser than or equal to %2$.1f</string>
@@ -1640,6 +1641,33 @@
     <string name="sync_tb_screening">TB Screening</string>
     <string name="sync_tb_confirmed">TB Confirmed</string>
     <string name="sync_counselling">Counselling</string>
+
+
+
+    <!-- Order Status -->
+    <string name="order_status_pending">Pending</string>
+    <string name="order_status_completed">Completed</string>
+    <string name="order_status_failed">Failed</string>
+    <string name="order_status_closed">Closed</string>
+    <string name="order_status_manual_entry">Manual Entry</string>
+
+    <!-- Chest X-Ray Results -->
+    <string name="chest_xray_normal">Normal</string>
+    <string name="chest_xray_abnormal">Abnormal but not TB Presumptive</string>
+    <string name="chest_xray_tb_presumptive">TB Presumptive</string>
+    <string name="chest_xray_ai_invalid">AI Invalid Result</string>
+
+    <!-- MTB Results -->
+    <string name="mtb_result_positive">TB Positive</string>
+    <string name="mtb_result_negative">TB Negative</string>
+    <string name="mtb_result_invalid_error">Invalid/Error</string>
+
+    <!-- RIF Results -->
+    <string name="rif_result_dr_tb">DR TB</string>
+    <string name="rif_result_non_dr_tb">Non DR TB</string>
+    <string name="rif_result_indeterminate">Indeterminate</string>
+    <string name="rif_result_invalid_error">Invalid/Error</string>
+
 
 
     <string name="loc_cb_update_location">Do you want to update the location details?</string>

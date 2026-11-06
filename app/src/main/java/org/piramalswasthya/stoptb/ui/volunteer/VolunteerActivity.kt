@@ -258,8 +258,10 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             }
         }
 
-        // Redirect to ServiceLocationActivity if location not set (multi-village users)
-        if (pref.getLocationRecord() == null) {
+        // Redirect to ServiceLocationActivity if location not set (multi-village users), or if the
+        // selected village's Pincode / Residential Area haven't been captured yet (incl. auto-set single-village users)
+        val selectedVillageId = pref.getLocationRecord()?.village?.id
+        if (selectedVillageId == null || pref.getVillageDefaults(selectedVillageId)?.isComplete != true) {
             val intent = Intent(this, ServiceLocationActivity::class.java)
             intent.putExtra("fromVolunteer", true)
             startActivity(intent)

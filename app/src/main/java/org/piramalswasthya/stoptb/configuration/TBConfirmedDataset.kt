@@ -563,6 +563,10 @@ class TBConfirmedDataset(
     }
     fun getFollowUpDateLong(): Long = getLongFromDate(followUpDate.value)
 
+    /** True when the last saved follow-up falls in the current month — the next one is only allowed from next month. */
+    fun isFollowUpDoneForCurrentMonth(): Boolean =
+        lastFollowUpDateLong > 0L && isSameMonth(lastFollowUpDateLong, System.currentTimeMillis())
+
 
     private fun calculateExpectedCompletionDate() {
         if (regimenTypeValue == null || treatmentStartDateValue == null) return

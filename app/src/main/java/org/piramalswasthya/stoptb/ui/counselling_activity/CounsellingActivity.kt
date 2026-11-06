@@ -85,6 +85,10 @@ class CounsellingActivity : AppCompatActivity() {
             override fun handleOnBackPressed() {
                 val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
                 if (currentFragment is CounsellingFormFragment) {
+                    // Toolbar Up reaches here with the keyboard still open; close it first like Next does,
+                    // otherwise the focused field is removed mid-IME and the content scrolls to a blank area.
+                    hideKeyboard()
+                    clearActiveFocus()
                     val currentStep = viewModel.currentStep.value ?: 0
                     if (currentStep > 0) {
                         viewModel.previousSection()
@@ -443,6 +447,7 @@ class CounsellingActivity : AppCompatActivity() {
         supportActionBar?.title = getString(R.string.counselling_overview_title)
         setupNavigationFooter()
         updateGeneralInfoUi()
+        binding.nsvContent.post { binding.nsvContent.scrollTo(0, 0) }
     }
 
     private fun hideKeyboard() {

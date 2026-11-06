@@ -964,6 +964,7 @@ class NewBenRegFragment : Fragment() {
                 115  -> notifyDataSetChanged()
                 12   -> notifyDataSetChanged()
                 1052 -> notifyDataSetChanged()
+                1040 -> notifyDataSetChanged() // village → Pincode / Residential Area reset (may switch locked/editable)
             }
         }
     }
