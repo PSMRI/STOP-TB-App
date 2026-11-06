@@ -164,7 +164,7 @@ class RoleModuleConfigTest {
         val p = RoleModuleConfig.privilegeFor(AppRole.VOLUNTEER)
         assertThat(p.homeModules).containsExactly(AppModule.HOUSEHOLD, AppModule.BENEFICIARIES)
         assertThat(p.allowQuickRefresh).isFalse()
-        assertThat(p.showRegisterSpouseButtons).isTrue()
+        assertThat(p.showRegisterSpouseButtons).isFalse()
         assertThat(p.canActOnReferral).isFalse()
         assertThat(p.showAbhaButton).isTrue()
         assertThat(p.showCallButton).isTrue()

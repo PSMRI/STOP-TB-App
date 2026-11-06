@@ -18,10 +18,13 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.HouseHoldListAdapter
+import org.piramalswasthya.stoptb.configuration.HouseholdSpouseRelations
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertNewBenBinding
@@ -49,6 +52,7 @@ class AllHouseholdFragment : Fragment() {
     private var hasDraft = false
     private var addBenAlert: AlertDialog? = null
     private var addBenAlertBinding: AlertNewBenBinding? = null
+    private var addMemberLookupJob: Job? = null
 
     private val sttContract = registerForActivityResult(SpeechToTextContract()) { value ->
         val lowerValue = value.lowercase()
@@ -201,8 +205,13 @@ class AllHouseholdFragment : Fragment() {
                 )
             )
         } else {
-            viewModel.setSelectedHouseholdId(household.hhId)
-            addBenAlert?.show()
+            addMemberLookupJob?.cancel()
+            addMemberLookupJob = viewLifecycleOwner.lifecycleScope.launch {
+                addBenAlertBinding?.let { resetAddBenDialog(it) }
+                viewModel.setSelectedHouseholdId(household.hhId)
+                if (!isActive || viewModel.selectedHouseholdId != household.hhId) return@launch
+                addBenAlert?.show()
+            }
         }
     }
 
@@ -233,13 +242,7 @@ class AllHouseholdFragment : Fragment() {
 
         addBenAlert = MaterialAlertDialogBuilder(requireContext())
             .setView(alertBinding.root)
-            .setOnCancelListener {
-                viewModel.resetSelectedHouseholdId()
-                alertBinding.rgGender.clearCheck()
-                alertBinding.linearLayout4.visibility = View.GONE
-                alertBinding.actvRth.text = null
-                alertBinding.btnOk.isEnabled = false
-            }
+            .setOnCancelListener { dismissAddBenDialog(alertBinding) }
             .create()
 
         alertBinding.btnOk.setOnClickListener {
@@ -255,14 +258,27 @@ class AllHouseholdFragment : Fragment() {
                     gender = gender
                 )
             )
-            viewModel.resetSelectedHouseholdId()
+            dismissAddBenDialog(alertBinding)
             addBenAlert?.dismiss()
         }
 
         alertBinding.btnCancel.setOnClickListener {
-            viewModel.resetSelectedHouseholdId()
+            dismissAddBenDialog(alertBinding)
             addBenAlert?.dismiss()
         }
+    }
+
+    private fun dismissAddBenDialog(alertBinding: AlertNewBenBinding) {
+        addMemberLookupJob?.cancel()
+        viewModel.resetSelectedHouseholdId()
+        resetAddBenDialog(alertBinding)
+    }
+
+    private fun resetAddBenDialog(alertBinding: AlertNewBenBinding) {
+        alertBinding.rgGender.clearCheck()
+        alertBinding.linearLayout4.visibility = View.GONE
+        alertBinding.actvRth.text = null
+        alertBinding.btnOk.isEnabled = false
     }
 
     private fun genderFromRadioId(alertBinding: AlertNewBenBinding, checkedId: Int): Gender? =
@@ -286,16 +302,27 @@ class AllHouseholdFragment : Fragment() {
         val fatherRegistered: Boolean,
         val motherRegistered: Boolean,
         val unmarried: Boolean,
-        val married: Boolean
+        val married: Boolean,
+        val wifeRegistered: Boolean,
+        val husbandRegistered: Boolean
     )
 
     private fun computeHofContext(): HofContext {
-        val hof = viewModel.householdBenList.firstOrNull { it.familyHeadRelationPosition == 19 }
-        val fatherRegistered = viewModel.householdBenList.any { it.familyHeadRelationPosition == 2 }
-        val motherRegistered = viewModel.householdBenList.any { it.familyHeadRelationPosition == 1 }
+        val members = viewModel.householdBenList
+        val hof = members.firstOrNull { it.familyHeadRelationPosition == 19 }
+        val fatherRegistered = members.any { it.familyHeadRelationPosition == 2 }
+        val motherRegistered = members.any { it.familyHeadRelationPosition == 1 }
         val unmarried = hof?.genDetails?.maritalStatusId == 1
         val married = hof?.genDetails?.maritalStatusId == 2
-        return HofContext(hof, fatherRegistered, motherRegistered, unmarried, married)
+        val wifeRegistered = members.any {
+            HouseholdSpouseRelations.isWife(it.familyHeadRelationPosition)
+        }
+        val husbandRegistered = members.any {
+            HouseholdSpouseRelations.isHusband(it.familyHeadRelationPosition)
+        }
+        return HofContext(
+            hof, fatherRegistered, motherRegistered, unmarried, married, wifeRegistered, husbandRegistered
+        )
     }
 
     private fun baseRelationDropdown(selectedGender: Gender?): List<String> {
@@ -312,7 +339,7 @@ class AllHouseholdFragment : Fragment() {
         baseList: List<String>,
         context: HofContext
     ): List<String> {
-        if (context.hof == null) return baseList
+        if (context.hof == null) return withoutRegisteredSpouse(baseList, context)
 
         val relationList = baseList.toMutableList()
         val commonRelations = resources.getStringArray(R.array.nbr_relationship_to_head)
@@ -337,7 +364,18 @@ class AllHouseholdFragment : Fragment() {
             relationList.remove(commonRelations[4])
         }
 
-        return relationList
+        return withoutRegisteredSpouse(relationList, context)
+    }
+
+    private fun withoutRegisteredSpouse(relations: List<String>, context: HofContext): List<String> {
+        val labels = resources.getStringArray(R.array.nbr_relationship_to_head)
+        return HouseholdSpouseRelations.withoutRegisteredSpouse(
+            relations,
+            wifeLabel = labels.getOrNull(4),
+            husbandLabel = labels.getOrNull(5),
+            wifeRegistered = context.wifeRegistered,
+            husbandRegistered = context.husbandRegistered
+        )
     }
 
     private fun applyRelationAdapter(alertBinding: AlertNewBenBinding, items: List<String>) {

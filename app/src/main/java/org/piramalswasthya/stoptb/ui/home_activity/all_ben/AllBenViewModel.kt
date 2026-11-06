@@ -76,14 +76,15 @@ class AllBenViewModel @Inject constructor(
         _householdBenListForAddMember.clear()
     }
 
-    fun setSelectedHouseholdForAddMember(hhId: Long) {
+    suspend fun setSelectedHouseholdForAddMember(hhId: Long) {
         _selectedHouseholdIdForAddMember = hhId
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                _householdBenListForAddMember.clear()
-                _householdBenListForAddMember.addAll(benRepo.getBenListFromHousehold(hhId))
-            }
+        val members = withContext(Dispatchers.IO) {
+            benRepo.getBenListFromHousehold(hhId)
         }
+        // A newer selection, or a reset, happened while this lookup was running.
+        if (_selectedHouseholdIdForAddMember != hhId) return
+        _householdBenListForAddMember.clear()
+        _householdBenListForAddMember.addAll(members)
     }
 
     private var sourceFromArgs = AllBenFragmentArgs.fromSavedStateHandle(savedStateHandle).source

@@ -20,13 +20,16 @@ import androidx.paging.LoadState
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.configuration.HouseholdSpouseRelations
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.adapters.BenListAdapter
 import org.piramalswasthya.stoptb.adapters.BenPagingAdapter
@@ -94,6 +97,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     private var addMemberAlert: androidx.appcompat.app.AlertDialog? = null
     private var addMemberAlertBinding: AlertNewBenBinding? = null
+    private var addMemberLookupJob: Job? = null
 
     private val viewModel: AllBenViewModel by viewModels()
 
@@ -970,12 +974,15 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     private fun addMemberToBeneficiaryHousehold(item: org.piramalswasthya.stoptb.model.BenBasicDomain) {
         if (item.isNonHH || item.isDeath || item.isDeactivate) return
-        viewLifecycleOwner.lifecycleScope.launch {
+        addMemberLookupJob?.cancel()
+        addMemberLookupJob = viewLifecycleOwner.lifecycleScope.launch {
             if (viewModel.isHouseholdMemberLimitReached(item.hhId)) {
                 showHouseholdMemberLimitReachedMessage(item.hhId)
                 return@launch
             }
+            addMemberAlertBinding?.let { resetAddMemberDialog(it) }
             viewModel.setSelectedHouseholdForAddMember(item.hhId)
+            if (!isActive || viewModel.selectedHouseholdIdForAddMember != item.hhId) return@launch
             addMemberAlert?.show()
         }
     }
@@ -985,7 +992,9 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         val fatherRegistered: Boolean,
         val motherRegistered: Boolean,
         val unmarried: Boolean,
-        val married: Boolean
+        val married: Boolean,
+        val wifeRegistered: Boolean,
+        val husbandRegistered: Boolean
     )
 
     private fun computeHofContextForAddMember(): HofContext {
@@ -995,7 +1004,15 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         val motherRegistered = list.any { it.familyHeadRelationPosition == 1 }
         val unmarried = hof?.genDetails?.maritalStatusId == 1
         val married = hof?.genDetails?.maritalStatusId == 2
-        return HofContext(hof, fatherRegistered, motherRegistered, unmarried, married)
+        val wifeRegistered = list.any {
+            HouseholdSpouseRelations.isWife(it.familyHeadRelationPosition)
+        }
+        val husbandRegistered = list.any {
+            HouseholdSpouseRelations.isHusband(it.familyHeadRelationPosition)
+        }
+        return HofContext(
+            hof, fatherRegistered, motherRegistered, unmarried, married, wifeRegistered, husbandRegistered
+        )
     }
 
     private fun baseRelationDropdownForAddMember(selectedGender: org.piramalswasthya.stoptb.model.Gender?): List<String> {
@@ -1012,7 +1029,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         baseList: List<String>,
         context: HofContext
     ): List<String> {
-        if (context.hof == null) return baseList
+        if (context.hof == null) return withoutRegisteredSpouseForAddMember(baseList, context)
 
         val relationList = baseList.toMutableList()
         val commonRelations = resources.getStringArray(R.array.nbr_relationship_to_head)
@@ -1037,7 +1054,18 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             relationList.remove(commonRelations[4])
         }
 
-        return relationList
+        return withoutRegisteredSpouseForAddMember(relationList, context)
+    }
+
+    private fun withoutRegisteredSpouseForAddMember(relations: List<String>, context: HofContext): List<String> {
+        val labels = resources.getStringArray(R.array.nbr_relationship_to_head)
+        return HouseholdSpouseRelations.withoutRegisteredSpouse(
+            relations,
+            wifeLabel = labels.getOrNull(4),
+            husbandLabel = labels.getOrNull(5),
+            wifeRegistered = context.wifeRegistered,
+            husbandRegistered = context.husbandRegistered
+        )
     }
 
     private fun genderFromRadioIdForAddMember(alertBinding: AlertNewBenBinding, checkedId: Int): org.piramalswasthya.stoptb.model.Gender? =
@@ -1089,13 +1117,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
         addMemberAlert = MaterialAlertDialogBuilder(requireContext())
             .setView(alertBinding.root)
-            .setOnCancelListener {
-                viewModel.resetSelectedHouseholdForAddMember()
-                alertBinding.rgGender.clearCheck()
-                alertBinding.linearLayout4.visibility = View.GONE
-                alertBinding.actvRth.text = null
-                alertBinding.btnOk.isEnabled = false
-            }
+            .setOnCancelListener { dismissAddMemberDialog(alertBinding) }
             .create()
 
         alertBinding.btnOk.setOnClickListener {
@@ -1113,14 +1135,27 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     gender = gender
                 )
             )
-            viewModel.resetSelectedHouseholdForAddMember()
+            dismissAddMemberDialog(alertBinding)
             addMemberAlert?.dismiss()
         }
 
         alertBinding.btnCancel.setOnClickListener {
-            viewModel.resetSelectedHouseholdForAddMember()
+            dismissAddMemberDialog(alertBinding)
             addMemberAlert?.dismiss()
         }
+    }
+
+    private fun dismissAddMemberDialog(alertBinding: AlertNewBenBinding) {
+        addMemberLookupJob?.cancel()
+        viewModel.resetSelectedHouseholdForAddMember()
+        resetAddMemberDialog(alertBinding)
+    }
+
+    private fun resetAddMemberDialog(alertBinding: AlertNewBenBinding) {
+        alertBinding.rgGender.clearCheck()
+        alertBinding.linearLayout4.visibility = View.GONE
+        alertBinding.actvRth.text = null
+        alertBinding.btnOk.isEnabled = false
     }
 
     override fun onDestroy() {
