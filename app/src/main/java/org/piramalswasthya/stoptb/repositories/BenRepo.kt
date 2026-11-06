@@ -2166,19 +2166,22 @@ class BenRepo @Inject constructor(
                         ?: stopTBDetailsObj.optStringOrNull("nikshayId")
                         ?: stopTBDetailsObj.optStringOrNull("nikshayID")
 
-                    val benGpsLatitude = demographicsObj.optDoubleOrNull("latitude")
-                        ?: demographicsObj.optDoubleOrNull("gpsLatitude")
-                        ?: benDataObj.optDoubleOrNull("latitude")
-                        ?: benDataObj.optDoubleOrNull("gpsLatitude")
-                        ?: jsonObject.optDoubleOrNull("latitude")
-                        ?: jsonObject.optDoubleOrNull("gpsLatitude")
+                    val benGpsPairs = listOf(
+                        demographicsObj.optDoubleOrNull("latitude") to demographicsObj.optDoubleOrNull("longitude"),
+                        demographicsObj.optDoubleOrNull("gpsLatitude") to demographicsObj.optDoubleOrNull("gpsLongitude"),
+                        benDataObj.optDoubleOrNull("latitude") to benDataObj.optDoubleOrNull("longitude"),
+                        benDataObj.optDoubleOrNull("gpsLatitude") to benDataObj.optDoubleOrNull("gpsLongitude"),
+                        jsonObject.optDoubleOrNull("latitude") to jsonObject.optDoubleOrNull("longitude"),
+                        jsonObject.optDoubleOrNull("gpsLatitude") to jsonObject.optDoubleOrNull("gpsLongitude"),
+                    ).mapNotNull { (latitude, longitude) ->
+                        if (latitude != null && longitude != null) latitude to longitude else null
+                    }
+                    val benGpsPair = benGpsPairs.firstOrNull { (latitude, longitude) ->
+                        latitude != 0.0 || longitude != 0.0
+                    } ?: benGpsPairs.firstOrNull()
 
-                    val benGpsLongitude = demographicsObj.optDoubleOrNull("longitude")
-                        ?: demographicsObj.optDoubleOrNull("gpsLongitude")
-                        ?: benDataObj.optDoubleOrNull("longitude")
-                        ?: benDataObj.optDoubleOrNull("gpsLongitude")
-                        ?: jsonObject.optDoubleOrNull("longitude")
-                        ?: jsonObject.optDoubleOrNull("gpsLongitude")
+                    val benGpsLatitude = benGpsPair?.first
+                    val benGpsLongitude = benGpsPair?.second
 
                     val benDigipin = demographicsObj.optStringOrNull("digipin")
                         ?: benDataObj.optStringOrNull("digipin")

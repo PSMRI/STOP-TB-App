@@ -1770,7 +1770,8 @@ interface BenDao {
      *
      * Recently created first, the same order as the All Beneficiaries list
      * (searchBenPagedWithoutTbTables), so a worker finds the person they just registered at the
-     * top. benId DESC breaks ties so the order is total.
+     * top. A pull stores createdDate = 0 when the server sends none, so NULLIF lets regDate
+     * stand in for it. benId DESC breaks ties so the order is total.
      *
      * This replaces the earlier benId ASC order. benId is a server-assigned id, not a date, so
      * ASC put new registrations at the bottom. ASC was chosen because rows inserted ahead of the
@@ -1783,7 +1784,7 @@ interface BenDao {
         SELECT * FROM BEN_BASIC_CACHE
         WHERE villageId = :selectedVillage AND isDeactivate = 0 AND isNonHH = 1
         AND (:query = '' OR benName LIKE '%' || :query || '%' OR benSurname LIKE '%' || :query || '%' OR (IFNULL(benName, '') || ' ' || IFNULL(benSurname, '')) LIKE '%' || :query || '%' OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%')
-        ORDER BY COALESCE(createdDate, regDate, 0) DESC, benId DESC
+        ORDER BY COALESCE(NULLIF(createdDate, 0), regDate, 0) DESC, benId DESC
     """)
     fun searchNonHHBeneficiariesPaged(selectedVillage: Int, query: String): PagingSource<Int, BenBasicCache>
 
