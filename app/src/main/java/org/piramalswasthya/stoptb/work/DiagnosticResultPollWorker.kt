@@ -61,12 +61,13 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 tbRepo.refreshDeviceIntegrationConfig()
 
                 var hasInProgress = false
+                // The changes feed already brings every order's status on each pull, so the
+                // village-wide status sweeps and per-order result calls are only needed when the
+                // hub has no feed.
+                val feedActive = preferenceDao.isChangesFeedActive()
                 if (!tbRepo.isXrayIntegrated() && !tbRepo.isTruenatIntegrated()) {
                     Timber.d("Skipping automated result polling: no diagnostic devices are integrated")
                 } else {
-                // The changes feed already brings every order's status on each pull, so the
-                // village-wide status sweeps are only needed when the hub has no feed.
-                val feedActive = preferenceDao.isChangesFeedActive()
                 if (!feedActive && tbRepo.isXrayIntegrated()) {
                     tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST")
                 }
@@ -112,7 +113,28 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 // call already catches its own exceptions and returns NetworkResponse.Error
                 // (never throws), so one beneficiary's failure can't cancel the others under
                 // coroutineScope's structured concurrency.
-                if (hasInProgress) {
+                if (hasInProgress && feedActive) {
+                    // The server polls the X-ray and TrueNat vendors itself and every result change
+                    // reaches the tablet through the changes feed (applyFeedDiagnosticOrders runs the
+                    // same applyOrderResult as fetchOrderResult). Calling order/result per pending
+                    // order on top of that only duplicated the feed, and the TB suspected re-uploads
+                    // it set off kept the push chain busy and the feed pull waiting. Ask for a quick
+                    // delta pull instead; it is debounced and costs one small request.
+                    Timber.d("Pending diagnostic orders: ${pendingOrders.size}, results come from the changes feed")
+                    WorkerUtils.triggerCampQuickPullIfConnected(appContext, preferenceDao)
+                    // The feed skips a row for an order this tablet created moments ago and moves
+                    // past it, so a result that arrived then has to be asked for directly.
+                    tbRepo.takeFeedSkippedOrdersPastGrace().forEach { (benId, type) ->
+                        Timber.d("Polling $type result for benId=$benId skipped by the feed")
+                        tbRepo.fetchOrderResult(benId, type)
+                    }
+                    // Keeps the "Last checked" caption current, as the per-order path does.
+                    pendingOrders.forEach { order ->
+                        if (order.xray) preferenceDao.setLastCheckedTime(order.benId, "XRAY_CHEST", now)
+                        if (order.trueNat) preferenceDao.setLastCheckedTime(order.benId, "SPUTUM_TRUENAT", now)
+                        if (order.rif) preferenceDao.setLastCheckedTime(order.benId, "MDR_RIF", now)
+                    }
+                } else if (hasInProgress) {
                     val pollSemaphore = Semaphore(MAX_CONCURRENT_POLLS)
                     coroutineScope {
                         pendingOrders.forEach { order ->

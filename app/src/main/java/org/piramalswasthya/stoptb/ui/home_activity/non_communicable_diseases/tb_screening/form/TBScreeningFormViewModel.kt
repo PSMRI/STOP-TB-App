@@ -233,7 +233,9 @@ class TBScreeningFormViewModel @Inject constructor(
     }
 
     /**
-     * Writes the screening row and its derived diagnostics row, then kicks off the order push.
+     * Writes the screening row and its derived diagnostics row, then starts the upload. In camp
+     * mode the hub creates the referred orders from the uploaded screening; otherwise this tablet
+     * pushes them itself.
      *
      * The two writes deliberately propagate. This used to be wrapped end-to-end in
      * `catch (e: Exception) { Timber.e(...) }`, which swallowed a failed
@@ -295,6 +297,25 @@ class TBScreeningFormViewModel @Inject constructor(
             }
         }
         tbRepo.saveTBDiagnostics(currentDiag)
+
+        // On a camp hub the hub creates the referred orders from the screening record itself, so
+        // the order no longer depends on this tablet reaching the hub at save time (a push made
+        // while the hub was unreachable was marked FAILED here and never retried, and the
+        // registrar cannot open the X-ray/TrueNat screens to retry it). Only the screening upload
+        // is started now; the order arrives back through the changes feed.
+        if (preferenceDao.isCampModeEnabled()) {
+            if (refersXray || refersTruenat) {
+                try {
+                    tbRepo.pushUnSyncedTBScreeningRecords()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.e(e, "TB Screening upload after save failed; the sync worker will retry it")
+                }
+            }
+            return
+        }
+
         val ordersToPush = mutableListOf<String>()
         if (refersXray && !hasXrayOrder) ordersToPush.add("XRAY_CHEST")
         if (refersTruenat && !hasTruenatOrder) ordersToPush.add("SPUTUM_TRUENAT")
