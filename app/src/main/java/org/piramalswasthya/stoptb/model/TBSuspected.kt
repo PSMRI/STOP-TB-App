@@ -77,6 +77,22 @@ data class TBSuspectedCache(
     var serverUpdatedDate: Long? = null,
     var syncState: SyncState = SyncState.UNSYNCED,
 ) : FormDataModel {
+    /**
+     * This record with the fields the server's tb_suspected does not store (hasSymptoms,
+     * isNaatConducted, naatResult, latitude, longitude, address) and the sync bookkeeping blanked,
+     * so two copies compare equal when everything the server keeps is the same.
+     */
+    fun withoutTabletOnlyFields(): TBSuspectedCache = copy(
+        hasSymptoms = false,
+        isNaatConducted = null,
+        naatResult = null,
+        latitude = null,
+        longitude = null,
+        address = null,
+        syncState = SyncState.UNSYNCED,
+        serverUpdatedDate = null,
+    )
+
     fun toDTO(): TBSuspectedDTO {
         return TBSuspectedDTO(
             id = 0,

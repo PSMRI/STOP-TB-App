@@ -85,6 +85,10 @@ class TBRepo @Inject constructor(
 ) {
     private val orderCreatedTimestamps = java.util.concurrent.ConcurrentHashMap<String, Long>()
     private val ORDER_STATUS_GRACE_PERIOD_MS = 90_000L
+    // Orders whose feed row was skipped inside the grace period are kept in PreferenceDao
+    // (getFeedSkippedOrders). The feed token moves past that row, so DiagnosticResultPollWorker
+    // asks order/result for them once the grace period ends.
+    private fun feedSkippedKey(benId: Long, type: String) = "$benId|$type"
 
     // Per-beneficiary lock for every TB_DIAGNOSTICS/TB_SUSPECTED read-modify-write below, so
     // concurrent calls for the same benId (e.g. parallel X-ray/TrueNat polling) can't clobber
@@ -660,7 +664,11 @@ class TBRepo @Inject constructor(
             // An order this tablet created in the last moments may not be on the hub's feed yet;
             // the older server row must not overwrite it.
             val createdAt = orderCreatedTimestamps["${ben.beneficiaryId}_$localType"]
-            if (createdAt != null && System.currentTimeMillis() - createdAt < ORDER_STATUS_GRACE_PERIOD_MS) continue
+            if (createdAt != null && System.currentTimeMillis() - createdAt < ORDER_STATUS_GRACE_PERIOD_MS) {
+                preferenceDao.addFeedSkippedOrder(feedSkippedKey(ben.beneficiaryId, localType))
+                continue
+            }
+            preferenceDao.removeFeedSkippedOrder(feedSkippedKey(ben.beneficiaryId, localType))
             val current = tbDao.getTbDiagnosticsByBenId(ben.beneficiaryId)?.let {
                 when (localType) {
                     "XRAY_CHEST" -> it.xrayOrderId
@@ -684,6 +692,31 @@ class TBRepo @Inject constructor(
             }
         }
         applied
+    }
+
+    /**
+     * The orders the feed skipped inside the grace period whose grace period has now ended, as
+     * (benId, order type) pairs ready for [fetchOrderResult]. They stay recorded until
+     * [ackFeedSkippedOrder] (after a successful fetch) or a later feed row for the same order, so
+     * a failed or interrupted fetch is tried again on the next run. After a restart the creation
+     * time is gone, so the pair is due straight away.
+     */
+    fun feedSkippedOrdersPastGrace(): List<Pair<Long, String>> {
+        val now = System.currentTimeMillis()
+        return preferenceDao.getFeedSkippedOrders().mapNotNull { entry ->
+            val benId = entry.substringBefore('|').toLongOrNull()
+            val type = entry.substringAfter('|', "")
+            if (benId == null || type.isEmpty()) {
+                preferenceDao.removeFeedSkippedOrder(entry)
+                return@mapNotNull null
+            }
+            val createdAt = orderCreatedTimestamps["${benId}_$type"]
+            if (createdAt == null || now - createdAt >= ORDER_STATUS_GRACE_PERIOD_MS) benId to type else null
+        }
+    }
+
+    fun ackFeedSkippedOrder(benId: Long, type: String) {
+        preferenceDao.removeFeedSkippedOrder(feedSkippedKey(benId, type))
     }
 
     private fun feedResponse(records: JSONArray): JSONObject =
@@ -1139,7 +1172,9 @@ class TBRepo @Inject constructor(
                                 visitLabel = incoming.visitLabel,
                                 typeOfTBCase = incoming.typeOfTBCase,
                                 reasonForSuspicion = incoming.reasonForSuspicion,
-                                hasSymptoms = incoming.hasSymptoms,
+                                // The server keeps no column for these, so a pulled record
+                                // carries null; keep what the tablet derived.
+                                hasSymptoms = tbSuspectedDTO.hasSymptoms ?: tbSuspectedCache.hasSymptoms,
                                 isSputumCollected = incoming.isSputumCollected,
                                 sputumSubmittedAt = incoming.sputumSubmittedAt,
                                 nikshayId = incoming.nikshayId,
@@ -1148,8 +1183,8 @@ class TBRepo @Inject constructor(
                                 chestXRayResult = incoming.chestXRayResult,
                                 isAICoughAssessmentDone = incoming.isAICoughAssessmentDone,
                                 aiCoughAssessmentResult = incoming.aiCoughAssessmentResult,
-                                isNaatConducted = incoming.isNaatConducted,
-                                naatResult = incoming.naatResult,
+                                isNaatConducted = incoming.isNaatConducted ?: tbSuspectedCache.isNaatConducted,
+                                naatResult = incoming.naatResult ?: tbSuspectedCache.naatResult,
                                 recommendedForLiquidCultureTest = incoming.recommendedForLiquidCultureTest,
                                 isLiquidCultureConducted = incoming.isLiquidCultureConducted,
                                 liquidCultureResult = incoming.liquidCultureResult,
@@ -1158,9 +1193,9 @@ class TBRepo @Inject constructor(
                                 isDRTBConfirmed = incoming.isDRTBConfirmed,
                                 otherReasonForSuspicion = incoming.otherReasonForSuspicion,
                                 isConfirmed = incoming.isConfirmed,
-                                latitude = incoming.latitude,
-                                longitude = incoming.longitude,
-                                address = incoming.address,
+                                latitude = incoming.latitude ?: tbSuspectedCache.latitude,
+                                longitude = incoming.longitude ?: tbSuspectedCache.longitude,
+                                address = incoming.address ?: tbSuspectedCache.address,
                                 referred = incoming.referred,
                                 followUps = incoming.followUps,
                                 serverUpdatedDate = incoming.serverUpdatedDate,
@@ -3046,6 +3081,19 @@ class TBRepo @Inject constructor(
                 Timber.w("TB_SUSPECTED_DIRTY: benId=$benId marking UNSYNCED (was ${existing.syncState}), diag.xrayOrderStatus=${diag.xrayOrderStatus} trueNatOrderStatus=${diag.trueNatOrderStatus} rifOrderStatus=${diag.rifOrderStatus}, changes=$diffs")
             } else {
                 Timber.w("TB_SUSPECTED_DIRTY: benId=$benId creating new tb_suspected record from diagnostics")
+            }
+
+            // hasSymptoms, isNaatConducted and naatResult live only on the tablet: the server's
+            // tb_suspected has no columns for them, so they are dropped on upload and come back
+            // false/null in the next changes-feed page. Re-deriving them here then looked like a
+            // change every time, so the record was marked UNSYNCED, uploaded, pulled back without
+            // them and marked again. Keep them locally, but only queue an upload when a field the
+            // server stores has changed.
+            if (existing != null &&
+                provisionalCache.withoutTabletOnlyFields() == existing.withoutTabletOnlyFields()
+            ) {
+                saveTBSuspected(provisionalCache.copy(syncState = existing.syncState))
+                return@withBenIdLock
             }
 
             saveTBSuspected(provisionalCache.copy(syncState = SyncState.UNSYNCED))
