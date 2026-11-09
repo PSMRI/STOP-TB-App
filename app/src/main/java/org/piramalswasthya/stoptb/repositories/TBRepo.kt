@@ -659,7 +659,9 @@ class TBRepo @Inject constructor(
         val typeOrder = listOf("MDR_RIF", "SPUTUM_TRUENAT", "XRAY_CHEST")
         val now = System.currentTimeMillis()
         val skippedBefore = preferenceDao.getFeedSkippedOrders()
-        val toRemoveFromSkipped = mutableListOf<String>()
+        // Skipped-order entries for orders this page applies; removed only once they are applied,
+        // so a page that fails part-way leaves them for DiagnosticResultPollWorker.
+        val appliedSkipKeys = mutableListOf<String>()
 
         // Sorted RIF -> TrueNat -> X-ray, resolved to the local beneficiary, and split three ways:
         // inside the grace period (left for DiagnosticResultPollWorker), needing the MTB -> RIF
@@ -679,13 +681,11 @@ class TBRepo @Inject constructor(
                 preferenceDao.addFeedSkippedOrder(skipKey)
                 continue
             }
-            if (skipKey in skippedBefore) toRemoveFromSkipped += skipKey
             val rifOrderKnown = latest.containsKey(benKey to "MDR_RIF")
             val order = FeedOrder(ben, localType, value.second)
             if (needsRifCascade(localType, value.second, rifOrderKnown)) cascade += order to rifOrderKnown
             else bulk += order
         }
-        preferenceDao.removeFeedSkippedOrders(toRemoveFromSkipped)
 
         // One set of locks and one write transaction for the page. Applying each order on its own
         // (lock, read, write TB_DIAGNOSTICS, read and write TB_SUSPECTED) committed four or so
@@ -694,8 +694,6 @@ class TBRepo @Inject constructor(
         // order. Rows that come out unchanged are not written at all, so a page that only
         // repeats what the tablet already holds costs no writes.
         var applied = 0
-        var suspectedQueued = false
-        val trueNatReferrals = LinkedHashSet<Long>()
         // A cascade only arises when this page has no RIF order for the beneficiary, so applying
         // these TrueNat results first keeps the RIF -> TrueNat -> X-ray order: the X-ray rows
         // below then see the TrueNat state, as they did when every order was applied in turn.
@@ -703,20 +701,35 @@ class TBRepo @Inject constructor(
             val current = tbDao.getTbDiagnosticsByBenId(order.ben.beneficiaryId)?.trueNatOrderId
             applyOrderResult(order.ben, order.localType, order.data, current, pushSuspectedAfter = false, rifOrderKnown = rifOrderKnown)
             applied++
-            suspectedQueued = true
+            feedSkippedKey(order.ben.beneficiaryId, order.localType).let { if (it in skippedBefore) appliedSkipKeys += it }
         }
 
         if (bulk.isNotEmpty()) {
             val truenatIntegrated = isTruenatIntegrated()
+            var bulkApplied = 0
             withBenIdLocks(bulk.map { it.ben.beneficiaryId }) {
                 database.withTransaction {
                     for (order in bulk) {
                         val benId = order.ben.beneficiaryId
+                        val skipKey = feedSkippedKey(benId, order.localType)
+                        // Checked again under the lock: createOrder() saves a new order and records
+                        // its time under this same lock, so one placed after the page was sorted
+                        // above shows here, and the older feed row must not overwrite it.
+                        val createdAt = orderCreatedTimestamps["${benId}_${order.localType}"]
+                        if (createdAt != null && System.currentTimeMillis() - createdAt < ORDER_STATUS_GRACE_PERIOD_MS) {
+                            preferenceDao.addFeedSkippedOrder(skipKey)
+                            continue
+                        }
                         val rawStatus = order.data.status
                         val status = if (rawStatus.isNullOrBlank()) "IN_PROGRESS" else rawStatus
                         val existing = tbDao.getTbDiagnosticsByBenId(benId)
                         val merged = mergeOrderResult(existing, benId, order.localType, order.data, status, null, truenatIntegrated)
-                        if (merged.triggerTrueNat) trueNatReferrals += benId
+                        // Enqueued before the row is saved, as before: WorkManager keeps the work
+                        // across a restart, so the referral is not lost if the process dies after
+                        // the completed X-ray is stored.
+                        if (merged.triggerTrueNat) {
+                            WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, listOf("SPUTUM_TRUENAT"))
+                        }
                         val synced = merged.cache.copy(syncState = SyncState.SYNCED)
                         if (synced != existing) tbDao.saveTbDiagnostics(synced)
                         val existingSuspected = tbDao.getTbSuspected(benId)
@@ -724,22 +737,21 @@ class TBRepo @Inject constructor(
                         if (suspected != null) {
                             order.ben.gpsLatitude?.let { suspected.latitude = it }
                             order.ben.gpsLongitude?.let { suspected.longitude = it }
-                            if (suspected != existingSuspected) {
-                                tbDao.saveTbSuspected(suspected)
-                                if (suspected.syncState == SyncState.UNSYNCED) suspectedQueued = true
-                            }
+                            if (suspected != existingSuspected) tbDao.saveTbSuspected(suspected)
                         }
-                        applied++
+                        if (skipKey in skippedBefore) appliedSkipKeys += skipKey
+                        bulkApplied++
                     }
                 }
             }
-            Timber.d("Feed diagnostic orders: applied ${bulk.size} in one transaction")
+            applied += bulkApplied
+            Timber.d("Feed diagnostic orders: applied $bulkApplied of ${bulk.size} in one transaction")
         }
-        trueNatReferrals.forEach { benId ->
-            WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, listOf("SPUTUM_TRUENAT"))
-        }
+        preferenceDao.removeFeedSkippedOrders(appliedSkipKeys)
 
-        if (suspectedQueued) {
+        if (applied > 0) {
+            // Pushes whatever TB_SUSPECTED rows are waiting, including ones an earlier failed
+            // upload left behind; it returns at once when there are none.
             try {
                 pushUnSyncedRecordsTBSuspected()
             } catch (e: CancellationException) {
@@ -3371,7 +3383,6 @@ class TBRepo @Inject constructor(
         // type on the same beneficiary (or the RIF cascade above, which
         // already committed its own fields) is guaranteed to be visible here
         // rather than clobbered by a stale pre-cascade snapshot.
-        var triggerTrueNat = false
         val syncedCache = withBenIdLock(benId) {
         val existing = tbDao.getTbDiagnosticsByBenId(benId)
         val currentOrderId = if (isXrayType) existing?.xrayOrderId else if (isRifType) existing?.rifOrderId else existing?.trueNatOrderId
@@ -3386,13 +3397,14 @@ class TBRepo @Inject constructor(
             return@withBenIdLock existing ?: TBDiagnosticsCache(benId = benId)
         }
         val merged = mergeOrderResult(existing, benId, orderType, responseData, status, rifFieldOverride, isTruenatIntegrated())
-        triggerTrueNat = merged.triggerTrueNat
+        // Enqueued before the row is saved: WorkManager keeps the work across a restart, so the
+        // referral survives the process dying right after the completed X-ray is stored.
+        if (merged.triggerTrueNat) {
+            WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, listOf("SPUTUM_TRUENAT"))
+        }
         val synced = merged.cache.copy(syncState = SyncState.SYNCED)
         tbDao.saveTbDiagnostics(synced)
         synced
-        }
-        if (triggerTrueNat) {
-            WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, listOf("SPUTUM_TRUENAT"))
         }
 
         try {
