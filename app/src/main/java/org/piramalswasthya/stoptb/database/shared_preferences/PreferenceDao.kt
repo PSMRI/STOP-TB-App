@@ -243,6 +243,14 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
     }
 
     @Synchronized
+    fun removeFeedSkippedOrders(entries: Collection<String>) {
+        if (entries.isEmpty()) return
+        val current = getFeedSkippedOrders()
+        val remaining = current - entries.toSet()
+        if (remaining.size != current.size) pref.edit().putStringSet(FEED_SKIPPED_ORDERS, remaining).apply()
+    }
+
+    @Synchronized
     fun removeFeedSkippedOrder(entry: String) {
         val current = getFeedSkippedOrders()
         if (entry in current) pref.edit().putStringSet(FEED_SKIPPED_ORDERS, current - entry).apply()

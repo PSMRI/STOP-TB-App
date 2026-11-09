@@ -657,32 +657,89 @@ class TBRepo @Inject constructor(
             )
         }
         val typeOrder = listOf("MDR_RIF", "SPUTUM_TRUENAT", "XRAY_CHEST")
-        var applied = 0
+        val now = System.currentTimeMillis()
+        val skippedBefore = preferenceDao.getFeedSkippedOrders()
+        val toRemoveFromSkipped = mutableListOf<String>()
+
+        // Sorted RIF -> TrueNat -> X-ray, resolved to the local beneficiary, and split three ways:
+        // inside the grace period (left for DiagnosticResultPollWorker), needing the MTB -> RIF
+        // cascade (network calls; applied one at a time through applyOrderResult, which already
+        // handles its locking), and everything else, applied below in one transaction.
+        data class FeedOrder(val ben: BenRegCache, val localType: String, val data: OrderResultData)
+        val bulk = ArrayList<FeedOrder>()
+        val cascade = ArrayList<Pair<FeedOrder, Boolean>>()
         for ((key, value) in latest.entries.sortedBy { typeOrder.indexOf(it.key.second) }) {
             val (benKey, localType) = key
             val ben = benDao.getBenByRegId(benKey) ?: benDao.getBen(benKey) ?: continue
+            val skipKey = feedSkippedKey(ben.beneficiaryId, localType)
             // An order this tablet created in the last moments may not be on the hub's feed yet;
             // the older server row must not overwrite it.
             val createdAt = orderCreatedTimestamps["${ben.beneficiaryId}_$localType"]
-            if (createdAt != null && System.currentTimeMillis() - createdAt < ORDER_STATUS_GRACE_PERIOD_MS) {
-                preferenceDao.addFeedSkippedOrder(feedSkippedKey(ben.beneficiaryId, localType))
+            if (createdAt != null && now - createdAt < ORDER_STATUS_GRACE_PERIOD_MS) {
+                preferenceDao.addFeedSkippedOrder(skipKey)
                 continue
             }
-            preferenceDao.removeFeedSkippedOrder(feedSkippedKey(ben.beneficiaryId, localType))
-            val current = tbDao.getTbDiagnosticsByBenId(ben.beneficiaryId)?.let {
-                when (localType) {
-                    "XRAY_CHEST" -> it.xrayOrderId
-                    "MDR_RIF" -> it.rifOrderId
-                    else -> it.trueNatOrderId
+            if (skipKey in skippedBefore) toRemoveFromSkipped += skipKey
+            val rifOrderKnown = latest.containsKey(benKey to "MDR_RIF")
+            val order = FeedOrder(ben, localType, value.second)
+            if (needsRifCascade(localType, value.second, rifOrderKnown)) cascade += order to rifOrderKnown
+            else bulk += order
+        }
+        preferenceDao.removeFeedSkippedOrders(toRemoveFromSkipped)
+
+        // One set of locks and one write transaction for the page. Applying each order on its own
+        // (lock, read, write TB_DIAGNOSTICS, read and write TB_SUSPECTED) committed four or so
+        // transactions per order, and every commit re-ran the queries of whatever list screen was
+        // open; with a thousand pending orders on first login that took about two seconds an
+        // order. Rows that come out unchanged are not written at all, so a page that only
+        // repeats what the tablet already holds costs no writes.
+        var applied = 0
+        var suspectedQueued = false
+        val trueNatReferrals = LinkedHashSet<Long>()
+        // A cascade only arises when this page has no RIF order for the beneficiary, so applying
+        // these TrueNat results first keeps the RIF -> TrueNat -> X-ray order: the X-ray rows
+        // below then see the TrueNat state, as they did when every order was applied in turn.
+        for ((order, rifOrderKnown) in cascade) {
+            val current = tbDao.getTbDiagnosticsByBenId(order.ben.beneficiaryId)?.trueNatOrderId
+            applyOrderResult(order.ben, order.localType, order.data, current, pushSuspectedAfter = false, rifOrderKnown = rifOrderKnown)
+            applied++
+            suspectedQueued = true
+        }
+
+        if (bulk.isNotEmpty()) {
+            val truenatIntegrated = isTruenatIntegrated()
+            withBenIdLocks(bulk.map { it.ben.beneficiaryId }) {
+                database.withTransaction {
+                    for (order in bulk) {
+                        val benId = order.ben.beneficiaryId
+                        val rawStatus = order.data.status
+                        val status = if (rawStatus.isNullOrBlank()) "IN_PROGRESS" else rawStatus
+                        val existing = tbDao.getTbDiagnosticsByBenId(benId)
+                        val merged = mergeOrderResult(existing, benId, order.localType, order.data, status, null, truenatIntegrated)
+                        if (merged.triggerTrueNat) trueNatReferrals += benId
+                        val synced = merged.cache.copy(syncState = SyncState.SYNCED)
+                        if (synced != existing) tbDao.saveTbDiagnostics(synced)
+                        val existingSuspected = tbDao.getTbSuspected(benId)
+                        val suspected = suspectedFromDiagnostics(existingSuspected, benId, synced)
+                        if (suspected != null) {
+                            order.ben.gpsLatitude?.let { suspected.latitude = it }
+                            order.ben.gpsLongitude?.let { suspected.longitude = it }
+                            if (suspected != existingSuspected) {
+                                tbDao.saveTbSuspected(suspected)
+                                if (suspected.syncState == SyncState.UNSYNCED) suspectedQueued = true
+                            }
+                        }
+                        applied++
+                    }
                 }
             }
-            applyOrderResult(
-                ben, localType, value.second, current, pushSuspectedAfter = false,
-                rifOrderKnown = latest.containsKey(benKey to "MDR_RIF")
-            )
-            applied++
+            Timber.d("Feed diagnostic orders: applied ${bulk.size} in one transaction")
         }
-        if (applied > 0) {
+        trueNatReferrals.forEach { benId ->
+            WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, listOf("SPUTUM_TRUENAT"))
+        }
+
+        if (suspectedQueued) {
             try {
                 pushUnSyncedRecordsTBSuspected()
             } catch (e: CancellationException) {
@@ -2949,158 +3006,172 @@ class TBRepo @Inject constructor(
     ) {
         try {
             withBenIdLock(benId) {
-            val existing = tbDao.getTbSuspected(benId)
-
-            // TB_SUSPECTED.isSputumCollected still means "referred" (a separate, unrelated table
-            // from TB_DIAGNOSTICS' own isSputumCollected, which was repurposed to mean "sample
-            // physically collected") — so this reads diag.isReferredForSputum, not diag.isSputumCollected.
-            val mappedIsSputumCollected = when {
-                diag.isReferredForSputum == false ||
-                diag.reasonForDenialSputum != null -> false
-
-                diag.reasonNotConductedNaat != null ||
-                diag.isReferredForSputum == true ||
-                !diag.trueNatOrderId.isNullOrBlank() -> true
-
-                else -> existing?.isSputumCollected
-            }
-
-            val mappedSputumSubmittedAt = when {
-                mappedIsSputumCollected == false -> null
-                mappedIsSputumCollected == true -> diag.sputumSubmittedAt ?: existing?.sputumSubmittedAt ?: "TB Screening Camp"
-                else -> existing?.sputumSubmittedAt
-            }
-
-            val naatResLocal = diag.naatResult
-            val mappedSputumTestResult = when {
-                !naatResLocal.isNullOrBlank() -> {
-                    val clean = naatResLocal.trim().lowercase()
-                    when {
-                        clean.contains("not detected") || clean.contains("negative") -> "TB Negative"
-                        clean.contains("detected") || clean.contains("positive") -> "TB Positive"
-                        else -> null
-                    }
-                }
-                else -> existing?.sputumTestResult
-            }
-
-            val mappedIsChestXRayDone = when {
-                // Unlike sputum's mappedIsSputumCollected above, both CLOSED sub-cases
-                // (declined, or not-conducted via reasonNotConductedChestXray already checked
-                // below in this same branch) legitimately map to the same outcome here — a
-                // closed X-ray order always means the chest X-ray itself was not done.
-                diag.xrayOrderStatus.equals("CLOSED", ignoreCase = true) ||
-                diag.isReferredForDigitalChestXray == false ||
-                diag.reasonNotConductedChestXray != null -> false
-
-                diag.isChestXRayDone == true ||
-                !diag.xrayOrderId.isNullOrBlank() -> true
-
-                else -> existing?.isChestXRayDone
-            }
-
-            val mappedChestXRayResult = when {
-                diag.xrayOrderStatus.equals("COMPLETED", ignoreCase = true) && diag.chestXRayResult != null -> {
-                    diag.chestXRayResult
-                }
-                else -> diag.chestXRayResult ?: existing?.chestXRayResult
-            }
-
-            val mappedMdrRifResult = when {
-                diag.rifOrderStatus.equals("COMPLETED", ignoreCase = true) && diag.trueNatRifResult != null -> {
-                    when {
-                        diag.trueNatRifResult.equals("Rif Resistance Detected", ignoreCase = true) ||
-                        diag.trueNatRifResult.equals("DR TB", ignoreCase = true) -> "DR TB"
-                        diag.trueNatRifResult.equals("Rif Resistance Not Detected", ignoreCase = true) ||
-                        diag.trueNatRifResult.equals("Non DR TB", ignoreCase = true) -> "Non DR TB"
-                        diag.trueNatRifResult.equals("Indeterminate", ignoreCase = true) -> "Indeterminate"
-                        else -> diag.trueNatRifResult
-                    }
-                }
-                else -> diag.trueNatRifResult ?: existing?.mdrRifResult
-            }
-
-            val mappedIsDRTBConfirmed = when (mappedMdrRifResult) {
-                "DR TB" -> true
-                "Non DR TB", "Indeterminate" -> false
-                else -> existing?.isDRTBConfirmed
-            }
-
-            // Built from `existing` without touching syncState, so a structural comparison
-            // against `existing` tells us whether anything actually changed. Without this guard,
-            // every diagnostic poll (which runs every 60s while a device order is in progress)
-            // would unconditionally flip an already-synced record back to UNSYNCED.
-            val provisionalCache = (existing ?: TBSuspectedCache(benId = benId, visitLabel = "Visit 1")).copy(
-                hasSymptoms = true,
-                isChestXRayDone = mappedIsChestXRayDone,
-                chestXRayResult = mappedChestXRayResult,
-                isSputumCollected = mappedIsSputumCollected,
-                sputumSubmittedAt = mappedSputumSubmittedAt,
-                isNaatConducted = diag.isNaatConducted ?: existing?.isNaatConducted,
-                naatResult = diag.naatResult ?: existing?.naatResult,
-                reasonForRefusalXray = diag.reasonNotConductedChestXray ?: existing?.reasonForRefusalXray,
-                reasonForRefusalSputum = diag.reasonForDenialSputum ?: existing?.reasonForRefusalSputum,
-                reasonForRefusalMTB = diag.reasonNotConductedNaat ?: existing?.reasonForRefusalMTB,
-                reasonForRefusalMDRRIF = reasonForRefusalMDRRIF ?: existing?.reasonForRefusalMDRRIF,
-                mdrRifResult = mappedMdrRifResult,
-                isDRTBConfirmed = mappedIsDRTBConfirmed,
-                isTBConfirmed = mappedSputumTestResult == "TB Positive",
-                isConfirmed = mappedSputumTestResult == "TB Positive",
-                sputumTestResult = mappedSputumTestResult
-            )
-
-            // hasSymptoms is deliberately always forced true above (this function only runs off
-            // the back of a diagnostic test, which implies symptomatic), but the server's getAll
-            // response sometimes omits the field entirely, which toCache() then defaults back to
-            // false on the next pull. Normalize it here so that server-side quirk alone can't
-            // masquerade as a real change and defeat the guard below on every poll.
-            val normalizedExisting = existing?.copy(hasSymptoms = true)
-            if (existing != null && provisionalCache == normalizedExisting) {
-                return@withBenIdLock
-            }
-
-            if (existing != null) {
-                val diffs = buildList {
-                    if (existing.hasSymptoms != provisionalCache.hasSymptoms) add("hasSymptoms: ${existing.hasSymptoms} -> ${provisionalCache.hasSymptoms}")
-                    if (existing.isChestXRayDone != provisionalCache.isChestXRayDone) add("isChestXRayDone: ${existing.isChestXRayDone} -> ${provisionalCache.isChestXRayDone}")
-                    if (existing.chestXRayResult != provisionalCache.chestXRayResult) add("chestXRayResult: ${existing.chestXRayResult} -> ${provisionalCache.chestXRayResult}")
-                    if (existing.isSputumCollected != provisionalCache.isSputumCollected) add("isSputumCollected: ${existing.isSputumCollected} -> ${provisionalCache.isSputumCollected}")
-                    if (existing.sputumSubmittedAt != provisionalCache.sputumSubmittedAt) add("sputumSubmittedAt: ${existing.sputumSubmittedAt} -> ${provisionalCache.sputumSubmittedAt}")
-                    if (existing.isNaatConducted != provisionalCache.isNaatConducted) add("isNaatConducted: ${existing.isNaatConducted} -> ${provisionalCache.isNaatConducted}")
-                    if (existing.naatResult != provisionalCache.naatResult) add("naatResult: ${existing.naatResult} -> ${provisionalCache.naatResult}")
-                    if (existing.reasonForRefusalXray != provisionalCache.reasonForRefusalXray) add("reasonForRefusalXray: ${existing.reasonForRefusalXray} -> ${provisionalCache.reasonForRefusalXray}")
-                    if (existing.reasonForRefusalSputum != provisionalCache.reasonForRefusalSputum) add("reasonForRefusalSputum: ${existing.reasonForRefusalSputum} -> ${provisionalCache.reasonForRefusalSputum}")
-                    if (existing.reasonForRefusalMTB != provisionalCache.reasonForRefusalMTB) add("reasonForRefusalMTB: ${existing.reasonForRefusalMTB} -> ${provisionalCache.reasonForRefusalMTB}")
-                    if (existing.reasonForRefusalMDRRIF != provisionalCache.reasonForRefusalMDRRIF) add("reasonForRefusalMDRRIF: ${existing.reasonForRefusalMDRRIF} -> ${provisionalCache.reasonForRefusalMDRRIF}")
-                    if (existing.mdrRifResult != provisionalCache.mdrRifResult) add("mdrRifResult: ${existing.mdrRifResult} -> ${provisionalCache.mdrRifResult}")
-                    if (existing.isDRTBConfirmed != provisionalCache.isDRTBConfirmed) add("isDRTBConfirmed: ${existing.isDRTBConfirmed} -> ${provisionalCache.isDRTBConfirmed}")
-                    if (existing.isTBConfirmed != provisionalCache.isTBConfirmed) add("isTBConfirmed: ${existing.isTBConfirmed} -> ${provisionalCache.isTBConfirmed}")
-                    if (existing.isConfirmed != provisionalCache.isConfirmed) add("isConfirmed: ${existing.isConfirmed} -> ${provisionalCache.isConfirmed}")
-                    if (existing.sputumTestResult != provisionalCache.sputumTestResult) add("sputumTestResult: ${existing.sputumTestResult} -> ${provisionalCache.sputumTestResult}")
-                }
-                Timber.w("TB_SUSPECTED_DIRTY: benId=$benId marking UNSYNCED (was ${existing.syncState}), diag.xrayOrderStatus=${diag.xrayOrderStatus} trueNatOrderStatus=${diag.trueNatOrderStatus} rifOrderStatus=${diag.rifOrderStatus}, changes=$diffs")
-            } else {
-                Timber.w("TB_SUSPECTED_DIRTY: benId=$benId creating new tb_suspected record from diagnostics")
-            }
-
-            // hasSymptoms, isNaatConducted and naatResult live only on the tablet: the server's
-            // tb_suspected has no columns for them, so they are dropped on upload and come back
-            // false/null in the next changes-feed page. Re-deriving them here then looked like a
-            // change every time, so the record was marked UNSYNCED, uploaded, pulled back without
-            // them and marked again. Keep them locally, but only queue an upload when a field the
-            // server stores has changed.
-            if (existing != null &&
-                provisionalCache.withoutTabletOnlyFields() == existing.withoutTabletOnlyFields()
-            ) {
-                saveTBSuspected(provisionalCache.copy(syncState = existing.syncState))
-                return@withBenIdLock
-            }
-
-            saveTBSuspected(provisionalCache.copy(syncState = SyncState.UNSYNCED))
+                val updated = suspectedFromDiagnostics(tbDao.getTbSuspected(benId), benId, diag, reasonForRefusalMDRRIF)
+                if (updated != null) saveTBSuspected(updated)
             }
         } catch (e: Exception) {
             Timber.e(e, "syncTBSuspectedFromDiagnostics failed for benId=$benId")
         }
+    }
+
+    /**
+     * The TB_SUSPECTED row [diag] implies for this beneficiary, given the current row [existing],
+     * with its syncState already decided; null when nothing changes. Pure: no database access.
+     */
+    @androidx.annotation.VisibleForTesting
+    internal fun suspectedFromDiagnostics(
+        existing: TBSuspectedCache?,
+        benId: Long,
+        diag: TBDiagnosticsCache,
+        reasonForRefusalMDRRIF: String? = null
+    ): TBSuspectedCache? {
+        // TB_SUSPECTED.isSputumCollected still means "referred" (a separate, unrelated table
+        // from TB_DIAGNOSTICS' own isSputumCollected, which was repurposed to mean "sample
+        // physically collected") — so this reads diag.isReferredForSputum, not diag.isSputumCollected.
+        val mappedIsSputumCollected = when {
+            diag.isReferredForSputum == false ||
+            diag.reasonForDenialSputum != null -> false
+
+            diag.reasonNotConductedNaat != null ||
+            diag.isReferredForSputum == true ||
+            !diag.trueNatOrderId.isNullOrBlank() -> true
+
+            else -> existing?.isSputumCollected
+        }
+
+        val mappedSputumSubmittedAt = when {
+            mappedIsSputumCollected == false -> null
+            mappedIsSputumCollected == true -> diag.sputumSubmittedAt ?: existing?.sputumSubmittedAt ?: "TB Screening Camp"
+            else -> existing?.sputumSubmittedAt
+        }
+
+        val naatResLocal = diag.naatResult
+        val mappedSputumTestResult = when {
+            !naatResLocal.isNullOrBlank() -> {
+                val clean = naatResLocal.trim().lowercase()
+                when {
+                    clean.contains("not detected") || clean.contains("negative") -> "TB Negative"
+                    clean.contains("detected") || clean.contains("positive") -> "TB Positive"
+                    else -> null
+                }
+            }
+            else -> existing?.sputumTestResult
+        }
+
+        val mappedIsChestXRayDone = when {
+            // Unlike sputum's mappedIsSputumCollected above, both CLOSED sub-cases
+            // (declined, or not-conducted via reasonNotConductedChestXray already checked
+            // below in this same branch) legitimately map to the same outcome here — a
+            // closed X-ray order always means the chest X-ray itself was not done.
+            diag.xrayOrderStatus.equals("CLOSED", ignoreCase = true) ||
+            diag.isReferredForDigitalChestXray == false ||
+            diag.reasonNotConductedChestXray != null -> false
+
+            diag.isChestXRayDone == true ||
+            !diag.xrayOrderId.isNullOrBlank() -> true
+
+            else -> existing?.isChestXRayDone
+        }
+
+        val mappedChestXRayResult = when {
+            diag.xrayOrderStatus.equals("COMPLETED", ignoreCase = true) && diag.chestXRayResult != null -> {
+                diag.chestXRayResult
+            }
+            else -> diag.chestXRayResult ?: existing?.chestXRayResult
+        }
+
+        val mappedMdrRifResult = when {
+            diag.rifOrderStatus.equals("COMPLETED", ignoreCase = true) && diag.trueNatRifResult != null -> {
+                when {
+                    diag.trueNatRifResult.equals("Rif Resistance Detected", ignoreCase = true) ||
+                    diag.trueNatRifResult.equals("DR TB", ignoreCase = true) -> "DR TB"
+                    diag.trueNatRifResult.equals("Rif Resistance Not Detected", ignoreCase = true) ||
+                    diag.trueNatRifResult.equals("Non DR TB", ignoreCase = true) -> "Non DR TB"
+                    diag.trueNatRifResult.equals("Indeterminate", ignoreCase = true) -> "Indeterminate"
+                    else -> diag.trueNatRifResult
+                }
+            }
+            else -> diag.trueNatRifResult ?: existing?.mdrRifResult
+        }
+
+        val mappedIsDRTBConfirmed = when (mappedMdrRifResult) {
+            "DR TB" -> true
+            "Non DR TB", "Indeterminate" -> false
+            else -> existing?.isDRTBConfirmed
+        }
+
+        // Built from `existing` without touching syncState, so a structural comparison
+        // against `existing` tells us whether anything actually changed. Without this guard,
+        // every diagnostic poll (which runs every 60s while a device order is in progress)
+        // would unconditionally flip an already-synced record back to UNSYNCED.
+        val provisionalCache = (existing ?: TBSuspectedCache(benId = benId, visitLabel = "Visit 1")).copy(
+            hasSymptoms = true,
+            isChestXRayDone = mappedIsChestXRayDone,
+            chestXRayResult = mappedChestXRayResult,
+            isSputumCollected = mappedIsSputumCollected,
+            sputumSubmittedAt = mappedSputumSubmittedAt,
+            isNaatConducted = diag.isNaatConducted ?: existing?.isNaatConducted,
+            naatResult = diag.naatResult ?: existing?.naatResult,
+            reasonForRefusalXray = diag.reasonNotConductedChestXray ?: existing?.reasonForRefusalXray,
+            reasonForRefusalSputum = diag.reasonForDenialSputum ?: existing?.reasonForRefusalSputum,
+            reasonForRefusalMTB = diag.reasonNotConductedNaat ?: existing?.reasonForRefusalMTB,
+            reasonForRefusalMDRRIF = reasonForRefusalMDRRIF ?: existing?.reasonForRefusalMDRRIF,
+            mdrRifResult = mappedMdrRifResult,
+            isDRTBConfirmed = mappedIsDRTBConfirmed,
+            isTBConfirmed = mappedSputumTestResult == "TB Positive",
+            isConfirmed = mappedSputumTestResult == "TB Positive",
+            sputumTestResult = mappedSputumTestResult
+        )
+
+        // hasSymptoms is deliberately always forced true above (this function only runs off
+        // the back of a diagnostic test, which implies symptomatic), but the server's getAll
+        // response sometimes omits the field entirely, which toCache() then defaults back to
+        // false on the next pull. Normalize it here so that server-side quirk alone can't
+        // masquerade as a real change and defeat the guard below on every poll.
+        val normalizedExisting = existing?.copy(hasSymptoms = true)
+        if (existing != null && provisionalCache == normalizedExisting) {
+            return null
+        }
+
+        // hasSymptoms, isNaatConducted and naatResult live only on the tablet: the server's
+        // tb_suspected has no columns for them, so they are dropped on upload and come back
+        // false/null in the next changes-feed page. Re-deriving them here then looked like a
+        // change every time, so the record was marked UNSYNCED, uploaded, pulled back without
+        // them and marked again. Keep them locally, but only queue an upload when a field the
+        // server stores has changed.
+        if (existing != null &&
+            provisionalCache.withoutTabletOnlyFields() == existing.withoutTabletOnlyFields()
+        ) {
+            return provisionalCache.copy(syncState = existing.syncState)
+        }
+
+        // Logged only here, where the row is really queued for upload: a change to tablet-only
+        // fields alone (returned above with its sync state kept) is not.
+        if (existing != null) {
+            val diffs = buildList {
+                if (existing.hasSymptoms != provisionalCache.hasSymptoms) add("hasSymptoms: ${existing.hasSymptoms} -> ${provisionalCache.hasSymptoms}")
+                if (existing.isChestXRayDone != provisionalCache.isChestXRayDone) add("isChestXRayDone: ${existing.isChestXRayDone} -> ${provisionalCache.isChestXRayDone}")
+                if (existing.chestXRayResult != provisionalCache.chestXRayResult) add("chestXRayResult: ${existing.chestXRayResult} -> ${provisionalCache.chestXRayResult}")
+                if (existing.isSputumCollected != provisionalCache.isSputumCollected) add("isSputumCollected: ${existing.isSputumCollected} -> ${provisionalCache.isSputumCollected}")
+                if (existing.sputumSubmittedAt != provisionalCache.sputumSubmittedAt) add("sputumSubmittedAt: ${existing.sputumSubmittedAt} -> ${provisionalCache.sputumSubmittedAt}")
+                if (existing.isNaatConducted != provisionalCache.isNaatConducted) add("isNaatConducted: ${existing.isNaatConducted} -> ${provisionalCache.isNaatConducted}")
+                if (existing.naatResult != provisionalCache.naatResult) add("naatResult: ${existing.naatResult} -> ${provisionalCache.naatResult}")
+                if (existing.reasonForRefusalXray != provisionalCache.reasonForRefusalXray) add("reasonForRefusalXray: ${existing.reasonForRefusalXray} -> ${provisionalCache.reasonForRefusalXray}")
+                if (existing.reasonForRefusalSputum != provisionalCache.reasonForRefusalSputum) add("reasonForRefusalSputum: ${existing.reasonForRefusalSputum} -> ${provisionalCache.reasonForRefusalSputum}")
+                if (existing.reasonForRefusalMTB != provisionalCache.reasonForRefusalMTB) add("reasonForRefusalMTB: ${existing.reasonForRefusalMTB} -> ${provisionalCache.reasonForRefusalMTB}")
+                if (existing.reasonForRefusalMDRRIF != provisionalCache.reasonForRefusalMDRRIF) add("reasonForRefusalMDRRIF: ${existing.reasonForRefusalMDRRIF} -> ${provisionalCache.reasonForRefusalMDRRIF}")
+                if (existing.mdrRifResult != provisionalCache.mdrRifResult) add("mdrRifResult: ${existing.mdrRifResult} -> ${provisionalCache.mdrRifResult}")
+                if (existing.isDRTBConfirmed != provisionalCache.isDRTBConfirmed) add("isDRTBConfirmed: ${existing.isDRTBConfirmed} -> ${provisionalCache.isDRTBConfirmed}")
+                if (existing.isTBConfirmed != provisionalCache.isTBConfirmed) add("isTBConfirmed: ${existing.isTBConfirmed} -> ${provisionalCache.isTBConfirmed}")
+                if (existing.isConfirmed != provisionalCache.isConfirmed) add("isConfirmed: ${existing.isConfirmed} -> ${provisionalCache.isConfirmed}")
+                if (existing.sputumTestResult != provisionalCache.sputumTestResult) add("sputumTestResult: ${existing.sputumTestResult} -> ${provisionalCache.sputumTestResult}")
+            }
+            Timber.w("TB_SUSPECTED_DIRTY: benId=$benId marking UNSYNCED (was ${existing.syncState}), diag.xrayOrderStatus=${diag.xrayOrderStatus} trueNatOrderStatus=${diag.trueNatOrderStatus} rifOrderStatus=${diag.rifOrderStatus}, changes=$diffs")
+        } else {
+            Timber.w("TB_SUSPECTED_DIRTY: benId=$benId creating new tb_suspected record from diagnostics")
+        }
+
+        return provisionalCache.copy(syncState = SyncState.UNSYNCED)
     }
 
     // Pass errorMessage only for confirmed server/HTTP failures; keep it null for ambiguous failures.
@@ -3281,7 +3352,6 @@ class TBRepo @Inject constructor(
         val status = if (rawStatus.isNullOrBlank()) "IN_PROGRESS" else rawStatus
        Timber.d("STOP-TB polling debug: fetchOrderResult benId=$benId status=$status rawStatus=$rawStatus")
 
-        val fetchedOrderId = responseData.externalOrderId.asValidOrderId()
         val isCompleted = status.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
 
         // MTB-positive -> RIF cascade must run to completion BEFORE this
@@ -3293,6 +3363,69 @@ class TBRepo @Inject constructor(
         // status/id to persist; null means "leave whatever is currently in the
         // row untouched" in the locked commit below (never re-apply a stale
         // pre-cascade snapshot over it).
+        val rifFieldOverride = mtbRifCascade(ben, orderType, responseData, isCompleted, rifOrderKnown)
+
+        // Final commit: re-reads the row fresh, INSIDE the per-benId lock,
+        // right before writing — this is what actually fixes the lost-update
+        // race (Gaps 1/2), since any concurrent write for a different test
+        // type on the same beneficiary (or the RIF cascade above, which
+        // already committed its own fields) is guaranteed to be visible here
+        // rather than clobbered by a stale pre-cascade snapshot.
+        var triggerTrueNat = false
+        val syncedCache = withBenIdLock(benId) {
+        val existing = tbDao.getTbDiagnosticsByBenId(benId)
+        val currentOrderId = if (isXrayType) existing?.xrayOrderId else if (isRifType) existing?.rifOrderId else existing?.trueNatOrderId
+        if (orderIdAtStart != null && currentOrderId != orderIdAtStart) {
+            // A newer order for this test type (e.g. an auto-reorder on
+            // Invalid/Error) was created while this call's network round trip
+            // was in flight. This response — including its fresh-looking
+            // status/order id — describes the now-superseded order; committing
+            // it here (and force-marking SYNCED below) would clobber whatever
+            // that newer order's own write already committed. Skip; the next
+            // poll cycle will fetch against the current order instead.
+            return@withBenIdLock existing ?: TBDiagnosticsCache(benId = benId)
+        }
+        val merged = mergeOrderResult(existing, benId, orderType, responseData, status, rifFieldOverride, isTruenatIntegrated())
+        triggerTrueNat = merged.triggerTrueNat
+        val synced = merged.cache.copy(syncState = SyncState.SYNCED)
+        tbDao.saveTbDiagnostics(synced)
+        synced
+        }
+        if (triggerTrueNat) {
+            WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, listOf("SPUTUM_TRUENAT"))
+        }
+
+        try {
+            syncTBSuspectedFromDiagnostics(benId, syncedCache)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to sync diagnostic results into tb_suspected table")
+        }
+        if (pushSuspectedAfter) {
+            try {
+                pushUnSyncedRecordsTBSuspected()
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to call pushUnSyncedRecordsTBSuspected after fetchOrderResult")
+            }
+        }
+        return status
+    }
+
+    // MTB-positive -> RIF cascade: must run to completion BEFORE the caller
+    // takes its own per-benId lock — createOrder()/fetchBeneficiariesByStatus()
+    // for the RIF cascade lock the SAME benId internally (kotlinx.coroutines
+    // Mutex is not reentrant), so holding the lock across this call would
+    // deadlock. Returns null unless this cascade actually determined a fresh RIF
+    // status/id to persist; null means "leave whatever is currently in the row
+    // untouched" in the locked commit (never re-apply a stale pre-cascade
+    // snapshot over it).
+    private suspend fun mtbRifCascade(
+        ben: BenRegCache,
+        orderType: String,
+        responseData: OrderResultData,
+        isCompleted: Boolean,
+        rifOrderKnown: Boolean
+    ): Pair<String, String?>? {
+        val benId = ben.beneficiaryId
         var rifFieldOverride: Pair<String, String?>? = null
         if (!orderType.equals("XRAY_CHEST", ignoreCase = true) &&
             !orderType.equals("MDR_RIF", ignoreCase = true)) {
@@ -3357,25 +3490,39 @@ class TBRepo @Inject constructor(
             }
         }
 
-        // Final commit: re-reads the row fresh, INSIDE the per-benId lock,
-        // right before writing — this is what actually fixes the lost-update
-        // race (Gaps 1/2), since any concurrent write for a different test
-        // type on the same beneficiary (or the RIF cascade above, which
-        // already committed its own fields) is guaranteed to be visible here
-        // rather than clobbered by a stale pre-cascade snapshot.
-        val syncedCache = withBenIdLock(benId) {
-        val existing = tbDao.getTbDiagnosticsByBenId(benId)
-        val currentOrderId = if (isXrayType) existing?.xrayOrderId else if (isRifType) existing?.rifOrderId else existing?.trueNatOrderId
-        if (orderIdAtStart != null && currentOrderId != orderIdAtStart) {
-            // A newer order for this test type (e.g. an auto-reorder on
-            // Invalid/Error) was created while this call's network round trip
-            // was in flight. This response — including its fresh-looking
-            // status/order id — describes the now-superseded order; committing
-            // it here (and force-marking SYNCED below) would clobber whatever
-            // that newer order's own write already committed. Skip; the next
-            // poll cycle will fetch against the current order instead.
-            return@withBenIdLock existing ?: TBDiagnosticsCache(benId = benId)
-        }
+        return rifFieldOverride
+    }
+
+    /** Whether a feed result for [orderType] would start the MTB -> RIF cascade. */
+    @androidx.annotation.VisibleForTesting
+    internal fun needsRifCascade(orderType: String, responseData: OrderResultData, rifOrderKnown: Boolean): Boolean {
+        if (rifOrderKnown) return false
+        if (orderType.equals("XRAY_CHEST", ignoreCase = true) || orderType.equals("MDR_RIF", ignoreCase = true)) return false
+        val status = responseData.status
+        if (!status.equals(OrderStatus.COMPLETED.name, ignoreCase = true)) return false
+        return MtbResult.fromResultText(responseData.resultSummary ?: "") == MtbResult.TB_POSITIVE
+    }
+
+    internal data class MergedOrderResult(val cache: TBDiagnosticsCache, val triggerTrueNat: Boolean)
+
+    /**
+     * The diagnostics row after applying one order result to [existing] (null = no row yet).
+     * Pure: no database or network. [triggerTrueNat] asks the caller to start the X-ray ->
+     * TrueNat referral push once the row is saved.
+     */
+    @androidx.annotation.VisibleForTesting
+    internal fun mergeOrderResult(
+        existing: TBDiagnosticsCache?,
+        benId: Long,
+        orderType: String,
+        responseData: OrderResultData,
+        status: String,
+        rifFieldOverride: Pair<String, String?>?,
+        truenatIntegrated: Boolean
+    ): MergedOrderResult {
+        val fetchedOrderId = responseData.externalOrderId.asValidOrderId()
+        val isCompleted = status.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
+        var triggerTrueNat = false
         val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
             if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
                 // Chest X-Ray order lifecycle redesign: standardized 4-way
@@ -3397,11 +3544,7 @@ class TBRepo @Inject constructor(
                                 it.trueNatOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
                                 it.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
                                 it.trueNatOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
-                        if (!hasTruenat && isTruenatIntegrated()) {
-                            WorkerUtils.triggerDiagnosticOrderPushWorkers(
-                                context, benId, listOf("SPUTUM_TRUENAT")
-                            )
-                        }
+                        if (!hasTruenat && truenatIntegrated) triggerTrueNat = true
                         it.copy(
                             xrayOrderId = fetchedOrderId ?: it.xrayOrderId,
                             xrayOrderStatus = OrderStatus.COMPLETED.name,
@@ -3540,24 +3683,7 @@ class TBRepo @Inject constructor(
                 }
             }
         }
-        val synced = cache.copy(syncState = SyncState.SYNCED)
-        tbDao.saveTbDiagnostics(synced)
-        synced
-        }
-
-        try {
-            syncTBSuspectedFromDiagnostics(benId, syncedCache)
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to sync diagnostic results into tb_suspected table")
-        }
-        if (pushSuspectedAfter) {
-            try {
-                pushUnSyncedRecordsTBSuspected()
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to call pushUnSyncedRecordsTBSuspected after fetchOrderResult")
-            }
-        }
-        return status
+        return MergedOrderResult(cache, triggerTrueNat)
     }
 
     /**
