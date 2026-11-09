@@ -85,9 +85,10 @@ class TBRepo @Inject constructor(
 ) {
     private val orderCreatedTimestamps = java.util.concurrent.ConcurrentHashMap<String, Long>()
     private val ORDER_STATUS_GRACE_PERIOD_MS = 90_000L
-    // Orders whose feed row was skipped inside the grace period. The feed token moves past that
-    // row, so DiagnosticResultPollWorker asks order/result for them once the grace period ends.
-    private val feedSkippedOrders = java.util.concurrent.ConcurrentHashMap.newKeySet<Pair<Long, String>>()
+    // Orders whose feed row was skipped inside the grace period are kept in PreferenceDao
+    // (getFeedSkippedOrders). The feed token moves past that row, so DiagnosticResultPollWorker
+    // asks order/result for them once the grace period ends.
+    private fun feedSkippedKey(benId: Long, type: String) = "$benId|$type"
 
     // Per-beneficiary lock for every TB_DIAGNOSTICS/TB_SUSPECTED read-modify-write below, so
     // concurrent calls for the same benId (e.g. parallel X-ray/TrueNat polling) can't clobber
@@ -664,10 +665,10 @@ class TBRepo @Inject constructor(
             // the older server row must not overwrite it.
             val createdAt = orderCreatedTimestamps["${ben.beneficiaryId}_$localType"]
             if (createdAt != null && System.currentTimeMillis() - createdAt < ORDER_STATUS_GRACE_PERIOD_MS) {
-                feedSkippedOrders.add(ben.beneficiaryId to localType)
+                preferenceDao.addFeedSkippedOrder(feedSkippedKey(ben.beneficiaryId, localType))
                 continue
             }
-            feedSkippedOrders.remove(ben.beneficiaryId to localType)
+            preferenceDao.removeFeedSkippedOrder(feedSkippedKey(ben.beneficiaryId, localType))
             val current = tbDao.getTbDiagnosticsByBenId(ben.beneficiaryId)?.let {
                 when (localType) {
                     "XRAY_CHEST" -> it.xrayOrderId
@@ -694,17 +695,28 @@ class TBRepo @Inject constructor(
     }
 
     /**
-     * Removes and returns the orders the feed skipped inside the grace period whose grace period
-     * has now ended, as (benId, order type) pairs ready for [fetchOrderResult].
+     * The orders the feed skipped inside the grace period whose grace period has now ended, as
+     * (benId, order type) pairs ready for [fetchOrderResult]. They stay recorded until
+     * [ackFeedSkippedOrder] (after a successful fetch) or a later feed row for the same order, so
+     * a failed or interrupted fetch is tried again on the next run. After a restart the creation
+     * time is gone, so the pair is due straight away.
      */
-    fun takeFeedSkippedOrdersPastGrace(): List<Pair<Long, String>> {
+    fun feedSkippedOrdersPastGrace(): List<Pair<Long, String>> {
         val now = System.currentTimeMillis()
-        val due = feedSkippedOrders.filter { (benId, type) ->
+        return preferenceDao.getFeedSkippedOrders().mapNotNull { entry ->
+            val benId = entry.substringBefore('|').toLongOrNull()
+            val type = entry.substringAfter('|', "")
+            if (benId == null || type.isEmpty()) {
+                preferenceDao.removeFeedSkippedOrder(entry)
+                return@mapNotNull null
+            }
             val createdAt = orderCreatedTimestamps["${benId}_$type"]
-            createdAt == null || now - createdAt >= ORDER_STATUS_GRACE_PERIOD_MS
+            if (createdAt == null || now - createdAt >= ORDER_STATUS_GRACE_PERIOD_MS) benId to type else null
         }
-        feedSkippedOrders.removeAll(due.toSet())
-        return due
+    }
+
+    fun ackFeedSkippedOrder(benId: Long, type: String) {
+        preferenceDao.removeFeedSkippedOrder(feedSkippedKey(benId, type))
     }
 
     private fun feedResponse(records: JSONArray): JSONObject =

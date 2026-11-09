@@ -20,6 +20,7 @@ import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.database.room.SyncState
+import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.OrderStatus
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
@@ -107,6 +108,21 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 }
                 hasInProgress = pendingOrders.isNotEmpty()
 
+                // The feed skips a row for an order this tablet created moments ago and moves past
+                // it, so a result that arrived then has to be asked for directly. Done whether or
+                // not any order still looks pending here: an order saved without an order id is not
+                // in pendingOrders. A pair is cleared only once its fetch succeeds.
+                if (feedActive) {
+                    val skipped = tbRepo.feedSkippedOrdersPastGrace()
+                    skipped.forEach { (benId, type) ->
+                        Timber.d("Polling $type result for benId=$benId skipped by the feed")
+                        if (tbRepo.fetchOrderResult(benId, type) is NetworkResponse.Success) {
+                            tbRepo.ackFeedSkippedOrder(benId, type)
+                        }
+                    }
+                    if (skipped.isNotEmpty()) hasInProgress = true
+                }
+
                 // Fetch results with bounded parallelism instead of one-by-one sequential awaits
                 // — a busy camp with many orders in flight no longer makes this cycle's
                 // wall-clock time grow linearly with beneficiary count. Each fetchOrderResult
@@ -122,12 +138,6 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                     // delta pull instead; it is debounced and costs one small request.
                     Timber.d("Pending diagnostic orders: ${pendingOrders.size}, results come from the changes feed")
                     WorkerUtils.triggerCampQuickPullIfConnected(appContext, preferenceDao)
-                    // The feed skips a row for an order this tablet created moments ago and moves
-                    // past it, so a result that arrived then has to be asked for directly.
-                    tbRepo.takeFeedSkippedOrdersPastGrace().forEach { (benId, type) ->
-                        Timber.d("Polling $type result for benId=$benId skipped by the feed")
-                        tbRepo.fetchOrderResult(benId, type)
-                    }
                     // Keeps the "Last checked" caption current, as the per-order path does.
                     pendingOrders.forEach { order ->
                         if (order.xray) preferenceDao.setLastCheckedTime(order.benId, "XRAY_CHEST", now)
