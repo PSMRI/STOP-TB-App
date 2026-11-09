@@ -313,7 +313,10 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
 
     fun setCampHubUrl(url: String) {
         val key = context.getString(R.string.PREF_camp_hub_url)
-        pref.edit().putString(key, url).commit()
+        val editor = pref.edit().putString(key, url)
+        // A different hub has not said it creates referral orders yet.
+        if (pref.getString(key, null) != url) editor.putBoolean(HUB_CREATES_REFERRAL_ORDERS, false)
+        editor.commit()
     }
 
     fun getCampHubUrl(): String {
@@ -335,7 +338,12 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
 
     fun setCampHubConnected(connected: Boolean) {
         val key = context.getString(R.string.PREF_camp_hub_connected)
-        pref.edit().putBoolean(key, connected).commit()
+        val editor = pref.edit().putBoolean(key, connected)
+        // Hubs share one address, so a reconnect may be to a different (older) laptop. Until its
+        // changes feed answers again the tablet places screening orders itself; the hub's
+        // duplicate check absorbs any overlap.
+        if (connected && !pref.getBoolean(key, false)) editor.putBoolean(HUB_CREATES_REFERRAL_ORDERS, false)
+        editor.commit()
     }
 
     fun isCampHubConnected(): Boolean {

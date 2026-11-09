@@ -305,6 +305,7 @@ interface BenDao {
                     SELECT tbs.benId FROM TB_SCREENING tbs
                     WHERE
                         tbs.recommendedForTruenatTest = 1
+                        OR tbs.referredForSputumCollection = 1
                         OR (
                             tbs.bloodInSputum = 1
                             OR tbs.coughMoreThan2Weeks = 1
@@ -489,6 +490,7 @@ interface BenDao {
                     SELECT tbs.benId FROM TB_SCREENING tbs
                     WHERE
                         tbs.recommendedForTruenatTest = 1
+                        OR tbs.referredForSputumCollection = 1
                         OR (
                             tbs.bloodInSputum = 1
                             OR tbs.coughMoreThan2Weeks = 1
@@ -798,6 +800,7 @@ interface BenDao {
                     SELECT tbs.benId FROM TB_SCREENING tbs
                     WHERE
                         tbs.recommendedForTruenatTest = 1
+                        OR tbs.referredForSputumCollection = 1
                         OR (
                             tbs.bloodInSputum = 1
                             OR tbs.coughMoreThan2Weeks = 1
@@ -1354,6 +1357,7 @@ interface BenDao {
               SELECT tbs.benId FROM TB_SCREENING tbs
               WHERE
                 tbs.recommendedForTruenatTest = 1
+                OR tbs.referredForSputumCollection = 1
                 OR (
                   tbs.bloodInSputum = 1
                   OR tbs.coughMoreThan2Weeks = 1

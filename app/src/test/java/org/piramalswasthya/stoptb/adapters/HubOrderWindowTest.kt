@@ -49,4 +49,13 @@ class HubOrderWindowTest {
         val future = System.currentTimeMillis() + 60 * 60_000L
         assertThat(hubOrderWindowRemaining(diag(future), pref())).isEqualTo(HUB_ORDER_CREATION_WINDOW_MS)
     }
+
+    @Test
+    fun idLessPendingIsAPlaceholderOnlyOnAHubThatCreatesOrders() {
+        assertThat("PENDING".withoutHubPlaceholder(null, pref())).isNull()
+        assertThat("PENDING".withoutHubPlaceholder("N/A", pref())).isNull()
+        assertThat("PENDING".withoutHubPlaceholder("ord-1", pref())).isEqualTo("PENDING")
+        assertThat("PENDING".withoutHubPlaceholder(null, pref(hubCreates = false))).isEqualTo("PENDING")
+        assertThat("FAILED".withoutHubPlaceholder(null, pref())).isEqualTo("FAILED")
+    }
 }

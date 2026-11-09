@@ -66,6 +66,24 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 // village-wide status sweeps and per-order result calls are only needed when the
                 // hub has no feed.
                 val feedActive = preferenceDao.isChangesFeedActive()
+
+                // The feed skips a row for an order this tablet created moments ago and moves past
+                // it, so a result that arrived then has to be asked for directly. Runs whether or
+                // not a device is integrated or any order still looks pending (an order saved
+                // without an order id is not in pendingOrders). A pair is cleared only once its
+                // fetch succeeds; the worker keeps rescheduling while any remain.
+                var hasSkippedFeedOrders = false
+                if (feedActive) {
+                    val skipped = tbRepo.feedSkippedOrdersPastGrace()
+                    skipped.forEach { (benId, type) ->
+                        Timber.d("Polling $type result for benId=$benId skipped by the feed")
+                        if (tbRepo.fetchOrderResult(benId, type) is NetworkResponse.Success) {
+                            tbRepo.ackFeedSkippedOrder(benId, type)
+                        }
+                    }
+                    hasSkippedFeedOrders = preferenceDao.getFeedSkippedOrders().isNotEmpty()
+                }
+
                 if (!tbRepo.isXrayIntegrated() && !tbRepo.isTruenatIntegrated()) {
                     Timber.d("Skipping automated result polling: no diagnostic devices are integrated")
                 } else {
@@ -108,20 +126,6 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 }
                 hasInProgress = pendingOrders.isNotEmpty()
 
-                // The feed skips a row for an order this tablet created moments ago and moves past
-                // it, so a result that arrived then has to be asked for directly. Done whether or
-                // not any order still looks pending here: an order saved without an order id is not
-                // in pendingOrders. A pair is cleared only once its fetch succeeds.
-                if (feedActive) {
-                    val skipped = tbRepo.feedSkippedOrdersPastGrace()
-                    skipped.forEach { (benId, type) ->
-                        Timber.d("Polling $type result for benId=$benId skipped by the feed")
-                        if (tbRepo.fetchOrderResult(benId, type) is NetworkResponse.Success) {
-                            tbRepo.ackFeedSkippedOrder(benId, type)
-                        }
-                    }
-                    if (skipped.isNotEmpty()) hasInProgress = true
-                }
 
                 // Fetch results with bounded parallelism instead of one-by-one sequential awaits
                 // — a busy camp with many orders in flight no longer makes this cycle's
@@ -183,7 +187,7 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 // Reschedule while there's still an active automated order OR a manual-result
                 // sync still pending (e.g. the hub only just reconnected and the retry above
                 // hasn't caught up yet).
-                if (hasInProgress || hasPendingManualResultSync) {
+                if (hasInProgress || hasPendingManualResultSync || hasSkippedFeedOrders) {
                     val pollDelaySec = 60L
                     Timber.d("Scheduling next DiagnosticResultPollWorker run in ${pollDelaySec}s")
                     val pollRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>()

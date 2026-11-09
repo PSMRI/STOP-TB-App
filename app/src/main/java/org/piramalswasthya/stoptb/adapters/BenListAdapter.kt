@@ -56,6 +56,17 @@ private fun String?.isMissingOrderId(): Boolean =
 internal const val HUB_ORDER_CREATION_WINDOW_MS = 5 * 60_000L
 
 /**
+ * On a camp hub that creates referral orders, a PENDING with no order id is a local placeholder
+ * the screening form wrote (before this tablet stopped writing it, or after a push whose failure
+ * was never recorded), not an order the hub holds: the card treats it as "no order yet". A Retry
+ * from there cannot duplicate an order, the hub returns any order it already has.
+ */
+internal fun String?.withoutHubPlaceholder(orderId: String?, pref: PreferenceDao?): String? =
+    if (equals("PENDING", ignoreCase = true) && orderId.isMissingOrderId() &&
+        pref?.isCampModeEnabled() == true && pref.hubCreatesReferralOrders()
+    ) null else this
+
+/**
  * Milliseconds left in which the camp hub is still expected to create a referral order for the
  * latest screening, or 0 when the tablet should offer Retry Referral instead.
  */
@@ -102,18 +113,20 @@ class BenListAdapter(
         RecyclerView.ViewHolder(binding.root) {
 
         // Rebinds this card when an "Order being created" window ends, so it moves on to Retry
-        // Referral even if no data changes in the meantime.
+        // Referral even if no data changes in the meantime. Posted on its own handler rather than
+        // the view, so it can still be cancelled when the holder is rebound while detached.
+        private val refreshHandler = android.os.Handler(android.os.Looper.getMainLooper())
         private var hubOrderRefresh: Runnable? = null
 
         private fun scheduleHubOrderRefresh(delayMs: Long) {
-            hubOrderRefresh?.let { binding.root.removeCallbacks(it) }
+            hubOrderRefresh?.let { refreshHandler.removeCallbacks(it) }
             val refresh = Runnable {
                 hubOrderRefresh = null
                 val position = bindingAdapterPosition
                 if (position != RecyclerView.NO_POSITION) bindingAdapter?.notifyItemChanged(position)
             }
             hubOrderRefresh = refresh
-            binding.root.postDelayed(refresh, delayMs + 1_000L)
+            refreshHandler.postDelayed(refresh, delayMs + 1_000L)
         }
         companion object {
             fun from(parent: ViewGroup): BenViewHolder {
@@ -554,7 +567,7 @@ class BenListAdapter(
             householdHeadNameMap: Map<Long, String> = emptyMap(),
             showAddMemberButton: Boolean = false
         ) {
-            hubOrderRefresh?.let { binding.root.removeCallbacks(it) }
+            hubOrderRefresh?.let { refreshHandler.removeCallbacks(it) }
             hubOrderRefresh = null
             binding.btnAbha.visibility = View.VISIBLE
             if (!showSyncIcon) item.syncState = null
@@ -807,7 +820,7 @@ class BenListAdapter(
                     val hubOrderWait = hubOrderWindowRemaining(tbDiag, pref)
                     val config = when (source) {
                         6 -> {
-                            val status = tbDiag?.xrayOrderStatus
+                            val status = tbDiag?.xrayOrderStatus.withoutHubPlaceholder(tbDiag?.xrayOrderId, pref)
                             val referred = tbDiag?.isReferredForDigitalChestXray
                             binding.btnVitalScreenSecondary.visibility = View.GONE
 
@@ -867,7 +880,7 @@ class BenListAdapter(
                             }
                         }
                         7 -> {
-                            val status = tbDiag?.trueNatOrderStatus
+                            val status = tbDiag?.trueNatOrderStatus.withoutHubPlaceholder(tbDiag?.trueNatOrderId, pref)
                             val referredForSputum = tbDiag?.isReferredForSputum
                             binding.btnVitalScreenSecondary.visibility = View.GONE
                             binding.btnVitalScreen.visibility = View.VISIBLE
