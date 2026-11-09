@@ -23,6 +23,8 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         const val CHANGES_FEED_SCOPE = "changes_feed_scope"
         const val MASTERS_REFRESHED_AT = "masters_refreshed_at"
         const val CHANGES_FEED_ACTIVE = "changes_feed_active"
+        const val HUB_CREATES_REFERRAL_ORDERS = "hub_creates_referral_orders"
+        const val FEED_SKIPPED_ORDERS = "feed_skipped_orders"
     }
 
     fun deleteAmritToken() {
@@ -216,6 +218,34 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
 
     fun setChangesFeedActive(active: Boolean) {
         pref.edit().putBoolean(CHANGES_FEED_ACTIVE, active).apply()
+    }
+
+    // True once the server's changes feed reported that it creates the X-ray / TrueNat orders a
+    // screening refers for. Until then (older hub, no feed, central server) the tablet keeps
+    // placing those orders itself.
+    fun hubCreatesReferralOrders(): Boolean = pref.getBoolean(HUB_CREATES_REFERRAL_ORDERS, false)
+
+    fun setHubCreatesReferralOrders(value: Boolean) {
+        pref.edit().putBoolean(HUB_CREATES_REFERRAL_ORDERS, value).apply()
+    }
+
+    // Orders whose changes-feed row was skipped, as "benId|orderType". Kept on disk because the
+    // feed token has already moved past that row: if the app is killed before the result is
+    // fetched directly, nothing else would bring it back.
+    @Synchronized
+    fun getFeedSkippedOrders(): Set<String> =
+        pref.getStringSet(FEED_SKIPPED_ORDERS, null)?.toSet() ?: emptySet()
+
+    @Synchronized
+    fun addFeedSkippedOrder(entry: String) {
+        val current = getFeedSkippedOrders()
+        if (entry !in current) pref.edit().putStringSet(FEED_SKIPPED_ORDERS, current + entry).apply()
+    }
+
+    @Synchronized
+    fun removeFeedSkippedOrder(entry: String) {
+        val current = getFeedSkippedOrders()
+        if (entry in current) pref.edit().putStringSet(FEED_SKIPPED_ORDERS, current - entry).apply()
     }
 
     // When visit categories, chief complaints and drug masters were last downloaded. Cleared at
