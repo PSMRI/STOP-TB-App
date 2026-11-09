@@ -286,12 +286,19 @@ class TBScreeningFormViewModel @Inject constructor(
                 existingDiag?.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
                 existingDiag?.trueNatOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
 
+        // When the hub creates the referred orders, no order status is written here: this tablet
+        // places no order, so a PENDING with no order id would never be replaced if the hub made
+        // none, and other tablets (which never see it) would show something different. The real
+        // status arrives with the hub's order through the changes feed.
+        val hubCreatesOrders = preferenceDao.isCampModeEnabled() && preferenceDao.hubCreatesReferralOrders()
         if (refersXray) {
-            if (currentDiag.xrayOrderStatus.isNullOrBlank()) {
+            if (hubCreatesOrders) {
+                currentDiag = currentDiag.copy(isReferredForDigitalChestXray = true)
+            } else if (currentDiag.xrayOrderStatus.isNullOrBlank()) {
                 currentDiag = currentDiag.copy(xrayOrderStatus = OrderStatus.PENDING.name, isReferredForDigitalChestXray = true)
             }
         }
-        if (refersTruenat) {
+        if (refersTruenat && !hubCreatesOrders) {
             if (currentDiag.trueNatOrderStatus.isNullOrBlank()) {
                 currentDiag = currentDiag.copy(trueNatOrderStatus = OrderStatus.PENDING.name)
             }
@@ -304,7 +311,7 @@ class TBScreeningFormViewModel @Inject constructor(
         // retried, and the registrar cannot open the X-ray/TrueNat screens to retry it). The
         // screening upload is queued by the form's background push on save, and the order comes
         // back through the changes feed. A hub that has not reported this still gets the push.
-        if (preferenceDao.isCampModeEnabled() && preferenceDao.hubCreatesReferralOrders()) {
+        if (hubCreatesOrders) {
             return
         }
 
