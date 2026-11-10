@@ -32,6 +32,7 @@ import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.utils.navigateSafe
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -92,7 +93,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
                     if (isMemberLimitReached) {
                         showMemberLimitReachedMessage()
                     } else {
-                        findNavController().navigate(
+                        findNavController().navigateSafe(
                             HouseholdMembersFragmentDirections.actionHouseholdMembersFragmentToNewBenRegFragment(
                                 hhId = hhId,
                                 relToHeadId = 4,        // "Wife" index in nbr_relationship_to_head_src
@@ -108,7 +109,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
                     if (isMemberLimitReached) {
                         showMemberLimitReachedMessage()
                     } else {
-                        findNavController().navigate(
+                        findNavController().navigateSafe(
                             HouseholdMembersFragmentDirections.actionHouseholdMembersFragmentToNewBenRegFragment(
                                 hhId = hhId,
                                 relToHeadId = 5,        // "Husband" index in nbr_relationship_to_head_src
@@ -354,7 +355,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
     }
 
     private fun openMemberForm(hhId: Long, benId: Long, relToHeadId: Int) {
-        findNavController().navigate(
+        findNavController().navigateSafe(
             HouseholdMembersFragmentDirections.actionHouseholdMembersFragmentToNewBenRegFragment(
                 hhId = hhId,
                 relToHeadId = relToHeadId,
@@ -416,7 +417,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
                 return@setOnClickListener
             }
 
-            findNavController().navigate(
+            findNavController().navigateSafe(
                 HouseholdMembersFragmentDirections.actionHouseholdMembersFragmentToNewBenRegFragment(
                     hhId = viewModel.hhId,
                     relToHeadId = selectedRelationIndex,

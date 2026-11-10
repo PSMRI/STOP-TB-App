@@ -34,6 +34,7 @@ import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.HouseHoldBasicDomain
 import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.utils.navigateSafe
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -144,7 +145,7 @@ class AllHouseholdFragment : Fragment() {
         viewModel.hasDraft.observe(viewLifecycleOwner) { hasDraft = it }
         viewModel.navigateToNewHouseholdRegistration.observe(viewLifecycleOwner) {
             if (it) {
-                findNavController().navigate(
+                findNavController().navigateSafe(
                     AllHouseholdFragmentDirections.actionAllHouseholdFragmentToNewHouseholdFragment()
                 )
                 viewModel.navigateToNewHouseholdRegistrationCompleted()
@@ -175,14 +176,14 @@ class AllHouseholdFragment : Fragment() {
 
     private fun openHouseholdDetails(household: HouseHoldBasicDomain) {
         if (household.isDeactivate) return
-        findNavController().navigate(
+        findNavController().navigateSafe(
             AllHouseholdFragmentDirections.actionAllHouseholdFragmentToNewHouseholdFragment(household.hhId)
         )
     }
 
     private fun openHouseholdMembers(household: HouseHoldBasicDomain) {
         if (household.isDeactivate) return
-        findNavController().navigate(
+        findNavController().navigateSafe(
             AllHouseholdFragmentDirections.actionAllHouseholdFragmentToHouseholdMembersFragment(household.hhId)
         )
     }
@@ -198,7 +199,7 @@ class AllHouseholdFragment : Fragment() {
             return
         }
         if (household.numMembers == 0) {
-            findNavController().navigate(
+            findNavController().navigateSafe(
                 AllHouseholdFragmentDirections.actionAllHouseholdFragmentToNewBenRegFragment(
                     hhId = household.hhId,
                     relToHeadId = 18
@@ -251,7 +252,7 @@ class AllHouseholdFragment : Fragment() {
             val gender = genderIntFromRadioId(alertBinding)
             if (relIndex < 0 || gender == 0) return@setOnClickListener
 
-            findNavController().navigate(
+            findNavController().navigateSafe(
                 AllHouseholdFragmentDirections.actionAllHouseholdFragmentToNewBenRegFragment(
                     hhId = viewModel.selectedHouseholdId,
                     relToHeadId = relIndex,
