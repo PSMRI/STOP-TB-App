@@ -18,13 +18,8 @@ import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.Toast
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Matrix
-import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.FileOutputStream
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.content.FileProvider
@@ -55,6 +50,7 @@ import org.piramalswasthya.stoptb.databinding.AlertConsentBinding
 import org.piramalswasthya.stoptb.databinding.FragmentNewBenRegBinding
 import org.piramalswasthya.stoptb.databinding.LayoutViewMediaBinding
 import org.piramalswasthya.stoptb.helpers.GpsDiagnostics
+import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
@@ -993,7 +989,7 @@ class NewBenRegFragment : Fragment() {
             .addOnSuccessListener { faces ->
                 if (faces.isNotEmpty()) {
                     viewLifecycleOwner.lifecycleScope.launch {
-                        val finalUri = withContext(Dispatchers.Default) { compressPhoto(uri) } ?: uri
+                        val finalUri = withContext(Dispatchers.IO) { compressPhoto(uri) } ?: uri
                         viewModel.setImageUriToFormElement(finalUri)
                         binding.form.rvInputForm.adapter?.notifyItemChanged(0)
                         if (continuePreviewAfterPhoto) {
@@ -1028,45 +1024,14 @@ class NewBenRegFragment : Fragment() {
     }
 
 
-    /** Resizes to max 1024px on the long side and re-encodes as JPEG (~100-250 KB). Returns null on failure. */
-    private fun compressPhoto(uri: Uri, maxDim: Int = 1024, quality: Int = 70): Uri? {
-        return try {
-            val resolver = requireContext().contentResolver
-
-            // 1. Read size only
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-
-            // 2. Decode a downsampled bitmap
-            var sample = 1
-            while (bounds.outWidth / (sample * 2) >= maxDim || bounds.outHeight / (sample * 2) >= maxDim) sample *= 2
-            val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-            var bmp = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) } ?: return null
-
-            // 3. Keep the correct orientation
-            val rotation = resolver.openInputStream(uri)?.use {
-                when (ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
-                    ExifInterface.ORIENTATION_ROTATE_90 -> 90f
-                    ExifInterface.ORIENTATION_ROTATE_180 -> 180f
-                    ExifInterface.ORIENTATION_ROTATE_270 -> 270f
-                    else -> 0f
-                }
-            } ?: 0f
-
-            // 4. Final scale to maxDim (and rotate if needed)
-            val scale = minOf(1f, maxDim.toFloat() / maxOf(bmp.width, bmp.height))
-            val m = Matrix().apply { postScale(scale, scale); postRotate(rotation) }
-            val out = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
-            if (out !== bmp) bmp.recycle()
-
-            // 5. Write the compressed JPEG
-            val file = File.createTempFile(Konstants.tempBenImagePrefix, ".jpg", requireActivity().cacheDir)
-            FileOutputStream(file).use { out.compress(Bitmap.CompressFormat.JPEG, quality, it) }
-            out.recycle()
+    /** Shrinks a camera photo to at most 400 KB without stretching it. Returns null on failure. */
+    private fun compressPhoto(uri: Uri): Uri? {
+        val file = File.createTempFile(Konstants.tempBenImagePrefix, ".jpg", requireContext().cacheDir)
+        return if (ImageUtils.compressToJpeg(requireContext(), uri, file)) {
             FileProvider.getUriForFile(requireContext(), "${requireContext().packageName}.provider", file)
-        } catch (e: Exception) {
-            Timber.e(e, "Photo compression failed")
+        } else {
+            file.delete()
+            Timber.e("Photo compression failed")
             null
         }
     }
