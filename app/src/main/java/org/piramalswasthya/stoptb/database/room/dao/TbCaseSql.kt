@@ -38,6 +38,15 @@ object TbCaseSql {
 
     const val CONFIRMED = "(" + SUSPECTED_CONFIRMED + " OR " + DIAGNOSTICS_CONFIRMED + ")"
 
+    /**
+     * benIds that are [CONFIRMED], as a subquery for `benId IN (...)`. Same set as joining both
+     * tables and testing [CONFIRMED] (confirmed through either table), but it starts from the few
+     * confirmed rows instead of testing every beneficiary of the village: 100K device DB, host
+     * 0.28-0.80 s -> 0.016 s for the Confirmed list.
+     */
+    const val CONFIRMED_BEN_IDS = "(SELECT sus.benId FROM TB_SUSPECTED sus WHERE " + SUSPECTED_CONFIRMED +
+        " UNION SELECT dx.benId FROM TB_DIAGNOSTICS dx WHERE " + DIAGNOSTICS_CONFIRMED + ")"
+
     const val PRESUMPTIVE = "((" + SYMPTOMATIC + " OR " + XRAY_PRESUMPTIVE + ")" +
         " AND NOT " + CONFIRMED +
         " AND NOT EXISTS (SELECT 1 FROM TB_CONFIRMED_TREATMENT tc WHERE tc.benId = scr.benId))"

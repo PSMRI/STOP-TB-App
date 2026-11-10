@@ -121,11 +121,9 @@ interface BenTbListQueries {
             " GROUP BY b.benId" + PAGED_ORDER
 
         /** Shared by the Confirmed list and its home-card count. Definition: [TbCaseSql.CONFIRMED]. */
-        const val CONFIRMED_LIST_SQL = "SELECT DISTINCT b.* FROM BEN_BASIC_CACHE b" +
-            " LEFT JOIN TB_SUSPECTED sus ON b.benId = sus.benId" +
-            " LEFT JOIN TB_DIAGNOSTICS dx ON b.benId = dx.benId" +
+        const val CONFIRMED_LIST_SQL = "SELECT b.* FROM BEN_BASIC_CACHE b" +
             " WHERE b.villageId = :villageId AND b.isDeactivate = 0 AND b.isDeath = 0" +
-            " AND " + TbCaseSql.CONFIRMED
+            " AND b.benId IN " + TbCaseSql.CONFIRMED_BEN_IDS
 
         const val CONFIRMED_PAGED_SQL = CONFIRMED_LIST_SQL + " AND " + BenListSearchSql.MATCHES + PAGED_ORDER
     }
