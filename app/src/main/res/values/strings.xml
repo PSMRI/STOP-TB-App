@@ -1,4 +1,5 @@
 <resources>
+    <string name="sync_dashboard_no_manual_logs">No manual-refresh or direct-save logs to share in this session.</string>
 
     <!--    Pref-->
     <string name="PREF_NAME" translatable="false">Sakhi-pref-1</string>
@@ -1057,7 +1058,10 @@
     <string name="sync_entity_tb_confirmed">TB confirmed</string>
     <string name="sync_dashboard_no_logs">No sync logs yet. Trigger a sync to see activity.</string>
     <string name="sync_dashboard_clear_logs">Clear Logs</string>
-    <string name="sync_dashboard_export_logs">Export Logs</string>
+    <string name="sync_dashboard_export_logs">Share sync diagnostics</string>
+    <string name="sync_share_title">Share Logs / Summary</string>
+    <string name="sync_share_send">Share</string>
+    <string name="sync_share_unavailable">Unable to share diagnostics. Logs may be empty. Please refresh Summary or try again.</string>
     <string name="sync_dashboard_no_log_files">No log files to export</string>
     <string name="form_name">Form Name</string>
     <string name="no_records_found_hh">No Household records found.</string>
@@ -1674,5 +1678,15 @@
 
 
 
+    <string name="sync_dashboard_tab_summary">Summary</string>
+    <string name="sync_summary_refresh">Refresh Summary</string>
+    <string name="sync_summary_scope">PUSH: day-wise local saves and their upload status. PULL: selected sync records saved to DB and skipped reasons. Today is default. PUSH totals persist; PULL run history covers this app session.</string>
+    <string name="sync_summary_push">PUSH</string>
+    <string name="sync_summary_pull">PULL</string>
+    <string name="sync_summary_history">History</string>
+    <string name="sync_summary_today">Today</string>
+    <string name="sync_summary_yesterday">Yesterday</string>
+    <string name="sync_summary_all">All</string>
+    <string name="sync_summary_empty">No structured sync reports yet. Run sync, then refresh this summary.</string>
 </resources>
 

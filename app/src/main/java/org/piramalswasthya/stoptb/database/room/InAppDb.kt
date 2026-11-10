@@ -133,6 +133,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
 
 )
 abstract class InAppDb : RoomDatabase() {
+    abstract fun syncVillageCountsDao(): org.piramalswasthya.stoptb.database.room.dao.SyncVillageCountsDao
 
     abstract val benIdGenDao: BeneficiaryIdsAvailDao
     abstract val householdDao: HouseholdDao
