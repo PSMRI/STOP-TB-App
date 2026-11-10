@@ -461,11 +461,27 @@ class BenRepo @Inject constructor(
                     }
 
                     file.absolutePath.startsWith(context.filesDir.absolutePath) -> {
-                        imagePath
+                        if (file.length() > ImageUtils.MAX_REGISTRATION_IMAGE_BYTES) {
+                            ImageUtils.saveBenImageFromCameraToStorage(
+                                context = context,
+                                uriString = imagePath,
+                                benId = ben.beneficiaryId
+                            ) ?: imagePath
+                        } else {
+                            imagePath
+                        }
                     }
 
                     else -> {
-                        imagePath
+                        if (file.exists()) {
+                            ImageUtils.saveBenImageFromCameraToStorage(
+                                context = context,
+                                uriString = imagePath,
+                                benId = ben.beneficiaryId
+                            ) ?: imagePath
+                        } else {
+                            imagePath
+                        }
                     }
                 }
             }
