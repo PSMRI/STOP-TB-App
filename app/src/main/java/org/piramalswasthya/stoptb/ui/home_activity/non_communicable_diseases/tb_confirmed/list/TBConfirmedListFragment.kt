@@ -16,7 +16,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.navigation.fragment.navArgs
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import org.piramalswasthya.stoptb.ui.ListTransitions
+import org.piramalswasthya.stoptb.ui.renderListStates
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.TbConfirmedListAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
@@ -54,7 +57,6 @@ class TBConfirmedListFragment : Fragment() {
     private val viewModel: TBConfirmedListViewModel by viewModels()
 
     private lateinit var benAdapter: TbConfirmedListAdapter
-    private var currentBenList: List<BenWithTbSuspectedDomain> = emptyList()
 
     private val sttContract = registerForActivityResult(SpeechToTextContract()) { value ->
         val lowerValue = value.lowercase()
@@ -74,7 +76,8 @@ class TBConfirmedListFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        viewModel.fetchCompletedBeneficiaries()
+        // Counselling status is fetched in onResume, which also runs on first entry (PR 6: it
+        // was fetched three times per visit - ViewModel init, here and onResume).
         binding.btnNextPage.visibility = View.GONE
         benAdapter = TbConfirmedListAdapter(
             TbConfirmedListAdapter.ClickListener(
@@ -120,6 +123,7 @@ class TBConfirmedListFragment : Fragment() {
             restrictToAction = restrictToAction
         )
         binding.rvAny.adapter = benAdapter
+        listTransitions = ListTransitions(binding.rvAny)
         binding.flLoading.visibility = View.VISIBLE
         binding.rvAny.visibility = View.GONE
         // fl_empty declares no visibility and therefore starts VISIBLE, which is what drew
@@ -131,12 +135,17 @@ class TBConfirmedListFragment : Fragment() {
         // started the next time onViewCreated runs, each doing the same work on every emission.
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.benList.collect {
-                renderListState(it)
-                currentBenList = it
-                benAdapter.submitList(it)
-                }
+                viewModel.benList.collectLatest { page -> benAdapter.submitData(page) }
             }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            benAdapter.renderListStates(
+                render = { awaitingFirstLoad, isEmpty -> renderListState(awaitingFirstLoad, isEmpty) },
+                onSettled = {
+                    _binding?.rvAny?.removeCallbacks(showSearchLoader)
+                    listTransitions?.onSettled()
+                }
+            )
         }
         viewModel.beneficiaryIdArray.observe(viewLifecycleOwner,{ benids ->
             benAdapter.submitBenIds(benids)
@@ -176,9 +185,6 @@ class TBConfirmedListFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        if (::benAdapter.isInitialized) {
-            benAdapter.submitList(currentBenList)
-        }
         viewModel.fetchCompletedBeneficiaries()
     }
 
@@ -212,12 +218,11 @@ class TBConfirmedListFragment : Fragment() {
      * before the first emission the screen was blank, and an empty first emission drew
      * "No records found" on top of rv_any rather than instead of it.
      */
-    private fun renderListState(items: List<*>) {
+    private fun renderListState(awaitingFirstLoad: Boolean, isEmpty: Boolean) {
         _binding?.let { b ->
-            b.rvAny.removeCallbacks(showSearchLoader)
-            b.flLoading.visibility = View.GONE
-            b.flEmpty.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
-            b.rvAny.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
+            b.flLoading.visibility = if (awaitingFirstLoad) View.VISIBLE else View.GONE
+            b.flEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
+            b.rvAny.visibility = if (awaitingFirstLoad || isEmpty) View.GONE else View.VISIBLE
         }
     }
 
@@ -231,6 +236,7 @@ class TBConfirmedListFragment : Fragment() {
     }
 
     private var lastQuery: String? = null
+    private var listTransitions: ListTransitions? = null
 
     private fun onQueryChanged(query: String) {
         // The ViewModel normalizes to lowercase and the filter is a StateFlow, which drops an
@@ -240,6 +246,7 @@ class TBConfirmedListFragment : Fragment() {
         val normalized = query.lowercase()
         if (normalized == lastQuery) return
         lastQuery = normalized
+        listTransitions?.onQueryChanged()
         _binding?.rvAny?.let { rv ->
             rv.removeCallbacks(showSearchLoader)
             rv.postDelayed(showSearchLoader, SEARCH_LOADER_DELAY_MS)

@@ -53,7 +53,7 @@ class ChangesFeedRepo @Inject constructor(
         /** Everything up to the hub's current state is applied. */
         DONE,
         /** This server has no changes feed: use the getAll endpoints. */
-        UNSUPPORTED,
+        UNSUPPORTED
     }
 
     companion object {

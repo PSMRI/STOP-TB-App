@@ -33,7 +33,7 @@ class SyncDashboardFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.viewPager.adapter = SyncDashboardPagerAdapter(this)
+        binding.viewPager.adapter = SyncDashboardPagerAdapter(childFragmentManager, viewLifecycleOwner.lifecycle)
 
         TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
             tab.text = tabTitles[position]

@@ -1,6 +1,9 @@
 package org.piramalswasthya.stoptb.repositories
 
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
 import androidx.paging.PagingSource
+import androidx.paging.map
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.scopes.ActivityRetainedScoped
@@ -40,6 +43,11 @@ class RecordsRepo @Inject constructor(
     val hhList get() = householdDao.getAllHouseholdWithNumMembers(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }
     val hhListCount get() = householdDao.getAllHouseholdsCount(selectedVillage)
+
+    // PR 6: All Household paged, searched and sorted in SQL.
+    fun householdsPaged(query: String) =
+        Pager(tbListPagingConfig) { householdDao.getHouseholdsWithNumMembersPaged(selectedVillage, query) }
+            .flow.map { page -> page.map { row -> row.asBasicDomainModel() } }
 
     val hhListforAsha get() = householdDao.getAllHouseholdForAshaFamilyMembers(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }
@@ -93,8 +101,11 @@ class RecordsRepo @Inject constructor(
 
 
     val unscreenedListCount get() = benDao.getUnscreenedCount(selectedVillage)
-    val unscreenedList get() = benDao.getUnscreenedList(selectedVillage)
-        .map { list -> list.map { it.asBasicDomainModel() } }
+    // PR 6: paged, searched in SQL, TB-screened beneficiaries excluded in SQL.
+    fun unscreenedPaged(query: String) =
+        Pager(tbListPagingConfig) { benDao.getUnscreenedPaged(selectedVillage, query) }
+            .flow.map { page -> page.map { row -> row.asBasicDomainModel() } }
+    val unscreenedNotTbScreenedCount get() = benDao.getUnscreenedNotTbScreenedCount(selectedVillage)
 
 
 
@@ -178,17 +189,24 @@ class RecordsRepo @Inject constructor(
     fun filariaScreeningList(hhId: Long) = benDao.getAllFilariaScreeningBen(selectedVillage, hhId = hhId)
         .map { list -> list.map { it.asFilariaScreeningDomainModel() } }
 
-    val tbScreeningList get() = benDao.getAllTbScreeningBen(selectedVillage)
-        .map { list -> list.map { it.asTbScreeningDomainModel() } }
+    // PR 6: the TB lists page from the database and search in SQL; they used to load (and
+    // filter) the whole village with every row's @Relation children on each emission.
+    fun tbScreeningPaged(query: String) =
+        Pager(tbListPagingConfig) { benDao.getTbScreeningBenPaged(selectedVillage, query) }
+            .flow.map { page -> page.map { row -> row.asTbScreeningDomainModel() } }
     val tbScreeningListCount get() = benDao.getTbScreenedBenCount(selectedVillage)
 
-    val tbSuspectedList get() = benDao.getTbScreeningList(selectedVillage)
-        .map { list -> list.map { it.asTbSuspectedDomainModel() } }
-    val tbSuspectedListCount get() = tbSuspectedList.map { it.size }
+    fun tbPresumptivePaged(query: String) =
+        Pager(tbListPagingConfig) { benDao.getTbPresumptivePaged(selectedVillage, query) }
+            .flow.map { page -> page.map { row -> row.asTbSuspectedDomainModel() } }
+    // Counted in SQL: was the whole Presumptive list (with @Relation children) loaded just for .size.
+    val tbSuspectedListCount get() = benDao.getTbPresumptiveListCount(selectedVillage)
 
-    val tbConfirmedList get() = benDao.getTbConfirmedList(selectedVillage)
-        .map { list -> list.map { it.asTbSuspectedDomainModel() } }
-    val tbConfirmedListCount get() = tbConfirmedList.map { it.size }
+    fun tbConfirmedPaged(query: String) =
+        Pager(tbListPagingConfig) { benDao.getTbConfirmedPaged(selectedVillage, query) }
+            .flow.map { page -> page.map { row -> row.asTbSuspectedDomainModel() } }
+    // Counted in SQL: was the whole Confirmed list loaded just for .size.
+    val tbConfirmedListCount get() = benDao.getTbConfirmedListCount(selectedVillage)
 
     val leprosySuspectedListCount get() = benDao.getLeprosyScreeningBenCountBySymptoms(selectedVillage, 0)
     val leprosyConfirmedCasesListCount get() = benDao.getConfirmedLeprosyCaseCount(selectedVillage = selectedVillage)
@@ -198,5 +216,10 @@ class RecordsRepo @Inject constructor(
 
     suspend fun getBenById(benId: Long): BenBasicDomain? {
         return benDao.getBenById(benId)?.asBasicDomainModel()
+    }
+
+    private companion object {
+        /** Bounded memory for long lists: ~10 pages kept, older ones dropped while scrolling. */
+        val tbListPagingConfig = PagingConfig(pageSize = 30, prefetchDistance = 10, initialLoadSize = 60, maxSize = 300)
     }
 }

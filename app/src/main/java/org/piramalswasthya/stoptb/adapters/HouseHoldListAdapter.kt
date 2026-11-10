@@ -6,7 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.ListAdapter
+import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.RecyclerView
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.configuration.IconDataset
@@ -17,7 +17,7 @@ import org.piramalswasthya.stoptb.ui.getTitle
 
 
 class HouseHoldListAdapter(private val diseaseType: String, private var isDisease: Boolean, val pref: PreferenceDao,private val isSoftDeleteEnabled:Boolean = false, private val clickListener: HouseholdClickListener) :
-    ListAdapter<HouseHoldBasicDomain, HouseHoldListAdapter.HouseHoldViewHolder>(
+    PagingDataAdapter<HouseHoldBasicDomain, HouseHoldListAdapter.HouseHoldViewHolder>(
         HouseHoldDiffUtilCallBack
     ) {
 
@@ -134,7 +134,7 @@ class HouseHoldListAdapter(private val diseaseType: String, private var isDiseas
     }
 
     override fun onBindViewHolder(holder: HouseHoldViewHolder, position: Int) {
-        holder.bind(getItem(position), clickListener, isDisease, pref, diseaseType, isSoftDeleteEnabled, showAddMember)
+        holder.bind(getItem(position) ?: return, clickListener, isDisease, pref, diseaseType, isSoftDeleteEnabled, showAddMember)
     }
 
 

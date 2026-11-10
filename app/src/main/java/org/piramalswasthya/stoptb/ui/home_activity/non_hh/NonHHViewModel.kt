@@ -28,6 +28,8 @@ import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
+import org.piramalswasthya.stoptb.repositories.RowBadgeRepo
+import org.piramalswasthya.stoptb.ui.LoadedRowBadges
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
@@ -37,37 +39,28 @@ class NonHHViewModel @Inject constructor(
     private val benRepo: BenRepo,
     private val vitalRepo: VitalRepo,
     private val tbRepo: TBRepo,
-    private val preferenceDao: PreferenceDao
+    private val preferenceDao: PreferenceDao,
+    private val rowBadgeRepo: RowBadgeRepo
 ) : ViewModel() {
 
     // ── Examine form fill status ──────────────────────────────────────────────
-    val vitalBenIds: StateFlow<List<Long>> = vitalRepo.vitalBenIds
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val unsyncedVitalBenIds: StateFlow<List<Long>> = vitalRepo.unsyncedVitalBenIds
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val syncingVitalBenIds: StateFlow<List<Long>> = vitalRepo.syncingVitalBenIds
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val tbScreeningBenIds: StateFlow<List<Long>> = tbRepo.tbScreeningBenIds
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val allTbDiagnostics = tbRepo.allTbDiagnostics
-    val unsyncedTbScreeningBenIds: StateFlow<List<Long>> = tbRepo.unsyncedTbScreeningBenIds
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val syncingTbScreeningBenIds: StateFlow<List<Long>> = tbRepo.syncingTbScreeningBenIds
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val generalOpdBenIds: StateFlow<List<Long>> = tbRepo.generalOpdBenIds
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val unsyncedGeneralOpdBenIds: StateFlow<List<Long>> = tbRepo.unsyncedGeneralOpdBenIds
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val syncingGeneralOpdBenIds: StateFlow<List<Long>> = tbRepo.syncingGeneralOpdBenIds
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val anthropometryBenIds: StateFlow<List<Long>> = recordsRepo.anthropometryFilledBenIds
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    // PR 6 (6.3): for the rows the list has loaded, not whole tables (RowBadgeRepo).
+    private val rowBadges = LoadedRowBadges(viewModelScope, rowBadgeRepo)
 
-    val diagnosisBenIds: StateFlow<List<Long>> = combine(
-        tbRepo.tbDiagnosticsBenIdsFromCards,
-        tbRepo.tbSuspectedBenIds
-    ) { diagnostics, suspected -> (diagnostics + suspected).distinct() }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    fun onRowsLoaded(benIds: Set<Long>) = rowBadges.onRowsLoaded(benIds)
+
+    val vitalBenIds: Flow<List<Long>> = rowBadges.vitalBenIds
+    val unsyncedVitalBenIds: Flow<List<Long>> = rowBadges.unsyncedVitalBenIds
+    val syncingVitalBenIds: Flow<List<Long>> = rowBadges.syncingVitalBenIds
+    val tbScreeningBenIds: Flow<List<Long>> = rowBadges.tbScreeningBenIds
+    val allTbDiagnostics = rowBadges.tbDiagnostics
+    val unsyncedTbScreeningBenIds: Flow<List<Long>> = rowBadges.unsyncedTbScreeningBenIds
+    val syncingTbScreeningBenIds: Flow<List<Long>> = rowBadges.syncingTbScreeningBenIds
+    val generalOpdBenIds: Flow<List<Long>> = rowBadges.generalOpdBenIds
+    val unsyncedGeneralOpdBenIds: Flow<List<Long>> = rowBadges.unsyncedGeneralOpdBenIds
+    val syncingGeneralOpdBenIds: Flow<List<Long>> = rowBadges.syncingGeneralOpdBenIds
+    val anthropometryBenIds: Flow<List<Long>> = rowBadges.anthropometryBenIds
+    val diagnosisBenIds: Flow<List<Long>> = rowBadges.diagnosisBenIds
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> get() = _searchQuery
@@ -87,7 +80,7 @@ class NonHHViewModel @Inject constructor(
         .debounce { query -> if (query.isEmpty()) 0L else searchDebounceMs }
         .distinctUntilChanged()
         .flatMapLatest { query ->
-            Pager(config = PagingConfig(pageSize = 30, prefetchDistance = 10)) {
+            Pager(config = PagingConfig(pageSize = 30, prefetchDistance = 10, maxSize = 300)) {
                 recordsRepo.searchNonHHPagedSource(query)
             }.flow.map { pagingData -> pagingData.map { it.asBasicDomainModel() } }
         }

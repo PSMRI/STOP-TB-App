@@ -42,6 +42,8 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class TBScreeningFormFragment : Fragment() {
 
+    private var formListJob: kotlinx.coroutines.Job? = null
+
     @Inject lateinit var preferenceDao: PreferenceDao
 
     private val openedFromHousehold: Boolean
@@ -100,7 +102,10 @@ class TBScreeningFormFragment : Fragment() {
                 binding.btnSubmit.isEnabled = !(recordExists || viewModel.viewOnly)
                 binding.btnSubmit.visibility = if (recordExists || viewModel.viewOnly) View.GONE else View.VISIBLE
                 binding.form.rvInputForm.adapter = adapter
-                lifecycleScope.launch {
+                // recordExists can emit more than once: replace the previous collector instead of
+                // stacking another one, and stop it with the view.
+                formListJob?.cancel()
+                formListJob = viewLifecycleOwner.lifecycleScope.launch {
                     viewModel.formList.collect {
                         if (it.isNotEmpty()) {
                             val dateIndex = viewModel.getIndexOfDate()

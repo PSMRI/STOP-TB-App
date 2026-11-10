@@ -1,16 +1,16 @@
 package org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.tb_confirmed.list
 
+import org.piramalswasthya.stoptb.ui.debounceTyping
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import androidx.paging.cachedIn
 import kotlinx.coroutines.launch
-import org.piramalswasthya.stoptb.helpers.filterTbSuspectedList
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import org.piramalswasthya.stoptb.repositories.dynamicRepo.ICounsellingRepository
 import org.piramalswasthya.stoptb.ui.counselling_activity.FormType
@@ -22,7 +22,6 @@ class TBConfirmedListViewModel @Inject constructor(
     val recordsRepo: RecordsRepo,
     private val counsellingRepository: ICounsellingRepository
 ): ViewModel() {
-    private val allBenList = recordsRepo.tbConfirmedList
     private val filter = MutableStateFlow("")
 
     private val _beneficiaryIdArray : MutableLiveData<List<Long>> = MutableLiveData()
@@ -38,15 +37,15 @@ class TBConfirmedListViewModel @Inject constructor(
     private val _localFilledCounts: MutableLiveData<Map<Long, Int>> = MutableLiveData(emptyMap())
     val localFilledCounts: LiveData<Map<Long, Int>> = _localFilledCounts
 
-    // The filter runs over the whole list on every keystroke and on every database
-    // emission. Collected on lifecycleScope, that ran on the main thread - thousands of
-    // rows per typed character on a field device.
-    val benList = allBenList.combine(filter) { list, filter ->
-        filterTbSuspectedList(list, filter)
-    }.flowOn(Dispatchers.Default)
+    // PR 6: paged, and the search runs in SQL. The whole village used to be loaded and
+    // filtered in Kotlin on every keystroke and every database write.
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val benList = filter.debounceTyping()
+        .flatMapLatest { query -> recordsRepo.tbConfirmedPaged(query) }
+        .cachedIn(viewModelScope)
 
     init {
-        fetchCompletedBeneficiaries()
+        // Completed-beneficiary status is fetched by the fragment's onResume.
         fetchTotalSectionsFallback()
     }
 

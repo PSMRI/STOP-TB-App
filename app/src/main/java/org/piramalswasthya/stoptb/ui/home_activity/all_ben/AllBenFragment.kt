@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import org.piramalswasthya.stoptb.ui.loadedIds
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.repositories.BenRepo
@@ -183,6 +184,9 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // stack would accumulate another 17 Room Flow subscriptions per view creation.
         rowDecorationsStarted = false
         super.onDestroyView()
+        // A new adapter and binding are created per view; don't keep the old view tree alive
+        // while the fragment sits on the back stack.
+        _binding = null
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -532,7 +536,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         var firstPagingDataSeen = false
         var firstRefreshSettled = false
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.benList.collectLatest {
                 if (!firstPagingDataSeen) {
                     firstPagingDataSeen = true
@@ -544,7 +548,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
         // TEMPORARY PERF INSTRUMENTATION - how long Paging's refresh (COUNT + page 0) takes,
         // and how many times it restarts before it settles.
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             benAdapter.loadStateFlow.collect { loadStates ->
                 if (loadStates.refresh is LoadState.NotLoading && !firstRefreshSettled) {
                     firstRefreshSettled = true
@@ -571,7 +575,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             viewModel.expandSearchToBlock()
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             // Settles only once the expanded search's PagingData is submitted and its refresh has completed,
             // so page updates from the previous search can't end the loading state early.
             benAdapter.onPagesUpdatedFlow.collect {
@@ -588,7 +592,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             // A failed refresh never produces a page update, so settle the expanded search's error here
             // instead of leaving the loader up; Retry re-runs the same refresh via benAdapter.retry().
             benAdapter.loadStateFlow.collect { loadStates ->
@@ -611,7 +615,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             combine(
                 benAdapter.loadStateFlow.map { it.refresh is LoadState.Loading },
                 benAdapter.loadStateFlow.map { loadStates ->
@@ -695,7 +699,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // page data either way; the decorations land a frame later.
 
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.orderActionState.collectLatest { state ->
                 when (state) {
                     is AllBenViewModel.OrderActionResult.Idle -> {}
@@ -931,6 +935,10 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // destroyed view would stop the next, legitimate call from ever starting them.
         if (_binding == null || rowDecorationsStarted) return
         rowDecorationsStarted = true
+        // The badges below are read only for the rows the list has loaded (PR 6).
+        viewLifecycleOwner.lifecycleScope.launch {
+            benAdapter.loadedIds { item -> item.benId }.collect { benIds -> viewModel.onRowsLoaded(benIds) }
+        }
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.childCounts.collectLatest { countMap ->
                 benAdapter.submitChildCounts(countMap)
@@ -1244,6 +1252,5 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         addMemberAlert?.dismiss()
         addMemberAlert = null
         addMemberAlertBinding = null
-        _binding = null
     }
 }

@@ -42,7 +42,7 @@ class ReferralIconsFragment : Fragment() {
         )
         binding.rvIconGrid.adapter = IconGridAdapter(
             IconGridAdapter.GridIconClickListener { findNavController().navigateSafe(it) },
-            viewLifecycleOwner.lifecycleScope
+            viewLifecycleOwner
         ).also {
             it.submitList(iconDataset.getReferralDataset(resources))
         }

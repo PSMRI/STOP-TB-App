@@ -1,11 +1,15 @@
 package org.piramalswasthya.stoptb.ui.home_activity.sync_dashboard
 
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentManager
+import androidx.lifecycle.Lifecycle
 import androidx.viewpager2.adapter.FragmentStateAdapter
 
+/** Build with (childFragmentManager, viewLifecycleOwner.lifecycle) so the pages don't outlive the host view. */
 class SyncDashboardPagerAdapter(
-    fragment: Fragment
-) : FragmentStateAdapter(fragment) {
+    fragmentManager: FragmentManager,
+    lifecycle: Lifecycle
+) : FragmentStateAdapter(fragmentManager, lifecycle) {
 
     override fun getItemCount(): Int = 2
 

@@ -180,7 +180,7 @@ class CampModeConnectFragment : Fragment() {
                     ContextCompat.getColor(requireContext(), R.color.md_theme_light_primary)
                 )
                 WorkerUtils.triggerAmritPushWorker(requireContext().applicationContext)
-                WorkerUtils.triggerCampQuickPullIfConnected(requireContext().applicationContext, pref, force = true)
+                WorkerUtils.triggerCampQuickPullAsync(requireContext().applicationContext, pref, force = true)
                 WorkerUtils.reportTabletVersion(requireContext().applicationContext, force = true)
                 closeConnectScreen(refreshSignIn = true)
             }

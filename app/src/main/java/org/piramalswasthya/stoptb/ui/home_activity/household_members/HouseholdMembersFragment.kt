@@ -153,11 +153,13 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.benList.collect { list ->
+                    binding.flLoading.visibility = View.GONE
                     binding.flEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
                     benAdapter.submitHouseholdMemberCounts(
                         list.groupingBy { it.hhId }.eachCount()
                     )
                     benAdapter.submitList(list)
+                    viewModel.onRowsLoaded(list.mapTo(HashSet()) { member -> member.benId })
                 }
             }
         }

@@ -4,6 +4,9 @@ import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.flow.flowOn
+import org.piramalswasthya.stoptb.utils.throttleLatest
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -30,7 +33,8 @@ class VitalRepo @Inject constructor(
     private val preferenceDao: PreferenceDao,
     private val userRepo: UserRepo,
     private val tmcNetworkApiService: AmritApiService,
-    private val database: InAppDb
+    private val database: InAppDb,
+    @org.piramalswasthya.stoptb.di.ApplicationScope private val appScope: kotlinx.coroutines.CoroutineScope
 ) {
 
     private companion object {
@@ -50,12 +54,16 @@ class VitalRepo @Inject constructor(
      */
     private val vitalBenIdStates: Flow<List<org.piramalswasthya.stoptb.model.BenIdSyncState>> =
         vitalDao.getVitalBenIdSyncStates()
+            // One query shared by all three sets and every collector of this repo instance,
+            // delivering at most 2 updates/s to the list screens during sync.
+            .throttleLatest(500L)
+            .shareIn(appScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), replay = 1)
 
-    val vitalBenIds: Flow<List<Long>> = vitalBenIdStates.map { rows -> rows.map { it.benId } }
+    val vitalBenIds: Flow<List<Long>> = vitalBenIdStates.map { rows -> rows.map { it.benId } }.flowOn(Dispatchers.Default)
     val unsyncedVitalBenIds: Flow<List<Long>> =
-        vitalBenIdStates.map { rows -> rows.filter { it.syncState == SyncState.UNSYNCED }.map { it.benId } }
+        vitalBenIdStates.map { rows -> rows.filter { it.syncState == SyncState.UNSYNCED }.map { it.benId } }.flowOn(Dispatchers.Default)
     val syncingVitalBenIds: Flow<List<Long>> =
-        vitalBenIdStates.map { rows -> rows.filter { it.syncState == SyncState.SYNCING }.map { it.benId } }
+        vitalBenIdStates.map { rows -> rows.filter { it.syncState == SyncState.SYNCING }.map { it.benId } }.flowOn(Dispatchers.Default)
 
     suspend fun saveVitals(vitalCache: VitalCache) {
         withContext(Dispatchers.IO) {

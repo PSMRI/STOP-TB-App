@@ -91,7 +91,7 @@ class VolunteerIconsFragment : Fragment() {
             IconGridAdapter.GridIconClickListener {
                 findNavController().navigateSafe(it)
             },
-            viewLifecycleOwner.lifecycleScope
+            viewLifecycleOwner
         )
         iconAdapter = adapter
         binding.rvIconGrid.adapter = adapter

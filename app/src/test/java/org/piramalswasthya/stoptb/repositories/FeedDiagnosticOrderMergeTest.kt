@@ -29,10 +29,16 @@ class FeedDiagnosticOrderMergeTest {
 
     private val benId = 422455468513L
 
-    private val repo = TBRepo(
+    // The merge / cascade / suspected helpers live in DiagnosticOrderRepo (split out of TBRepo).
+    private val repo = org.piramalswasthya.stoptb.repositories.tb.DiagnosticOrderRepo(
         mock(TBDao::class.java, RETURNS_DEEP_STUBS), mock(BenDao::class.java), mock(PreferenceDao::class.java),
         mock(UserRepo::class.java), mock(AmritApiService::class.java), mock(InAppDb::class.java),
-        mock(DrugMasterRepo::class.java), mock(SyncRetryStore::class.java), mock(Context::class.java)
+        mock(SyncRetryStore::class.java), mock(Context::class.java),
+        mock(org.piramalswasthya.stoptb.repositories.tb.TbLocalRepo::class.java),
+        mock(org.piramalswasthya.stoptb.repositories.tb.TbPushRepo::class.java),
+        org.piramalswasthya.stoptb.repositories.tb.DeviceIntegrationRepo(
+            mock(PreferenceDao::class.java), mock(AmritApiService::class.java), mock(Context::class.java)),
+        org.piramalswasthya.stoptb.repositories.tb.BenIdLocks()
     )
 
     private fun result(status: String, summary: String? = null, id: String = "ext-1") =

@@ -15,6 +15,11 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.BenListAdapter
+import org.piramalswasthya.stoptb.adapters.BenPagingAdapter
+import kotlinx.coroutines.flow.collectLatest
+import org.piramalswasthya.stoptb.ui.loadedIds
+import org.piramalswasthya.stoptb.ui.ListTransitions
+import org.piramalswasthya.stoptb.ui.renderListStates
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentUnScreenedPeopleBinding
 import org.piramalswasthya.stoptb.helpers.RoleManager
@@ -41,7 +46,8 @@ class UnScreenedPeople : Fragment(),
 
     private val viewModel: UnScreenedPeopleViewModel by viewModels()
 
-    private lateinit var benAdapter: BenListAdapter
+    private lateinit var benAdapter: BenPagingAdapter
+    private var listTransitions: ListTransitions? = null
 
     private var pendingExamineBenId: Long? = null
     // Latest showExamineBottomSheet call; an older call whose ID lookup finishes late is dropped.
@@ -64,12 +70,13 @@ class UnScreenedPeople : Fragment(),
         binding.searchView.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                listTransitions?.onQueryChanged()
                 viewModel.filterText(s?.toString()?.trim() ?: "")
             }
             override fun afterTextChanged(s: android.text.Editable?) {}
         })
 
-        benAdapter = BenListAdapter(
+        benAdapter = BenPagingAdapter(
             clickListener = BenListAdapter.BenClickListener(
 
                 clickedBen = { _, _, _, _ ->
@@ -122,34 +129,21 @@ class UnScreenedPeople : Fragment(),
 
 
         binding.rvUnscreened.adapter = benAdapter
-        (binding.rvUnscreened.itemAnimator as? androidx.recyclerview.widget.SimpleItemAnimator)
-            ?.supportsChangeAnimations = false
+        listTransitions = ListTransitions(binding.rvUnscreened)
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-//                launch {
-//                    viewModel.unscreenedCount.collect {
-//                        binding.tvUnscreenedCount.text = "Unscreened: $it"
-//                    }
-//                }
+                launch { viewModel.unscreenedList.collectLatest { page -> benAdapter.submitData(page) } }
                 launch {
-                    viewModel.unscreenedList.collect { list ->
-                        benAdapter.submitList(list)
-                        binding.tvEmpty.visibility =
-                            if (list.isEmpty()) View.VISIBLE else View.GONE
-                    }
+                    benAdapter.renderListStates(onSettled = { listTransitions?.onSettled() }, render = { awaitingFirstLoad, isEmpty ->
+                        _binding?.let { b ->
+                            b.flLoading.visibility = if (awaitingFirstLoad) View.VISIBLE else View.GONE
+                            b.tvEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
+                            b.rvUnscreened.visibility = if (awaitingFirstLoad || isEmpty) View.INVISIBLE else View.VISIBLE
+                        }
+                    })
                 }
-            }
-        }
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch {
-                    viewModel.unscreenedList.collect { list ->
-                        benAdapter.submitList(list)
-                        binding.tvEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
-                    }
-                }
+                launch { benAdapter.loadedIds { item -> item.benId }.collect { benIds -> viewModel.onRowsLoaded(benIds) } }
                 launch { viewModel.vitalBenIds.collect { benAdapter.submitBenIds(it) } }
                 launch { viewModel.tbScreeningBenIds.collect { benAdapter.submitTbScreeningBenIds(it) } }
                 launch { viewModel.generalOpdBenIds.collect { benAdapter.submitGeneralOpdBenIds(it) } }
