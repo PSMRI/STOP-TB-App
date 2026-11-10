@@ -11,6 +11,8 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.Before
+import org.junit.After
 import org.mockito.Mockito
 import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.doThrow
@@ -26,6 +28,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.asContextElement
 
 class SyncApiPayloadInterceptorTest {
+    @Before fun startLogSession() = interactiveSyncLogSession.reset(signedIn = true)
+    @After fun endLogSession() = interactiveSyncLogSession.reset(signedIn = false)
     // Local JVM-8 helpers avoid inlining the dependency's JVM-11 Kotlin helpers.
     private inline fun <reified T : Any> mock(): T = Mockito.mock(T::class.java)
     private fun <T> whenever(value: T) = Mockito.`when`(value)
@@ -81,7 +85,27 @@ class SyncApiPayloadInterceptorTest {
         }
         assertNull(SyncHttpOrigins.current.get())
     }
-    private val origin = SyncHttpOrigin("manual-run", "PUSH", "MANUAL_REFRESH")
+    private val origin get() = SyncHttpOrigin("manual-run", "PUSH", "MANUAL_REFRESH",
+        interactiveSyncLogSession.session.value)
+
+    @Test fun responseFromPreviousLoginIsNotLoggedAfterAccountSwitch() {
+        val logs = mock<SyncLogManager>()
+        val messages = mutableListOf<String>()
+        doAnswer { messages.add(it.getArgument(2)); null }.whenever(logs).addLog(any(), any(), any())
+        val request = Request.Builder().url("https://example.test/save")
+            .tag(SyncHttpOrigin::class.java, origin).build()
+        val chain = mock<Interceptor.Chain>()
+        whenever(chain.request()).thenReturn(request)
+        val expected = response(request, """{"statusCode":200}""")
+        whenever(chain.proceed(request)).thenAnswer {
+            interactiveSyncLogSession.reset(signedIn = false)
+            interactiveSyncLogSession.reset(signedIn = true)
+            expected
+        }
+        assertSame(expected, SyncApiPayloadInterceptor(logs).intercept(chain))
+        assertEquals(1, messages.size)
+        assertTrue(messages.single().contains("phase=REQUEST"))
+    }
     private fun response(request: Request, body: String) = Response.Builder().request(request)
         .protocol(Protocol.HTTP_1_1).code(200).message("OK").body(body.toResponseBody("application/json".toMediaType())).build()
 

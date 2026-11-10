@@ -24,6 +24,7 @@ import org.piramalswasthya.stoptb.work.dynamicWoker.FormSyncWorker
 import org.piramalswasthya.stoptb.work.dynamicWoker.NCDFollowUpSyncWorker
 import org.piramalswasthya.stoptb.work.dynamicWoker.NDCFollowUpPushWorker
 import org.piramalswasthya.stoptb.helpers.SyncDiagnostics
+import org.piramalswasthya.stoptb.helpers.SyncHttpOrigins
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
 
@@ -128,11 +129,13 @@ object WorkerUtils {
     // bursts of saves into one push cycle and, if a cycle is already running,
     // starts a follow-up cycle after it ends instead of dropping the save.
     fun triggerAmritPushWorker(context: Context, triggerSource: String = "DIRECT_SAVE",
-                              syncRunId: String = java.util.UUID.randomUUID().toString()) {
+                              syncRunId: String = java.util.UUID.randomUUID().toString(),
+                              logSessionId: String? = SyncHttpOrigins.captureSession()) {
         if (!canTriggerPush(context)) return
         val gate = OneTimeWorkRequestBuilder<SyncGateWorker>()
             .setInputData(Data.Builder().putString(SyncDiagnostics.RUN_ID, syncRunId)
-                .putString(SyncDiagnostics.TRIGGER, triggerSource).build())
+                .putString(SyncDiagnostics.TRIGGER, triggerSource)
+                .putString(SyncDiagnostics.LOG_SESSION, logSessionId).build())
             .setInitialDelay(SyncGateWorker.DEBOUNCE_SECONDS, TimeUnit.SECONDS)
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork(
@@ -180,7 +183,8 @@ object WorkerUtils {
     // Enqueues the push chain directly and returns its work IDs. Used by
     // SyncGateWorker and by manual camp refresh, which tracks these IDs.
     fun enqueuePushChain(context: Context, triggerSource: String = "AUTO_PUSH",
-                         syncRunId: String = java.util.UUID.randomUUID().toString()): List<java.util.UUID> {
+                         syncRunId: String = java.util.UUID.randomUUID().toString(),
+                         logSessionId: String? = SyncHttpOrigins.captureSession()): List<java.util.UUID> {
         if (!canPush(context)) return emptyList()
 
         val isCampHubSyncActive = isCampHubSyncActive(context)
@@ -188,7 +192,7 @@ object WorkerUtils {
         val activePushInfos = getActiveUniqueWorkInfos(workManager, pushWorkerUniqueName)
         if (activePushInfos.any { it.state == WorkInfo.State.RUNNING }) {
             Timber.d("Push chain already running, arming sync gate for a follow-up cycle")
-            triggerAmritPushWorker(context, triggerSource, syncRunId)
+            triggerAmritPushWorker(context, triggerSource, syncRunId, logSessionId)
             return activePushInfos.map { it.id }
         }
         if (activePushInfos.isNotEmpty() && isCampHubSyncActive) {
@@ -198,7 +202,8 @@ object WorkerUtils {
 
         val campMode = isCampModeEnabled(context)
         val traceData = Data.Builder().putString(SyncDiagnostics.RUN_ID, syncRunId)
-            .putString(SyncDiagnostics.TRIGGER, triggerSource).build()
+            .putString(SyncDiagnostics.TRIGGER, triggerSource)
+            .putString(SyncDiagnostics.LOG_SESSION, logSessionId).build()
 
         // StopTB push chain:
         // Registration (+ vitals) → TB data + ABHA + counselling + contact tracing
@@ -254,7 +259,7 @@ object WorkerUtils {
         WorkContinuation.combine(listOf(chainTB, chainAbha, chainCounselling, chainContactTracing)).enqueue()
         val ids = listOf(registration.id, groupAbha.id, groupCounselling.id, groupContactTracing.id) +
                 groupTB.map { it.id }
-        SyncDiagnostics.observeRun(context, syncRunId, "PUSH", triggerSource, ids)
+        SyncDiagnostics.observeRun(context, syncRunId, "PUSH", triggerSource, ids, logSessionId)
         return ids
     }
 
@@ -262,7 +267,8 @@ object WorkerUtils {
         context: Context,
         force: Boolean = false,
         triggerSource: String = "DIRECT",
-        syncRunId: String = java.util.UUID.randomUUID().toString()
+        syncRunId: String = java.util.UUID.randomUUID().toString(),
+        logSessionId: String? = SyncHttpOrigins.captureSession()
     ): List<java.util.UUID> {
         if (!hasLoggedInUser(context)) {
             Timber.w("Pull worker skipped: no logged-in user is stored yet")
@@ -280,6 +286,7 @@ object WorkerUtils {
         val pullRunData = Data.Builder()
             .putString(SyncDiagnostics.RUN_ID, syncRunId)
             .putString(SyncDiagnostics.TRIGGER, triggerSource)
+            .putString(SyncDiagnostics.LOG_SESSION, logSessionId)
             .putString(pullTriggerSourceKey, triggerSource)
             .putLong(pullStartedAtKey, SystemClock.elapsedRealtime())
             .build()
@@ -316,7 +323,7 @@ object WorkerUtils {
         SyncDiagnostics.prepareRun(syncRunId, "PULL")
         chainTB.then(setSyncCompleteWorker).enqueue()
         val ids = listOf(pullWorkRequest.id, setSyncCompleteWorker.id) + groupTB.map { it.id }
-        SyncDiagnostics.observeRun(context, syncRunId, "PULL", triggerSource, ids)
+        SyncDiagnostics.observeRun(context, syncRunId, "PULL", triggerSource, ids, logSessionId)
         return ids
     }
 
@@ -367,12 +374,14 @@ object WorkerUtils {
         manualCampRefreshInProgress = true
         Timber.i("Camp sync [MANUAL_REFRESH] requested by user")
         val runId = java.util.UUID.randomUUID().toString()
-        val pushIds = enqueuePushChain(context, "MANUAL_REFRESH", runId)
+        val logSessionId = SyncHttpOrigins.captureSession()
+        val pushIds = enqueuePushChain(context, "MANUAL_REFRESH", runId, logSessionId)
         val pullIds = triggerAmritPullWorker(
             context,
             force = true,
             triggerSource = "MANUAL_REFRESH",
-            syncRunId = runId
+            syncRunId = runId,
+            logSessionId = logSessionId
         )
         return pushIds + pullIds
     }

@@ -25,16 +25,14 @@ class SyncLogManager @Inject constructor(
 
     private val scope = CoroutineScope(Dispatchers.Default)
     private val buffer = ArrayDeque<SyncLogEntry>(MAX_BUFFER_SIZE)
-    private val interactiveBuffer = ArrayDeque<SyncLogEntry>(MAX_BUFFER_SIZE)
-    private val liveFilter = SyncLiveLogFilter()
     private var nextId = 0L
     private var emitJob: Job? = null
     private val _logs = MutableStateFlow<List<SyncLogEntry>>(emptyList())
     val logs: StateFlow<List<SyncLogEntry>> = _logs.asStateFlow()
-    private val _interactiveLogs = MutableStateFlow<List<SyncLogEntry>>(emptyList())
-    val interactiveLogs: StateFlow<List<SyncLogEntry>> = _interactiveLogs.asStateFlow()
+    val interactiveLogs: StateFlow<List<SyncLogEntry>> = interactiveSyncLogSession.logs
 
-    fun interactiveSnapshot(): List<SyncLogEntry> = synchronized(buffer) { interactiveBuffer.toList() }
+    internal fun interactiveSnapshot(sessionId: String): List<SyncLogEntry> =
+        interactiveSyncLogSession.snapshot(sessionId)
 
     fun addLog(level: LogLevel, tag: String, message: String) {
         synchronized(buffer) {
@@ -50,10 +48,7 @@ class SyncLogManager @Inject constructor(
                     message = message
                 )
             )
-            if (liveFilter.accepts(tag, message)) {
-                if (interactiveBuffer.size >= MAX_BUFFER_SIZE) interactiveBuffer.removeFirst()
-                interactiveBuffer.addLast(buffer.last())
-            }
+            interactiveSyncLogSession.append(SyncHttpOrigins.current.get()?.sessionId, buffer.last())
             scheduleEmit()
         }
         fileWriter.writeLog(level, tag, message)
@@ -65,7 +60,7 @@ class SyncLogManager @Inject constructor(
             delay(EMIT_DELAY_MS)
             synchronized(buffer) {
                 _logs.value = buffer.toList()
-                _interactiveLogs.value = interactiveBuffer.toList()
+                interactiveSyncLogSession.publish()
                 emitJob = null
             }
         }
@@ -75,9 +70,8 @@ class SyncLogManager @Inject constructor(
         synchronized(buffer) {
             emitJob?.cancel()
             buffer.clear()
-            interactiveBuffer.clear()
+            interactiveSyncLogSession.clear()
             _logs.value = emptyList()
-            _interactiveLogs.value = emptyList()
         }
     }
 }

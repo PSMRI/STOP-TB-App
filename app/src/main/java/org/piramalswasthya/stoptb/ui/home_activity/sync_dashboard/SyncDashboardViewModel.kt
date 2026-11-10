@@ -171,8 +171,9 @@ class SyncDashboardViewModel @Inject constructor(
     }
 
     // Shared export for Logs and Summary.
-    private val _exportIntent = MutableStateFlow<Intent?>(null)
-    val exportIntent: StateFlow<Intent?> = _exportIntent.asStateFlow()
+    internal data class PendingExport(val sessionId: String, val intent: Intent)
+    private val _exportIntent = MutableStateFlow<PendingExport?>(null)
+    internal val exportIntent: StateFlow<PendingExport?> = _exportIntent.asStateFlow()
 
     private val _exportEmpty = MutableStateFlow(false)
     val exportEmpty: StateFlow<Boolean> = _exportEmpty.asStateFlow()
@@ -182,7 +183,8 @@ class SyncDashboardViewModel @Inject constructor(
     private var shareSummaryScope: String? = null
     internal fun summaryScope(): String {
         val user = preferenceDao.getLoggedInUser()
-        return "${user?.userId}/${user?.serviceMapId}/$selectedVillage"
+        val session = org.piramalswasthya.stoptb.helpers.interactiveSyncLogSession.session.value
+        return "$session/${user?.userId}/${user?.serviceMapId}/$selectedVillage"
     }
     fun updateShareSummary(summary: String?, scope: String? = null) {
         shareSummaryScope = scope
@@ -193,6 +195,8 @@ class SyncDashboardViewModel @Inject constructor(
 
     fun exportLogs(includeLogs: Boolean = true, includeSummary: Boolean = false) {
         if (_exportBusy.value || (!includeLogs && !includeSummary)) return
+        val logSession = org.piramalswasthya.stoptb.helpers.interactiveSyncLogSession
+        val sessionId = logSession.session.value ?: return
         val summary = if (includeSummary) _shareSummary.value else null
         if (includeSummary && summary == null) return
         if (includeSummary && shareSummaryScope != summaryScope()) {
@@ -203,10 +207,10 @@ class SyncDashboardViewModel @Inject constructor(
         _exportBusy.value = true
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val intent = syncLogExporter.createShareIntent(getApplication(), includeLogs, summary)
-                if (intent != null) {
-                    _exportIntent.value = intent
-                } else {
+                val intent = syncLogExporter.createShareIntent(getApplication(), sessionId, includeLogs, summary)
+                if (intent != null && logSession.isCurrent(sessionId)) {
+                    _exportIntent.value = PendingExport(sessionId, intent)
+                } else if (logSession.isCurrent(sessionId)) {
                     _exportEmpty.value = true
                 }
             } catch (cancelled: CancellationException) {

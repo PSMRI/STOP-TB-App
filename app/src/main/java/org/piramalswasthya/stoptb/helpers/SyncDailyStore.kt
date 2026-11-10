@@ -29,6 +29,7 @@ internal object SyncDailyStore {
         if (outcome !in setOf("SUCCESS", "FAILURE")) return
         val trace = currentCoroutineContext()[SyncTrace]
         val run = trace?.runId ?: "LOCAL_SAVE"
+        val logSessionId = SyncHttpOrigins.captureSession()
         withContext(Dispatchers.IO) {
             try {
                 val scope = trace?.accountScope ?: scope() ?: return@withContext
@@ -38,7 +39,9 @@ internal object SyncDailyStore {
                 val keys = ids.map { it.toString() }.filter { it.isNotBlank() && it != "0" }.distinct()
                 if (keys.isEmpty()) return@withContext
                 if (action == "SAVE" && trace == null) runCatching {
-                    timber.log.Timber.tag("SyncTrace").i("LOCAL SAVE | module=%s | records=%d | outcome=%s", module, keys.size, outcome)
+                    SyncHttpOrigins.withOrigin(SyncHttpOrigin(run, "PUSH", "DIRECT_SAVE", logSessionId)) {
+                        timber.log.Timber.tag("SyncTrace").i("LOCAL SAVE | module=%s | records=%d | outcome=%s", module, keys.size, outcome)
+                    }
                 }
                 db.beginTransaction()
                 try {

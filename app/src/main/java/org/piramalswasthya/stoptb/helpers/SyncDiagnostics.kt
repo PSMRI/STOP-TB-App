@@ -27,6 +27,7 @@ import timber.log.Timber
 object SyncDiagnostics {
     const val RUN_ID = "sync_run_id"
     const val TRIGGER = "sync_trigger"
+    const val LOG_SESSION = "sync_log_session"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val results = ConcurrentHashMap<String, SyncDataResult>()
     @Volatile private var activeRole: String = "UNKNOWN"
@@ -67,14 +68,18 @@ object SyncDiagnostics {
         results.putIfAbsent("$runId/$direction", SyncDataResult())
     }
 
-    fun observeRun(context: Context, runId: String, direction: String, trigger: String, ids: List<UUID>) {
+    fun observeRun(context: Context, runId: String, direction: String, trigger: String,
+                   ids: List<UUID>, logSessionId: String?) {
         if (ids.isEmpty()) return
         val key = "$runId/$direction"
         results.putIfAbsent(key, SyncDataResult())
         val app = context.applicationContext
         val start = android.os.SystemClock.elapsedRealtime()
-        emit("SYNC START | runId=$runId | direction=$direction | trigger=$trigger | ${identity(app)}")
-        scope.launch {
+        val origin = SyncHttpOrigin(runId, direction, trigger, logSessionId)
+        SyncHttpOrigins.withOrigin(origin) {
+            emit("SYNC START | runId=$runId | direction=$direction | trigger=$trigger | ${identity(app)}")
+        }
+        scope.launch(SyncHttpOrigins.current.asContextElement(origin)) {
             try {
                 val manager = WorkManager.getInstance(app)
                 // React to local state changes, without polling or changing scheduled work.
@@ -107,7 +112,8 @@ object SyncDiagnostics {
                                 attempt: Int, direction: String,
                                 block: suspend () -> ListenableWorker.Result): ListenableWorker.Result {
         val runId = input.getString(RUN_ID) ?: workId.toString()
-        val origin = SyncHttpOrigin(runId, direction, input.getString(TRIGGER) ?: "DIRECT")
+        val origin = SyncHttpOrigin(runId, direction, input.getString(TRIGGER) ?: "DIRECT",
+            input.getString(LOG_SESSION))
         return withContext(SyncTrace(runId, direction, SyncDailyStore.accountScope(context)) +
             SyncHttpOrigins.current.asContextElement(origin)) {
             emit("SYNC WORKER START | runId=$runId | direction=$direction | worker=$name | workId=$workId | attempt=$attempt" +

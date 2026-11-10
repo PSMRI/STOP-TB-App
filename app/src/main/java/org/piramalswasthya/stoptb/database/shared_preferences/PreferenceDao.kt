@@ -127,7 +127,11 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
     }
 
     fun deleteForLogout() {
-        pref.edit().clear().apply()
+        val logs = org.piramalswasthya.stoptb.helpers.interactiveSyncLogSession
+        synchronized(logs) {
+            logs.reset(signedIn = false)
+            pref.edit().clear().apply()
+        }
     }
 
     fun deleteLoginCred() {
@@ -418,7 +422,12 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         val prefKey = context.getString(R.string.PREF_user_entry)
         val userJson = Gson().toJson(user)
         editor.putString(prefKey, userJson)
-        editor.apply()
+        val logs = org.piramalswasthya.stoptb.helpers.interactiveSyncLogSession
+        synchronized(logs) {
+            logs.reset(signedIn = false)
+            editor.apply()
+            logs.reset(signedIn = true)
+        }
     }
 
     fun getLoggedInUser(): User? {

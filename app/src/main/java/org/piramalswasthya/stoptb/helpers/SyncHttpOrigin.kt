@@ -6,18 +6,31 @@ import kotlinx.coroutines.asContextElement
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
-internal data class SyncHttpOrigin(val runId: String, val direction: String, val trigger: String) {
+internal data class SyncHttpOrigin(
+    val runId: String, val direction: String, val trigger: String, val sessionId: String? = null
+) {
     val interactive: Boolean get() = trigger == "MANUAL_REFRESH" || trigger == "DIRECT_SAVE"
 }
 
 internal object SyncHttpOrigins {
     val current = ThreadLocal<SyncHttpOrigin?>()
+
+    fun captureSession(): String? {
+        val origin = current.get()
+        return if (origin != null) origin.sessionId else interactiveSyncLogSession.session.value
+    }
+
+    fun <T> withOrigin(origin: SyncHttpOrigin, block: () -> T): T {
+        val previous = current.get()
+        current.set(origin)
+        return try { block() } finally { current.set(previous) }
+    }
 }
 
 internal suspend fun <T> withDirectSaveHttpOrigin(block: suspend () -> T): T {
     if (SyncHttpOrigins.current.get() != null) return block()
     return withContext(SyncHttpOrigins.current.asContextElement(
-        SyncHttpOrigin(UUID.randomUUID().toString(), "PUSH", "DIRECT_SAVE"))) { block() }
+        SyncHttpOrigin(UUID.randomUUID().toString(), "PUSH", "DIRECT_SAVE", SyncHttpOrigins.captureSession()))) { block() }
 }
 
 /** Capture origin while Retrofit creates the call, before OkHttp switches threads. */

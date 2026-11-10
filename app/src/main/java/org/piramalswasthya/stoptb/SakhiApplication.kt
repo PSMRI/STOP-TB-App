@@ -49,6 +49,11 @@ class SakhiApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        org.piramalswasthya.stoptb.helpers.interactiveSyncLogSession.reset(
+            signedIn = runCatching {
+                org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao(this).getLoggedInUser() != null
+            }.getOrDefault(false)
+        )
         org.piramalswasthya.stoptb.helpers.SyncDailyStore.initialize(this)
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
         val builder = VmPolicy.Builder()

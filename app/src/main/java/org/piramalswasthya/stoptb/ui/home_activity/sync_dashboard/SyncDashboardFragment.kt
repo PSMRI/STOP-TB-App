@@ -49,11 +49,12 @@ class SyncDashboardFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 launch {
-                    viewModel.exportIntent.collect { intent ->
-                        if (intent != null) {
+                    viewModel.exportIntent.collect { export ->
+                        if (export != null) {
                             viewModel.onExportHandled()
+                            if (!org.piramalswasthya.stoptb.helpers.interactiveSyncLogSession.isCurrent(export.sessionId)) return@collect
                             try {
-                                startActivity(Intent.createChooser(intent, getString(R.string.sync_share_title)))
+                                startActivity(Intent.createChooser(export.intent, getString(R.string.sync_share_title)))
                             } catch (_: android.content.ActivityNotFoundException) {
                                 Toast.makeText(requireContext(), R.string.sync_share_unavailable, Toast.LENGTH_SHORT).show()
                             }

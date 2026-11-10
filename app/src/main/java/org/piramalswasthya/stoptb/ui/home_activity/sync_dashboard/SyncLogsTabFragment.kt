@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.helpers.SYNC_LOG_DISPLAY_INTERVAL_MS
 import org.piramalswasthya.stoptb.helpers.syncLogDisplaySnapshot
+import org.piramalswasthya.stoptb.helpers.interactiveSyncLogSession
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.SyncLogAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentSyncLogsTabBinding
@@ -36,6 +37,7 @@ class SyncLogsTabFragment : Fragment() {
     private val viewModel: SyncDashboardViewModel by viewModels({ requireParentFragment() })
 
     private var isPaused = false
+    private var detailDialog: AlertDialog? = null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -49,23 +51,19 @@ class SyncLogsTabFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         val viewBinding = binding
         val appContext = requireContext().applicationContext
-        viewLifecycleOwner.lifecycleScope.launch {
-            val identity = withContext(Dispatchers.IO) {
-                org.piramalswasthya.stoptb.helpers.SyncDiagnostics.identity(appContext)
-            }
-            viewBinding.tvSyncIdentity.text = identity
-        }
-
         val adapter = SyncLogAdapter { entry ->
             viewLifecycleOwner.lifecycleScope.launch {
+                val sessionId = interactiveSyncLogSession.session.value ?: return@launch
                 val original = withContext(Dispatchers.Default) { viewModel.syncLogs.value.find { it.id == entry.id } }
-                val text = original?.message ?: "Full entry is no longer retained. Preview:\n${entry.message}"
+                if (!interactiveSyncLogSession.isCurrent(sessionId) || original == null) return@launch
+                val text = original.message
                 val label = TextView(requireContext()).apply {
                     setPadding(24, 16, 24, 16)
                     this.text = text
                     setTextIsSelectable(true)
                 }
-                AlertDialog.Builder(requireContext()).setTitle("${entry.tag} details")
+                detailDialog?.dismiss()
+                detailDialog = AlertDialog.Builder(requireContext()).setTitle("${entry.tag} details")
                     .setView(ScrollView(requireContext()).apply { addView(label) })
                     .setPositiveButton("Close", null).show()
             }
@@ -74,8 +72,27 @@ class SyncLogsTabFragment : Fragment() {
         binding.rvSyncLogs.adapter = adapter
         binding.rvSyncLogs.itemAnimator = null
 
+        viewLifecycleOwner.lifecycleScope.launch {
+            interactiveSyncLogSession.session.collect { sessionId ->
+                detailDialog?.dismiss()
+                detailDialog = null
+                adapter.showSnapshot(emptyList())
+                viewBinding.rvSyncLogs.visibility = View.GONE
+                viewBinding.tvEmpty.visibility = View.VISIBLE
+                viewBinding.tvSyncIdentity.text = ""
+                if (sessionId != null) {
+                    val identity = withContext(Dispatchers.IO) {
+                        org.piramalswasthya.stoptb.helpers.SyncDiagnostics.identity(appContext)
+                    }
+                    if (interactiveSyncLogSession.isCurrent(sessionId)) viewBinding.tvSyncIdentity.text = identity
+                }
+            }
+        }
+
         fun showLogs(logs: List<org.piramalswasthya.stoptb.model.SyncLogEntry>) {
             if (isPaused) return
+            val last = logs.lastOrNull()
+            if (last != null && viewModel.syncLogs.value.none { it.id == last.id }) return
             val wasAtBottom = !viewBinding.rvSyncLogs.canScrollVertically(1)
             viewBinding.tvEmpty.visibility = if (logs.isEmpty()) View.VISIBLE else View.GONE
             viewBinding.rvSyncLogs.visibility = if (logs.isEmpty()) View.GONE else View.VISIBLE
@@ -117,6 +134,8 @@ class SyncLogsTabFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        detailDialog?.dismiss()
+        detailDialog = null
         _binding?.rvSyncLogs?.adapter = null
         super.onDestroyView()
         _binding = null

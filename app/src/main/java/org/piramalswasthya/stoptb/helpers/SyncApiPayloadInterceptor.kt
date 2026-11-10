@@ -11,10 +11,15 @@ class SyncApiPayloadInterceptor @Inject constructor(private val logs: SyncLogMan
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val origin = request.tag(SyncHttpOrigin::class.java)
-        if (origin?.interactive != true) return chain.proceed(request)
+        if (origin?.interactive != true || !interactiveSyncLogSession.isCurrent(origin.sessionId)) {
+            return chain.proceed(request)
+        }
         val id = UUID.randomUUID().toString()
         val prefix = "HTTP EXCHANGE | trigger=${origin.trigger} | runId=${origin.runId} | direction=${origin.direction} | callId=$id"
-        fun emit(level: LogLevel, message: String) { runCatching { logs.addLog(level, "SyncApi", message) } }
+        fun emit(level: LogLevel, message: String) {
+            if (!interactiveSyncLogSession.isCurrent(origin.sessionId)) return
+            runCatching { SyncHttpOrigins.withOrigin(origin) { logs.addLog(level, "SyncApi", message) } }
+        }
         val safeQueryKeys = setOf("villageid", "benid", "beneficiaryid", "beneficiaryregid", "providerservicemapid",
             "pageno", "pagesize", "limit", "offset", "formuuid", "formid", "ordertype")
         val url = request.url.newBuilder().username("").password("").apply {
@@ -38,6 +43,7 @@ class SyncApiPayloadInterceptor @Inject constructor(private val logs: SyncLogMan
             emit(LogLevel.ERROR, "$prefix | phase=ERROR\nNo HTTP response received. Error: ${failure.javaClass.simpleName}")
             throw failure
         }
+        if (!interactiveSyncLogSession.isCurrent(origin.sessionId)) return response
         val preview = runCatching {
             if (response.body == null) "[No response body]"
             else if (response.body?.contentType()?.subtype?.contains("json", ignoreCase = true) != true) "[Non-JSON response omitted]"

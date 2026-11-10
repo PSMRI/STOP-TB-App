@@ -91,7 +91,8 @@ class SyncGateWorker @AssistedInject constructor(
                 Timber.d("SyncGate: no running push chain, starting one")
                 WorkerUtils.enqueuePushChain(applicationContext,
                     inputData.getString(org.piramalswasthya.stoptb.helpers.SyncDiagnostics.TRIGGER) ?: "AUTO_PUSH",
-                    inputData.getString(org.piramalswasthya.stoptb.helpers.SyncDiagnostics.RUN_ID) ?: java.util.UUID.randomUUID().toString())
+                    inputData.getString(org.piramalswasthya.stoptb.helpers.SyncDiagnostics.RUN_ID) ?: java.util.UUID.randomUUID().toString(),
+                    inputData.getString(org.piramalswasthya.stoptb.helpers.SyncDiagnostics.LOG_SESSION))
             }
             Result.success()
         } catch (e: Exception) {
