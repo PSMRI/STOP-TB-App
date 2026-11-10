@@ -128,6 +128,7 @@ class SyncDashboardViewModel @Inject constructor(
     private fun entityLabel(context: Context, entity: String): String = when (entity) {
         SyncRetryStore.ENTITY_BENEFICIARY -> context.getString(R.string.sync_entity_beneficiary)
         SyncRetryStore.ENTITY_REGISTRATION -> context.getString(R.string.sync_entity_registration)
+        SyncRetryStore.ENTITY_TB_SCREENING -> context.getString(R.string.sync_entity_tb_screening)
         SyncRetryStore.ENTITY_TB_DIAGNOSTICS -> context.getString(R.string.sync_entity_tb_diagnostics)
         SyncRetryStore.ENTITY_TB_SUSPECTED -> context.getString(R.string.sync_entity_tb_suspected)
         SyncRetryStore.ENTITY_TB_CONFIRMED -> context.getString(R.string.sync_entity_tb_confirmed)

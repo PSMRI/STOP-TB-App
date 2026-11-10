@@ -94,6 +94,8 @@ class TbPushRepo @Inject constructor(
     private companion object {
         // Returned by the TB push sub-functions when a network error stopped the run.
         const val PUSH_NETWORK_ERROR = -1
+        // Same size as the diagnostics / suspected / confirmed pushes.
+        const val TB_SCREENING_CHUNK_SIZE = 20
     }
 
     // Serializes pushUnSyncedRecordsTBSuspected() against itself — it reads all UNSYNCED rows,
@@ -127,13 +129,16 @@ class TbPushRepo @Inject constructor(
         return pushUnSyncedRecordsTBScreening()
     }
 
-    // RECORD-LEVEL ISOLATION: TB Screening records are now sent in
-    // chunks of 20 instead of one giant batch. Previously, if ANY record in
-    // the batch was malformed, the ENTIRE batch failed and ALL records stayed
-    // UNSYNCED. Now each chunk is independent — one bad chunk doesn't affect
-    // the others. Failed chunks' records stay UNSYNCED for the next sync cycle.
-    // Also removed dangerous recursive retry on SocketTimeoutException that
-    // could cause infinite recursion and stack overflow.
+    // PR 7: TB Screening is pushed in chunks of TB_SCREENING_CHUNK_SIZE, like diagnostics,
+    // suspected and confirmed. It had gone to one record per request (0875cbe9, nurse-flow
+    // endpoint), which at 2,000 pending records meant ~1,200 requests and as many sync-state
+    // writes, each re-running every observed list query (1M device test: 11 records/min).
+    // stoptb/nurse/tbScreening/save takes a list and saves it in one transaction with the same
+    // per-beneficiary, per-day visit handling as single sends. A rejected chunk is re-queued one
+    // record at a time (rejectTbChunk), so one bad record no longer holds back the rest, and a
+    // record the server keeps rejecting backs off and shows on the sync dashboard
+    // (SyncRetryStore). Only records actually sent are marked SYNCED, in one transaction per
+    // chunk, and only if unchanged since they were read (updateSyncStatusScreening).
     internal suspend fun pushUnSyncedRecordsTBScreening(): Int = tbScreeningPushMutex.withLock {
 
         withContext(Dispatchers.IO) {
@@ -145,57 +150,75 @@ class TbPushRepo @Inject constructor(
 
             if (tbsnList.isEmpty()) return@withContext 1
 
+            val queue = tbUploadQueue(tbsnList, TB_SCREENING_CHUNK_SIZE, SyncRetryStore.ENTITY_TB_SCREENING) { it.id.toLong() }
+            val rejectedSingles = mutableListOf<TBScreeningCache>()
+            var lastError = ""
             var successCount = 0
             var failCount = 0
             var networkFailed = false
 
-            for (screening in tbsnList) {
+            while (queue.isNotEmpty()) {
+                val chunk = queue.removeFirst()
                 try {
-                    val beneficiaryRegID = benDao.getBen(screening.benId)?.benRegId
-                    if (beneficiaryRegID == null || beneficiaryRegID <= 0L) {
-                        failCount += 1
-                        continue
-                    }
-                    val response = tmcNetworkApiService.saveTBScreeningData(
-                        listOf(
+                    // Only what is sent may be marked SYNCED: a row whose beneficiary has no
+                    // server benRegId yet stays UNSYNCED for the next cycle.
+                    val sentRecords = mutableListOf<TBScreeningCache>()
+                    val request = chunk.mapNotNull { screening ->
+                        val beneficiaryRegID = benDao.getBen(screening.benId)?.benRegId?.takeIf { it > 0L }
+                        if (beneficiaryRegID == null) {
+                            null
+                        } else {
+                            sentRecords += screening
                             TBScreeningSaveRequest.from(
                                 cache = screening,
                                 beneficiaryRegID = beneficiaryRegID,
                                 providerServiceMapID = user.serviceMapId,
                                 createdBy = user.userName
                             )
-                        )
-                    )
+                        }
+                    }
+                    val notSent = chunk.size - sentRecords.size
+                    if (request.isEmpty()) {
+                        failCount += chunk.size
+                        continue
+                    }
+                    val response = tmcNetworkApiService.saveTBScreeningData(request)
                     val statusCode = response.code()
                     if (statusCode == 200) {
                         val responseString = response.body()?.string()
                         if (responseString != null) {
                             val jsonObj = JSONObject(responseString)
                             val responseStatusCode = jsonObj.getInt("statusCode")
-                            Timber.d("Push to Amrit TB Screening record: $responseStatusCode")
+                            Timber.d("Push to Amrit TB Screening chunk of ${request.size}: $responseStatusCode")
                             when (responseStatusCode) {
                                 200 -> {
-                                    updateSyncStatusScreening(listOf(screening))
-                                    successCount += 1
+                                    if (notSent > 0) {
+                                        failCount += notSent
+                                        Timber.w("TB Screening push: $notSent record(s) not sent (no server benRegId yet), stay UNSYNCED")
+                                    }
+                                    updateSyncStatusScreening(sentRecords)
+                                    syncRetryStore.clear(SyncRetryStore.ENTITY_TB_SCREENING, sentRecords.map { it.id.toLong() })
+                                    successCount += sentRecords.size
                                 }
 
                                 401, 5002 -> {
-                                    // Token expired — try refreshing for subsequent chunks
                                     if (userRepo.refreshTokenTmc(user.userName, user.password)) {
-                                        Timber.d("Token refreshed, TB Screening record will retry next cycle")
+                                        Timber.d("Token refreshed, TB Screening chunk will retry next cycle")
                                     }
-                                    failCount += 1
+                                    failCount += chunk.size
                                 }
 
                                 else -> {
-                                    Timber.e("TB Screening record failed with statusCode: $responseStatusCode")
-                                    failCount += 1
+                                    Timber.e("TB Screening chunk failed with statusCode: $responseStatusCode")
+                                    lastError = "statusCode=$responseStatusCode"
+                                    failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                                 }
                             }
                         }
                     } else {
-                        Timber.e("TB Screening record HTTP error: $statusCode")
-                        failCount += 1
+                        Timber.e("TB Screening chunk HTTP error: $statusCode")
+                        lastError = "HTTP $statusCode"
+                        failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                     }
                 } catch (e: IOException) {
                     // Hub unreachable: stop this run and let the push worker retry with backoff.
@@ -203,11 +226,13 @@ class TbPushRepo @Inject constructor(
                     networkFailed = true
                     break
                 } catch (e: Exception) {
-                    Timber.e(e, "TB Screening record push failed for benId=${screening.benId}")
-                    failCount += 1
+                    Timber.e(e, "TB Screening chunk push failed: ${chunk.size} records")
+                    lastError = e.message ?: e.javaClass.simpleName
+                    failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                 }
             }
 
+            recordTbRejections(SyncRetryStore.ENTITY_TB_SCREENING, rejectedSingles, successCount > 0, lastError) { it.id.toLong() }
             Timber.d("TB Screening push complete: $successCount succeeded, $failCount failed out of ${tbsnList.size}")
             // Worker succeeds — failed records stay UNSYNCED for next cycle
             return@withContext if (networkFailed) PUSH_NETWORK_ERROR else 1
