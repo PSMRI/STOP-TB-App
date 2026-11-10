@@ -448,8 +448,9 @@ interface BenSearchQueries {
             ELSE COALESCE(createdDate, regDate, 0)
         END DESC,
         benId DESC
+        LIMIT :limit OFFSET :offset
     """)
-    fun searchBenPaged(villageIds: List<Int>, source: Int, filterType: Int, query: String): PagingSource<Int, BenBasicCache>
+    suspend fun searchBenPage(villageIds: List<Int>, source: Int, filterType: Int, query: String, limit: Int, offset: Int): List<BenBasicCache>
 
     /**
      * The beneficiary list query for the sources that have no TB predicate: 0 All, 1 ABHA,
@@ -507,8 +508,9 @@ interface BenSearchQueries {
         END ASC,
         COALESCE(createdDate, regDate, 0) DESC,
         benId DESC
+        LIMIT :limit OFFSET :offset
     """)
-    fun searchBenPagedWithoutTbTables(villageIds: List<Int>, source: Int, filterType: Int, query: String): PagingSource<Int, BenBasicCache>
+    suspend fun searchBenPageWithoutTbTables(villageIds: List<Int>, source: Int, filterType: Int, query: String, limit: Int, offset: Int): List<BenBasicCache>
 
 
 
@@ -752,6 +754,7 @@ interface BenSearchQueries {
         WHERE villageId = :selectedVillage AND isDeactivate = 0 AND isNonHH = 1
         AND (:query = '' OR benName LIKE '%' || :query || '%' OR benSurname LIKE '%' || :query || '%' OR (IFNULL(benName, '') || ' ' || IFNULL(benSurname, '')) LIKE '%' || :query || '%' OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%')
         ORDER BY COALESCE(NULLIF(createdDate, 0), regDate, 0) DESC, benId DESC
+        LIMIT :limit OFFSET :offset
     """)
-    fun searchNonHHBeneficiariesPaged(selectedVillage: Int, query: String): PagingSource<Int, BenBasicCache>
+    suspend fun searchNonHHBeneficiariesPage(selectedVillage: Int, query: String, limit: Int, offset: Int): List<BenBasicCache>
 }

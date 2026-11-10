@@ -51,8 +51,9 @@ interface HouseholdDao {
             OR CAST(h.fam_familyHeadPhoneNo AS TEXT) LIKE '%' || :query || '%')
         GROUP BY h.householdId
         ORDER BY h.isDeactivate ASC, h.createdTimeStamp DESC, h.householdId ASC
+        LIMIT :limit OFFSET :offset
     """)
-    fun getHouseholdsWithNumMembersPaged(selectedVillage: Int, query: String): PagingSource<Int, HouseholdBasicCache>
+    suspend fun getHouseholdsWithNumMembersPage(selectedVillage: Int, query: String, limit: Int, offset: Int): List<HouseholdBasicCache>
 
     @Query("SELECT h.*, count(b.householdId) as numMembers FROM HOUSEHOLD as h left outer join BENEFICIARY b on b.householdId = h.householdId WHERE h.isDraft = 0 and h.loc_village_Id = :selectedVillage AND h.registrationType = 'Yes' group by h.householdId")
     fun getAllHouseholdForAshaFamilyMembers(selectedVillage: Int): Flow<List<HouseholdBasicCache>>

@@ -2,7 +2,6 @@ package org.piramalswasthya.stoptb.database.room.query
 
 import android.content.Context
 import androidx.core.text.isDigitsOnly
-import androidx.paging.PagingSource
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -52,7 +51,7 @@ class TbListPagingEquivalenceTest {
     fun pagedListsMatchTheOldListsAndFilter() = runBlocking {
         var nonEmpty = 0
         for (villageId in VILLAGES) {
-            val allScreening = db.benDao.getTbScreeningBenPaged(villageId, "").loadAll()
+            val allScreening = db.benDao.getTbScreeningBenPage(villageId, "", ALL_ROWS, 0)
                 .map { row -> row.asTbScreeningDomainModel().ben }
             // The Flow lists order by updatedDate only; ties came back in no defined order. The
             // paged lists add benId DESC as a tie-break, so the reference is sorted the same way.
@@ -64,17 +63,17 @@ class TbListPagingEquivalenceTest {
                 .map { row -> row.asTbSuspectedDomainModel().ben }
 
             assertEquals("presumptive unfiltered", allPresumptive.map { ben -> ben.benId },
-                db.benDao.getTbPresumptivePaged(villageId, "").loadAll().map { row -> row.ben.benId })
+                db.benDao.getTbPresumptivePage(villageId, "", ALL_ROWS, 0).map { row -> row.ben.benId })
             assertEquals("confirmed unfiltered", allConfirmed.map { ben -> ben.benId },
-                db.benDao.getTbConfirmedPaged(villageId, "").loadAll().map { row -> row.ben.benId })
+                db.benDao.getTbConfirmedPage(villageId, "", ALL_ROWS, 0).map { row -> row.ben.benId })
 
             for (query in QUERIES) {
                 val label = "village=$villageId query='$query'"
-                val screening = db.benDao.getTbScreeningBenPaged(villageId, query).loadAll().map { row -> row.ben.benId }
+                val screening = db.benDao.getTbScreeningBenPage(villageId, query, ALL_ROWS, 0).map { row -> row.ben.benId }
                 assertEquals("screening $label", allScreening.filter { ben -> oldFilterMatches(ben, query) }.map { ben -> ben.benId }, screening)
-                val presumptive = db.benDao.getTbPresumptivePaged(villageId, query).loadAll().map { row -> row.ben.benId }
+                val presumptive = db.benDao.getTbPresumptivePage(villageId, query, ALL_ROWS, 0).map { row -> row.ben.benId }
                 assertEquals("presumptive $label", allPresumptive.filter { ben -> oldFilterMatches(ben, query) }.map { ben -> ben.benId }, presumptive)
-                val confirmed = db.benDao.getTbConfirmedPaged(villageId, query).loadAll().map { row -> row.ben.benId }
+                val confirmed = db.benDao.getTbConfirmedPage(villageId, query, ALL_ROWS, 0).map { row -> row.ben.benId }
                 assertEquals("confirmed $label", allConfirmed.filter { ben -> oldFilterMatches(ben, query) }.map { ben -> ben.benId }, confirmed)
                 if (screening.isNotEmpty() && presumptive.isNotEmpty() && confirmed.isNotEmpty()) nonEmpty++
             }
@@ -89,7 +88,7 @@ class TbListPagingEquivalenceTest {
             val expected = QueryEquivalence.rows(db,
                 "SELECT benId FROM BEN_BASIC_CACHE WHERE villageId = ? AND isDeath = 0 AND isDeactivate = 0 ORDER BY updatedDate DESC, benId DESC",
                 arrayOf(villageId)).map { row -> row.single()!!.toLong() }
-            assertEquals(expected, db.benDao.getTbScreeningBenPaged(villageId, "").loadAll().map { row -> row.ben.benId })
+            assertEquals(expected, db.benDao.getTbScreeningBenPage(villageId, "", ALL_ROWS, 0).map { row -> row.ben.benId })
         }
     }
 
@@ -105,9 +104,6 @@ class TbListPagingEquivalenceTest {
             ben.gender.lowercase().contains(filterText) ||
             ben.rchId.takeIf { rch -> rch?.isDigitsOnly() == true }?.contains(filterText) ?: false
 
-    private suspend fun <T : Any> PagingSource<Int, T>.loadAll(): List<T> =
-        (load(PagingSource.LoadParams.Refresh(key = null, loadSize = 100_000, placeholdersEnabled = false))
-            as PagingSource.LoadResult.Page).data
 
     private suspend fun seed() {
         val firstNames = listOf("Ramesh", "Sunita", "Arjun", "Priya", "Mohan", "Kavita", "Imran", "Lakshmi")
@@ -153,6 +149,7 @@ class TbListPagingEquivalenceTest {
     }
 
     private companion object {
+        const val ALL_ROWS = 100_000
         const val FIRST_BEN_ID = 610_000L
         const val BASE = 1_700_000_000_000L
         const val MILLIS_PER_DAY = 24L * 60 * 60 * 1000

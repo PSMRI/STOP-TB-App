@@ -1,7 +1,6 @@
 package org.piramalswasthya.stoptb.database.room.query
 
 import android.content.Context
-import androidx.paging.PagingSource
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -65,7 +64,7 @@ class PagedScreensEquivalenceTest {
                         "${ben.benName} ${ben.benSurname}".lowercase().contains(query) ||
                         ben.mobileNo.contains(query)
                 }.map { ben -> ben.benId }
-                val paged = db.benDao.getUnscreenedPaged(villageId, query).loadAll().map { row -> row.benId }
+                val paged = db.benDao.getUnscreenedPage(villageId, query, ALL_ROWS, 0).map { row -> row.benId }
                 assertEquals("village=$villageId query='$query'", expected, paged)
                 if (paged.isNotEmpty()) nonEmpty++
             }
@@ -79,7 +78,7 @@ class PagedScreensEquivalenceTest {
             val all = db.householdDao.getAllHouseholdWithNumMembers(villageId).first().map { row -> row.asBasicDomainModel() }
             for (query in listOf("", "gopal", "khan", "9123", "700")) {
                 val expected = oldHouseholdFilter(all, query).map { hh -> hh.hhId to hh.numMembers }
-                val paged = db.householdDao.getHouseholdsWithNumMembersPaged(villageId, query).loadAll()
+                val paged = db.householdDao.getHouseholdsWithNumMembersPage(villageId, query, ALL_ROWS, 0)
                     .map { row -> row.asBasicDomainModel() }.map { hh -> hh.hhId to hh.numMembers }
                 assertEquals("village=$villageId query='$query'", expected, paged)
             }
@@ -130,9 +129,6 @@ class PagedScreensEquivalenceTest {
         return filtered.sortedWith(compareBy<HouseHoldBasicDomain> { hh -> hh.isDeactivate }.thenByDescending { hh -> hh.createdTimeStamp })
     }
 
-    private suspend fun <T : Any> PagingSource<Int, T>.loadAll(): List<T> =
-        (load(PagingSource.LoadParams.Refresh(key = null, loadSize = 100_000, placeholdersEnabled = false))
-            as PagingSource.LoadResult.Page).data
 
     private fun location(villageId: Int) = LocationRecord(
         country = LocationEntity(1, "India"), state = LocationEntity(2, "State"),
@@ -204,6 +200,7 @@ class PagedScreensEquivalenceTest {
     }
 
     private companion object {
+        const val ALL_ROWS = 100_000
         const val FIRST_BEN_ID = 620_000L
         const val FIRST_HH_ID = 700L
         const val BASE = 1_700_000_000_000L

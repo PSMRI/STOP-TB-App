@@ -125,8 +125,9 @@ interface BenScreeningListQueries {
             OR (IFNULL(b.benName, '') || ' ' || IFNULL(b.benSurname, '')) LIKE '%' || :query || '%'
             OR CAST(b.mobileNo AS TEXT) LIKE '%' || :query || '%')
         ORDER BY b.updatedDate DESC, b.benId DESC
+        LIMIT :limit OFFSET :offset
     """)
-    fun getUnscreenedPaged(selectedVillage: Int, query: String): PagingSource<Int, BenBasicCache>
+    suspend fun getUnscreenedPage(selectedVillage: Int, query: String, limit: Int, offset: Int): List<BenBasicCache>
 
     /** Count for the same rows as [getUnscreenedPaged] with no search. */
     @Query("""

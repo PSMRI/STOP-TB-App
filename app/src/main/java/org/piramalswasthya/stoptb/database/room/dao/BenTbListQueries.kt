@@ -36,18 +36,20 @@ interface BenTbListQueries {
      * PR 6: the three TB list screens page from here (Room loads each page's @Relation children
      * with it) and search in SQL ([BenListSearchSql]); `query` is lowercased, '' = all.
      * The Flow lists above stay as the reference the home-card counts are tested against.
+     *
+     * No @Transaction on these page reads: Room runs a suspend @Transaction query on its single
+     * transaction thread, so during a sync the list waited behind every push write (1M device
+     * test: no query at all within 15 s). A row and its @Relation children are read in two
+     * statements instead; a write in between only triggers the refresh that follows any write.
      */
-    @Transaction
-    @Query(TB_SCREENING_PAGED_SQL)
-    fun getTbScreeningBenPaged(villageId: Int, query: String): PagingSource<Int, BenWithTbScreeningCache>
+    @Query(TB_SCREENING_PAGED_SQL + " LIMIT :limit OFFSET :offset")
+    suspend fun getTbScreeningBenPage(villageId: Int, query: String, limit: Int, offset: Int): List<BenWithTbScreeningCache>
 
-    @Transaction
-    @Query(PRESUMPTIVE_PAGED_SQL)
-    fun getTbPresumptivePaged(villageId: Int, query: String): PagingSource<Int, BenWithTbSuspectedCache>
+    @Query(PRESUMPTIVE_PAGED_SQL + " LIMIT :limit OFFSET :offset")
+    suspend fun getTbPresumptivePage(villageId: Int, query: String, limit: Int, offset: Int): List<BenWithTbSuspectedCache>
 
-    @Transaction
-    @Query(CONFIRMED_PAGED_SQL)
-    fun getTbConfirmedPaged(villageId: Int, query: String): PagingSource<Int, BenWithTbSuspectedCache>
+    @Query(CONFIRMED_PAGED_SQL + " LIMIT :limit OFFSET :offset")
+    suspend fun getTbConfirmedPage(villageId: Int, query: String, limit: Int, offset: Int): List<BenWithTbSuspectedCache>
 
     /** Home card count for the Presumptive list: same rows as [getTbScreeningList], counted in SQL. */
     @Query("SELECT COUNT(*) FROM (" + PRESUMPTIVE_LIST_SQL + ")")
@@ -117,8 +119,21 @@ interface BenTbListQueries {
             " WHERE b.villageId = :villageId AND b.isDeath = 0 AND b.isDeactivate = 0" +
             " AND " + BenListSearchSql.MATCHES + PAGED_ORDER
 
-        const val PRESUMPTIVE_PAGED_SQL = PRESUMPTIVE_WHERE_SQL + " AND " + BenListSearchSql.MATCHES +
-            " GROUP BY b.benId" + PAGED_ORDER
+        /**
+         * The Presumptive list's pages: the same beneficiaries as [PRESUMPTIVE_LIST_SQL] (some
+         * screening/suspected/diagnostics combination is presumptive), written as EXISTS so SQLite
+         * walks beneficiaries in list order and stops after a page. The GROUP BY form must find and
+         * sort every match first: 1M device DB, host 6.2-7.6 s -> 0.05 s for the first page, rows and
+         * order identical (695,123). The count keeps the GROUP BY form, which counts faster.
+         * TbListPagingEquivalenceTest compares the two forms.
+         */
+        const val PRESUMPTIVE_PAGED_SQL = "SELECT b.* FROM BEN_BASIC_CACHE b" +
+            " WHERE b.villageId = :villageId AND b.isDeactivate = 0 AND b.isDeath = 0" +
+            " AND EXISTS (SELECT 1 FROM TB_SCREENING scr" +
+            " LEFT JOIN TB_SUSPECTED sus ON sus.benId = scr.benId" +
+            " LEFT JOIN TB_DIAGNOSTICS dx ON dx.benId = scr.benId" +
+            " WHERE scr.benId = b.benId AND " + TbCaseSql.PRESUMPTIVE + ")" +
+            " AND " + BenListSearchSql.MATCHES + PAGED_ORDER
 
         /** Shared by the Confirmed list and its home-card count. Definition: [TbCaseSql.CONFIRMED]. */
         const val CONFIRMED_LIST_SQL = "SELECT b.* FROM BEN_BASIC_CACHE b" +

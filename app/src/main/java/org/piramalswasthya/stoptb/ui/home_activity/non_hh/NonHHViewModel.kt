@@ -80,7 +80,7 @@ class NonHHViewModel @Inject constructor(
         .debounce { query -> if (query.isEmpty()) 0L else searchDebounceMs }
         .distinctUntilChanged()
         .flatMapLatest { query ->
-            Pager(config = PagingConfig(pageSize = 30, prefetchDistance = 10, maxSize = 300)) {
+            Pager(config = PagingConfig(pageSize = 30, prefetchDistance = 10, maxSize = 300, enablePlaceholders = false)) {
                 recordsRepo.searchNonHHPagedSource(query)
             }.flow.map { pagingData -> pagingData.map { it.asBasicDomainModel() } }
         }

@@ -162,7 +162,7 @@ class AllBenViewModel @Inject constructor(
         _searchGeneration.update { it + 1 }
         Pager(
             // maxSize bounds memory and keeps the loaded-row id list (badge queries) small.
-            config = PagingConfig(pageSize = 30, prefetchDistance = 10, maxSize = 300)
+            config = PagingConfig(pageSize = 30, prefetchDistance = 10, maxSize = 300, enablePlaceholders = false)
         ) {
             recordsRepo.searchBenPagedSource(text, kind, sourceFromArgs, expanded)
         }.flow.map { pagingData ->
