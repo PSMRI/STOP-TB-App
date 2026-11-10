@@ -22,7 +22,14 @@ interface BenDao :
     BenHouseholdQueries,
     BenScreeningListQueries {
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    /**
+     * Insert, or update in place when the beneficiary already exists (PR 7.1). This was
+     * @Insert(REPLACE), which for an existing row is DELETE + INSERT: every table referencing
+     * BENEFICIARY with ON DELETE CASCADE (TB screening/suspected/diagnostics/confirmed, vitals,
+     * OPD, CBAC, ...) lost that beneficiary's rows - e.g. editing a child in NewChildBenViewModel.
+     * BENEFICIARY's only unique key is the primary key, so the stored row is the same as before.
+     */
+    @Upsert
     suspend fun upsert(vararg ben: BenRegCache)
 
     @Update

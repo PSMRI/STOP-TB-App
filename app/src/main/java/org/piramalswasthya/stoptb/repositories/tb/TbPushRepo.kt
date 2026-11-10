@@ -108,6 +108,10 @@ class TbPushRepo @Inject constructor(
     // calls it directly after a save, in addition to the generic push sweep.
     private val tbScreeningPushMutex = Mutex()
     private val generalOpdPushMutex = Mutex()
+    // PR 7.4: the diagnostics and confirmed pushes had no lock, so two overlapping sync runs could
+    // POST the same rows twice. Same pattern as the screening / suspected / OPD pushes.
+    private val tbDiagnosticsPushMutex = Mutex()
+    private val tbConfirmedPushMutex = Mutex()
 
     suspend fun pushUnSyncedRecords(): Boolean {
         val screeningResult = pushUnSyncedRecordsTBScreening()
@@ -321,8 +325,8 @@ class TbPushRepo @Inject constructor(
         } }
     }
 
-    private suspend fun pushUnSyncedRecordsTBDiagnostics(): Int {
-        return withContext(Dispatchers.IO) {
+    private suspend fun pushUnSyncedRecordsTBDiagnostics(): Int = tbDiagnosticsPushMutex.withLock {
+        withContext(Dispatchers.IO) {
             val user =
                 preferenceDao.getLoggedInUser()
                     ?: throw IllegalStateException("No user logged in!!")
@@ -538,8 +542,8 @@ class TbPushRepo @Inject constructor(
 
     // RECORD-LEVEL ISOLATION: Same chunking pattern as TB Screening.
     // Records sent in chunks of 20 with per-chunk error isolation.
-    private suspend fun pushUnSyncedRecordsTBConfirmed(): Int {
-        return withContext(Dispatchers.IO) {
+    private suspend fun pushUnSyncedRecordsTBConfirmed(): Int = tbConfirmedPushMutex.withLock {
+        withContext(Dispatchers.IO) {
             val user =
                 preferenceDao.getLoggedInUser()
                     ?: throw IllegalStateException("No user logged in!!")

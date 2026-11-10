@@ -81,6 +81,9 @@ class BenRepo @Inject constructor(
         private const val benWriteBatchPages = 20
         private const val DEFAULT_OFFICER_ID = 501L
 
+        /** PR 7.5: most beneficiaries per syncDataToAmrit request for new records. */
+        private const val MAX_BENS_PER_PUSH = 100
+
         // Temp (negative) benId -> server benId, recorded when the push(server) replaces the temp ID.
         // Screens opened before that (form/Examine sheet nav args) still hold the temp ID,
         // which no longer exists in BENEFICIARY — see resolveCurrentBenId().
@@ -685,12 +688,15 @@ class BenRepo @Inject constructor(
             }
             val due = claimed.groupBy(::groupKey).values.map { members -> buildUploadGroup(members, user) }
 
-            // New records go as one batch; records that were rejected before are
-            // retried one group at a time so they can't hold the batch back.
+            // New records go in batches of at most MAX_BENS_PER_PUSH beneficiaries (a household's
+            // members are never split); records that were rejected before are retried one group
+            // at a time so they can't hold a batch back. PR 7.5: new records used to go as one
+            // batch - 500 beneficiaries were one 64 s request, all-or-nothing until split.
             val (retrying, fresh) = due.partition { g ->
                 g.benIds.any { syncRetryStore.contains(SyncRetryStore.ENTITY_BENEFICIARY, it) }
             }
-            val outcomes = listOf(BatchIsolation.send(fresh) { postUploadGroups(it) }) +
+            val outcomes = batchBySize(fresh, MAX_BENS_PER_PUSH) { g -> g.members.size }
+                .map { batch -> BatchIsolation.send(batch) { postUploadGroups(it) } } +
                     retrying.map { g -> BatchIsolation.send(listOf(g)) { postUploadGroups(it) } }
             val sent = outcomes.flatMap { it.sent }
             val rejected = outcomes.flatMap { it.rejected }
@@ -1920,6 +1926,7 @@ class BenRepo @Inject constructor(
     private suspend fun getHouseholdCacheFromServerResponse(response: String): MutableList<HouseholdCache> {
         val jsonObj = JSONObject(response)
         val result = mutableListOf<HouseholdCache>()
+        val addedHouseholdIds = HashSet<Long>()
 
         val responseStatusCode = jsonObj.getInt("statusCode")
         if (responseStatusCode == 200) {
@@ -1940,13 +1947,13 @@ class BenRepo @Inject constructor(
                     val houseDataObj = jsonObject.getJSONObject("householdDetails")
                     val benDataObj = jsonObject.getJSONObject("beneficiaryDetails")
 
-                    val existingHh = householdDao.getHousehold(hhId)
-                    val resultContains = result.map { it.householdId }.contains(hhId)
-
-                    if (resultContains) {
+                    // PR 7.6: a household already added from this page is skipped before its
+                    // database lookup, and the check is a set lookup instead of a scan of the list
+                    // built so far. Same rule as before: only households actually added count.
+                    if (hhId in addedHouseholdIds) {
                         continue
                     }
-                    Timber.d("HouseHoldList $result")
+                    val existingHh = householdDao.getHousehold(hhId)
 
                     val hhGpsLatitude = houseDataObj.optDoubleOrNull("latitude")
                         ?: houseDataObj.optDoubleOrNull("gpsLatitude")
@@ -2075,9 +2082,11 @@ class BenRepo @Inject constructor(
 
                         if (existingHh == null) {
                             result.add(serverHh)
+                            addedHouseholdIds.add(hhId)
                         } else {
                             if (existingHh.processed == "P") {
                                 result.add(serverHh)
+                                addedHouseholdIds.add(hhId)
                             }
                         }
                     } catch (e: JSONException) {
