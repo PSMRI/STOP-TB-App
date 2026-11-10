@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_age_more_15
 
+import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -41,8 +42,9 @@ class NewBenRegG15ObjectFragment : Fragment() {
         registerForActivityResult(ActivityResultContracts.TakePicture()) { success: Boolean ->
             if (success) {
                 latestTmpUri?.let { uri ->
+                    val context = requireContext()
                     viewLifecycleOwner.lifecycleScope.launch {
-                        val finalUri = withContext(Dispatchers.IO) { compressCapturedPhoto(uri) } ?: uri
+                        val finalUri = withContext(Dispatchers.IO) { compressCapturedPhoto(context, uri) } ?: uri
                         latestImageForm?.value?.value = finalUri.toString()
                         binding.inputForm.rvInputForm.apply {
                             val adapter = this.adapter as FormInputAdapterOld
@@ -79,10 +81,10 @@ class NewBenRegG15ObjectFragment : Fragment() {
         }
     }
 
-    private fun compressCapturedPhoto(uri: Uri): Uri? {
-        val file = File.createTempFile("tmp_image_file", ".jpeg", requireContext().cacheDir)
-        return if (ImageUtils.compressToJpeg(requireContext(), uri, file)) {
-            FileProvider.getUriForFile(requireContext(), "${BuildConfig.APPLICATION_ID}.provider", file)
+    private fun compressCapturedPhoto(context: Context, uri: Uri): Uri? {
+        val file = File.createTempFile("tmp_image_file", ".jpeg", context.cacheDir)
+        return if (ImageUtils.compressToJpeg(context, uri, file)) {
+            FileProvider.getUriForFile(context, "${BuildConfig.APPLICATION_ID}.provider", file)
         } else {
             file.delete()
             null

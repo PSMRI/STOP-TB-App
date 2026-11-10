@@ -71,8 +71,9 @@ class NewBenRegG15Fragment : Fragment() {
         registerForActivityResult(ActivityResultContracts.TakePicture()) { success: Boolean ->
             if (success) {
                 latestTmpUri?.let { uri ->
+                    val context = requireContext()
                     viewLifecycleOwner.lifecycleScope.launch {
-                        val finalUri = withContext(Dispatchers.IO) { compressCapturedPhoto(uri) } ?: uri
+                        val finalUri = withContext(Dispatchers.IO) { compressCapturedPhoto(context, uri) } ?: uri
                         viewModel.setImageUriToFormElement(finalUri)
                         binding.inputForm.rvInputForm.apply {
                             val adapter = this.adapter as FormInputAdapter
@@ -286,10 +287,10 @@ class NewBenRegG15Fragment : Fragment() {
         }
     }
 
-    private fun compressCapturedPhoto(uri: Uri): Uri? {
-        val file = File.createTempFile(Konstants.tempBenImagePrefix, ".jpg", requireContext().cacheDir)
-        return if (ImageUtils.compressToJpeg(requireContext(), uri, file)) {
-            FileProvider.getUriForFile(requireContext(), "${BuildConfig.APPLICATION_ID}.provider", file)
+    private fun compressCapturedPhoto(context: Context, uri: Uri): Uri? {
+        val file = File.createTempFile(Konstants.tempBenImagePrefix, ".jpg", context.cacheDir)
+        return if (ImageUtils.compressToJpeg(context, uri, file)) {
+            FileProvider.getUriForFile(context, "${BuildConfig.APPLICATION_ID}.provider", file)
         } else {
             file.delete()
             null
