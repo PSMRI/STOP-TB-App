@@ -989,8 +989,9 @@ class NewBenRegFragment : Fragment() {
         detector.process(image)
             .addOnSuccessListener { faces ->
                 if (faces.isNotEmpty()) {
+                    val context = requireContext()
                     viewLifecycleOwner.lifecycleScope.launch {
-                        val finalUri = withContext(Dispatchers.IO) { compressPhoto(uri) } ?: uri
+                        val finalUri = withContext(Dispatchers.IO) { compressPhoto(context, uri) } ?: uri
                         viewModel.setImageUriToFormElement(finalUri)
                         binding.form.rvInputForm.adapter?.notifyItemChanged(0)
                         if (continuePreviewAfterPhoto) {
@@ -1026,10 +1027,10 @@ class NewBenRegFragment : Fragment() {
 
 
     /** Shrinks a camera photo to at most 400 KB without stretching it. Returns null on failure. */
-    private fun compressPhoto(uri: Uri): Uri? {
-        val file = File.createTempFile(Konstants.tempBenImagePrefix, ".jpg", requireContext().cacheDir)
-        return if (ImageUtils.compressToJpeg(requireContext(), uri, file)) {
-            FileProvider.getUriForFile(requireContext(), "${requireContext().packageName}.provider", file)
+    private fun compressPhoto(context: Context, uri: Uri): Uri? {
+        val file = File.createTempFile(Konstants.tempBenImagePrefix, ".jpg", context.cacheDir)
+        return if (ImageUtils.compressToJpeg(context, uri, file)) {
+            FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
         } else {
             file.delete()
             Timber.e("Photo compression failed")
