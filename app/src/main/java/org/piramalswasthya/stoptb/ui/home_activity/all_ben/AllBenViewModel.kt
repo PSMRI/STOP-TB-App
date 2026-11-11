@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -188,9 +189,14 @@ class AllBenViewModel @Inject constructor(
     val unsyncedGeneralOpdBenIds: Flow<List<Long>> = rowBadges.unsyncedGeneralOpdBenIds
     val syncingGeneralOpdBenIds: Flow<List<Long>> = rowBadges.syncingGeneralOpdBenIds
     val anthropometryFilledBenIds: Flow<List<Long>> = rowBadges.anthropometryBenIds
-    val contactFollowUpDoneBenIds: Flow<List<Long>> = contactTracingRepo.observeContactFollowUpDoneBenIds()
-    val tptFollowUpDoneBenIds: Flow<List<Long>> = contactTracingRepo.observeTptFollowUpTargetReachedBenIds()
-    val tptEligibleBenIds: Flow<List<Long>> = contactTracingRepo.observeTptEligibleBenIds()
+    // Not limited to the loaded rows (contact tracing records): built into sets here, off Main,
+    // so the adapter doesn't convert the whole list on the main thread on every emission.
+    val contactFollowUpDoneBenIds: Flow<Set<Long>> = contactTracingRepo.observeContactFollowUpDoneBenIds()
+        .map { benIds -> benIds.toHashSet() }.flowOn(Dispatchers.Default)
+    val tptFollowUpDoneBenIds: Flow<Set<Long>> = contactTracingRepo.observeTptFollowUpTargetReachedBenIds()
+        .map { benIds -> benIds.toHashSet() }.flowOn(Dispatchers.Default)
+    val tptEligibleBenIds: Flow<Set<Long>> = contactTracingRepo.observeTptEligibleBenIds()
+        .map { benIds -> benIds.toHashSet() }.flowOn(Dispatchers.Default)
 
     /** Diagnosis = TB_DIAGNOSTICS (new saves) OR TB_SUSPECTED (legacy saves), for the loaded rows. */
     val diagnosisBenIds: Flow<List<Long>> = rowBadges.diagnosisBenIds

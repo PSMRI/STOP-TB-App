@@ -129,6 +129,9 @@ class VolunteerHomeFragment : Fragment() {
                 manualRefreshWorkIds.clear()
                 val generation = ++manualRefreshGeneration
                 val appContext = requireContext().applicationContext
+                // Deadline first: if starting the workers blocks on WorkManager, the timeout must
+                // already be running or the button stays disabled.
+                startManualRefreshTimeout()
                 // Queries WorkManager's DB synchronously: run it off the main thread.
                 val refreshWorkIds = try {
                     withContext(Dispatchers.IO) {
@@ -149,7 +152,6 @@ class VolunteerHomeFragment : Fragment() {
                     return@launch
                 }
                 manualRefreshWorkIds.addAll(refreshWorkIds)
-                startManualRefreshTimeout()
                 // A WorkInfo update that arrived before the IDs were registered was ignored by the
                 // observer; evaluate the current state once now so a quick finish isn't missed.
                 val currentInfos = try {
@@ -292,9 +294,10 @@ class VolunteerHomeFragment : Fragment() {
 
     private fun startManualRefreshTimeout() {
         manualRefreshTimeoutJob?.cancel()
+        val generation = manualRefreshGeneration
         manualRefreshTimeoutJob = viewLifecycleOwner.lifecycleScope.launch {
             delay(manualRefreshReleaseTimeoutMs)
-            if (!manualHomeRefreshRequested || _binding == null) return@launch
+            if (generation != manualRefreshGeneration || !manualHomeRefreshRequested || _binding == null) return@launch
             finishManualRefresh(getString(R.string.quick_refresh_failed))
         }
         startManualRefreshProgress()

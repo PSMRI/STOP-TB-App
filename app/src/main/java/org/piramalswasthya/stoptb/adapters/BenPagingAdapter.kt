@@ -197,16 +197,21 @@ class BenPagingAdapter(
     fun submitSyncingGeneralOpdBenIds(list: List<Long>) { syncingGeneralOpdBenIds = swapIds(syncingGeneralOpdBenIds, list) }
     fun submitRetryingBenIds(list: List<Long>) { retryingBenIds = swapIds(retryingBenIds, list) }
     fun submitDiagnosisBenIds(list: List<Long>) { diagnosisIds = swapIds(diagnosisIds, list) }
-    fun submitContactFollowUpDoneBenIds(list: List<Long>) { contactFollowUpDoneIds = swapIds(contactFollowUpDoneIds, list) }
-    fun submitTptFollowUpDoneBenIds(list: List<Long>) { tptFollowUpDoneIds = swapIds(tptFollowUpDoneIds, list) }
-    fun submitTptEligibleBenIds(list: List<Long>) { tptEligibleIds = swapIds(tptEligibleIds, list) }
+    fun submitContactFollowUpDoneBenIds(ids: Collection<Long>) { contactFollowUpDoneIds = swapIds(contactFollowUpDoneIds, ids) }
+    fun submitTptFollowUpDoneBenIds(ids: Collection<Long>) { tptFollowUpDoneIds = swapIds(tptFollowUpDoneIds, ids) }
+    fun submitTptEligibleBenIds(ids: Collection<Long>) { tptEligibleIds = swapIds(tptEligibleIds, ids) }
 
     /**
-     * Returns the new id set for [list] and rebinds the loaded rows whose membership changed.
+     * Returns the new id set for [ids] and rebinds the loaded rows whose membership changed.
      * The caller assigns the result before the rebind runs (notifyItemChanged only schedules it).
+     * A Set is used as is (built off the main thread by the caller); a List is converted here.
      */
-    private fun swapIds(old: Set<Long>, list: List<Long>): Set<Long> {
-        val updated: Set<Long> = if (list.isEmpty()) emptySet() else list.toHashSet()
+    private fun swapIds(old: Set<Long>, ids: Collection<Long>): Set<Long> {
+        val updated: Set<Long> = when {
+            ids.isEmpty() -> emptySet()
+            ids is Set<Long> -> ids
+            else -> ids.toHashSet()
+        }
         notifyLoadedRowsWhere { benId -> (benId in old) != (benId in updated) }
         return updated
     }

@@ -1,6 +1,7 @@
 package org.piramalswasthya.stoptb.ui
 
 import android.view.View
+import androidx.paging.CombinedLoadStates
 import androidx.paging.LoadState
 import com.google.android.material.snackbar.Snackbar
 import org.piramalswasthya.stoptb.R
@@ -34,12 +35,19 @@ suspend fun PagingDataAdapter<*, *>.renderListStates(
     var refreshWasLoading = false
     var failedLoads = 0
     var failureShown: Snackbar? = null
-    loadStateFlow.collectLatest { loadStates ->
-        val refresh = loadStates.refresh
-        if (refresh is LoadState.Loading && !refreshWasLoading) {
+    // loadStateFlow is conflated: a refresh that starts and finishes while the main thread is busy
+    // can reach the collector as NotLoading only, and the search would never settle. A load-state
+    // listener is called for every change, so the start of a refresh is never missed.
+    val refreshStartListener: (CombinedLoadStates) -> Unit = { states ->
+        if (states.refresh is LoadState.Loading && !refreshWasLoading) {
             refreshWasLoading = true
             onRefreshStarted()
         }
+    }
+    addLoadStateListener(refreshStartListener)
+    try {
+    loadStateFlow.collectLatest { loadStates ->
+        val refresh = loadStates.refresh
         if (refresh is LoadState.NotLoading) {
             firstLoadSettled = true
             // Only when a refresh has just finished: an append of the previous query finishing
@@ -51,12 +59,16 @@ suspend fun PagingDataAdapter<*, *>.renderListStates(
         }
         // A failed load (a database error in the paging source) left the list empty, or stopped
         // at the last loaded row, with no way back. Retry a few times, backing off; then offer a
-        // Retry action. Covers the first load (refresh) and loading further rows (append).
+        // Retry action. Covers the first load (refresh), loading further rows (append), and
+        // loading earlier rows again after they were dropped (prepend, when scrolling back up).
         val error = (refresh as? LoadState.Error) ?: (loadStates.append as? LoadState.Error)
+            ?: (loadStates.prepend as? LoadState.Error)
         if (error == null) {
             // Reset only once nothing is loading: an append retry shows refresh NotLoading and
             // append Loading, and resetting there kept a failing append retrying forever.
-            if (refresh is LoadState.NotLoading && loadStates.append is LoadState.NotLoading) failedLoads = 0
+            if (refresh is LoadState.NotLoading && loadStates.append is LoadState.NotLoading &&
+                loadStates.prepend is LoadState.NotLoading
+            ) failedLoads = 0
             failureShown?.dismiss()
             failureShown = null
         } else if (failedLoads < MAX_REFRESH_RETRIES) {
@@ -77,6 +89,9 @@ suspend fun PagingDataAdapter<*, *>.renderListStates(
         }
         val isEmpty = refresh is LoadState.NotLoading && loadStates.append.endOfPaginationReached && itemCount == 0
         render(refresh is LoadState.Loading && !firstLoadSettled, isEmpty)
+    }
+    } finally {
+        removeLoadStateListener(refreshStartListener)
     }
 }
 
