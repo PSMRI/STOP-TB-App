@@ -134,7 +134,7 @@ class AllHouseholdFragment : Fragment() {
                 launch { viewModel.householdList.collectLatest { page -> householdAdapter.submitData(page) } }
                 launch {
                     // PR 6 UX: spinner while the first page loads (the screen was blank before).
-                    householdAdapter.renderListStates(onSettled = { listTransitions.onSettled() }, render = { awaitingFirstLoad, isEmpty ->
+                    householdAdapter.renderListStates(onSettled = { listTransitions.onSettled() }, errorAnchor = binding.root, render = { awaitingFirstLoad, isEmpty ->
                         _binding?.let { b ->
                             b.flLoading.visibility = if (awaitingFirstLoad) View.VISIBLE else View.GONE
                             b.flEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE

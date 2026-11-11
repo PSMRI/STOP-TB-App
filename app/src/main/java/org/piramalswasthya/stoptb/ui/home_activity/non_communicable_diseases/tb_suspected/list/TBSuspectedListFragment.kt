@@ -90,6 +90,7 @@ class TBSuspectedListFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             benAdapter.renderListStates(
                 render = { awaitingFirstLoad, isEmpty -> renderListState(awaitingFirstLoad, isEmpty) },
+                errorAnchor = binding.root,
                 onSettled = {
                     _binding?.rvAny?.removeCallbacks(showSearchLoader)
                     listTransitions?.onSettled()

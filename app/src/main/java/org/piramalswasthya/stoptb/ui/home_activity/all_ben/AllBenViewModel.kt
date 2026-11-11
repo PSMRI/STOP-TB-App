@@ -338,7 +338,9 @@ class AllBenViewModel @Inject constructor(
             // With the changes feed active every order status already arrives with each pull
             // (the result poll worker and pull worker skip these sweeps too); this unfiltered
             // refresh only duplicated it, with a per-beneficiary order/result fan-out.
-            if (tbRepo.preferenceDao.isChangesFeedActive()) return
+            // Only while the feed is actually delivering: the flag stays set while pulls fail,
+            // and then this refresh is the only way the cards get fresh order states.
+            if (org.piramalswasthya.stoptb.repositories.isChangesFeedHealthy(tbRepo.preferenceDao.isChangesFeedActive())) return
             val now = android.os.SystemClock.elapsedRealtime()
             if (now - lastStatusRefreshAt < statusRefreshDebounceMs) return
             lastStatusRefreshAt = now
