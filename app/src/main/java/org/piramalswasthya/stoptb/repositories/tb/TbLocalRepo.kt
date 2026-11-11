@@ -162,10 +162,12 @@ class TbLocalRepo @Inject constructor(
                     }
                     if (fresh.xrayOrderId != cache.xrayOrderId) {
                         cache.chestXRayResult = fresh.chestXRayResult
+                        cache.xrayOrderId = fresh.xrayOrderId
                         cache.xrayOrderStatus = fresh.xrayOrderStatus
                     }
                     if (fresh.rifOrderId != cache.rifOrderId) {
                         cache.trueNatRifResult = fresh.trueNatRifResult
+                        cache.rifOrderId = fresh.rifOrderId
                         cache.rifOrderStatus = fresh.rifOrderStatus
                     }
                 }
