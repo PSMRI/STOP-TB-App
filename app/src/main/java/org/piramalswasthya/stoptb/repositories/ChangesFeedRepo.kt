@@ -38,16 +38,20 @@ import javax.inject.Singleton
  */
 
 /**
- * When the changes feed last returned a page in this process (elapsedRealtime, 0 = never). The
+ * The last changes-feed page this process applied: when (elapsedRealtime) and from which hub. The
  * "feed active" pref stays true while pulls fail (hub busy, network, auth), so screens that skip
  * their own status refresh while the feed is active also check that it is actually delivering.
+ * Recorded only after a page is saved, and cleared when a pull fails.
  */
-@Volatile var lastFeedPageAtElapsed = 0L
+private class FeedPage(val atElapsed: Long, val hubUrl: String?)
 
-/** True when the feed is active and returned a page within [maxAgeMs]. */
-fun isChangesFeedHealthy(feedActive: Boolean, maxAgeMs: Long = 2 * 60_000L): Boolean {
-    val last = lastFeedPageAtElapsed
-    return feedActive && last != 0L && android.os.SystemClock.elapsedRealtime() - last < maxAgeMs
+@Volatile private var lastFeedPage: FeedPage? = null
+
+/** True when the feed is active and applied a page from [hubUrl] within [maxAgeMs]. */
+fun isChangesFeedHealthy(feedActive: Boolean, hubUrl: String?, maxAgeMs: Long = 2 * 60_000L): Boolean {
+    val last = lastFeedPage ?: return false
+    return feedActive && last.hubUrl == hubUrl &&
+            android.os.SystemClock.elapsedRealtime() - last.atElapsed < maxAgeMs
 }
 
 @Singleton
@@ -88,6 +92,18 @@ class ChangesFeedRepo @Inject constructor(
      * worker retries) and IllegalStateException when the server rejects the request.
      */
     suspend fun pull(): Outcome = withContext(Dispatchers.IO) {
+        try {
+            pullPages()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // A failed pull or page save: screens fall back to their own status refresh.
+            lastFeedPage = null
+            throw e
+        }
+    }
+
+    private suspend fun pullPages(): Outcome {
         val user = preferenceDao.getLoggedInUser() ?: throw IllegalStateException("No user logged in")
         // Every village assigned to the user, so the tablet holds all of them and works offline in
         // any; the selected village is only a view filter. The selected village is always included,
@@ -111,7 +127,7 @@ class ChangesFeedRepo @Inject constructor(
                     404, 405, 501 -> {
                         preferenceDao.setChangesFeedActive(false)
                         preferenceDao.setHubCreatesReferralOrders(false)
-                        return@withContext Outcome.UNSUPPORTED
+                        return Outcome.UNSUPPORTED
                     }
                     // Hub busy or unreachable through a proxy: retry later.
                     408, 429, 502, 503, 504 -> throw IOException("Changes feed HTTP $code")
@@ -141,30 +157,28 @@ class ChangesFeedRepo @Inject constructor(
             if (!data.optBoolean("supported", false)) {
                 preferenceDao.setChangesFeedActive(false)
                 preferenceDao.setHubCreatesReferralOrders(false)
-                return@withContext Outcome.UNSUPPORTED
+                return Outcome.UNSUPPORTED
             }
             preferenceDao.setChangesFeedActive(true)
-            lastFeedPageAtElapsed = android.os.SystemClock.elapsedRealtime()
             preferenceDao.setHubCreatesReferralOrders(data.optBoolean("createsReferralOrders", false))
 
             val items = data.optJSONArray("items") ?: JSONArray()
             applyPage(items)
             token = data.getString("nextToken")
             preferenceDao.setChangesFeedToken(scope, token)
+            lastFeedPage = FeedPage(android.os.SystemClock.elapsedRealtime(), preferenceDao.getStoredCampHubUrl())
             pages++
             Timber.d(
                 "Changes feed page $pages: ${items.length()} items, snapshot=${data.optBoolean("snapshot")}, " +
                         "hasMore=${data.optBoolean("hasMore")}"
             )
-            if (!data.optBoolean("hasMore")) return@withContext Outcome.DONE
+            if (!data.optBoolean("hasMore")) return Outcome.DONE
             if (pages >= MAX_PAGES_PER_RUN) {
                 // Keep each run bounded; the next pull continues from the saved token.
                 Timber.w("Changes feed: stopping after $pages pages, continuing next pull")
-                return@withContext Outcome.DONE
+                return Outcome.DONE
             }
         }
-        @Suppress("UNREACHABLE_CODE")
-        Outcome.DONE
     }
 
     private suspend fun applyPage(items: JSONArray) {
