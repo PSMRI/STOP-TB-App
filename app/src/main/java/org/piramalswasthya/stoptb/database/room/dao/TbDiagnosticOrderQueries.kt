@@ -85,6 +85,47 @@ interface TbDiagnosticOrderQueries {
     )
     suspend fun getDiagnosticsWithPendingManualResult(): List<TBDiagnosticsCache>
 
+    /**
+     * Whether any row has a PENDING order. Same condition as [getDiagnosticsWithPendingOrder], but
+     * stops at the first match and builds no row objects: the poll only needs a yes/no, and loading
+     * every pending row each minute cost seconds and risked running out of memory at 1M orders.
+     */
+    @Query(
+        """SELECT EXISTS(SELECT 1 FROM TB_DIAGNOSTICS
+        WHERE xrayOrderStatus = 'PENDING' COLLATE NOCASE
+           OR trueNatOrderStatus = 'PENDING' COLLATE NOCASE
+           OR rifOrderStatus = 'PENDING' COLLATE NOCASE)"""
+    )
+    suspend fun hasDiagnosticsWithPendingOrder(): Boolean
+
+    /** Whether any row has a manually entered result still waiting to sync. */
+    @Query(
+        """SELECT EXISTS(SELECT 1 FROM TB_DIAGNOSTICS
+        WHERE xrayManualResultPendingSync = 1
+           OR trueNatManualResultPendingSync = 1
+           OR rifManualResultPendingSync = 1)"""
+    )
+    suspend fun hasDiagnosticsWithPendingManualResult(): Boolean
+
+    /**
+     * Whether any order is still waiting for an automated result: PENDING, with a real order id
+     * (not blank, not "N/A"), for a device that is integrated. X-ray checks [xray]; TrueNat and RIF
+     * check [truenat]. The same test the result poll applied in Kotlin to every pending row.
+     */
+    @Query(
+        """SELECT EXISTS(SELECT 1 FROM TB_DIAGNOSTICS WHERE
+           (:xray AND xrayOrderStatus = 'PENDING' COLLATE NOCASE
+             AND TRIM(COALESCE(xrayOrderId, ''), char(32, 9, 10, 13)) != ''
+             AND xrayOrderId != 'N/A' COLLATE NOCASE)
+        OR (:truenat AND trueNatOrderStatus = 'PENDING' COLLATE NOCASE
+             AND TRIM(COALESCE(trueNatOrderId, ''), char(32, 9, 10, 13)) != ''
+             AND trueNatOrderId != 'N/A' COLLATE NOCASE)
+        OR (:truenat AND rifOrderStatus = 'PENDING' COLLATE NOCASE
+             AND TRIM(COALESCE(rifOrderId, ''), char(32, 9, 10, 13)) != ''
+             AND rifOrderId != 'N/A' COLLATE NOCASE))"""
+    )
+    suspend fun hasPollableOrder(xray: Boolean, truenat: Boolean): Boolean
+
     @Query("SELECT * FROM TB_DIAGNOSTICS WHERE benId IN (:benIds)")
     suspend fun getDiagnosticsForBenIds(benIds: List<Long>): List<TBDiagnosticsCache>
 }
