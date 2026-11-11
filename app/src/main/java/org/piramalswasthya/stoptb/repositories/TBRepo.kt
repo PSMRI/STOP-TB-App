@@ -142,6 +142,9 @@ class TBRepo @Inject constructor(
     suspend fun getDiagnosticsWithPendingOrder(): List<TBDiagnosticsCache> =
         tbLocalRepo.getDiagnosticsWithPendingOrder()
 
+    suspend fun getDiagnosticsWithPendingManualResult(): List<TBDiagnosticsCache> =
+        tbLocalRepo.getDiagnosticsWithPendingManualResult()
+
     suspend fun getDiagnosticsList(): List<TBDiagnosticsCache> =
         tbLocalRepo.getDiagnosticsList()
 

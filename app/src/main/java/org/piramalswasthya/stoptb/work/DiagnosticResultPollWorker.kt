@@ -90,8 +90,18 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                     // The hub can read as disconnected for a moment (e.g. while Connect re-checks
                     // it). Stopping here left result polling dead until something triggered it
                     // again, so look again later; this check reads prefs only, no network.
-                    Timber.d("DiagnosticResultPollWorker: Camp Hub is disconnected, checking again in ${HUB_DOWN_RECHECK_SEC}s")
-                    scheduleNextRun(HUB_DOWN_RECHECK_SEC)
+                    // Only while there is something to poll or replay: with nothing pending, a
+                    // device that left the camp would otherwise wake every 5 min indefinitely;
+                    // the hub-reconnect path triggers this worker again anyway.
+                    val workLeft = preferenceDao.getFeedSkippedOrders().isNotEmpty() ||
+                        tbRepo.getDiagnosticsWithPendingOrder().isNotEmpty() ||
+                        tbRepo.getDiagnosticsWithPendingManualResult().isNotEmpty()
+                    if (workLeft) {
+                        Timber.d("DiagnosticResultPollWorker: Camp Hub is disconnected, checking again in ${HUB_DOWN_RECHECK_SEC}s")
+                        scheduleNextRun(HUB_DOWN_RECHECK_SEC)
+                    } else {
+                        Timber.d("DiagnosticResultPollWorker: Camp Hub is disconnected and nothing is pending; not rescheduling")
+                    }
                     return@withContext Result.success()
                 }
 
