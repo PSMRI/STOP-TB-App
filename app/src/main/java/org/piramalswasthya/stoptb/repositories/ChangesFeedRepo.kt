@@ -36,6 +36,20 @@ import javax.inject.Singleton
  * Form responses (counselling, contact tracing, TPT) and diagnostic orders come from the feed too;
  * PullTBFromAmritWorker and DiagnosticResultPollWorker skip their own endpoints while it is active.
  */
+
+/**
+ * When the changes feed last returned a page in this process (elapsedRealtime, 0 = never). The
+ * "feed active" pref stays true while pulls fail (hub busy, network, auth), so screens that skip
+ * their own status refresh while the feed is active also check that it is actually delivering.
+ */
+@Volatile var lastFeedPageAtElapsed = 0L
+
+/** True when the feed is active and returned a page within [maxAgeMs]. */
+fun isChangesFeedHealthy(feedActive: Boolean, maxAgeMs: Long = 2 * 60_000L): Boolean {
+    val last = lastFeedPageAtElapsed
+    return feedActive && last != 0L && android.os.SystemClock.elapsedRealtime() - last < maxAgeMs
+}
+
 @Singleton
 class ChangesFeedRepo @Inject constructor(
     private val api: AmritApiService,
@@ -130,6 +144,7 @@ class ChangesFeedRepo @Inject constructor(
                 return@withContext Outcome.UNSUPPORTED
             }
             preferenceDao.setChangesFeedActive(true)
+            lastFeedPageAtElapsed = android.os.SystemClock.elapsedRealtime()
             preferenceDao.setHubCreatesReferralOrders(data.optBoolean("createsReferralOrders", false))
 
             val items = data.optJSONArray("items") ?: JSONArray()
