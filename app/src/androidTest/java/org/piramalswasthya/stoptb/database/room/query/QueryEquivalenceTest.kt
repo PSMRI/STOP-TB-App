@@ -87,9 +87,11 @@ class QueryEquivalenceTest {
         val flags = listOf(false to false, true to false, false to true, true to true)
         val orderIds = listOf(null, "", "  ", "\t", "N/A", "n/a", "ORD-1")
         var benId = FIRST_BEN_ID
+        // Only TB_DIAGNOSTICS is cleared: its rows reference the seeded beneficiaries.
+        fun clearDiagnostics() = db.openHelper.writableDatabase.execSQL("DELETE FROM TB_DIAGNOSTICS")
         // One row at a time, so each order id is checked on its own for each column.
         for (column in 0..2) for (status in listOf("pending", "COMPLETED")) for (orderId in orderIds) {
-            db.clearAllTables()
+            clearDiagnostics()
             db.tbDao.saveTbDiagnostics(
                 when (column) {
                     0 -> TBDiagnosticsCache(benId = benId++, xrayOrderStatus = status, xrayOrderId = orderId)
@@ -107,7 +109,7 @@ class QueryEquivalenceTest {
             assertEquals(db.tbDao.getDiagnosticsWithPendingOrder().isNotEmpty(), db.tbDao.hasDiagnosticsWithPendingOrder())
         }
 
-        db.clearAllTables()
+        clearDiagnostics()
         db.tbDao.saveTbDiagnostics(TBDiagnosticsCache(benId = benId++, trueNatManualResultPendingSync = true))
         assertEquals(true, db.tbDao.hasDiagnosticsWithPendingManualResult())
         assertEquals(false, db.tbDao.hasDiagnosticsWithPendingOrder())
