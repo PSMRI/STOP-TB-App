@@ -145,6 +145,8 @@ class TbPullRepo @Inject constructor(
                             200 -> {
                                 try {
                                     saveTBScreeningCacheFromNewResponse(jsonObj)
+                                } catch (e: CancellationException) {
+                                    throw e // a cancelled pull must stop, not report 0 / -1 records
                                 } catch (e: Exception) {
                                     Timber.d("TB Screening entries not synced $e")
                                     return@withContext 0
@@ -172,6 +174,8 @@ class TbPullRepo @Inject constructor(
                     }
                 }
 
+            } catch (e: CancellationException) {
+                throw e // a cancelled pull must stop, not report 0 / -1 records
             } catch (e: SocketTimeoutException) {
                 Timber.e("get_tb error : $e")
                 return@withContext -2
@@ -682,6 +686,8 @@ class TbPullRepo @Inject constructor(
                             200 -> {
                                 try {
                                     saveTBDiagnosticsCacheFromNewResponse(jsonObj)
+                                } catch (e: CancellationException) {
+                                    throw e // a cancelled pull must stop, not report 0 / -1 records
                                 } catch (e: Exception) {
                                     Timber.d("TB Diagnostics entries not synced $e")
                                     return@withContext 0
@@ -707,6 +713,8 @@ class TbPullRepo @Inject constructor(
                         }
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e // a cancelled pull must stop, not report 0 / -1 records
             } catch (e: SocketTimeoutException) {
                 Timber.e("get_tb_diagnostics error : $e")
                 return@withContext -2
@@ -768,30 +776,29 @@ class TbPullRepo @Inject constructor(
         // by DiagnosticResultPollWorker, which would itself be waiting for that write lock.
         for (chunkStart in 0 until records.length() step pullWriteChunkSize) {
             val chunkEnd = minOf(chunkStart + pullWriteChunkSize, records.length())
-            val chunkBenIds = (chunkStart until chunkEnd).mapNotNull { index ->
-                val item = records.optJSONObject(index) ?: return@mapNotNull null
-                val benRegId = item.optLong("benRegID", 0L).takeIf { it > 0 } ?: return@mapNotNull null
-                benDao.getBenByRegId(benRegId)?.beneficiaryId
-            }.toSet()
+            // benRegId has no index, so resolve the chunk's ids in one query (was two full-table
+            // scans per record). Only ids resolved here get a lock; a beneficiary registered after
+            // this lookup is left for the next pull, as before - re-applying is idempotent.
+            val chunkRegIds = (chunkStart until chunkEnd).mapNotNull { index ->
+                records.optJSONObject(index)?.optLong("benRegID", 0L)?.takeIf { it > 0 }
+            }.distinct()
+            val benIdByRegId = if (chunkRegIds.isEmpty()) emptyMap() else
+                benDao.getBenIdsByRegIds(chunkRegIds).associate { mapping -> mapping.benRegId to mapping.beneficiaryId }
+            val chunkBenIds = benIdByRegId.values.toSet()
             if (chunkBenIds.isEmpty()) continue
             benIdLocks.withLocks(chunkBenIds) {
                 database.withTransaction {
                     for (index in chunkStart until chunkEnd) {
                         val item = records.optJSONObject(index) ?: continue
                         val benRegId = item.optLong("benRegID", 0L).takeIf { it > 0 } ?: continue
-                        val ben = benDao.getBenByRegId(benRegId) ?: continue
-                        // A beneficiary registered between the pass above and here would not
-                        // have had its lock taken, so writing it now would be unsynchronised.
-                        // Leave it for the next pull cycle instead - the pull is a pure
-                        // server->device download and re-applying a record is idempotent.
-                        if (ben.beneficiaryId !in chunkBenIds) continue
+                        val benId = benIdByRegId[benRegId] ?: continue
                         val visitDate = getLongFromDateMultipleSupport(item.optString("visitDate"))
                         val serverUpdatedDate = getServerUpdatedDate(item)
-                        val existing = tbDao.getTbDiagnostics(ben.beneficiaryId)
+                        val existing = tbDao.getTbDiagnostics(benId)
                         if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
                             continue
                         }
-                        val cache = (existing ?: TBDiagnosticsCache(benId = ben.beneficiaryId)).copy(
+                        val cache = (existing ?: TBDiagnosticsCache(benId = benId)).copy(
                             visitDate = visitDate,
                             nikshayId = item.optStringOrNull("nikshayId") ?: existing?.nikshayId,
                             isChestXRayDone = item.optNullableBoolean("isDigitalChestXrayConducted") ?: existing?.isChestXRayDone,
@@ -851,6 +858,8 @@ class TbPullRepo @Inject constructor(
                                 try {
                                     val dataObj = jsonObj.getString("data")
                                     saveTBSuspectedCacheFromResponse(dataObj)
+                                } catch (e: CancellationException) {
+                                    throw e // a cancelled pull must stop, not report 0 / -1 records
                                 } catch (e: Exception) {
                                     Timber.d("TB Suspected entries not synced $e")
                                     return@withContext 0
@@ -878,6 +887,8 @@ class TbPullRepo @Inject constructor(
                     }
                 }
 
+            } catch (e: CancellationException) {
+                throw e // a cancelled pull must stop, not report 0 / -1 records
             } catch (e: SocketTimeoutException) {
                 Timber.e("get_tb error : $e")
                 return@withContext -2
@@ -991,6 +1002,8 @@ class TbPullRepo @Inject constructor(
 
                                     saveTBConfirmedCacheFromResponse(dataObj)
 
+                                } catch (e: CancellationException) {
+                                    throw e // a cancelled pull must stop, not report 0 / -1 records
                                 } catch (e: Exception) {
                                     Timber.e(e, "TBConfirmed: Error while saving data")
                                     return@withContext 0
@@ -1019,6 +1032,8 @@ class TbPullRepo @Inject constructor(
                     }
                 }
 
+            } catch (e: CancellationException) {
+                throw e // a cancelled pull must stop, not report 0 / -1 records
             } catch (e: SocketTimeoutException) {
                 return@withContext -2
 
@@ -1085,6 +1100,8 @@ class TbPullRepo @Inject constructor(
                 }
             }
 
+        } catch (e: CancellationException) {
+            throw e // a cancelled pull must stop, not report 0 / -1 records
         } catch (e: Exception) {
             if (rethrow) throw e
             Timber.e(e, "TBConfirmed: Error parsing or saving JSON")

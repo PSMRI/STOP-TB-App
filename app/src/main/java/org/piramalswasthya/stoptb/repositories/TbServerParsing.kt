@@ -13,11 +13,11 @@ import java.util.Locale
  * TBRepo's companion object unchanged. Same package, so TBRepo calls them without qualification.
  */
 
-internal val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
-internal val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.ENGLISH)
+// New formatters per call: SimpleDateFormat is not thread-safe, and these helpers run from
+// concurrent pulls on Dispatchers.IO (a shared instance could garble a date filter).
 internal fun getCurrentDate(millis: Long = System.currentTimeMillis()): String {
-    val dateString = dateFormat.format(millis)
-    val timeString = timeFormat.format(millis)
+    val dateString = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).format(millis)
+    val timeString = SimpleDateFormat("HH:mm:ss", Locale.ENGLISH).format(millis)
     return "${dateString}T${timeString}.000Z"
 }
 
