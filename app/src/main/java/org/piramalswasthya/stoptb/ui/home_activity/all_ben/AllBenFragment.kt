@@ -14,6 +14,8 @@ import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import androidx.paging.LoadState
@@ -935,122 +937,129 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // destroyed view would stop the next, legitimate call from ever starting them.
         if (_binding == null || rowDecorationsStarted) return
         rowDecorationsStarted = true
-        // The badges below are read only for the rows the list has loaded (PR 6).
+        // Only while the view is STARTED: behind a dialog or with the app in the background these
+        // badge queries stopped being needed but kept running (LoadedRowBadges shares them
+        // WhileSubscribed, which never ended). One block, so they stop and restart together.
         viewLifecycleOwner.lifecycleScope.launch {
-            benAdapter.loadedIds { item -> item.benId }.collect { benIds -> viewModel.onRowsLoaded(benIds) }
-        }
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.childCounts.collectLatest { countMap ->
-                benAdapter.submitChildCounts(countMap)
-            }
-        }
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // The badges below are read only for the rows the list has loaded (PR 6).
+                launch {
+                    benAdapter.loadedIds { item -> item.benId }.collect { benIds -> viewModel.onRowsLoaded(benIds) }
+                }
+                launch {
+                    viewModel.childCounts.collectLatest { countMap ->
+                        benAdapter.submitChildCounts(countMap)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.householdMemberCounts.collectLatest { countMap ->
-                benAdapter.submitHouseholdMemberCounts(countMap)
-            }
-        }
+                launch {
+                    viewModel.householdMemberCounts.collectLatest { countMap ->
+                        benAdapter.submitHouseholdMemberCounts(countMap)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.householdHeadNames.collectLatest { nameMap ->
-                benAdapter.submitHouseholdHeadNames(nameMap)
-            }
-        }
+                launch {
+                    viewModel.householdHeadNames.collectLatest { nameMap ->
+                        benAdapter.submitHouseholdHeadNames(nameMap)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.vitalBenIds.collectLatest { benIds ->
-                benAdapter.submitBenIds(benIds)
-            }
-        }
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.unsyncedVitalBenIds.collectLatest { benIds ->
-                benAdapter.submitUnsyncedVitalBenIds(benIds)
-            }
-        }
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.syncingVitalBenIds.collectLatest { benIds ->
-                benAdapter.submitSyncingVitalBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.vitalBenIds.collectLatest { benIds ->
+                        benAdapter.submitBenIds(benIds)
+                    }
+                }
+                launch {
+                    viewModel.unsyncedVitalBenIds.collectLatest { benIds ->
+                        benAdapter.submitUnsyncedVitalBenIds(benIds)
+                    }
+                }
+                launch {
+                    viewModel.syncingVitalBenIds.collectLatest { benIds ->
+                        benAdapter.submitSyncingVitalBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.tbScreeningBenIds.collectLatest { benIds ->
-                benAdapter.submitTbScreeningBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.tbScreeningBenIds.collectLatest { benIds ->
+                        benAdapter.submitTbScreeningBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.unsyncedTbScreeningBenIds.collectLatest { benIds ->
-                benAdapter.submitUnsyncedTbScreeningBenIds(benIds)
-            }
-        }
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.syncingTbScreeningBenIds.collectLatest { benIds ->
-                benAdapter.submitSyncingTbScreeningBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.unsyncedTbScreeningBenIds.collectLatest { benIds ->
+                        benAdapter.submitUnsyncedTbScreeningBenIds(benIds)
+                    }
+                }
+                launch {
+                    viewModel.syncingTbScreeningBenIds.collectLatest { benIds ->
+                        benAdapter.submitSyncingTbScreeningBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.generalOpdBenIds.collectLatest { benIds ->
-                benAdapter.submitGeneralOpdBenIds(benIds)
-            }
-        }
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.unsyncedGeneralOpdBenIds.collectLatest { benIds ->
-                benAdapter.submitUnsyncedGeneralOpdBenIds(benIds)
-            }
-        }
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.syncingGeneralOpdBenIds.collectLatest { benIds ->
-                benAdapter.submitSyncingGeneralOpdBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.generalOpdBenIds.collectLatest { benIds ->
+                        benAdapter.submitGeneralOpdBenIds(benIds)
+                    }
+                }
+                launch {
+                    viewModel.unsyncedGeneralOpdBenIds.collectLatest { benIds ->
+                        benAdapter.submitUnsyncedGeneralOpdBenIds(benIds)
+                    }
+                }
+                launch {
+                    viewModel.syncingGeneralOpdBenIds.collectLatest { benIds ->
+                        benAdapter.submitSyncingGeneralOpdBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.anthropometryFilledBenIds.collectLatest { benIds ->
-                benAdapter.submitAnthropometryBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.anthropometryFilledBenIds.collectLatest { benIds ->
+                        benAdapter.submitAnthropometryBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.diagnosisBenIds.collectLatest { benIds ->
-                benAdapter.submitDiagnosisBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.diagnosisBenIds.collectLatest { benIds ->
+                        benAdapter.submitDiagnosisBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.contactFollowUpDoneBenIds.collectLatest { benIds ->
-                benAdapter.submitContactFollowUpDoneBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.contactFollowUpDoneBenIds.collectLatest { benIds ->
+                        benAdapter.submitContactFollowUpDoneBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.tptFollowUpDoneBenIds.collectLatest { benIds ->
-                benAdapter.submitTptFollowUpDoneBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.tptFollowUpDoneBenIds.collectLatest { benIds ->
+                        benAdapter.submitTptFollowUpDoneBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.tptEligibleBenIds.collectLatest { benIds ->
-                benAdapter.submitTptEligibleBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.tptEligibleBenIds.collectLatest { benIds ->
+                        benAdapter.submitTptEligibleBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.allTbDiagnostics.collectLatest { diagnosticsList ->
-                benAdapter.submitTBDiagnostics(diagnosticsList)
-            }
-        }
+                launch {
+                    viewModel.allTbDiagnostics.collectLatest { diagnosticsList ->
+                        benAdapter.submitTBDiagnostics(diagnosticsList)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.allTbScreening.collectLatest { screeningList ->
-                benAdapter.submitTbScreeningList(screeningList)
-            }
-        }
+                launch {
+                    viewModel.allTbScreening.collectLatest { screeningList ->
+                        benAdapter.submitTbScreeningList(screeningList)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.retryingBenIds.collectLatest { benIds ->
-                benAdapter.submitRetryingBenIds(benIds)
+                launch {
+                    viewModel.retryingBenIds.collectLatest { benIds ->
+                        benAdapter.submitRetryingBenIds(benIds)
+                    }
+                }
             }
         }
     }
