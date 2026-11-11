@@ -67,7 +67,7 @@ object WorkerUtils {
     @Volatile
     private var manualCampRefreshInProgress = false
 
-    private val networkOnlyConstraint = Constraints.Builder()
+    internal val networkOnlyConstraint = Constraints.Builder()
         .setRequiredNetworkType(NetworkType.CONNECTED)
         .build()
 

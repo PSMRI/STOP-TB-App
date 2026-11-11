@@ -141,8 +141,14 @@ class SyncGateWorker @AssistedInject constructor(
             return
         }
         Timber.d("SyncGate: camp hub unreachable, re-checking in ${OFFLINE_RECHECK_SECONDS}s (attempt ${reArm + 1})")
+        // Requires a network: with the app in the background Android blocks its network
+        // (blocked=APP_BACKGROUND) unless the running job declared one, so an unconstrained
+        // re-check failed DNS for ~90 s after the network returned (device test 2026-11-11).
+        // The constraint also holds the re-check while the device is fully offline and runs it
+        // as soon as a network is back.
         val next = OneTimeWorkRequestBuilder<SyncGateWorker>()
             .setInitialDelay(OFFLINE_RECHECK_SECONDS, TimeUnit.SECONDS)
+            .setConstraints(WorkerUtils.networkOnlyConstraint)
             .setInputData(workDataOf(KEY_OFFLINE_REARM to reArm + 1))
             .build()
         workManager.enqueueUniqueWork(WorkerUtils.syncGateUniqueName, ExistingWorkPolicy.REPLACE, next)
