@@ -136,7 +136,7 @@ class UnScreenedPeople : Fragment(),
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.unscreenedList.collectLatest { page -> benAdapter.submitData(page) } }
                 launch {
-                    benAdapter.renderListStates(onSettled = { listTransitions?.onSettled() }, errorAnchor = binding.root, render = { awaitingFirstLoad, isEmpty ->
+                    benAdapter.renderListStates(onSettled = { listTransitions?.onSettled() }, onRefreshStarted = { listTransitions?.onRefreshStarted() }, errorAnchor = binding.root, render = { awaitingFirstLoad, isEmpty ->
                         _binding?.let { b ->
                             b.flLoading.visibility = if (awaitingFirstLoad) View.VISIBLE else View.GONE
                             b.tvEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE

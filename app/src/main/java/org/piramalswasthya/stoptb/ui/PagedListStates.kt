@@ -21,11 +21,13 @@ import kotlinx.coroutines.flow.onStart
  * the tables it reads, and showing the loader for those reloads made the list vanish under the
  * user during a sync (same rule as AllBenFragment and NonHHFragment). "Empty" needs the load to
  * have finished and reached the end, so the idle state before the first load never flashes
- * "No records found". [onSettled] runs each time a load finishes (to clear a search loader).
+ * "No records found". [onRefreshStarted] runs when a refresh starts and [onSettled] when it
+ * finishes (to clear a search loader, see [ListTransitions]).
  */
 suspend fun PagingDataAdapter<*, *>.renderListStates(
     render: (awaitingFirstLoad: Boolean, isEmpty: Boolean) -> Unit,
     onSettled: () -> Unit = {},
+    onRefreshStarted: () -> Unit = {},
     errorAnchor: View? = null
 ) {
     var firstLoadSettled = false
@@ -34,7 +36,10 @@ suspend fun PagingDataAdapter<*, *>.renderListStates(
     var failureShown: Snackbar? = null
     loadStateFlow.collectLatest { loadStates ->
         val refresh = loadStates.refresh
-        if (refresh is LoadState.Loading) refreshWasLoading = true
+        if (refresh is LoadState.Loading && !refreshWasLoading) {
+            refreshWasLoading = true
+            onRefreshStarted()
+        }
         if (refresh is LoadState.NotLoading) {
             firstLoadSettled = true
             // Only when a refresh has just finished: an append of the previous query finishing
@@ -49,7 +54,9 @@ suspend fun PagingDataAdapter<*, *>.renderListStates(
         // Retry action. Covers the first load (refresh) and loading further rows (append).
         val error = (refresh as? LoadState.Error) ?: (loadStates.append as? LoadState.Error)
         if (error == null) {
-            if (refresh is LoadState.NotLoading) failedLoads = 0
+            // Reset only once nothing is loading: an append retry shows refresh NotLoading and
+            // append Loading, and resetting there kept a failing append retrying forever.
+            if (refresh is LoadState.NotLoading && loadStates.append is LoadState.NotLoading) failedLoads = 0
             failureShown?.dismiss()
             failureShown = null
         } else if (failedLoads < MAX_REFRESH_RETRIES) {
@@ -89,11 +96,14 @@ fun <T : Any> PagingDataAdapter<T, *>.loadedIds(idOf: (T) -> Long): Flow<Set<Lon
 /**
  * Smoother list transitions for the paged screens:
  * - a new search shows the top of its results, not the old scroll offset (call [onQueryChanged]
- *   when the query changes and [onSettled] when a load finishes - renderListStates' onSettled);
+ *   when the query changes, and pass [onRefreshStarted] / [onSettled] to renderListStates);
  * - badge and sync-icon updates rebind rows without the cross-fade that made them flash.
  */
 class ListTransitions(private val list: RecyclerView) {
     private var scrollToTopPending = false
+    // Set once a refresh starts after the query changed, so a refresh of the previous query that
+    // finishes during the search debounce does not settle (and clear) the new query's scroll.
+    private var newQueryLoading = false
     private var lastQuery: String? = null
 
     init {
@@ -109,11 +119,17 @@ class ListTransitions(private val list: RecyclerView) {
         if (query == lastQuery) return
         lastQuery = query
         scrollToTopPending = true
+        newQueryLoading = false
+    }
+
+    fun onRefreshStarted() {
+        if (scrollToTopPending) newQueryLoading = true
     }
 
     fun onSettled() {
-        if (!scrollToTopPending) return
+        if (!scrollToTopPending || !newQueryLoading) return
         scrollToTopPending = false
+        newQueryLoading = false
         list.scrollToPosition(0)
     }
 }
