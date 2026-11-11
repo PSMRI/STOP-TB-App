@@ -16,9 +16,39 @@ import javax.inject.Singleton
 @Singleton
 class BenIdLocks @Inject constructor() {
 
-    private val locks = java.util.concurrent.ConcurrentHashMap<Long, Mutex>()
-    suspend fun <T> withLock(benId: Long, block: suspend () -> T): T =
-        locks.getOrPut(benId) { Mutex() }.withLock { block() }
+    /** One beneficiary's lock and the number of callers holding it or waiting for it. */
+    private class Entry {
+        val mutex = Mutex()
+        var users = 0 // guarded by [locks]
+    }
+
+    // An entry is removed once no caller holds or waits for it. Keeping every lock ever taken grew
+    // without bound: a diagnostics pull touches every beneficiary with a record, so at 1M of them
+    // the map alone held ~100 MB for the life of the process. A caller registers (users++) before
+    // waiting on the mutex and unregisters after releasing it, all under the map's monitor, so two
+    // callers for the same benId always get the same Entry and none is removed while in use.
+    private val locks = HashMap<Long, Entry>()
+
+    private fun acquire(benId: Long): Entry = synchronized(locks) {
+        locks.getOrPut(benId) { Entry() }.also { entry -> entry.users++ }
+    }
+
+    private fun release(benId: Long, entry: Entry) = synchronized(locks) {
+        entry.users--
+        if (entry.users == 0) locks.remove(benId)
+    }
+
+    /** Number of beneficiaries with a lock in use (held or waited for); for tests. */
+    internal fun activeCount(): Int = synchronized(locks) { locks.size }
+
+    suspend fun <T> withLock(benId: Long, block: suspend () -> T): T {
+        val entry = acquire(benId)
+        try {
+            return entry.mutex.withLock { block() }
+        } finally {
+            release(benId, entry)
+        }
+    }
 
     /**
      * Holds every lock in [benIds] for the duration of [block], acquiring them in ascending
@@ -37,20 +67,22 @@ class BenIdLocks @Inject constructor() {
      */
     suspend fun <T> withLocks(benIds: Collection<Long>, block: suspend () -> T): T {
         val ordered = benIds.distinct().sorted()
-        val acquired = ArrayList<Mutex>(ordered.size)
+        val registered = ArrayList<Pair<Long, Entry>>(ordered.size)
+        val locked = ArrayList<Mutex>(ordered.size)
         try {
             ordered.forEach { benId ->
                 // Acquired one at a time rather than by nesting withLock, so a chunk of a
                 // few hundred does not build a correspondingly deep chain of suspend frames.
                 // Cancellation while waiting here still unwinds through the finally below.
-                locks.getOrPut(benId) { Mutex() }.also { mutex ->
-                    mutex.lock()
-                    acquired += mutex
-                }
+                val entry = acquire(benId)
+                registered += benId to entry
+                entry.mutex.lock()
+                locked += entry.mutex
             }
             return block()
         } finally {
-            for (index in acquired.indices.reversed()) acquired[index].unlock()
+            for (index in locked.indices.reversed()) locked[index].unlock()
+            for ((benId, entry) in registered) release(benId, entry)
         }
     }
 }

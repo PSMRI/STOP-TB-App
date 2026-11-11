@@ -12,8 +12,8 @@ package org.piramalswasthya.stoptb.database.room.dao
  *   TBScreeningDataset.TbScreeningUtils.isPresumptive), or the chest X-ray is Positive /
  *   TB Presumptive / Abnormal but not TB Presumptive - and the person is not confirmed and not
  *   on treatment.
- * - Confirmed: either confirmed flag on the suspected or diagnostics record, or NAAT/TrueNat
- *   positive (MTB Detected), or liquid culture positive. The app sets both flags when MTB is
+ * - Confirmed: either confirmed flag, or NAAT/TrueNat positive (MTB Detected), or liquid culture
+ *   positive, on the suspected or the diagnostics record. The app sets both flags when MTB is
  *   detected; checking the results too covers records synced from elsewhere.
  */
 object TbCaseSql {
@@ -28,12 +28,20 @@ object TbCaseSql {
     const val XRAY_PRESUMPTIVE = "(UPPER(IFNULL(sus.chestXRayResult, '')) IN " + PRESUMPTIVE_XRAY_VALUES +
         " OR UPPER(IFNULL(dx.chestXRayResult, '')) IN " + PRESUMPTIVE_XRAY_VALUES + ")"
 
-    /** Confirmed through the suspected record (its own visit date applies on the dashboard). */
-    const val SUSPECTED_CONFIRMED = "(IFNULL(sus.isConfirmed, 0) = 1 OR IFNULL(sus.isTBConfirmed, 0) = 1)"
+    private const val POSITIVE_NAAT_VALUES = "('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')"
+
+    /**
+     * Confirmed through the suspected record (its own visit date applies on the dashboard): a flag
+     * or a positive lab result. The app's forms set both flags from the NAAT result, but a record
+     * synced from elsewhere can carry only the result, as on the diagnostics record.
+     */
+    const val SUSPECTED_CONFIRMED = "(IFNULL(sus.isConfirmed, 0) = 1 OR IFNULL(sus.isTBConfirmed, 0) = 1" +
+        " OR UPPER(IFNULL(sus.naatResult, '')) IN " + POSITIVE_NAAT_VALUES +
+        " OR UPPER(IFNULL(sus.liquidCultureResult, '')) = 'POSITIVE')"
 
     /** Confirmed through the diagnostics record: a flag or a positive lab result. */
     const val DIAGNOSTICS_CONFIRMED = "(IFNULL(dx.isConfirmed, 0) = 1 OR IFNULL(dx.isTBConfirmed, 0) = 1" +
-        " OR UPPER(IFNULL(dx.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')" +
+        " OR UPPER(IFNULL(dx.naatResult, '')) IN " + POSITIVE_NAAT_VALUES +
         " OR UPPER(IFNULL(dx.liquidCultureResult, '')) = 'POSITIVE')"
 
     const val CONFIRMED = "(" + SUSPECTED_CONFIRMED + " OR " + DIAGNOSTICS_CONFIRMED + ")"
