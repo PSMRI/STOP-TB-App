@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.ncd_list
 
+import org.piramalswasthya.stoptb.ui.debounceTyping
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -22,7 +23,7 @@ class NcdListViewModel @Inject constructor(
 ) {
     private val allBenList = recordsRepo.allBenList
     private val filter = MutableStateFlow("")
-    val benList = allBenList.combine(filter) { list, filter ->
+    val benList = allBenList.combine(filter.debounceTyping()) { list, filter ->
         filterBenList(list, filter)
     }
 

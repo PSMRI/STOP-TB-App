@@ -6,7 +6,7 @@ import android.view.ViewGroup
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.ListAdapter
+import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.RecyclerView
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -24,7 +24,7 @@ class TbScreeningListAdapter(
     // (fill) action on an unfilled row is gated by this.
     private val canFill: Boolean = true
 ) :
-    ListAdapter<BenWithTbScreeningDomain, TbScreeningListAdapter.BenViewHolder>
+    PagingDataAdapter<BenWithTbScreeningDomain, TbScreeningListAdapter.BenViewHolder>
         (BenDiffUtilCallBack) {
     private object BenDiffUtilCallBack : DiffUtil.ItemCallback<BenWithTbScreeningDomain>() {
         override fun areItemsTheSame(
@@ -163,7 +163,7 @@ class TbScreeningListAdapter(
         BenViewHolder.from(parent)
 
     override fun onBindViewHolder(holder: BenViewHolder, position: Int) {
-        holder.bind(getItem(position), pref, clickListener, canFill)
+        holder.bind(getItem(position) ?: return, pref, clickListener, canFill)
     }
 
 

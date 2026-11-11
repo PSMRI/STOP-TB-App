@@ -64,8 +64,12 @@ class NcdNonEligibleListFragment : Fragment() {
         binding.rvAny.adapter = benAdapter
 
 
+        // Loader until the first emission; "No records found" only once the list is known empty.
+        binding.flLoading.visibility = View.VISIBLE
+        binding.flEmpty.visibility = View.GONE
         lifecycleScope.launch {
             viewModel.benList.collect {
+                binding.flLoading.visibility = View.GONE
                 if (it.isEmpty())
                     binding.flEmpty.visibility = View.VISIBLE
                 else

@@ -62,6 +62,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @AndroidEntryPoint
 class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
@@ -80,7 +81,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
                     if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
                         syncRetryStore.resetBackoff()
                         WorkerUtils.triggerAmritPushWorker(applicationContext)
-                        WorkerUtils.triggerCampQuickPullIfConnected(applicationContext, pref, force = true)
+                        WorkerUtils.triggerCampQuickPullAsync(applicationContext, pref, force = true)
                     }
                 }
             }
@@ -230,6 +231,10 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         WorkerUtils.scheduleSyncHeartbeat(applicationContext)
         // Opening the app (including right after login) retries waiting records now.
         syncRetryStore.resetBackoff()
+        // ...and actually starts that retry: records left unsynced by an app that was killed or
+        // force-stopped otherwise waited for the next save or the 15-min heartbeat (UAT 2026-11-11).
+        // Goes through the debounced gate, which checks the hub itself; not on recreation.
+        if (savedInstanceState == null) WorkerUtils.triggerAmritPushWorker(applicationContext)
         // Resolve assigned/active role for this cold start. Always resets to the first
         // assigned role — no persistence across app restarts, by design.
         roleManager.initializeFromLoggedInUser()
@@ -268,9 +273,9 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
 
         // Auto-trigger sync on first launch (when full pull hasn't completed yet)
         if (!pref.isFullPullComplete) {
-            WorkerUtils.triggerAmritPullWorker(this)
+            WorkerUtils.triggerAmritPullWorkerAsync(this)
         }
-        WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
+        WorkerUtils.triggerCampQuickPullAsync(this, pref)
     }
 
     /**
@@ -437,7 +442,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             lastClickTime = SystemClock.elapsedRealtime()
             WorkerUtils.triggerAmritPushWorker(this)
             if (!pref.isFullPullComplete)
-                WorkerUtils.triggerAmritPullWorker(this)
+                WorkerUtils.triggerAmritPullWorkerAsync(this)
             binding.drawerLayout.close()
             true
         }
@@ -604,7 +609,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         window.decorView.alpha = 1f
         refreshCampHubOfflineBanner()
         refreshCampHubDrawerItem()
-        WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
+        WorkerUtils.triggerCampQuickPullAsync(this, pref)
         startCampAutoPullLoop()
     }
 
@@ -612,7 +617,10 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         if (campAutoPullJob?.isActive == true) return
         campAutoPullJob = lifecycleScope.launch {
             while (isActive) {
-                WorkerUtils.triggerCampQuickPullIfConnected(applicationContext, pref)
+                // Queries WorkManager's DB synchronously: keep it off the main thread.
+                withContext(Dispatchers.IO) {
+                    WorkerUtils.triggerCampQuickPullIfConnected(applicationContext, pref)
+                }
                 delay(WorkerUtils.campAutoPullIntervalMs)
             }
         }

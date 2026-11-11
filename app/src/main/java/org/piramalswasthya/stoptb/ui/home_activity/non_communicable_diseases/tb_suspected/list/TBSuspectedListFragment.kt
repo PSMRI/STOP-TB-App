@@ -14,7 +14,10 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.fragment.findNavController
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import org.piramalswasthya.stoptb.ui.ListTransitions
+import org.piramalswasthya.stoptb.ui.renderListStates
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.TbSuspectedListAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
@@ -66,6 +69,7 @@ class TBSuspectedListFragment : Fragment() {
             }, pref = prefDao
         )
         binding.rvAny.adapter = benAdapter
+        listTransitions = ListTransitions(binding.rvAny)
         binding.flLoading.visibility = View.VISIBLE
         binding.rvAny.visibility = View.GONE
         // fl_empty declares no visibility and therefore starts VISIBLE, which is what drew
@@ -77,11 +81,17 @@ class TBSuspectedListFragment : Fragment() {
         // started the next time onViewCreated runs, each doing the same work on every emission.
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.benList.collect {
-                renderListState(it)
-                benAdapter.submitList(it)
-                }
+                viewModel.benList.collectLatest { page -> benAdapter.submitData(page) }
             }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            benAdapter.renderListStates(
+                render = { awaitingFirstLoad, isEmpty -> renderListState(awaitingFirstLoad, isEmpty) },
+                onSettled = {
+                    _binding?.rvAny?.removeCallbacks(showSearchLoader)
+                    listTransitions?.onSettled()
+                }
+            )
         }
 
         binding.ibSearch.setOnClickListener { sttContract.launch(Unit) }
@@ -136,12 +146,11 @@ class TBSuspectedListFragment : Fragment() {
      * before the first emission the screen was blank, and an empty first emission drew
      * "No records found" on top of rv_any rather than instead of it.
      */
-    private fun renderListState(items: List<*>) {
+    private fun renderListState(awaitingFirstLoad: Boolean, isEmpty: Boolean) {
         _binding?.let { b ->
-            b.rvAny.removeCallbacks(showSearchLoader)
-            b.flLoading.visibility = View.GONE
-            b.flEmpty.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
-            b.rvAny.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
+            b.flLoading.visibility = if (awaitingFirstLoad) View.VISIBLE else View.GONE
+            b.flEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
+            b.rvAny.visibility = if (awaitingFirstLoad || isEmpty) View.GONE else View.VISIBLE
         }
     }
 
@@ -155,6 +164,7 @@ class TBSuspectedListFragment : Fragment() {
     }
 
     private var lastQuery: String? = null
+    private var listTransitions: ListTransitions? = null
 
     private fun onQueryChanged(query: String) {
         // The ViewModel normalizes to lowercase and the filter is a StateFlow, which drops an
@@ -164,6 +174,7 @@ class TBSuspectedListFragment : Fragment() {
         val normalized = query.lowercase()
         if (normalized == lastQuery) return
         lastQuery = normalized
+        listTransitions?.onQueryChanged()
         _binding?.rvAny?.let { rv ->
             rv.removeCallbacks(showSearchLoader)
             rv.postDelayed(showSearchLoader, SEARCH_LOADER_DELAY_MS)

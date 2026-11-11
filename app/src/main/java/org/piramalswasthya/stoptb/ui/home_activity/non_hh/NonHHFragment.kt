@@ -18,6 +18,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import org.piramalswasthya.stoptb.ui.loadedIds
 import org.piramalswasthya.stoptb.R
 import androidx.paging.LoadState
 import kotlinx.coroutines.flow.first
@@ -161,17 +162,8 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             showRedesignedCard = true
         )
 
-        benAdapter.submitBenIds(viewModel.vitalBenIds.value)
-        benAdapter.submitUnsyncedVitalBenIds(viewModel.unsyncedVitalBenIds.value)
-        benAdapter.submitSyncingVitalBenIds(viewModel.syncingVitalBenIds.value)
-        benAdapter.submitTbScreeningBenIds(viewModel.tbScreeningBenIds.value)
-        benAdapter.submitUnsyncedTbScreeningBenIds(viewModel.unsyncedTbScreeningBenIds.value)
-        benAdapter.submitSyncingTbScreeningBenIds(viewModel.syncingTbScreeningBenIds.value)
-        benAdapter.submitGeneralOpdBenIds(viewModel.generalOpdBenIds.value)
-        benAdapter.submitUnsyncedGeneralOpdBenIds(viewModel.unsyncedGeneralOpdBenIds.value)
-        benAdapter.submitSyncingGeneralOpdBenIds(viewModel.syncingGeneralOpdBenIds.value)
-        benAdapter.submitAnthropometryBenIds(viewModel.anthropometryBenIds.value)
-        benAdapter.submitDiagnosisBenIds(viewModel.diagnosisBenIds.value)
+        // Badges arrive from the collectors below once the first page has loaded; they are read
+        // for the loaded rows only (PR 6), so there is no whole-table value to pre-seed here.
 
         binding.rvAny.adapter = benAdapter
         (binding.rvAny.itemAnimator as? androidx.recyclerview.widget.SimpleItemAnimator)
@@ -225,6 +217,7 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch { benAdapter.loadedIds { item -> item.benId }.collect { benIds -> viewModel.onRowsLoaded(benIds) } }
                 launch { viewModel.vitalBenIds.collect { benAdapter.submitBenIds(it) } }
                 launch { viewModel.unsyncedVitalBenIds.collect { benAdapter.submitUnsyncedVitalBenIds(it) } }
                 launch { viewModel.syncingVitalBenIds.collect { benAdapter.submitSyncingVitalBenIds(it) } }
