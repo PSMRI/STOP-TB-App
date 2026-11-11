@@ -4,6 +4,7 @@ import androidx.paging.LoadState
 import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.SimpleItemAnimator
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -24,16 +25,31 @@ suspend fun PagingDataAdapter<*, *>.renderListStates(
     onSettled: () -> Unit = {}
 ) {
     var firstLoadSettled = false
+    var failedRefreshes = 0
     loadStateFlow.collectLatest { loadStates ->
         val refresh = loadStates.refresh
         if (refresh is LoadState.NotLoading) {
             firstLoadSettled = true
+            failedRefreshes = 0
             onSettled()
+        }
+        // A failed load (e.g. a database error in the paging source) left the list empty with no
+        // way back. Retry a few times, backing off; the loader stays up meanwhile on a first load.
+        if (refresh is LoadState.Error && failedRefreshes < MAX_REFRESH_RETRIES) {
+            failedRefreshes++
+            timber.log.Timber.w(refresh.error, "Paged list load failed, retry $failedRefreshes of $MAX_REFRESH_RETRIES")
+            render(!firstLoadSettled, false)
+            delay(REFRESH_RETRY_DELAY_MS * failedRefreshes)
+            retry()
+            return@collectLatest
         }
         val isEmpty = refresh is LoadState.NotLoading && loadStates.append.endOfPaginationReached && itemCount == 0
         render(refresh is LoadState.Loading && !firstLoadSettled, isEmpty)
     }
 }
+
+private const val MAX_REFRESH_RETRIES = 3
+private const val REFRESH_RETRY_DELAY_MS = 1_000L
 
 /**
  * Ids of the rows the adapter currently holds, re-emitted when pages load or drop. Lets a screen
