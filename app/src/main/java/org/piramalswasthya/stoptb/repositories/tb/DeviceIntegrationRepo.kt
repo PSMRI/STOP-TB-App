@@ -93,8 +93,10 @@ class DeviceIntegrationRepo @Inject constructor(
         }
         val xrayHealth = getVendorHealth("XRAY_CHEST")
         val truenatHealth = getVendorHealth("MTB")
-        preferenceDao.setXrayIntegrated(isIntegrated(xrayHealth))
-        preferenceDao.setTruenatIntegrated(isIntegrated(truenatHealth))
+        // Save a flag only from a real answer: a failed check stored as "not integrated" made the
+        // poll treat every order as not pending and stop rescheduling until something re-triggered it.
+        if (xrayHealth is NetworkResponse.Success) preferenceDao.setXrayIntegrated(isIntegrated(xrayHealth))
+        if (truenatHealth is NetworkResponse.Success) preferenceDao.setTruenatIntegrated(isIntegrated(truenatHealth))
         // Cache only a real answer from the hub: a timeout or HTTP error is retried on the next
         // poll cycle instead of reporting both devices as not integrated for the whole window.
         if (xrayHealth is NetworkResponse.Success && truenatHealth is NetworkResponse.Success) {

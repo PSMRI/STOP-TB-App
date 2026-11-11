@@ -262,7 +262,9 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 if (hasInProgress || hasPendingManualResultSync || hasSkippedFeedOrders) {
                     // Without a feed, sleep until the earliest order is due (1-10 min) instead of
                     // waking every minute for orders that are all backing off.
-                    val pollDelaySec = if (!feedActive && hasInProgress) {
+                    // A pending manual result or skipped feed order is one cheap request: keep
+                    // those at 60 s instead of the orders' backoff (up to 10 min).
+                    val pollDelaySec = if (!feedActive && hasInProgress && !hasPendingManualResultSync && !hasSkippedFeedOrders) {
                         val wallNow = System.currentTimeMillis()
                         val dueIn = (pollSchedule.earliestDue() ?: wallNow) - wallNow
                         (dueIn / 1000).coerceIn(60L, 600L)
