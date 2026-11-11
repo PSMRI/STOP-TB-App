@@ -47,12 +47,19 @@ class RowBadgeRepo @Inject constructor(
         /** TB_DIAGNOSTICS (new saves) or TB_SUSPECTED (legacy saves), as AllBenViewModel defined it. */
         val diagnosisBenIds: List<Long> = emptyList(),
         val tbDiagnostics: List<TbDiagnosticsCardFields> = emptyList(),
-        val tbScreeningSymptoms: List<TbScreeningSymptoms> = emptyList()
+        val tbScreeningSymptoms: List<TbScreeningSymptoms> = emptyList(),
+        /**
+         * The benIds this snapshot was read for. A row outside it has not been looked up yet,
+         * so a missing entry above means "not loaded", not "none" (e.g. a page that has just
+         * loaded while the previous snapshot is still the latest).
+         */
+        val queriedBenIds: Set<Long> = emptySet()
     )
 
     fun badgesFor(benIds: Collection<Long>): Flow<RowBadges> {
         if (benIds.isEmpty()) return flowOf(RowBadges())
         val ids = if (benIds.size > MAX_IDS) benIds.take(MAX_IDS) else benIds
+        val queriedBenIds = ids.toSet()
         val sources: List<Flow<List<*>>> = listOf(
             vitalDao.getVitalBenIdSyncStatesIn(ids),
             tbDao.getTbScreeningBenIdSyncStatesIn(ids),
@@ -81,7 +88,8 @@ class RowBadgeRepo @Inject constructor(
                 anthropometryBenIds = results[3] as List<Long>,
                 diagnosisBenIds = (diagnostics.map { row -> row.benId } + results[4] as List<Long>).distinct(),
                 tbDiagnostics = diagnostics,
-                tbScreeningSymptoms = results[6] as List<TbScreeningSymptoms>
+                tbScreeningSymptoms = results[6] as List<TbScreeningSymptoms>,
+                queriedBenIds = queriedBenIds
             )
         }.throttleLatest(BADGE_UPDATE_PERIOD_MS).flowOn(Dispatchers.Default)
     }
