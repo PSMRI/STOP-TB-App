@@ -96,7 +96,7 @@ enum class ScreeningStatus {
  */
 @DatabaseView(
     viewName = "BEN_BASIC_CACHE",
-    value = "SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId" +
+    value = "SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.updatedDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId" +
             ", b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod" +
             ", b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus" +
             ", b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId" +
@@ -134,12 +134,12 @@ enum class ScreeningStatus {
             ", b.institutionName" +
             " FROM BENEFICIARY b " +
             "LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId " +
-            // ORDER BY stays. GROUP BY was dropped (the join is on HOUSEHOLD's primary key, so
-            // it cannot multiply rows) but dropping the ordering too silently reordered 43 list
-            // queries that select from this view without an ORDER BY of their own - they showed
-            // most-recently-updated beneficiaries first and would otherwise fall back to rowid
-            // order. Costs ~18ms on a 10k COUNT; the lists are worth it.
-            "WHERE b.isDraft = 0 ORDER BY b.updatedDate DESC"
+            // No ORDER BY in the view (v63). It made SQLite sort every non-draft beneficiary
+            // under every COUNT and every query on the view - the dominant cost at 100K+.
+            // List queries that relied on it now say ORDER BY <alias>.updatedDate DESC
+            // themselves (updatedDate is exposed for that). GROUP BY stays dropped: the join is
+            // on HOUSEHOLD's primary key, so it cannot multiply rows.
+            "WHERE b.isDraft = 0"
 )
 @Parcelize
 data class BenBasicCache(
@@ -148,6 +148,8 @@ data class BenBasicCache(
     val hhId: Long? = null,
     val regDate: Long,
     val createdDate: Long? = null,
+    /** Exposed by the view so list queries can order by it (v63). */
+    val updatedDate: Long? = null,
     var isDeath: Boolean = false,
     var isDeathValue: String? = null,
     var dateOfDeath: String? = null,
@@ -1282,9 +1284,11 @@ data class BenRegGen(
 //    ],
 //    indices = [Index(name = "ind_ben", value = ["beneficiaryId"/*, "householdId"*/])]
     indices = [
-        Index(name = "ind_ben", value = ["beneficiaryId"]),
         Index(name = "ind_ben_village", value = ["loc_village_id"]),
-        Index(name = "ind_ben_sync", value = ["syncState"]),
+        // Push queries filter syncState + processed + isDraft; covers syncState-only lookups too (v62).
+        Index(name = "ind_ben_sync_processed", value = ["syncState", "processed", "isDraft"]),
+        // Village lists ordered by last update (v62).
+        Index(name = "ind_ben_village_updated", value = ["loc_village_id", "isDeactivate", "updatedDate"]),
         Index(name = "ind_ben_draft_deactivate", value = ["isDraft", "isDeactivate"]),
         Index(name = "ind_ben_village_deactivate", value = ["loc_village_id", "isDeactivate", "isDraft"]),
         Index(name = "ind_ben_draft_created", value = ["isDraft", "createdDate"]),

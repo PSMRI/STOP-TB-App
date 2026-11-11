@@ -19,6 +19,7 @@ class ExampleInstrumentedTest {
     fun useAppContext() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("org.piramalswasthya.sakhi", appContext.packageName)
+        // Debug/UAT builds append a suffix (e.g. ".uat"), so check the base id only.
+        assertTrue(appContext.packageName.startsWith("org.piramalswasthya.stoptb"))
     }
 }

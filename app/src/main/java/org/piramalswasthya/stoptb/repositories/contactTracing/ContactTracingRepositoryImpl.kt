@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.repositories.contactTracing
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.room.withTransaction
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -894,7 +895,13 @@ class ContactTracingRepositoryImpl @Inject constructor(
         )
     }
 
-    override suspend fun syncUnsyncedResponses(): Boolean {
+    // PR 7.4: PushContactTracingWorker and ContactTracingSyncWorker both call this; overlapping
+    // runs submitted the same responses twice. Serialized like CounsellingRepositoryImpl's sync.
+    private val syncMutex = kotlinx.coroutines.sync.Mutex()
+
+    override suspend fun syncUnsyncedResponses(): Boolean = syncMutex.withLock { syncUnsyncedResponsesLocked() }
+
+    private suspend fun syncUnsyncedResponsesLocked(): Boolean {
         val unsynced = responseDao.getUnsyncedFormResponsesForTypes(
             listOf(
                 FormType.COMMUNITY_CONTACT_TRACING.name,

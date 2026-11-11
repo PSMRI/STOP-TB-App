@@ -42,7 +42,18 @@ class GeneralOpdStaticMasterModeTest {
         val repo = TBRepo(
             mock(TBDao::class.java, RETURNS_DEEP_STUBS), mock(BenDao::class.java), preferences,
             mock(UserRepo::class.java), api, db, mock(DrugMasterRepo::class.java),
-            mock(SyncRetryStore::class.java), mock(Context::class.java)
+            mock(SyncRetryStore::class.java), mock(Context::class.java),
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
+        org.piramalswasthya.stoptb.repositories.tb.BenIdLocks(),
+        org.piramalswasthya.stoptb.repositories.tb.DeviceIntegrationRepo(
+            mock(PreferenceDao::class.java), mock(AmritApiService::class.java), mock(Context::class.java)),
+        org.piramalswasthya.stoptb.repositories.tb.GeneralOpdRepo(
+            mock(TBDao::class.java, RETURNS_DEEP_STUBS), db, mock(DrugMasterRepo::class.java), api, preferences),
+        mock(org.piramalswasthya.stoptb.repositories.tb.TbPushRepo::class.java),
+        mock(org.piramalswasthya.stoptb.repositories.tb.TbLocalRepo::class.java),
+        mock(org.piramalswasthya.stoptb.repositories.tb.DiagnosticOrderRepo::class.java),
+        mock(org.piramalswasthya.stoptb.repositories.tb.ManualResultRepo::class.java),
+        mock(org.piramalswasthya.stoptb.repositories.tb.TbPullRepo::class.java)
         )
 
         // Empty master names deliberately select the dataset's static resource list.
@@ -60,7 +71,18 @@ class GeneralOpdStaticMasterModeTest {
         val repo = TBRepo(
             mock(TBDao::class.java, RETURNS_DEEP_STUBS), mock(BenDao::class.java), preferences,
             mock(UserRepo::class.java), api, db, mock(DrugMasterRepo::class.java),
-            mock(SyncRetryStore::class.java), mock(Context::class.java)
+            mock(SyncRetryStore::class.java), mock(Context::class.java),
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
+        org.piramalswasthya.stoptb.repositories.tb.BenIdLocks(),
+        org.piramalswasthya.stoptb.repositories.tb.DeviceIntegrationRepo(
+            mock(PreferenceDao::class.java), mock(AmritApiService::class.java), mock(Context::class.java)),
+        org.piramalswasthya.stoptb.repositories.tb.GeneralOpdRepo(
+            mock(TBDao::class.java, RETURNS_DEEP_STUBS), db, mock(DrugMasterRepo::class.java), api, preferences),
+        mock(org.piramalswasthya.stoptb.repositories.tb.TbPushRepo::class.java),
+        mock(org.piramalswasthya.stoptb.repositories.tb.TbLocalRepo::class.java),
+        mock(org.piramalswasthya.stoptb.repositories.tb.DiagnosticOrderRepo::class.java),
+        mock(org.piramalswasthya.stoptb.repositories.tb.ManualResultRepo::class.java),
+        mock(org.piramalswasthya.stoptb.repositories.tb.TbPullRepo::class.java)
         )
         val pending = GeneralOpdCache(benId = 1L, chiefComplaints = listOf("Fever", "Cough"))
         assertEquals(listOf(1, 9), repo.resolveChiefComplaintIds(pending))

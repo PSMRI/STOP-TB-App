@@ -19,6 +19,8 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
     private val pref = PreferenceManager.getInstance(context)
 
     private companion object {
+        private const val LAST_RESULT_CHECK_TIME = "last_result_check_time"
+        private const val LEGACY_LAST_CHECKED_PRUNED = "legacy_last_checked_time_pruned"
         const val CHANGES_FEED_TOKEN = "changes_feed_token"
         const val CHANGES_FEED_SCOPE = "changes_feed_scope"
         const val MASTERS_REFRESHED_AT = "masters_refreshed_at"
@@ -466,12 +468,26 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         pref.edit().putLong("track_submit_time_${benId}_${orderType}", time).apply()
     }
 
-    fun getLastCheckedTime(benId: Long, orderType: String): Long {
-        return pref.getLong("last_checked_time_${benId}_${orderType}", 0L)
+    /**
+     * When order results were last checked, shown as the "Last checked" caption on pending
+     * orders. One value for all orders: every poll cycle checks all pending orders at once (the
+     * changes feed or the fallback sweep). It used to be one encrypted key per order and test,
+     * rewritten for every pending order every cycle and never removed.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun getLastCheckedTime(benId: Long, orderType: String): Long =
+        pref.getLong(LAST_RESULT_CHECK_TIME, 0L)
+
+    fun setLastResultCheckTime(time: Long) {
+        pref.edit().putLong(LAST_RESULT_CHECK_TIME, time).apply()
     }
 
-    fun setLastCheckedTime(benId: Long, orderType: String, time: Long) {
-        pref.edit().putLong("last_checked_time_${benId}_${orderType}", time).apply()
+    /** Removes the old per-order "last_checked_time_*" keys (once; they are no longer read). */
+    fun pruneLegacyLastCheckedTimes() {
+        if (pref.getBoolean(LEGACY_LAST_CHECKED_PRUNED, false)) return
+        val editor = pref.edit()
+        pref.all.keys.filter { key -> key.startsWith("last_checked_time_") }.forEach { key -> editor.remove(key) }
+        editor.putBoolean(LEGACY_LAST_CHECKED_PRUNED, true).apply()
     }
 
     fun getRifNotConductedReason(benId: Long): String? {

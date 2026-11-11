@@ -53,11 +53,13 @@ class ChangesFeedRepo @Inject constructor(
         /** Everything up to the hub's current state is applied. */
         DONE,
         /** This server has no changes feed: use the getAll endpoints. */
-        UNSUPPORTED,
+        UNSUPPORTED
     }
 
     companion object {
-        private const val PAGE_SIZE = 200
+        // PR 7.6: the hub's maximum (StopTBSyncServiceImpl.MAX_LIMIT). Fewer round trips while
+        // catching up; the token is still saved after each page, and re-applying a page is idempotent.
+        private const val PAGE_SIZE = 500
         private const val MAX_PAGES_PER_RUN = 500
 
         // Applied in this order within a page, so a beneficiary is saved before its TB records.

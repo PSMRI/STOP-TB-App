@@ -1770,6 +1770,45 @@ abstract class InAppDb : RoomDatabase() {
          * Costs ~18ms on a 10k COUNT (the view's ORDER BY forces a sort for Paging's count
          * query); the correct list order is worth it.
          */
+        /**
+         * v63: BEN_BASIC_CACHE without its ORDER BY (every COUNT and query on the view sorted
+         * all non-draft beneficiaries), plus an updatedDate column so the list queries that
+         * relied on the view's order now order explicitly. View SQL copied from the generated
+         * schema (63.json) so Room's identity check matches.
+         */
+        val MIGRATION_62_63 = object : Migration(62, 63) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
+                database.execSQL(
+                    "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.updatedDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId, b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod, b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus, b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId, b.isNewAbha, 0 as cbacFilled, NULL as cbacSyncState, 0 as cdrFilled, NULL as cdrSyncState, 0 as mdsrFilled, NULL as mdsrSyncState, NULL as pmsmaSyncState, 0 as pmsmaFilled, 0 as hbncFilled, 0 as hbycFilled, 0 as pwrFilled, NULL as pwrSyncState, NULL as doSyncState, NULL as irSyncState, NULL as crSyncState, 0 as ecrFilled, 0 as ectFilled, 0 as isMdsr, 0 as tbsnFilled, NULL as tbsnSyncState, 0 as tbspFilled, NULL as tbspSyncState, 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled, 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled, NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState, 0 as isDelivered, 0 as pwHrp, 0 as irFilled, 0 as crFilled, 0 as doFilled, b.isNonHH, b.isAvailableForCamp, b.reasonForNotAttendingCamp, b.otherReasonForNotAttendingCamp, b.screeningStatus, b.symptomsScreenedDate, b.chestXrayDoneDate, b.trunatTestDoneDate, b.placeOfCurrentLiving, b.otherPlaceOfCurrentLiving, b.institutionName FROM BENEFICIARY b LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId WHERE b.isDraft = 0"
+                )
+            }
+        }
+
+        /**
+         * v62: indexes for the push/sync-state lookups, village lists and household lists, and
+         * drops of indexes that duplicated a primary key (ind_ben, ind_vitals_ben) or are covered
+         * by a new composite (ind_ben_sync). Idempotent (IF [NOT] EXISTS) so the same SQL can be
+         * appended to another release line's migration chain.
+         */
+        val MIGRATION_61_62 = object : Migration(61, 62) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DROP INDEX IF EXISTS `ind_ben`")
+                database.execSQL("DROP INDEX IF EXISTS `ind_ben_sync`")
+                database.execSQL("DROP INDEX IF EXISTS `ind_vitals_ben`")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_ben_sync_processed` ON `BENEFICIARY` (`syncState`, `processed`, `isDraft`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_ben_village_updated` ON `BENEFICIARY` (`loc_village_id`, `isDeactivate`, `updatedDate`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_hh_village` ON `HOUSEHOLD` (`loc_village_id`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_tbsn_sync` ON `TB_SCREENING` (`syncState`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_tbs_sync` ON `TB_SUSPECTED` (`syncState`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_tb_diagnostics_sync` ON `TB_DIAGNOSTICS` (`syncState`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_tb_confirmed_sync` ON `TB_CONFIRMED_TREATMENT` (`syncState`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_vitals_sync` ON `BEN_VITALS` (`syncState`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_general_opd_sync` ON `GENERAL_OPD` (`syncState`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_cbac_sync` ON `CBAC` (`syncState`)")
+            }
+        }
+
         val MIGRATION_60_61 = object : Migration(60, 61) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
@@ -2016,7 +2055,7 @@ abstract class InAppDb : RoomDatabase() {
 
 
         // Bump together with a new MIGRATION_x_y added to MIGRATIONS below.
-        const val DB_VERSION = 61
+        const val DB_VERSION = 63
 
         // Oldest schema version that can be migrated in place.
         const val OLDEST_MIGRATABLE_VERSION = 2
@@ -2082,7 +2121,9 @@ abstract class InAppDb : RoomDatabase() {
             MIGRATION_57_58,
             MIGRATION_58_59,
             MIGRATION_59_60,
-            MIGRATION_60_61
+            MIGRATION_60_61,
+            MIGRATION_61_62,
+            MIGRATION_62_63
         )
 
         fun getInstance(appContext: Context): InAppDb {

@@ -1,0 +1,94 @@
+package org.piramalswasthya.stoptb.database.room.paging
+
+import androidx.paging.PagingSource
+import androidx.paging.PagingState
+import androidx.room.InvalidationTracker
+import androidx.room.RoomDatabase
+import java.util.concurrent.atomic.AtomicBoolean
+
+/**
+ * A Room-backed PagingSource that loads pages with LIMIT/OFFSET and never counts the result.
+ *
+ * Room's own PagingSource (LimitOffsetPagingSource) runs `SELECT COUNT(*) FROM (<query>)` before
+ * the first page and again after every invalidation, only to size placeholders. On a 1M-row
+ * device that count took ~45 s for the TB Screening list while the page itself was instant
+ * (index order), and a sync writing every few seconds made it start over each time
+ * (device test 2026-11-10, report 10).
+ *
+ * Same SQL, same rows, same order as before - only the count is gone. Consequences:
+ * - placeholders are off, so the list grows as it is scrolled (no jump-to-end);
+ * - on a database change the source is invalidated exactly like Room's (same [tables]) and the
+ *   list reloads around the user's position ([getRefreshKey]).
+ *
+ * [tables] must be the tables (or views) the query reads, as Room lists them for the original
+ * @Query PagingSource, so writes to any of them refresh the list.
+ */
+class NoCountPagingSource<T : Any>(
+    private val db: RoomDatabase,
+    tables: Array<String>,
+    private val loadRange: suspend (limit: Int, offset: Int) -> List<T>
+) : PagingSource<Int, T>() {
+
+    private val observer = object : InvalidationTracker.Observer(tables) {
+        override fun onInvalidated(tables: Set<String>) {
+            invalidate()
+        }
+    }
+    private val registered = AtomicBoolean(false)
+
+    init {
+        registerInvalidatedCallback {
+            if (registered.get()) db.invalidationTracker.removeObserver(observer)
+        }
+    }
+
+    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, T> {
+        // Registered on the first load (off the main thread), as Room does, before reading.
+        if (!invalid && registered.compareAndSet(false, true)) {
+            db.invalidationTracker.addObserver(observer)
+            // invalidate() may have run its callback before the observer was added, which then
+            // removed nothing; the tracker holds observers strongly, so drop it here instead of
+            // leaking this source and running it on every write. Removing twice is harmless.
+            if (invalid) db.invalidationTracker.removeObserver(observer)
+        }
+        return try {
+            val (offset, limit) = when (params) {
+                is LoadParams.Refresh -> (params.key ?: 0).coerceAtLeast(0) to params.loadSize
+                is LoadParams.Append -> params.key to params.loadSize
+                // Prepend key = offset where the already-loaded data starts; load the rows before it.
+                is LoadParams.Prepend -> {
+                    val end = params.key
+                    val start = (end - params.loadSize).coerceAtLeast(0)
+                    start to (end - start)
+                }
+            }
+            if (limit <= 0) return LoadResult.Page(emptyList(), prevKey = null, nextKey = null)
+            val rows = loadRange(limit, offset)
+            if (invalid) return LoadResult.Invalid()
+            LoadResult.Page(
+                data = rows,
+                prevKey = if (offset == 0) null else offset,
+                nextKey = if (rows.size < limit) null else offset + rows.size
+            )
+        } catch (error: Exception) {
+            LoadResult.Error(error)
+        }
+    }
+
+    /** Reload around the item the user was looking at (offset of the anchor, minus half a load). */
+    override fun getRefreshKey(state: PagingState<Int, T>): Int? {
+        val anchor = state.anchorPosition ?: return null
+        var itemsBefore = 0
+        for (page in state.pages) {
+            if (anchor < itemsBefore + page.data.size) {
+                val pageOffset = page.prevKey ?: 0
+                val anchorOffset = pageOffset + (anchor - itemsBefore)
+                return (anchorOffset - state.config.initialLoadSize / 2).coerceAtLeast(0)
+            }
+            itemsBefore += page.data.size
+        }
+        return null
+    }
+
+    override val jumpingSupported: Boolean get() = false
+}

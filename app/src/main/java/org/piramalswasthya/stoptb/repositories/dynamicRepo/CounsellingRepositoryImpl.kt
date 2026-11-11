@@ -423,13 +423,8 @@ class CounsellingRepositoryImpl @Inject constructor(
     }
 
     private suspend fun syncUnsyncedRecordsLocked(): Boolean {
-        Timber.d("syncUnsyncedRecords: querying all local form responses for debugging...")
-        val allResponses = responseDao.getAllFormResponses()
-        val allDetails = allResponses.map {
-            "Response[id=${it.formResponse.responseId}, benId=${it.formResponse.beneficiaryId}, status=${it.formResponse.status}, syncStatus=${it.formResponse.syncStatus}, sectionsCount=${it.sectionResponses.size}]"
-        }
-        Timber.d("syncUnsyncedRecords: ALL records currently in DB: $allDetails")
-
+        // PR 6: a debug dump of every response (with all section/question rows, and beneficiary
+        // ids in the log) ran here on every sync; removed.
         Timber.d("syncUnsyncedRecords: querying unsynced records...")
         val unsynced = responseDao.getUnsyncedFormResponsesForTypes(
             listOf(FormType.TB_COUNSELLING_V2.name, FormType.TB_COUNSELLING.name)
@@ -785,9 +780,9 @@ class CounsellingRepositoryImpl @Inject constructor(
             (def.versions.find { it.version.isActive } ?: def.versions.maxByOrNull { it.version.versionNumber })
                 ?.version?.versionId
         } ?: return emptyList()
-        return responseDao.getAllFormResponses()
-            .map { it.formResponse }
-            .filter { it.formVersionId == versionId && !it.isHistorySnapshot }
+        // PR 6: only the response rows are needed; this used to load every response with all its
+        // section and question rows (the Confirmed list calls it on each visit).
+        return responseDao.getLiveResponsesForVersion(versionId)
             .map {
                 CompletedBeneficiaryStatus(
                     beneficiaryId = it.beneficiaryId,

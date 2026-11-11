@@ -7,6 +7,7 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.ExistingWorkPolicy
 import dagger.assisted.Assisted
@@ -24,6 +25,7 @@ import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.OrderStatus
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 @HiltWorker
 class DiagnosticResultPollWorker @AssistedInject constructor(
@@ -31,6 +33,7 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val tbRepo: TBRepo,
     private val preferenceDao: PreferenceDao,
+    private val pollSchedule: ResultPollSchedule,
 ) : CoroutineWorker(appContext, params) {
 
     companion object {
@@ -41,14 +44,64 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
         // at all (instead of the previous one-by-one sequential loop) is what actually shortens
         // a busy cycle's wall-clock time; this cap just keeps that from overwhelming the hub.
         private const val MAX_CONCURRENT_POLLS = 4
+        private const val DEVICE_CONFIG_MAX_AGE_MS = 10 * 60_000L
+        private const val HUB_DOWN_RECHECK_SEC = 300L
+    }
+
+    private fun scheduleNextRun(delaySec: Long) {
+        val workManager = WorkManager.getInstance(appContext)
+        // A trigger that arrived during this run already queued the next cycle right behind it,
+        // and that cycle schedules its own successor. Adding ours too would keep an extra cycle in
+        // the chain for good. Called from doWork on Dispatchers.IO, so the blocking query is fine.
+        val successorQueued = try {
+            workManager.getWorkInfosForUniqueWork(name).get().any { info ->
+                info.id != id && (info.state == WorkInfo.State.ENQUEUED || info.state == WorkInfo.State.BLOCKED)
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "Could not read DiagnosticResultPollWorker state; scheduling the next run anyway")
+            false
+        }
+        if (successorQueued) {
+            Timber.d("Next DiagnosticResultPollWorker run already queued; not adding another")
+            return
+        }
+        Timber.d("Scheduling next DiagnosticResultPollWorker run in ${delaySec}s")
+        val pollRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>()
+            .setInitialDelay(delaySec, TimeUnit.SECONDS)
+            .build()
+        // APPEND_OR_REPLACE: queue the next cycle behind this one. REPLACE on our own unique
+        // name cancelled this still-running work.
+        workManager.enqueueUniqueWork(
+            name,
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
+            pollRequest
+        )
     }
 
     override suspend fun doWork(): Result {
         return try {
             withContext(Dispatchers.IO) {
                 Timber.d("DiagnosticResultPollWorker starting work")
-                if (!preferenceDao.isCampModeEnabled() || !preferenceDao.isCampHubConnected()) {
-                    Timber.d("Skipping DiagnosticResultPollWorker: Camp Mode is disabled or Camp Hub is disconnected")
+                if (!preferenceDao.isCampModeEnabled()) {
+                    Timber.d("Skipping DiagnosticResultPollWorker: Camp Mode is disabled")
+                    return@withContext Result.success()
+                }
+                if (!preferenceDao.isCampHubConnected()) {
+                    // The hub can read as disconnected for a moment (e.g. while Connect re-checks
+                    // it). Stopping here left result polling dead until something triggered it
+                    // again, so look again later; this check reads prefs only, no network.
+                    // Only while there is something to poll or replay: with nothing pending, a
+                    // device that left the camp would otherwise wake every 5 min indefinitely;
+                    // the hub-reconnect path triggers this worker again anyway.
+                    val workLeft = preferenceDao.getFeedSkippedOrders().isNotEmpty() ||
+                        tbRepo.getDiagnosticsWithPendingOrder().isNotEmpty() ||
+                        tbRepo.getDiagnosticsWithPendingManualResult().isNotEmpty()
+                    if (workLeft) {
+                        Timber.d("DiagnosticResultPollWorker: Camp Hub is disconnected, checking again in ${HUB_DOWN_RECHECK_SEC}s")
+                        scheduleNextRun(HUB_DOWN_RECHECK_SEC)
+                    } else {
+                        Timber.d("DiagnosticResultPollWorker: Camp Hub is disconnected and nothing is pending; not rescheduling")
+                    }
                     return@withContext Result.success()
                 }
 
@@ -56,10 +109,12 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 // disconnected (or a network failure happened) — Enter Result/Not Conducted are
                 // standing actions independent of device integration, so this must run
                 // regardless of the integration check below, not be skipped along with it.
+                preferenceDao.pruneLegacyLastCheckedTimes()
                 val hasPendingManualResultSync = tbRepo.retryPendingManualResultSyncs()
 
                 // Refresh vendor integration config dynamically before polling
-                tbRepo.refreshDeviceIntegrationConfig()
+                // At most every 10 min (and on the first cycle / a hub change), not every cycle.
+                tbRepo.refreshDeviceIntegrationConfig(maxAgeMs = DEVICE_CONFIG_MAX_AGE_MS)
 
                 var hasInProgress = false
                 // The changes feed already brings every order's status on each pull, so the
@@ -87,14 +142,23 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 if (!tbRepo.isXrayIntegrated() && !tbRepo.isTruenatIntegrated()) {
                     Timber.d("Skipping automated result polling: no diagnostic devices are integrated")
                 } else {
+                // Without a feed: one status sweep per order type. It applies completed results
+                // itself, and its "awaiting provider result" list tells us which pending orders
+                // the server has nothing new for, so we don't ask order/result about those.
+                val awaitingByType = HashMap<String, Set<Long>>()
                 if (!feedActive && tbRepo.isXrayIntegrated()) {
-                    tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST")
+                    awaitingByType["XRAY_CHEST"] =
+                        tbRepo.awaitingResultBenIds(tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST"))
                 }
                 if (!feedActive && tbRepo.isTruenatIntegrated()) {
-                    tbRepo.fetchBeneficiariesByStatus("SPUTUM_TRUENAT")
-                    tbRepo.fetchBeneficiariesByStatus("MDR_RIF")
+                    awaitingByType["SPUTUM_TRUENAT"] =
+                        tbRepo.awaitingResultBenIds(tbRepo.fetchBeneficiariesByStatus("SPUTUM_TRUENAT"))
+                    awaitingByType["MDR_RIF"] =
+                        tbRepo.awaitingResultBenIds(tbRepo.fetchBeneficiariesByStatus("MDR_RIF"))
                 }
-                val activeList = tbRepo.getDiagnosticsList()
+                // Only rows with a PENDING order: the filter below keeps nothing else, and loading
+                // the whole table every 60 s cost a full scan + every row's object at scale.
+                val activeList = tbRepo.getDiagnosticsWithPendingOrder()
                 val now = System.currentTimeMillis()
 
                 // Real order/result contract confirmed: PENDING, IN_PROGRESS, COMPLETED, FAILED,
@@ -142,45 +206,53 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                     // delta pull instead; it is debounced and costs one small request.
                     Timber.d("Pending diagnostic orders: ${pendingOrders.size}, results come from the changes feed")
                     WorkerUtils.triggerCampQuickPullIfConnected(appContext, preferenceDao)
-                    // Keeps the "Last checked" caption current, as the per-order path does.
-                    pendingOrders.forEach { order ->
-                        if (order.xray) preferenceDao.setLastCheckedTime(order.benId, "XRAY_CHEST", now)
-                        if (order.trueNat) preferenceDao.setLastCheckedTime(order.benId, "SPUTUM_TRUENAT", now)
-                        if (order.rif) preferenceDao.setLastCheckedTime(order.benId, "MDR_RIF", now)
-                    }
+                    // Keeps the "Last checked" caption current: one write per cycle, not 3 per order.
+                    preferenceDao.setLastResultCheckTime(now)
                 } else if (hasInProgress) {
+                    // Fallback (no feed): ask order/result only for orders that are due on their
+                    // own backoff schedule and that the status sweep didn't already report as
+                    // still awaiting a result. Was: every pending order, every cycle.
                     val pollSemaphore = Semaphore(MAX_CONCURRENT_POLLS)
+                    val fetched = AtomicInteger(); val skippedAwaiting = AtomicInteger(); val notDue = AtomicInteger()
+                    pollSchedule.retainOnly(pendingOrders.flatMap { order ->
+                        listOfNotNull(
+                            (order.benId to "XRAY_CHEST").takeIf { order.xray },
+                            (order.benId to "SPUTUM_TRUENAT").takeIf { order.trueNat },
+                            (order.benId to "MDR_RIF").takeIf { order.rif }
+                        )
+                    })
                     coroutineScope {
                         pendingOrders.forEach { order ->
-                            if (order.xray) {
-                                launch {
-                                    pollSemaphore.withPermit {
-                                        Timber.d("Polling xray result for benId=${order.benId}")
-                                        tbRepo.fetchOrderResult(order.benId, "XRAY_CHEST")
-                                        preferenceDao.setLastCheckedTime(order.benId, "XRAY_CHEST", now)
+                            for ((isPending, orderType) in listOf(
+                                order.xray to "XRAY_CHEST",
+                                order.trueNat to "SPUTUM_TRUENAT",
+                                order.rif to "MDR_RIF"
+                            )) {
+                                if (!isPending) continue
+                                when {
+                                    order.benId in awaitingByType[orderType].orEmpty() -> {
+                                        pollSchedule.recordUnchanged(order.benId, orderType, now)
+                                        skippedAwaiting.incrementAndGet()
                                     }
-                                }
-                            }
-                            if (order.trueNat) {
-                                launch {
-                                    pollSemaphore.withPermit {
-                                        Timber.d("Polling truenat result for benId=${order.benId}")
-                                        tbRepo.fetchOrderResult(order.benId, "SPUTUM_TRUENAT")
-                                        preferenceDao.setLastCheckedTime(order.benId, "SPUTUM_TRUENAT", now)
-                                    }
-                                }
-                            }
-                            if (order.rif) {
-                                launch {
-                                    pollSemaphore.withPermit {
-                                        Timber.d("Polling rif result for benId=${order.benId}")
-                                        tbRepo.fetchOrderResult(order.benId, "MDR_RIF")
-                                        preferenceDao.setLastCheckedTime(order.benId, "MDR_RIF", now)
+                                    !pollSchedule.isDue(order.benId, orderType, now) -> notDue.incrementAndGet()
+                                    else -> launch {
+                                        pollSemaphore.withPermit {
+                                            fetched.incrementAndGet()
+                                            val result = tbRepo.fetchOrderResult(order.benId, orderType)
+                                            val stillPending = result !is NetworkResponse.Success ||
+                                                result.data.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
+                                                result.data.equals("IN_PROGRESS", ignoreCase = true)
+                                            if (stillPending) pollSchedule.recordUnchanged(order.benId, orderType, now)
+                                            else pollSchedule.recordChanged(order.benId, orderType)
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                    Timber.d("Result poll (no feed): ${pendingOrders.size} pending, fetched ${fetched.get()}, " +
+                        "server still awaiting ${skippedAwaiting.get()}, not yet due ${notDue.get()}")
+                    preferenceDao.setLastResultCheckTime(now)
                 }
                 }
 
@@ -188,16 +260,14 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 // sync still pending (e.g. the hub only just reconnected and the retry above
                 // hasn't caught up yet).
                 if (hasInProgress || hasPendingManualResultSync || hasSkippedFeedOrders) {
-                    val pollDelaySec = 60L
-                    Timber.d("Scheduling next DiagnosticResultPollWorker run in ${pollDelaySec}s")
-                    val pollRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>()
-                        .setInitialDelay(pollDelaySec, TimeUnit.SECONDS)
-                        .build()
-                    WorkManager.getInstance(appContext).enqueueUniqueWork(
-                        name,
-                        ExistingWorkPolicy.REPLACE,
-                        pollRequest
-                    )
+                    // Without a feed, sleep until the earliest order is due (1-10 min) instead of
+                    // waking every minute for orders that are all backing off.
+                    val pollDelaySec = if (!feedActive && hasInProgress) {
+                        val wallNow = System.currentTimeMillis()
+                        val dueIn = (pollSchedule.earliestDue() ?: wallNow) - wallNow
+                        (dueIn / 1000).coerceIn(60L, 600L)
+                    } else 60L
+                    scheduleNextRun(pollDelaySec)
                 } else {
                     Timber.d("No active in-progress diagnostic orders or pending manual-result syncs. DiagnosticResultPollWorker stopping.")
                 }
