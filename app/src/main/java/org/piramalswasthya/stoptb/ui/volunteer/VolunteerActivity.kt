@@ -625,10 +625,9 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         if (campAutoPullJob?.isActive == true) return
         campAutoPullJob = lifecycleScope.launch {
             while (isActive) {
-                // Queries WorkManager's DB synchronously: keep it off the main thread.
-                withContext(Dispatchers.IO) {
-                    WorkerUtils.triggerCampQuickPullIfConnected(applicationContext, pref)
-                }
+                // Queries WorkManager's DB synchronously: off the main thread, and in order with
+                // the other triggers so the first-sync DIRECT pull from onCreate registers first.
+                WorkerUtils.triggerCampQuickPullInOrder(applicationContext, pref)
                 delay(WorkerUtils.campAutoPullIntervalMs)
             }
         }
