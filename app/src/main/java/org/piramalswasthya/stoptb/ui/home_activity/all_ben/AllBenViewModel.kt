@@ -287,7 +287,7 @@ class AllBenViewModel @Inject constructor(
         }
     }
 
-    val allTbDiagnostics: Flow<List<org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields>> =
+    val allTbDiagnostics: Flow<org.piramalswasthya.stoptb.ui.TbDiagnosticsSnapshot> =
         rowBadges.tbDiagnostics
 
     val allTbScreening: Flow<List<TbScreeningSymptoms>> =

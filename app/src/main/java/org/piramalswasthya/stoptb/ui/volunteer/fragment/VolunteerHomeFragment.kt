@@ -53,6 +53,8 @@ class VolunteerHomeFragment : Fragment() {
     private var manualHomeRefreshRequested = false
     private var manualRefreshStartedAtMs = 0L
     private val manualRefreshWorkIds = mutableListOf<java.util.UUID>()
+    /** Bumped when a refresh starts or ends, so a late result from an ended refresh is dropped. */
+    private var manualRefreshGeneration = 0
     private var manualRefreshTimeoutJob: Job? = null
     private var manualRefreshProgressJob: Job? = null
 
@@ -125,13 +127,29 @@ class VolunteerHomeFragment : Fragment() {
                 }
                 manualHomeRefreshRequested = true
                 manualRefreshWorkIds.clear()
+                val generation = ++manualRefreshGeneration
                 val appContext = requireContext().applicationContext
                 // Queries WorkManager's DB synchronously: run it off the main thread.
                 val refreshWorkIds = withContext(Dispatchers.IO) {
                     WorkerUtils.startManualCampRefresh(appContext, pref)
                 }
+                // The refresh may have ended (hub lost, view gone) while this ran, and another
+                // may have started: its IDs must not join that one's list.
+                if (generation != manualRefreshGeneration || !manualHomeRefreshRequested || _binding == null) {
+                    return@launch
+                }
                 manualRefreshWorkIds.addAll(refreshWorkIds)
                 startManualRefreshTimeout()
+                // A WorkInfo update that arrived before the IDs were registered was ignored by the
+                // observer; evaluate the current state once now so a quick finish isn't missed.
+                val currentInfos = withContext(Dispatchers.IO) {
+                    runCatching {
+                        WorkManager.getInstance(appContext).getWorkInfos(refreshWorkQuery()).get()
+                    }.getOrDefault(emptyList())
+                }
+                if (generation == manualRefreshGeneration && _binding != null) {
+                    onManualRefreshWorkInfos(currentInfos)
+                }
             }
         }
     }
@@ -156,60 +174,62 @@ class VolunteerHomeFragment : Fragment() {
         setQuickRefreshButtonEnabled(true)
 
         WorkManager.getInstance(requireContext().applicationContext)
-            .getWorkInfosLiveData(
-                WorkQuery.fromUniqueWorkNames(
-                    WorkerUtils.pushWorkerUniqueName,
-                    WorkerUtils.pullWorkerUniqueName
-                )
-            )
-            .observe(viewLifecycleOwner) { workInfos ->
-                if (!manualHomeRefreshRequested || workInfos.isNullOrEmpty()) return@observe
+            .getWorkInfosLiveData(refreshWorkQuery())
+            .observe(viewLifecycleOwner) { workInfos -> onManualRefreshWorkInfos(workInfos) }
+    }
 
-                // If camp hub disconnected while a refresh was running, abort immediately
-                // (the worker may stay BLOCKED forever waiting for connectivity).
-                if (!pref.isCampModeEnabled() || !pref.isCampHubConnected()) {
-                    finishManualRefresh(getString(R.string.quick_refresh_camp_disconnected))
-                    return@observe
-                }
+    private fun refreshWorkQuery() = WorkQuery.fromUniqueWorkNames(
+        WorkerUtils.pushWorkerUniqueName,
+        WorkerUtils.pullWorkerUniqueName
+    )
 
-                val filteredInfos = workInfos.filter { manualRefreshWorkIds.contains(it.id) }
-                if (filteredInfos.isEmpty()) {
-                    val refreshTimedOut = manualRefreshStartedAtMs > 0L &&
-                            SystemClock.elapsedRealtime() - manualRefreshStartedAtMs >=
-                            manualRefreshReleaseTimeoutMs
-                    if (refreshTimedOut) {
-                        finishManualRefresh(getString(R.string.quick_refresh_failed))
-                    }
-                    return@observe
-                }
+    private fun onManualRefreshWorkInfos(workInfos: List<WorkInfo>?) {
+        if (!manualHomeRefreshRequested || workInfos.isNullOrEmpty()) return
 
-                val isRunning = filteredInfos.any {
-                    it.state == WorkInfo.State.ENQUEUED ||
-                            it.state == WorkInfo.State.RUNNING ||
-                            it.state == WorkInfo.State.BLOCKED
-                }
-                val isFailed = filteredInfos.any {
-                    it.state == WorkInfo.State.FAILED || it.state == WorkInfo.State.CANCELLED
-                }
-                val isFinished = filteredInfos.all { it.state.isFinished }
+        // If camp hub disconnected while a refresh was running, abort immediately
+        // (the worker may stay BLOCKED forever waiting for connectivity).
+        if (!pref.isCampModeEnabled() || !pref.isCampHubConnected()) {
+            finishManualRefresh(getString(R.string.quick_refresh_camp_disconnected))
+            return
+        }
 
-                when {
-                    isRunning -> {
-                        setQuickRefreshButtonEnabled(false)
-                        binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_refreshing)
-                    }
-
-                    isFailed -> {
-                        finishManualRefresh(getString(R.string.quick_refresh_failed))
-                    }
-
-                    isFinished -> {
-                        finishManualRefresh()
-                        pref.lastQuickRefreshTimestamp = System.currentTimeMillis()
-                        updateQuickRefreshStatus()
-                    }
-                }
+        val filteredInfos = workInfos.filter { manualRefreshWorkIds.contains(it.id) }
+        if (filteredInfos.isEmpty()) {
+            val refreshTimedOut = manualRefreshStartedAtMs > 0L &&
+                    SystemClock.elapsedRealtime() - manualRefreshStartedAtMs >=
+                    manualRefreshReleaseTimeoutMs
+            if (refreshTimedOut) {
+                finishManualRefresh(getString(R.string.quick_refresh_failed))
             }
+            return
+        }
+
+        val isRunning = filteredInfos.any {
+            it.state == WorkInfo.State.ENQUEUED ||
+                    it.state == WorkInfo.State.RUNNING ||
+                    it.state == WorkInfo.State.BLOCKED
+        }
+        val isFailed = filteredInfos.any {
+            it.state == WorkInfo.State.FAILED || it.state == WorkInfo.State.CANCELLED
+        }
+        val isFinished = filteredInfos.all { it.state.isFinished }
+
+        when {
+            isRunning -> {
+                setQuickRefreshButtonEnabled(false)
+                binding.tvQuickRefreshStatus.text = getString(R.string.quick_refresh_refreshing)
+            }
+
+            isFailed -> {
+                finishManualRefresh(getString(R.string.quick_refresh_failed))
+            }
+
+            isFinished -> {
+                finishManualRefresh()
+                pref.lastQuickRefreshTimestamp = System.currentTimeMillis()
+                updateQuickRefreshStatus()
+            }
+        }
     }
 
     private fun showRefreshStatus(status: String) {
@@ -248,6 +268,7 @@ class VolunteerHomeFragment : Fragment() {
         manualRefreshProgressJob?.cancel()
         manualRefreshProgressJob = null
         manualHomeRefreshRequested = false
+        manualRefreshGeneration++
         manualRefreshStartedAtMs = 0L
         manualRefreshWorkIds.clear()
         WorkerUtils.finishManualCampRefresh()

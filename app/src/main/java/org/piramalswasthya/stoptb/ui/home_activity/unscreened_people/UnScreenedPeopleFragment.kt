@@ -70,8 +70,9 @@ class UnScreenedPeople : Fragment(),
         binding.searchView.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                listTransitions?.onQueryChanged()
-                viewModel.filterText(s?.toString()?.trim() ?: "")
+                val query = s?.toString()?.trim() ?: ""
+                listTransitions?.onQueryChanged(query)
+                viewModel.filterText(query)
             }
             override fun afterTextChanged(s: android.text.Editable?) {}
         })
@@ -262,6 +263,8 @@ class UnScreenedPeople : Fragment(),
 
     override fun onDestroyView() {
         super.onDestroyView()
+        // ListTransitions holds the RecyclerView; drop it with the view.
+        listTransitions = null
         _binding = null
     }
 

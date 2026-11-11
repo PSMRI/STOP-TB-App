@@ -53,12 +53,20 @@ fun <T : Any> PagingDataAdapter<T, *>.loadedIds(idOf: (T) -> Long): Flow<Set<Lon
  */
 class ListTransitions(private val list: RecyclerView) {
     private var scrollToTopPending = false
+    private var lastQuery: String? = null
 
     init {
         (list.itemAnimator as? SimpleItemAnimator)?.supportsChangeAnimations = false
     }
 
-    fun onQueryChanged() {
+    /**
+     * [query] is the query as the screen's filter will see it. A keystroke that leaves it
+     * unchanged (e.g. a trailing space the screen trims) starts no reload, so nothing would clear
+     * the pending scroll and the next background reload would jump the list to the top.
+     */
+    fun onQueryChanged(query: String) {
+        if (query == lastQuery) return
+        lastQuery = query
         scrollToTopPending = true
     }
 

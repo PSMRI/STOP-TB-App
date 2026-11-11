@@ -46,8 +46,11 @@ class TBScreeningListFragment : Fragment() {
 
     private val sttContract = registerForActivityResult(SpeechToTextContract()) { value ->
         val lowerValue = value.lowercase()
-        binding.searchView.setText(lowerValue)
-        binding.searchView.setSelection(lowerValue.length)
+        // A result can arrive with no view (fragment on the back stack): ignore it then.
+        _binding?.searchView?.let { searchView ->
+            searchView.setText(lowerValue)
+            searchView.setSelection(lowerValue.length)
+        }
         viewModel.filterText(lowerValue)
     }
 
@@ -177,6 +180,15 @@ class TBScreeningListFragment : Fragment() {
     }
 
     /** Posted on each query change; the next emission cancels it, so a fast filter never flashes. */
+    override fun onDestroyView() {
+        super.onDestroyView()
+        // The fragment stays on the back stack: drop everything that holds the old view.
+        _binding?.rvAny?.removeCallbacks(showSearchLoader)
+        listTransitions = null
+        lastQuery = null
+        _binding = null
+    }
+
     private val showSearchLoader = Runnable {
         _binding?.let { b ->
             b.flEmpty.visibility = View.GONE
@@ -196,7 +208,7 @@ class TBScreeningListFragment : Fragment() {
         val normalized = query.lowercase()
         if (normalized == lastQuery) return
         lastQuery = normalized
-        listTransitions?.onQueryChanged()
+        listTransitions?.onQueryChanged(normalized)
         _binding?.rvAny?.let { rv ->
             rv.removeCallbacks(showSearchLoader)
             rv.postDelayed(showSearchLoader, SEARCH_LOADER_DELAY_MS)

@@ -7,6 +7,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields
+import org.piramalswasthya.stoptb.ui.TbDiagnosticsSnapshot
 import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
 
 class BenPagingAdapter(
@@ -66,6 +67,27 @@ class BenPagingAdapter(
     /** Set by [submitTBDiagnostics]; until then a missing row means "not loaded yet". */
     private var tbDiagnosticsLoaded = false
 
+    /**
+     * The benIds the latest diagnostics snapshot was read for, when the screen reads them per
+     * loaded row ([LoadedRowBadges]); null for a whole-table list. A row outside it is "not
+     * loaded yet" even after the first snapshot - see [isTbDiagnosticsLoadedFor].
+     */
+    private var tbDiagnosticsCoveredBenIds: Set<Long>? = null
+
+    private fun isTbDiagnosticsLoadedFor(benId: Long): Boolean =
+        tbDiagnosticsLoaded && (tbDiagnosticsCoveredBenIds?.contains(benId) ?: true)
+
+    /**
+     * Per-row snapshot from [LoadedRowBadges]: rows whose benId the snapshot just started
+     * covering are rebound, so they leave the "Checking" placeholder even when they have no
+     * diagnostics row at all.
+     */
+    fun submitTBDiagnostics(snapshot: TbDiagnosticsSnapshot) {
+        val previouslyCovered = tbDiagnosticsCoveredBenIds.orEmpty()
+        tbDiagnosticsCoveredBenIds = snapshot.coveredBenIds
+        submitTBDiagnostics(snapshot.rows, newlyCovered = snapshot.coveredBenIds - previouslyCovered)
+    }
+
     private var tbScreeningMap: Map<Long, TbScreeningSymptoms> = emptyMap()
     private var retryingBenIds: Set<Long> = emptySet()
 
@@ -107,7 +129,7 @@ class BenPagingAdapter(
             showAnthropometryButton = showAnthropometryButton,
             showExamineButton = showExamineButton,
             tbDiagnosticsByBenId = tbDiagnosticsByBenId,
-            tbDiagnosticsLoaded = tbDiagnosticsLoaded,
+            tbDiagnosticsLoaded = isTbDiagnosticsLoadedFor(item.benId),
             tbScreeningMap = tbScreeningMap,
             showScreeningStatus = showScreeningStatus,   // ADD THIS
             showRedesignedCard = showRedesignedCard,
@@ -121,7 +143,7 @@ class BenPagingAdapter(
         )
     }
 
-    fun submitTBDiagnostics(list: List<TbDiagnosticsCardFields>) {
+    fun submitTBDiagnostics(list: List<TbDiagnosticsCardFields>, newlyCovered: Set<Long> = emptySet()) {
         // Diff instead of notifyDataSetChanged(), same pattern as the submit*() functions below
         // — a blanket refresh here rebinds every visible row on every emission, which was the
         // root cause of cards needing multiple taps to register.
@@ -140,6 +162,7 @@ class BenPagingAdapter(
         tbDiagnosticsLoaded = true
         val changedBenIds = (oldByBenId.keys + newByBenId.keys)
             .filterTo(mutableSetOf()) { benId -> oldByBenId[benId] != newByBenId[benId] }
+        changedBenIds += newlyCovered
         if (changedBenIds.isNotEmpty() || firstLoad) {
             val items = snapshot()
             items.forEachIndexed { index, item ->
