@@ -378,6 +378,10 @@ class VolunteerHomeFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        // End a refresh this view started: its startup and timeout are view-scoped and are
+        // cancelled here, so on a new view it would show "Refreshing..." and refuse a new
+        // refresh with nothing left to end it. Bumps the generation, so a late result is dropped.
+        if (manualHomeRefreshRequested) finishManualRefresh()
         manualRefreshTimeoutJob?.cancel()
         manualRefreshTimeoutJob = null
         manualRefreshProgressJob?.cancel()

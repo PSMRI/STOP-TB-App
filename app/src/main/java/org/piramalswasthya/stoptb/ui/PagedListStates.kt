@@ -1,6 +1,9 @@
 package org.piramalswasthya.stoptb.ui
 
+import android.view.View
 import androidx.paging.LoadState
+import com.google.android.material.snackbar.Snackbar
+import org.piramalswasthya.stoptb.R
 import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.SimpleItemAnimator
@@ -22,26 +25,48 @@ import kotlinx.coroutines.flow.onStart
  */
 suspend fun PagingDataAdapter<*, *>.renderListStates(
     render: (awaitingFirstLoad: Boolean, isEmpty: Boolean) -> Unit,
-    onSettled: () -> Unit = {}
+    onSettled: () -> Unit = {},
+    errorAnchor: View? = null
 ) {
     var firstLoadSettled = false
-    var failedRefreshes = 0
+    var refreshWasLoading = false
+    var failedLoads = 0
+    var failureShown: Snackbar? = null
     loadStateFlow.collectLatest { loadStates ->
         val refresh = loadStates.refresh
+        if (refresh is LoadState.Loading) refreshWasLoading = true
         if (refresh is LoadState.NotLoading) {
             firstLoadSettled = true
-            failedRefreshes = 0
-            onSettled()
+            // Only when a refresh has just finished: an append of the previous query finishing
+            // while a new query is still debouncing must not settle (and clear) its pending scroll.
+            if (refreshWasLoading) {
+                refreshWasLoading = false
+                onSettled()
+            }
         }
-        // A failed load (e.g. a database error in the paging source) left the list empty with no
-        // way back. Retry a few times, backing off; the loader stays up meanwhile on a first load.
-        if (refresh is LoadState.Error && failedRefreshes < MAX_REFRESH_RETRIES) {
-            failedRefreshes++
-            timber.log.Timber.w(refresh.error, "Paged list load failed, retry $failedRefreshes of $MAX_REFRESH_RETRIES")
-            render(!firstLoadSettled, false)
-            delay(REFRESH_RETRY_DELAY_MS * failedRefreshes)
+        // A failed load (a database error in the paging source) left the list empty, or stopped
+        // at the last loaded row, with no way back. Retry a few times, backing off; then offer a
+        // Retry action. Covers the first load (refresh) and loading further rows (append).
+        val error = (refresh as? LoadState.Error) ?: (loadStates.append as? LoadState.Error)
+        if (error == null) {
+            if (refresh is LoadState.NotLoading) failedLoads = 0
+            failureShown?.dismiss()
+            failureShown = null
+        } else if (failedLoads < MAX_REFRESH_RETRIES) {
+            failedLoads++
+            timber.log.Timber.w(error.error, "Paged list load failed, retry $failedLoads of $MAX_REFRESH_RETRIES")
+            render(!firstLoadSettled && refresh is LoadState.Error, false)
+            delay(REFRESH_RETRY_DELAY_MS * failedLoads)
             retry()
             return@collectLatest
+        } else if (failureShown == null && errorAnchor != null) {
+            failureShown = Snackbar.make(errorAnchor, R.string.list_load_failed, Snackbar.LENGTH_INDEFINITE)
+                .setAction(R.string.try_again) {
+                    failedLoads = 0
+                    failureShown = null
+                    retry()
+                }
+                .also { snackbar -> snackbar.show() }
         }
         val isEmpty = refresh is LoadState.NotLoading && loadStates.append.endOfPaginationReached && itemCount == 0
         render(refresh is LoadState.Loading && !firstLoadSettled, isEmpty)

@@ -185,6 +185,11 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // lifecycleScope they would NOT be cancelled, and a fragment returning from the back
         // stack would accumulate another 17 Room Flow subscriptions per view creation.
         rowDecorationsStarted = false
+        // The add-member dialog is built per view (buildAddMemberDialog in onViewCreated) and
+        // holds that view's inflated layout: release it with the view, not the fragment.
+        addMemberAlert?.dismiss()
+        addMemberAlert = null
+        addMemberAlertBinding = null
         super.onDestroyView()
         // A new adapter and binding are created per view; don't keep the old view tree alive
         // while the fragment sits on the back stack.
