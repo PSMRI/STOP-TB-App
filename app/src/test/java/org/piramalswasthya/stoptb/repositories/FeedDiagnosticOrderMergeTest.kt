@@ -105,4 +105,58 @@ class FeedDiagnosticOrderMergeTest {
         assertEquals(true, created.isChestXRayDone)
         assertNull(repo.suspectedFromDiagnostics(created.copy(syncState = SyncState.SYNCED), benId, diag))
     }
+
+    // Finding 5 (UAT 2026-11-11): the reason an order was closed reaches the other tablets.
+    private fun closed(reason: String?) =
+        OrderResultData(externalOrderId = "ext-1", status = "CLOSED", reasonToClose = reason)
+
+    @Test
+    fun closedXrayCarriesItsNotConductedReason() {
+        val merged = merge(null, "XRAY_CHEST", closed("Power issue")).cache
+        assertEquals(OrderStatus.CLOSED.name, merged.xrayOrderStatus)
+        assertEquals(false, merged.isChestXRayDone)
+        assertEquals("Power issue", merged.reasonNotConductedChestXray)
+        assertNull(merged.reasonNotConductedChestXrayOther)
+    }
+
+    @Test
+    fun otherReasonIsSplitIntoChoiceAndText() {
+        val merged = merge(null, "MDR_RIF", closed("Other: lab closed today")).cache
+        assertEquals("Other", merged.reasonNotConductedRif)
+        assertEquals("lab closed today", merged.reasonNotConductedRifOther)
+    }
+
+    @Test
+    fun trueNatReasonGoesToNotConductedOrSputumDenialByValue() {
+        val notConducted = merge(null, "SPUTUM_TRUENAT", closed("Cartridge unavailable")).cache
+        assertEquals("Cartridge unavailable", notConducted.reasonNotConductedNaat)
+        assertEquals(false, notConducted.isNaatConducted)
+        assertNull(notConducted.reasonForDenialSputum)
+
+        val notCollected = merge(null, "SPUTUM_TRUENAT", closed("Unable to produce sputum|Fear/anxiety")).cache
+        assertEquals("Unable to produce sputum|Fear/anxiety", notCollected.reasonForDenialSputum)
+        assertEquals(false, notCollected.isSputumCollected)
+        assertNull(notCollected.reasonNotConductedNaat)
+    }
+
+    @Test
+    fun theTabletThatEnteredTheReasonKeepsItsRowUnchanged() {
+        // "Patient refused" is on both TrueNat lists; the entering tablet stored it as a sputum denial.
+        val entered = TBDiagnosticsCache(benId = benId, trueNatOrderId = "ext-1", trueNatOrderStatus = "CLOSED",
+            isReferredForSputum = true, isSputumCollected = false, reasonForDenialSputum = "Patient refused")
+        val merged = merge(entered, "SPUTUM_TRUENAT", closed("Patient refused")).cache
+        assertEquals(entered.copy(syncState = SyncState.SYNCED), merged.copy(syncState = SyncState.SYNCED))
+
+        val xray = merge(null, "XRAY_CHEST", closed("Other: no film")).cache.copy(syncState = SyncState.SYNCED)
+        assertEquals(xray, merge(xray, "XRAY_CHEST", closed("Other: no film")).cache.copy(syncState = SyncState.SYNCED))
+    }
+
+    @Test
+    fun closedWithoutAReasonOrAnotherStatusLeavesReasonsAlone() {
+        val noReason = merge(null, "XRAY_CHEST", closed(null)).cache
+        assertNull(noReason.reasonNotConductedChestXray)
+        assertNull(noReason.isChestXRayDone)
+        val pending = merge(null, "XRAY_CHEST", OrderResultData(externalOrderId = "ext-1", status = "PENDING", reasonToClose = "Power issue")).cache
+        assertNull(pending.reasonNotConductedChestXray)
+    }
 }

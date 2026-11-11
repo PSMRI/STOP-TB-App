@@ -96,6 +96,17 @@ class DiagnosticOrderRepo @Inject constructor(
     private val benIdLocks: BenIdLocks
 ) {
     companion object {
+        // How TBSuspectedQuickViewModel joins an "Other" choice and its text into reasonToClose.
+        private const val OTHER_REASON = "Other"
+        private const val OTHER_REASON_PREFIX = "Other: "
+
+        // English values of R.array.tb_reason_not_conducted_naat (the stored form). A TrueNat
+        // closure reason outside this list came from the sputum-denial question.
+        private val NAAT_NOT_CONDUCTED_REASONS = setOf(
+            "Machine unavailable", "Cartridge unavailable", "Sample rejected", "Patient refused",
+            "Connectivity issue", "Technical issue", "Patient absent", "Excessive waiting time", OTHER_REASON
+        )
+
         /**
          * How many "completed" beneficiaries one sweep of [fetchBeneficiariesByStatus] fans out
          * at a time. Sized to keep OkHttp's 5 per-host slots saturated with a little slack for
@@ -1085,7 +1096,40 @@ class DiagnosticOrderRepo @Inject constructor(
                 }
             }
         }
-        return MergedOrderResult(cache, triggerTrueNat)
+        val closed = reducedOrderStatus(status) == OrderStatus.CLOSED.name
+        return MergedOrderResult(if (closed) withCloseReason(cache, orderType, responseData.reasonToClose) else cache, triggerTrueNat)
+    }
+
+    /**
+     * Copies the reason an order was closed without a result onto the row, so every tablet shows
+     * why the test was not done. Before, only the tablet that entered "Not Conducted" had it; the
+     * order closure reached the others with the status alone (UAT field test 2026-11-11, finding 5).
+     *
+     * [reasonToClose] is what that tablet sent: the selected English value, or "Other: <text>".
+     * TrueNat is closed for two reasons that share one server field - test not conducted
+     * (reasonNotConductedNaat) or sputum not collected (reasonForDenialSputum, pipe-separated) -
+     * so the value decides: all of it from the not-conducted list means not conducted, anything
+     * else means the sputum was not collected. A row that already holds the reason (the tablet
+     * that entered it) is left as it is.
+     */
+    internal fun withCloseReason(cache: TBDiagnosticsCache, orderType: String, reasonToClose: String?): TBDiagnosticsCache {
+        val reason = reasonToClose?.trim()?.takeIf { it.isNotEmpty() } ?: return cache
+        val (value, other) = if (reason.startsWith(OTHER_REASON_PREFIX)) {
+            OTHER_REASON to reason.removePrefix(OTHER_REASON_PREFIX).trim().ifEmpty { null }
+        } else reason to null
+        return when {
+            orderType.equals("XRAY_CHEST", ignoreCase = true) ->
+                if (cache.reasonNotConductedChestXray == value && cache.reasonNotConductedChestXrayOther == other) cache
+                else cache.copy(isChestXRayDone = false, reasonNotConductedChestXray = value, reasonNotConductedChestXrayOther = other)
+            orderType.equals("MDR_RIF", ignoreCase = true) ->
+                if (cache.reasonNotConductedRif == value && cache.reasonNotConductedRifOther == other) cache
+                else cache.copy(reasonNotConductedRif = value, reasonNotConductedRifOther = other)
+            cache.reasonForDenialSputum == reason -> cache
+            reason.split('|').all { part -> part.trim() in NAAT_NOT_CONDUCTED_REASONS } || value == OTHER_REASON ->
+                if (cache.reasonNotConductedNaat == value && cache.reasonNotConductedNaatOther == other) cache
+                else cache.copy(isNaatConducted = false, reasonNotConductedNaat = value, reasonNotConductedNaatOther = other)
+            else -> cache.copy(isSputumCollected = false, reasonForDenialSputum = reason)
+        }
     }
 
     /**

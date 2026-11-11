@@ -323,7 +323,8 @@ class TbPullRepo @Inject constructor(
                 resultSummary = item.optStringOrNull("resultSummary"),
                 tbPresence = item.optNullableBoolean("tbPresence"),
                 drugResistancePresence = item.optNullableBoolean("drugResistancePresence"),
-                errorMessage = item.optStringOrNull("errorMessage")
+                errorMessage = item.optStringOrNull("errorMessage"),
+                reasonToClose = item.optStringOrNull("reasonToClose")
             )
         }
         val typeOrder = listOf("MDR_RIF", "SPUTUM_TRUENAT", "XRAY_CHEST")
