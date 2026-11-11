@@ -345,9 +345,15 @@ class TbPullRepo @Inject constructor(
         data class FeedOrder(val ben: BenRegCache, val localType: String, val data: OrderResultData)
         val bulk = ArrayList<FeedOrder>()
         val cascade = ArrayList<Pair<FeedOrder, Boolean>>()
+        // benRegId has no index: resolve the page's keys in one query (was a full-table scan per
+        // order), then load each beneficiary by its primary key. A key that is not a benRegId
+        // falls back to a beneficiaryId lookup, as before.
+        val benIdByRegId = latest.keys.map { (benKey, _) -> benKey }.distinct().chunked(500)
+            .flatMap { regIds -> benDao.getBenIdsByRegIds(regIds) }
+            .associate { mapping -> mapping.benRegId to mapping.beneficiaryId }
         for ((key, value) in latest.entries.sortedBy { typeOrder.indexOf(it.key.second) }) {
             val (benKey, localType) = key
-            val ben = benDao.getBenByRegId(benKey) ?: benDao.getBen(benKey) ?: continue
+            val ben = benDao.getBen(benIdByRegId[benKey] ?: benKey) ?: continue
             val skipKey = diagnosticOrderRepo.feedSkippedKey(ben.beneficiaryId, localType)
             // An order this tablet created in the last moments may not be on the hub's feed yet;
             // the older server row must not overwrite it.
@@ -595,6 +601,10 @@ class TbPullRepo @Inject constructor(
             .chunked(pullWriteChunkSize)
             .forEach { chunk ->
                 val chunkOffset = recordsBeforeChunk
+                // benRegId has no index: one lookup for the chunk instead of a scan per record.
+                val chunkRegIds = chunk.mapNotNull { item -> item?.optLong("beneficiaryRegID", 0L)?.takeIf { it > 0 } }.distinct()
+                val benIdByRegId = if (chunkRegIds.isEmpty()) emptyMap() else
+                    benDao.getBenIdsByRegIds(chunkRegIds).associate { mapping -> mapping.benRegId to mapping.beneficiaryId }
                 database.withTransaction {
                     val chunkComplete = processGeneralOpdPullBatch(
                         records = chunk,
@@ -609,7 +619,7 @@ class TbPullRepo @Inject constructor(
                         save = saveRecord@ { record, incomingRows ->
                             val item = requireNotNull(record)
                             val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { it > 0 } ?: return@saveRecord
-                            val ben = benDao.getBenByRegId(benRegId) ?: return@saveRecord
+                            val ben = benIdByRegId[benRegId]?.let { benId -> benDao.getBen(benId) } ?: return@saveRecord
                             val serverUpdatedDate = getServerUpdatedDate(item)
                             val incomingComplaints = item.optChiefComplaintsOrNull()
                             val hasDrugs = item.has("drugs") && !item.isNull("drugs")
