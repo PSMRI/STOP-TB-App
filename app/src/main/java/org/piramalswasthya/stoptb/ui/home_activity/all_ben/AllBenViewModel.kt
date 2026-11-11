@@ -340,7 +340,9 @@ class AllBenViewModel @Inject constructor(
             // refresh only duplicated it, with a per-beneficiary order/result fan-out.
             // Only while the feed is actually delivering: the flag stays set while pulls fail,
             // and then this refresh is the only way the cards get fresh order states.
-            if (org.piramalswasthya.stoptb.repositories.isChangesFeedHealthy(tbRepo.preferenceDao.isChangesFeedActive())) return
+            if (org.piramalswasthya.stoptb.repositories.isChangesFeedHealthy(
+                    tbRepo.preferenceDao.isChangesFeedActive(), tbRepo.preferenceDao.getStoredCampHubUrl()
+                )) return
             val now = android.os.SystemClock.elapsedRealtime()
             if (now - lastStatusRefreshAt < statusRefreshDebounceMs) return
             lastStatusRefreshAt = now

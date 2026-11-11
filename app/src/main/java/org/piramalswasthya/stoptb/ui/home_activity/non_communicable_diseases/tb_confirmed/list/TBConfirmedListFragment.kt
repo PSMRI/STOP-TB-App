@@ -142,6 +142,7 @@ class TBConfirmedListFragment : Fragment() {
             benAdapter.renderListStates(
                 render = { awaitingFirstLoad, isEmpty -> renderListState(awaitingFirstLoad, isEmpty) },
                 errorAnchor = binding.root,
+                onRefreshStarted = { listTransitions?.onRefreshStarted() },
                 onSettled = {
                     _binding?.rvAny?.removeCallbacks(showSearchLoader)
                     listTransitions?.onSettled()
