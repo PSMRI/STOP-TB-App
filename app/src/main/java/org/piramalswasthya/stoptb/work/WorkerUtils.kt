@@ -28,6 +28,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
 
@@ -57,11 +58,20 @@ object WorkerUtils {
      * quick AUTO_PULL from onCreate/onResume, or an interrupted first download restarts from
      * page 0 (that order was implicit when these ran inline on Main).
      */
-    private val triggerScope = CoroutineScope(
-        SupervisorJob() + java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
-            Thread(runnable, "worker-triggers").apply { isDaemon = true }
-        }.asCoroutineDispatcher()
-    )
+    private val triggerDispatcher = java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "worker-triggers").apply { isDaemon = true }
+    }.asCoroutineDispatcher()
+    private val triggerScope = CoroutineScope(SupervisorJob() + triggerDispatcher)
+
+    /**
+     * [triggerCampQuickPullIfConnected] on the same ordered thread as the async triggers, for the
+     * camp auto-pull loop. On Dispatchers.IO the loop could register AUTO_PULL before the
+     * first-sync DIRECT pull queued in onCreate, and that pull then kept the AUTO_PULL chain.
+     */
+    suspend fun triggerCampQuickPullInOrder(context: Context, preferenceDao: PreferenceDao) {
+        val appContext = context.applicationContext
+        withContext(triggerDispatcher) { triggerCampQuickPullIfConnected(appContext, preferenceDao) }
+    }
 
     /** [triggerCampQuickPullIfConnected] off the main thread, for UI callers. */
     fun triggerCampQuickPullAsync(context: Context, preferenceDao: PreferenceDao, force: Boolean = false) {
