@@ -67,6 +67,52 @@ class QueryEquivalenceTest {
         }
     }
 
+    /**
+     * The poll's yes/no queries give the same answer as the Kotlin filters they replace: any
+     * PENDING / manual-result row, and an order of an integrated device that is PENDING with a
+     * real order id (not null, blank or "N/A").
+     */
+    @Test
+    fun pendingYesNoQueriesMatchKotlinFilters() = runBlocking {
+        assertEquals(false, db.tbDao.hasDiagnosticsWithPendingOrder())
+        assertEquals(false, db.tbDao.hasDiagnosticsWithPendingManualResult())
+        assertEquals(false, db.tbDao.hasPollableOrder(xray = true, truenat = true))
+
+        fun hasRealOrderId(id: String?) = !id.isNullOrBlank() && !id.equals("N/A", ignoreCase = true)
+        fun kotlinPollable(rows: List<TBDiagnosticsCache>, xray: Boolean, truenat: Boolean) = rows.any { row ->
+            (xray && row.xrayOrderStatus.equals("PENDING", true) && hasRealOrderId(row.xrayOrderId)) ||
+                (truenat && row.trueNatOrderStatus.equals("PENDING", true) && hasRealOrderId(row.trueNatOrderId)) ||
+                (truenat && row.rifOrderStatus.equals("PENDING", true) && hasRealOrderId(row.rifOrderId))
+        }
+        val flags = listOf(false to false, true to false, false to true, true to true)
+        val orderIds = listOf(null, "", "  ", "\t", "N/A", "n/a", "ORD-1")
+        var benId = FIRST_BEN_ID
+        // One row at a time, so each order id is checked on its own for each column.
+        for (column in 0..2) for (status in listOf("pending", "COMPLETED")) for (orderId in orderIds) {
+            db.clearAllTables()
+            db.tbDao.saveTbDiagnostics(
+                when (column) {
+                    0 -> TBDiagnosticsCache(benId = benId++, xrayOrderStatus = status, xrayOrderId = orderId)
+                    1 -> TBDiagnosticsCache(benId = benId++, trueNatOrderStatus = status, trueNatOrderId = orderId)
+                    else -> TBDiagnosticsCache(benId = benId++, rifOrderStatus = status, rifOrderId = orderId)
+                }
+            )
+            val rows = db.tbDao.getDiagnosticsList()
+            for ((xray, truenat) in flags) {
+                assertEquals(
+                    "column=$column status=$status orderId=$orderId xray=$xray truenat=$truenat",
+                    kotlinPollable(rows, xray, truenat), db.tbDao.hasPollableOrder(xray, truenat)
+                )
+            }
+            assertEquals(db.tbDao.getDiagnosticsWithPendingOrder().isNotEmpty(), db.tbDao.hasDiagnosticsWithPendingOrder())
+        }
+
+        db.clearAllTables()
+        db.tbDao.saveTbDiagnostics(TBDiagnosticsCache(benId = benId++, trueNatManualResultPendingSync = true))
+        assertEquals(true, db.tbDao.hasDiagnosticsWithPendingManualResult())
+        assertEquals(false, db.tbDao.hasDiagnosticsWithPendingOrder())
+    }
+
     /** PR 4: the poll's pending-order query returns exactly the rows the old Kotlin filter kept. */
     @Test
     fun pendingOrderAndManualResultQueriesMatchKotlinFilters() = runBlocking {

@@ -94,8 +94,8 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                     // device that left the camp would otherwise wake every 5 min indefinitely;
                     // the hub-reconnect path triggers this worker again anyway.
                     val workLeft = preferenceDao.getFeedSkippedOrders().isNotEmpty() ||
-                        tbRepo.getDiagnosticsWithPendingOrder().isNotEmpty() ||
-                        tbRepo.getDiagnosticsWithPendingManualResult().isNotEmpty()
+                        tbRepo.hasDiagnosticsWithPendingOrder() ||
+                        tbRepo.hasDiagnosticsWithPendingManualResult()
                     if (workLeft) {
                         Timber.d("DiagnosticResultPollWorker: Camp Hub is disconnected, checking again in ${HUB_DOWN_RECHECK_SEC}s")
                         scheduleNextRun(HUB_DOWN_RECHECK_SEC)
@@ -141,16 +141,33 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
 
                 if (!tbRepo.isXrayIntegrated() && !tbRepo.isTruenatIntegrated()) {
                     Timber.d("Skipping automated result polling: no diagnostic devices are integrated")
+                } else if (feedActive) {
+                    // The server polls the X-ray and TrueNat vendors itself and every result change
+                    // reaches the tablet through the changes feed (applyFeedDiagnosticOrders runs the
+                    // same applyOrderResult as fetchOrderResult). Calling order/result per pending
+                    // order on top of that only duplicated the feed, and the TB suspected re-uploads
+                    // it set off kept the push chain busy and the feed pull waiting. Ask for a quick
+                    // delta pull instead; it is debounced and costs one small request.
+                    // Only a yes/no is needed here, so no pending row is loaded: at 1M pending
+                    // orders, loading them all every minute cost seconds and risked running out
+                    // of memory.
+                    hasInProgress = tbRepo.hasPollableOrder(tbRepo.isXrayIntegrated(), tbRepo.isTruenatIntegrated())
+                    if (hasInProgress) {
+                        Timber.d("Pending diagnostic orders found, results come from the changes feed")
+                        WorkerUtils.triggerCampQuickPullIfConnected(appContext, preferenceDao)
+                        // Keeps the "Last checked" caption current: one write per cycle, not 3 per order.
+                        preferenceDao.setLastResultCheckTime(System.currentTimeMillis())
+                    }
                 } else {
                 // Without a feed: one status sweep per order type. It applies completed results
                 // itself, and its "awaiting provider result" list tells us which pending orders
                 // the server has nothing new for, so we don't ask order/result about those.
                 val awaitingByType = HashMap<String, Set<Long>>()
-                if (!feedActive && tbRepo.isXrayIntegrated()) {
+                if (tbRepo.isXrayIntegrated()) {
                     awaitingByType["XRAY_CHEST"] =
                         tbRepo.awaitingResultBenIds(tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST"))
                 }
-                if (!feedActive && tbRepo.isTruenatIntegrated()) {
+                if (tbRepo.isTruenatIntegrated()) {
                     awaitingByType["SPUTUM_TRUENAT"] =
                         tbRepo.awaitingResultBenIds(tbRepo.fetchBeneficiariesByStatus("SPUTUM_TRUENAT"))
                     awaitingByType["MDR_RIF"] =
@@ -197,18 +214,7 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 // call already catches its own exceptions and returns NetworkResponse.Error
                 // (never throws), so one beneficiary's failure can't cancel the others under
                 // coroutineScope's structured concurrency.
-                if (hasInProgress && feedActive) {
-                    // The server polls the X-ray and TrueNat vendors itself and every result change
-                    // reaches the tablet through the changes feed (applyFeedDiagnosticOrders runs the
-                    // same applyOrderResult as fetchOrderResult). Calling order/result per pending
-                    // order on top of that only duplicated the feed, and the TB suspected re-uploads
-                    // it set off kept the push chain busy and the feed pull waiting. Ask for a quick
-                    // delta pull instead; it is debounced and costs one small request.
-                    Timber.d("Pending diagnostic orders: ${pendingOrders.size}, results come from the changes feed")
-                    WorkerUtils.triggerCampQuickPullIfConnected(appContext, preferenceDao)
-                    // Keeps the "Last checked" caption current: one write per cycle, not 3 per order.
-                    preferenceDao.setLastResultCheckTime(now)
-                } else if (hasInProgress) {
+                if (hasInProgress) {
                     // Fallback (no feed): ask order/result only for orders that are due on their
                     // own backoff schedule and that the status sweep didn't already report as
                     // still awaiting a result. Was: every pending order, every cycle.

@@ -96,6 +96,20 @@ class TbLocalRepo @Inject constructor(
         tbDao.getDiagnosticsWithPendingManualResult()
     }
 
+    /** Yes/no forms of the two queries above, for callers that only test emptiness. */
+    suspend fun hasDiagnosticsWithPendingOrder(): Boolean = withContext(Dispatchers.IO) {
+        tbDao.hasDiagnosticsWithPendingOrder()
+    }
+
+    suspend fun hasDiagnosticsWithPendingManualResult(): Boolean = withContext(Dispatchers.IO) {
+        tbDao.hasDiagnosticsWithPendingManualResult()
+    }
+
+    /** Whether any order of an integrated device still waits for an automated result. */
+    suspend fun hasPollableOrder(xray: Boolean, truenat: Boolean): Boolean = withContext(Dispatchers.IO) {
+        tbDao.hasPollableOrder(xray, truenat)
+    }
+
     suspend fun getDiagnosticsList(): List<TBDiagnosticsCache> = withContext(Dispatchers.IO) {
         tbDao.getDiagnosticsList()
     }
