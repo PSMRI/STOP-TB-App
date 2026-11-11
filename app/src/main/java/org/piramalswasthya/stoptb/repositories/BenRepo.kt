@@ -695,8 +695,8 @@ class BenRepo @Inject constructor(
             val (retrying, fresh) = due.partition { g ->
                 g.benIds.any { syncRetryStore.contains(SyncRetryStore.ENTITY_BENEFICIARY, it) }
             }
-            val batches = batchBySize(fresh, MAX_BENS_PER_PUSH) { g -> g.members.size } +
-                    retrying.map { g -> listOf(g) }
+            val freshBatches = batchBySize(fresh, MAX_BENS_PER_PUSH) { g -> g.members.size }
+            val batches = freshBatches + retrying.map { g -> listOf(g) }
             val outcomes = mutableListOf<BatchIsolation.Outcome<UploadGroup>>()
 
             // Records what the completed batches got back. Also runs when a later batch hits a
@@ -712,15 +712,26 @@ class BenRepo @Inject constructor(
                     syncRetryStore.resetBackoff()
                 }
                 if (rejected.isNotEmpty()) {
+                    // "The server rejected everything" (an outage, not bad records: no backoff)
+                    // is judged per fresh batch of several groups, as well as for the whole run:
+                    // one accepted batch must not give a later batch rejected during an outage
+                    // per-record backoff of up to an hour. A single retried group rejected on
+                    // its own still backs off unless nothing at all was accepted.
                     val serverWide = sent.isEmpty()
-                    val ids = rejected.flatMap { it.benIds }
-                    benDao.benSyncWithServerFailed(*ids.toLongArray())
-                    ids.forEach {
-                        syncRetryStore.recordFailure(
-                            SyncRetryStore.ENTITY_BENEFICIARY, it,
-                            lastBenUploadError ?: "Rejected by server", backoff = !serverWide
-                        )
+                    outcomes.forEachIndexed { index, outcome ->
+                        if (outcome.rejected.isEmpty()) return@forEachIndexed
+                        val batchServerWide = serverWide ||
+                            (index < freshBatches.size && freshBatches[index].size > 1 && outcome.nothingAccepted)
+                        val ids = outcome.rejected.flatMap { it.benIds }
+                        benDao.benSyncWithServerFailed(*ids.toLongArray())
+                        ids.forEach {
+                            syncRetryStore.recordFailure(
+                                SyncRetryStore.ENTITY_BENEFICIARY, it,
+                                lastBenUploadError ?: "Rejected by server", backoff = !batchServerWide
+                            )
+                        }
                     }
+                    val ids = rejected.flatMap { it.benIds }
                     Timber.e("Beneficiary push: ${rejected.size} group(s) rejected${if (serverWide) " (server rejected everything)" else ""}: $ids")
                 }
                 Timber.d("Beneficiary push: ${sent.size} group(s) sent, ${rejected.size} rejected, ${waiting.size} waiting")
@@ -729,7 +740,11 @@ class BenRepo @Inject constructor(
 
             try {
                 batches.forEach { batch -> outcomes += BatchIsolation.send(batch) { postUploadGroups(it) } }
-            } catch (e: IOException) {
+            } catch (e: CancellationException) {
+                throw e // claimed rows are reset to UNSYNCED at the start of the next run
+            } catch (e: Exception) {
+                // Network errors, and token-refresh failures (IllegalStateException), still
+                // record what the completed batches got back before the run fails.
                 applyOutcomes()
                 throw e
             }

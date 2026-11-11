@@ -817,7 +817,10 @@ class TbPullRepo @Inject constructor(
                             serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
                             syncState = SyncState.SYNCED
                         )
-                        tbDao.saveTbDiagnostics(cache)
+                        // An unchanged row is not rewritten: every write re-runs all live queries
+                        // on TB_DIAGNOSTICS (records without a parseable updateDate always pass
+                        // shouldApplyServerRecord). It is still returned to the caller as before.
+                        if (cache != existing) tbDao.saveTbDiagnostics(cache)
                         tbDiagnosticsList.add(cache)
                     }
                 }

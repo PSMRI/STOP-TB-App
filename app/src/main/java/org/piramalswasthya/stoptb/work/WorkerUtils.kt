@@ -26,6 +26,7 @@ import org.piramalswasthya.stoptb.work.dynamicWoker.NDCFollowUpPushWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
@@ -50,8 +51,17 @@ object WorkerUtils {
      * Runs fire-and-forget triggers from UI callers. The triggers query WorkManager's database
      * synchronously (getWorkInfosForUniqueWork().get()), which must not run on the main thread:
      * the camp loop called it every 10 s from VolunteerActivity on Main.
+     *
+     * One thread, so triggers run one at a time in the order they were made (they are blocking,
+     * not suspending): e.g. the first-sync DIRECT pull registered in onCreate must win over the
+     * quick AUTO_PULL from onCreate/onResume, or an interrupted first download restarts from
+     * page 0 (that order was implicit when these ran inline on Main).
      */
-    private val triggerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val triggerScope = CoroutineScope(
+        SupervisorJob() + java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "worker-triggers").apply { isDaemon = true }
+        }.asCoroutineDispatcher()
+    )
 
     /** [triggerCampQuickPullIfConnected] off the main thread, for UI callers. */
     fun triggerCampQuickPullAsync(context: Context, preferenceDao: PreferenceDao, force: Boolean = false) {
