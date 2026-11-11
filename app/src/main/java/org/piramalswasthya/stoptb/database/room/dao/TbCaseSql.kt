@@ -47,7 +47,13 @@ object TbCaseSql {
     const val CONFIRMED_BEN_IDS = "(SELECT sus.benId FROM TB_SUSPECTED sus WHERE " + SUSPECTED_CONFIRMED +
         " UNION SELECT dx.benId FROM TB_DIAGNOSTICS dx WHERE " + DIAGNOSTICS_CONFIRMED + ")"
 
+    /**
+     * "Not confirmed" is decided per beneficiary ([CONFIRMED_BEN_IDS]), not per joined row: a
+     * beneficiary can have several suspected / diagnostics rows, and an older unconfirmed row
+     * must not keep someone in Presumptive who is confirmed through a newer one (they would be in
+     * both lists). benId is NOT NULL in both tables, so NOT IN is safe.
+     */
     const val PRESUMPTIVE = "((" + SYMPTOMATIC + " OR " + XRAY_PRESUMPTIVE + ")" +
-        " AND NOT " + CONFIRMED +
+        " AND scr.benId NOT IN " + CONFIRMED_BEN_IDS +
         " AND NOT EXISTS (SELECT 1 FROM TB_CONFIRMED_TREATMENT tc WHERE tc.benId = scr.benId))"
 }

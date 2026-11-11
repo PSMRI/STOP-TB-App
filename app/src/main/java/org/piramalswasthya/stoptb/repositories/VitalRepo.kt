@@ -92,8 +92,14 @@ class VitalRepo @Inject constructor(
 
             vitalDao.saveVitals(localData)
 
-            // Network failures leave the record UNSYNCED for the background push.
-            pushMutex.withLock {
+            // Network failures leave the record UNSYNCED for the background push. If that push is
+            // running, don't make the form wait for its whole queue: it (or the next cycle) sends
+            // this row, which is already stored as UNSYNCED.
+            if (!pushMutex.tryLock()) {
+                Timber.d("Vital push left to the running background push for benId=%s", localData.benId)
+                return@withContext false
+            }
+            try {
                 val synced = try {
                     pushSingleVital(localData)
                 } catch (e: IOException) {
@@ -106,6 +112,8 @@ class VitalRepo @Inject constructor(
                 }
 
                 synced
+            } finally {
+                pushMutex.unlock()
             }
         }
     }
