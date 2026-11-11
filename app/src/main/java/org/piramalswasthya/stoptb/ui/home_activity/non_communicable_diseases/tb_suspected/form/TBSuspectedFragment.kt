@@ -194,8 +194,9 @@ class TBSuspectedFragment : Fragment() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
+    // Released with the view, not the fragment: on the back stack the fragment outlives its view.
+    override fun onDestroyView() {
+        super.onDestroyView()
         _binding = null
     }
 

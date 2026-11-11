@@ -18,6 +18,11 @@ import org.piramalswasthya.stoptb.repositories.RowBadgeRepo
  * The fragment reports the loaded ids ([onRowsLoaded], from `PagingDataAdapter.loadedIds`) and
  * collects the flows below into the adapter exactly as it collected the whole-table ones.
  */
+data class TbDiagnosticsSnapshot(
+    val rows: List<TbDiagnosticsCardFields>,
+    val coveredBenIds: Set<Long>
+)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class LoadedRowBadges(scope: CoroutineScope, rowBadgeRepo: RowBadgeRepo) {
 
@@ -44,6 +49,13 @@ class LoadedRowBadges(scope: CoroutineScope, rowBadgeRepo: RowBadgeRepo) {
     val syncingGeneralOpdBenIds: Flow<List<Long>> = field { row -> row.syncingGeneralOpdBenIds }
     val anthropometryBenIds: Flow<List<Long>> = field { row -> row.anthropometryBenIds }
     val diagnosisBenIds: Flow<List<Long>> = field { row -> row.diagnosisBenIds }
-    val tbDiagnostics: Flow<List<TbDiagnosticsCardFields>> = field { row -> row.tbDiagnostics }
+    /**
+     * The diagnostics card fields together with the benIds they were read for, in one value so
+     * the two can't come from different snapshots. Adapters treat a row as "loaded" only when its
+     * benId is covered: a missing row then means "no order", which drives the Retry Referral
+     * branch - showing that for a row not looked up yet could raise a second order.
+     */
+    val tbDiagnostics: Flow<TbDiagnosticsSnapshot> =
+        field { row -> TbDiagnosticsSnapshot(row.tbDiagnostics, row.queriedBenIds) }
     val tbScreeningSymptoms: Flow<List<TbScreeningSymptoms>> = field { row -> row.tbScreeningSymptoms }
 }

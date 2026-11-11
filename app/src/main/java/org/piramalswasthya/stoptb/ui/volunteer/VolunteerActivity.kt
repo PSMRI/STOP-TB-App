@@ -64,6 +64,10 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+
+/** Process-wide: set by the first VolunteerActivity.onCreate in this process. */
+private val startupPushTriggered = java.util.concurrent.atomic.AtomicBoolean(false)
+
 @AndroidEntryPoint
 class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
 
@@ -233,8 +237,11 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         syncRetryStore.resetBackoff()
         // ...and actually starts that retry: records left unsynced by an app that was killed or
         // force-stopped otherwise waited for the next save or the 15-min heartbeat (UAT 2026-11-11).
-        // Goes through the debounced gate, which checks the hub itself; not on recreation.
-        if (savedInstanceState == null) WorkerUtils.triggerAmritPushWorker(applicationContext)
+        // Goes through the debounced gate, which checks the hub itself. Runs on a fresh start and
+        // on the first create in a new process (Android can restore the activity after killing
+        // the process, with a saved state), but not on configuration changes.
+        val firstCreateInProcess = startupPushTriggered.compareAndSet(false, true)
+        if (savedInstanceState == null || firstCreateInProcess) WorkerUtils.triggerAmritPushWorker(applicationContext)
         // Resolve assigned/active role for this cold start. Always resets to the first
         // assigned role — no persistence across app restarts, by design.
         roleManager.initializeFromLoggedInUser()

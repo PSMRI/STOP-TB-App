@@ -52,15 +52,19 @@ class IconGridAdapter(
         }
 
         private var countJob: Job? = null
+        private var boundItem: Icon? = null
+        private var boundOwner: LifecycleOwner? = null
 
         fun bind(item: Icon, clickListener: GridIconClickListener, lifecycleOwner: LifecycleOwner) {
             binding.homeIcon = item
             binding.clickListener = clickListener
             binding.executePendingBindings()
+            boundItem = item
+            boundOwner = lifecycleOwner
             collectCount(item, lifecycleOwner)
         }
 
-        private fun collectCount(item: Icon, lifecycleOwner: LifecycleOwner) {
+        private fun collectCount(item: Icon, lifecycleOwner: LifecycleOwner, clearBadge: Boolean = true) {
             countJob?.cancel()
             val countFlow = item.count
             if (countFlow == null) {
@@ -68,8 +72,9 @@ class IconGridAdapter(
                 countJob = null
                 return
             }
-            // A recycled holder would otherwise show the previous card's count until this flow emits.
-            binding.tvCount.text = null
+            // A rebound holder would otherwise show the previous card's count until this flow
+            // emits; a cached holder re-attached for the same card keeps its count.
+            if (clearBadge) binding.tvCount.text = null
             countJob = lifecycleOwner.lifecycleScope.launch {
                 lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                     try {
@@ -87,6 +92,14 @@ class IconGridAdapter(
             countJob = null
         }
 
+        /** Restarts the count for a holder that comes back from RecyclerView's cache unbound. */
+        fun resumeCount() {
+            if (countJob != null) return
+            val item = boundItem ?: return
+            val owner = boundOwner ?: return
+            collectCount(item, owner, clearBadge = false)
+        }
+
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
@@ -94,6 +107,18 @@ class IconGridAdapter(
 
     override fun onBindViewHolder(holder: IconViewHolder, position: Int) {
         holder.bind(getItem(position), clickListener, lifecycleOwner)
+    }
+
+    // A detached holder can sit in RecyclerView's cache without being recycled: stop its count
+    // while it is off screen and restart it if it is re-attached without a new bind.
+    override fun onViewDetachedFromWindow(holder: IconViewHolder) {
+        holder.stopCount()
+        super.onViewDetachedFromWindow(holder)
+    }
+
+    override fun onViewAttachedToWindow(holder: IconViewHolder) {
+        super.onViewAttachedToWindow(holder)
+        holder.resumeCount()
     }
 
     override fun onViewRecycled(holder: IconViewHolder) {

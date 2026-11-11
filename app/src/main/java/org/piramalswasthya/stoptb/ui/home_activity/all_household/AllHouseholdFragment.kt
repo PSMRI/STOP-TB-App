@@ -167,8 +167,9 @@ class AllHouseholdFragment : Fragment() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
             override fun afterTextChanged(s: Editable?) {
-                listTransitions.onQueryChanged()
-                viewModel.filterText(s?.toString()?.trim().orEmpty())
+                val query = s?.toString()?.trim().orEmpty()
+                listTransitions.onQueryChanged(query)
+                viewModel.filterText(query)
             }
         }
 

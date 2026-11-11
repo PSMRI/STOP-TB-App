@@ -206,6 +206,10 @@ class TBConfirmedListFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        // ListTransitions holds the RecyclerView; drop it (and a pending search loader) with the view.
+        _binding?.rvAny?.removeCallbacks(showSearchLoader)
+        listTransitions = null
+        lastQuery = null
         _binding = null
 
     }
@@ -246,7 +250,7 @@ class TBConfirmedListFragment : Fragment() {
         val normalized = query.lowercase()
         if (normalized == lastQuery) return
         lastQuery = normalized
-        listTransitions?.onQueryChanged()
+        listTransitions?.onQueryChanged(normalized)
         _binding?.rvAny?.let { rv ->
             rv.removeCallbacks(showSearchLoader)
             rv.postDelayed(showSearchLoader, SEARCH_LOADER_DELAY_MS)
