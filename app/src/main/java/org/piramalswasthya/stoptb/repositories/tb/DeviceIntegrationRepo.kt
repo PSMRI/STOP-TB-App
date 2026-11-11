@@ -53,6 +53,8 @@ class DeviceIntegrationRepo @Inject constructor(
                     }
                 }
                 NetworkResponse.Error(context.getString(R.string.error_http_code, statusCode))
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e // cancellation must stop the poll, not read as a failed health check
             } catch (e: Exception) {
                 Timber.e(e, "getVendorHealth failed for $orderType")
                 NetworkResponse.Error(e.message ?: "Unknown error")

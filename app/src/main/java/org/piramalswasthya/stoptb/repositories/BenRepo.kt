@@ -695,31 +695,45 @@ class BenRepo @Inject constructor(
             val (retrying, fresh) = due.partition { g ->
                 g.benIds.any { syncRetryStore.contains(SyncRetryStore.ENTITY_BENEFICIARY, it) }
             }
-            val outcomes = batchBySize(fresh, MAX_BENS_PER_PUSH) { g -> g.members.size }
-                .map { batch -> BatchIsolation.send(batch) { postUploadGroups(it) } } +
-                    retrying.map { g -> BatchIsolation.send(listOf(g)) { postUploadGroups(it) } }
-            val sent = outcomes.flatMap { it.sent }
-            val rejected = outcomes.flatMap { it.rejected }
+            val batches = batchBySize(fresh, MAX_BENS_PER_PUSH) { g -> g.members.size } +
+                    retrying.map { g -> listOf(g) }
+            val outcomes = mutableListOf<BatchIsolation.Outcome<UploadGroup>>()
 
-            sent.forEach { syncRetryStore.clear(SyncRetryStore.ENTITY_BENEFICIARY, it.benIds) }
-            if (sent.isNotEmpty() || registered > 0) {
-                // The server is accepting data: make every waiting record due again.
-                syncRetryStore.resetBackoff()
-            }
-            if (rejected.isNotEmpty()) {
-                val serverWide = sent.isEmpty()
-                val ids = rejected.flatMap { it.benIds }
-                benDao.benSyncWithServerFailed(*ids.toLongArray())
-                ids.forEach {
-                    syncRetryStore.recordFailure(
-                        SyncRetryStore.ENTITY_BENEFICIARY, it,
-                        lastBenUploadError ?: "Rejected by server", backoff = !serverWide
-                    )
+            // Records what the completed batches got back. Also runs when a later batch hits a
+            // network error (rethrown below): otherwise groups an earlier batch got rejected
+            // would lose their retry history and go out as fresh again on the next run.
+            suspend fun applyOutcomes(): Boolean {
+                val sent = outcomes.flatMap { it.sent }
+                val rejected = outcomes.flatMap { it.rejected }
+
+                sent.forEach { syncRetryStore.clear(SyncRetryStore.ENTITY_BENEFICIARY, it.benIds) }
+                if (sent.isNotEmpty() || registered > 0) {
+                    // The server is accepting data: make every waiting record due again.
+                    syncRetryStore.resetBackoff()
                 }
-                Timber.e("Beneficiary push: ${rejected.size} group(s) rejected${if (serverWide) " (server rejected everything)" else ""}: $ids")
+                if (rejected.isNotEmpty()) {
+                    val serverWide = sent.isEmpty()
+                    val ids = rejected.flatMap { it.benIds }
+                    benDao.benSyncWithServerFailed(*ids.toLongArray())
+                    ids.forEach {
+                        syncRetryStore.recordFailure(
+                            SyncRetryStore.ENTITY_BENEFICIARY, it,
+                            lastBenUploadError ?: "Rejected by server", backoff = !serverWide
+                        )
+                    }
+                    Timber.e("Beneficiary push: ${rejected.size} group(s) rejected${if (serverWide) " (server rejected everything)" else ""}: $ids")
+                }
+                Timber.d("Beneficiary push: ${sent.size} group(s) sent, ${rejected.size} rejected, ${waiting.size} waiting")
+                return rejected.isEmpty()
             }
-            Timber.d("Beneficiary push: ${sent.size} group(s) sent, ${rejected.size} rejected, ${waiting.size} waiting")
-            return@withContext rejected.isEmpty()
+
+            try {
+                batches.forEach { batch -> outcomes += BatchIsolation.send(batch) { postUploadGroups(it) } }
+            } catch (e: IOException) {
+                applyOutcomes()
+                throw e
+            }
+            return@withContext applyOutcomes()
         }
     }
 
