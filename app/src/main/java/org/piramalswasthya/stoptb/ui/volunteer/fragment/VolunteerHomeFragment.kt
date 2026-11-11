@@ -130,8 +130,18 @@ class VolunteerHomeFragment : Fragment() {
                 val generation = ++manualRefreshGeneration
                 val appContext = requireContext().applicationContext
                 // Queries WorkManager's DB synchronously: run it off the main thread.
-                val refreshWorkIds = withContext(Dispatchers.IO) {
-                    WorkerUtils.startManualCampRefresh(appContext, pref)
+                val refreshWorkIds = try {
+                    withContext(Dispatchers.IO) {
+                        WorkerUtils.startManualCampRefresh(appContext, pref)
+                    }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Without this the button stayed disabled and the spinner ran until the hub
+                    // disconnected: no IDs and no timeout were ever registered.
+                    Timber.e(e, "Manual camp refresh could not start")
+                    if (generation == manualRefreshGeneration) finishManualRefresh(getString(R.string.quick_refresh_failed))
+                    return@launch
                 }
                 // The refresh may have ended (hub lost, view gone) while this ran, and another
                 // may have started: its IDs must not join that one's list.
@@ -142,10 +152,14 @@ class VolunteerHomeFragment : Fragment() {
                 startManualRefreshTimeout()
                 // A WorkInfo update that arrived before the IDs were registered was ignored by the
                 // observer; evaluate the current state once now so a quick finish isn't missed.
-                val currentInfos = withContext(Dispatchers.IO) {
-                    runCatching {
+                val currentInfos = try {
+                    withContext(Dispatchers.IO) {
                         WorkManager.getInstance(appContext).getWorkInfos(refreshWorkQuery()).get()
-                    }.getOrDefault(emptyList())
+                    }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    emptyList() // the observer and the timeout still settle the refresh
                 }
                 if (generation == manualRefreshGeneration && _binding != null) {
                     onManualRefreshWorkInfos(currentInfos)
