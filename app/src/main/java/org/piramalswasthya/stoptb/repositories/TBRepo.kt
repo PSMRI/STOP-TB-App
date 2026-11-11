@@ -145,6 +145,14 @@ class TBRepo @Inject constructor(
     suspend fun getDiagnosticsWithPendingManualResult(): List<TBDiagnosticsCache> =
         tbLocalRepo.getDiagnosticsWithPendingManualResult()
 
+    suspend fun hasDiagnosticsWithPendingOrder(): Boolean = tbLocalRepo.hasDiagnosticsWithPendingOrder()
+
+    suspend fun hasDiagnosticsWithPendingManualResult(): Boolean =
+        tbLocalRepo.hasDiagnosticsWithPendingManualResult()
+
+    suspend fun hasPollableOrder(xray: Boolean, truenat: Boolean): Boolean =
+        tbLocalRepo.hasPollableOrder(xray, truenat)
+
     suspend fun getDiagnosticsList(): List<TBDiagnosticsCache> =
         tbLocalRepo.getDiagnosticsList()
 
