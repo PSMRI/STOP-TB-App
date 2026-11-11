@@ -61,7 +61,15 @@ class IconGridAdapter(
             binding.executePendingBindings()
             boundItem = item
             boundOwner = lifecycleOwner
-            collectCount(item, lifecycleOwner)
+            // Collect only while attached: RecyclerView can prefetch and bind a holder it never
+            // attaches, and a detach callback can't stop that one. An unattached holder starts
+            // on attach (resumeCount); its old card's count is cleared here.
+            if (itemView.isAttachedToWindow) {
+                collectCount(item, lifecycleOwner)
+            } else {
+                stopCount()
+                binding.tvCount.text = null
+            }
         }
 
         private fun collectCount(item: Icon, lifecycleOwner: LifecycleOwner, clearBadge: Boolean = true) {
