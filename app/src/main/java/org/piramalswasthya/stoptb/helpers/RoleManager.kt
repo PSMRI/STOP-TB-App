@@ -40,6 +40,7 @@ class RoleManager @Inject constructor(
         val user = preferenceDao.getLoggedInUser()
         _assignedRoles = resolveRoles(user)
         _activeRole.value = _assignedRoles.firstOrNull() ?: AppRole.VOLUNTEER
+        SyncDiagnostics.setActiveRole(_activeRole.value)
         Timber.d(
             "RoleManager: screenNames=${user?.assignedRoleScreenNames}, legacyRole=${user?.role}, " +
                     "assignedRoles=$_assignedRoles, activeRole=${_activeRole.value}"
@@ -54,6 +55,7 @@ class RoleManager @Inject constructor(
     fun setActiveRole(role: AppRole) {
         require(role in _assignedRoles) { "Role $role is not assigned to this user" }
         _activeRole.value = role
+        SyncDiagnostics.setActiveRole(role)
     }
 
     /** The login-gate check: does this user have at least one resolvable role? */

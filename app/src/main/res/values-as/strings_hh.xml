@@ -57,15 +57,17 @@
     <string name="nhhr_type_of_house">ঘৰৰ প্ৰকাৰ</string>
     <string name="nhhr_type_of_house_1">কোনো ঘৰ নাই</string>
     <string name="nhhr_type_of_house_2">কেঁচা ঘৰ (জুপুৰি)</string>
-    <string name="nhhr_type_of_house_3">শিল আৰু গাৰেৰে নিৰ্মিত পকী ঘৰ</string>
-    <string name="nhhr_type_of_house_4">অন্যান্য</string>
-    <string name="nhhr_type_of_house_other">ঘৰৰ অন্য প্ৰকাৰ</string>
+    <string name="nhhr_type_of_house_3">ইটা আৰু কংক্ৰিটেৰে নিৰ্মিত পকী ঘৰ</string>
+    <string name="nhhr_type_of_house_4">শিল আৰু গাৰেৰে নিৰ্মিত পকী ঘৰ</string>
+    <string name="nhhr_type_of_house_5">অন্যান্য প্ৰকাৰ</string>
+    <string name="nhhr_type_of_house_other">ঘৰৰ অন্য প্ৰকাৰ, অনুগ্ৰহ কৰি উল্লেখ কৰক</string>
 
     <string-array name="nhhr_type_of_house_array">
         <item>@string/nhhr_type_of_house_1</item>
         <item>@string/nhhr_type_of_house_2</item>
         <item>@string/nhhr_type_of_house_3</item>
         <item>@string/nhhr_type_of_house_4</item>
+        <item>@string/nhhr_type_of_house_5</item>
     </string-array>
     <string name="nhhr_house_own">ঘৰৰ মালিকীস্বত্ব</string>
     <string-array name="nhhr_house_own_array">
@@ -78,9 +80,9 @@
         <item>নহয়</item>
     </string-array>
 
-    <string name="nhhr_fuel_cooking">ৰন্ধা-বঢ়াৰ বাবে ব্যৱহাৰ কৰা ইন্ধনৰ প্ৰধান উৎস</string>
+    <string name="nhhr_fuel_cooking">ৰন্ধন কাৰ্যৰ বাবে ব্যৱহাৰ কৰা ইন্ধনৰ প্ৰধান উৎস</string>
     <string name="nhhr_fuel_cooking_1">খৰি (কাঠ)</string>
-    <string name="nhhr_fuel_cooking_2">শস্যৰ অৱশিষ্ট</string>
+    <string name="nhhr_fuel_cooking_2">শস্যৰ অৱশিষ্টাংশ</string>
     <string name="nhhr_fuel_cooking_3">গোবৰ শুকুৱাই তৈয়াৰ কৰা উপলা</string>
     <string name="nhhr_fuel_cooking_4">কয়লা</string>
     <string name="nhhr_fuel_cooking_5">কেৰাচিন</string>
@@ -180,6 +182,9 @@
     <string name="sub_title_current_living_info">Please provide the beneficiary\'s current living place details.</string>
     <string name="hint_place_of_current_living">Place of Current Living *</string>
     <string name="hint_other_place">Other Place *</string>
-    <string name="hint_institution_name">Name of the Institution *</string>
+    <string name="hint_institution_name">Name of Institution *</string>
+    <string name="ben_reg_place_of_current_living">বৰ্তমান বসবাসৰ স্থান</string>
+    <string name="ben_reg_other_place_of_current_living">অন্য স্থান</string>
+    <string name="ben_reg_institution_name">প্ৰতিষ্ঠানৰ নাম</string>
 
 </resources>

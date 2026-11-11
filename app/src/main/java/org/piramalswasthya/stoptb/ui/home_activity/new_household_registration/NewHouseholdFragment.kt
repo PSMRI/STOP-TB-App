@@ -338,9 +338,9 @@ class NewHouseholdFragment : Fragment() {
     // row and reshuffles recycled views between fields; a focused EditText then keeps showing another
     // field's text (e.g. village name inside Mobile No).
     private fun hardCodedListUpdate(formId: Int) {
-        val targetId = when (formId) {
-            23 -> 24      // villageHamlet changed → address is auto-filled
-            1002 -> 2     // mobileNotAvailable toggled → mobileNoHeadOfFamily cleared/enabled/disabled
+        val targetIds = when (formId) {
+            23 -> listOf(24, 25, 8) // villageHamlet changed → address auto-filled, pincode & residential area reset
+            1002 -> listOf(2)   // mobileNotAvailable toggled → mobileNoHeadOfFamily cleared/enabled/disabled
             else -> return // address (24) edits: its own watcher already shows the validation error
         }
         requireActivity().currentFocus?.clearFocus()
@@ -352,8 +352,10 @@ class NewHouseholdFragment : Fragment() {
         }
         rv.post {
             val adapter = rv.adapter as? FormInputAdapter ?: return@post
-            val position = adapter.currentList.indexOfFirst { it.id == targetId }
-            if (position >= 0) adapter.notifyItemChanged(position)
+            targetIds.forEach { targetId ->
+                val position = adapter.currentList.indexOfFirst { it.id == targetId }
+                if (position >= 0) adapter.notifyItemChanged(position)
+            }
         }
     }
 
@@ -824,7 +826,7 @@ class NewHouseholdFragment : Fragment() {
         if (!isAdded) return
         if (viewModel.linkBenId != 0L) {
             android.widget.Toast.makeText(requireContext(), "Beneficiary linked as Head of Family successfully", android.widget.Toast.LENGTH_SHORT).show()
-            org.piramalswasthya.stoptb.work.WorkerUtils.triggerAmritPushWorker(requireContext())
+            org.piramalswasthya.stoptb.work.WorkerUtils.triggerAmritPushWorker(requireContext(), "DIRECT_SAVE")
             val popped = findNavController().popBackStack(R.id.nonHHFragment, false)
             if (!popped) findNavController().navigateUp()
         } else {

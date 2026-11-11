@@ -3,12 +3,14 @@ package org.piramalswasthya.stoptb.database.shared_preferences
 import android.content.Context
 import android.net.Uri
 import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.model.LocationRecord
 import org.piramalswasthya.stoptb.model.User
+import org.piramalswasthya.stoptb.model.VillageDefaults
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -17,6 +19,17 @@ import javax.inject.Singleton
 class PreferenceDao @Inject constructor(@ApplicationContext private val context: Context) {
 
     private val pref = PreferenceManager.getInstance(context)
+
+    private companion object {
+        const val CHANGES_FEED_TOKEN = "changes_feed_token"
+        const val COUNSELLING_SCHEMA_STORE_FORMAT_KEY = "counselling_schema_store_format"
+        const val CHANGES_FEED_SCOPE = "changes_feed_scope"
+        const val MASTERS_REFRESHED_AT = "masters_refreshed_at"
+        const val CHANGES_FEED_ACTIVE = "changes_feed_active"
+        const val VILLAGE_DEFAULTS_KEY = "village_defaults_by_village_id"
+        const val VILLAGE_MASTER_DEFAULTS_KEY = "village_master_defaults_by_village_id"
+    }
+
     fun deleteAmritToken() {
         val editor = pref.edit()
         val prefKey = context.getString(R.string.PREF_D2D_API_KEY)
@@ -65,6 +78,24 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         pref.edit().putLong("diag_poll_actual_start_${benId}_${orderType}", time).apply()
     }
 
+    /** Lowest temp (negative) beneficiary ID issued so far; 0 if none. */
+    fun getLastTempBenId(): Long {
+        return pref.getLong("last_temp_ben_id", 0L)
+    }
+
+    fun setLastTempBenId(benId: Long) {
+        pref.edit().putLong("last_temp_ben_id", benId).commit()
+    }
+
+    /** Server benId that replaced temp [tempBenId] on push; 0 if not recorded. */
+    fun getFinalBenId(tempBenId: Long): Long {
+        return pref.getLong("final_ben_id_$tempBenId", 0L)
+    }
+
+    fun setFinalBenId(tempBenId: Long, finalBenId: Long) {
+        pref.edit().putLong("final_ben_id_$tempBenId", finalBenId).commit()
+    }
+
     fun registerJWTAmritToken(token: String) {
         val editor = pref.edit()
         val prefKey = context.getString(R.string.PREF_primary_JWT_API_KEY)
@@ -96,7 +127,11 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
     }
 
     fun deleteForLogout() {
-        pref.edit().clear().apply()
+        val logs = org.piramalswasthya.stoptb.helpers.interactiveSyncLogSession
+        synchronized(logs) {
+            logs.reset(signedIn = false)
+            pref.edit().clear().apply()
+        }
     }
 
     fun deleteLoginCred() {
@@ -162,6 +197,69 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         return Gson().fromJson(json, LocationRecord::class.java)
     }
 
+    /**
+     * Pincode / Residential Area for a village: the backend master value (getUserDetail) where it has one,
+     * otherwise the value captured on the device.
+     */
+    fun getVillageDefaults(villageId: Int): VillageDefaults? {
+        val capturedDefaults = getVillageDefaultsByVillageId(VILLAGE_DEFAULTS_KEY)[villageId.toString()]
+        val masterDefaults = getVillageMasterDefaults(villageId) ?: return capturedDefaults
+        return VillageDefaults(
+            pinCode = masterDefaults.pinCode?.takeIf { masterDefaults.hasPinCode } ?: capturedDefaults?.pinCode,
+            residentialAreaId = masterDefaults.residentialAreaId.takeIf { masterDefaults.hasResidentialArea }
+                ?: capturedDefaults?.residentialAreaId ?: 0
+        )
+    }
+
+    /** Backend master Pincode / Residential Area for a village, or null when the backend sent none. */
+    fun getVillageMasterDefaults(villageId: Int): VillageDefaults? =
+        getVillageDefaultsByVillageId(VILLAGE_MASTER_DEFAULTS_KEY)[villageId.toString()]
+
+    /** Replaces the backend master values with those from the latest getUserDetail. */
+    fun saveVillageMasterDefaults(masterDefaultsByVillageId: Map<Int, VillageDefaults>) {
+        val json = Gson().toJson(masterDefaultsByVillageId.mapKeys { (villageId, _) -> villageId.toString() })
+        pref.edit().putString(VILLAGE_MASTER_DEFAULTS_KEY, json).apply()
+    }
+
+    /** Saves the values entered on the device for a village (used where the backend has none). */
+    fun saveVillageDefaults(villageId: Int, villageDefaults: VillageDefaults) {
+        val defaultsByVillageId = getVillageDefaultsByVillageId(VILLAGE_DEFAULTS_KEY).toMutableMap()
+        defaultsByVillageId[villageId.toString()] = villageDefaults
+        pref.edit().putString(VILLAGE_DEFAULTS_KEY, Gson().toJson(defaultsByVillageId)).apply()
+    }
+
+    /**
+     * Remembers values captured in a registration form for a village that had none saved yet.
+     * Never overwrites a value already saved for the village.
+     */
+    fun saveVillageDefaultsIfMissing(villageId: Int, capturedDefaults: VillageDefaults) {
+        if (villageId <= 0) return
+        val savedDefaults = getVillageDefaults(villageId)
+        val mergedDefaults = VillageDefaults(
+            pinCode = savedDefaults?.pinCode?.takeIf { savedDefaults.hasPinCode }
+                ?: capturedDefaults.pinCode?.trim()?.takeIf { it.isNotEmpty() },
+            residentialAreaId = savedDefaults?.residentialAreaId?.takeIf { savedDefaults.hasResidentialArea }
+                ?: capturedDefaults.residentialAreaId
+        )
+        if (mergedDefaults != savedDefaults) saveVillageDefaults(villageId, mergedDefaults)
+    }
+
+    private fun getVillageDefaultsByVillageId(prefKey: String): Map<String, VillageDefaults> {
+        val json = pref.getString(prefKey, null) ?: return emptyMap()
+        return runCatching {
+            Gson().fromJson<Map<String, VillageDefaults>>(
+                json,
+                object : TypeToken<Map<String, VillageDefaults>>() {}.type
+            )
+        }.getOrNull() ?: emptyMap()
+    }
+
+    fun getCounsellingSchemaStoreFormat(): Int = pref.getInt(COUNSELLING_SCHEMA_STORE_FORMAT_KEY, 0)
+
+    fun setCounsellingSchemaStoreFormat(format: Int) {
+        pref.edit().putInt(COUNSELLING_SCHEMA_STORE_FORMAT_KEY, format).apply()
+    }
+
     fun setLastSyncedTimeStamp(lastSaved: Long) {
         val editor = pref.edit()
         val prefKey = context.getString(R.string.PREF_full_load_pull_progress)
@@ -172,6 +270,32 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
     fun getLastSyncedTimeStamp(): Long {
         val prefKey = context.getString(R.string.PREF_full_load_pull_progress)
         return pref.getLong(prefKey, Konstants.defaultTimeStamp)
+    }
+
+    // Changes feed position. The scope (service, villages, record types) is stored with it: a token is
+    // only valid for the scope it was issued for, so a different scope starts a new full download.
+    fun getChangesFeedToken(scope: String): String? =
+        if (pref.getString(CHANGES_FEED_SCOPE, null) == scope) pref.getString(CHANGES_FEED_TOKEN, null) else null
+
+    fun setChangesFeedToken(scope: String, token: String?) {
+        pref.edit().putString(CHANGES_FEED_SCOPE, scope).putString(CHANGES_FEED_TOKEN, token).apply()
+    }
+
+    // True after a pull completed through the changes feed, false when the server has no feed.
+    // Screens and workers that used to call the per-dataset endpoints read local data instead
+    // while it is true.
+    fun isChangesFeedActive(): Boolean = pref.getBoolean(CHANGES_FEED_ACTIVE, false)
+
+    fun setChangesFeedActive(active: Boolean) {
+        pref.edit().putBoolean(CHANGES_FEED_ACTIVE, active).apply()
+    }
+
+    // When visit categories, chief complaints and drug masters were last downloaded. Cleared at
+    // logout with everything else, so the first pull after login always refreshes them.
+    fun getMastersRefreshedAt(): Long = pref.getLong(MASTERS_REFRESHED_AT, 0L)
+
+    fun setMastersRefreshedAt(time: Long) {
+        pref.edit().putLong(MASTERS_REFRESHED_AT, time).apply()
     }
 
     fun setFirstSyncLastSyncedPage(page: Int) {
@@ -231,7 +355,10 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
 
     fun setCampHubUrl(url: String) {
         val key = context.getString(R.string.PREF_camp_hub_url)
-        pref.edit().putString(key, url).commit()
+        val previous = runCatching { pref.getString(key, null) }.getOrNull()
+        if (pref.edit().putString(key, url).commit()) {
+            org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.addressChanged(context, previous, url)
+        }
     }
 
     fun getCampHubUrl(): String {
@@ -295,7 +422,12 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         val prefKey = context.getString(R.string.PREF_user_entry)
         val userJson = Gson().toJson(user)
         editor.putString(prefKey, userJson)
-        editor.apply()
+        val logs = org.piramalswasthya.stoptb.helpers.interactiveSyncLogSession
+        synchronized(logs) {
+            logs.reset(signedIn = false)
+            editor.apply()
+            logs.reset(signedIn = true)
+        }
     }
 
     fun getLoggedInUser(): User? {

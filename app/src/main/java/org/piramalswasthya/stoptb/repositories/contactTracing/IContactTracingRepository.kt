@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.repositories.contactTracing
 
+import org.piramalswasthya.stoptb.model.dynamicEntity.ServerCounsellingResponseDto
 import kotlinx.coroutines.flow.Flow
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.contactTracing.ContactTracingStatus
@@ -57,6 +58,10 @@ interface IContactTracingRepository {
         answersBySectionId: Map<Int, List<QuestionResponseEntity>>
     )
 
+    // Re-keys the beneficiary's older-version TPT_FOLLOW_UP rows (live and history) onto
+    // activeVersionId by questionUuid/optionValue, so version-scoped TPT lookups see them.
+    suspend fun migrateTptResponsesToVersion(beneficiaryId: Long, activeVersionId: Int)
+
     // Fetches the beneficiary's previously submitted answers for this form type from the server and stores them locally for prefill.
     suspend fun fetchAndStoreContactResponse(
         beneficiaryId: Long,
@@ -103,6 +108,13 @@ interface IContactTracingRepository {
     // Fetches TPT Follow-up history village-wide from the server and refreshes local storage for all beneficiaries in the village in one bulk request.
     suspend fun fetchAndRefreshVillageTptHistory(villageId: Int, formVersionId: Int): Boolean
 
+    // Contact tracing, contact follow-up and TPT follow-up responses from the changes feed, saved
+    // exactly as the village pulls above save them.
+    suspend fun applyFeedFormResponses(
+        formType: FormType,
+        responses: List<ServerCounsellingResponseDto>
+    )
+
     // Finds the beneficiary's current response for a given form phase, or null if a new one should be started.
     suspend fun getExistingContactResponseForPhase(
         beneficiaryId: Long,
@@ -132,15 +144,18 @@ interface IContactTracingRepository {
     // Fetches Community and Occupational contact tracing completion status to drive the type bottom sheet's tick/cross indicators.
     suspend fun getContactTracingStatus(beneficiaryId: Long): ContactTracingStatus
 
-    // "Done" requires the follow-on TPT_FOLLOW_UP PRE_SUBMIT to also be submitted for
-    // TPT_ELIGIBLE beneficiaries — matches ExamineViewModel.isContactFollowUpDone so the list
-    // badge and the Examine screen's per-row Fill/View state never disagree.
+    // "Done" once CONTACT_FOLLOW_UP itself is submitted — TPT registration is its own "Start TPT"
+    // step (observeTptRegistrationDoneBenIds). Matches ExamineViewModel.isContactFollowUpDone.
     fun observeContactFollowUpDoneBenIds(): Flow<List<Long>>
+
+    // Beneficiaries whose TPT_FOLLOW_UP PRE_SUBMIT (registration/regimen) is submitted — the
+    // Examine sheet's "Start TPT" row and its list-badge item.
+    fun observeTptRegistrationDoneBenIds(): Flow<List<Long>>
 
     fun observeTptFollowUpTargetReachedBenIds(): Flow<List<Long>>
 
     // Beneficiaries whose CONTACT_FOLLOW_UP clinical screening answer is TPT_ELIGIBLE — drives
-    // whether the Counselling Officer's Examine badge total is x/2 (TB Screening + Contact
-    // Follow Up only) or x/3 (TPT Follow Up also required).
+    // whether the Counselling Officer's Examine badge total is x/3 (Anthropometry, TB Screening,
+    // Contact Follow Up) or x/5 (Start TPT and TPT Follow Up also required).
     fun observeTptEligibleBenIds(): Flow<List<Long>>
 }

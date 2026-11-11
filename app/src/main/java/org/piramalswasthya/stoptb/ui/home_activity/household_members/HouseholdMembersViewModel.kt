@@ -62,13 +62,14 @@ class HouseholdMembersViewModel @Inject constructor(
 
     /** Diagnosis = TB_DIAGNOSTICS (new) OR TB_SUSPECTED (legacy) */
     val diagnosisBenIds: Flow<List<Long>> = combine(
-        tbRepo.tbDiagnosticsBenIds,
+        tbRepo.tbDiagnosticsBenIdsFromCards,
         tbRepo.tbSuspectedBenIds
     ) { diagnostics, suspected -> (diagnostics + suspected).distinct() }
 
     val contactFollowUpDoneBenIds: Flow<List<Long>> = contactTracingRepo.observeContactFollowUpDoneBenIds()
     val tptFollowUpDoneBenIds: Flow<List<Long>> = contactTracingRepo.observeTptFollowUpTargetReachedBenIds()
     val tptEligibleBenIds: Flow<List<Long>> = contactTracingRepo.observeTptEligibleBenIds()
+    val tptRegistrationDoneBenIds: Flow<List<Long>> = contactTracingRepo.observeTptRegistrationDoneBenIds()
 
     suspend fun getBenRegId(benId: Long): Long {
         return withContext(Dispatchers.IO) {

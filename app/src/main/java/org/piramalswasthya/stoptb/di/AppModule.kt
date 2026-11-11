@@ -29,6 +29,8 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.FormRespons
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.AnalyticsHelper
 import org.piramalswasthya.stoptb.helpers.ApiAnalyticsInterceptor
+import org.piramalswasthya.stoptb.helpers.SyncApiPayloadInterceptor
+import org.piramalswasthya.stoptb.helpers.SyncHttpCallFactory
 import org.piramalswasthya.stoptb.helpers.TokenExpiryManager
 import org.piramalswasthya.stoptb.network.AbhaApiService
 import org.piramalswasthya.stoptb.network.AmritApiService
@@ -97,6 +99,7 @@ object AppModule {
     @Provides
     @Named(UAT_CLIENT)
     fun provideUatHttpClient(
+        syncApiPayloadInterceptor: SyncApiPayloadInterceptor,
         apiAnalyticsInterceptor: ApiAnalyticsInterceptor,
         tokenInsertTmcInterceptor: TokenInsertTmcInterceptor,
         tokenAuthenticator: TokenAuthenticator,
@@ -109,6 +112,7 @@ object AppModule {
             .addInterceptor(tokenInsertTmcInterceptor)
             .addInterceptor(apiAnalyticsInterceptor)
             .addInterceptor(campModeUrlInterceptor)
+            .addInterceptor(syncApiPayloadInterceptor)
             .addInterceptor(loggingInterceptor)
             .addInterceptor(accountDeactivationInterceptor)
             .authenticator(tokenAuthenticator) // attach authenticator for 401 handling
@@ -124,7 +128,7 @@ object AppModule {
         return Retrofit.Builder()
             .baseUrl(KeyUtils.baseTMCUrl())
             .addConverterFactory(MoshiConverterFactory.create(moshi))
-            .client(httpClient)
+            .callFactory(SyncHttpCallFactory(httpClient))
             .build()
             .create(AmritApiService::class.java)
     }
@@ -133,11 +137,15 @@ object AppModule {
     @Provides
     fun provideHttpLoggingInterceptor(): HttpLoggingInterceptor {
         val loggingInterceptor = HttpLoggingInterceptor(LoggingInterceptor()).apply {
-            level =
-                    //if (BuildConfig.DEBUG)
-                HttpLoggingInterceptor.Level.BODY
-            //else
-            //HttpLoggingInterceptor.Level.NONE
+            // BASIC, not BODY. At BODY this interceptor reads every response fully into a
+            // Buffer and then copies it into a String purely to log it - for the bulk
+            // `getAll` endpoints that is a multi-megabyte UTF-16 copy of a body the parser is
+            // about to materialise again. On a camp device that showed up as ~93MB sitting in
+            // the large-object space and a heap pinned near its 186MB ceiling, which stalled
+            // the whole app in back-to-back GCs. BASIC keeps method, URL, status and size.
+            // Flip this to BODY temporarily when a payload actually has to be inspected; it
+            // also writes beneficiary PII (names, DOB, phone numbers) into logcat.
+            level = HttpLoggingInterceptor.Level.BASIC
         }
         return loggingInterceptor
     }
@@ -210,7 +218,7 @@ object AppModule {
         return Retrofit.Builder()
             .addConverterFactory(GsonConverterFactory.create()) // ✅ Only for this API
             .baseUrl(KeyUtils.baseTMCUrl())
-            .client(httpClient)
+            .callFactory(SyncHttpCallFactory(httpClient))
             .build()
             .create(AmritApiService::class.java)
     }
