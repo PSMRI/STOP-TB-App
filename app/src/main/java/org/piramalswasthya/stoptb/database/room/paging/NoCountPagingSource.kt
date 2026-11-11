@@ -4,6 +4,8 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import androidx.room.InvalidationTracker
 import androidx.room.RoomDatabase
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -36,28 +38,36 @@ class NoCountPagingSource<T : Any>(
     }
     private val registered = AtomicBoolean(false)
 
+    // Adding or removing an observer can create or drop Room's triggers, which waits for the
+    // database (behind a sync write, if one is running). Room's own PagingSource does both on its
+    // query executor; load() can run on Main when the pager is collected in viewModelScope.
+    private val queryDispatcher = db.queryExecutor.asCoroutineDispatcher()
+
     init {
         registerInvalidatedCallback {
-            if (registered.get()) db.invalidationTracker.removeObserver(observer)
+            // invalidate() can be called on Main (a list refresh); remove on the query executor.
+            if (registered.get()) db.queryExecutor.execute { db.invalidationTracker.removeObserver(observer) }
         }
     }
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, T> {
         return try {
-            // Registered on the first load (off the main thread), as Room does, before reading.
+            // Registered on the first load, on the query executor as Room does, before reading.
             // Inside the try: an unknown table name throws here, and that must become a
             // retryable LoadResult.Error rather than fail the list's collector.
             if (!invalid && registered.compareAndSet(false, true)) {
-                try {
-                    db.invalidationTracker.addObserver(observer)
-                } catch (error: Exception) {
-                    registered.set(false) // a retry of this load registers again
-                    throw error
+                withContext(queryDispatcher) {
+                    try {
+                        db.invalidationTracker.addObserver(observer)
+                    } catch (error: Exception) {
+                        registered.set(false) // a retry of this load registers again
+                        throw error
+                    }
+                    // invalidate() may have run its callback before the observer was added, which then
+                    // removed nothing; the tracker holds observers strongly, so drop it here instead of
+                    // leaking this source and running it on every write. Removing twice is harmless.
+                    if (invalid) db.invalidationTracker.removeObserver(observer)
                 }
-                // invalidate() may have run its callback before the observer was added, which then
-                // removed nothing; the tracker holds observers strongly, so drop it here instead of
-                // leaking this source and running it on every write. Removing twice is harmless.
-                if (invalid) db.invalidationTracker.removeObserver(observer)
             }
             val (offset, limit) = when (params) {
                 is LoadParams.Refresh -> (params.key ?: 0).coerceAtLeast(0) to params.loadSize

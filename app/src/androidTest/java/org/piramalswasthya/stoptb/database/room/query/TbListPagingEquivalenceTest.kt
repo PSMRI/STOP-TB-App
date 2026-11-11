@@ -81,6 +81,41 @@ class TbListPagingEquivalenceTest {
         assertTrue("searches should find rows in all three lists, got $nonEmpty", nonEmpty >= 6)
     }
 
+    /**
+     * A suspected record with a positive NAAT or liquid culture result but no confirmed flag (a
+     * record synced from elsewhere) makes the beneficiary Confirmed, not Presumptive, in the lists
+     * and their counts - the same as a positive result on the diagnostics record.
+     */
+    @Test
+    fun positiveSuspectedLabResultWithoutFlagsIsConfirmed() = runBlocking {
+        // Index 4 and 8: symptomatic screening (cough), no suspected row in the seed, alive, active.
+        val cases = listOf(4 to "naatResult = 'MTB Detected'", 8 to "liquidCultureResult = 'Positive'")
+        val sql = db.openHelper.writableDatabase
+        for ((index, _) in cases) {
+            val benId = FIRST_BEN_ID + index
+            val villageId = VILLAGES[index % VILLAGES.size]
+            assertTrue("seed: $benId presumptive before", db.benDao.getTbPresumptivePage(villageId, "", ALL_ROWS, 0).any { row -> row.ben.benId == benId })
+        }
+        for ((index, result) in cases) {
+            val benId = FIRST_BEN_ID + index
+            sql.execSQL(
+                "INSERT INTO TB_SUSPECTED (benId, visitDate, hasSymptoms, isConfirmed, syncState, isTBConfirmed) " +
+                    "VALUES ($benId, $BASE, 1, 0, 2, 0)"
+            )
+            sql.execSQL("UPDATE TB_SUSPECTED SET $result WHERE benId = $benId")
+        }
+        for ((index, result) in cases) {
+            val benId = FIRST_BEN_ID + index
+            val villageId = VILLAGES[index % VILLAGES.size]
+            val confirmed = db.benDao.getTbConfirmedPage(villageId, "", ALL_ROWS, 0).map { row -> row.ben.benId }
+            val presumptive = db.benDao.getTbPresumptivePage(villageId, "", ALL_ROWS, 0).map { row -> row.ben.benId }
+            assertTrue("$result: confirmed", benId in confirmed)
+            assertTrue("$result: not presumptive", benId !in presumptive)
+            assertEquals("$result: confirmed count", confirmed.size, db.benDao.getTbConfirmedListCount(villageId).first())
+            assertEquals("$result: presumptive count", presumptive.size, db.benDao.getTbPresumptiveListCount(villageId).first())
+        }
+    }
+
     /** The screening list is every live beneficiary of the village, newest update first. */
     @Test
     fun screeningListIsTheWholeVillageNewestFirst() = runBlocking {
