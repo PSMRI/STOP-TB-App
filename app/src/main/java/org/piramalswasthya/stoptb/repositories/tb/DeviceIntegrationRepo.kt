@@ -60,8 +60,10 @@ class DeviceIntegrationRepo @Inject constructor(
         }
     }
 
-    suspend fun checkDeviceIntegration(orderType: String): Boolean {
-        val health = getVendorHealth(orderType)
+    suspend fun checkDeviceIntegration(orderType: String): Boolean =
+        isIntegrated(getVendorHealth(orderType))
+
+    private fun isIntegrated(health: NetworkResponse<String>): Boolean {
         if (health is NetworkResponse.Success) {
             val dataStr = health.data
             return dataStr?.contains("isDeviceIntegrated: true") == true &&
@@ -89,12 +91,16 @@ class DeviceIntegrationRepo @Inject constructor(
         if (maxAgeMs > 0L && lastRefreshAt != 0L && hubUrl == lastRefreshHubUrl && now - lastRefreshAt < maxAgeMs) {
             return
         }
-        val xrayVal = checkDeviceIntegration("XRAY_CHEST")
-        val truenatVal = checkDeviceIntegration("MTB")
-        preferenceDao.setXrayIntegrated(xrayVal)
-        preferenceDao.setTruenatIntegrated(truenatVal)
-        lastRefreshAt = now
-        lastRefreshHubUrl = hubUrl
+        val xrayHealth = getVendorHealth("XRAY_CHEST")
+        val truenatHealth = getVendorHealth("MTB")
+        preferenceDao.setXrayIntegrated(isIntegrated(xrayHealth))
+        preferenceDao.setTruenatIntegrated(isIntegrated(truenatHealth))
+        // Cache only a real answer from the hub: a timeout or HTTP error is retried on the next
+        // poll cycle instead of reporting both devices as not integrated for the whole window.
+        if (xrayHealth is NetworkResponse.Success && truenatHealth is NetworkResponse.Success) {
+            lastRefreshAt = now
+            lastRefreshHubUrl = hubUrl
+        }
     }
 
     fun isXrayIntegrated(): Boolean {

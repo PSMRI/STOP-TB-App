@@ -437,26 +437,24 @@ object WorkerUtils {
     }
 
     /**
-     * KEEP, not REPLACE: REPLACE cancels a poll that is already running and starts it again from
-     * the top, so a run that is part-way through its per-beneficiary network calls loses that work
-     * and repeats the writes it has already done. With ~9 call sites plus the worker's own 60s
-     * reschedule, runs were cancelling each other continuously (97 runs in 104 minutes, minimum
-     * gap 0.1s). KEEP lets an in-flight run finish; the worker reschedules itself every 60s while
-     * any order is still in progress, so nothing is lost — a trigger that arrives while a run is
-     * pending is simply folded into that run instead of restarting it.
-     */
-    /**
-     * Runs a result-poll cycle now. If a cycle is running, the new one is queued right behind it;
-     * if only the next delayed cycle is waiting, that one is replaced so a new order doesn't wait
-     * up to the full delay (KEEP used to ignore the trigger in both cases). The WorkManager state
-     * check is a blocking query, so it runs off the caller's thread.
+     * Runs a result-poll cycle now. If nothing is running, the new cycle replaces any delayed one,
+     * so a new order doesn't wait up to the full delay. If a cycle is running with nothing queued
+     * behind it, the new one is queued right behind it. If a cycle is running and already has a
+     * successor (its own delayed reschedule or an earlier trigger), the trigger is dropped: every
+     * cycle schedules its own successor, so a second queued cycle would never leave the chain.
+     * (REPLACE on a running cycle cancels it part-way through; KEEP ignored triggers entirely.)
+     * The WorkManager state check is a blocking query, so it runs off the caller's thread.
      */
     fun triggerDiagnosticResultPollWorker(context: Context) {
         val appContext = context.applicationContext
         triggerScope.launch {
             val workManager = WorkManager.getInstance(appContext)
-            val running = getActiveUniqueWorkInfos(workManager, DiagnosticResultPollWorker.name)
-                .any { info -> info.state == WorkInfo.State.RUNNING }
+            val activeCycles = getActiveUniqueWorkInfos(workManager, DiagnosticResultPollWorker.name)
+            val running = activeCycles.any { info -> info.state == WorkInfo.State.RUNNING }
+            val hasQueuedSuccessor = activeCycles.any { info ->
+                info.state == WorkInfo.State.ENQUEUED || info.state == WorkInfo.State.BLOCKED
+            }
+            if (running && hasQueuedSuccessor) return@launch
             val workRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>().build()
             workManager.enqueueUniqueWork(
                 DiagnosticResultPollWorker.name,

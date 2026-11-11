@@ -68,6 +68,8 @@ class IconGridAdapter(
                 countJob = null
                 return
             }
+            // A recycled holder would otherwise show the previous card's count until this flow emits.
+            binding.tvCount.text = null
             countJob = lifecycleOwner.lifecycleScope.launch {
                 lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                     try {

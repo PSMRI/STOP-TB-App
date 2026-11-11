@@ -7,6 +7,7 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.ExistingWorkPolicy
 import dagger.assisted.Assisted
@@ -48,13 +49,29 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
     }
 
     private fun scheduleNextRun(delaySec: Long) {
+        val workManager = WorkManager.getInstance(appContext)
+        // A trigger that arrived during this run already queued the next cycle right behind it,
+        // and that cycle schedules its own successor. Adding ours too would keep an extra cycle in
+        // the chain for good. Called from doWork on Dispatchers.IO, so the blocking query is fine.
+        val successorQueued = try {
+            workManager.getWorkInfosForUniqueWork(name).get().any { info ->
+                info.id != id && (info.state == WorkInfo.State.ENQUEUED || info.state == WorkInfo.State.BLOCKED)
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "Could not read DiagnosticResultPollWorker state; scheduling the next run anyway")
+            false
+        }
+        if (successorQueued) {
+            Timber.d("Next DiagnosticResultPollWorker run already queued; not adding another")
+            return
+        }
         Timber.d("Scheduling next DiagnosticResultPollWorker run in ${delaySec}s")
         val pollRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>()
             .setInitialDelay(delaySec, TimeUnit.SECONDS)
             .build()
         // APPEND_OR_REPLACE: queue the next cycle behind this one. REPLACE on our own unique
         // name cancelled this still-running work.
-        WorkManager.getInstance(appContext).enqueueUniqueWork(
+        workManager.enqueueUniqueWork(
             name,
             ExistingWorkPolicy.APPEND_OR_REPLACE,
             pollRequest

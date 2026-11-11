@@ -224,6 +224,9 @@ class TbPushRepo @Inject constructor(
                         lastError = "HTTP $statusCode"
                         failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                     }
+                } catch (e: CancellationException) {
+                    // A cancelled chain is not a server rejection: let WorkManager stop the run.
+                    throw e
                 } catch (e: IOException) {
                     // Hub unreachable: stop this run and let the push worker retry with backoff.
                     Timber.e("TB Screening push stopped by network error: $e")
@@ -408,6 +411,9 @@ class TbPushRepo @Inject constructor(
                         lastError = "HTTP $statusCode"
                         failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                     }
+                } catch (e: CancellationException) {
+                    // A cancelled chain is not a server rejection: let WorkManager stop the run.
+                    throw e
                 } catch (e: IOException) {
                     // Hub unreachable: stop this run and let the push worker retry with backoff.
                     Timber.e("TB Diagnostics push stopped by network error: $e")
@@ -522,6 +528,9 @@ class TbPushRepo @Inject constructor(
                         lastError = "HTTP $statusCode"
                         failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                     }
+                } catch (e: CancellationException) {
+                    // A cancelled chain is not a server rejection: let WorkManager stop the run.
+                    throw e
                 } catch (e: IOException) {
                     // Hub unreachable: stop this run and let the push worker retry with backoff.
                     Timber.e("TB Suspected push stopped by network error: $e")
@@ -626,6 +635,9 @@ class TbPushRepo @Inject constructor(
                         lastError = "HTTP $statusCode"
                         failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                     }
+                } catch (e: CancellationException) {
+                    // A cancelled chain is not a server rejection: let WorkManager stop the run.
+                    throw e
                 } catch (e: IOException) {
                     // Hub unreachable: stop this run and let the push worker retry with backoff.
                     Timber.e("TB Confirmed push stopped by network error: $e")

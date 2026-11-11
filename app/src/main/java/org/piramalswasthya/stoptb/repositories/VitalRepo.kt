@@ -27,7 +27,13 @@ import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Locale
 import javax.inject.Inject
+import javax.inject.Singleton
 
+/**
+ * Singleton: [vitalBenIdStates] is shared in the process-wide app scope, so each extra instance
+ * would leave its sharing coroutine (and this repo) alive for the life of the process.
+ */
+@Singleton
 class VitalRepo @Inject constructor(
     private val vitalDao: VitalDao,
     private val benDao: BenDao,
@@ -46,7 +52,7 @@ class VitalRepo @Inject constructor(
 
         /**
          * PR 7.4: serializes the background push and the push right after a save, which could
-         * POST the same vital twice. Process-wide because VitalRepo is not a singleton.
+         * POST the same vital twice. Kept in the companion so it stays process-wide.
          */
         private val pushMutex = kotlinx.coroutines.sync.Mutex()
     }
