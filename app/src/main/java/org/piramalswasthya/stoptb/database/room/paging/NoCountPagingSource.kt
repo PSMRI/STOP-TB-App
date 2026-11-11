@@ -43,15 +43,22 @@ class NoCountPagingSource<T : Any>(
     }
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, T> {
-        // Registered on the first load (off the main thread), as Room does, before reading.
-        if (!invalid && registered.compareAndSet(false, true)) {
-            db.invalidationTracker.addObserver(observer)
-            // invalidate() may have run its callback before the observer was added, which then
-            // removed nothing; the tracker holds observers strongly, so drop it here instead of
-            // leaking this source and running it on every write. Removing twice is harmless.
-            if (invalid) db.invalidationTracker.removeObserver(observer)
-        }
         return try {
+            // Registered on the first load (off the main thread), as Room does, before reading.
+            // Inside the try: an unknown table name throws here, and that must become a
+            // retryable LoadResult.Error rather than fail the list's collector.
+            if (!invalid && registered.compareAndSet(false, true)) {
+                try {
+                    db.invalidationTracker.addObserver(observer)
+                } catch (error: Exception) {
+                    registered.set(false) // a retry of this load registers again
+                    throw error
+                }
+                // invalidate() may have run its callback before the observer was added, which then
+                // removed nothing; the tracker holds observers strongly, so drop it here instead of
+                // leaking this source and running it on every write. Removing twice is harmless.
+                if (invalid) db.invalidationTracker.removeObserver(observer)
+            }
             val (offset, limit) = when (params) {
                 is LoadParams.Refresh -> (params.key ?: 0).coerceAtLeast(0) to params.loadSize
                 is LoadParams.Append -> params.key to params.loadSize

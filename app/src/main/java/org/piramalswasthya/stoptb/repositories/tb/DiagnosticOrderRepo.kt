@@ -625,7 +625,7 @@ class DiagnosticOrderRepo @Inject constructor(
     // Rechecks the order result and updates the diagnostic record.
     private suspend fun reconcileOrderResult(benId: Long, orderType: String) {
         try {
-            val existing = tbDao.getTbDiagnosticsByBenId(benId) ?: return
+            if (tbDao.getTbDiagnosticsByBenId(benId) == null) return
             val response = tmcNetworkApiService.fetchOrderResult(
                 benId = benId,
                 orderType = orderType
@@ -635,6 +635,11 @@ class DiagnosticOrderRepo @Inject constructor(
             val responseData = response.body()?.takeIf { it.statusCode == 200 }?.data
                 ?: return
 
+            // Network call outside the lock; read-modify-write inside it on a fresh row, like every
+            // other TB_DIAGNOSTICS update here - a row read before the call could revert a write
+            // that landed during it (a result, a new order, a feed apply) and re-push the old state.
+            benIdLocks.withLock(benId) {
+            val existing = tbDao.getTbDiagnosticsByBenId(benId) ?: return@withLock
             val cache = when {
                 orderType.equals("XRAY_CHEST", ignoreCase = true) ->
                     existing.copy(
@@ -656,7 +661,7 @@ class DiagnosticOrderRepo @Inject constructor(
                         syncState = SyncState.UNSYNCED
                     )
 
-                else -> return
+                else -> return@withLock
             }
 
             // Only write (and re-mark for push) when the error message actually changed. While
@@ -664,6 +669,7 @@ class DiagnosticOrderRepo @Inject constructor(
             // row and re-queueing the same push each time.
             if (cache.copy(syncState = existing.syncState) != existing) {
                 tbDao.saveTbDiagnostics(cache)
+            }
             }
         } catch (e: Exception) {
             Timber.e(e, "giveUpReconciliation failed")
