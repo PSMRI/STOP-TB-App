@@ -276,9 +276,14 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
 
                 Result.success()
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
+            // Not Result.failure(): WorkManager would also fail a successor a trigger queued
+            // behind this cycle, and polling would stop until something triggered it again.
             Timber.e(e, "Error inside DiagnosticResultPollWorker")
-            Result.failure()
+            runCatching { scheduleNextRun(60L) }
+            Result.success()
         }
     }
 

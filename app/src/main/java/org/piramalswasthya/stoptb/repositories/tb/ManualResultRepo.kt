@@ -201,6 +201,8 @@ class ManualResultRepo @Inject constructor(
                         benId, orderType, resultSummary, reasonForRefusal, localResult
                     )
                 }
+            } catch (e: CancellationException) {
+                throw e // a stopped worker must not queue the entry and go on to the next one
             } catch (e: Exception) {
                 Timber.e(e, "submitManualResult failed")
                 return@withContext queueForLaterReplay(
