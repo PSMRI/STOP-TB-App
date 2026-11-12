@@ -130,15 +130,16 @@ internal class RefreshTracker(
 /**
  * Smoother list transitions for the paged screens:
  * - a new search shows the top of its results, not the old scroll offset. Call [onQueryChanged]
- *   when the query changes, [onDataSubmitted] right before each `submitData`, and pass
- *   [onSettled] to renderListStates;
+ *   when the query changes, [onDataSubmitted] with the query the data was built for right
+ *   before each `submitData`, and pass [onSettled] to renderListStates;
  * - badge and sync-icon updates rebind rows without the cross-fade that made them flash.
  *
  * The scroll belongs to the data of the latest query: it runs at the first refresh that finishes
- * after that data was submitted. A refresh of the previous query finishing during the search
- * debounce (before the new data is submitted) doesn't take it, and neither does a background
- * reload when no query changed. Submitting new data while the previous refresh is still loading
- * reports no new "refresh started", which is why this keys on the submit instead.
+ * after data built for that query was submitted. Data of the previous query doesn't take it - a
+ * refresh finishing during the search debounce, or a new generation of the old query's pages
+ * when a write invalidates them during the debounce - and neither does a background reload when
+ * no query changed. Submitting new data while the previous refresh is still loading reports no
+ * new "refresh started", which is why this keys on the submit instead.
  */
 class ListTransitions internal constructor(private val scrollToTop: () -> Unit) {
 
@@ -161,9 +162,13 @@ class ListTransitions internal constructor(private val scrollToTop: () -> Unit) 
         pendingDataSubmitted = false
     }
 
-    /** Call right before `submitData`: the next refresh to finish belongs to this data. */
-    fun onDataSubmitted() {
-        if (scrollToTopPending) pendingDataSubmitted = true
+    /**
+     * Call right before `submitData`, with the query the data was built for (as passed to
+     * [onQueryChanged]). Only data of the latest query arms the scroll; null (not known yet)
+     * never does.
+     */
+    fun onDataSubmitted(query: String?) {
+        if (scrollToTopPending && query == lastQuery) pendingDataSubmitted = true
     }
 
     fun onSettled() {
