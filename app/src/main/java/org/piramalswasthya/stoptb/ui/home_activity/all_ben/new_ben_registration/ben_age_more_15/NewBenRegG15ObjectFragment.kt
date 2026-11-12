@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_age_more_15
 
+import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -11,7 +12,11 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.BuildConfig
+import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.adapters.FormInputAdapterOld
 import org.piramalswasthya.stoptb.adapters.NewBenKidPagerAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentInputFormPageBinding
@@ -37,13 +42,17 @@ class NewBenRegG15ObjectFragment : Fragment() {
         registerForActivityResult(ActivityResultContracts.TakePicture()) { success: Boolean ->
             if (success) {
                 latestTmpUri?.let { uri ->
-                    latestImageForm?.value?.value = uri.toString()
-                    binding.inputForm.rvInputForm.apply {
-                        val adapter = this.adapter as FormInputAdapterOld
-                        latestImageForm?.errorText = null
-                        adapter.notifyItemChanged(0)
+                    val context = requireContext()
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        val finalUri = withContext(Dispatchers.IO) { compressCapturedPhoto(context, uri) } ?: uri
+                        latestImageForm?.value?.value = finalUri.toString()
+                        binding.inputForm.rvInputForm.apply {
+                            val adapter = this.adapter as FormInputAdapterOld
+                            latestImageForm?.errorText = null
+                            adapter.notifyItemChanged(0)
+                        }
+                        Timber.d("Image saved at @ $finalUri")
                     }
-                    Timber.d("Image saved at @ $uri")
                 }
             }
         }
@@ -69,6 +78,16 @@ class NewBenRegG15ObjectFragment : Fragment() {
                 latestTmpUri = uri
                 takePicture.launch(uri)
             }
+        }
+    }
+
+    private fun compressCapturedPhoto(context: Context, uri: Uri): Uri? {
+        val file = File.createTempFile("tmp_image_file", ".jpeg", context.cacheDir)
+        return if (ImageUtils.compressToJpeg(context, uri, file)) {
+            FileProvider.getUriForFile(context, "${BuildConfig.APPLICATION_ID}.provider", file)
+        } else {
+            file.delete()
+            null
         }
     }
 
