@@ -647,7 +647,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
                 if (isWifiAvailable() && pingCampHub()) {
                     pref.setCampHubConnected(true)
                     WorkerUtils.triggerDiagnosticResultPollWorker(applicationContext)
-                    runOnUiThread { refreshCampHubOfflineBanner() }
+                    if (isActive) runOnUiThread { refreshCampHubOfflineBanner() }
                     return@launch
                 }
                 delay(3_000L)
@@ -656,6 +656,9 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     }
 
     private fun refreshCampHubOfflineBanner() {
+        // Async callbacks (pref listener, WiFi onLost, reconnect job) can land after
+        // onDestroy has cleared the binding; skip the UI update in that case.
+        val binding = _binding ?: return
         val isConnected = pref.isCampHubConnected()
         binding.tvCampHubOffline.visibility = View.VISIBLE
         binding.tvCampHubOffline.text =

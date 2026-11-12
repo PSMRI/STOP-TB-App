@@ -87,6 +87,8 @@ class AgePickerDialog(context: Context) : AlertDialog(context) {
             }
 
             binding.dialogNumberPickerDays.apply {
+                //reset days picker labels before changing its range
+                displayedValues = null
                 maxValue = safeDaysMax
                 minValue = resolveDaysMin(
                     years = ageUnitDTO.years.coerceIn(safeYearsMin, safeYearsMax),
@@ -104,6 +106,7 @@ class AgePickerDialog(context: Context) : AlertDialog(context) {
                     defaultDaysMin = safeDaysMin
                 )
                 if (binding.dialogNumberPickerDays.minValue != resolvedDaysMin) {
+                    binding.dialogNumberPickerDays.displayedValues = null
                     binding.dialogNumberPickerDays.minValue = resolvedDaysMin
                     if (binding.dialogNumberPickerDays.value < resolvedDaysMin) {
                         binding.dialogNumberPickerDays.value = resolvedDaysMin
