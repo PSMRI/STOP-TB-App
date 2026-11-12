@@ -223,6 +223,9 @@ class TBRepo @Inject constructor(
     suspend fun saveTBSuspected(tbSuspectedCache: TBSuspectedCache) =
         tbLocalRepo.saveTBSuspected(tbSuspectedCache)
 
+    suspend fun markTbSuspectedConfirmed(benId: Long, createIfMissing: Boolean): Boolean =
+        tbLocalRepo.markTbSuspectedConfirmed(benId, createIfMissing)
+
     suspend fun getTBConfirmed(benId: Long): TBConfirmedTreatmentCache? =
         tbLocalRepo.getTBConfirmed(benId)
 

@@ -188,6 +188,12 @@ class TbLocalRepo @Inject constructor(
                     // meanwhile (changes feed, poll, manual entry on another path): keep the
                     // fresh status and result. An order never goes back from a final status to
                     // PENDING through a form snapshot; a re-order gets a new order id instead.
+                    // Owned by ManualResultRepo (set when a result is queued offline, cleared once
+                    // the backend has it), which writes them directly; a form snapshot never
+                    // changes them, so a stale one must not reset a queued result's flag.
+                    cache.xrayManualResultPendingSync = fresh.xrayManualResultPendingSync
+                    cache.trueNatManualResultPendingSync = fresh.trueNatManualResultPendingSync
+                    cache.rifManualResultPendingSync = fresh.rifManualResultPendingSync
                     if (isStalePending(cache.xrayOrderStatus, fresh.xrayOrderStatus)) {
                         cache.xrayOrderStatus = fresh.xrayOrderStatus
                         cache.chestXRayResult = cache.chestXRayResult ?: fresh.chestXRayResult
@@ -228,6 +234,23 @@ class TbLocalRepo @Inject constructor(
     suspend fun saveTBSuspected(tbSuspectedCache: TBSuspectedCache) {
         benIdLocks.withLock(tbSuspectedCache.benId) { saveTBSuspectedLocked(tbSuspectedCache) }
     }
+
+    /**
+     * Marks the beneficiary's TB suspected record confirmed, on the row as it stands now (read
+     * under the lock), so a sync that updated other fields since a screen loaded its copy is
+     * kept. Creates the record when [createIfMissing] and there is none. Returns false when
+     * there is none and none was created.
+     */
+    suspend fun markTbSuspectedConfirmed(benId: Long, createIfMissing: Boolean): Boolean =
+        benIdLocks.withLock(benId) {
+            val current = withContext(Dispatchers.IO) { tbDao.getTbSuspected(benId) }
+                ?: if (createIfMissing) TBSuspectedCache(benId = benId) else return@withLock false
+            current.isConfirmed = true
+            current.isTBConfirmed = true
+            current.syncState = SyncState.UNSYNCED
+            saveTBSuspectedLocked(current)
+            true
+        }
 
     /** [saveTBSuspected] for a caller that already holds this beneficiary's lock (Mutex isn't reentrant). */
     internal suspend fun saveTBSuspectedLocked(tbSuspectedCache: TBSuspectedCache) {
