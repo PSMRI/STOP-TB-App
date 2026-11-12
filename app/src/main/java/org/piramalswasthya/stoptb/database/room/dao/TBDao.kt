@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.database.room.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.Upsert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
@@ -12,8 +13,10 @@ import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.model.GeneralOpdCache
 import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
+import org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
+import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
 
 @Dao
 interface TBDao {
@@ -25,13 +28,28 @@ interface TBDao {
     suspend fun getTbScreening(benId: Long, visitDate: Long, visitDateGMT: Long): TBScreeningCache?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun saveTbScreening(tbScreeningCache: TBScreeningCache)
+    suspend fun saveTbScreening(tbScreeningCache: TBScreeningCache): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveTbScreening(tbScreeningCaches: List<TBScreeningCache>)
+
+    /** Existing rows for a whole pull chunk in one statement instead of one per record. */
+    @Query("SELECT * FROM TB_SCREENING WHERE benId IN (:benIds)")
+    suspend fun getTbScreeningByBenIds(benIds: List<Long>): List<TBScreeningCache>
 
     @Query("SELECT * FROM GENERAL_OPD WHERE benId =:benId limit 1")
     suspend fun getGeneralOpd(benId: Long): GeneralOpdCache?
 
     @Query("SELECT benId FROM TB_SCREENING")
     fun getAllTbScreeningBenIds(): Flow<List<Long>>
+
+    /** id + syncState in one pass; callers split it instead of running three queries. */
+    @Query("SELECT benId, syncState FROM TB_SCREENING")
+    fun getTbScreeningBenIdSyncStates(): Flow<List<org.piramalswasthya.stoptb.model.BenIdSyncState>>
+
+    /** id + syncState in one pass; callers split it instead of running three queries. */
+    @Query("SELECT benId, syncState FROM GENERAL_OPD")
+    fun getGeneralOpdBenIdSyncStates(): Flow<List<org.piramalswasthya.stoptb.model.BenIdSyncState>>
 
     @Query("SELECT benId FROM TB_SCREENING WHERE syncState = :syncState")
     fun getTbScreeningBenIdsBySyncState(syncState: SyncState): Flow<List<Long>>
@@ -48,17 +66,75 @@ interface TBDao {
     @Query("SELECT benId FROM TB_DIAGNOSTICS")
     fun getAllTbDiagnosticsBenIds(): Flow<List<Long>>
 
-    @Query("SELECT * FROM TB_DIAGNOSTICS")
-    fun getAllTbDiagnostics(): Flow<List<TBDiagnosticsCache>>
+    /**
+     * The card-rendering subset of TB_DIAGNOSTICS - see [TbDiagnosticsCardFields] for why the
+     * list screens must not observe the whole 46-column entity for every beneficiary.
+     */
+    @Query(
+        "SELECT benId, isReferredForDigitalChestXray, reasonForDenialChestXray, " +
+                "reasonForDenialChestXrayOther, reasonNotConductedChestXray, " +
+                "reasonNotConductedChestXrayOther, chestXRayResult, isReferredForSputum, " +
+                "reasonForDenialSputum, reasonForDenialSputumOther, reasonNotConductedNaat, " +
+                "reasonNotConductedNaatOther, naatResult, reasonNotConductedRif, " +
+                "reasonNotConductedRifOther, trueNatRifResult, liquidCultureResult, " +
+                "xrayOrderId, xrayOrderStatus, trueNatOrderId, trueNatOrderStatus, " +
+                "rifOrderId, rifOrderStatus, errorMsgXray, errorMsgTrueNat, errorMsgRif, " +
+                "xrayManualResultPendingSync, trueNatManualResultPendingSync, " +
+                "rifManualResultPendingSync FROM TB_DIAGNOSTICS"
+    )
+    fun getAllTbDiagnosticsCardFields(): Flow<List<TbDiagnosticsCardFields>>
 
-    @Query("SELECT * FROM TB_SCREENING")
-    fun getAllTbScreening(): Flow<List<TBScreeningCache>>
+    /**
+     * The eleven values the beneficiary cards derive "Presumptive / Asymptomatic" from. Kept
+     * narrow deliberately: `SELECT *` here loaded 50 columns per beneficiary, four of them
+     * TypeConverter-parsed lists, to render one label. See [TbScreeningSymptoms].
+     */
+    @Query(
+        "SELECT benId, coughMoreThan2Weeks, bloodInSputum, feverMoreThan2Weeks, riseOfFever, " +
+                "lossOfAppetite, lossOfWeight, nightSweats, historyOfTb, takingAntiTBDrugs, " +
+                "familySufferingFromTB, asymptomatic FROM TB_SCREENING"
+    )
+    fun getAllTbScreeningSymptoms(): Flow<List<TbScreeningSymptoms>>
 
     @Query("SELECT * FROM TB_SUSPECTED")
     fun getAllTbSuspected(): Flow<List<TBSuspectedCache>>
 
     @Query("SELECT * FROM TB_DIAGNOSTICS")
     suspend fun getDiagnosticsList(): List<TBDiagnosticsCache>
+
+    /**
+     * The beneficiaries in [benIds] that already hold a usable order id for one test type.
+     *
+     * The order-id backfill in [TBRepo.fetchBeneficiariesByStatus] used to decide this one
+     * beneficiary at a time - a `getBenByRegId` plus a whole-row `getTbDiagnosticsByBenId` per
+     * entry, over the entire in-flight backlog - which is thousands of statements queued on the
+     * single Room executor before the first one is even needed. Asking SQLite which ids are
+     * already present answers the same question in one statement per chunk, and reads one
+     * column instead of forty-six.
+     *
+     * "Usable" means the same thing the backfill means by it: non-null, non-blank, not the
+     * "N/A" placeholder the backend sends when an order exists but carries no external id.
+     */
+    @Query(
+        "SELECT benId FROM TB_DIAGNOSTICS WHERE benId IN (:benIds) " +
+                "AND xrayOrderId IS NOT NULL AND TRIM(xrayOrderId) <> '' " +
+                "AND UPPER(TRIM(xrayOrderId)) <> 'N/A'"
+    )
+    suspend fun getBenIdsWithXrayOrderId(benIds: List<Long>): List<Long>
+
+    @Query(
+        "SELECT benId FROM TB_DIAGNOSTICS WHERE benId IN (:benIds) " +
+                "AND trueNatOrderId IS NOT NULL AND TRIM(trueNatOrderId) <> '' " +
+                "AND UPPER(TRIM(trueNatOrderId)) <> 'N/A'"
+    )
+    suspend fun getBenIdsWithTrueNatOrderId(benIds: List<Long>): List<Long>
+
+    @Query(
+        "SELECT benId FROM TB_DIAGNOSTICS WHERE benId IN (:benIds) " +
+                "AND rifOrderId IS NOT NULL AND TRIM(rifOrderId) <> '' " +
+                "AND UPPER(TRIM(rifOrderId)) <> 'N/A'"
+    )
+    suspend fun getBenIdsWithRifOrderId(benIds: List<Long>): List<Long>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertGeneralOpd(generalOpdCache: GeneralOpdCache): Long
@@ -118,8 +194,17 @@ interface TBDao {
     @Query("SELECT * FROM TB_DIAGNOSTICS WHERE benId = :benId ORDER BY id DESC LIMIT 1")
     suspend fun getTbDiagnosticsByBenId(benId: Long): TBDiagnosticsCache?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun saveTbDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache)
+    // @Upsert, not @Insert(REPLACE): REPLACE is DELETE + INSERT in SQLite, so every
+    // save rewrote the whole row twice and churned its rowid. Both entities have an
+    // autoGenerate primary key and only a non-unique index on benId, so @Upsert is
+    // equivalent - id 0 inserts, an existing id updates - as a single statement.
+    @Upsert
+    suspend fun upsertTbDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache): Long
+
+    suspend fun saveTbDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache): Long {
+        val insertedId = upsertTbDiagnostics(tbDiagnosticsCache)
+        return if (tbDiagnosticsCache.id > 0) tbDiagnosticsCache.id.toLong() else insertedId
+    }
 
     @Query("SELECT * FROM TB_SUSPECTED WHERE benId =:benId ORDER BY id DESC limit 1")
     suspend fun getTbSuspected(benId: Long): TBSuspectedCache?
@@ -145,16 +230,31 @@ interface TBDao {
     @Query("SELECT * FROM TB_SUSPECTED WHERE benId =:benId and (visitDate = :visitDate or visitDate = :visitDateGMT) limit 1")
     suspend fun getTbSuspected(benId: Long, visitDate: Long, visitDateGMT: Long): TBSuspectedCache?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun saveTbSuspected(tbSuspectedCache: TBSuspectedCache)
+    // @Upsert, not @Insert(REPLACE): REPLACE is DELETE + INSERT in SQLite, so every
+    // save rewrote the whole row twice and churned its rowid. Both entities have an
+    // autoGenerate primary key and only a non-unique index on benId, so @Upsert is
+    // equivalent - id 0 inserts, an existing id updates - as a single statement.
+    @Upsert
+    suspend fun upsertTbSuspected(tbSuspectedCache: TBSuspectedCache): Long
+
+    suspend fun saveTbSuspected(tbSuspectedCache: TBSuspectedCache): Long {
+        val insertedId = upsertTbSuspected(tbSuspectedCache)
+        return if (tbSuspectedCache.id > 0) tbSuspectedCache.id.toLong() else insertedId
+    }
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun saveTbConfirmed(tbConfirmedCache: TBConfirmedTreatmentCache)
+    suspend fun saveTbConfirmed(tbConfirmedCache: TBConfirmedTreatmentCache): Long
 
 
 
     @Query("SELECT * FROM TB_SCREENING WHERE  syncState = :syncState")
     suspend fun getTBScreening(syncState: SyncState): List<TBScreeningCache>
+
+    @Query("SELECT * FROM TB_SCREENING WHERE id = :id")
+    suspend fun getTbScreeningById(id: Int): TBScreeningCache?
+
+    @Query("SELECT * FROM TB_CONFIRMED_TREATMENT WHERE id = :id")
+    suspend fun getTbConfirmedById(id: Int): TBConfirmedTreatmentCache?
 
     @Query("SELECT * FROM GENERAL_OPD WHERE syncState = :syncState")
     suspend fun getGeneralOpd(syncState: SyncState): List<GeneralOpdCache>
@@ -480,7 +580,13 @@ interface TBDao {
                OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
                OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
                OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
-               OR (v.rbs IS NOT NULL AND v.rbs >= 100))
+               OR (v.rbs IS NOT NULL AND v.rbs >= 100)
+               OR (v.pallorId = 1 OR UPPER(TRIM(IFNULL(v.pallor, ''))) IN ('PRESENT', 'YES'))
+               OR (v.icterusId = 1 OR UPPER(TRIM(IFNULL(v.icterus, ''))) IN ('PRESENT', 'YES'))
+               OR (v.cyanosisId = 1 OR UPPER(TRIM(IFNULL(v.cyanosis, ''))) IN ('PRESENT', 'YES'))
+               OR (v.clubbingId = 1 OR UPPER(TRIM(IFNULL(v.clubbing, ''))) IN ('PRESENT', 'YES'))
+               OR (v.lymphadenopathyId = 1 OR UPPER(TRIM(IFNULL(v.lymphadenopathy, ''))) IN ('PRESENT', 'YES'))
+               OR (v.oedemaId = 1 OR UPPER(TRIM(IFNULL(v.oedema, ''))) IN ('PRESENT', 'YES')))
             AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
             AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN IFNULL(v.capturedAt, 0) >= 100000000000 THEN v.capturedAt WHEN IFNULL(v.capturedAt, 0) > 0 THEN v.capturedAt * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
             AND (:endTime = :endTime)

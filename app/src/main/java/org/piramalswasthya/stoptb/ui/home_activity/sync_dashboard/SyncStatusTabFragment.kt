@@ -8,6 +8,9 @@ import android.widget.LinearLayout
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.asFlow
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.work.WorkInfo
 import dagger.hilt.android.AndroidEntryPoint
@@ -35,18 +38,34 @@ class SyncStatusTabFragment : Fragment() {
 
     private var failedExpanded = false
     private lateinit var failedWorkerAdapter: FailedWorkerAdapter
+    private lateinit var needsAttentionAdapter: FailedWorkerAdapter
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         val adapter = SyncDashboardStatusAdapter()
         binding.rvSyncStatus.adapter = adapter
+        binding.rvSyncStatus.itemAnimator = null
         binding.rvSyncStatus.addItemDecoration(
             DividerItemDecoration(context, LinearLayout.VERTICAL)
         )
 
         failedWorkerAdapter = FailedWorkerAdapter()
         binding.rvFailedWorkers.adapter = failedWorkerAdapter
+        binding.rvFailedWorkers.itemAnimator = null
+
+        needsAttentionAdapter = FailedWorkerAdapter()
+        binding.rvNeedsAttention.adapter = needsAttentionAdapter
+        viewModel.needsAttention.observe(viewLifecycleOwner) { items ->
+            needsAttentionAdapter.submitList(items)
+            binding.cardNeedsAttention.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
+            binding.tvNeedsAttentionSummary.text =
+                getString(R.string.sync_dashboard_needs_attention_summary, items.size)
+        }
+        binding.btnRetryNow.setOnClickListener {
+            viewModel.retryNow(requireContext())
+            viewModel.refreshNeedsAttention(requireContext())
+        }
 
         val localNames = viewModel.getLocalNames(requireContext())
         val englishNames = viewModel.getEnglishNames(requireContext())
@@ -54,6 +73,7 @@ class SyncStatusTabFragment : Fragment() {
 
         // Collect sync status
         viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             viewModel.syncStatus.collect { statusList ->
                 val list = statusList.asDomainModel(localNames, englishNames)
 
@@ -72,10 +92,12 @@ class SyncStatusTabFragment : Fragment() {
                     }
                 )
             }
+            }
         }
 
         // Collect overall progress
         viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             viewModel.overallProgress.collect { (synced, total) ->
                 binding.tvProgressText.text = getString(
                     R.string.sync_dashboard_records_synced, synced, total
@@ -83,16 +105,24 @@ class SyncStatusTabFragment : Fragment() {
                 binding.progressOverall.max = if (total > 0) total else 1
                 binding.progressOverall.progress = synced
             }
+            }
         }
 
-        // Observe worker states
-        viewModel.workerStates.observe(viewLifecycleOwner) { workInfoList ->
-            updateWorkerStatus(workInfoList)
+        // Refresh attention details only while this tab is visible.
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                viewModel.workerStates.asFlow().collect { workInfoList ->
+                    updateWorkerStatus(workInfoList)
+                    viewModel.refreshNeedsAttention(requireContext())
+                }
+            }
         }
 
         // Observe failed worker details
-        viewModel.failedWorkerDetails.observe(viewLifecycleOwner) { failedList ->
-            failedWorkerAdapter.submitList(failedList)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                viewModel.failedWorkerDetails.asFlow().collect { failedList -> failedWorkerAdapter.submitList(failedList) }
+            }
         }
 
         // Toggle expand/collapse on tap
@@ -124,13 +154,22 @@ class SyncStatusTabFragment : Fragment() {
                 binding.tvWorkerDetails.visibility = View.GONE
                 binding.rvFailedWorkers.visibility = View.GONE
             }
-            // Treat mixed success+failure as completed for the current cycle when nothing is running/enqueued.
-            // This prevents stale failed workers from older sync attempts from showing as an active issue.
+            // The cycle finished. Show it as complete, but keep any failures in
+            // this cycle visible instead of hiding them behind "Complete".
             succeeded > 0 && enqueued == 0 -> {
                 binding.tvWorkerStatus.text = getString(R.string.sync_dashboard_worker_complete)
-                binding.tvWorkerDetails.visibility = View.GONE
-                binding.rvFailedWorkers.visibility = View.GONE
-                failedExpanded = false
+                if (failed.isNotEmpty()) {
+                    binding.tvWorkerDetails.text = getString(
+                        R.string.sync_dashboard_worker_failed, failed.size
+                    )
+                    binding.tvWorkerDetails.visibility = View.VISIBLE
+                    binding.rvFailedWorkers.visibility =
+                        if (failedExpanded) View.VISIBLE else View.GONE
+                } else {
+                    binding.tvWorkerDetails.visibility = View.GONE
+                    binding.rvFailedWorkers.visibility = View.GONE
+                    failedExpanded = false
+                }
             }
             failed.isNotEmpty() -> {
                 binding.tvWorkerStatus.text = getString(R.string.sync_dashboard_worker_idle)

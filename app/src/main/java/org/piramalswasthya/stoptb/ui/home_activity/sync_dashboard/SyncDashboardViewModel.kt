@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.map
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
@@ -18,9 +19,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.dao.SyncDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
 import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.SyncLogExporter
 import org.piramalswasthya.stoptb.helpers.SyncLogManager
@@ -42,6 +46,8 @@ class SyncDashboardViewModel @Inject constructor(
     private val syncLogManager: SyncLogManager,
     private val syncLogExporter: SyncLogExporter,
     private val roleManager: RoleManager,
+    private val syncRetryStore: SyncRetryStore,
+    private val database: InAppDb,
     application: Application
 ) : AndroidViewModel(application) {
 
@@ -86,8 +92,60 @@ class SyncDashboardViewModel @Inject constructor(
             }
     }
 
+    // Records the server has not accepted yet. They stay UNSYNCED and are
+    // retried automatically; listed here so they are not invisible.
+    private val _needsAttention = MutableLiveData<List<FailedWorkerInfo>>(emptyList())
+    val needsAttention: LiveData<List<FailedWorkerInfo>> = _needsAttention
+
+    fun refreshNeedsAttention(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val now = System.currentTimeMillis()
+            val items = syncRetryStore.entries().map { e ->
+                FailedWorkerInfo(
+                    workerName = "${entityLabel(context, e.entity)} #${e.id}",
+                    error = context.getString(
+                        R.string.sync_dashboard_retry_detail,
+                        formatAge(context, now - e.firstFailedAt), e.attempts, e.lastError
+                    )
+                )
+            }.toMutableList()
+            val orphaned = database.counsellingFormResponseDao().countOrphanedTempIdResponses()
+            if (orphaned > 0) {
+                items += FailedWorkerInfo(
+                    workerName = context.getString(R.string.sync_dashboard_orphan_responses_title),
+                    error = context.getString(R.string.sync_dashboard_orphan_responses_detail, orphaned)
+                )
+            }
+            _needsAttention.postValue(items)
+        }
+    }
+
+    /** Makes every waiting record due now and starts a push. */
+    fun retryNow(context: Context) {
+        syncRetryStore.resetBackoff()
+        WorkerUtils.triggerAmritPushWorker(context.applicationContext, "MANUAL_REFRESH")
+    }
+
+    private fun entityLabel(context: Context, entity: String): String = when (entity) {
+        SyncRetryStore.ENTITY_BENEFICIARY -> context.getString(R.string.sync_entity_beneficiary)
+        SyncRetryStore.ENTITY_REGISTRATION -> context.getString(R.string.sync_entity_registration)
+        SyncRetryStore.ENTITY_TB_DIAGNOSTICS -> context.getString(R.string.sync_entity_tb_diagnostics)
+        SyncRetryStore.ENTITY_TB_SUSPECTED -> context.getString(R.string.sync_entity_tb_suspected)
+        SyncRetryStore.ENTITY_TB_CONFIRMED -> context.getString(R.string.sync_entity_tb_confirmed)
+        else -> entity
+    }
+
+    private fun formatAge(context: Context, millis: Long): String {
+        val minutes = (millis / 60_000L).toInt().coerceAtLeast(0)
+        return when {
+            minutes < 60 -> context.getString(R.string.sync_dashboard_age_minutes, minutes)
+            minutes < 48 * 60 -> context.getString(R.string.sync_dashboard_age_hours, minutes / 60)
+            else -> context.getString(R.string.sync_dashboard_age_days, minutes / (24 * 60))
+        }
+    }
+
     // Tab 2: Logs
-    val syncLogs: StateFlow<List<SyncLogEntry>> = syncLogManager.logs
+    val syncLogs: StateFlow<List<SyncLogEntry>> = syncLogManager.interactiveLogs
 
     fun clearLogs() = syncLogManager.clearLogs()
 
@@ -112,20 +170,55 @@ class SyncDashboardViewModel @Inject constructor(
         return result
     }
 
-    // Tab 2: Log export
-    private val _exportIntent = MutableStateFlow<Intent?>(null)
-    val exportIntent: StateFlow<Intent?> = _exportIntent.asStateFlow()
+    // Shared export for Logs and Summary.
+    internal data class PendingExport(val sessionId: String, val intent: Intent)
+    private val _exportIntent = MutableStateFlow<PendingExport?>(null)
+    internal val exportIntent: StateFlow<PendingExport?> = _exportIntent.asStateFlow()
 
     private val _exportEmpty = MutableStateFlow(false)
     val exportEmpty: StateFlow<Boolean> = _exportEmpty.asStateFlow()
 
-    fun exportLogs() {
+    private val _shareSummary = MutableStateFlow<String?>(null)
+    val shareSummary: StateFlow<String?> = _shareSummary.asStateFlow()
+    private var shareSummaryScope: String? = null
+    internal fun summaryScope(): String {
+        val user = preferenceDao.getLoggedInUser()
+        val session = org.piramalswasthya.stoptb.helpers.interactiveSyncLogSession.session.value
+        return "$session/${user?.userId}/${user?.serviceMapId}/$selectedVillage"
+    }
+    fun updateShareSummary(summary: String?, scope: String? = null) {
+        shareSummaryScope = scope
+        _shareSummary.value = summary
+    }
+    private val _exportBusy = MutableStateFlow(false)
+    val exportBusy: StateFlow<Boolean> = _exportBusy.asStateFlow()
+
+    fun exportLogs(includeLogs: Boolean = true, includeSummary: Boolean = false) {
+        if (_exportBusy.value || (!includeLogs && !includeSummary)) return
+        val logSession = org.piramalswasthya.stoptb.helpers.interactiveSyncLogSession
+        val sessionId = logSession.session.value ?: return
+        val summary = if (includeSummary) _shareSummary.value else null
+        if (includeSummary && summary == null) return
+        if (includeSummary && shareSummaryScope != summaryScope()) {
+            updateShareSummary(null)
+            _exportEmpty.value = true
+            return
+        }
+        _exportBusy.value = true
         viewModelScope.launch(Dispatchers.IO) {
-            val intent = syncLogExporter.createShareIntent(getApplication())
-            if (intent != null) {
-                _exportIntent.value = intent
-            } else {
+            try {
+                val intent = syncLogExporter.createShareIntent(getApplication(), sessionId, includeLogs, summary)
+                if (intent != null && logSession.isCurrent(sessionId)) {
+                    _exportIntent.value = PendingExport(sessionId, intent)
+                } else if (logSession.isCurrent(sessionId)) {
+                    _exportEmpty.value = true
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
                 _exportEmpty.value = true
+            } finally {
+                _exportBusy.value = false
             }
         }
     }

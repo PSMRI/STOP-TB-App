@@ -16,10 +16,9 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
 // Base class for all dynamic workers (dynamicWoker/ directory).
-// Provides foreground service protection (prevents OS from killing workers
-// on aggressive-battery devices like Xiaomi MIUI, Oppo ColorOS, Vivo
-// FunTouchOS), centralized token initialization, and structured error
-// handling with a 3-retry limit for transient failures.
+// Provides centralized token initialization and structured error handling
+// with a 3-retry limit for transient failures. Like BasePushWorker, it does
+// not call setForeground().
 //
 // Subclasses implement doSyncWork() and provide workerName and preferenceDao
 // (via Hilt DI with `override val`).
@@ -46,8 +45,6 @@ abstract class BaseDynamicWorker(
         createForegroundInfo("Syncing data...")
 
     override suspend fun doWork(): Result {
-        setForeground(getForegroundInfo())
-
         if (runAttemptCount >= MAX_RETRY_COUNT) {
             Timber.e("[$workerName] Max retries ($MAX_RETRY_COUNT) exceeded, giving up")
             return Result.failure(workDataOf(

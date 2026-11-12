@@ -38,6 +38,7 @@ import dagger.hilt.components.SingletonComponent
 import org.piramalswasthya.stoptb.BuildConfig
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
 import org.piramalswasthya.stoptb.databinding.ActivityVolunteerBinding
 import org.piramalswasthya.stoptb.helpers.AutoFlowBackNavigationHost
 import org.piramalswasthya.stoptb.helpers.ImageUtils
@@ -53,6 +54,7 @@ import org.piramalswasthya.stoptb.ui.login_activity.LoginActivity
 import org.piramalswasthya.stoptb.ui.service_location_activity.ServiceLocationActivity
 import org.piramalswasthya.stoptb.ui.volunteer.fragment.VolunteerViewModel
 import org.piramalswasthya.stoptb.work.WorkerUtils
+import org.piramalswasthya.stoptb.utils.sync.CampHubReachability
 import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -76,7 +78,8 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
                 runOnUiThread {
                     refreshCampHubOfflineBanner()
                     if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
-                        WorkerUtils.triggerAmritPushWorker(applicationContext)
+                        syncRetryStore.resetBackoff()
+                        WorkerUtils.triggerAmritPushWorker(applicationContext, "AUTO_RECONNECT")
                         WorkerUtils.triggerCampQuickPullIfConnected(applicationContext, pref, force = true)
                     }
                 }
@@ -105,6 +108,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             campHubReconnectJob = null
             // WiFi dropped — if camp mode was active, mark disconnected at once
             if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
+                org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.observe(applicationContext, pref.getCampHubUrl(), false, "WIFI_UNAVAILABLE", "WIFI_CALLBACK")
                 pref.setCampHubConnected(false)
                 runOnUiThread { refreshCampHubOfflineBanner() }
             }
@@ -123,6 +127,9 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
 
     @Inject
     lateinit var pref: PreferenceDao
+
+    @Inject
+    lateinit var syncRetryStore: SyncRetryStore
 
     @Inject
     lateinit var roleManager: RoleManager
@@ -221,6 +228,9 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     override fun onCreate(savedInstanceState: Bundle?) {
         TapjackingProtectionHelper.applyWindowSecurity(this)
         super.onCreate(savedInstanceState)
+        WorkerUtils.scheduleSyncHeartbeat(applicationContext)
+        // Opening the app (including right after login) retries waiting records now.
+        syncRetryStore.resetBackoff()
         // Resolve assigned/active role for this cold start. Always resets to the first
         // assigned role — no persistence across app restarts, by design.
         roleManager.initializeFromLoggedInUser()
@@ -248,8 +258,10 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             }
         }
 
-        // Redirect to ServiceLocationActivity if location not set (multi-village users)
-        if (pref.getLocationRecord() == null) {
+        // Redirect to ServiceLocationActivity if location not set (multi-village users), or if the
+        // selected village's Pincode / Residential Area haven't been captured yet (incl. auto-set single-village users)
+        val selectedVillageId = pref.getLocationRecord()?.village?.id
+        if (selectedVillageId == null || pref.getVillageDefaults(selectedVillageId)?.isComplete != true) {
             val intent = Intent(this, ServiceLocationActivity::class.java)
             intent.putExtra("fromVolunteer", true)
             startActivity(intent)
@@ -323,6 +335,11 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         navController.addOnDestinationChangedListener { _, destination, _ ->
             binding.bottomNavRole.visibility =
                 if (destination.id == R.id.volunteerHomeFragment) View.VISIBLE else View.GONE
+            // Back on Home from any in-app module: re-check form versions, so a single-role
+            // Counselling user (who never switches tabs) still picks up a server-side upgrade.
+            if (destination.id == R.id.volunteerHomeFragment && roleManager.activeRole.value == AppRole.COUNSELING) {
+                viewModel.checkFormVersions()
+            }
         }
     }
 
@@ -426,9 +443,9 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
                 return@setOnMenuItemClickListener true
             }
             lastClickTime = SystemClock.elapsedRealtime()
-            WorkerUtils.triggerAmritPushWorker(this)
+            WorkerUtils.triggerAmritPushWorker(this, "MANUAL_REFRESH")
             if (!pref.isFullPullComplete)
-                WorkerUtils.triggerAmritPullWorker(this)
+                WorkerUtils.triggerAmritPullWorker(this, triggerSource = "MANUAL_REFRESH")
             binding.drawerLayout.close()
             true
         }
@@ -567,6 +584,9 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         super.onResume()
         pref.addOnPreferenceChangeListener(campHubPrefListener)
 
+        // Back from a form screen, another app or screen-off: re-check form versions for Counselling.
+        if (roleManager.activeRole.value == AppRole.COUNSELING) viewModel.checkFormVersions()
+
         // If WiFi was lost while the app was in the background, the NetworkCallback
         // couldn't fire (it was unregistered). Catch that case here on resume.
         if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
@@ -574,7 +594,10 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
                 connectivityManager.getNetworkCapabilities(it)
                     ?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
             } ?: false
-            if (!hasWifi) pref.setCampHubConnected(false)
+            if (!hasWifi) {
+                org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.observe(applicationContext, pref.getCampHubUrl(), false, "WIFI_UNAVAILABLE", "RESUME_NETWORK_CHECK")
+                pref.setCampHubConnected(false)
+            }
         }
 
         // Register WiFi callback (guard against double-registration)
@@ -687,26 +710,10 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         )
     }
 
-    /**
-     * Tries to reach the camp hub URL over HTTP (3 s timeout).
-     * Any HTTP response (even 4xx) means the server is up.
-     * Must be called from a background thread.
-     */
-    private fun pingCampHub(): Boolean {
-        return try {
-            val url = java.net.URL(pref.getCampHubUrl())
-            val conn = url.openConnection() as java.net.HttpURLConnection
-            conn.connectTimeout = 3000
-            conn.readTimeout = 3000
-            conn.requestMethod = "GET"
-            conn.connect()
-            val code = conn.responseCode
-            conn.disconnect()
-            code in 100..499
-        } catch (e: Exception) {
-            false
-        }
-    }
+    // Same reachability rule as the sign-in screen, interceptor and sync gate
+    // (GET /common-api/health, 2xx). Blocking: call off the main thread.
+    private fun pingCampHub(): Boolean =
+        org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.checkReachability(applicationContext, pref.getCampHubUrl(), "RECONNECT_CHECK")
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {

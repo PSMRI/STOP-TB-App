@@ -118,6 +118,13 @@ class TBConfirmedFormFragment : Fragment() {
 
     @SuppressLint("NotifyDataSetChanged")
     private fun submitTBSuspectedForm() {
+        if (viewModel.isFollowUpDoneForCurrentMonth()) {
+            Toast.makeText(
+                requireContext(),
+                getString(R.string.tb_followup_already_submitted_this_month), Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
         if (validateCurrentPage()) {
             viewModel.saveForm()
 

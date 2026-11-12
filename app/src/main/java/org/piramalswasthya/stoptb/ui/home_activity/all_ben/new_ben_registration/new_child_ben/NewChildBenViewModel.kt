@@ -146,7 +146,7 @@ class NewChildBenViewModel @Inject constructor(
                     val childCount = dataset.noOfChildren.value?.toIntOrNull() ?: 0
 
                     for (i in (oldChildCount + 1)..childCount) {
-                        val benIdToSet = minOf(benRepo.getMinBenId() - 1L, -1L)
+                        val benIdToSet = benRepo.nextTempBenId()
                         val newBen = BenRegCache(
                             ashaId = user.userId,
                             beneficiaryId = benIdToSet,

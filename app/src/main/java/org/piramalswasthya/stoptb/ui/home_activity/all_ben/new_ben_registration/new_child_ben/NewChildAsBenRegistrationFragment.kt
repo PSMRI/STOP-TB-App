@@ -211,7 +211,7 @@ class NewChildAsBenRegistrationFragment : Fragment() {
                         resources.getString(R.string.registration_successful),
                         Toast.LENGTH_LONG
                     ).show()
-                    WorkerUtils.triggerAmritPushWorker(requireContext())
+                    WorkerUtils.triggerAmritPushWorker(requireContext(), "DIRECT_SAVE")
                     if (viewModel.isHoFMarried() && !viewModel.isBenMarried) {
                         //
                     } else {

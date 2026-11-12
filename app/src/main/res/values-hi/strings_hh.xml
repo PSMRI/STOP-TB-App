@@ -59,17 +59,18 @@
     <string name="nhhr_type_of_house">घर का प्रकार</string>
     <string name="nhhr_type_of_house_1">कोई घर नहीं</string>
     <string name="nhhr_type_of_house_2">कच्चा घर (झोपड़ी)</string>
-    <string name="nhhr_type_of_house_3">पत्थर और गारे से बना पक्का घर</string>
-    <string name="nhhr_type_of_house_4">अन्य</string>
-    <string name="nhhr_type_of_house_other">घर का अन्य प्रकार</string>
+    <string name="nhhr_type_of_house_3">ईंट और कंक्रीट से बना पक्का घर</string>
+    <string name="nhhr_type_of_house_4">पत्थर और गारे से बना पक्का घर</string>
+    <string name="nhhr_type_of_house_5">अन्य प्रकार</string>
+    <string name="nhhr_type_of_house_other">घर का अन्य प्रकार, कृपया निर्दिष्ट करें</string>
 
     <string-array name="nhhr_type_of_house_array">
         <item>@string/nhhr_type_of_house_1</item>
         <item>@string/nhhr_type_of_house_2</item>
         <item>@string/nhhr_type_of_house_3</item>
         <item>@string/nhhr_type_of_house_4</item>
+        <item>@string/nhhr_type_of_house_5</item>
     </string-array>
-
 
     <string name="nhhr_house_own">घर का स्वामित्व</string>
     <string-array name="nhhr_house_own_array">
@@ -81,8 +82,9 @@
         <item>हाँ</item>
         <item>नहीं</item>
     </string-array>
+
     <string name="nhhr_fuel_cooking">खाना पकाने के लिए उपयोग किए जाने वाले ईंधन का मुख्य स्रोत</string>
-    <string name="nhhr_fuel_cooking_1">लकड़ी</string>
+    <string name="nhhr_fuel_cooking_1">लकड़ी (ईंधन)</string>
     <string name="nhhr_fuel_cooking_2">फसल अवशेष</string>
     <string name="nhhr_fuel_cooking_3">गोबर के उपले</string>
     <string name="nhhr_fuel_cooking_4">कोयला</string>
@@ -184,6 +186,9 @@
     <string name="hint_place_of_current_living">वर्तमान निवास का स्थान *</string>
     <string name="hint_other_place">अन्य स्थान *</string>
     <string name="hint_institution_name">संस्था का नाम *</string>
+    <string name="ben_reg_place_of_current_living">वर्तमान निवास का स्थान</string>
+    <string name="ben_reg_other_place_of_current_living">अन्य स्थान</string>
+    <string name="ben_reg_institution_name">संस्था का नाम</string>
 
     <string name="all_non_household_beneficiaries">सभी गैर-परिवार लाभार्थी</string>
 

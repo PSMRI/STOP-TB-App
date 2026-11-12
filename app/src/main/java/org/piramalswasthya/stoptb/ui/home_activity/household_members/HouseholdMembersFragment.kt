@@ -23,13 +23,14 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.BenListAdapter
 import org.piramalswasthya.stoptb.configuration.HouseholdSpouseRelations
-import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertNewBenBinding
 import org.piramalswasthya.stoptb.databinding.FragmentHouseholdMembersBinding
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.helpers.RoleManager
+import org.piramalswasthya.stoptb.model.BenBasicDomain
+import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.utils.navigateSafe
@@ -45,6 +46,9 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
     @Inject
     lateinit var roleManager: RoleManager
 
+    @Inject
+    lateinit var benRepo: BenRepo
+
     private val args: HouseholdMembersFragmentArgs by navArgs()
 
     private var _binding: FragmentHouseholdMembersBinding? = null
@@ -56,6 +60,8 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
     private var selectedRelationIndex = -1
     private var householdMembers: List<BenBasicDomain> = emptyList()
     private var pendingExamineBenId: Long? = null
+    // Latest showExamineBottomSheet call; an older call whose ID lookup finishes late is dropped.
+    private var examineRequestId = 0
     private var isMemberLimitReached = false
 
     override fun onCreateView(
@@ -152,11 +158,13 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.benList.collect { list ->
                     householdMembers = list
-                    binding.flEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+                    // Hide the beneficiary whose "View Member" was tapped; counts still use the full household
+                    val displayList = list.filter { it.benId != args.excludeBenId }
+                    binding.flEmpty.visibility = if (displayList.isEmpty()) View.VISIBLE else View.GONE
                     benAdapter.submitHouseholdMemberCounts(
                         list.groupingBy { it.hhId }.eachCount()
                     )
-                    benAdapter.submitList(list)
+                    benAdapter.submitList(displayList)
                 }
             }
         }
@@ -234,6 +242,11 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
         }
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.tptRegistrationDoneBenIds.collect { benAdapter.submitTptRegistrationDoneBenIds(it) }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.allTbDiagnostics.collect { benAdapter.submitTBDiagnostics(it) }
             }
         }
@@ -276,8 +289,19 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
     private fun showExamineBottomSheet(benId: Long) {
         val existing = childFragmentManager.findFragmentByTag(ExamineBottomSheetFragment.TAG)
         if (existing != null) return
-        ExamineBottomSheetFragment.newInstance(benId, autoFlow = false, showContactTracingForms = args.fromContactTracing)
-            .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
+        val requestId = ++examineRequestId
+        viewLifecycleOwner.lifecycleScope.launch {
+            // In Camp Mode the push can replace a temp benId after this screen captured it;
+            // open the sheet (and the forms it launches) with the current ID.
+            val currentBenId = benRepo.resolveCurrentBenId(benId)
+            if (requestId != examineRequestId) return@launch
+            if (pendingExamineBenId == benId) pendingExamineBenId = currentBenId
+            if (childFragmentManager.isStateSaved ||
+                childFragmentManager.findFragmentByTag(ExamineBottomSheetFragment.TAG) != null
+            ) return@launch
+            ExamineBottomSheetFragment.newInstance(currentBenId, autoFlow = false, showContactTracingForms = args.fromContactTracing)
+                .show(childFragmentManager, ExamineBottomSheetFragment.TAG)
+        }
     }
 
     override fun onNavigateToExamineForm(benId: Long, formIndex: Int, viewOnly: Boolean) {

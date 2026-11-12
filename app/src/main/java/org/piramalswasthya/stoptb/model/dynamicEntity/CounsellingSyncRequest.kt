@@ -72,5 +72,6 @@ data class ServerAnswerDto(
     @SerializedName("optionId") val optionId: Int? = null,
     @SerializedName("answerText") val answerText: String? = null,
     @SerializedName("questionUuid") val questionUuid: String? = null,
-    @SerializedName("optionValue") val optionValue: String? = null
+    @SerializedName("optionValue") val optionValue: String? = null,
+    @SerializedName("optionUuid") val optionUuid: String? = null
 )
