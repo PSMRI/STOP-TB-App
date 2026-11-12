@@ -15,7 +15,9 @@ class AccountDeactivationInterceptor @Inject constructor(
         val response = chain.proceed(chain.request())
 
         try {
-            val peekBody = response.peekBody(1024 * 1024) // peek up to 1MB
+            // The deactivation marker is in the small error envelope; avoid buffering a
+            // megabyte from arbitrary responses just to detect it.
+            val peekBody = response.peekBody(16 * 1024)
             val bodyString = peekBody.string()
             if (bodyString.isNotBlank()) {
                 val json = JSONObject(bodyString)

@@ -48,6 +48,15 @@ class SyncLogTree(
     override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
         if (!isSyncRelated(tag, message)) return
 
+        // Bound before logcat, throwable concatenation, classification, or persistence.
+        val boundedMessage = message.take(SyncLogLimits.MAX_MESSAGE_CHARS).let {
+            if (message.length > SyncLogLimits.MAX_MESSAGE_CHARS) it + SyncLogLimits.TRUNCATION_SUFFIX else it
+        }
+        val boundedThrowableMessage = t?.message?.take(SyncLogLimits.MAX_MESSAGE_CHARS)
+        val fullMessage = if (boundedThrowableMessage != null) {
+            (boundedMessage + ": " + boundedThrowableMessage).take(SyncLogLimits.MAX_MESSAGE_CHARS)
+        } else boundedMessage
+
         // Write sync-related logs to logcat via DebugTree.log().
         // In release builds (where DebugTree is not planted) this is the ONLY path to
         // logcat — essential for field debugging with adb — so it must stay.
@@ -56,7 +65,7 @@ class SyncLogTree(
         // message matches the sync keywords paid that cost, which includes every OkHttp
         // line (the backend hostname contains "amrit"), and logcat writes are blocking.
         if (!BuildConfig.DEBUG) {
-            super.log(priority, tag, message, t)
+            super.log(priority, tag, fullMessage, t)
         }
 
         val level = when {
@@ -66,7 +75,6 @@ class SyncLogTree(
             else -> LogLevel.DEBUG
         }
 
-        val fullMessage = if (t != null) "$message: ${t.message}" else message
         val effectiveLevel = promoteIfError(level, fullMessage, t)
         syncLogManager.addLog(effectiveLevel, tag ?: "Sync", fullMessage)
     }
@@ -75,10 +83,9 @@ class SyncLogTree(
         if (t != null && level.ordinal < LogLevel.ERROR.ordinal) return LogLevel.ERROR
         if (level.ordinal >= LogLevel.WARN.ordinal) return level
 
-        val lower = message.lowercase()
-        if (ERROR_CONTENT_PATTERNS.any { lower.contains(it) }) return LogLevel.ERROR
-        if (FAILURE_CONTENT_PATTERNS.any { lower.contains(it) }) {
-            if (FAILURE_EXCLUSIONS.none { lower.contains(it) }) return LogLevel.WARN
+        if (ERROR_CONTENT_PATTERNS.any { message.contains(it, ignoreCase = true) }) return LogLevel.ERROR
+        if (FAILURE_CONTENT_PATTERNS.any { message.contains(it, ignoreCase = true) }) {
+            if (FAILURE_EXCLUSIONS.none { message.contains(it, ignoreCase = true) }) return LogLevel.WARN
         }
         return level
     }
