@@ -223,6 +223,10 @@ interface BenCountQueries {
         WHERE villageId = :selectedVillage
           AND isDeactivate = 0
           AND isDeath = 0
+          -- Same membership as source 6 in searchBenPaged: pregnant beneficiaries (by
+          -- reproductive status or recorded in vitals) are not referred for X-ray at all.
+          AND reproductiveStatusId != 1
+          AND benId NOT IN (SELECT v.benId FROM BEN_VITALS v WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%')
           AND (
             benId IN (
               SELECT ts.benId FROM TB_SUSPECTED ts
@@ -232,9 +236,9 @@ interface BenCountQueries {
               SELECT td.benId FROM TB_DIAGNOSTICS td
               WHERE td.isChestXRayDone IS NOT NULL
             )
-            OR (reproductiveStatusId != 1 AND benId IN (
+            OR benId IN (
               SELECT tbs.benId FROM TB_SCREENING tbs
-            ))
+            )
           )
     """)
     fun getDigitalChestXRayBenCount(selectedVillage: Int): Flow<Int>
@@ -265,7 +269,11 @@ interface BenCountQueries {
             -- measured 5.3 SECONDS on a mid-range device at 5,000 beneficiaries and grows
             -- quadratically. Hoisted to the outer level, which is logically identical (same
             -- row counts verified at 5k and 25k) and uncorrelated, it runs in ~44ms.
-            OR (reproductiveStatusId = 1 AND benId IN (SELECT tbs.benId FROM TB_SCREENING tbs))
+            -- Same pregnancy rule as source 7 in searchBenPaged: by reproductive status or as
+            -- recorded in vitals.
+            OR ((reproductiveStatusId = 1 OR benId IN (
+                  SELECT v.benId FROM BEN_VITALS v WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%'
+                )) AND benId IN (SELECT tbs.benId FROM TB_SCREENING tbs))
             OR benId IN (
               SELECT tbs.benId FROM TB_SCREENING tbs
               WHERE

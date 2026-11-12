@@ -21,6 +21,7 @@ import org.piramalswasthya.stoptb.model.BenWithTbSuspectedCache
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.LocationEntity
 import org.piramalswasthya.stoptb.model.LocationRecord
+import org.piramalswasthya.stoptb.model.VitalCache
 
 /**
  * PR 6: the TB lists page from SQL and search in SQL. For each list and a set of searches, the
@@ -114,6 +115,31 @@ class TbListPagingEquivalenceTest {
             assertEquals("$result: confirmed count", confirmed.size, db.benDao.getTbConfirmedListCount(villageId).first())
             assertEquals("$result: presumptive count", presumptive.size, db.benDao.getTbPresumptiveListCount(villageId).first())
         }
+    }
+
+    /**
+     * The X-ray (source 6) and TrueNat (source 7) card counts must count exactly the list each
+     * card opens, including pregnancy: by reproductive status, or recorded only in vitals.
+     */
+    @Test
+    fun referralCountsMatchTheirListsForPregnantBeneficiaries() = runBlocking {
+        val sql = db.openHelper.writableDatabase
+        val pregnantInVitals = FIRST_BEN_ID + 2   // screened, no symptoms, no suspected row
+        val pregnantByStatus = FIRST_BEN_ID + 10  // screened, suspected row with an X-ray
+        db.vitalDao.saveVitals(VitalCache(benId = pregnantInVitals, benRegId = 0L, keyPopulationRiskFactors = listOf("PREGNANCY")))
+        sql.execSQL("UPDATE BENEFICIARY SET gen_reproductiveStatusId = 1 WHERE beneficiaryId = $pregnantByStatus")
+        sql.execSQL("UPDATE TB_SUSPECTED SET isChestXRayDone = 1 WHERE benId = $pregnantByStatus")
+        for (villageId in VILLAGES) {
+            val xray = db.benDao.searchBenOnce(listOf(villageId), 6, 0, "").map { row -> row.benId }
+            val truenat = db.benDao.searchBenOnce(listOf(villageId), 7, 0, "").map { row -> row.benId }
+            assertEquals("village $villageId X-ray count", xray.size, db.benDao.getDigitalChestXRayBenCount(villageId).first())
+            assertEquals("village $villageId TrueNat count", truenat.size, db.benDao.getTrueNatBenCount(villageId).first())
+        }
+        val vitalsVillage = VILLAGES[2 % VILLAGES.size]
+        assertTrue("pregnant in vitals: TrueNat", pregnantInVitals in db.benDao.searchBenOnce(listOf(vitalsVillage), 7, 0, "").map { row -> row.benId })
+        assertTrue("pregnant in vitals: not X-ray", pregnantInVitals !in db.benDao.searchBenOnce(listOf(vitalsVillage), 6, 0, "").map { row -> row.benId })
+        val statusVillage = VILLAGES[10 % VILLAGES.size]
+        assertTrue("pregnant by status: not X-ray", pregnantByStatus !in db.benDao.searchBenOnce(listOf(statusVillage), 6, 0, "").map { row -> row.benId })
     }
 
     /** A birth before 1970 is a negative dob; an age search must still find it (dob 0 = unknown). */
