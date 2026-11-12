@@ -6,11 +6,14 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.Route
 import org.json.JSONObject
+import org.piramalswasthya.stoptb.crypt.CryptoUtil
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.TokenExpiryManager
 import org.piramalswasthya.stoptb.network.AmritApiService
 import org.piramalswasthya.stoptb.network.TmcRefreshTokenRequest
+import org.piramalswasthya.stoptb.network.TmcAuthUserRequest
 import timber.log.Timber
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Named
 
@@ -24,12 +27,12 @@ class TokenAuthenticator @Inject constructor(
 
     override fun authenticate(route: Route?, response: Response): Request? {
 
-        if (responseCount(response) >= 3) return null
+        val attempt = responseCount(response)
+        if (attempt >= 3) return null
         if (response.request.header("No-Auth") == "true") return null
+        if (tokenExpiryManager.loginRequired.value) return null
 
         val oldJwt = response.request.header("Jwttoken")
-        val refreshToken = pref.getRefreshToken() ?: return null
-
         val newJwt = synchronized(refreshLock) {
             val currentJwt = pref.getJWTAmritToken()
             if (!currentJwt.isNullOrBlank() && currentJwt != oldJwt) {
@@ -37,39 +40,73 @@ class TokenAuthenticator @Inject constructor(
             }
             runBlocking {
                 try {
-                    val resp = authApi.getRefreshToken(
-                        TmcRefreshTokenRequest(refreshToken)
-                    )
-
-                    if (!resp.isSuccessful) {
-                        resp.errorBody()?.close()
-                        Timber.w(
-                            "Token refresh failed: HTTP ${resp.code()}"
-                        )
-                        tokenExpiryManager.onRefreshFailed()
-                        return@runBlocking null
-                    }
-
-                    val body = resp.body()?.string().orEmpty()
-                    if (body.isEmpty()) {
-                        tokenExpiryManager.onRefreshFailed()
-                        return@runBlocking null
-                    }
-
-                    val json = JSONObject(body)
-                    val jwt = json.optString("jwtToken", "")
-                    val newRefresh = json.optString("refreshToken", refreshToken)
-
-                    if (jwt.isBlank()) {
-                        tokenExpiryManager.onRefreshFailed()
+                    val refreshed = if (attempt == 1) try {
+                        pref.getRefreshToken()?.let { refreshToken ->
+                            val resp = authApi.getRefreshToken(TmcRefreshTokenRequest(refreshToken))
+                            if (resp.isSuccessful) {
+                                val json = JSONObject(resp.body()?.string().orEmpty())
+                                val data = json.optJSONObject("data") ?: json
+                                data.optString("jwtToken").takeIf { it.isNotBlank() }?.also { jwt ->
+                                    pref.registerJWTAmritToken(jwt)
+                                    pref.registerRefreshToken(data.optString("refreshToken", refreshToken))
+                                }
+                            } else {
+                                Timber.w("Token refresh failed: HTTP ${resp.code()}")
+                                resp.errorBody()?.close()
+                                null
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Timber.w(e, "Token refresh failed; trying login")
                         null
+                    } else null
+                    if (refreshed != null) {
+                        tokenExpiryManager.onRefreshSuccess()
+                        refreshed
                     } else {
+                        // A revoked or expired refresh token can still be recovered with the
+                        // current user's saved credentials. Keep all local rows and cursors.
+                        val user = pref.getLoggedInUser() ?: run {
+                            tokenExpiryManager.onRefreshFailed()
+                            return@runBlocking null
+                        }
+                        val login = authApi.getJwtToken(
+                            TmcAuthUserRequest(user.userName, CryptoUtil().encrypt(user.password))
+                        )
+                        if (!login.isSuccessful) {
+                            login.errorBody()?.close()
+                            if (login.code() == 401 || login.code() == 403)
+                                tokenExpiryManager.onRefreshFailed()
+                            return@runBlocking null
+                        }
+                        val data = JSONObject(login.body()?.string().orEmpty())
+                            .optJSONObject("data") ?: run {
+                            tokenExpiryManager.onRefreshFailed()
+                            return@runBlocking null
+                        }
+                        // Never replace this tablet's identity with another user's session.
+                        if (data.optInt("userID", -1) != user.userId) {
+                            tokenExpiryManager.onRefreshFailed()
+                            return@runBlocking null
+                        }
+                        val jwt = data.optString("jwtToken")
+                        val newRefresh = data.optString("refreshToken")
+                        if (jwt.isBlank() || newRefresh.isBlank()) {
+                            tokenExpiryManager.onRefreshFailed()
+                            return@runBlocking null
+                        }
                         pref.registerJWTAmritToken(jwt)
                         pref.registerRefreshToken(newRefresh)
+                        data.optString("key").takeIf { it.isNotBlank() }
+                            ?.let { pref.registerAmritToken(it) }
                         tokenExpiryManager.onRefreshSuccess()
                         jwt
                     }
 
+                } catch (e: IOException) {
+                    // Network failure is temporary; the next worker run can retry.
+                    Timber.w(e, "Authentication network error")
+                    null
                 } catch (e: Exception) {
                     Timber.e(e, "Token refresh failed")
                     tokenExpiryManager.onRefreshFailed()

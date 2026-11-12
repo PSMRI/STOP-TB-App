@@ -1,12 +1,15 @@
 package org.piramalswasthya.stoptb.ui.home_activity.sync
 
 import android.os.Bundle
+import android.content.Intent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.Lifecycle
 import androidx.recyclerview.widget.DividerItemDecoration
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
@@ -20,6 +23,9 @@ import org.piramalswasthya.stoptb.databinding.BottomSheetSyncBinding
 //import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 //import org.piramalswasthya.stoptb.helpers.isRegistrationOfficerRole
 import org.piramalswasthya.stoptb.helpers.RoleManager
+import org.piramalswasthya.stoptb.helpers.TokenExpiryManager
+import org.piramalswasthya.stoptb.ui.login_activity.LoginActivity
+import org.piramalswasthya.stoptb.work.WorkerUtils
 import org.piramalswasthya.stoptb.model.SyncRowFilter
 import org.piramalswasthya.stoptb.model.asDomainModel
 import timber.log.Timber
@@ -32,6 +38,9 @@ class SyncBottomSheetFragment : BottomSheetDialogFragment() {
 
     @Inject
     lateinit var roleManager: RoleManager
+
+    @Inject
+    lateinit var tokenExpiryManager: TokenExpiryManager
 
     private var _binding: BottomSheetSyncBinding? = null
     private val binding: BottomSheetSyncBinding
@@ -56,6 +65,18 @@ class SyncBottomSheetFragment : BottomSheetDialogFragment() {
         val divider = DividerItemDecoration(context, LinearLayout.VERTICAL)
         binding.rvSync.adapter = adapter
         binding.rvSync.addItemDecoration(divider)
+        binding.tvSessionExpired.setOnClickListener {
+            WorkerUtils.cancelAllWork(requireContext())
+            startActivity(Intent(requireContext(), LoginActivity::class.java))
+            requireActivity().finish()
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                tokenExpiryManager.loginRequired.collect { required ->
+                    binding.tvSessionExpired.visibility = if (required) View.VISIBLE else View.GONE
+                }
+            }
+        }
 
         val localNames = viewModel.getLocalNames(requireContext())
         val englishNames = viewModel.getEnglishNames(requireContext())
