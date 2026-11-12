@@ -91,7 +91,14 @@ class PullFromAmritWorker @AssistedInject constructor(
             return if (runAttemptCount < MAX_RUN_ATTEMPTS) Result.retry()
             else Result.failure(workDataOf("worker_name" to "PullFromAmritWorker", "error" to "Network error: ${e.message}"))
         } catch (e: Exception) {
-            Timber.e(e, "Pull [$triggerSource] changes feed failed, using the full pull")
+            // The server has the feed but this call failed (rejected request, bad page, auth).
+            // Falling back to the per-table getAll pulls here used to start a second, slower read
+            // path that bypassed the feed and competed with it on the server. Retry the feed
+            // with backoff instead; the full pull is only for a server with no feed (UNSUPPORTED).
+            // The feed token is saved after every page, so the retry resumes where this stopped.
+            Timber.e(e, "Pull [$triggerSource] changes feed failed, will retry the feed")
+            return if (runAttemptCount < MAX_RUN_ATTEMPTS) Result.retry()
+            else Result.failure(workDataOf("worker_name" to "PullFromAmritWorker", "error" to "Changes feed failed: ${e.message}"))
         }
 
         return try {
